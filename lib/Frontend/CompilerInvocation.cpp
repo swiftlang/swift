@@ -1336,9 +1336,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_requirement_machine_opaque_archetypes))
     Opts.EnableRequirementMachineOpaqueArchetypes = true;
 
-  if (Args.hasArg(OPT_warn_redundant_requirements))
-    Opts.WarnRedundantRequirements = true;
-
   Opts.EnableExperimentalAssociatedTypeInference = true;
 
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))

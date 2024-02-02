@@ -127,7 +127,7 @@
 //
 // The desugaring process eliminates requirements where both sides are
 // concrete by evaluating them immediately, reporting an error if the
-// requirement does not hold, or a warning if it is trivially true.
+// requirement does not hold, or silently discarding it otherwise.
 //
 // Conformance requirements with protocol compositions on the right hand side
 // are broken down into multiple conformance requirements.
@@ -186,8 +186,6 @@ static void desugarSameTypeRequirement(
     SmallVector<Position, 2> stack;
 
   public:
-    bool recordedErrors = false;
-
     explicit Matcher(SourceLoc loc,
                      SmallVectorImpl<Requirement> &result,
                      SmallVectorImpl<RequirementError> &errors)
@@ -226,7 +224,6 @@ static void desugarSameTypeRequirement(
       if (firstType->isParameterPack() != secondType->isParameterPack()) {
         errors.push_back(RequirementError::forSameElement(
             {kind, sugaredFirstType, secondType}, loc));
-        recordedErrors = true;
         return true;
       }
 
@@ -247,23 +244,11 @@ static void desugarSameTypeRequirement(
 
       errors.push_back(RequirementError::forConflictingRequirement(
           {RequirementKind::SameType, sugaredFirstType, secondType}, loc));
-      recordedErrors = true;
       return true;
     }
   } matcher(loc, result, errors);
 
   (void) matcher.match(req.getFirstType(), req.getSecondType());
-
-  // If neither side is directly a type parameter, the type parameter
-  // must be in structural position where the enclosing type is redundant.
-  if (!req.getFirstType()->isTypeParameter() &&
-      !req.getSecondType()->isTypeParameter() &&
-      !matcher.recordedErrors) {
-    // FIXME: Add a tailored error message when requirements were
-    // recorded, e.g. Array<Int> == Array<T>. The outer type is
-    // redundant, but the inner requirement T == Int is not.
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
-  }
 }
 
 static void desugarSuperclassRequirement(
@@ -282,7 +267,6 @@ static void desugarSuperclassRequirement(
   switch (req.checkRequirement(subReqs)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
     break;
 
   case CheckRequirementResult::RequirementFailure:
@@ -316,7 +300,6 @@ static void desugarLayoutRequirement(
   switch (req.checkRequirement(subReqs)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
     break;
 
   case CheckRequirementResult::RequirementFailure:
@@ -359,7 +342,6 @@ static void desugarConformanceRequirement(
     case CheckRequirementResult::Success:
     case CheckRequirementResult::PackRequirement:
     case CheckRequirementResult::ConditionalConformance:
-      errors.push_back(RequirementError::forRedundantRequirement(req, loc));
       break;
 
     case CheckRequirementResult::RequirementFailure:
@@ -810,11 +792,8 @@ void swift::rewriting::applyInverses(
 
     // Check if this inverse has already been seen.
     auto inverseKind = inverse.getKind();
-    if (state.contains(inverseKind)) {
-      errors.push_back(
-          RequirementError::forRedundantInverseRequirement(inverse));
+    if (state.contains(inverseKind))
       continue;
-    }
 
     state.insert(inverseKind);
     inverses[canSubject] = state;
@@ -876,14 +855,6 @@ void swift::rewriting::realizeInheritedRequirements(
         inheritedTypes.getResolvedType(index, TypeResolutionStage::Structural);
 
     if (!inheritedType) continue;
-
-    // Ignore trivially circular protocol refinement (protocol P : P)
-    // since we diagnose that elsewhere. Adding a rule here would emit
-    // a useless redundancy warning.
-    if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
-      if (inheritedType->isEqual(protoDecl->getDeclaredInterfaceType()))
-        continue;
-    }
 
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());

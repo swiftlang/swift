@@ -120,66 +120,6 @@ void RewriteSystem::propagateExplicitBits() {
   }
 }
 
-/// Propagate requirement IDs from redundant rules to their
-/// replacements that appear once in empty context.
-void RewriteSystem::propagateRedundantRequirementIDs() {
-  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-    llvm::dbgs() << "\nPropagating requirement IDs: {";
-  }
-
-  for (const auto &ruleAndReplacement : RedundantRules) {
-    unsigned ruleID = ruleAndReplacement.first;
-    const auto &rewritePath = ruleAndReplacement.second;
-    const auto &rule = Rules[ruleID];
-
-    auto requirementID = rule.getRequirementID();
-    if (!requirementID.has_value()) {
-      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-        llvm::dbgs() << "\n- rule does not have a requirement ID: "
-                     << rule;
-      }
-      continue;
-    }
-
-    MutableTerm lhs(rule.getLHS());
-    for (auto ruleID : rewritePath.findRulesAppearingOnceInEmptyContext(lhs, *this)) {
-      auto &replacement = Rules[ruleID];
-      if (replacement.isPermanent()) {
-        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-          llvm::dbgs() << "\n- skipping permanent rule: " << rule;
-        }
-        continue;
-      }
-
-      // If the replacement rule already has a requirementID, overwrite
-      // it if the existing ID corresponds to an inferred requirement.
-      // This effectively makes the inferred requirement the redundant
-      // one, which makes it easier to suppress redundancy warnings for
-      // inferred requirements later on.
-      auto existingID = replacement.getRequirementID();
-      if (existingID.has_value() && !WrittenRequirements[*existingID].inferred) {
-        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-          llvm::dbgs() << "\n- rule already has a requirement ID: "
-                       << rule;
-        }
-        continue;
-      }
-
-      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-        llvm::dbgs() << "\n- propagating ID = " << requirementID
-                     << "\n  from " << rule;
-        llvm::dbgs() << "\n  to " << replacement;
-      }
-
-      replacement.setRequirementID(requirementID);
-    }
-  }
-
-  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-    llvm::dbgs() << "\n}\n";
-  }
-}
-
 /// Find concrete type or superclass rules where the right hand side occurs as a
 /// proper prefix of one of its substitutions.
 ///
@@ -614,7 +554,6 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
     return false;
   });
 
-  propagateRedundantRequirementIDs();
   computeRecursiveRules();
 
   // Check invariants after homotopy reduction.

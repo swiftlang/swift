@@ -111,21 +111,6 @@ public:
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
 
-  llvm::Optional<unsigned> getRequirementID() const {
-    if (RequirementID == 0)
-      return llvm::None;
-    else
-      return RequirementID - 1;
-  }
-
-  void setRequirementID(llvm::Optional<unsigned> requirementID) {
-    assert(!Frozen);
-    if (!requirementID)
-      RequirementID = 0;
-    else
-      RequirementID = *requirementID + 1;
-  }
-
   llvm::Optional<Symbol> isPropertyRule() const;
 
   const ProtocolDecl *isProtocolConformanceRule() const;

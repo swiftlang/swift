@@ -247,8 +247,6 @@ struct X18: P18, P17 {
   typealias A = X18
 }
 
-// FIXME(rqm-diagnostics): Bogus warning
-
 // CHECK-LABEL: .X19.foo@
 // CHECK: Generic signature: <T, U where T == X18>
 struct X19<T: P18> where T == T.A {
