@@ -921,7 +921,7 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     return;
   }
 
-  // Sanity check to make sure entries are properly removed.
+  // Soundness check to make sure entries are properly removed.
   assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
          && "Entries were not properly removed?!");
 }
@@ -936,7 +936,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
   //      accesses must have begun in the same order on all edges. This ensures
   //      consistent diagnostics across changes to the exploration of the CFG.
   //    - On return from a function there are no in-progress accesses. This
-  //      enables a sanity check for lean analysis state at function exit.
+  //      enables a soundness check for lean analysis state at function exit.
   //    - Each end_access instruction corresponds to exactly one begin access
   //      instruction. (This is encoded in the EndAccessInst itself)
   //    - begin_access arguments cannot be basic block arguments.

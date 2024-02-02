@@ -9336,7 +9336,7 @@ static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
     return;
   base->loadAllMembers();
 
-  // Sanity check: make sure we don't jump over to a category /while/
+  // Soundness check: make sure we don't jump over to a category /while/
   // loading the original class's members. Right now we only check if this
   // happens on the first member.
   if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase))

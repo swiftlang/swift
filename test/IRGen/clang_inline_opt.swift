@@ -5,7 +5,7 @@ func return10() -> UInt32 {
 	return return7() + 3
 }
 
-// Sanity check that we tell Clang to generate optimizable code when
+// Soundness check that we tell Clang to generate optimizable code when
 // we're optimizing.
 
 // CHECK: define internal{{(zeroext)?}} i32 @return7() [[CLANG_ATTRS:#[0-9]+]] {

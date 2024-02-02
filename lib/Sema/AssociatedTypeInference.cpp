@@ -1684,7 +1684,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     // Skip operator requirements, because they match globally and
     // therefore tend to cause deduction mismatches.
-    // FIXME: If we had some basic sanity checking of Self, we might be able to
+    // FIXME: If we had some basic soundness checking of Self, we might be able to
     // use these.
     if (auto func = dyn_cast<FuncDecl>(req)) {
       if (func->isOperator() || isa<AccessorDecl>(func))

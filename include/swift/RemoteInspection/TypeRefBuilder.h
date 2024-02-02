@@ -994,7 +994,7 @@ public:
       return nullptr;
     }
 
-    // Sanity:  Verify that the generic params per level add
+    // Soundness:  Verify that the generic params per level add
     // up exactly to the number of args we were provided, and
     // that we don't have a rediculous number of either one
     auto genericParamsPerLevel = *maybeGenericParamsPerLevel;

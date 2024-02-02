@@ -549,7 +549,7 @@ public:
         wt->convertToDefinition(Entries, ConditionalConformances, Serialized);
 
         // Since we had a declaration before, its linkage should be external,
-        // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
+        // ensure that we have a compatible linkage for soundness. *NOTE* we are ok
         // with both being shared since we do not have a shared_external
         // linkage.
         assert(stripExternalFromLinkage(wt->getLinkage()) == Linkage &&

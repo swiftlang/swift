@@ -463,7 +463,7 @@ private:
   }
 
   /// Checks the rules of order relation introduced among functions set.
-  /// Returns true, if sanity check has been passed, and false if failed.
+  /// Returns true, if soundness check has been passed, and false if failed.
   bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence

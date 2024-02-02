@@ -2257,7 +2257,7 @@ void OverriddenDeclsRequest::cacheResult(
   if (value.empty())
     return;
 
-  // Sanity-check the declarations we were given.
+  // Soundness-check the declarations we were given.
   for (auto overriddenDecl : value) {
     assert(overriddenDecl->getKind() == decl->getKind() &&
            "Overridden decl kind mismatch");

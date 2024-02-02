@@ -428,7 +428,7 @@ public:
   }
 
   /// Pop the last component off this LValue unsafely. Validates that the
-  /// component is of kind \p kind as a sanity check.
+  /// component is of kind \p kind as a soundness check.
   ///
   /// Please be careful when using this!
   void unsafelyDropLastComponent(PathComponent::KindTy kind) & {
