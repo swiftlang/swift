@@ -39,7 +39,7 @@ sil @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
-sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+sil @initNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
 
 sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -58,6 +58,7 @@ protocol P {
 
 sil @initP : $@convention(thin) () -> @owned P
 sil @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+sil @useP : $@convention(thin) (@in_guaranteed P) -> ()
 
 protocol PAnyObject : AnyObject {}
 
@@ -66,6 +67,10 @@ sil @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObjec
 sil @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
 sil @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
 sil @usePAnyObject : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> ()
+
+extension NonSendableKlass : P {
+  func doSomething()
+}
 
 /////////////////
 // MARK: Tests //
@@ -168,6 +173,24 @@ bb0:
 
   end_borrow %pBorrowed : $Optional<PAnyObject>
   destroy_value %p : $Optional<PAnyObject>
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @test_init_existential_value : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %f() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
+  %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access here could race}}
+  destroy_value %i : $P
 
   %9999 = tuple ()
   return %9999 : $()

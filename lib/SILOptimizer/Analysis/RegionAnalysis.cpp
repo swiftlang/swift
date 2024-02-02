@@ -228,6 +228,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::StrongCopyUnmanagedValueInst:
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::UnmanagedToRefInst:
+  case SILInstructionKind::InitExistentialValueInst:
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
@@ -2350,6 +2351,7 @@ CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
+CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 
 //===---
 // Store
@@ -2476,12 +2478,6 @@ CONSTANT_TRANSLATION(AllocExistentialBoxInst, AssignFresh)
 CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Assign)
 CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
-
-//===---
-// Unhandled Instructions
-//
-
-CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 
 //===---
 // Differentiable
