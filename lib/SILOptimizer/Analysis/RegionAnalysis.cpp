@@ -183,15 +183,12 @@ struct UseDefChainVisitor
 /// values. We assert that all instructions that are CONSTANT_TRANSLATION
 /// LookThrough to make sure they stay in sync.
 static bool isStaticallyLookThroughInst(SILInstruction *inst) {
-  if (auto cast = SILDynamicCastInst::getAs(inst))
-    if (cast.isRCIdentityPreserving())
-      return true;
-
   switch (inst->getKind()) {
   default:
     return false;
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::CopyValueInst:
@@ -224,6 +221,13 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
     return true;
+  case SILInstructionKind::UnconditionalCheckedCastInst: {
+    auto cast = SILDynamicCastInst::getAs(inst);
+    assert(cast);
+    if (cast.isRCIdentityPreserving())
+      return true;
+    return false;
+  }
   }
 }
 
@@ -2306,6 +2310,7 @@ CONSTANT_TRANSLATION(UnownedToRefInst, LookThrough)
 CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
+CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
 
 //===---
 // Store
@@ -2321,6 +2326,9 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
+CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
+CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
+CONSTANT_TRANSLATION(StoreUnownedInst, Store)
 
 //===---
 // Ignored
@@ -2332,8 +2340,13 @@ CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
 CONSTANT_TRANSLATION(AutoreleaseValueInst, Ignored)
 CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
+CONSTANT_TRANSLATION(DeallocPartialRefInst, Ignored)
+CONSTANT_TRANSLATION(DeallocRefInst, Ignored)
 CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
+CONSTANT_TRANSLATION(DeallocStackRefInst, Ignored)
 CONSTANT_TRANSLATION(DebugValueInst, Ignored)
+CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Ignored)
+CONSTANT_TRANSLATION(DeinitExistentialValueInst, Ignored)
 CONSTANT_TRANSLATION(DestroyAddrInst, Ignored)
 CONSTANT_TRANSLATION(DestroyValueInst, Ignored)
 CONSTANT_TRANSLATION(EndAccessInst, Ignored)
@@ -2346,6 +2359,8 @@ CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
+CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
+CONSTANT_TRANSLATION(TestSpecificationInst, Ignored)
 
 //===---
 // Require
@@ -2410,7 +2425,6 @@ CONSTANT_TRANSLATION(VectorInst, Unhandled)
 CONSTANT_TRANSLATION(TuplePackElementAddrInst, Unhandled)
 CONSTANT_TRANSLATION(TuplePackExtractInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementGetInst, Unhandled)
-CONSTANT_TRANSLATION(RefTailAddrInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
@@ -2433,9 +2447,6 @@ CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
@@ -2445,15 +2456,7 @@ CONSTANT_TRANSLATION(AssignInst, Unhandled)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
-CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
-CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
-CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
-CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
-CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Unhandled)
-CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
 
 //===---
 // Apply
@@ -2628,12 +2631,42 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 // ref_element_addr to be merged into.
 TranslationSemantics
 PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
-  // If we are accessing a let of a Sendable type, do not treat the
-  // ref_element_addr as a require use.
-  if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
-    LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
-    return TranslationSemantics::Ignored;
+  // If our field is a NonSendableType...
+  if (!isNonSendableType(reai->getType())) {
+    // And the field is a let... then ignore it. We know that we cannot race on
+    // any writes to the field.
+    if (reai->getField()->isLet()) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
+      return TranslationSemantics::Ignored;
+    }
+
+    // Otherwise, we need to treat the access to the field as a require since we
+    // could have a race on assignment to the class.
+    return TranslationSemantics::Require;
   }
+
+  return TranslationSemantics::Assign;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
+  // If our trailing type is Sendable...
+  if (!isNonSendableType(reai->getType())) {
+    // And our ref_tail_addr is immutable... we can ignore the access since we
+    // cannot race against a write to any of these fields.
+    if (reai->isImmutable()) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "    Found an immutable Sendable ref_tail_addr! Not tracking!\n");
+      return TranslationSemantics::Ignored;
+    }
+
+    // Otherwise, we need a require since the value maybe alive.
+    return TranslationSemantics::Require;
+  }
+
+  // If we have a NonSendable type, treat the address as a separate Element from
+  // our base value.
   return TranslationSemantics::Assign;
 }
 
