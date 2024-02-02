@@ -419,7 +419,7 @@ public:
   static constexpr bool isOptionSetFor##CLASS(DeclAttrOptions Bit) {                              \
     return (OPTIONS) & Bit;                                                                       \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
   static bool isAddingBreakingAPI(DeclAttrKind DK) {
     return getOptions(DK) & APIBreakingToAdd;
@@ -503,7 +503,7 @@ public:
 // Declare typedefs for all of the simple declaration attributes.
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
   typedef SimpleDeclAttr<DeclAttrKind::CLASS> CLASS##Attr;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 /// Defines the @_silgen_name attribute.
 class SILGenNameAttr : public DeclAttribute {
@@ -3040,7 +3040,7 @@ using SimpleTypeAttrWithArgs = SimpleTypeAttr<Kind, AtTypeAttrWithArgsBase>;
 
 #define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
   using CLASS##TypeAttr = SimpleTypeAttr<TypeAttrKind::CLASS>;
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
 
 class ConventionTypeAttr
     : public SimpleTypeAttrWithArgs<TypeAttrKind::Convention> {

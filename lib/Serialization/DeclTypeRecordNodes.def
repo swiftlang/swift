@@ -217,7 +217,7 @@ OTHER(LIFETIME_DEPENDENCE, 158)
 #ifndef DECL_ATTR
 #define DECL_ATTR(NAME, CLASS, OPTIONS, CODE) RECORD_VAL(CLASS##_DECL_ATTR, 180+CODE)
 #endif
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 #undef RECORD
 #undef DECLTYPERECORDNODES_HAS_RECORD_VAL

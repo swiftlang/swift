@@ -2704,7 +2704,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                       DA->isImplicit());                       \
     return;                                                                    \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
     case DeclAttrKind::SILGenName: {
       auto *theAttr = cast<SILGenNameAttr>(DA);
@@ -6007,7 +6007,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
   bool wroteSomething;
   do {

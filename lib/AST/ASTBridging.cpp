@@ -177,7 +177,7 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
       Bridged##CLASS##Attr attr) {                                             \
     return static_cast<DeclAttribute *>(attr.unbridged());                     \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostics
@@ -357,7 +357,7 @@ BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case DeclAttrKind::CLASS:                                                    \
     return BridgedDeclAttrKind##CLASS;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case DeclAttrKind::Count:
     return BridgedDeclAttrKindNone;
   }
@@ -368,7 +368,7 @@ DeclAttrKind unbridged(BridgedDeclAttrKind kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
     return DeclAttrKind::CLASS;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case BridgedDeclAttrKindNone:
     return DeclAttrKind::Count;
   }
@@ -1949,7 +1949,7 @@ BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case TypeAttrKind::CLASS:                                                    \
     return BridgedTypeAttrKind##CLASS;
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
 }
 
@@ -1958,7 +1958,7 @@ static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case BridgedTypeAttrKind##CLASS:                                             \
     return TypeAttrKind::CLASS;
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   case BridgedTypeAttrKindNone:
     return llvm::None;
   }

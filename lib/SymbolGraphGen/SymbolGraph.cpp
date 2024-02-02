@@ -77,7 +77,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
 #define TYPE_ATTR(X, C)                                                        \
   ExcludeAttrs.insert(std::make_pair("TypeAttrKind::" #C, TypeAttrKind::C));
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
 
   // Allow the following type attributes:
   ExcludeAttrs.erase("TypeAttrKind::Autoclosure");
@@ -141,7 +141,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
 #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
   Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
 #define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
   // Don't include these attributes in subheadings.
   Options.ExcludeAttrList.push_back(DeclAttrKind::Final);

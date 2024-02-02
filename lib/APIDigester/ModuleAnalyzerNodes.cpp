@@ -711,7 +711,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
           auto Result = llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(
                             GetScalarString(&N))
 #define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
                             .Default(llvm::None);
 
           if (!Result)
@@ -730,7 +730,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
               auto Result =
                   llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
 #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::NAME)
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
                       .Default(DeclAttrKind::Count);
               if (Result == DeclAttrKind::Count)
                 Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
@@ -2231,7 +2231,7 @@ struct ScalarEnumerationTraits<TypeAttrKind> {
 // NOTE: For historical reasons. TypeAttribute uses the spelling, but
 // DeclAttribute uses the kind name.
 #define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::C);
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
 };
 
@@ -2241,7 +2241,7 @@ struct ScalarEnumerationTraits<DeclAttrKind> {
 // NOTE: For historical reasons. TypeAttribute uses the spelling, but
 // DeclAttribute uses the kind name.
 #define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::Name);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   }
 };
 
@@ -2780,7 +2780,7 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   case DeclAttrKind::CLASS:                                                    \
     return DeclAttribute::isDeclModifier(DeclAttrKind::CLASS) ? #NAME          \
                                                               : "@" #NAME;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case DeclAttrKind::Count:
     llvm_unreachable("unrecognized attribute kind.");
   }

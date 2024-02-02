@@ -2911,7 +2911,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     llvm_unreachable("handled by DeclAttrKind::AccessControl");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) case DeclAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
     if (!DiscardAttribute)
       Attributes.add(DeclAttribute::createSimple(Context, DK, AtLoc, Loc));
     break;
@@ -4759,7 +4759,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   // Simple type attributes don't need any further checking.
 #define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS)
 #define SIMPLE_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   SimpleAttr:
     if (!justChecking) {
       result = TypeAttribute::createSimple(Context, attr, AtLoc, attrLoc);
@@ -4769,7 +4769,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   // For simple SIL type attributes, check whether we're parsing SIL,
   // then return to the SimpleAttr case.
 #define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
     if (!isInSILMode()) {
       if (!justChecking) {
         if (attr == TypeAttrKind::Inout) {
@@ -5165,7 +5165,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 #define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
-#include <swift/AST/Attr.def>
+#include <swift/AST/DeclAttr.def>
 #undef CONTEXTUAL_CASE
                               .Default(DeclAttrKind::Count);
 

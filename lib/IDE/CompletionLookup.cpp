@@ -3030,7 +3030,7 @@ void CompletionLookup::getAttributeDeclCompletions(
   if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
                             DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(

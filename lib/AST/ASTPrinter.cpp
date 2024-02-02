@@ -1245,7 +1245,7 @@ void PrintAST::printAttributes(const Decl *D) {
 #define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
     }
 
     // If the declaration is implicitly @objc, print the attribute now.

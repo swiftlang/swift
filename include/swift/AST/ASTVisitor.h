@@ -141,7 +141,7 @@ public:
   case DeclAttrKind::CLASS:                                                    \
     return static_cast<ImplClass *>(this)->visit##CLASS##Attr(                 \
         static_cast<CLASS##Attr *>(A), ::std::forward<Args>(AA)...);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
     case DeclAttrKind::Count:
       llvm_unreachable("Not an attribute kind");
@@ -153,7 +153,7 @@ public:
     return static_cast<ImplClass*>(this)->visitDeclAttribute(       \
              A, ::std::forward<Args>(AA)...);                       \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   
   bool visit(ParameterList *PL) {
     return static_cast<ImplClass*>(this)->visitParameterList(PL);

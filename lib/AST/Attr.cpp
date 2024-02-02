@@ -40,7 +40,7 @@ using namespace swift;
 #define DECL_ATTR(_, Id, ...) \
   static_assert(IsTriviallyDestructible<Id##Attr>::value, \
                 "Attrs are BumpPtrAllocated; the destructor is never called");
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 static_assert(IsTriviallyDestructible<DeclAttributes>::value,
               "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
 
@@ -48,25 +48,25 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
 static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
               #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 #define DECL_ATTR(Name, Id, ...)                                                                        \
 static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
               #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 #define DECL_ATTR(Name, Id, ...)                                                                     \
 static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
               #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 #define DECL_ATTR(Name, Id, ...)                                                                        \
 static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
               DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
               #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
@@ -86,7 +86,7 @@ SourceLoc TypeAttribute::getStartLoc() const {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case TypeAttrKind::CLASS:                                                    \
     return static_cast<const CLASS##TypeAttr *>(this)->getStartLocImpl();
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad kind");
 }
@@ -96,7 +96,7 @@ SourceLoc TypeAttribute::getEndLoc() const {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case TypeAttrKind::CLASS:                                                    \
     return static_cast<const CLASS##TypeAttr *>(this)->getEndLocImpl();
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad kind");
 }
@@ -108,7 +108,7 @@ SourceRange TypeAttribute::getSourceRange() const {
     auto attr = static_cast<const CLASS##TypeAttr *>(this);                    \
     return SourceRange(attr->getStartLocImpl(), attr->getEndLocImpl());        \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad kind");
 }
@@ -120,7 +120,7 @@ llvm::Optional<TypeAttrKind>
 TypeAttribute::getAttrKindFromString(StringRef Str) {
   return llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(Str)
 #define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
       .Default(llvm::None);
 }
 
@@ -130,7 +130,7 @@ const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
 #define TYPE_ATTR(X, C)                                                        \
   case TypeAttrKind::C:                                                        \
     return #X;
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("unknown type attribute kind");
 }
@@ -150,7 +150,7 @@ TypeAttribute *TypeAttribute::createSimple(const ASTContext &context,
 #define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
   case TypeAttrKind::CLASS:                                                    \
     return new (context) CLASS##TypeAttr(atLoc, attrLoc);
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad type attribute kind");
 }
@@ -166,7 +166,7 @@ void TypeAttribute::print(ASTPrinter &printer,
   switch (getKind()) {
 #define TYPE_ATTR(_, CLASS)
 #define SIMPLE_TYPE_ATTR(_, CLASS) case TypeAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
     printer.printSimpleAttr(getAttrName(getKind()), /*needAt*/ true);
     return;
 
@@ -174,7 +174,7 @@ void TypeAttribute::print(ASTPrinter &printer,
   case TypeAttrKind::CLASS:                                                    \
     return cast<CLASS##TypeAttr>(this)->printImpl(printer, options);
 #define SIMPLE_TYPE_ATTR(_, C)
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad kind");
 }
@@ -258,7 +258,7 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
   return llvm::StringSwitch<DeclAttrKind>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DeclAttrKind::CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DeclAttrKind::CLASS)
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
       .Case(SPI_AVAILABLE_ATTRNAME, DeclAttrKind::Available)
       .Default(DeclAttrKind::Count);
 }
@@ -276,7 +276,7 @@ DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
 #define SIMPLE_DECL_ATTR(SPELLING, CLASS, ...)                                 \
   case DeclAttrKind::CLASS:                                                    \
     return new (context) CLASS##Attr(atLoc, attrLoc);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case DeclAttrKind::Count:
     llvm_unreachable("bad decl attribute kind");
   }
@@ -1161,7 +1161,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   switch (getKind()) {
     // Handle all of the SIMPLE_DECL_ATTRs.
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case DeclAttrKind::Inline:
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::ReferenceOwnership:
@@ -1707,7 +1707,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     llvm_unreachable("exceed declaration attribute kinds");
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
 
   default:
@@ -1742,7 +1742,7 @@ uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
 #define DECL_ATTR(_, CLASS, OPTIONS, ...)                                      \
   case DeclAttrKind::CLASS:                                                    \
     return OPTIONS;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1754,7 +1754,7 @@ StringRef DeclAttribute::getAttrName() const {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   case DeclAttrKind::SILGenName:
     return "_silgen_name";
   case DeclAttrKind::Alignment:

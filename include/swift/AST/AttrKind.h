@@ -132,7 +132,7 @@ enum : unsigned { NumExternKindBits =
 
 enum class DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   Count
 };
 
@@ -144,12 +144,12 @@ enum : unsigned {
 // Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
 enum class TypeAttrKind {
 #define TYPE_ATTR(_, CLASS) CLASS,
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
 };
 
 enum : unsigned {
 #define TYPE_ATTR(_, C) _counting_TAK_##C,
-#include "swift/AST/Attr.def"
+#include "swift/AST/TypeAttr.def"
   NumTypeAttrKinds,
 
   NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1)

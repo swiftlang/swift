@@ -856,7 +856,7 @@ SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
     static UIdent Attr_##X("source.decl.attribute." #X);                       \
     return Attr_##X;                                                           \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   }
 
   return llvm::None;

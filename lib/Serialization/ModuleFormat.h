@@ -2342,7 +2342,7 @@ namespace decls_block {
     CLASS##_DECL_ATTR, \
     BCFixed<1> /* implicit flag */ \
   >;
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
   using DynamicReplacementDeclAttrLayout = BCRecordLayout<
     DynamicReplacement_DECL_ATTR,
