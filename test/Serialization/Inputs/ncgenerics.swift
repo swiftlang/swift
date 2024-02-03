@@ -31,10 +31,5 @@ public protocol Either<Left, Right>: ~Copyable {
     associatedtype Left: ~Copyable
     associatedtype Right: ~Copyable
 }
-
-#else
-public enum Maybe<Wrapped> {
-    case just(Wrapped)
-    case none
-}
 #endif
+

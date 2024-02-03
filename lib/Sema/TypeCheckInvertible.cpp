@@ -161,8 +161,8 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
 static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   auto &ctx = type->getASTContext();
 
-  auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(invertible && "failed to load Copyable/Escapable from stdlib!");
+  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+  assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Must not have a type parameter!
   assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
@@ -177,8 +177,8 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
                     SILTokenType>()));
 
   const bool conforms =
-      (bool) invertible->getParentModule()->checkConformance(
-          type, invertible,
+      (bool) proto->getParentModule()->checkConformance(
+          type, proto,
           /*allowMissing=*/false);
 
   return conforms;
@@ -468,13 +468,9 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     // All types already start with conformances to the invertible protocols in
     // this case, within `NominalTypeDecl::prepareConformanceTable`.
     //
-    // I'm currently unsure what happens when rebuilding a module from its
-    // interface, so this might not be unreachable code just yet.
-    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-        file->getKind() != FileUnitKind::Synthesized) {
-      llvm_unreachable("when can this actually happen??");
-    }
-
+    // There are various other kinds of SourceFiles, like SIL, which instead
+    // get their conformances here instead.
+    //
     // If there's no inverse, we infer a positive IP conformance.
     return generateConformance(nominal);
   }

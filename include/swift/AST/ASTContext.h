@@ -801,6 +801,13 @@ public:
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
+
+  /// Synthesizes the given invertible protocol decl into the stdlib (preferred)
+  /// or, if the stdlib is not available, the Builtin module.
+  ///
+  /// Does *not* perform any name lookup to check whether, the module already
+  /// contains a decl with the same name, only does synthesis.
+  ProtocolDecl *synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const;
   
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another

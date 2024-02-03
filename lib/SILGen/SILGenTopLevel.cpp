@@ -377,9 +377,8 @@ void SILGenTopLevel::visitSourceFile(SourceFile *SF) {
 
   if (auto *SynthesizedFile = SF->getSynthesizedFile()) {
     for (auto *D : SynthesizedFile->getTopLevelDecls()) {
-      if (isa<ExtensionDecl>(D)) {
-        visit(D);
-      }
+      assert(isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D));
+      visit(D);
     }
   }
 

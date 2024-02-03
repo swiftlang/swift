@@ -388,7 +388,7 @@ static void expandDefaultProtocols(
       continue;
 
     auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-    assert(proto);
+    assert(proto && "missing Copyable/Escapable from stdlib!");
 
     protocols.push_back(proto);
   }
