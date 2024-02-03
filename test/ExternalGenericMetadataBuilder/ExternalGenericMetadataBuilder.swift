@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %s -o %t/ExternalMetadataBuilderTest
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %s -o %t/ExternalMetadataBuilderTest
 // RUN: %target-codesign %t/ExternalMetadataBuilderTest
 // RUN: %target-run %t/ExternalMetadataBuilderTest
 
