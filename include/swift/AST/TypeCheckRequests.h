@@ -475,43 +475,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given type is Escapable.
-class IsEscapableRequest
-    : public SimpleRequest<IsEscapableRequest, bool(CanType),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
-/// Determine whether the given type is noncopyable. Assumes type parameters
-/// have become archetypes.
-class IsNoncopyableRequest
-    : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType type) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 /// Determine whether the given declaration is 'dynamic''.
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,
