@@ -2497,9 +2497,13 @@ bool ContextualFailure::diagnoseAsError() {
 
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-      emitDiagnosticAt(KPE->getLoc(),
-                       diag::expr_keypath_type_covert_to_contextual_type,
-                       getFromType(), getToType());
+      Diag<Type, Type> diag;
+      if (auto ctxDiag = getDiagnosticFor(CTP, getToType())) {
+        diag = *ctxDiag;
+      } else {
+        diag = diag::expr_keypath_type_mismatch;
+      }
+      emitDiagnosticAt(KPE->getLoc(), diag, getFromType(), getToType());
       return true;
     }
 
@@ -2750,9 +2754,14 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
+  case ConstraintLocator::FunctionResult:
   case ConstraintLocator::KeyPathValue: {
-    diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
-    break;
+    if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
+      diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
+      break;
+    } else {
+      return false;
+    }
   }
 
   default:
@@ -8272,13 +8281,24 @@ bool CoercionAsForceCastFailure::diagnoseAsError() {
 
 bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
   auto locator = getLocator();
+  auto anchor = locator->getAnchor();
   assert(locator->isKeyPathRoot() && "Expected a key path root");
-  
-  auto baseType = getFromType();
-  auto rootType = getToType();
 
-  emitDiagnostic(diag::expr_keypath_root_type_mismatch,
-                 rootType, baseType);
+
+
+  if (isExpr<KeyPathApplicationExpr>(anchor) || isExpr<SubscriptExpr>(anchor)) {
+    auto baseType = getFromType();
+    auto rootType = getToType();
+
+    emitDiagnostic(diag::expr_keypath_application_root_type_mismatch,
+                   rootType, baseType);
+  } else {
+    auto rootType = getFromType();
+    auto expectedType = getToType();
+
+    emitDiagnostic(diag::expr_keypath_root_type_mismatch, rootType,
+                   expectedType);
+  }
   return true;
 }
 

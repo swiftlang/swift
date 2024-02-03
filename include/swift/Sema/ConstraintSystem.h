@@ -1737,6 +1737,11 @@ public:
   /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
   Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
 
+  TypeVariableType *getKeyPathRootType(const KeyPathExpr *keyPath) const;
+
+  TypeVariableType *
+  getKeyPathRootTypeIfAvailable(const KeyPathExpr *keyPath) const;
+
   /// Retrieve the type of the given node as recorded in this solution
   /// and resolve all of the type variables in contains to form a fully
   /// "resolved" concrete type.
