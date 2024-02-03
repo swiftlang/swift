@@ -908,7 +908,7 @@ public:
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
         auto start =
-            this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
+            this->readInstanceStartFromClassMetadata(MetadataAddress);
 
         // Perform layout
         if (start)
@@ -1202,8 +1202,41 @@ public:
     }
   }
 
-  const RecordTypeInfo *getRecordTypeInfo(const TypeRef *TR,
-                              remote::TypeInfoProvider *ExternalTypeInfo) {
+  /// Given a typeref, attempt to calculate the unaligned start of this
+  /// instance's fields. For example, for a type without a superclass, the start
+  /// of the instance fields would after the word for the isa pointer and the
+  /// word for the refcount field. For a subclass the start would be the after
+  /// the superclass's fields. For a version of this function that performs the
+  /// same job but starting out with an instance pointer check
+  /// MetadataReader::readInstanceStartFromClassMetadata.
+  llvm::Optional<unsigned>
+  computeUnalignedFieldStartOffset(const TypeRef *TR) {
+    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+
+    const TypeRef *superclass = getBuilder().lookupSuperclass(TR);
+    if (!superclass)
+      // If there is no superclass the stat of the instance's field is right
+      // after the isa and retain fields.
+      return isaAndRetainCountSize;
+
+    auto superclassStart =
+        computeUnalignedFieldStartOffset(superclass);
+    if (!superclassStart)
+      return llvm::None;
+
+    auto *superTI = getBuilder().getTypeConverter().getClassInstanceTypeInfo(
+        superclass, *superclassStart, nullptr);
+    if (!superTI)
+      return llvm::None;
+
+    // The start of the subclass's fields is right after the super class's ones.
+    size_t start = superTI->getSize();
+    return start;
+  }
+
+  const RecordTypeInfo *
+  getRecordTypeInfo(const TypeRef *TR,
+                    remote::TypeInfoProvider *ExternalTypeInfo) {
     auto *TypeInfo = getTypeInfo(TR, ExternalTypeInfo);
     return dyn_cast_or_null<const RecordTypeInfo>(TypeInfo);
   }
