@@ -3178,6 +3178,9 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
              llvm::dbgs() << '\n');
 
   auto subjectTy = S->getSubjectExpr()->getType();
+  auto subjectLoweredTy = getLoweredType(subjectTy);
+  auto subjectLoweredAddress =
+    silConv.useLoweredAddresses() && subjectLoweredTy.isAddressOnly(F);
 
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
@@ -3254,27 +3257,88 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitAddressOnlyAllocations();
 
   SILBasicBlock *contBB = createBasicBlock();
-  JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
-
+  // Depending on the switch ownership behavior, we want to either:
+  //
+  // - allow the subject to (potentially or explicitly) be forwarded into the
+  //   case blocks. In this case we want to include the cleanups for the subject
+  //   in the case blocks so that the subject and its components can be
+  //   consumed by each case block.
+  //
+  // or:
+  //
+  // - evaluate the subject under a formal access scope (a borrow or inout).
+  //   In this case the lifetime of the access should cover all the way to the
+  //   exits out of the switch.
+  //
+  // When we break out of a case block, we take the subject's remnants with us
+  // in the former case, but not the latter.q
+  CleanupsDepth subjectDepth = Cleanups.getCleanupsDepth();
   LexicalScope switchScope(*this, CleanupLocation(S));
+  llvm::Optional<FormalEvaluationScope> switchFormalAccess;
+  
+  bool subjectUndergoesFormalAccess;
+  switch (ownership) {
+  // For normal copyable subjects, we allow the value to be forwarded into
+  // the cases, since we can copy it as needed to evaluate the pattern match.
+  case ValueOwnership::Default:
+  // Similarly, if the subject is an explicitly consumed noncopyable value,
+  // we can forward ownership of the subject's parts into matching case blocks.
+  case ValueOwnership::Owned:
+    subjectUndergoesFormalAccess = false;
+    break;
 
-  // Enter a break/continue scope.  If we wanted a continue
-  // destination, it would probably be out here.
-  BreakContinueDestStack.push_back({S, contDest, JumpDest(S)});
+  // Borrowed and inout pattern matches both undergo a formal access.
+  case ValueOwnership::Shared:
+  case ValueOwnership::InOut:
+    subjectUndergoesFormalAccess = true;
+    break;
+  }
 
   PatternMatchContext switchContext = { emission };
   SwitchStack.push_back(&switchContext);
 
-  // Emit the subject value. If at +1, dispatching will consume it. If it is at
-  // +0, we just forward down borrows.
-  //
-  // TODO: For an inout switch, we'd start a formal access to an lvalue here.
-  ManagedValue subjectMV = emitRValueAsSingleValue(
-      S->getSubjectExpr(),
-      ownership <= ValueOwnership::Shared
-        ? SGFContext::AllowGuaranteedPlusZero
-        : SGFContext());
-
+  // Emit the subject value.
+  ManagedValue subjectMV;
+  switch (ownership) {
+  case ValueOwnership::Default: {
+    // A regular copyable pattern match. Emit as a regular rvalue.
+    // If at +1, dispatching will consume it. If it is at +0, we just forward
+    // down borrows.
+    subjectMV = emitRValueAsSingleValue(
+        S->getSubjectExpr(),
+        SGFContext::AllowGuaranteedPlusZero);
+    break;
+  }
+  case ValueOwnership::Shared: {
+    // A borrowing pattern match. See if we can emit the subject under a read
+    // formal access.
+    switchFormalAccess.emplace(*this);
+    auto subjectExpr = S->getSubjectExpr();
+    if (auto subjectLVExpr = findStorageReferenceExprForMoveOnly(subjectExpr,
+                                       StorageReferenceOperationKind::Borrow)) {
+      LValue sharedLV = emitLValue(subjectLVExpr,
+        subjectLoweredAddress ? SGFAccessKind::BorrowedAddressRead
+                              : SGFAccessKind::BorrowedObjectRead);
+      subjectMV = emitBorrowedLValue(S->getSubjectExpr(), std::move(sharedLV));
+    } else {
+      // Emit the value as an allowed-+0 rvalue if it doesn't have special
+      // lvalue treatment.
+      subjectMV = emitRValueAsSingleValue(S->getSubjectExpr(),
+                                          SGFContext::AllowGuaranteedPlusZero);
+    }
+    break;
+  }
+  case ValueOwnership::InOut: {
+    // A mutating pattern match. Emit the subject under a modify access.
+    llvm_unreachable("not yet implemented");
+  }
+  case ValueOwnership::Owned: {
+    // A consuming pattern match. Emit as a +1 rvalue.
+    subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
+    break;
+  }
+  }
+  
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
     if (subjectMV.getType().isMoveOnly()) {
@@ -3292,12 +3356,15 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         
         case ValueOwnership::Shared:
           emission.setNoncopyableBorrowingOwnership();
+          if (!subjectMV.isPlusZero()) {
+            subjectMV = subjectMV.borrow(*this, S);
+          }
           if (subjectMV.getType().isAddress() &&
               subjectMV.getType().isLoadable(F)) {
             // Load a borrow if the type is loadable.
-            subjectMV = B.createLoadBorrow(S, subjectMV);
-          } else if (!subjectMV.isPlusZero()) {
-            subjectMV = subjectMV.borrow(*this, S);
+            subjectMV = subjectUndergoesFormalAccess
+              ? B.createFormalAccessLoadBorrow(S, subjectMV)
+              : B.createLoadBorrow(S, subjectMV);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
           
@@ -3385,6 +3452,20 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
   }());
 
+  CleanupsDepth caseBodyDepth = Cleanups.getCleanupsDepth();
+  llvm::Optional<LexicalScope> caseBodyScope;
+  if (subjectUndergoesFormalAccess) {
+    caseBodyScope.emplace(*this, CleanupLocation(S));
+  }
+
+  // Enter a break/continue scope. As discussed above, the depth we jump to
+  // depends on whether the subject is under a formal access.
+  JumpDest contDest(contBB,
+                    subjectUndergoesFormalAccess ? caseBodyDepth
+                                                 : subjectDepth,
+                    CleanupLocation(S));
+  BreakContinueDestStack.push_back({S, contDest, JumpDest(S)});
+
   // If we need to diagnose an unexpected enum case or unexpected enum case
   // value, we need access to a value metatype for the subject. Emit this state
   // now before we emit the actual switch to ensure that the subject has not
@@ -3446,7 +3527,14 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
 
   assert(!B.hasValidInsertionPoint());
-  switchScope.pop();
+  // Disable the cleanups for values that should be consumed by the case
+  // bodies.
+  caseBodyScope.reset();
+  // If the subject isn't under a formal access, that includes the subject
+  // itself.
+  if (!subjectUndergoesFormalAccess) {
+    switchScope.pop();
+  }
 
   // Then emit the case blocks shared by multiple pattern cases.
   emission.emitSharedCaseBlocks(
@@ -3462,6 +3550,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     eraseBasicBlock(contBB);
   } else {
     B.emitBlock(contBB);
+  }
+  
+  // End the formal access to the subject now (if there was one).
+  if (subjectUndergoesFormalAccess) {
+    switchFormalAccess.reset();
+    switchScope.pop();
   }
 
   // Now that we have emitted everything, see if our unexpected enum case info
