@@ -3194,8 +3194,6 @@ ERROR(recursive_superclass_constraint,none,
       "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
-WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0 : %1", (Type, Type))
 
 WARNING(missing_protocol_refinement, none,
         "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
@@ -3204,17 +3202,9 @@ WARNING(missing_protocol_refinement, none,
 ERROR(requirement_conflict,none,
       "no type for %0 can satisfy both %1",
       (Type, StringRef))
-WARNING(redundant_same_type_to_concrete,none,
-        "redundant same-type constraint %0 == %1", (Type, Type))
 ERROR(conflicting_superclass_constraints,none,
       "type %0 cannot be a subclass of both %1 and %2",
       (Type, Type, Type))
-WARNING(redundant_superclass_constraint,none,
-        "redundant superclass constraint %0 : %1", (Type, Type))
-
-WARNING(redundant_layout_constraint,none,
-        "redundant constraint %0 : %1",
-        (Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
@@ -7578,8 +7568,6 @@ ERROR(inverse_but_also_conforms, none,
 ERROR(inverse_generic_but_also_conforms, none,
       "%0 required to be '%1' but is marked with '~%1'",
       (Type, StringRef))
-WARNING(redundant_inverse_constraint,none,
-        "redundant constraint %0 : '~%1'", (Type, StringRef))
 ERROR(inverse_on_class, none,
       "classes cannot be '~%0'",
       (StringRef))

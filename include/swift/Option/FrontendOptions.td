@@ -425,9 +425,6 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 
-def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
-  HelpText<"Emit warnings for redundant requirements in generic signatures">;
-
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 

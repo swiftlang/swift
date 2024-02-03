@@ -20,7 +20,6 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Evaluator.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SILOptions.h"
@@ -87,6 +86,7 @@ namespace swift {
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
+  class GenericSignature;
   class InFlightDiagnostic;
   class IterableDeclContext;
   class LazyContextData;

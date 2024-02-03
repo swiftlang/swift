@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures -disable-requirement-machine-concrete-contraction %s 2>&1 | %FileCheck %s
 
@@ -42,11 +42,9 @@ public class FinalD : Q {
 
 // CHECK-LABEL: Generic signature: <T where T : C>
 public func takesBoth1<T>(_: T) where T : P, T : C {}
-// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // CHECK-LABEL: Generic signature: <U where U : C>
 public func takesBoth2<U>(_: U) where U : C, U : P {}
-// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // 'Self' can also occur inside of a concrete type or superclass requirement.
 public class G<T> {}

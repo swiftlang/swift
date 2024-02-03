@@ -50,10 +50,6 @@ struct RequirementError {
     ConflictingInverseRequirement,
     /// A recursive requirement, e.g. T == G<T.A>.
     RecursiveRequirement,
-    /// A redundant requirement, e.g. T == T.
-    RedundantRequirement,
-    /// A redundant requirement, e.g. T : ~Copyable, T : ~Copyable.
-    RedundantInverseRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
   } kind;
@@ -89,14 +85,12 @@ private:
 public:
   Requirement getRequirement() const {
     assert(!(kind == Kind::InvalidInverseOuterSubject ||
-             kind == Kind::RedundantInverseRequirement ||
              kind == Kind::ConflictingInverseRequirement));
     return requirement;
   }
 
   InverseRequirement getInverse() const {
     assert(kind == Kind::InvalidInverseOuterSubject ||
-           kind == Kind::RedundantInverseRequirement ||
            kind == Kind::ConflictingInverseRequirement);
     return inverse;
   }
@@ -143,16 +137,6 @@ public:
                                                     Requirement second,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, first, second, loc};
-  }
-
-  static RequirementError forRedundantRequirement(Requirement req,
-                                                  SourceLoc loc) {
-    return {Kind::RedundantRequirement, req, loc};
-  }
-
-  static
-  RequirementError forRedundantInverseRequirement(InverseRequirement req) {
-    return {Kind::RedundantInverseRequirement, req, req.loc};
   }
 
   static RequirementError forRecursiveRequirement(Requirement req,

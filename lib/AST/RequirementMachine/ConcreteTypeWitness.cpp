@@ -599,7 +599,6 @@ void PropertyMap::inferConditionalRequirements(
                                           substitutions);
 
   assert(builder.PermanentRules.empty());
-  assert(builder.WrittenRequirements.empty());
 
   System.addRules(std::move(builder.ImportedRules),
                   std::move(builder.PermanentRules),

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 class C {}
@@ -9,7 +9,6 @@ struct S {}
 // CHECK-NEXT: Requirement signature: <Self where Self.[P1]T == C>
 protocol P1 {
   associatedtype T where T : C, T == C
-  // expected-warning@-1 {{redundant superclass constraint 'Self.T' : 'C'}}
 }
 
 // CHECK-LABEL: .P2@

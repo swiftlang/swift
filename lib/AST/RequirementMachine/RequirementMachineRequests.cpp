@@ -188,8 +188,8 @@ static void splitConcreteEquivalenceClasses(
                            req.getFirstType(), concreteType);
       Requirement secondReq(RequirementKind::SameType,
                             req.getSecondType(), concreteType);
-      splitRequirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
-      splitRequirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+      splitRequirements.push_back({firstReq, SourceLoc()});
+      splitRequirements.push_back({secondReq, SourceLoc()});
 
       if (debug) {
         llvm::dbgs() << "- First split: ";
@@ -201,7 +201,7 @@ static void splitConcreteEquivalenceClasses(
       continue;
     }
 
-    splitRequirements.push_back({req, SourceLoc(), /*inferred=*/false});
+    splitRequirements.push_back({req, SourceLoc()});
 
     if (debug) {
       llvm::dbgs() << "- Not split: ";
@@ -319,7 +319,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     for (auto req : proto->getStructuralRequirements())
       requirements.push_back(req);
     for (auto req : proto->getTypeAliasRequirements())
-      requirements.push_back({req, SourceLoc(), /*inferred=*/false});
+      requirements.push_back({req, SourceLoc()});
   }
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
@@ -638,11 +638,11 @@ AbstractGenericSignatureRequest::evaluate(
   // empty source locations.
   SmallVector<StructuralRequirement, 2> requirements;
   for (auto req : baseSignature.getRequirements())
-    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
+    requirements.push_back({req, SourceLoc()});
 
   // Add the new requirements.
   for (auto req : addedRequirements)
-    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
+    requirements.push_back({req, SourceLoc()});
 
   // The requirements passed to this request may have been substituted,
   // meaning the subject type might be a concrete type and not a type
@@ -780,7 +780,7 @@ InferredGenericSignatureRequest::evaluate(
   }();
 
   for (const auto &req : parentSig.getRequirements())
-    requirements.push_back({req, loc, /*wasInferred=*/false});
+    requirements.push_back({req, loc});
 
   DeclContext *lookupDC = nullptr;
 
@@ -868,7 +868,7 @@ InferredGenericSignatureRequest::evaluate(
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc(), /*inferred=*/true});
+    requirements.push_back({req, SourceLoc()});
 
   desugarRequirements(requirements, inverses, errors);
 
@@ -882,15 +882,6 @@ InferredGenericSignatureRequest::evaluate(
   // generic parameters, as the outer parameters have already been expanded.
   InverseRequirement::expandDefaults(ctx, paramTypes, requirements);
   applyInverses(ctx, paramTypes, inverses, requirements, errors);
-
-  // Re-order requirements so that inferred requirements appear last. This
-  // ensures that if an inferred requirement is redundant with some other
-  // requirement, it is the inferred requirement that becomes redundant,
-  // which muffles the redundancy diagnostic.
-  std::stable_partition(requirements.begin(), requirements.end(),
-                        [](const StructuralRequirement &req) {
-                          return !req.inferred;
-                        });
 
   auto &rewriteCtx = ctx.getRewriteContext();
 

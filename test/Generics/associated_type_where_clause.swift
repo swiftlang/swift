@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -134,7 +134,6 @@ struct X { }
 protocol P {
 	associatedtype P1 where P1 == X
 	associatedtype P2 where P2 == P1, P2 == X
-	// expected-warning@-1{{redundant same-type constraint 'Self.P2' == 'X'}}
 }
 
 // Lookup of same-named associated types aren't ambiguous in this context.
