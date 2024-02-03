@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-
+// REQUIRES: swift_in_compiler
 
 // https://github.com/apple/swift/issues/71164
 
