@@ -8087,7 +8087,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
 
   if (options.contains(SILParameterInfo::Isolated)) {
     options -= SILParameterInfo::Isolated;
-    Printer << "@isolated ";
+    Printer << "@sil_isolated ";
   }
 
   // If we did not handle a case in Options, this code was not updated

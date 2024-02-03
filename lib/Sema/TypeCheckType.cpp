@@ -4432,7 +4432,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         parameterOptions |= SILParameterInfo::NotDifferentiable;
         return true;
 
-      case TypeAttrKind::Isolated:
+      case TypeAttrKind::SILIsolated:
         parameterOptions |= SILParameterInfo::Isolated;
         return true;
 
