@@ -3188,6 +3188,9 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
     if (auto result = findStorageReferenceExprForBorrow(ioe->getSubExpr()))
       return result.withTransitiveRoot(ioe);
+  } else if (auto le = dyn_cast<LoadExpr>(e)) {
+    if (auto result = findStorageReferenceExprForBorrow(le->getSubExpr()))
+      return result.withTransitiveRoot(le);
   }
 
   return StorageRefResult();
