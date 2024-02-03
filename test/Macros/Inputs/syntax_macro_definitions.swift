@@ -2316,3 +2316,13 @@ public struct AddSubscript: MemberMacro {
     ]
   }
 }
+
+public struct AllLexicalContextsMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    context.lexicalContext.compactMap { $0.as(DeclSyntax.self)?.trimmed }
+  }
+}
+
