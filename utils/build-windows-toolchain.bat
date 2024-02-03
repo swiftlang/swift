@@ -77,7 +77,8 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
   %TestArg% ^
-  -Stage %PackageRoot% || (exit /b 1)
+  -Stage %PackageRoot% ^
+  -Summary || (exit /b 1)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
