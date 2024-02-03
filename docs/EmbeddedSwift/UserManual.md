@@ -33,42 +33,42 @@ Most of these steps are out of scope for this document, instead refer to the ven
 A basic way to build a set of Swift source files in Embedded Swift mode, is to simply give the compiler (1) a target triple, (2) the `-enable-experimental-feature Embedded` flag, (3) the set of source files that form the input module:
 
 ```bash
-$ swiftc -target <target triple> -enable-experimental-feature Embedded \
+$ swiftc -target <target triple> -enable-experimental-feature Embedded -wmo \
   input1.swift input2.swift ... -c -o output.o
 ```
 
-The target triple also decides whether whether the output object file will be an ELF file, or a Mach-O. For example:
+## Examples
+
+### Building Swift firmware for an embedded target
+
+To build Swift firmware (for now ingnoring integration with SDKs, libraries and other pre-existing C code), we can use the `-target` argument to specify the CPU architecture. The target triple also decides whether the output object file will be an ELF file, or a Mach-O. For example:
 
 ```bash
 # To build an ARMv7 Mach-O object file:
-$ swiftc -target armv7-apple-none-macho -enable-experimental-feature Embedded \
+$ swiftc -target armv7-apple-none-macho -enable-experimental-feature Embedded -wmo \
   input1.swift input2.swift ... -c -o output.o
 
 # To build an ARMv7 ELF object file:
-$ swiftc -target armv7-unknown-none-eabi -enable-experimental-feature Embedded \
+$ swiftc -target armv7-unknown-none-eabi -enable-experimental-feature Embedded -wmo \
   input1.swift input2.swift ... -c -o output.o
 ```
 
-Additionally, you probably want to specify additional Clang and/or LLVM flags to get the compiler to produce code for the exact ISA and ABI you need for your target. For example, a Raspberry Pi Pico / Pico W expects the `-mfloat-abi=soft` Clang option, and if you want to match ABI with libraries built with the GNU toolchain, you might also need `-fshort-enums`. To pass those to Swift, use the `-Xcc` prefix:
+Additionally, you probably want to specify additional Clang and/or LLVM flags to get the compiler to produce code for the exact ISA and ABI you need for your target. 
+
+For example, a Raspberry Pi Pico / Pico W should target the ARMv6-M architecture via the `armv6m-*` target triple, but the `-mfloat-abi=soft` Clang option should also be used, and if you want to match ABI with libraries built with the GNU toolchain, you might also need `-fshort-enums`. To pass those to Swift, use the `-Xcc` prefix:
 
 ```bash
 # To build an ELF object file for ARMv6-M with soft float ABI (floating-point arguments passed in integer registers) and "short enums":
-$ swiftc -target armv6m-unknown-none-eabi -enable-experimental-feature Embedded \
+$ swiftc -target armv6m-unknown-none-eabi -enable-experimental-feature Embedded -wmo \
    -Xcc -mfloat-abi=soft -Xcc -fshort-enums \
   input1.swift input2.swift ... -c -o output.o
 ```
 
 This might not be obvious: `-Xcc` flags are typically only used to alter behavior of the Clang importer, but passing flags to Clang this way also works to specify LLVM target options like selecting a specific CPU architecture (`-march`, `-mcpu`, `-mmcu`), FPU unit availability (`-mfpu`), which registers are used to pass floating-point values (`-mfloat-abi`), and others.
 
-## Examples
-
-### Building a pure Swift firmware for an embedded target
-
-TODO
-
 ### Integrating with embedded SDKs and build systems
 
-TODO
+For details and concrete examples of how to integrate with existing SDKs, see [Embedded Swift -- Integrating with embedded SDKs](IntegratingWithSDKs.md).
 
 ### Building a macOS Embedded Swift program:
 
@@ -109,30 +109,72 @@ Features that are not available:
 - **Not available**: Metatypes, e.g. `let t = SomeClass.Type` or `type(of: value)` are not allowed.
 - **Not available yet (under development)**: The print() function for types other than StaticString and integers.
 - **Not available yet (under development)**: String. (StaticString **is** available).
-- **Not available yet (under development)**: Set.
-- **Not available yet (under development)**: Dictionary.
+- **Not available yet (under development)**: Swift Concurrency.
+
+For a more complete list of supported features in Embedded Swift, see [Embedded Swift -- Status](EmbeddedSwiftStatus.md).
 
 ## Libraries and modules in Embedded Swift
 
-TODO
+Traditional library build and use model of Swift is that library code is compiled into a .swiftmodule, containing the interfaces, and a compiled library with binary code, either a .a static library or a .dylib/.so dynamic library. A client's build then uses the .swiftmodule at compile-time, and the static/dynamic library at link-time.
+
+The library model in Embedded Swift works slightly differently: All Swift source code of a library is promoted into being inlineable and visible to client builds (this is necessary for generic code, and beneficial for optimizations for non-generic code), and ends up serialized into the .swiftmodule, the interface of the library. Therefore, the compiled code of a library is never needed, and doesn't even need to be produced. For example:
+
+```
+# Build the library, only as a .swiftmomodule. Notice that we never build the .o or .a for the library.
+$ swiftc -target <target> -enable-experimental-feature Embedded -wmo \
+  a.swift b.swift -module-name MyLibrary -emit-module -emit-module-path ./MyLibrary.swiftmodule
+
+# Build the client, "-I ." add the current directory to the module search path list
+$ swiftc -target <target> -enable-experimental-feature Embedded -wmo \
+  client.swift -I . -c -o client.o
+```
+
+The Embedded Swift standard library is distributed in the toolchain the same way: It's strictly a .swiftmodule without any compiled code present anywhere. All the compiling into machine code is performed as part of the client's build. This has the major benefit that the client's build can provide additional ABI and ISA defining flags, such as the above-mentioned `-mfloat-abi`, `-fshort-enums`, `-mcpu`, `-march` flags, and these flags in the client's build will apply to all the library code (including standard library code) as well.
 
 ## Allocating and non-allocating Embedded Swift mode
 
-TODO
+Embedded Swift does allow instantiating and using reference types (classes) which are refcounted objects allocated on the heap. A common case of needing those is for dynamic containers like arrays and sets (they use dynamically-sized heap-allocated class instances as their storage). Outside of creating class instances and explicitly calling allocation APIs (e.g. `UnsafeMutablePointer.allocate()`), Embedded Swift does not perform allocations or cause heap usage.
 
-## Runtime support for allocating Embedded Swift
+Some embedded platforms don't have and/or don't want *any heap allocations whatsoever* and don't provide a heap at all. The `-no-allocations` compiler flag can be used to match that, which will cause the compiler to produce an error at compile time when creating class instances or calling allocation APIs.
 
-TODO
+```bash
+$ cat test.swift
+let p = UnsafeMutablePointer<UInt8>.allocate(capacity: 10)
+$ swiftc test.swift -enable-experimental-feature Embedded -wmo -no-allocations
+test.swift:1:37: error: cannot use allocating operation in -no-allocations mode
+```
 
 ## External dependencies
 
-Embedded Swift minimizes external dependencies, but they still exist. In Embedded Swift compilation mode, the compiler only triggers external dependencies based on actual usage of the program under compilation. The following table lists which situations cause which external dependencies:
+Embedded Swift minimizes external dependencies (i.e. functions that need to be available at link-time), but they still exist. There are generally two categories of dependencies: (1) functions that the Swift standard library or Embedded Swift runtime need to call, and (2) functions/symbols that are implicitly added by LLVM and the compiler pipeline.
 
-|                                                                     | external dependencies:                                                  |
-|---------------------------------------------------------------------|-------------------------------------------------------------------------|
-| *(basic dependencies, added by the compiler in various situations)* | `void *memset(void *, int, size_t);`                                    |
-| instantiating a class, or using UnsafePointer.allocate()            | `int posix_memalign(void **, size_t, size_t);`<br/>`void free(void *);` |
-| using print()                                                       | `int putchar(int);`                                                     |
-| using Hashable, Set, Dictionary, or random-number generating APIs   | `void arc4random_buf(void *, size_t);`                                  |
+For (1), external dependencies are only used based on actual usage of the program under compilation:
 
-The user and/or the platform is expected to provide these well-known APIs.
+- instantiating a class, or using UnsafeMutablePointer.allocate()
+  - dependency: `int posix_memalign(void **, size_t, size_t);`
+  - dependency: `void free(void *);`
+- using print()
+  - dependency: `int putchar(int);`
+- using Hashable, Set, Dictionary, or random-number generating APIs
+  - dependency: `void arc4random_buf(void *, size_t);`
+
+For (2), external dependencies are also triggered by specific code needing them, but they are somewhat lower-level patterns where it might not be obvious that such patterns should cause external dependencies:
+
+- **basic memory copying and zeroing functions**
+  - usage added for a variety of reasons (e.g. using structs on the stack)
+  - dependency: `void *memset(void *, int, size_t);`
+  - dependency: `void *memcpy(void *, const void *, size_t);`
+- **stack protectors** (aka stack cookies or stack canaries)
+  - dependency: `void *__stack_chk_guard;`
+  - dependency: `void __stack_chk_fail(void);`
+  - stack protectors can be disabled with `-disable-stack-protector` swiftc flag
+- **atomics instrinsics**
+  - on CPU architectures that don't have direct load-acquire/store-release support in the ISA, LLVM calls helper functions for atomic operations
+  - needed by refcounting in the Embedded Swift runtime (so any class usage will trigger this dependency)
+- **multiplication/division/modulo instrinsics**
+  - on CPU architectures that don't have direct support for the math operations in the ISA
+  - dependency (on Mach-O): `__divti3`
+  - dependency (on Mach-O): `__modti3`
+  - dependency (with EABI): `__aeabi_ldivmod`
+
+The user and/or the platform (via basic libraries like libc or compiler builtins) is expected to provide these well-known APIs.
