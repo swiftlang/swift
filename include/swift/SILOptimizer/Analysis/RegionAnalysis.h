@@ -41,6 +41,12 @@ inline bool isNonSendableType(SILType type, SILFunction *fn) {
     return true;
   }
 
+  // Treat Builtin.SILToken as Sendable. It cannot escape from the current
+  // function. We should change isSendable to hardwire this.
+  if (type.getASTType()->is<SILTokenType>()) {
+    return false;
+  }
+
   // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
   return !type.isSendable(fn);
 }

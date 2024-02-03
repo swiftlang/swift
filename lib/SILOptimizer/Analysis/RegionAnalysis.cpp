@@ -196,11 +196,13 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
@@ -210,6 +212,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
   case SILInstructionKind::ProjectBoxInst:
   case SILInstructionKind::RefToBridgeObjectInst:
@@ -220,6 +223,12 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnownedToRefInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
+  case SILInstructionKind::WeakCopyValueInst:
+  case SILInstructionKind::StrongCopyWeakValueInst:
+  case SILInstructionKind::StrongCopyUnmanagedValueInst:
+  case SILInstructionKind::RefToUnmanagedInst:
+  case SILInstructionKind::UnmanagedToRefInst:
+  case SILInstructionKind::InitExistentialValueInst:
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
@@ -1157,9 +1166,12 @@ enum class TranslationSemantics {
   /// handle every instruction to ensure we cover the IR.
   Asserting,
 
-  /// An instruction that we do not handle yet. Just for now during bring
-  /// up. Will be removed.
-  Unhandled,
+  /// An instruction that the checker thinks it can ignore as long as all of its
+  /// operands are Sendable. If we see that such an instruction has a
+  /// non-Sendable parameter, then someone added an instruction to the compiler
+  /// without updating this code correctly. This is most likely driver error and
+  /// should be caught in testing when we assert.
+  AssertingIfNonSendable,
 };
 
 } // namespace
@@ -1199,8 +1211,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   case TranslationSemantics::Asserting:
     os << "asserting";
     return os;
-  case TranslationSemantics::Unhandled:
-    os << "unhandled";
+  case TranslationSemantics::AssertingIfNonSendable:
+    os << "asserting_if_nonsendable";
     return os;
   }
 
@@ -2101,8 +2113,15 @@ public:
           "transfer-non-sendable: Found banned instruction?!");
       return;
 
-    case TranslationSemantics::Unhandled:
-      LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
+    case TranslationSemantics::AssertingIfNonSendable:
+      // Do not error if all of our operands are sendable.
+      if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
+            return ::isNonSendableType(value->getType(), inst->getFunction());
+          }))
+        return;
+      llvm::report_fatal_error(
+          "transfer-non-sendable: Found instruction that is not allowed to "
+          "have non-Sendable parameters with such parameters?!");
       return;
     }
 
@@ -2170,8 +2189,11 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     assert(trackableValue);
     llvm::dbgs() << "State: %%" << opArg << ". ";
     trackableValue->getValueState().print(llvm::dbgs());
-    llvm::dbgs() << "\n             Value: "
+    llvm::dbgs() << "\n             Rep Value: "
                  << trackableValue->getRepresentative();
+    if (auto value = trackableValue->getRepresentative().maybeGetValue()) {
+      llvm::dbgs() << "             Type: " << value->getType() << '\n';
+    }
   }
 #endif
 }
@@ -2218,6 +2240,9 @@ CONSTANT_TRANSLATION(WitnessMethodInst, AssignFresh)
 CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
+// Metatypes are Sendable, but AnyObject isn't
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, AssignFresh)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
 
 //===---
 // Assign
@@ -2236,6 +2261,7 @@ CONSTANT_TRANSLATION(ClassMethodInst, Assign)
 CONSTANT_TRANSLATION(ObjCMethodInst, Assign)
 CONSTANT_TRANSLATION(SuperMethodInst, Assign)
 CONSTANT_TRANSLATION(ObjCSuperMethodInst, Assign)
+CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
 
 // These instructions are in between look through and a true assign. We should
 // probably eventually treat them as look through but we haven't done the work
@@ -2253,14 +2279,12 @@ CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
 CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
-CONSTANT_TRANSLATION(RefToUnmanagedInst, Assign)
 CONSTANT_TRANSLATION(TailAddrInst, Assign)
 CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, Assign)
 CONSTANT_TRANSLATION(ThinToThickFunctionInst, Assign)
 CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
-CONSTANT_TRANSLATION(UnmanagedToRefInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
@@ -2311,6 +2335,13 @@ CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
+CONSTANT_TRANSLATION(OpenExistentialValueInst, LookThrough)
+CONSTANT_TRANSLATION(WeakCopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
+CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
+CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
+CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
+CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 
 //===---
 // Store
@@ -2352,6 +2383,7 @@ CONSTANT_TRANSLATION(DestroyValueInst, Ignored)
 CONSTANT_TRANSLATION(EndAccessInst, Ignored)
 CONSTANT_TRANSLATION(EndBorrowInst, Ignored)
 CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
+CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
@@ -2371,6 +2403,26 @@ CONSTANT_TRANSLATION(FixLifetimeInst, Require)
 CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
 CONSTANT_TRANSLATION(IsUniqueInst, Require)
+CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Require)
+CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Require)
+CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Require)
+CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
+CONSTANT_TRANSLATION(RebindMemoryInst, Require)
+CONSTANT_TRANSLATION(BindMemoryInst, Require)
+CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
+// Require of the value we extract the metatype from.
+CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
+// Require of the value we extract the metatype from.
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
+
+//===---
+// Asserting If Non Sendable Parameter
+//
+
+// Takes metatypes as parameters and metatypes today are always sendable.
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, AssertingIfNonSendable)
 
 //===---
 // Terminators
@@ -2383,6 +2435,8 @@ CONSTANT_TRANSLATION(CondFailInst, Ignored)
 CONSTANT_TRANSLATION(SwitchValueInst, Ignored)
 CONSTANT_TRANSLATION(UnreachableInst, Ignored)
 CONSTANT_TRANSLATION(UnwindInst, Ignored)
+// Doesn't take a parameter.
+CONSTANT_TRANSLATION(ThrowAddrInst, Ignored)
 
 // Terminators that only need require.
 CONSTANT_TRANSLATION(ReturnInst, Require)
@@ -2395,6 +2449,13 @@ CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+// Today, await_async_continuation just takes Sendable values
+// (UnsafeContinuation and UnsafeThrowingContinuation).
+CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
 
 //===---
 // Existential Box
@@ -2409,54 +2470,25 @@ CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Assign)
 CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 
 //===---
-// Unhandled Instructions
+// Differentiable
 //
 
-CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
-CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
-CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
-CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(VectorInst, Unhandled)
-CONSTANT_TRANSLATION(TuplePackElementAddrInst, Unhandled)
-CONSTANT_TRANSLATION(TuplePackExtractInst, Unhandled)
-CONSTANT_TRANSLATION(PackElementGetInst, Unhandled)
-CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(OpenPackElementInst, Unhandled)
-CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
-CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(PackPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(ScalarPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiableFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
-CONSTANT_TRANSLATION(LinearFunctionExtractInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(GetAsyncContinuationInst, Unhandled)
-CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Unhandled)
-CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
-CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
-CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
-CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
-CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
-CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
-CONSTANT_TRANSLATION(AssignInst, Unhandled)
-CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
-CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
-CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
-CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
+CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, AssignFresh)
+CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, LookThrough)
+CONSTANT_TRANSLATION(LinearFunctionExtractInst, LookThrough)
+CONSTANT_TRANSLATION(LinearFunctionInst, Assign)
+CONSTANT_TRANSLATION(DifferentiableFunctionInst, Assign)
+
+//===---
+// Packs
+//
+
+CONSTANT_TRANSLATION(DeallocPackInst, Ignored)
+CONSTANT_TRANSLATION(DynamicPackIndexInst, Ignored)
+CONSTANT_TRANSLATION(OpenPackElementInst, Ignored)
+CONSTANT_TRANSLATION(PackLengthInst, Ignored)
+CONSTANT_TRANSLATION(PackPackIndexInst, Ignored)
+CONSTANT_TRANSLATION(ScalarPackIndexInst, Ignored)
 
 //===---
 // Apply
@@ -2487,6 +2519,16 @@ CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
 // after adding an assert into the SILVerifier that this property is true.
 CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
 CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
+
+// All of these instructions should be removed by DI which runs before us in the
+// pass pipeline.
+CONSTANT_TRANSLATION(AssignInst, Asserting)
+CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
+CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
+
+// We should never hit this since it can only appear as a final instruction in a
+// global variable static initializer list.
+CONSTANT_TRANSLATION(VectorInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
@@ -2571,6 +2613,46 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
+  if (!isNonSendableType(r->getType()))
+    return TranslationSemantics::Require;
+  translateSILAssign(SILValue(r), r->getPack());
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
+    TuplePackElementAddrInst *r) {
+  if (!isNonSendableType(r->getType())) {
+    translateSILRequire(r->getTuple());
+  } else {
+    translateSILAssign(SILValue(r), r->getTuple());
+  }
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
+  if (!isNonSendableType(r->getType())) {
+    translateSILRequire(r->getTuple());
+  } else {
+    translateSILAssign(SILValue(r), r->getTuple());
+  }
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitPackElementSetInst(PackElementSetInst *r) {
+  // If the value we are storing is sendable, treat this as a require.
+  if (!isNonSendableType(r->getValue()->getType())) {
+    return TranslationSemantics::Require;
+  }
+
+  // Otherwise, this is a store.
+  translateSILStore(r->getPackOperand(), r->getValueOperand());
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {

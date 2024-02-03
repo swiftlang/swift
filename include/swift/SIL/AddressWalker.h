@@ -200,7 +200,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
-        isa<TupleAddrConstructorInst>(user)) {
+        isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user)) {
       callVisitUse(op);
       continue;
     }
