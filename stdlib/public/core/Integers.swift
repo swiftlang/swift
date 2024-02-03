@@ -1630,8 +1630,8 @@ extension BinaryInteger {
         : self + Self(truncatingIfNeeded: n)
     } else {
       return n < (0 as Int)
-        ? self - Self(n.magnitude)
-        : self + Self(n.magnitude)
+        ? self - Self(UInt(bitPattern: ~n &+ 1))
+        : self + Self(UInt(bitPattern: n))
     }
   }
 }
