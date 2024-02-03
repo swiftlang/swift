@@ -64,6 +64,20 @@ extension Parser.ExperimentalFeatures {
   }
 }
 
+extension Parser.SwiftVersion {
+  init?(from context: BridgedASTContext?) {
+    guard let context else {
+      return nil
+    }
+    switch context.majorLanguageVersion {
+    case 1, 2, 3, 4: self = .v4
+    case 5: self = .v5
+    case 6: self = .v6
+    default: self = .v6
+    }
+  }
+}
+
 /// Parses the given source file and produces a pointer to a new
 /// ExportedSourceFile instance.
 @_cdecl("swift_ASTGen_parseSourceFile")
@@ -77,7 +91,11 @@ public func parseSourceFile(
   let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
 
   let ctx = ctxPtr.map { BridgedASTContext(raw: $0) }
-  let sourceFile = Parser.parse(source: buffer, experimentalFeatures: .init(from: ctx))
+  let sourceFile = Parser.parse(
+    source: buffer,
+    swiftVersion: Parser.SwiftVersion(from: ctx),
+    experimentalFeatures: .init(from: ctx)
+  )
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
   let moduleName = String(cString: moduleName)

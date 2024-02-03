@@ -185,6 +185,9 @@ SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                           BridgedFeature feature);
 
+SWIFT_NAME("getter:BridgedASTContext.majorLanguageVersion(self:)")
+unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext);
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
