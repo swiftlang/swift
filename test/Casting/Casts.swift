@@ -1096,11 +1096,13 @@ CastsTests.test("type(of:) should look through __SwiftValue")
 @objc protocol P106973771 {
   func sayHello()
 }
+@objc protocol P106973771a { }
+extension NSObject : P106973771a {}
 CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
-  class C106973771: NSObject, P106973771 {
+  @objc class C106973771: NSObject, P106973771 {
     func sayHello() { print("Hello") }
   }
-  // A class instance clearly conforms to the protocol
+  // A class instance clearly conforms to this protocol
   expectTrue(C106973771() is any P106973771)
   // But the metatype definitely does not
   expectFalse(C106973771.self is any P106973771)
@@ -1109,8 +1111,13 @@ CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
   // The following will crash if the cast succeeds
   (C106973771.self as? any P106973771)?.sayHello()
 
-  // But it's fine to cast a metatype to NSObjectProtocol:
+  // We should also follow ObjC rules for
+  // ObjC metatypes:
   expectTrue(C106973771.self is any NSObjectProtocol)
+  expectTrue(C106973771.self is NSObject.Type)
+  expectTrue(C106973771.self is NSObject) // FIXME
+  expectTrue(C106973771.self as AnyObject is any P106973771a)
+  expectTrue(C106973771.self is any P106973771a)
 }
 #endif
 

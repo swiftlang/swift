@@ -1338,6 +1338,15 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   return type;
 }
 
+static bool classObjectConformsToProtocol(id object, Protocol *protocol) {
+  for (Class c = object_getClass(object_getClass(object)); c; c = class_getSuperclass(c)) {
+    if (class_conformsToProtocol(c, protocol)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 SWIFT_RUNTIME_EXPORT
 id swift_dynamicCastObjCProtocolUnconditional(id object,
                                               size_t numProtocols,
@@ -1350,15 +1359,17 @@ id swift_dynamicCastObjCProtocolUnconditional(id object,
   if (object_isClass(object)) {
     // Shield old apps from this behavior change
     if (!runtime::bincompat::useLegacyObjCMetatypeCasting()) {
-      // Obj-C metatypes can conform to NSObject protocol,
-      // but no others. (TODO: Check with @MikeAsh)
-      if (numProtocols > 1 || protocols[0] != @protocol(NSObject)) {
-	Class sourceType = object_getClass(object);
-	swift_dynamicCastFailure(sourceType, class_getName(sourceType),
-			       protocols[0], protocol_getName(protocols[0]));
+      for (size_t i = 0; i < numProtocols; ++i) {
+	if (!classObjectConformsToProtocol(object, protocols[i])) {
+	  Class sourceType = object_getClass(object);
+	  swift_dynamicCastFailure(sourceType, class_getName(sourceType),
+				   protocols[i], protocol_getName(protocols[i]));
+	}
       }
+      return object;
     }
   }
+  // General case for non-class objects:
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
@@ -1386,11 +1397,12 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   if (object_isClass(object)) {
     // Shield old apps from this behavior change
     if (!runtime::bincompat::useLegacyObjCMetatypeCasting()) {
-      // Obj-C metatypes can conform to NSObject protocol,
-      // but no others. (TODO: Check with @MikeAsh)
-      if (numProtocols > 1 || protocols[0] != @protocol(NSObject)) {
-	return nil;
+      for (size_t i = 0; i < numProtocols; ++i) {
+	if (!classObjectConformsToProtocol(object, protocols[i])) {
+	  return nil;
+	}
       }
+      return object;
     }
   }
   for (size_t i = 0; i < numProtocols; ++i) {
