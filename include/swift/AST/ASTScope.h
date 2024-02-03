@@ -37,10 +37,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceManager.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include <optional>
 
 /// In case there's a bug in the ASTScope lookup system, suggest that the user
 /// try disabling it.
@@ -164,7 +164,7 @@ private:
   /// Child scopes, sorted by source range.
   Children storedChildren;
 
-  mutable llvm::Optional<SourceRange> cachedCharSourceRange;
+  mutable std::optional<SourceRange> cachedCharSourceRange;
 
 #pragma mark - constructor / destructor
 public:
@@ -995,11 +995,11 @@ public:
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
   const bool isLocalBinding;
-  llvm::Optional<SourceLoc> endLoc;
+  std::optional<SourceLoc> endLoc;
 
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding, llvm::Optional<SourceLoc> endLoc)
+                        bool isLocalBinding, std::optional<SourceLoc> endLoc)
       : AbstractPatternEntryScope(ScopeKind::PatternEntryDecl, pbDecl,
                                   entryIndex),
         isLocalBinding(isLocalBinding), endLoc(endLoc) {}

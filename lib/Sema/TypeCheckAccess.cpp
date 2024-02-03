@@ -248,7 +248,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   AccessScope problematicAccessScope = AccessScope::getPublic();
 
   if (type) {
-    llvm::Optional<AccessScope> typeAccessScope =
+    std::optional<AccessScope> typeAccessScope =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
                                                checkUsableFromInline);
 
@@ -302,7 +302,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       //   public let foo: Optional = VeryPrivateStruct()
       //
       // Downgrade the error to a warning in this case for source compatibility.
-      llvm::Optional<AccessScope> typeReprAccessScope =
+      std::optional<AccessScope> typeReprAccessScope =
           TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                  checkUsableFromInline);
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
@@ -316,7 +316,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   const DeclRefTypeRepr *complainRepr = findTypeDeclWithAccessScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
-  ImportAccessLevel complainImport = llvm::None;
+  ImportAccessLevel complainImport = std::nullopt;
   if (complainRepr) {
     const ValueDecl *VD = complainRepr->getBoundDecl();
     assert(VD &&
@@ -327,7 +327,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // level of the decl. This can happen with imported `package` decls.
     if (complainImport.has_value() &&
         complainImport->accessLevel >= VD->getFormalAccess())
-      complainImport = llvm::None;
+      complainImport = std::nullopt;
   }
 
   diagnose(problematicAccessScope, complainRepr, downgradeToWarning,
@@ -421,7 +421,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
-  ImportAccessLevel minImportLimit = llvm::None;
+  ImportAccessLevel minImportLimit = std::nullopt;
 
   auto callbackACEK = ACEK::Parameter;
 
@@ -758,7 +758,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
-    ImportAccessLevel minImportLimit = llvm::None;
+    ImportAccessLevel minImportLimit = std::nullopt;
 
     for (TypeLoc requirement : assocType->getInherited().getEntries()) {
       checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
@@ -940,7 +940,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
-    ImportAccessLevel minImportLimit = llvm::None;
+    ImportAccessLevel minImportLimit = std::nullopt;
     DescriptiveDeclKind declKind = DescriptiveDeclKind::Protocol;
 
     // FIXME: Hack to ensure that we've computed the types involved here.
@@ -1028,7 +1028,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
-    ImportAccessLevel minImportLimit = llvm::None;
+    ImportAccessLevel minImportLimit = std::nullopt;
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
@@ -1104,7 +1104,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
-    ImportAccessLevel minImportLimit = llvm::None;
+    ImportAccessLevel minImportLimit = std::nullopt;
     unsigned entityKind = EK_Parameter;
 
     bool hasInaccessibleParameterWrapper = false;
@@ -1237,7 +1237,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
-    ImportAccessLevel minImportLimit = llvm::None;
+    ImportAccessLevel minImportLimit = std::nullopt;
     bool problemIsResult = false;
 
     if (MD->parameterList) {
@@ -1299,8 +1299,9 @@ public:
       auto *macroDecl = D->getResolvedMacro(customAttr);
       if (macroDecl) {
         diagnoseDeclAvailability(
-          macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-          ExportContext::forDeclSignature(const_cast<Decl *>(D)), llvm::None);
+            macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
+            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
+            std::nullopt);
       }
     }
   }
@@ -2013,7 +2014,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
   void checkType(Type type, const TypeRepr *typeRepr, const Decl *context,
                  ExportabilityReason reason = ExportabilityReason::General,
-                 DeclAvailabilityFlags flags = llvm::None) {
+                 DeclAvailabilityFlags flags = std::nullopt) {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;

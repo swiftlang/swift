@@ -55,7 +55,7 @@ struct ASTLoweringDescriptor {
 
   /// A specific set of SILDeclRefs to emit. If set, only these refs will be
   /// emitted. Otherwise the entire \c context will be emitted.
-  llvm::Optional<SymbolSources> SourcesToEmit;
+  std::optional<SymbolSources> SourcesToEmit;
 
   friend llvm::hash_code hash_value(const ASTLoweringDescriptor &owner) {
     return llvm::hash_combine(owner.context, (void *)&owner.conv,
@@ -76,7 +76,7 @@ struct ASTLoweringDescriptor {
 public:
   static ASTLoweringDescriptor
   forFile(FileUnit &sf, Lowering::TypeConverter &conv, const SILOptions &opts,
-          llvm::Optional<SymbolSources> SourcesToEmit = llvm::None,
+          std::optional<SymbolSources> SourcesToEmit = std::nullopt,
           const IRGenOptions *irgenOptions = nullptr) {
     return ASTLoweringDescriptor{&sf, conv, opts, irgenOptions,
                                  std::move(SourcesToEmit)};
@@ -85,7 +85,7 @@ public:
   static ASTLoweringDescriptor
   forWholeModule(ModuleDecl *mod, Lowering::TypeConverter &conv,
                  const SILOptions &opts,
-                 llvm::Optional<SymbolSources> SourcesToEmit = llvm::None,
+                 std::optional<SymbolSources> SourcesToEmit = std::nullopt,
                  const IRGenOptions *irgenOptions = nullptr) {
     return ASTLoweringDescriptor{mod, conv, opts, irgenOptions,
                                  std::move(SourcesToEmit)};

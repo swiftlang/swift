@@ -136,9 +136,9 @@ public:
     return false;
   }
 
-  virtual llvm::Optional<Fingerprint>
+  virtual std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const {
-    return llvm::None;
+    return std::nullopt;
   }
 
 protected:
@@ -165,34 +165,34 @@ public:
   /// This function is an implementation detail for comment serialization.
   /// If you just want to get a comment attached to a decl, use
   /// \c Decl::getRawComment() or \c Decl::getSemanticBriefComment().
-  virtual llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const {
-    return llvm::None;
+  virtual std::optional<CommentInfo> getCommentForDecl(const Decl *D) const {
+    return std::nullopt;
   }
 
   /// For a serialized AST file, returns \c true if an adjacent swiftdoc has been
   /// loaded. Otherwise, returns \c false.
   virtual bool hasLoadedSwiftDoc() const { return false; }
 
-  virtual llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const {
-    return llvm::None;
+  virtual std::optional<StringRef> getGroupNameForDecl(const Decl *D) const {
+    return std::nullopt;
   }
 
-  virtual llvm::Optional<StringRef>
+  virtual std::optional<StringRef>
   getSourceFileNameForDecl(const Decl *D) const {
-    return llvm::None;
+    return std::nullopt;
   }
 
-  virtual llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const {
-    return llvm::None;
+  virtual std::optional<unsigned> getSourceOrderForDecl(const Decl *D) const {
+    return std::nullopt;
   }
 
-  virtual llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const {
-    return llvm::None;
+  virtual std::optional<StringRef> getGroupNameByUSR(StringRef USR) const {
+    return std::nullopt;
   }
 
-  virtual llvm::Optional<ExternalSourceLocs::RawLocs>
+  virtual std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const {
-    return llvm::None;
+    return std::nullopt;
   }
 
   virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}

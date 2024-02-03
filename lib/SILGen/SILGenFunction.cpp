@@ -208,7 +208,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
 
 SILDebugLocation SILGenFunction::getSILDebugLocation(
     SILBuilder &B, SILLocation Loc,
-    llvm::Optional<SILLocation> CurDebugLocOverride, bool ForMetaInstruction) {
+    std::optional<SILLocation> CurDebugLocOverride, bool ForMetaInstruction) {
   const SILDebugScope *Scope = B.getCurrentDebugScope();
   if (!Scope)
     Scope = F.getDebugScope();
@@ -382,7 +382,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
                              ParameterConvention::Direct_Unowned, /*Params*/ {},
                              /*yields*/
                              {},
-                             /*Results*/ {}, llvm::None, SubstitutionMap(),
+                             /*Results*/ {}, std::nullopt, SubstitutionMap(),
                              SubstitutionMap(), ASTContext);
     StringRef MacroName = ASTContext.getIdentifier(Macro.Name).str();
     RegularLocation MacroLoc(Macro.SLoc);
@@ -1083,7 +1083,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
-  llvm::Optional<Type> errorIfaceTy;
+  std::optional<Type> errorIfaceTy;
   if (auto optErrorTy = ace->getEffectiveThrownType())
     errorIfaceTy = (*optErrorTy)->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
@@ -1210,7 +1210,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto NSStringFromClassType = SILFunctionType::get(
         nullptr, extInfo, SILCoroutineKind::None, paramConvention, params,
-        /*yields*/ {}, resultInfos, /*error result*/ llvm::None,
+        /*yields*/ {}, resultInfos, /*error result*/ std::nullopt,
         SubstitutionMap(), SubstitutionMap(), ctx);
 
     auto NSStringFromClassFn = builder.getOrCreateFunction(
@@ -1299,7 +1299,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
         ParameterConvention::Direct_Unowned, argTypes,
         /*yields*/ {},
         SILResultInfo(argc->getType().getASTType(), ResultConvention::Unowned),
-        /*error result*/ llvm::None, SubstitutionMap(), SubstitutionMap(),
+        /*error result*/ std::nullopt, SubstitutionMap(), SubstitutionMap(),
         getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
@@ -1493,17 +1493,17 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(dc, captureInfo, params, /*selfParam=*/nullptr, interfaceType,
-             /*errorType=*/llvm::None, SourceLoc());
+             /*errorType=*/std::nullopt, SourceLoc());
   if (EmitProfilerIncrement) {
     // Emit a profiler increment for the top-level value, not looking through
     // any function conversions. This is necessary as the counter would have
     // been recorded for this expression, not the sub-expression.
     emitProfilerIncrement(topLevelValue);
   }
-  prepareEpilog(dc, interfaceType, llvm::None, CleanupLocation(Loc));
+  prepareEpilog(dc, interfaceType, std::nullopt, CleanupLocation(Loc));
 
   {
-    llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
+    std::optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
 
     // For a property wrapper backing initializer, bind the opaque value used
     // in the initializer expression to the given parameter.
@@ -1562,12 +1562,11 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   emitBasicProlog(dc,
                   /*paramList*/ nullptr,
-                  /*selfParam*/ nullptr,
-                  interfaceType,
-                  /*errorType=*/llvm::None,
+                  /*selfParam*/ nullptr, interfaceType,
+                  /*errorType=*/std::nullopt,
                   /*throwsLoc=*/SourceLoc(),
                   /*ignored parameters*/ 0);
-  prepareEpilog(dc, interfaceType, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dc, interfaceType, std::nullopt, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
@@ -1611,7 +1610,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
 void SILGenFunction::emitGeneratorFunction(
     SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
-    llvm::Optional<AbstractionPattern> pattern) {
+    std::optional<AbstractionPattern> pattern) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation loc(function.getDecl());
@@ -1621,9 +1620,9 @@ void SILGenFunction::emitGeneratorFunction(
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   emitProlog(dc, captureInfo, ParameterList::createEmpty(getASTContext()),
              /*selfParam=*/nullptr, resultInterfaceType,
-             /*errorType=*/llvm::None, SourceLoc(), pattern);
+             /*errorType=*/std::nullopt, SourceLoc(), pattern);
 
-  prepareEpilog(dc, resultInterfaceType, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dc, resultInterfaceType, std::nullopt, CleanupLocation(loc));
 
   emitStmt(body);
 
@@ -1674,10 +1673,10 @@ ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {
   return ProfileCounter();
 }
 
-llvm::Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
+std::optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
   if (SILProfiler *SP = F.getProfiler())
     return SP->getPGOParent(Node);
-  return llvm::None;
+  return std::nullopt;
 }
 
 SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,

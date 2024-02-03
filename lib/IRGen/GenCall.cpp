@@ -30,10 +30,10 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
+#include <optional>
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -136,10 +136,10 @@ AsyncContextLayout::AsyncContextLayout(
     IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
     ArrayRef<const TypeInfo *> fieldTypeInfos, CanSILFunctionType originalType,
     CanSILFunctionType substitutedType, SubstitutionMap substitutionMap)
-    : StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
+    : StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                    strategy, fieldTypeInfos, /*typeToFill*/ nullptr),
       originalType(originalType), substitutedType(substitutedType),
-      substitutionMap(substitutionMap)  {
+      substitutionMap(substitutionMap) {
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
   assert(this->isFixedLayout());
@@ -150,10 +150,10 @@ Alignment IRGenModule::getAsyncContextAlignment() const {
   return Alignment(MaximumAlignment);
 }
 
-llvm::Optional<Size>
+std::optional<Size>
 FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
   if (!isSpecial())
-    return llvm::None;
+    return std::nullopt;
 
   auto headerSize = getAsyncContextHeaderSize(IGM);
   headerSize = headerSize.roundUpToAlignment(IGM.getPointerAlignment());
@@ -177,7 +177,7 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
     // These frames being this small is very arguably a mistake.
     return headerSize + 3 * IGM.getPointerSize();
   case SpecialKind::KeyPathAccessor:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("covered switch");
 }
@@ -605,7 +605,7 @@ namespace {
   class YieldSchema {
     SILType YieldTy;
     const TypeInfo &YieldTI;
-    llvm::Optional<NativeConventionSchema> NativeSchema;
+    std::optional<NativeConventionSchema> NativeSchema;
     bool IsIndirect;
   public:
     YieldSchema(IRGenModule &IGM, SILFunctionConventions fnConv,
@@ -2292,7 +2292,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   // The AsyncFunctionPointer is not needed in the case where only the function
   // is being loaded and the FunctionPointer was created from a function_ref
   // instruction.
-  llvm::Optional<llvm::Value *> afpPtrValue = llvm::None;
+  std::optional<llvm::Value *> afpPtrValue = std::nullopt;
   auto getAFPPtr = [&]() {
     if (!afpPtrValue) {
       auto *ptr = functionPointer.getRawPointer();
@@ -2644,7 +2644,7 @@ class AsyncCallEmission final : public CallEmission {
   llvm::Value *currentResumeFn = nullptr;
   llvm::Value *thickContext = nullptr;
   Size staticContextSize = Size(0);
-  llvm::Optional<AsyncContextLayout> asyncContextLayout;
+  std::optional<AsyncContextLayout> asyncContextLayout;
 
   AsyncContextLayout getAsyncContextLayout() {
     if (!asyncContextLayout) {
@@ -2656,14 +2656,14 @@ class AsyncCallEmission final : public CallEmission {
   }
 
   void saveValue(ElementLayout layout, llvm::Value *value, bool isOutlined) {
-    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    Address addr = layout.project(IGF, context, /*offsets*/ std::nullopt);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     Explosion explosion;
     explosion.add(value);
     ti.initialize(IGF, explosion, addr, isOutlined);
   }
   void loadValue(ElementLayout layout, Explosion &explosion) {
-    Address addr = layout.project(IGF, context, /*offsets*/ llvm::None);
+    Address addr = layout.project(IGF, context, /*offsets*/ std::nullopt);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     ti.loadAsTake(IGF, addr, explosion);
   }
@@ -2864,7 +2864,7 @@ public:
       if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
         Address fieldAddr =
             parentContextField.project(IGF, this->context,
-                                       /*offsets*/ llvm::None);
+                                       /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         context = emitPointerAuthSign(IGF, context, authInfo);
@@ -2880,8 +2880,8 @@ public:
       auto fnVal = currentResumeFn;
       // Sign the pointer.
       if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
-        Address fieldAddr =
-            resumeParentField.project(IGF, this->context, /*offsets*/ llvm::None);
+        Address fieldAddr = resumeParentField.project(IGF, this->context,
+                                                      /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
@@ -4085,7 +4085,7 @@ void CallEmission::setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
     llvm_unreachable("unexpected representation");
   }
 
-  llvm::Optional<StackAddress> dynamicArgsBuf;
+  std::optional<StackAddress> dynamicArgsBuf;
   SmallVector<SILType, 4> indiceTypes;
   for (auto i : indices(params)) {
     auto ty = getParameterType(i);
@@ -4661,7 +4661,7 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
                      + unsigned(!indirectComponents.empty()))));
 
   // Fill in the indirect buffer if necessary.
-  llvm::Optional<Address> indirectBuffer;
+  std::optional<Address> indirectBuffer;
   Size indirectBufferSize;
   if (!indirectComponents.empty()) {
     auto bufferStructTy = coroInfo.indirectResultsType;
@@ -5713,19 +5713,19 @@ FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
 void irgen::emitAsyncReturn(
     IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
     CanSILFunctionType fnType,
-    llvm::Optional<ArrayRef<llvm::Value *>> nativeResultArgs) {
+    std::optional<ArrayRef<llvm::Value *>> nativeResultArgs) {
   auto contextAddr = asyncLayout.emitCastTo(IGF, IGF.getAsyncContext());
   auto returnToCallerLayout = asyncLayout.getResumeParentLayout();
   auto returnToCallerAddr =
-      returnToCallerLayout.project(IGF, contextAddr, llvm::None);
+      returnToCallerLayout.project(IGF, contextAddr, std::nullopt);
   Explosion fn;
   cast<LoadableTypeInfo>(returnToCallerLayout.getType())
       .loadAsCopy(IGF, returnToCallerAddr, fn);
   llvm::Value *fnVal = fn.claimNext();
 
   if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
-    Address fieldAddr =
-        returnToCallerLayout.project(IGF, contextAddr, /*offsets*/ llvm::None);
+    Address fieldAddr = returnToCallerLayout.project(IGF, contextAddr,
+                                                     /*offsets*/ std::nullopt);
     auto authInfo = PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
                                           PointerAuthEntity());
     fnVal = emitPointerAuthAuth(IGF, fnVal, authInfo);
@@ -5780,7 +5780,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   auto &IGM = IGF.IGM;
 
   // Map the explosion to the native result type.
-  llvm::Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
+  std::optional<ArrayRef<llvm::Value *>> nativeResults = std::nullopt;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
   SILFunctionConventions conv(fnType, IGF.getSILModule());
   auto &nativeSchema =
@@ -5892,7 +5892,7 @@ void irgen::forwardAsyncCallResult(IRGenFunction &IGF,
   Explosion resultExplosion;
   Explosion errorExplosion;
   auto hasError = fnType->hasErrorResult();
-  llvm::Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
+  std::optional<ArrayRef<llvm::Value *>> nativeResults = std::nullopt;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
 
   if (suspendResultTy->getNumElements() == numAsyncContextParams) {

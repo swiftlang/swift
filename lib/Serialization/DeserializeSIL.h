@@ -171,7 +171,7 @@ namespace swift {
     SILDifferentiabilityWitness *
         readDifferentiabilityWitness(serialization::DeclID);
 
-    llvm::Optional<KeyPathPatternComponent>
+    std::optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
 
   public:
@@ -185,7 +185,7 @@ namespace swift {
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name,
-                        llvm::Optional<SILLinkage> Linkage = llvm::None);
+                        std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);
     SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);

@@ -493,7 +493,7 @@ BatchJob::BatchJob(const JobAction &Source,
                    EnvironmentVector ExtraEnvironment,
                    std::vector<FilelistInfo> Infos,
                    ArrayRef<const Job *> Combined, int64_t &NextQuasiPID,
-                   llvm::Optional<ResponseFileInfo> ResponseFile)
+                   std::optional<ResponseFileInfo> ResponseFile)
     : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
           ExtraEnvironment, Infos, ResponseFile),
       CombinedJobs(Combined.begin(), Combined.end()),

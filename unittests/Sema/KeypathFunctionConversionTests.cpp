@@ -98,7 +98,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   // f(\String.isEmpty)
   auto kpArg = Argument(SourceLoc(), Identifier(), kpExpr);
   auto *argList = ArgumentList::create(Context, SourceLoc(), {kpArg},
-                                       SourceLoc(), llvm::None, false);
+                                       SourceLoc(), std::nullopt, false);
   llvm::SmallVector<ValueDecl *, 2> fDecls = {genericFnDecl, concreteFnDecl};
   auto *fDRE = new (Context) OverloadedDeclRefExpr(
       fDecls, DeclNameLoc(), FunctionRefKind::SingleApply, false);

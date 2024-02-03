@@ -871,7 +871,7 @@ public:
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   Address emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                          SILDebugVariable VarInfo,
-                         llvm::Optional<Alignment> _Align, bool Init,
+                         std::optional<Alignment> _Align, bool Init,
                          bool WasMoved) {
     auto Align = _Align.value_or(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
@@ -940,7 +940,7 @@ public:
   emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
                          const SILDebugScope *Scope, SILDebugVariable VarInfo,
                          bool IsAnonymous, bool WasMoved,
-                         llvm::Optional<Alignment> Align = llvm::None) {
+                         std::optional<Alignment> Align = std::nullopt) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1628,7 +1628,7 @@ class AsyncNativeCCEntryPointArgumentEmission final
   Address dataAddr;
 
   Explosion loadExplosion(ElementLayout layout) {
-    Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    Address addr = layout.project(IGF, dataAddr, /*offsets*/ std::nullopt);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     Explosion explosion;
     ti.loadAsTake(IGF, addr, explosion);
@@ -3465,7 +3465,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
 
   // Check for a negative capacity, which is invalid.
   auto capacity = IGF.getLoweredSingletonExplosion(vCapacity);
-  llvm::Optional<int64_t> capacityValue;
+  std::optional<int64_t> capacityValue;
   if (auto capacityConst = dyn_cast<llvm::ConstantInt>(capacity)) {
     capacityValue = capacityConst->getSExtValue();
     if (*capacityValue < 0) {
@@ -3476,7 +3476,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
   // Check for a negative stride, which should never occur because the caller
   // should always be using MemoryLayout<T>.stride to produce this value.
   auto stride = IGF.getLoweredSingletonExplosion(vStride);
-  llvm::Optional<int64_t> strideValue;
+  std::optional<int64_t> strideValue;
   if (auto strideConst = dyn_cast<llvm::ConstantInt>(stride)) {
     strideValue = strideConst->getSExtValue();
     if (*strideValue < 0) {
@@ -3624,7 +3624,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // If the callee is a differentiable function, we extract the original
   // function because we want to call the original function.
-  llvm::Optional<LoweredValue> diffCalleeOrigFnLV;
+  std::optional<LoweredValue> diffCalleeOrigFnLV;
   if (site.getOrigCalleeType()->isDifferentiable()) {
     auto diffFnExplosion = getLoweredExplosion(site.getCallee());
     Explosion origFnExplosion;
@@ -3671,7 +3671,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   // Allocate space for the coroutine buffer.
-  llvm::Optional<Address> coroutineBuffer;
+  std::optional<Address> coroutineBuffer;
   switch (origCalleeType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
@@ -4191,12 +4191,12 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       if (fnType->hasErrorResult()) {
         SmallVector<llvm::Value *, 16> nativeResultsStorage;
         nativeResultsStorage.push_back(getNullErrorValue());
-        return emitAsyncReturn(IGF, asyncLayout, fnType,
-                               llvm::Optional<llvm::ArrayRef<llvm::Value *>>(
-                                   nativeResultsStorage));
+        return emitAsyncReturn(
+            IGF, asyncLayout, fnType,
+            std::optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
       }
 
-      return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);
+      return emitAsyncReturn(IGF, asyncLayout, fnType, std::nullopt);
     }
   }
 
@@ -7125,7 +7125,7 @@ void IRGenSILFunction::visitFunctionExtractIsolationInst(
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
-  llvm::Optional<StackAddress> dynamicArgsBuf;
+  std::optional<StackAddress> dynamicArgsBuf;
   llvm::Value *args;
   if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();

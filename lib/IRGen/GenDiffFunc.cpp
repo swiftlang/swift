@@ -143,11 +143,11 @@ public:
         fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-    return llvm::None;
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+    return std::nullopt;
   }
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return llvm::None;
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return std::nullopt;
   }
 };
 
@@ -211,7 +211,7 @@ public:
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-    return StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
+    return StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                         LayoutStrategy::Universal, fieldTypes);
   }
 };
@@ -320,11 +320,11 @@ public:
         fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-    return llvm::None;
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+    return std::nullopt;
   }
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return llvm::None;
+  std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return std::nullopt;
   }
 };
 
@@ -383,7 +383,7 @@ public:
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-    return StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
+    return StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                         LayoutStrategy::Universal, fieldTypes);
   }
 };

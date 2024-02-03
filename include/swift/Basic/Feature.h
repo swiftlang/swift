@@ -13,8 +13,8 @@
 #ifndef SWIFT_BASIC_FEATURES_H
 #define SWIFT_BASIC_FEATURES_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 
@@ -54,15 +54,15 @@ inline bool featureImpliesFeature(Feature feature, Feature implied) {
 }
 
 /// Get the feature corresponding to this "future" feature, if there is one.
-llvm::Optional<Feature> getUpcomingFeature(llvm::StringRef name);
+std::optional<Feature> getUpcomingFeature(llvm::StringRef name);
 
 /// Get the feature corresponding to this "experimental" feature, if there is
 /// one.
-llvm::Optional<Feature> getExperimentalFeature(llvm::StringRef name);
+std::optional<Feature> getExperimentalFeature(llvm::StringRef name);
 
 /// Get the major language version in which this feature was introduced, or
 /// \c None if it does not have such a version.
-llvm::Optional<unsigned> getFeatureLanguageVersion(Feature feature);
+std::optional<unsigned> getFeatureLanguageVersion(Feature feature);
 
 /// Determine whether this feature should be included in the
 /// module interface

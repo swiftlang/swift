@@ -516,7 +516,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
-  llvm::Optional<Token> trySuffix;
+  std::optional<Token> trySuffix;
   if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
     trySuffix = Tok;
     consumeToken();
@@ -995,7 +995,7 @@ void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
 
   CancellableBacktrackingScope backtrack(*this);
   {
-    llvm::Optional<Lexer::ForwardSlashRegexRAII> regexScope;
+    std::optional<Lexer::ForwardSlashRegexRAII> regexScope;
     regexScope.emplace(*L, mustBeRegex);
 
     // Try re-lex as a `/.../` regex literal, this will split an operator if
@@ -1452,8 +1452,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // it as a "postfix ifconfig expression".
       bool isPostfixIfConfigExpr = false;
       {
-        llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash,
-                                                             llvm::None);
+        llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
+                                                            std::nullopt);
         Parser::BacktrackingScope Backtrack(*this);
         // Skip to the first body. We may need to skip multiple '#if' directives
         // since we support nested '#if's. e.g.
@@ -1911,7 +1911,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     }
     if (peekToken().is(tok::code_complete) &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-      return parseExprPoundCodeCompletion(/*ParentKind*/ llvm::None);
+      return parseExprPoundCodeCompletion(/*ParentKind*/ std::nullopt);
     }
 
     return parseExprMacroExpansion(isExprBasic);
@@ -2450,7 +2450,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
   assert(PlaceholderId.isEditorPlaceholder());
 
   auto parseTypeForPlaceholder = [&]() -> std::pair<TypeRepr *, TypeRepr *> {
-    llvm::Optional<EditorPlaceholderData> DataOpt =
+    std::optional<EditorPlaceholderData> DataOpt =
         swift::parseEditorPlaceholder(PlaceholderTok.getText());
     if (!DataOpt)
       return {nullptr, nullptr};
@@ -3196,7 +3196,7 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
     args.emplace_back(elt.LabelLoc, elt.Label, elt.E);
 
   auto numNonTrailing = args.size();
-  llvm::Optional<unsigned> trailingClosureIndex;
+  std::optional<unsigned> trailingClosureIndex;
 
   // If we can parse trailing closures, do so.
   if (allowTrailingClosure && Tok.is(tok::l_brace) &&
@@ -3440,7 +3440,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
 /// expr-pound-codecompletion:
 ///   '#' code-completion-token
 ParserResult<Expr>
-Parser::parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind) {
+Parser::parseExprPoundCodeCompletion(std::optional<StmtKind> ParentKind) {
   assert(Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
          Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc());
   consumeToken(); // '#' token.
@@ -3528,7 +3528,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   }
 
   ParserStatus Status;
-  llvm::Optional<bool> isDictionary;
+  std::optional<bool> isDictionary;
   SmallVector<Expr *, 8> ElementExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
 
@@ -3605,10 +3605,10 @@ ParserResult<Expr> Parser::parseExprCollection() {
 
 /// parseExprCollectionElement - Parse an element for collection expr.
 ///
-/// If \p isDictionary is \c llvm::None, it's set to \c true if the element is
+/// If \p isDictionary is \c std::nullopt, it's set to \c true if the element is
 /// for dictionary literal, or \c false otherwise.
 ParserResult<Expr>
-Parser::parseExprCollectionElement(llvm::Optional<bool> &isDictionary) {
+Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   auto Element = parseExpr(isDictionary.has_value() && *isDictionary
                                ? diag::expected_key_in_dictionary_literal
                                : diag::expected_expr_in_collection_literal);
@@ -3719,7 +3719,7 @@ ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
-  llvm::Optional<AvailabilitySpecKind> Kind;
+  std::optional<AvailabilitySpecKind> Kind;
   SourceRange VersionRange;
 
   if (Tok.isIdentifierOrUnderscore()) {
@@ -3779,7 +3779,7 @@ Parser::parsePlatformVersionConstraintSpec() {
     return nullptr;
   }
 
-  llvm::Optional<PlatformKind> Platform =
+  std::optional<PlatformKind> Platform =
       platformFromString(PlatformIdentifier.str());
 
   if (!Platform.has_value() || Platform.value() == PlatformKind::none) {

@@ -100,7 +100,7 @@ private:
   bool isDone() const { return CursorInfo->isValid(); }
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type(),
-                  llvm::Optional<ReferenceMetaData> Data = llvm::None);
+                  std::optional<ReferenceMetaData> Data = std::nullopt);
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
@@ -132,7 +132,7 @@ static bool locationMatches(SourceLoc currentLoc, SourceLoc toResolveLoc,
 bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
                                     ExtensionDecl *ExtTyRef, SourceLoc Loc,
                                     bool IsRef, Type Ty,
-                                    llvm::Optional<ReferenceMetaData> Data) {
+                                    std::optional<ReferenceMetaData> Data) {
   if (!D->hasName())
     return false;
 
@@ -151,8 +151,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   SmallVector<NominalTypeDecl *> ReceiverTypes;
   bool IsDynamic = false;
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
-      llvm::None;
+  std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      std::nullopt;
   if (Expr *BaseE = getBase(ExprStack)) {
     if (isDynamicRef(BaseE, D)) {
       IsDynamic = true;
@@ -556,7 +556,7 @@ private:
   SourceLoc Start;
   SourceLoc End;
 
-  llvm::Optional<ResolvedRangeInfo> Result;
+  std::optional<ResolvedRangeInfo> Result;
   std::vector<ContextInfo> ContextStack;
   ContextInfo &getCurrentDC() {
     assert(!ContextStack.empty());

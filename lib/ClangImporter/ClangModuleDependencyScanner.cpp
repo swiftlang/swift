@@ -84,7 +84,7 @@ static void addSearchPathInvocationArguments(
 
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
+    ASTContext &ctx, std::optional<StringRef> sourceFileName = std::nullopt) {
   std::vector<std::string> commandLineArgs =
       ClangImporter::getClangDriverArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
@@ -351,7 +351,7 @@ void ClangImporter::recordBridgingHeaderOptions(
 // Clang does have a concept working directory which may be specified on this
 // Clang invocation with '-working-directory'. If so, it is crucial that we
 // use this directory as an argument to the Clang scanner invocation below.
-static llvm::Optional<std::string>
+static std::optional<std::string>
 computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
                              const ASTContext &ctx) {
   std::string workingDir;
@@ -364,7 +364,7 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
     if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          "Missing '-working-directory' argument");
-      return llvm::None;
+      return std::nullopt;
     }
     workingDir = *(clangWorkingDirPos - 1);
   }

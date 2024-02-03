@@ -75,12 +75,12 @@ static bool updateAccessKind(SILAccessKind &LHS, SILAccessKind RHS) {
   return changed;
 }
 
-static bool updateOptionalAccessKind(llvm::Optional<SILAccessKind> &LHS,
-                                     llvm::Optional<SILAccessKind> RHS) {
-  if (RHS == llvm::None)
+static bool updateOptionalAccessKind(std::optional<SILAccessKind> &LHS,
+                                     std::optional<SILAccessKind> RHS) {
+  if (RHS == std::nullopt)
     return false;
 
-  if (LHS == llvm::None) {
+  if (LHS == std::nullopt) {
     LHS = RHS;
     return true;
   }
@@ -104,7 +104,7 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
 }
 
 bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
-  if (unidentifiedAccess == llvm::None) {
+  if (unidentifiedAccess == std::nullopt) {
     unidentifiedAccess = accessKind;
     return true;
   }
@@ -172,7 +172,7 @@ bool AccessStorageResult::mergeAccesses(
     // Merge StorageAccessInfo into already-mapped AccessStorage.
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
-  if (other.unidentifiedAccess != llvm::None)
+  if (other.unidentifiedAccess != std::nullopt)
     changed |= updateUnidentifiedAccess(other.unidentifiedAccess.value());
 
   return changed;
@@ -334,7 +334,7 @@ void AccessStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
-  if (unidentifiedAccess != llvm::None) {
+  if (unidentifiedAccess != std::nullopt) {
     os << "  unidentified accesses: "
        << getSILAccessKindName(unidentifiedAccess.value()) << "\n";
   }

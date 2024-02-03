@@ -92,7 +92,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   for (auto It = SN->begin(); It != SN->end(); ++It) {
     auto *MN = cast<MappingNode>(&*It);
     BatchScanInput entry;
-    llvm::Optional<std::set<int8_t>> Platforms;
+    std::optional<std::set<int8_t>> Platforms;
     for (auto &Pair : *MN) {
       auto Key = getScalaNodeText(Pair.getKey());
       auto *Value = Pair.getValue();
@@ -120,7 +120,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   return false;
 }
 
-static llvm::Optional<std::vector<BatchScanInput>>
+static std::optional<std::vector<BatchScanInput>>
 parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
                         llvm::StringSaver &saver) {
   assert(!batchInputPath.empty());
@@ -133,7 +133,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   if (!FileBufOrErr) {
     ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
                        batchInputPath);
-    return llvm::None;
+    return std::nullopt;
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
 
@@ -149,7 +149,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
     if (parseBatchInputEntries(ctx, saver, N, result)) {
       ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_corrupted,
                          batchInputPath);
-      return llvm::None;
+      return std::nullopt;
     }
   }
   return result;
@@ -1902,7 +1902,7 @@ swift::dependencies::performBatchModuleScan(
 
         StringRef moduleName = entry.moduleName;
         bool isClang = !entry.isSwift;
-        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
+        std::optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's

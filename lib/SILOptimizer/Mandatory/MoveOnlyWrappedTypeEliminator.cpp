@@ -223,11 +223,10 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   // the original function type into a function type without move only. This is
   // safe since adding/removing moveonlywrapped types is ABI neutral.
   bool visitApplySite(ApplySite ai) {
-    auto eliminateMoveOnlyWrapped =
-        [&](TypeBase *type) -> llvm::Optional<Type> {
+    auto eliminateMoveOnlyWrapped = [&](TypeBase *type) -> std::optional<Type> {
       if (auto *moveType = dyn_cast<SILMoveOnlyWrappedType>(type))
         return moveType->getInnerType();
-      return llvm::None;
+      return std::nullopt;
     };
 
     // First fix up the callee.

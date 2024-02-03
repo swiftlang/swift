@@ -260,7 +260,7 @@ namespace irgen {
 
   void emitAsyncReturn(
       IRGenFunction &IGF, AsyncContextLayout &layout, CanSILFunctionType fnType,
-      llvm::Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
+      std::optional<ArrayRef<llvm::Value *>> nativeResultArgs = std::nullopt);
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,

@@ -1917,7 +1917,7 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != llvm::None)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt)) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
@@ -1953,11 +1953,11 @@ Type AbstractClosureExpr::getResultType(
   return T->castTo<FunctionType>()->getResult();
 }
 
-llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
+std::optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
   if (auto fnType = getType()->getAs<AnyFunctionType>())
     return fnType->getEffectiveThrownErrorType();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
@@ -2436,14 +2436,14 @@ KeyPathExpr::setComponents(ASTContext &C,
   Components = Components.slice(0, newComponents.size());
 }
 
-llvm::Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
+std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   for (auto idx : indices(getComponents())) {
     if (auto *args = getComponents()[idx].getSubscriptArgs()) {
       if (args->findArgumentExpr(arg))
         return idx;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 BoundGenericType *KeyPathExpr::getKeyPathType() const {

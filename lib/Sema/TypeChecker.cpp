@@ -449,14 +449,14 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   GenericSignature GenericSig,
                                   SILTypeResolutionContext *SILContext,
                                   DeclContext *DC, bool ProduceDiagnostics) {
-  TypeResolutionOptions options = llvm::None;
+  TypeResolutionOptions options = std::nullopt;
   if (SILContext) {
     options |= TypeResolutionFlags::SILMode;
     if (SILContext->IsSILType)
       options |= TypeResolutionFlags::SILType;
   }
 
-  llvm::Optional<DiagnosticSuppression> suppression;
+  std::optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
@@ -602,7 +602,7 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
-                                   llvm::Optional<TypeResolutionStage> stage) {
+                                   std::optional<TypeResolutionStage> stage) {
   if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
@@ -617,8 +617,8 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
 }
 
 bool TypeChecker::diagnoseInvalidFunctionType(
-    FunctionType *fnTy, SourceLoc loc, llvm::Optional<FunctionTypeRepr *> repr,
-    DeclContext *dc, llvm::Optional<TypeResolutionStage> stage) {
+    FunctionType *fnTy, SourceLoc loc, std::optional<FunctionTypeRepr *> repr,
+    DeclContext *dc, std::optional<TypeResolutionStage> stage) {
   // Some of the below checks trigger cycles if we don't have a generic
   // signature yet; we'll run the checks again in
   // TypeResolutionStage::Interface.

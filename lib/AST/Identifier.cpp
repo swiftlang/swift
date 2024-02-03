@@ -230,15 +230,15 @@ ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
   Storage = DeclName(ctx, Identifier(), pieces);
 }
 
-llvm::Optional<ObjCSelector>
-ObjCSelector::parse(ASTContext &ctx, StringRef string) {
+std::optional<ObjCSelector> ObjCSelector::parse(ASTContext &ctx,
+                                                StringRef string) {
   // Find the first colon.
   auto colonPos = string.find(':');
 
   // If there is no colon, we have a nullary selector.
   if (colonPos == StringRef::npos) {
     if (string.empty() || !Lexer::isIdentifier(string))
-      return llvm::None;
+      return std::nullopt;
     return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
   }
 
@@ -250,7 +250,7 @@ ObjCSelector::parse(ASTContext &ctx, StringRef string) {
       pieces.push_back(Identifier());
     } else {
       if (!Lexer::isIdentifier(piece))
-        return llvm::None;
+        return std::nullopt;
       pieces.push_back(ctx.getIdentifier(piece));
     }
 
@@ -261,7 +261,7 @@ ObjCSelector::parse(ASTContext &ctx, StringRef string) {
 
   // If anything remains of the string, it's not a selector.
   if (!string.empty())
-    return llvm::None;
+    return std::nullopt;
 
   return ObjCSelector(ctx, pieces.size(), pieces);
 }

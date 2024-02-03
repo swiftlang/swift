@@ -930,31 +930,31 @@ namespace  {
 }
 
 /// Determine whether the given property should be accessed via the enclosing-self access pattern.
-static llvm::Optional<EnclosingSelfPropertyWrapperAccess>
+static std::optional<EnclosingSelfPropertyWrapperAccess>
 getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   // The enclosing-self pattern only applies to instance properties of
   // classes.
   if (!property->isInstanceMember())
-    return llvm::None;
+    return std::nullopt;
   auto classDecl = property->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // The pattern currently only works with the outermost property wrapper.
   Type outermostWrapperType = property->getPropertyWrapperBackingPropertyType();
   if (!outermostWrapperType)
-    return llvm::None;
+    return std::nullopt;
   NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
   if (!wrapperTypeDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // Look for a generic subscript that fits the general form we need.
   auto wrapperInfo = wrapperTypeDecl->getPropertyWrapperTypeInfo();
-  auto subscript =
-      forProjected ? wrapperInfo.enclosingInstanceProjectedSubscript
-                   : wrapperInfo.enclosingInstanceWrappedSubscript;
+  auto subscript = forProjected
+                       ? wrapperInfo.enclosingInstanceProjectedSubscript
+                       : wrapperInfo.enclosingInstanceWrappedSubscript;
   if (!subscript)
-    return llvm::None;
+    return std::nullopt;
 
   EnclosingSelfPropertyWrapperAccess result;
   result.subscript = subscript;
@@ -968,11 +968,11 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-static llvm::Optional<PropertyWrapperLValueness>
+static std::optional<PropertyWrapperLValueness>
 getPropertyWrapperLValueness(VarDecl *var) {
   auto &ctx = var->getASTContext();
   return evaluateOrDefault(ctx.evaluator, PropertyWrapperLValuenessRequest{var},
-                           llvm::None);
+                           std::nullopt);
 }
 
 /// Build a reference to the storage of a declaration. Returns nullptr if there
@@ -998,7 +998,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isLValue = isUsedForSetAccess;
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
-  llvm::Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
+  std::optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   // Contains the underlying wrappedValue declaration in a property wrapper
   // along with whether or not the reference to this field needs to be an lvalue
   llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
@@ -2967,7 +2967,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
     : PropertyWrapperMutability::Nonmutating;
 }
 
-llvm::Optional<PropertyWrapperMutability>
+std::optional<PropertyWrapperMutability>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *originalVar = var;
   unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
@@ -2976,7 +2976,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
     originalVar = var->getOriginalWrappedProperty(
         PropertyWrapperSynthesizedPropertyKind::Projection);
     if (!originalVar)
-      return llvm::None;
+      return std::nullopt;
 
     numWrappers = originalVar->getAttachedPropertyWrappers().size();
     isProjectedValue = true;
@@ -2989,9 +2989,9 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
       varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
 
   if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
-    return llvm::None;
+    return std::nullopt;
   if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Figure out which member we're looking through.
   auto varMember = isProjectedValue
@@ -3001,7 +3001,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   // Start with the traits from the outermost wrapper.
   auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
   if (firstWrapper.*varMember == nullptr)
-    return llvm::None;
+    return std::nullopt;
 
   PropertyWrapperMutability result;
   
@@ -3018,7 +3018,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
     assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
-      return llvm::None;
+      return std::nullopt;
 
     PropertyWrapperMutability nextResult;
     nextResult.Getter =
@@ -3032,7 +3032,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i]),
                getCustomAttrTypeLoc(var->getAttachedPropertyWrappers()[i-1]));
 
-      return llvm::None;
+      return std::nullopt;
     }
     nextResult.Setter =
               result.composeWith(getSetterMutatingness(wrapper.valueVar,
@@ -3044,7 +3044,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
   return result;
 }
 
-llvm::Optional<PropertyWrapperLValueness>
+std::optional<PropertyWrapperLValueness>
 PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   VarDecl *VD = var;
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
@@ -3057,7 +3057,7 @@ PropertyWrapperLValuenessRequest::evaluate(Evaluator &, VarDecl *var) const {
   }
 
   if (!VD)
-    return llvm::None;
+    return std::nullopt;
 
   auto varMember = isProjectedValue
       ? &PropertyWrapperTypeInfo::projectedValueVar
@@ -3637,11 +3637,11 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   return hasStorage;
 }
 
-llvm::Optional<bool> HasStorageRequest::getCachedResult() const {
+std::optional<bool> HasStorageRequest::getCachedResult() const {
   AbstractStorageDecl *decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.HasStorageComputed)
     return static_cast<bool>(decl->LazySemanticInfo.HasStorage);
-  return llvm::None;
+  return std::nullopt;
 }
 
 void HasStorageRequest::cacheResult(bool hasStorage) const {

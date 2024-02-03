@@ -166,7 +166,7 @@ public:
       MarkUnresolvedNonCopyableValueInst *markedValue,
       SILInstruction *lastLiveUse, SILInstruction *violatingUse,
       bool isUseConsuming,
-      llvm::Optional<ScopeRequiringFinalInit> scopeKind = llvm::None);
+      std::optional<ScopeRequiringFinalInit> scopeKind = std::nullopt);
   void emitInOutEndOfFunctionDiagnostic(
       MarkUnresolvedNonCopyableValueInst *markedValue,
       SILInstruction *violatingUse);

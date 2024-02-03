@@ -2151,11 +2151,11 @@ namespace {
     bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
                            SmallVectorImpl<SILYieldInfo> &yields,
                            SmallVectorImpl<SILResultInfo> &results,
-                           llvm::Optional<SILResultInfo> &errorResult);
+                           std::optional<SILResultInfo> &errorResult);
     bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
-                                llvm::Optional<SILResultInfo> &errorResult);
+                                std::optional<SILResultInfo> &errorResult);
     NeverNullType resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
                                             TypeResolutionOptions options);
     NeverNullType resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
@@ -2213,10 +2213,10 @@ namespace {
                                      TypeAttribute *thicknessAttr);
     NeverNullType
     buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
-                      llvm::Optional<MetatypeRepresentation> storedRepr);
+                      std::optional<MetatypeRepresentation> storedRepr);
     NeverNullType
     buildProtocolType(ProtocolTypeRepr *repr, Type instanceType,
-                      llvm::Optional<MetatypeRepresentation> storedRepr);
+                      std::optional<MetatypeRepresentation> storedRepr);
 
     NeverNullType resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                           unsigned ordinal,
@@ -2587,7 +2587,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<DeclRefTypeRepr>(repr) && !isa<PackExpansionTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
-    options.setContext(llvm::None);
+    options.setContext(std::nullopt);
   }
 
   bool isDirect = false;
@@ -2828,7 +2828,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     TypeRepr *repr, TypeResolutionOptions options, OpenedTypeAttr *openedAttr) {
   assert(silContext);
 
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
@@ -2910,7 +2910,7 @@ TypeResolver::resolvePackElementArchetype(
     return ErrorType::get(ctx);
   }
 
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   // The interface type is the type wrapped by the attribute. Resolve it
   // within the generic parameter list for the opened generic environment.
@@ -4003,7 +4003,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     return ErrorType::get(ctx);
   }
 
-  llvm::Optional<SILInnerGenericContextRAII> innerGenericContext;
+  std::optional<SILInnerGenericContextRAII> innerGenericContext;
   if (auto *genericParams = repr->getGenericParams()) {
     if (!silContext) {
       diagnose(genericParams->getLAngleLoc(), diag::generic_function_type)
@@ -4013,7 +4013,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     innerGenericContext.emplace(silContext, genericParams);
   }
 
-  TypeResolutionOptions options = llvm::None;
+  TypeResolutionOptions options = std::nullopt;
   options |= parentOptions.withoutContext().getFlags();
   auto params =
       resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options, diffKind);
@@ -4180,7 +4180,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                                    TypeResolutionOptions options,
                                                    TypeAttrSet *attrs) {
   assert(silContext);
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   bool hasError = false;
 
@@ -4301,7 +4301,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILParameterInfo, 4> params;
   SmallVector<SILYieldInfo, 4> yields;
   SmallVector<SILResultInfo, 4> results;
-  llvm::Optional<SILResultInfo> errorResult;
+  std::optional<SILResultInfo> errorResult;
 
   // Resolve generic params in the pattern environment, if present, or
   // else the function's generic environment, if it has one.
@@ -4458,8 +4458,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   if (shouldStoreClangType(representation) && !clangFnType) {
     assert(results.size() <= 1 && yields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
-    auto result =
-        results.empty() ? llvm::Optional<SILResultInfo>() : results[0];
+    auto result = results.empty() ? std::optional<SILResultInfo>() : results[0];
     clangFnType = getASTContext().getCanonicalClangFunctionType(params, result,
                                                                 representation);
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
@@ -4570,7 +4569,7 @@ bool TypeResolver::resolveSingleSILResult(
     TypeRepr *repr, TypeResolutionOptions options,
     SmallVectorImpl<SILYieldInfo> &yields,
     SmallVectorImpl<SILResultInfo> &ordinaryResults,
-    llvm::Optional<SILResultInfo> &errorResult) {
+    std::optional<SILResultInfo> &errorResult) {
   Type type;
   auto convention = DefaultResultConvention;
   bool isErrorResult = false;
@@ -4670,7 +4669,7 @@ bool TypeResolver::resolveSILResults(
     TypeRepr *repr, TypeResolutionOptions options,
     SmallVectorImpl<SILYieldInfo> &yields,
     SmallVectorImpl<SILResultInfo> &ordinaryResults,
-    llvm::Optional<SILResultInfo> &errorResult) {
+    std::optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
     // If any of the elements have a label, or an explicit missing label (_:),
     // resolve the entire result type as a single tuple type.
@@ -5407,7 +5406,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  llvm::Optional<unsigned> moveOnlyElementIndex = llvm::None;
+  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
@@ -5708,7 +5707,7 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  llvm::Optional<MetatypeRepresentation> storedRepr;
+  std::optional<MetatypeRepresentation> storedRepr;
 
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
@@ -5723,7 +5722,7 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
 
 NeverNullType TypeResolver::buildMetatypeType(
     MetatypeTypeRepr *repr, Type instanceType,
-    llvm::Optional<MetatypeRepresentation> storedRepr) {
+    std::optional<MetatypeRepresentation> storedRepr) {
   // If the instance type is an existential metatype, figure out if
   // the syntax is of the form '(any <protocol metatype>).Type'. In
   // this case, type resolution should produce the static metatype
@@ -5791,7 +5790,7 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  llvm::Optional<MetatypeRepresentation> storedRepr;
+  std::optional<MetatypeRepresentation> storedRepr;
 
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
@@ -5806,7 +5805,7 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
 
 NeverNullType TypeResolver::buildProtocolType(
     ProtocolTypeRepr *repr, Type instanceType,
-    llvm::Optional<MetatypeRepresentation> storedRepr) {
+    std::optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
     diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
              instanceType);

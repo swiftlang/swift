@@ -82,7 +82,7 @@ class Lexer {
 
   /// A queue of diagnostics to emit when a token is consumed. We want to queue
   /// them, as the parser may backtrack and re-lex a token.
-  llvm::Optional<DiagnosticQueue> DiagQueue;
+  std::optional<DiagnosticQueue> DiagQueue;
 
   using State = LexerState;
 
@@ -249,11 +249,11 @@ public:
 
   /// If a lexer cut off point has been set returns the offset in the buffer at
   /// which lexing is being cut off.
-  llvm::Optional<size_t> lexingCutOffOffset() const {
+  std::optional<size_t> lexingCutOffOffset() const {
     if (LexerCutOffPoint) {
       return LexerCutOffPoint - BufferStart;
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 

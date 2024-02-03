@@ -13,8 +13,7 @@
 #ifndef SWIFT_RULE_H
 #define SWIFT_RULE_H
 
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/None.h"
+#include <optional>
 
 #include "Symbol.h"
 #include "Term.h"
@@ -111,7 +110,7 @@ public:
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
 
-  llvm::Optional<Symbol> isPropertyRule() const;
+  std::optional<Symbol> isPropertyRule() const;
 
   const ProtocolDecl *isProtocolConformanceRule() const;
 
@@ -165,7 +164,7 @@ public:
             RHS.containsUnresolvedSymbols());
   }
 
-  llvm::Optional<Identifier> isProtocolTypeAliasRule() const;
+  std::optional<Identifier> isProtocolTypeAliasRule() const;
 
   bool isDerivedFromConcreteProtocolTypeAliasRule() const;
 
@@ -234,7 +233,7 @@ public:
 
   unsigned getNesting() const;
 
-  llvm::Optional<int> compare(const Rule &other, RewriteContext &ctx) const;
+  std::optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 

@@ -23,9 +23,8 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/LifetimeDependence.h"
 
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <utility>
 
@@ -185,7 +184,7 @@ struct UnexpectedClangTypeError {
   const Kind errorKind;
   const clang::Type *type;
 
-  static llvm::Optional<UnexpectedClangTypeError>
+  static std::optional<UnexpectedClangTypeError>
   checkClangType(SILFunctionTypeRepresentation fnRep, const clang::Type *type,
                  bool expectNonnullForCOrBlock, bool expectCanonical);
 
@@ -355,7 +354,7 @@ convertRepresentation(FunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled FunctionTypeRepresentation!");
 }
 
-inline llvm::Optional<FunctionTypeRepresentation>
+inline std::optional<FunctionTypeRepresentation>
 convertRepresentation(SILFunctionTypeRepresentation rep) {
   switch (rep) {
   case SILFunctionTypeRepresentation::Thick:
@@ -375,7 +374,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation!");
 }
@@ -1342,7 +1341,7 @@ public:
     return builder.isEqualTo(other.builder, useClangTypes);
   }
 
-  llvm::Optional<UnexpectedClangTypeError> checkClangType() const;
+  std::optional<UnexpectedClangTypeError> checkClangType() const;
 };
 
 /// Helper function to obtain the useClangTypes parameter for checking equality

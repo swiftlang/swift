@@ -19,8 +19,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include <optional>
 using namespace swift;
 
 namespace {
@@ -202,20 +202,20 @@ CanType TypeJoin::visitBoundGenericClassType(CanType second) {
 /// The subtype relationship of Optionals is as follows:
 ///   S  <: S?
 ///   S? <: T? if S <: T (covariant)
-static llvm::Optional<CanType> joinOptional(CanType first, CanType second) {
+static std::optional<CanType> joinOptional(CanType first, CanType second) {
   auto firstObject = first.getOptionalObjectType();
   auto secondObject = second.getOptionalObjectType();
 
   // If neither is any kind of Optional, we're done.
   if (!firstObject && !secondObject)
-    return llvm::None;
+    return std::nullopt;
 
   first = (firstObject ? firstObject : first);
   second = (secondObject ? secondObject : second);
 
   auto join = TypeJoin::join(first, second);
   if (!join)
-    return llvm::None;
+    return std::nullopt;
 
   return OptionalType::get(join)->getCanonicalType();
 }
@@ -496,16 +496,16 @@ CanType TypeJoin::visitBuiltinType(CanType second) {
 
 } // namespace
 
-llvm::Optional<Type> Type::join(Type first, Type second) {
+std::optional<Type> Type::join(Type first, Type second) {
   assert(first && second && "Unexpected null type!");
 
   if (!first || !second)
-    return llvm::None;
+    return std::nullopt;
 
   auto join =
       TypeJoin::join(first->getCanonicalType(), second->getCanonicalType());
   if (!join)
-    return llvm::None;
+    return std::nullopt;
 
   return join;
 }

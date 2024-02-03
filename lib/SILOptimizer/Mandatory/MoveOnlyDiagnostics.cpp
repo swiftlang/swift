@@ -501,7 +501,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
 void DiagnosticEmitter::emitAddressDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue,
     SILInstruction *lastLiveUser, SILInstruction *violatingUser,
-    bool isUseConsuming, llvm::Optional<ScopeRequiringFinalInit> scopeKind) {
+    bool isUseConsuming, std::optional<ScopeRequiringFinalInit> scopeKind) {
   if (!useWithDiagnostic.insert(violatingUser).second)
     return;
   registerDiagnosticEmitted(markedValue);

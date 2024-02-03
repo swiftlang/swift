@@ -112,9 +112,9 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
 }
 
 // Print information about the target triple in JSON.
-void targetinfo::printTripleInfo(const llvm::Triple &triple,
-                                 llvm::Optional<llvm::VersionTuple> runtimeVersion,
-                                 llvm::raw_ostream &out) {
+void targetinfo::printTripleInfo(
+    const llvm::Triple &triple,
+    std::optional<llvm::VersionTuple> runtimeVersion, llvm::raw_ostream &out) {
   out << "{\n";
 
   out << "    \"triple\": \"";

@@ -17,7 +17,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Chrono.h"
@@ -135,7 +134,7 @@ private:
 
 public:
   CompileJobAction(file_types::ID OutputType)
-      : JobAction(Action::Kind::CompileJob, llvm::None, OutputType) {}
+      : JobAction(Action::Kind::CompileJob, std::nullopt, OutputType) {}
   CompileJobAction(Action *Input, file_types::ID OutputType)
       : JobAction(Action::Kind::CompileJob, Input, OutputType) {}
 
@@ -170,7 +169,7 @@ private:
 
 public:
   explicit InterpretJobAction()
-      : JobAction(Action::Kind::InterpretJob, llvm::None,
+      : JobAction(Action::Kind::InterpretJob, std::nullopt,
                   file_types::TY_Nothing) {}
 
   static bool classof(const Action *A) {
@@ -210,8 +209,7 @@ private:
   Mode RequestedMode;
 public:
   REPLJobAction(Mode mode)
-      : JobAction(Action::Kind::REPLJob, llvm::None,
-                  file_types::TY_Nothing),
+      : JobAction(Action::Kind::REPLJob, std::nullopt, file_types::TY_Nothing),
         RequestedMode(mode) {}
 
   Mode getRequestedMode() const { return RequestedMode; }

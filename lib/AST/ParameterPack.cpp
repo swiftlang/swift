@@ -29,56 +29,54 @@ using namespace swift;
 /// FV(PackElementType(Param, M), N) = FV(Param, 0) if M >= N, {} otherwise
 /// FV(Param, N) = {Param}
 static Type transformTypeParameterPacksRec(
-    Type t, llvm::function_ref<llvm::Optional<Type>(SubstitutableType *)> fn,
+    Type t, llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn,
     unsigned expansionLevel) {
   return t.transformWithPosition(
       TypePosition::Invariant,
-      [&](TypeBase *t, TypePosition p) -> llvm::Optional<Type> {
+      [&](TypeBase *t, TypePosition p) -> std::optional<Type> {
+        // If we're already inside N levels of PackExpansionType,  and we're
+        // walking into another PackExpansionType, a type parameter pack
+        // reference now needs level (N+1) to be free.
+        if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
+          auto countType = expansionType->getCountType();
+          auto patternType = expansionType->getPatternType();
+          auto newPatternType = transformTypeParameterPacksRec(
+              patternType, fn, expansionLevel + 1);
+          if (patternType.getPointer() != newPatternType.getPointer())
+            return Type(PackExpansionType::get(patternType, countType));
 
-    // If we're already inside N levels of PackExpansionType,  and we're
-    // walking into another PackExpansionType, a type parameter pack
-    // reference now needs level (N+1) to be free.
-    if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
-      auto countType = expansionType->getCountType();
-      auto patternType = expansionType->getPatternType();
-      auto newPatternType = transformTypeParameterPacksRec(
-          patternType, fn, expansionLevel + 1);
-      if (patternType.getPointer() != newPatternType.getPointer())
-        return Type(PackExpansionType::get(patternType, countType));
+          return Type(expansionType);
+        }
 
-      return Type(expansionType);
-    }
+        // A PackElementType with level N reaches past N levels of
+        // nested PackExpansionType. So a type parameter pack reference
+        // therein is free if N is greater than or equal to our current
+        // expansion level.
+        if (auto *eltType = dyn_cast<PackElementType>(t)) {
+          if (eltType->getLevel() >= expansionLevel) {
+            return transformTypeParameterPacksRec(eltType->getPackType(), fn,
+                                                  /*expansionLevel=*/0);
+          }
 
-    // A PackElementType with level N reaches past N levels of
-    // nested PackExpansionType. So a type parameter pack reference
-    // therein is free if N is greater than or equal to our current
-    // expansion level.
-    if (auto *eltType = dyn_cast<PackElementType>(t)) {
-      if (eltType->getLevel() >= expansionLevel) {
-        return transformTypeParameterPacksRec(eltType->getPackType(), fn,
-                                              /*expansionLevel=*/0);
-      }
+          return Type(eltType);
+        }
 
-      return Type(eltType);
-    }
+        // A bare type parameter pack is like a PackElementType with level 0.
+        if (auto *paramType = dyn_cast<SubstitutableType>(t)) {
+          if (expansionLevel == 0 && (isa<PackArchetypeType>(paramType) ||
+                                      paramType->isRootParameterPack())) {
+            return fn(paramType);
+          }
 
-    // A bare type parameter pack is like a PackElementType with level 0.
-    if (auto *paramType = dyn_cast<SubstitutableType>(t)) {
-      if (expansionLevel == 0 &&
-          (isa<PackArchetypeType>(paramType) ||
-           paramType->isRootParameterPack())) {
-        return fn(paramType);
-      }
+          return Type(paramType);
+        }
 
-      return Type(paramType);
-    }
-
-    return llvm::None;
-  });
+        return std::nullopt;
+      });
 }
 
 Type Type::transformTypeParameterPacks(
-    llvm::function_ref<llvm::Optional<Type>(SubstitutableType *)> fn) const {
+    llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn) const {
   return transformTypeParameterPacksRec(*this, fn, /*expansionLevel=*/0);
 }
 
@@ -207,7 +205,7 @@ static Type increasePackElementLevelImpl(
     Type type, unsigned level, unsigned outerLevel) {
   assert(level > 0);
 
-  return type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *elementType = dyn_cast<PackElementType>(t)) {
       if (elementType->getLevel() >= outerLevel) {
         elementType = PackElementType::get(elementType->getPackType(),
@@ -231,7 +229,7 @@ static Type increasePackElementLevelImpl(
       return Type(t);
     }
 
-    return llvm::None;
+    return std::nullopt;
   });
 }
 
@@ -517,7 +515,7 @@ static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
   // Build an array of formal element types, but be lazy about it:
   // use the original array unless we see an element type that doesn't
   // work as a legal formal type.
-  llvm::Optional<SmallVector<CanType, 4>> formalEltTypes;
+  std::optional<SmallVector<CanType, 4>> formalEltTypes;
   for (auto i : indices(loweredEltTypes)) {
     auto loweredEltType = loweredEltTypes[i];
     bool isLegal = loweredEltType->isLegalFormalType();

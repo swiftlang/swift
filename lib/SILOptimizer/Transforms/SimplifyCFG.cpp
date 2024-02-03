@@ -3016,7 +3016,7 @@ class ArgumentSplitter {
   /// The list of first level projections that Arg can be split into.
   llvm::SmallVector<Projection, 4> Projections;
 
-  llvm::Optional<int> FirstNewArgIndex;
+  std::optional<int> FirstNewArgIndex;
 
 public:
   ArgumentSplitter(SILArgument *A, std::vector<SILArgument *> &W)

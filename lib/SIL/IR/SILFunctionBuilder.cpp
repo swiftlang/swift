@@ -344,8 +344,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
 
   auto *F = SILFunction::create(
-      mod, linkage, name, constantType, nullptr, llvm::None, IsNotBare, IsTrans,
-      IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
+      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare,
+      IsTrans, IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
       IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
       inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -407,7 +407,7 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericEnvironment *genericEnv, llvm::Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

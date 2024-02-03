@@ -179,7 +179,7 @@ private:
   TypeVariableType *TypeVar;
 
   /// The set of bindings associated with this type variable.
-  llvm::Optional<inference::PotentialBindings> Bindings;
+  std::optional<inference::PotentialBindings> Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.

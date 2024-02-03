@@ -131,7 +131,7 @@ public:
 
   /// Get the node's parent ASTNode (e.g to get the parent IfStmt or IfCond of
   /// a condition), if one is available.
-  llvm::Optional<ASTNode> getPGOParent(ASTNode Node);
+  std::optional<ASTNode> getPGOParent(ASTNode Node);
 
   /// Get the function name mangled for use with PGO.
   StringRef getPGOFuncName() const { return PGOFuncName; }

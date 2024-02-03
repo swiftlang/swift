@@ -141,8 +141,7 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  bool shouldContinuePre(const Decl *D,
-                         llvm::Optional<BracketOptions> Bracket) {
+  bool shouldContinuePre(const Decl *D, std::optional<BracketOptions> Bracket) {
     assert(Bracket.has_value());
     if (!Bracket.value().shouldOpenExtension(D) &&
         isa<ExtensionDecl>(D))
@@ -151,7 +150,7 @@ public:
   }
 
   bool shouldContinuePost(const Decl *D,
-                          llvm::Optional<BracketOptions> Bracket) {
+                          std::optional<BracketOptions> Bracket) {
     assert(Bracket.has_value());
     if (!Bracket.value().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
       return false;
@@ -161,9 +160,10 @@ public:
     return true;
   }
 
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     assert(!SynthesizedExtensionInfo.first);
     SynthesizedExtensionInfo = {ED, Target};
     if (!shouldContinuePre(ED, Bracket))
@@ -174,7 +174,7 @@ public:
 
   void printSynthesizedExtensionPost(
       const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+      std::optional<BracketOptions> Bracket) override {
     assert(SynthesizedExtensionInfo.first);
     SynthesizedExtensionInfo = {nullptr, {}};
     if (!shouldContinuePost(ED, Bracket))
@@ -187,7 +187,7 @@ public:
   }
 
   void printDeclPre(const Decl *D,
-                    llvm::Optional<BracketOptions> Bracket) override {
+                    std::optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
     if (!shouldContinuePre(D, Bracket))
@@ -211,7 +211,7 @@ public:
   }
 
   void printDeclPost(const Decl *D,
-                     llvm::Optional<BracketOptions> Bracket) override {
+                     std::optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
     if (!shouldContinuePost(D, Bracket))
@@ -1072,7 +1072,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
     return true;
 
   PrintOptions Options = PrintOptions::printDocInterface();
-  ModuleTraversalOptions TraversalOptions = llvm::None;
+  ModuleTraversalOptions TraversalOptions = std::nullopt;
   TraversalOptions |= ModuleTraversal::VisitSubmodules;
   TraversalOptions |= ModuleTraversal::VisitHidden;
 
@@ -1080,7 +1080,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
 
-  printModuleInterface(M, llvm::None, TraversalOptions, Printer, Options, true);
+  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options,
+                       true);
 
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);

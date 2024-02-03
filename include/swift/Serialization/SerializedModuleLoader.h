@@ -65,12 +65,12 @@ struct SerializedModuleBaseName {
   /// If the interface with \p baseName exists, returns its path (which may be the
   /// package interface if applicable (in the same package as the main module) or
   /// private interface if there is one, else public). Return an empty optional otherwise.
-  llvm::Optional<std::string>
-  findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const;
-  
+  std::optional<std::string> findInterfacePath(llvm::vfs::FileSystem &fs,
+                                               ASTContext &ctx) const;
+
   /// Returns the .package.swiftinterface path if its package-name also applies to
   /// the the importing module. Returns an empty optional otherwise.
-  llvm::Optional<std::string>
+  std::optional<std::string>
   getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
                                          ASTContext &ctx) const;
 };
@@ -198,7 +198,7 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   LoadedFile *
-  loadAST(ModuleDecl &M, llvm::Optional<SourceLoc> diagLoc,
+  loadAST(ModuleDecl &M, std::optional<SourceLoc> diagLoc,
           StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
           std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
           std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -448,7 +448,7 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  llvm::Optional<Fingerprint>
+  std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const override;
 
   virtual void
@@ -456,20 +456,20 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
-  llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
+  std::optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
   bool hasLoadedSwiftDoc() const override;
 
-  llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
+  std::optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
 
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   getSourceFileNameForDecl(const Decl *D) const override;
 
-  llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const override;
+  std::optional<unsigned> getSourceOrderForDecl(const Decl *D) const override;
 
-  llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
+  std::optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
 
-  llvm::Optional<ExternalSourceLocs::RawLocs>
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;

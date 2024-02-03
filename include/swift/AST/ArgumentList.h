@@ -20,9 +20,9 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 /// Forward declared trampoline for Expr::getType.
@@ -140,7 +140,7 @@ class alignas(Argument) ArgumentList final
   bool HasLabelLocs : 1;
 
   ArgumentList(SourceLoc lParenLoc, SourceLoc rParenLoc, unsigned numArgs,
-               llvm::Optional<unsigned> firstTrailingClosureIndex,
+               std::optional<unsigned> firstTrailingClosureIndex,
                ArgumentList *originalArgs, bool isImplicit, bool hasLabels,
                bool hasLabelLocs)
       : LParenLoc(lParenLoc), RParenLoc(rParenLoc), NumArgs(numArgs),
@@ -221,9 +221,8 @@ public:
   /// \param arena The arena to allocate the ArgumentList in.
   static ArgumentList *
   create(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-         SourceLoc rParenLoc,
-         llvm::Optional<unsigned> firstTrailingClosureIndex, bool isImplicit,
-         ArgumentList *originalArgs = nullptr,
+         SourceLoc rParenLoc, std::optional<unsigned> firstTrailingClosureIndex,
+         bool isImplicit, ArgumentList *originalArgs = nullptr,
          AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new explicit parsed ArgumentList.
@@ -237,7 +236,7 @@ public:
   static ArgumentList *
   createParsed(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
                SourceLoc rParenLoc,
-               llvm::Optional<unsigned> firstTrailingClosureIndex);
+               std::optional<unsigned> firstTrailingClosureIndex);
 
   /// Create a new type-checked ArgumentList from an original set of arguments.
   ///
@@ -259,13 +258,13 @@ public:
   static ArgumentList *createImplicit(
       ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
       SourceLoc rParenLoc,
-      llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
       AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
   static ArgumentList *createImplicit(
       ASTContext &ctx, ArrayRef<Argument> args,
-      llvm::Optional<unsigned> firstTrailingClosureIndex = llvm::None,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
       AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument
@@ -382,10 +381,10 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  llvm::Optional<unsigned> getFirstTrailingClosureIndex() const {
+  std::optional<unsigned> getFirstTrailingClosureIndex() const {
     assert(!HasOriginalArgs && "Query original args instead");
     if (RawFirstTrailingClosureIndex == NumArgs)
-      return llvm::None;
+      return std::nullopt;
     return RawFirstTrailingClosureIndex;
   }
 
@@ -469,11 +468,11 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  llvm::Optional<Argument> getFirstTrailingClosure() const {
+  std::optional<Argument> getFirstTrailingClosure() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
     if (!idx.has_value())
-      return llvm::None;
+      return std::nullopt;
     return get(*idx);
   }
 
@@ -527,8 +526,8 @@ public:
   /// arguments, returns its index. Otherwise returns \c None. By default this
   /// will match against semantic sub-expressions, but that may be disabled by
   /// passing \c false for \c allowSemantic.
-  llvm::Optional<unsigned> findArgumentExpr(Expr *expr,
-                                            bool allowSemantic = true) const;
+  std::optional<unsigned> findArgumentExpr(Expr *expr,
+                                           bool allowSemantic = true) const;
 
   /// Creates a TupleExpr or ParenExpr that holds the argument exprs. A
   /// ParenExpr will be returned for a single argument, otherwise a TupleExpr.

@@ -101,7 +101,7 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
     // This is necessary both because we might need to pop the cleanup and
     // because the cleanup might push other cleanups that will invalidate
     // references onto the stack.
-    llvm::Optional<CleanupBuffer> copiedCleanup;
+    std::optional<CleanupBuffer> copiedCleanup;
     if (stackCleanup.isActive() && SGF.B.hasValidInsertionPoint()) {
       copiedCleanup.emplace(stackCleanup);
     }
@@ -234,7 +234,7 @@ bool CleanupManager::isFormalAccessCleanup(CleanupHandle depth) {
   return RawTy(std::get<0>(state)) & RawTy(Cleanup::Flags::FormalAccessCleanup);
 }
 
-std::tuple<Cleanup::Flags, llvm::Optional<SILValue>>
+std::tuple<Cleanup::Flags, std::optional<SILValue>>
 CleanupManager::getFlagsAndWritebackBuffer(CleanupHandle depth) {
   auto iter = stack.find(depth);
   assert(iter != stack.end() && "can't change end of cleanups stack");
@@ -242,7 +242,7 @@ CleanupManager::getFlagsAndWritebackBuffer(CleanupHandle depth) {
          "Trying to get writeback buffer of a dead cleanup?!");
 
   auto resultFlags = iter->getFlags();
-  llvm::Optional<SILValue> result;
+  std::optional<SILValue> result;
   bool foundValue = iter->getWritebackBuffer([&](SILValue v) { result = v; });
   (void)foundValue;
   assert(result.has_value() == foundValue);
@@ -373,7 +373,7 @@ void CleanupStateRestorationScope::pop() && { popImpl(); }
 //===----------------------------------------------------------------------===//
 
 CleanupCloner::CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv)
-    : SGF(SGF), writebackBuffer(llvm::None), hasCleanup(mv.hasCleanup()),
+    : SGF(SGF), writebackBuffer(std::nullopt), hasCleanup(mv.hasCleanup()),
       isLValue(mv.isLValue()), isFormalAccess(false) {
   if (hasCleanup) {
     auto handle = mv.getCleanup();

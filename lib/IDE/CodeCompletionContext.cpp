@@ -133,7 +133,7 @@ void CodeCompletionContext::addResultsFromModules(
   for (auto &R : RequestedModules) {
     // FIXME(thread-safety): lock the whole AST context.  We might load a
     // module.
-    llvm::Optional<CodeCompletionCache::ValueRefCntPtr> V = Cache.get(R.Key);
+    std::optional<CodeCompletionCache::ValueRefCntPtr> V = Cache.get(R.Key);
     if (!V.has_value()) {
       // No cached results found. Fill the cache.
       V = Cache.createValue();

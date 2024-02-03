@@ -12,29 +12,29 @@
 
 #define DEBUG_TYPE "sil-function"
 
+#include "swift/SIL/SILFunction.h"
+#include "swift/AST/Availability.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
+#include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/SIL/CFG.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
-#include "swift/SIL/CFG.h"
-#include "swift/SIL/PrettyStackTrace.h"
-#include "swift/AST/Availability.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Stmt.h"
-#include "swift/Basic/OptimizationMode.h"
-#include "swift/Basic/Statistic.h"
-#include "llvm/ADT/Optional.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
-#include "clang/AST/Decl.h"
+#include <optional>
 
 using namespace swift;
 using namespace Lowering;
@@ -94,7 +94,7 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
 SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
     IsTransparent_t isTrans, IsSerialized_t isSerialized,
     ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

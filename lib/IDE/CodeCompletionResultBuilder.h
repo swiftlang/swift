@@ -45,7 +45,7 @@ class CodeCompletionResultBuilder {
   const Decl *AssociatedDecl = nullptr;
   bool IsAsync = false;
   bool HasAsyncAlternative = false;
-  llvm::Optional<CodeCompletionLiteralKind> LiteralKind;
+  std::optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;

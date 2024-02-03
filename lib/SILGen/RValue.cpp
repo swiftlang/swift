@@ -406,7 +406,7 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
 // This is a no-op in non-assert builds.
 #ifndef NDEBUG
   ValueOwnershipKind result = OwnershipKind::None;
-  llvm::Optional<bool> sameHaveCleanups;
+  std::optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
     assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
             v.getType().isObject()) &&

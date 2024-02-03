@@ -87,7 +87,7 @@ Diagnostic diagnoseRepresenationError(RepresentationError error, ValueDecl *vd);
 
 struct DeclRepresentation {
   RepresentationKind kind;
-  llvm::Optional<RepresentationError> error;
+  std::optional<RepresentationError> error;
 
   /// Returns true if the given Swift node is unsupported in Clang in any
   /// language mode.

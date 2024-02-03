@@ -234,10 +234,10 @@ private:
   /// but generalizing its component types.
   Type generalizeComponentTypes(CanType type) {
     return type.transformRec(
-        [&](TypeBase *componentType) -> llvm::Optional<Type> {
+        [&](TypeBase *componentType) -> std::optional<Type> {
           // Ignore the top level.
           if (componentType == type.getPointer())
-            return llvm::None;
+            return std::nullopt;
 
           return generalizeComponentType(CanType(componentType));
         });

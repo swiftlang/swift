@@ -596,8 +596,8 @@ namespace swift {
 
     /// Conditionally limit the diagnostic behavior if the given \c limit
     /// is not \c None.
-    InFlightDiagnostic &limitBehaviorIf(
-        llvm::Optional<DiagnosticBehavior> limit) {
+    InFlightDiagnostic &
+    limitBehaviorIf(std::optional<DiagnosticBehavior> limit) {
       if (!limit) {
         return *this;
       }
@@ -883,7 +883,7 @@ namespace swift {
     DiagnosticState state;
 
     /// The currently active diagnostic, if there is one.
-    llvm::Optional<Diagnostic> ActiveDiagnostic;
+    std::optional<Diagnostic> ActiveDiagnostic;
 
     /// Diagnostics wrapped by ActiveDiagnostic, if any.
     SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
@@ -1233,7 +1233,7 @@ namespace swift {
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
-    llvm::Optional<DiagnosticInfo>
+    std::optional<DiagnosticInfo>
     diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
 
     /// Send \c diag to all diagnostic consumers.

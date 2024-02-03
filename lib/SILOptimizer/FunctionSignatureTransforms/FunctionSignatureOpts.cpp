@@ -307,7 +307,7 @@ static void
 mapInterfaceTypes(SILFunction *F,
                   MutableArrayRef<SILParameterInfo> InterfaceParams,
                   MutableArrayRef<SILResultInfo> InterfaceResults,
-                  llvm::Optional<SILResultInfo> &InterfaceErrorResult) {
+                  std::optional<SILResultInfo> &InterfaceErrorResult) {
 
   for (auto &Param : InterfaceParams) {
     if (!Param.getInterfaceType()->hasArchetype())
@@ -416,7 +416,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     witnessMethodConformance = ProtocolConformanceRef::forInvalid();
   }
 
-  llvm::Optional<SILResultInfo> InterfaceErrorResult;
+  std::optional<SILResultInfo> InterfaceErrorResult;
   if (ExpectedFTy->hasErrorResult()) {
     InterfaceErrorResult = ExpectedFTy->getErrorResult();
   }

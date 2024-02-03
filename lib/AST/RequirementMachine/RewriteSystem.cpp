@@ -206,7 +206,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  llvm::Optional<int> result = lhs.compare(rhs, Context);
+  std::optional<int> result = lhs.compare(rhs, Context);
   if (*result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
