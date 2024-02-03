@@ -144,6 +144,8 @@ func passInt(_ i: Int) { take3(i) }
 
 func passTupleIntInt(_ t: (Int, Int)) { take3(t) }
 
+func passFWI<T : FixedWidthInteger>(_ t: T) { take3(t) }
+
 func passFloat(_ f: Float) { take3(f) }
 
 func passAnyObject(_ o: AnyObject) { take3(o) } // expected-error {{type_does_not_conform_decl_owner}}
@@ -155,7 +157,7 @@ func passAny(_ a: Any) { take3(a) } // expected-error {{type_does_not_conform_de
 func passAnyAny(_ a: any Any) { take3(a) } // expected-error {{type_does_not_conform_decl_owner}}
 
 func passString(_ s: String) { take3(s) } // expected-error    {{type_does_not_conform_decl_owner}}
-                                          // expected-note@-17 {{where_requirement_failure_one_subst}}
+                                          // expected-note@-19 {{where_requirement_failure_one_subst}}
 
 extension Optional where Wrapped : Copyable & Escapable {
   struct Some : _BitwiseCopyable & Copyable & Escapable {
@@ -190,6 +192,38 @@ struct S_Explicit_With_2_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> 
 struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_nonescapable}}
 
 struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
+
+func passUnmanaged<T : AnyObject>(_ u: Unmanaged<T>) { take3(u) }
+
+struct S_Explicit_With_Unmanaged<T : AnyObject> : _BitwiseCopyable {
+  var u: Unmanaged<T>
+}
+
+func passUnsafePointer<T>(_ p: UnsafePointer<T>) { take3(p) }
+
+struct S_Explicit_With_UnsafePointer<T> : _BitwiseCopyable  {
+  var ptr: UnsafePointer<T>
+}
+
+func passUnsafeMutablePointer<T>(_ p: UnsafeMutablePointer<T>) { take3(p) }
+
+struct S_Explicit_With_UnsafeMutablePointer<T> : _BitwiseCopyable  {
+  var ptr: UnsafeMutablePointer<T>
+}
+
+func passUnsafeBufferPointer<T>(_ p: UnsafeBufferPointer<T>) { take3(p) }
+
+struct S_Explicit_With_UnsafeBufferPointer<T> : _BitwiseCopyable  {
+  var ptr: UnsafeBufferPointer<T>
+}
+
+func passUnsafeMutableBufferPointer<T>(_ p: UnsafeMutableBufferPointer<T>) { take3(p) }
+
+struct S_Explicit_With_UnsafeMutableBufferPointer<T> : _BitwiseCopyable  {
+  var ptr: UnsafeMutableBufferPointer<T>
+}
+
+func passPointer<T : _Pointer>(_ p: T) { take3(p) }
 
 //==============================================================================
 //==========================STDLIB-DEPENDENCY TESTS=(END)=====================}}
