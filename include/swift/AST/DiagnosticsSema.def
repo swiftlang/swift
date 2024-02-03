@@ -2905,11 +2905,6 @@ NOTE(default_associated_type_unsatisfied_superclass,none,
      "default type %0 for associated type %1 (from protocol %2) "
      "does not inherit from %3",
      (Type, const AssociatedTypeDecl *, Type, Type))
-NOTE(default_associated_type_tuple,none,
-     "default type %0 for associated type %1 (from protocol %2) "
-     "is unsuitable for tuple conformance; the associated type requirement "
-     "must be fulfilled by a type alias with underlying type %3",
-     (Type, const AssociatedTypeDecl *, Type, Type))
 ERROR(associated_type_access,none,
       "associated type in "
       "%select{a private|a fileprivate|an internal|a package|a public|%error}0 protocol "
@@ -2944,11 +2939,6 @@ NOTE(associated_type_deduction_unsatisfied_conformance,none,
 NOTE(associated_type_deduction_unsatisfied_superclass,none,
      "candidate would match and infer %0 = %1 if %1 "
      "inherited from %2",
-     (const AssociatedTypeDecl *, Type, Type))
-NOTE(associated_type_deduction_tuple,none,
-     "cannot infer %0 = %1 in tuple conformance because "
-     "the associated type requirement must be fulfilled by a type alias with "
-     "underlying type %2",
      (const AssociatedTypeDecl *, Type, Type))
 NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "

@@ -11,16 +11,18 @@ protocol P1 {
 extension Tuple: P1 where repeat each T: P1 {} // expected-error {{type '(repeat each T)' does not conform to protocol 'P1'}}
 
 protocol P2 {
-  associatedtype B = Int // expected-note {{default type 'Int' for associated type 'B' (from protocol 'P2') is unsuitable for tuple conformance; the associated type requirement must be fulfilled by a type alias with underlying type '(repeat (each T).B)'}}
+  associatedtype B = Int
 }
 
 extension Tuple: P2 where repeat each T: P2 {} // expected-error {{type '(repeat each T)' does not conform to protocol 'P2'}}
+// expected-note@-1 {{possibly intended match 'Int' is unsuitable for tuple conformance; the associated type requirement must be fulfilled by a type alias with underlying type '(repeat (each T).B)'}}
 
 protocol P3 {
-  associatedtype C // expected-note {{unable to infer associated type 'C' for protocol 'P3'}}
+  associatedtype C
   func f() -> C
 }
 
 extension Tuple: P3 where repeat each T: P3 { // expected-error {{type '(repeat each T)' does not conform to protocol 'P3'}}
-  func f() -> Int {} // expected-note {{cannot infer 'C' = 'Int' in tuple conformance because the associated type requirement must be fulfilled by a type alias with underlying type '(repeat (each T).C)'}}
+  // expected-note@-1 {{possibly intended match 'Int' is unsuitable for tuple conformance; the associated type requirement must be fulfilled by a type alias with underlying type '(repeat (each T).C)'}}
+  func f() -> Int {}
 }
