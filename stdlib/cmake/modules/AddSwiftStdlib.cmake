@@ -1043,7 +1043,9 @@ function(add_swift_target_library_single target name)
     add_custom_target("${target}"
       DEPENDS
         "${swift_module_dependency_target}")
-    add_dependencies("${install_in_component}" "${target}")
+    if(TARGET "${install_in_component}")
+      add_dependencies("${install_in_component}" "${target}")
+    endif()
 
     return()
   endif()
@@ -1077,7 +1079,9 @@ function(add_swift_target_library_single target name)
   if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     add_custom_target("${target}"
       DEPENDS "${swift_module_dependency_target}")
-    add_dependencies("${install_in_component}" "${target}")
+    if(TARGET "${install_in_component}")
+      add_dependencies("${install_in_component}" "${target}")
+    endif()
     return()
   endif()
 
@@ -1086,7 +1090,7 @@ function(add_swift_target_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
-  if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
+  if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND TARGET "${install_in_component}")
     add_dependencies("${install_in_component}" "${target}")
   endif()
   # NOTE: always inject the LLVMSupport directory before anything else.  We want
