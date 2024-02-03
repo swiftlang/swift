@@ -2316,7 +2316,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
         continue;
 
       if (gp->getName() == assocType->getName())
-        return AbstractTypeWitness(assocType, gp);
+        return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(gp));
     }
   }
 
@@ -2348,7 +2348,8 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
           continue;
 
         if (gp->getName() == assocType->getName()) {
-          system.addTypeWitness(assocType->getName(), gp);
+          system.addTypeWitness(assocType->getName(),
+                                dc->mapTypeIntoContext(gp));
         }
       }
     }
@@ -2661,6 +2662,8 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   // not resolve otherwise.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
 
+  auto selfTypeInContext = dc->getSelfTypeInContext();
+
   if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
     TypeWitnessSystem system(unresolvedAssocTypes);
     collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
@@ -2683,12 +2686,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
       resolvedTy = resolvedTy.transformRec([&](Type ty) -> llvm::Optional<Type> {
         if (auto *gp = ty->getAs<GenericTypeParamType>()) {
-          // FIXME: 'computeFixedTypeWitness' uses 'getReducedType',
-          // so if a generic parameter is canonical here, it's 'Self'.
-          if (gp->isCanonical() ||
-              isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
-            return adoptee;
-          }
+          assert(gp->getDepth() == 0);
+          assert(gp->getIndex() == 0);
+          return selfTypeInContext;
         }
 
         return llvm::None;
@@ -2715,12 +2715,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
         resolvedTy = resolvedTy.transformRec([&](Type ty) -> llvm::Optional<Type> {
           if (auto *gp = ty->getAs<GenericTypeParamType>()) {
-            // FIXME: 'computeFixedTypeWitness' uses 'getReducedType',
-            // so if a generic parameter is canonical here, it's 'Self'.
-            if (gp->isCanonical() ||
-                isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
-              return adoptee;
-            }
+            assert(gp->getDepth() == 0);
+            assert(gp->getIndex() == 0);
+            return selfTypeInContext;
           }
 
           return llvm::None;
@@ -2763,8 +2760,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     LLVM_DEBUG(llvm::dbgs() << "Checking witness for " << assocType->getName()
                << " " << type << "\n";);
 
+    assert(!type->hasTypeParameter());
+
     // Replace type parameters with other known or tentative type witnesses.
-    if (type->hasDependentMember() || type->hasTypeParameter()) {
+    if (type->hasDependentMember()) {
       // FIXME: We should find a better way to detect and reason about these
       // cyclic solutions so that we can spot them earlier and express them in
       // diagnostics.
@@ -2826,27 +2825,20 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         Type tyWitness;
         if (assocTy->getProtocol() == proto && typeWitnesses.count(assocTy)) {
           tyWitness = typeWitnesses.begin(assocTy)->first;
+          assert(!tyWitness->hasTypeParameter());
 
           // A tentative type witness may contain a 'Self'-rooted type
           // parameter,
           // FIXME: or a weird concrete-type-rooted dependent member type
           // coming from inference via a value witness. Make sure we sort these
           // out so that we don't break any subst() invariants.
-          if (tyWitness->hasTypeParameter() ||
-              tyWitness->hasDependentMember()) {
+          if (tyWitness->hasDependentMember()) {
             tyWitness = tyWitness.transformRec(substCurrentTypeWitnesses);
           }
 
           if (tyWitness) {
-            // HACK: Those inferred via value witnesses are eagerly mapped into
-            // context. For now, do the same for abstract type witnesses and
-            // handle archetypes.
-            if (tyWitness->hasArchetype()) {
-              tyWitness = tyWitness->mapTypeOutOfContext();
-            }
-
             // If the transformed base is specialized, apply substitutions.
-            if (tyWitness->hasTypeParameter()) {
+            if (tyWitness->hasArchetype()) {
               const auto conf = dc->getParentModule()->lookupConformance(
                   substBase, assocTy->getProtocol(), /*allowMissing=*/true);
               if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(
@@ -2877,8 +2869,6 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
       // If any unresolved dependent member types remain, give up.
       assert(!containsConcreteDependentMemberType(type));
-
-      type = dc->mapTypeIntoContext(type);
 
       LLVM_DEBUG(llvm::dbgs() << "Simplified witness type is " << type << "\n";);
     }
