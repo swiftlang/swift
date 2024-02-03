@@ -513,30 +513,6 @@ bool TypeBase::isAnyActorType() {
   return false;
 }
 
-bool TypeBase::isSendableType() {
-  auto proto = getASTContext().getProtocol(KnownProtocolKind::Sendable);
-  if (!proto)
-    return true;
-
-  // First check if we have a function type. If we do, check if it is
-  // Sendable. We do this since functions cannot conform to protocols.
-  if (auto *fas = getAs<SILFunctionType>())
-    return fas->isSendable();
-  if (auto *fas = getAs<AnyFunctionType>())
-    return fas->isSendable();
-
-  auto conformance = proto->getParentModule()->checkConformance(this, proto);
-  if (conformance.isInvalid())
-    return false;
-
-  // Look for missing Sendable conformances.
-  return !conformance.forEachMissingConformance(
-      [](BuiltinProtocolConformance *missing) {
-        return missing->getProtocol()->isSpecificProtocol(
-            KnownProtocolKind::Sendable);
-      });
-}
-
 bool TypeBase::isDistributedActor() {
   if (auto actor = getAnyActor())
     return actor->isDistributedActor();
