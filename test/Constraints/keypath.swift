@@ -81,8 +81,8 @@ func testVariadicKeypathAsFunc() {
 
   // These are not okay, the KeyPath should have a base that matches the
   // internal parameter type of the function, i.e (S...).
-  let _: (S...) -> Int = \S.i // expected-error {{key path root type 'S' cannot be converted to contextual type 'S...'}}
-  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path root type 'S' cannot be converted to contextual type 'S...'}}
+  let _: (S...) -> Int = \S.i // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
 }
 
 // rdar://problem/54322807
