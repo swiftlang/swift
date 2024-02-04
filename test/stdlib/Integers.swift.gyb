@@ -853,7 +853,7 @@ tests.test("Strideable") {
   expectEqual(dist(Int8.min, Int8.max), 255)
   expectEqual(dist(Int8.max, Int8.min), -255)
   
-  expectEqual(Int8.min.advanced(by: 128), 0)
+  expectEqual(Int8.min.advanced(by: Int(Int8.max)+1), 0)
   expectEqual(UInt.max.advanced(by: Int.min), UInt.max / 2)
 }
 
