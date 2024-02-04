@@ -166,6 +166,9 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
+WARNING(ignoring_option_requires_option,none,
+        "ignoring %0 (requires %1)", (StringRef, StringRef))
+
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
 REMARK(warn_implicit_string_processing_import_failed,none,
