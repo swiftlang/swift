@@ -1289,8 +1289,7 @@ class PartitionOpTranslator {
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
-              if (isNonSendableType(
-                      pbi->getType().getSILBoxFieldType(function))) {
+              if (isNonSendableType(pbi->getType())) {
                 auto trackVal = getTrackableValue(val, true);
                 (void)trackVal;
                 continue;
