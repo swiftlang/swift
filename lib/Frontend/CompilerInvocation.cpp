@@ -1523,10 +1523,25 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
   Opts.DebugInverseRequirements |= Args.hasArg(OPT_debug_inverse_requirements);
 
-  Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
-  Opts.EnableLazyTypecheck |=
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  if (Args.hasArg(OPT_enable_library_evolution)) {
+    Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+    Opts.EnableLazyTypecheck |=
+        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+        Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  } else {
+    if (Args.hasArg(OPT_experimental_lazy_typecheck))
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-lazy-typecheck",
+                     "-enable-library-evolution");
+
+    if (Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy))
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-skip-non-inlinable-function-bodies-is-lazy",
+                     "-enable-library-evolution");
+  }
+
   // HACK: The driver currently erroneously passes all flags to module interface
   // verification jobs. -experimental-skip-non-exportable-decls is not
   // appropriate for verification tasks and should be ignored, though.
