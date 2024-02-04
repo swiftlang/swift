@@ -126,13 +126,17 @@ struct UseDefChainVisitor
     // do not want to treat this as a merge.
     if (auto p = Projection(inst)) {
       switch (p.getKind()) {
+      // Currently if we load and then project_box from a memory location,
+      // we treat that as a projection. This follows the semantics/notes in
+      // getAccessProjectionOperand.
+      case ProjectionKind::Box:
+        return cast<ProjectBoxInst>(inst)->getOperand();
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
       case ProjectionKind::BlockStorageCast:
       case ProjectionKind::BitwiseCast:
-      case ProjectionKind::TailElems:
-      case ProjectionKind::Box:
       case ProjectionKind::Class:
+      case ProjectionKind::TailElems:
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
         // Index is always a merge.
