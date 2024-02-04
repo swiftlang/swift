@@ -767,7 +767,7 @@ function Build-CMakeProject {
   if ($Summary) {
     $TimingData.Add([PSCustomObject]@{
       Arch = $Arch.ShortName
-      Checkout = $Src
+      Checkout = $Src.Replace($SourceCache, '')
       BuildID = Split-Path -Path $Bin -Leaf
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
@@ -827,7 +827,7 @@ function Build-SPMProject {
   if ($Summary) {
     $TimingData.Add([PSCustomObject]@{
       Arch = $Arch.ShortName
-      Checkout = $Src
+      Checkout = $Src.Replace($SourceCache, '')
       BuildID = Split-Path -Path $Bin -Leaf
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
@@ -1881,10 +1881,6 @@ if ($Stage) {
   Stage-BuildArtifacts $HostArch
 }
 
-if ($Summary) {
-  $TimingData | Select Arch,Checkout,BuildID,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
-}
-
 if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent) -ne $null) {
   $Tests = @{
     "-TestClang" = $Test -contains "clang";
@@ -1927,4 +1923,8 @@ if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   }
 
   exit 1
+} finally {
+  if ($Summary) {
+    $TimingData | Select Arch,Checkout,BuildID,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+  }
 }
