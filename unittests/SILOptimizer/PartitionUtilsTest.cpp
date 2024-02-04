@@ -698,3 +698,32 @@ TEST(PartitionUtilsTest, TestUndoTransfer) {
               PartitionOp::UndoTransfer(Element(0), instSingletons[0]),
               PartitionOp::Require(Element(0), instSingletons[0])});
 }
+
+TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::TransferringOperandSetFactory factory(allocator);
+
+  // First make sure that we do this correctly with an assign fresh.
+  Partition p;
+  {
+    PartitionOpEvaluatorBasic eval(p, factory);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1)),
+                PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::Transfer(Element(0), transferSingletons[0]),
+                PartitionOp::AssignFresh(Element(0))});
+  }
+  p.validateRegionToTransferredOpMapRegions();
+
+  // Now make sure that we do this correctly with assign.
+  Partition p2;
+  {
+    PartitionOpEvaluatorBasic eval(p2, factory);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1)),
+                PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::Transfer(Element(0), transferSingletons[0]),
+                PartitionOp::Assign(Element(0), Element(2))});
+  }
+  p2.validateRegionToTransferredOpMapRegions();
+}

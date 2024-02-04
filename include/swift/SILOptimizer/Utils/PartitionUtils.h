@@ -499,16 +499,73 @@ public:
   }
 
   void trackNewElement(Element newElt) {
-    // Map index newElt to a fresh label.
-    elementToRegionMap.insert_or_assign(newElt, fresh_label);
+    SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+
+    // First try to emplace newElt with fresh_label.
+    auto iter = elementToRegionMap.try_emplace(newElt, fresh_label);
+
+    // If we did insert, then we know that the value is completely new. We can
+    // just update the fresh_label, set canonical to false, and return.
+    if (iter.second) {
+      // Increment the fresh label so it remains fresh.
+      fresh_label = Region(fresh_label + 1);
+      canonical = false;
+      return;
+    }
+
+    // Otherwise, we have a bit more work that we need to perform:
+    //
+    // 1. We of course need to update iter to point at fresh_label.
+    //
+    // 2. We need to see if this value was the last element in its current
+    // region. If so, then we need to remove the region from the transferred op
+    // map.
+    //
+    // This is important to ensure that every region in the transferredOpMap is
+    // also in elementToRegionMap.
+    auto oldRegion = iter.first->second;
+    iter.first->second = fresh_label;
+
+    if (llvm::none_of(elementToRegionMap,
+                      [&](std::pair<Element, Region> value) {
+                        return value.second == oldRegion;
+                      })) {
+      regionToTransferredOpMap.erase(oldRegion);
+    }
 
     // Increment the fresh label so it remains fresh.
     fresh_label = Region(fresh_label + 1);
     canonical = false;
   }
 
+  /// Assigns \p oldElt to the region associated with \p newElt.
   void assignElement(Element oldElt, Element newElt) {
-    elementToRegionMap.insert_or_assign(oldElt, elementToRegionMap.at(newElt));
+    SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+
+    // First try to emplace oldElt with the newRegion.
+    auto newRegion = elementToRegionMap.at(newElt);
+    auto iter = elementToRegionMap.try_emplace(oldElt, newRegion);
+
+    // If we did an insert, then we know that the value is new and we can just
+    // set canonical to false and return.
+    if (iter.second) {
+      canonical = false;
+      return;
+    }
+
+    // Otherwise, we did an assign. In such a case, we need to see if oldElt was
+    // the last element in oldRegion. If so, we need to erase the oldRegion from
+    // regionToTransferredOpMap.
+    auto oldRegion = iter.first->second;
+    iter.first->second = newRegion;
+
+    if (llvm::none_of(elementToRegionMap,
+                      [&](std::pair<Element, Region> value) {
+                        return value.second == oldRegion;
+                      })) {
+      regionToTransferredOpMap.erase(oldRegion);
+    }
+
     canonical = false;
   }
 
@@ -766,6 +823,22 @@ public:
     return set;
   }
 
+  /// Validate that all regions in the regionToTransferredOpMap exist in the
+  /// elementToRegionMap.
+  ///
+  /// Asserts when NDEBUG is set. Does nothing otherwise.
+  void validateRegionToTransferredOpMapRegions() const {
+#ifndef NDEBUG
+    llvm::SmallSet<Region, 8> regions;
+    for (auto [eltNo, regionNo] : elementToRegionMap) {
+      regions.insert(regionNo);
+    }
+    for (auto [regionNo, opSet] : regionToTransferredOpMap) {
+      assert(regions.contains(regionNo) && "Region doesn't exist?!");
+    }
+#endif
+  }
+
   /// Used only in assertions, check that Partitions promised to be canonical
   /// are actually canonical
   bool is_canonical_correct() {
@@ -781,12 +854,7 @@ public:
       return false;
     };
 
-    llvm::SmallDenseSet<Region, 8> seenRegion;
     for (auto &[eltNo, regionNo] : elementToRegionMap) {
-      // See if all of our regionToTransferMap keys are regions in labels.
-      if (regionToTransferredOpMap.count(regionNo))
-        seenRegion.insert(regionNo);
-
       // Labels should not exceed fresh_label.
       if (regionNo >= fresh_label)
         return fail(eltNo, 0);
@@ -804,10 +872,8 @@ public:
         return fail(eltNo, 3);
     }
 
-    if (seenRegion.size() != regionToTransferredOpMap.size()) {
-      llvm::report_fatal_error(
-          "FAIL! regionToTransferMap has a region that isn't being tracked?!");
-    }
+    // Before we do anything, validate region to transferred op map.
+    validateRegionToTransferredOpMapRegions();
 
     return true;
 #endif
@@ -868,6 +934,7 @@ private:
       return;
     canonical = true;
 
+    validateRegionToTransferredOpMapRegions();
     std::map<Region, Region> oldRegionToRelabeledMap;
 
     // We rely on in-order traversal of labels to ensure that we always take the
