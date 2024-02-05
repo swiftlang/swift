@@ -215,10 +215,12 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 }
 
 void DependencyScanningTool::resetCache() {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   ScanningService.reset(new SwiftDependencyScanningService());
 }
 
 void DependencyScanningTool::resetDiagnostics() {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   CDC.reset();
 }
 
