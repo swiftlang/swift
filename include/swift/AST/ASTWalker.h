@@ -170,16 +170,17 @@ public:
     // The 'Result' set of types, which do take a payload.
     template <typename T>
     struct ContinueWalkResult {
+      ContinueWalkAction Action;
       T Value;
     };
     template <typename T>
     struct SkipChildrenIfWalkResult {
-      bool Cond;
+      SkipChildrenIfWalkAction Action;
       T Value;
     };
     template <typename T>
     struct StopIfWalkResult {
-      bool Cond;
+      StopIfWalkAction Action;
       T Value;
     };
   };
@@ -212,7 +213,7 @@ public:
     /// Continue the current walk, replacing the current node with \p node.
     template <typename T>
     static _Detail::ContinueWalkResult<T> Continue(T node) {
-      return {std::move(node)};
+      return {Continue(), std::move(node)};
     }
 
     /// Continue the current walk, replacing the current node with \p node.
@@ -228,7 +229,7 @@ public:
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T>
     SkipChildrenIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {SkipChildrenIf(cond), std::move(node)};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue(node).
@@ -243,7 +244,7 @@ public:
     /// Otherwise, it is equivalent to \c Action::Continue(node).
     template <typename T>
     static _Detail::StopIfWalkResult<T> StopIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {StopIf(cond), std::move(node)};
     }
 
     /// Continue the current walk.
@@ -283,8 +284,6 @@ public:
     enum Kind { Stop, SkipChildren, Continue };
     Kind Action;
 
-    PreWalkAction(Kind action) : Action(action) {}
-
     PreWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PreWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
 
@@ -302,8 +301,6 @@ public:
   struct PostWalkAction {
     enum Kind { Stop, Continue };
     Kind Action;
-
-    PostWalkAction(Kind action) : Action(action) {}
 
     PostWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PostWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
@@ -340,21 +337,18 @@ public:
 
     template <typename U>
     PreWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PreWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::SkipChildrenIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::SkipChildren
-                             : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::Stop : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PreWalkResult(_Detail::StopWalkAction)
-        : Action(PreWalkAction::Stop), Value(llvm::None) {}
+    PreWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(llvm::None) {}
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
@@ -385,15 +379,14 @@ public:
 
     template <typename U>
     PostWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PostWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PostWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PostWalkAction::Stop : PostWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PostWalkResult(_Detail::StopWalkAction)
-        : Action(PostWalkAction::Stop), Value(llvm::None) {}
+    PostWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(llvm::None) {}
   };
 
   /// This method is called when first visiting an expression
