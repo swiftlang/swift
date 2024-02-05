@@ -8,6 +8,37 @@ struct BufferView : ~Escapable {
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
+  init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
+    if (i % 2 == 0) {
+      return nil
+    } 
+    self.ptr = ptr
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _borrow(a) Self {
+    self.ptr = ptr
+    return self
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+    self.ptr = ptr
+    return self
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+    self.ptr = ptr
+    return self
+  }
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, b: borrowing Array<Int>, c: Double) -> _consume(a) _borrow(b) Int { // expected-error{{expected Self return type for initializers with lifetime dependence specifiers}}
+    self.ptr = ptr
+    return 0
+  }
+  /* TODO: Enable this test once stdlib builds with NonescapableTypes support
+  init?(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>, _ i: Int) -> _borrow(a) Self {
+    if (i % 2 == 0) {
+      self.ptr = ptr
+      return self
+    }
+    return nil
+  }
+  */
 }
 
 struct MutableBufferView : ~Escapable, ~Copyable {

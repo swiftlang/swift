@@ -945,12 +945,13 @@ BridgedConstructorDecl BridgedConstructorDecl_createParsed(
   auto throwsLoc = cThrowsLoc.unbridged();
   auto failabilityMarkLoc = cFailabilityMarkLoc.unbridged();
   // FIXME: rethrows
-
+  // TODO: Handle LifetimeDependentReturnTypeRepr here.
   auto *decl = new (context) ConstructorDecl(
       declName, cInitKeywordLoc.unbridged(), failabilityMarkLoc.isValid(),
       failabilityMarkLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(),
       throwsLoc, thrownType.unbridged(), parameterList,
-      genericParams.unbridged(), cDeclContext.unbridged());
+      genericParams.unbridged(), cDeclContext.unbridged(),
+      /*InitRetTy*/ nullptr);
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setImplicitlyUnwrappedOptional(isIUO);
 

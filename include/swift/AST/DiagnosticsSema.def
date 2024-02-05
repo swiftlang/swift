@@ -7811,5 +7811,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
        "cannot infer lifetime dependence, no ~Escapable or ~Copyable "
        "parameters with ownership modifiers present",
        ())
+ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
+       "expected nil or self as return values in an initializer with "
+       "lifetime dependent specifiers",
+       ())
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1075,17 +1075,25 @@ public:
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
+      } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+        if (CD->hasLifetimeDependentReturn()) {
+          resultType = CD->getResultInterfaceType();
+        } else {
+          resultType = TupleType::getEmpty(Ctx);
+        }
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }
-      
+
       if (S->hasResult()) {
-        if (isa<ConstructorDecl>(func)) {
-          Out << "Expected ReturnStmt not to have a result. A constructor "
-                 "should not return a result. Returned expression: ";
-          S->getResult()->dump(Out);
-          Out << "\n";
-          abort();
+        if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+          if (!CD->hasLifetimeDependentReturn()) {
+            Out << "Expected ReturnStmt not to have a result. A constructor "
+                   "should not return a result. Returned expression: ";
+            S->getResult()->dump(Out);
+            Out << "\n";
+            abort();
+          }
         }
 
         auto result = S->getResult();

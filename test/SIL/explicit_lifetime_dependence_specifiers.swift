@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  \
 // RUN: -enable-builtin-module \
-// RUN: -Xllvm -disable-lifetime-dependence-diagnostics \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics \
@@ -16,6 +15,28 @@ struct BufferView : ~Escapable {
   @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
+  }
+  @_unsafeNonescapableResult
+  init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
+    if (i % 2 == 0) {
+      return nil
+    } 
+    self.ptr = ptr
+  }
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _borrow(2) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _borrow(a) Self {
+    self.ptr = ptr
+    return self
+  }
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySdGtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Double>, @thin BufferView.Type) -> _inherit(2) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+    self.ptr = ptr
+    return self
+  }
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySdGSaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Double>, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_borrow(3) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+    self.ptr = ptr
+    return self
   }
 }
 

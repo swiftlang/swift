@@ -4,6 +4,18 @@ public struct BufferView : ~Escapable {
   public init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> _borrow(a) Self {
+    self.ptr = ptr
+    return self
+  }
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+    self.ptr = ptr
+    return self
+  }
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Int>, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+    self.ptr = ptr
+    return self
+  }
 }
 
 public struct MutableBufferView : ~Escapable, ~Copyable {
