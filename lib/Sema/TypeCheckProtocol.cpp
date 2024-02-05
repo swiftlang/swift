@@ -1231,8 +1231,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     auto witnessSig =
       witness->getInnermostDeclContext()->getGenericSignatureOfContext();
     result.WitnessSubstitutions =
-      solution->computeSubstitutions(witnessSig, witnessLocator);
-    
+        solution->computeSubstitutions(witness, witnessSig, witnessLocator);
+
     return result;
   };
 
