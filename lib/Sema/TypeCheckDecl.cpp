@@ -927,13 +927,12 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
 
   switch (TARGET) {
   case InvertibleProtocolKind::Copyable:
-    // Handle the legacy '@_moveOnly' attribute
-    if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
-      assert((isa<StructDecl, EnumDecl, ClassDecl>(decl)));
-
-      return InverseMarking::forInverse(Kind::LegacyExplicit,
-                                        attr->getLocation());
-    }
+    // Handle the legacy '@_moveOnly' for types they can validly appear.
+    // TypeCheckAttr handles the illegal situations for us.
+    if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>())
+      if (isa<StructDecl, EnumDecl, ClassDecl>(decl))
+        return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                          attr->getLocation());
     break;
 
   case InvertibleProtocolKind::Escapable:
