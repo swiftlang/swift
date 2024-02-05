@@ -128,7 +128,7 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
 /// Returns true if OSSA scope ending instructions end_borrow/destroy_value can
 /// be deleted trivially
 static bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
-  if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
+  if (!isa<EndBorrowInst>(i))
     return false;
   if (isa<StoreBorrowInst>(i->getOperand(0)))
     return false;
