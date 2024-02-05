@@ -205,14 +205,17 @@ func canTransferAfterAssign(_ x: transferring Any) async {
 }
 
 func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
+  // expected-note @-1:44 {{variable defined here}}
+
   // Ok, this is disconnected.
   let y = getAny()
 
   // y is transferred into x.
   x = y
 
-  // TODO: Change this to refer to task context? Or to transferring parameter?
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Any' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // TODO: This should refer to the transferring parameter.
+  await transferToMain(x) // expected-warning {{transferring non-Sendable binding 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   useValue(x) // expected-note {{access here could race}}
 }

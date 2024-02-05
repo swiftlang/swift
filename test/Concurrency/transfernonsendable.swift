@@ -112,7 +112,7 @@ func formClosureWithoutCrashing() {
 // treat assignments into contents as a merge operation rather than an assign.
 func closureInOut(_ a: Actor) async {
   var contents = NonSendableKlass()
-  let ns0 = NonSendableKlass()
+  let ns0 = NonSendableKlass() // expected-tns-note {{variable defined here}}
   let ns1 = NonSendableKlass()
 
   contents = ns0
@@ -123,7 +123,8 @@ func closureInOut(_ a: Actor) async {
 
   await a.useKlass(ns0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
-  // expected-tns-warning @-2 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context; later accesses could race}}
+  // expected-tns-warning @-2 {{transferring non-Sendable binding 'ns0' could yield races with later accesses}}
+  // expected-tns-note @-3 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // We only emit a warning on the first use we see, so make sure we do both
   // klass and the closure.
@@ -137,21 +138,23 @@ func closureInOut(_ a: Actor) async {
 
 func closureInOut2(_ a: Actor) async {
   var contents = NonSendableKlass()
-  let ns0 = NonSendableKlass()
-  let ns1 = NonSendableKlass()
+  let ns0 = NonSendableKlass() // expected-tns-note {{variable defined here}}
+  let ns1 = NonSendableKlass() // expected-tns-note {{variable defined here}}
 
   contents = ns0
   contents = ns1
 
   var closure = {}
 
-  await a.useKlass(ns0) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  await a.useKlass(ns0) // expected-tns-warning {{transferring non-Sendable binding 'ns0' could yield races with later accesses}}
+  // expected-tns-note @-1 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure = { useInOut(&contents) } // expected-tns-note {{access here could race}}
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable binding 'ns1' could yield races with later accesses}}
+  // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure() // expected-tns-note {{access here could race}}
 }
@@ -159,7 +162,7 @@ func closureInOut2(_ a: Actor) async {
 func closureNonInOut(_ a: Actor) async {
   var contents = NonSendableKlass()
   let ns0 = NonSendableKlass()
-  let ns1 = NonSendableKlass()
+  let ns1 = NonSendableKlass() // expected-tns-note {{variable defined here}}
 
   contents = ns0
   contents = ns1
@@ -171,8 +174,9 @@ func closureNonInOut(_ a: Actor) async {
 
   closure = { useValue(contents) }
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable binding 'ns1' could yield races with later accesses}}
+  // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure() // expected-tns-note {{access here could race}}
 }

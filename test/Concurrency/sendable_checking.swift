@@ -270,10 +270,11 @@ final class NonSendable {
 
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable()
+  let t = NonSendable() // expected-tns-note {{variable defined here}}
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning@-2 {{transferring value of non-Sendable type 'NonSendable' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // expected-tns-warning @-2 {{transferring non-Sendable binding 't' could yield races with later accesses}}
+  // expected-tns-note @-3 {{'t' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
