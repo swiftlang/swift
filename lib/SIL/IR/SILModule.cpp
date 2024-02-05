@@ -67,9 +67,11 @@ class SILModule::SerializationCallback final
   template <class T> void updateLinkage(T *decl) {
     switch (decl->getLinkage()) {
     case SILLinkage::Public:
+    case SILLinkage::Package:
       decl->setLinkage(SILLinkage::PublicExternal);
       return;
     case SILLinkage::PublicNonABI:
+    case SILLinkage::PackageNonABI:
       // PublicNonABI functions receive Shared linkage, so that
       // they have "link once" semantics when deserialized by multiple
       // translation units in the same Swift module.
@@ -81,6 +83,7 @@ class SILModule::SerializationCallback final
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::Shared:
       return;

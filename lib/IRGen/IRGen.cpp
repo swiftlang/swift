@@ -1085,7 +1085,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   // making sure to include non-public symbols.
   auto &ctx = desc.getParentModule()->getASTContext();
   auto tbdDesc = desc.getTBDGenDescriptor();
-  tbdDesc.getOptions().PublicSymbolsOnly = false;
+  tbdDesc.getOptions().PublicOrPackageSymbolsOnly = false;
   const auto *symbolMap =
       llvm::cantFail(ctx.evaluator(SymbolSourceMapRequest{std::move(tbdDesc)}));
 

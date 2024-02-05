@@ -471,8 +471,23 @@ class SerializeSILPass : public SILModuleTransform {
 
       // After serialization we don't need to keep @alwaysEmitIntoClient
       // functions alive, i.e. we don't need to treat them as public functions.
-      if (F.getLinkage() == SILLinkage::PublicNonABI && M.isWholeModule())
-        F.setLinkage(SILLinkage::Shared);
+      if (M.isWholeModule()) {
+        switch (F.getLinkage()) {
+        case SILLinkage::PublicNonABI:
+        case SILLinkage::PackageNonABI:
+          F.setLinkage(SILLinkage::Shared);
+          break;
+        case SILLinkage::Public:
+        case SILLinkage::Package:
+        case SILLinkage::Hidden:
+        case SILLinkage::Shared:
+        case SILLinkage::Private:
+        case SILLinkage::PublicExternal:
+        case SILLinkage::PackageExternal:
+        case SILLinkage::HiddenExternal:
+          break;
+        }
+      }
     }
 
     for (auto &WT : M.getWitnessTables()) {

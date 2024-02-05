@@ -58,6 +58,7 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
                                 ForDefinition_t forDefinition) {
   switch (linkage) {
   case FormalLinkage::PublicUnique:
+  case FormalLinkage::PackageUnique:
     return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
 
   case FormalLinkage::PublicNonUnique:
@@ -88,11 +89,11 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return SILLinkage::Private;
-
     case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
-
-    default:
+    case AccessLevel::Package:
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
 }
@@ -125,6 +126,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Public declarations are accessible from everywhere.
     case FormalLinkage::PublicUnique:
     case FormalLinkage::PublicNonUnique:
+    case FormalLinkage::PackageUnique:
       return false;
 
     // Hidden declarations are inaccessible from different modules.
@@ -174,6 +176,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
       switch (getTypeLinkage(CanType(req.getSecondType()))) {
       case FormalLinkage::PublicUnique:
       case FormalLinkage::PublicNonUnique:
+      case FormalLinkage::PackageUnique:
         continue;
       case FormalLinkage::HiddenUnique:
         linkage = FormalLinkage::HiddenUnique;
@@ -369,6 +372,8 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   switch (getterLinkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageNonABI:
     // We may need a descriptor.
     break;
     
@@ -380,6 +385,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
     llvm_unreachable("should be definition linkage?");
   }
 

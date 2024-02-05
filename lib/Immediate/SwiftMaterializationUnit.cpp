@@ -292,7 +292,7 @@ std::unique_ptr<LazySwiftMaterializationUnit>
 LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   auto *M = CI.getMainModule();
   TBDGenOptions Opts;
-  Opts.PublicSymbolsOnly = false;
+  Opts.PublicOrPackageSymbolsOnly = false;
   auto TBDDesc = TBDGenDescriptor::forModule(M, std::move(Opts));
   SymbolSourceMapRequest SourceReq{TBDDesc};
   const auto *Sources =

@@ -481,9 +481,12 @@ enum class MetadataAccessStrategy {
   /// is built as a side-effect of emitting a metadata candidate.
   ForeignAccessor,
 
+  /// There is a unique package accessor function for the given type metadata.
+  PackageUniqueAccessor,
+
   /// There is no unique accessor function for the given type metadata, but
   /// one should be made automatically.
-  NonUniqueAccessor
+  NonUniqueAccessor,
 };
 
 /// Does the given access strategy rely on an accessor that's generated
@@ -491,6 +494,7 @@ enum class MetadataAccessStrategy {
 static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
   switch (strategy) {
   case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::PackageUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
     return false;

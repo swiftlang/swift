@@ -1124,6 +1124,7 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     // Everything else requires accessors.
     switch (getDeclLinkage(nominal)) {
     case FormalLinkage::PublicUnique:
+    case FormalLinkage::PackageUnique:
       return MetadataAccessStrategy::PublicUniqueAccessor;
     case FormalLinkage::HiddenUnique:
       return MetadataAccessStrategy::HiddenUniqueAccessor;
@@ -3374,6 +3375,7 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
   switch (getTypeMetadataAccessStrategy(type)) {
   case MetadataAccessStrategy::ForeignAccessor:
   case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::PackageUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
     return getOtherwiseDefinedTypeMetadataAccessFunction(IGM, type);

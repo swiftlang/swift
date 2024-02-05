@@ -70,14 +70,16 @@ static llvm::Optional<SILLinkage> fromStableSILLinkage(unsigned value) {
   switch (value) {
   case SIL_LINKAGE_PUBLIC: return SILLinkage::Public;
   case SIL_LINKAGE_PUBLIC_NON_ABI: return SILLinkage::PublicNonABI;
+  case SIL_LINKAGE_PACKAGE: return SILLinkage::Package;
+  case SIL_LINKAGE_PACKAGE_NON_ABI: return SILLinkage::PackageNonABI;
   case SIL_LINKAGE_HIDDEN: return SILLinkage::Hidden;
   case SIL_LINKAGE_SHARED: return SILLinkage::Shared;
   case SIL_LINKAGE_PRIVATE: return SILLinkage::Private;
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
-  default:
-    return llvm::None;
   }
+
+  llvm_unreachable("Invalid SIL linkage");
 }
 
 static llvm::Optional<SILVTable::Entry::Kind>
@@ -646,13 +648,26 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     // referenced as a declaration, and Shared when it has
     // a deserialized body.
     if (isAvailableExternally(fn->getLinkage())) {
-      if (linkage == SILLinkage::PublicNonABI || linkage == SILLinkage::Shared) {
+      switch (linkage) {
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
+      case SILLinkage::Shared:
         fn->setLinkage(SILLinkage::Shared);
-      } else if (hasPublicVisibility(linkage)) {
-        // Cross-module-optimization can change the linkage to public. In this
-        // case we need to update the linkage of the function (which is
-        // originally just derived from the AST).
-        fn->setLinkage(SILLinkage::PublicExternal);
+        break;
+      case SILLinkage::Public:
+      case SILLinkage::Package:
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::PackageExternal:
+      case SILLinkage::HiddenExternal:
+        if (hasPublicVisibility(linkage)) {
+          // Cross-module-optimization can change the linkage to public. In this
+          // case we need to update the linkage of the function (which is
+          // originally just derived from the AST).
+          fn->setLinkage(SILLinkage::PublicExternal);
+        }
+        break;
       }
     }
 

@@ -41,6 +41,10 @@ enum class FormalLinkage {
   /// This entity is visible in only a single Swift file. These are by
   /// definition unique.
   Private,
+
+  /// This entity is visible in multiple Swift modules within a package
+  /// and has a unique file that is known to define it.
+  PackageUnique,
 };
 
 FormalLinkage getDeclLinkage(const ValueDecl *decl);

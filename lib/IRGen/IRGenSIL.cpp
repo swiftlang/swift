@@ -2942,12 +2942,21 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
 // function's implementation and the function's context size in the async
 // function pointer data structure.
 static bool mayDirectlyCallAsync(SILFunction *fn) {
-  if (fn->getLinkage() == SILLinkage::Shared ||
-      fn->getLinkage() == SILLinkage::PublicNonABI) {
+  switch (fn->getLinkage()) {
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::Shared:
     return false;
+  case SILLinkage::Public:
+  case SILLinkage::Package:
+  case SILLinkage::Hidden:
+  case SILLinkage::Private:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::HiddenExternal:
+    return true;
   }
-
-  return true;
+  llvm_unreachable("Invalid SIL linkage");
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {

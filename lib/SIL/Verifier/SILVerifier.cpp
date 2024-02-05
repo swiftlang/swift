@@ -6802,11 +6802,13 @@ public:
 
     switch (F->getLinkage()) {
     case SILLinkage::Public:
+    case SILLinkage::Package:
     case SILLinkage::Shared:
       require(F->isDefinition() || F->hasForeignBody(),
-              "public/shared function must have a body");
+              "public/package/shared function must have a body");
       break;
     case SILLinkage::PublicNonABI:
+    case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
       require(F->isSerialized() || mod.isSerialized(),
@@ -6823,6 +6825,11 @@ public:
       require(F->isExternalDeclaration() || F->isSerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
+      break;
+    case SILLinkage::PackageExternal:
+      require(F->isExternalDeclaration() || F->isSerialized() ||
+              mod.isSerialized(),
+              "package-external function definition must be serialized");
       break;
     case SILLinkage::HiddenExternal:
       require(F->isExternalDeclaration(),
