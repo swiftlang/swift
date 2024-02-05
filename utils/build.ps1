@@ -554,6 +554,7 @@ function Build-CMakeProject {
     [string[]] $UseMSVCCompilers = @(), # C,CXX
     [string[]] $UseBuiltCompilers = @(), # ASM,C,CXX,Swift
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
+    [switch] $UseSwiftSwiftDriver = $false,
     [string] $SwiftSDK = "",
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
@@ -572,6 +573,19 @@ function Build-CMakeProject {
   # for version checks.
   Isolate-EnvVars {
     Invoke-VsDevShell $Arch
+
+    if ($EnableCaching) {
+      $env:SCCACHE_DIRECT = "true"
+      $env:SCCACHE_DIR = "$BinaryCache\sccache"
+    }
+    if ($UseSwiftSwiftDriver) {
+      $env:SWIFT_DRIVER_SWIFT_FRONTEND_EXEC = "$BinaryCache\1\bin\swift-frontend.exe"
+    }
+
+    # TODO(compnerd) workaround swiftc.exe symlink not existing.
+    if ($UseSwiftSwiftDriver) {
+      Copy-Item -Force "$BinaryCache\7\bin\swift-driver.exe" "$BinaryCache\7\bin\swiftc.exe" | Out-Null
+    }
 
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
@@ -592,11 +606,6 @@ function Build-CMakeProject {
       }
     }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
-
-    if ($EnableCaching) {
-      $env:SCCACHE_DIRECT = "true"
-      $env:SCCACHE_DIR = "$BinaryCache\sccache"
-    }
 
     if ($UseMSVCCompilers.Contains("C")) {
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
@@ -660,7 +669,9 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("Swift") -Or $UseBuiltCompilers.Contains("Swift")) {
       $SwiftArgs = @()
 
-      if ($UseBuiltCompilers.Contains("Swift")) {
+      if ($UseSwiftSwiftDriver) {
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\7\bin\swiftc.exe"
+      } elseif ($UseBuiltCompilers.Contains("Swift")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe"
       } else {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath  "swiftc.exe")
