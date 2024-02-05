@@ -2404,6 +2404,12 @@ public:
       LookUpConformanceInModule(moduleDecl));
     
     for (auto reqt : nomGenericSig.getRequirements()) {
+      // Skip conformance requirements to Copyable and Escapable.
+      if (reqt.getKind() == RequirementKind::Conformance &&
+          reqt.getProtocolDecl()->getInvertibleProtocolKind()) {
+        continue;
+      }
+
       substRequirements.push_back(reqt.subst(newSubMap));
     }
     
