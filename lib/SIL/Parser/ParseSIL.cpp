@@ -675,6 +675,7 @@ static bool parseDeclSILOptional(
     SILFunction **usedAdHocRequirementWitness, Identifier *objCReplacementFor,
     SILFunction::Purpose *specialPurpose, Inline_t *inlineStrategy,
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
+    bool *isPerformanceConstraint,
     bool *markedAsUsed, StringRef *section, bool *isLet, bool *isWeakImported,
     bool *needStackProtection, AvailabilityContext *availability,
     bool *isWithoutActuallyEscapingThunk,
@@ -774,6 +775,8 @@ static bool parseDeclSILOptional(
       *perfConstraints = PerformanceConstraints::NoExistentials;
     else if (perfConstraints && SP.P.Tok.getText() == "no_objc_bridging")
       *perfConstraints = PerformanceConstraints::NoObjCBridging;
+    else if (isPerformanceConstraint && SP.P.Tok.getText() == "perf_constraint")
+      *isPerformanceConstraint = true;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")
       *markedAsUsed = true;
     else if (section && SP.P.Tok.getText() == "section") {
@@ -7033,6 +7036,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
+  bool isPerformanceConstraint = false;
   bool markedAsUsed = false;
   StringRef section;
   SmallVector<std::string, 1> Semantics;
@@ -7050,7 +7054,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &useStackForPackMetadata, &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
-          &inlineStrategy, &optimizationMode, &perfConstr, &markedAsUsed,
+          &inlineStrategy, &optimizationMode, &perfConstr,
+          &isPerformanceConstraint, &markedAsUsed,
           &section, nullptr, &isWeakImported, &needStackProtection,
           &availability, &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
@@ -7106,6 +7111,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);
+    FunctionState.F->setIsPerformanceConstraint(isPerformanceConstraint);
     FunctionState.F->setEffectsKind(MRK);
 
     if (ClangDecl)
@@ -7302,6 +7308,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, &isLet,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, State, M) ||
@@ -7356,7 +7363,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7426,7 +7433,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7537,7 +7544,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, moveOnlyDeinitTableState, M))
+                           nullptr, nullptr, nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8024,7 +8031,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

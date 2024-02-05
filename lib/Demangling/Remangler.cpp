@@ -3315,6 +3315,34 @@ ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
   Buffer << "WOh";
   return ManglingError::Success;
 }
+
+ManglingError Remangler::mangleOutlinedInitializeWithCopyNoValueWitness(Node *node,
+                                                                        unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOC";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOutlinedAssignWithTakeNoValueWitness(Node *node,
+                                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOD";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOutlinedAssignWithCopyNoValueWitness(Node *node,
+                                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOF";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOutlinedDestroyNoValueWitness(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOH";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleOutlinedEnumGetTag(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOg";

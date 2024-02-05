@@ -328,9 +328,13 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOs' // Outlined release
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
+  global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness
   global ::= generic-signature? type 'WOd' // Outlined assignWithTake
+  global ::= generic-signature? type 'WOD' // Outlined assignWithTake, not using value witness
   global ::= generic-signature? type 'WOf' // Outlined assignWithCopy
+  global ::= generic-signature? type 'WOF' // Outlined assignWithCopy, not using value witness
   global ::= generic-signature? type 'WOh' // Outlined destroy
+  global ::= generic-signature? type 'WOH' // Outlined destroy, not using value witness
   global ::= generic-signature? type 'WOi` // Outlined store enum tag
   global ::= generic-signature? type 'WOj` // Outlined enum destructive project
   global ::= generic-signature? type 'WOg` // Outlined enum get tag

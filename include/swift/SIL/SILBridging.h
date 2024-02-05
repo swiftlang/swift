@@ -542,6 +542,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setThunk(ThunkKind) const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
+  BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedNominalTypeDecl decl) const;
   BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type) const;
 

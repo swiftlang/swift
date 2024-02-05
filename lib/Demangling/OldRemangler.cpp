@@ -2549,6 +2549,24 @@ ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
   Buffer << "Wh";
   return mangleSingleChildNode(node, depth + 1);
 }
+ManglingError Remangler::mangleOutlinedInitializeWithCopyNoValueWitness(Node *node,
+                                                                        unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleOutlinedAssignWithTakeNoValueWitness(Node *node,
+                                                                    unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleOutlinedAssignWithCopyNoValueWitness(Node *node,
+                                                                    unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleOutlinedDestroyNoValueWitness(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
 ManglingError Remangler::mangleOutlinedEnumTagStore(Node *node, unsigned depth) {
   Buffer << "Wi";
   return mangleSingleChildNode(node, depth + 1);
