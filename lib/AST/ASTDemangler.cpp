@@ -1093,7 +1093,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
                     ASTBuilder>(node, requirements, *this);
 
-  return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements))
+  return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements),
+                               /*allowInverses=*/true)
       .getCanonicalSignature();
 }
 

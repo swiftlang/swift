@@ -544,7 +544,8 @@ AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
-         SmallVector<Requirement, 2> addedRequirements) const {
+         SmallVector<Requirement, 2> addedRequirements,
+         bool allowInverses) const {
   GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
   // If nothing is added to the base signature, just return the base
   // signature.
@@ -594,7 +595,8 @@ AbstractGenericSignatureRequest::evaluate(
         ctx.evaluator,
         AbstractGenericSignatureRequest{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
-          std::move(canAddedRequirements)},
+          std::move(canAddedRequirements),
+          allowInverses},
         GenericSignatureWithError());
     if (!canSignatureResult.getPointer())
       return GenericSignatureWithError();
@@ -660,8 +662,10 @@ AbstractGenericSignatureRequest::evaluate(
 
   /// Next, we need to expand default requirements and then apply inverses.
   SmallVector<Type, 2> paramsAsTypes;
-  for (auto *gtpt : addedParameters)
-    paramsAsTypes.push_back(gtpt);
+  if (allowInverses) {
+    for (auto *gtpt : addedParameters)
+      paramsAsTypes.push_back(gtpt);
+  }
 
   InverseRequirement::expandDefaults(ctx, paramsAsTypes, requirements);
   applyInverses(ctx, paramsAsTypes, inverses, requirements, errors);

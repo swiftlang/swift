@@ -439,7 +439,8 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
     });
   }
 
-  return buildGenericSignature(ctx, sig, {}, reqs).getCanonicalSignature();
+  return buildGenericSignature(ctx, sig, {}, reqs, /*allowInverses=*/false)
+      .getCanonicalSignature();
 }
 
 /// Given an original type, computes its tangent type for the purpose of
@@ -2993,7 +2994,8 @@ buildThunkSignature(SILFunction *fn,
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
                                           collector.Params,
-                                          collector.Requirements);
+                                          collector.Requirements,
+                                          /*allowInverses=*/false);
   genericEnv = genericSig.getGenericEnvironment();
 
   // Map the local archetypes to their new parameter types.

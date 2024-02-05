@@ -56,7 +56,8 @@ public:
     // Finish the signature.
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
-                                     addedRequirements);
+                                     addedRequirements,
+                                     /*allowInverses=*/false);
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.

@@ -384,7 +384,8 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     for (auto param : params)
       reqs.push_back({RequirementKind::Conformance, param, protoTy});
 
-    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs);
+    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs,
+                                       /*allowInverses=*/false);
     ext->setGenericSignature(genericSig);
 
     // Bind the extension.

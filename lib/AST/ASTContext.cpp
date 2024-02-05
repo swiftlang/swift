@@ -5973,7 +5973,8 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
                           constraint);
   auto genericSig = buildGenericSignature(
       *this, canParentSig,
-      {genericParam}, {requirement});
+      {genericParam}, {requirement},
+      /*allowInverses=*/true);
 
   CanGenericSignature canGenericSig(genericSig);
 
@@ -6085,8 +6086,8 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   }
 
   auto elementSig = buildGenericSignature(
-      *this, GenericSignature(), genericParams, requirements)
-          .getCanonicalSignature();
+      *this, GenericSignature(), genericParams, requirements,
+      /*allowInverses=*/false).getCanonicalSignature();
   sigs[key] = elementSig;
   return elementSig;
 }
@@ -6159,7 +6160,8 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
 
   auto genericSig = buildGenericSignature(*this, derivedNominalSig,
                                           std::move(addedGenericParams),
-                                          std::move(addedRequirements));
+                                          std::move(addedRequirements),
+                                          /*allowInverses=*/false);
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }

@@ -310,10 +310,13 @@ synthesizeGenericSignature(SynthesisContext &SC,
   CollectGenericParams collector(SC);
   list.Params.visit(collector);
 
+  // FIXME: Change allowInverses to false and add Copyable/Escapable explicitly
+  // to those builtins that need it.
   return buildGenericSignature(SC.Context,
                                GenericSignature(),
                                std::move(collector.GenericParamTypes),
-                               std::move(collector.AddedRequirements));
+                               std::move(collector.AddedRequirements),
+                               /*allowInverses=*/true);
 }
 
 /// Build a builtin function declaration.
@@ -732,10 +735,13 @@ namespace {
     }
 
     FuncDecl *build(Identifier name) {
+      // FIXME: Change allowInverses to false and add Copyable/Escapable
+      // explicitly to those builtins that need it.
       auto GenericSig = buildGenericSignature(
           Context, GenericSignature(),
           std::move(genericParamTypes),
-          std::move(addedRequirements));
+          std::move(addedRequirements),
+          /*allowInverses=*/true);
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList, GenericSig,

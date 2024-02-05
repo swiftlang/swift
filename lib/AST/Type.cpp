@@ -2416,7 +2416,8 @@ public:
         upperBoundGenericSig = buildGenericSignature(decl->getASTContext(),
                                                      upperBoundGenericSig,
                                                      /*genericParams=*/{ },
-                                                     std::move(addedRequirements));
+                                                     std::move(addedRequirements),
+                                                     /*allowInverses=*/false);
 
         upperBoundSubstMap = SubstitutionMap::get(upperBoundGenericSig,
           [&](SubstitutableType *t) -> Type {

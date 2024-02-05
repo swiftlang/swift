@@ -1975,7 +1975,8 @@ class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
-                                                    SmallVector<Requirement, 2>),
+                                                    SmallVector<Requirement, 2>,
+                                                    bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1988,7 +1989,8 @@ private:
   evaluate(Evaluator &evaluator,
            const GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
-           SmallVector<Requirement, 2> addedRequirements) const;
+           SmallVector<Requirement, 2> addedRequirements,
+           bool allowInverses) const;
 
 public:
   // Separate caching.

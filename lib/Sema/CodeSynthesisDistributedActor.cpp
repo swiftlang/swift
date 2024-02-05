@@ -695,10 +695,7 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     genericParamList = genericParams->clone(DC);
   }
 
-  GenericSignature baseSignature =
-      buildGenericSignature(C, func->getGenericSignature(),
-                            /*addedParameters=*/{},
-                            /*addedRequirements=*/{});
+  GenericSignature baseSignature = func->getGenericSignature();
 
   // --- Prepare parameters
   auto funcParams = func->getParameters();

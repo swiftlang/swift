@@ -572,7 +572,8 @@ GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
-    SmallVector<Requirement, 2> addedRequirements);
+    SmallVector<Requirement, 2> addedRequirements,
+    bool allowInverses);
 
 /// Summary of error conditions detected by the Requirement Machine.
 enum class GenericSignatureErrorFlags {

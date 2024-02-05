@@ -204,7 +204,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
                                                genericParamTypes,
-                                               std::move(requirements));
+                                               std::move(requirements),
+                                               /*allowInverses=*/true);
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;

@@ -218,5 +218,6 @@ RequirementEnvironment::RequirementEnvironment(
 
   witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),
                                           std::move(genericParamTypes),
-                                          std::move(requirements));
+                                          std::move(requirements),
+                                          /*allowInverses=*/false);
 }

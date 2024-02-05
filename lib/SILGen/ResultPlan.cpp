@@ -119,7 +119,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   }
 
   const auto mappedSubs = SubstitutionMap::get(
-      swift::buildGenericSignature(ctx, nullptr, params, requirements),
+      swift::buildGenericSignature(ctx, nullptr, params, requirements,
+                                   /*allowInverses=*/false),
       [&](SubstitutableType *t) -> Type {
         return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
       },

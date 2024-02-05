@@ -8865,7 +8865,8 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
   return swift::buildGenericSignature(
       SwiftContext, GenericSignature(),
       std::move(genericParamTypes),
-      std::move(requirements));
+      std::move(requirements),
+      /*allowInverses=*/true);
 }
 
 Decl *
