@@ -353,7 +353,7 @@ static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef executor) {
 /// 0 - no logging
 /// 1 - warn on each instance
 /// 2 - fatal error
-static unsigned unexpectedExecutorLogLevel = 1;
+static unsigned unexpectedExecutorLogLevel = 2;
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
