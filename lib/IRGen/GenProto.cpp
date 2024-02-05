@@ -989,7 +989,7 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (assocProtocol->isObjC())
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(assocProtocol))
       continue;
 
     auto assocConformance =
