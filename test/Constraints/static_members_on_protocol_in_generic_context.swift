@@ -349,3 +349,22 @@ func test_leading_dot_syntax_with_typelias() {
   test(.box) // expected-error {{type 'Box<T>.Type' cannot conform to 'Container'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
+
+extension Copyable where Self == Int {
+  static func answer() -> Int { 42 }
+}
+
+extension Escapable where Self == String {
+  static func question() -> String { "" }
+}
+
+do {
+  func testCopyable<T: Copyable>(_: T) {}
+  func testEscapable<T: Escapable>(_: T) {}
+
+  testCopyable(.answer())
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'answer'}}
+
+  testEscapable(.question())
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'question'}}
+}
