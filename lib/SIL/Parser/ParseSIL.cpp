@@ -1075,7 +1075,8 @@ void SILParser::bindSILGenericParams(TypeRepr *TyR) {
         }
 
         if (auto *genericParams = fnType->getPatternGenericParams()) {
-          auto sig = handleSILGenericParams(genericParams, SF);
+          auto sig = handleSILGenericParams(genericParams, SF,
+                                            /*allowInverses=*/false);
           fnType->setPatternGenericSignature(sig);
         }
       }

@@ -748,12 +748,18 @@ InferredGenericSignatureRequest::evaluate(
         WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
-        bool allowConcreteGenericParams) const {
+        bool isExtension, bool allowInverses) const {
   GenericSignature parentSig(parentSigImpl);
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
       parentSig.getGenericParams().begin(),
       parentSig.getGenericParams().end());
+
+  unsigned numOuterParams = genericParams.size();
+  if (isExtension) {
+    assert(allowInverses);
+    numOuterParams = 0;
+  }
 
   SmallVector<StructuralRequirement, 2> requirements;
   SmallVector<RequirementError, 2> errors;
@@ -791,12 +797,9 @@ InferredGenericSignatureRequest::evaluate(
     return false;
   };
 
-  // "Local" generic parameters to which we apply default Copyable and
-  // Escapable.
-  SmallVector<Type, 4> paramTypes;
-
   if (genericParamList) {
-    // Extensions never have a parent signature.
+    // If we have multiple parameter lists, we're in SIL mode, and there's
+    // no parent signature from context.
     assert(genericParamList->getOuterParameters() == nullptr || !parentSig);
 
     // Collect all outer generic parameter lists.
@@ -811,10 +814,6 @@ InferredGenericSignatureRequest::evaluate(
     // We walk them backwards to order outer parameters before inner
     // parameters.
     for (auto *gpList : llvm::reverse(gpLists)) {
-      for (auto *gpDecl : *gpList) {
-        paramTypes.push_back(gpDecl->getDeclaredInterfaceType());
-      }
-
       assert(gpList->size() > 0 &&
              "Parsed an empty generic parameter list?");
 
@@ -872,14 +871,13 @@ InferredGenericSignatureRequest::evaluate(
 
   desugarRequirements(requirements, inverses, errors);
 
-  if (!genericParamList && allowConcreteGenericParams) {
-    for (auto paramTy : genericParams) {
-      paramTypes.push_back(paramTy);
-    }
-  }
-
   // After realizing requirements, expand default requirements only for local
   // generic parameters, as the outer parameters have already been expanded.
+  SmallVector<Type, 4> paramTypes;
+  if (allowInverses) {
+    paramTypes.append(genericParams.begin() + numOuterParams, genericParams.end());
+  }
+
   InverseRequirement::expandDefaults(ctx, paramTypes, requirements);
   applyInverses(ctx, paramTypes, inverses, requirements, errors);
 
@@ -947,7 +945,7 @@ InferredGenericSignatureRequest::evaluate(
     if (attempt == 0) {
       machine->computeRequirementDiagnostics(errors, inverses, loc);
       diagnoseRequirementErrors(ctx, errors,
-                                (allowConcreteGenericParams || !genericParamList)
+                                (isExtension || !genericParamList)
                                 ? AllowConcreteTypePolicy::All
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
@@ -978,7 +976,7 @@ InferredGenericSignatureRequest::evaluate(
                                            std::move(machine));
     }
 
-    if (genericParamList && !allowConcreteGenericParams) {
+    if (genericParamList && !isExtension) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto reduced = result.getReducedType(genericParam);
 

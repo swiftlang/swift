@@ -2007,7 +2007,7 @@ class InferredGenericSignatureRequest :
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeLoc, 2>,
-                                                    bool),
+                                                    bool, bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2023,7 +2023,7 @@ private:
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
-           bool allowConcreteGenericParams) const;
+           bool isExtension, bool allowInverses) const;
 
 public:
   // Separate caching.
