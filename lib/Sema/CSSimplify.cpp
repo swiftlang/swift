@@ -12286,8 +12286,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto paramFnTy = FunctionType::get(paramParam, fnTy->getResult(),
                                          fnTy->getExtInfo());
 
-      return matchTypes(kpFnTy, paramFnTy, ConstraintKind::Conversion, subflags,
-                        locator).isSuccess();
+      return !matchTypes(kpFnTy, paramFnTy, ConstraintKind::Conversion,
+                         subflags, locator).isFailure();
     }
 
     assert(contextualRootTy && contextualValueTy);

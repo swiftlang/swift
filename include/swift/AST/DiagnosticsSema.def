@@ -697,10 +697,10 @@ ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
 ERROR(expr_keypath_root_type_mismatch, none,
-      "key path root type %0 cannot be converted to contextual type %1",
+      "cannot convert key path root type %0 to contextual type %1",
       (Type, Type))
 ERROR(expr_keypath_type_mismatch, none,
-      "key path of type %0 cannot be converted to contextual type %1",
+      "cannot convert key path of type %0 to contextual type %1",
       (Type, Type))
 ERROR(expr_keypath_application_root_type_mismatch, none,
       "key path with root type %0 cannot be applied to a base of type %1",
