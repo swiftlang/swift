@@ -347,23 +347,6 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return Action::SkipNode(E);
   }
 
-  auto doSkipChildren = [&]() -> PreWalkResult<Expr *> {
-    // If we decide to skip the children after having issued the call to
-    // walkToExprPre, we need to simulate a corresponding call to walkToExprPost
-    // which will not be issued by the ASTWalker if we return false in the first
-    // component.
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(E);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      return Action::SkipNode(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
-  };
-
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
@@ -439,11 +422,11 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
-                                         OpAccess)))
+                                         OpAccess))) {
       return Action::Stop();
-
+    }
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
 
   } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
     if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getType(),
@@ -478,7 +461,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
 
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
 
   } else if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
     for (auto &component : KPE->getComponents()) {
@@ -522,7 +505,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
 
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
     llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
                                                        AccessKind::ReadWrite);
@@ -531,7 +514,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
 
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
     llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
                                                        AccessKind::Read);
@@ -540,7 +523,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
 
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto AE = dyn_cast<AssignExpr>(E)) {
     {
       llvm::SaveAndRestore<llvm::Optional<AccessKind>> C(this->OpAccess,
@@ -554,7 +537,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
 
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto OEE = dyn_cast<OpenExistentialExpr>(E)) {
     // Record opaque value.
     OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
@@ -565,7 +548,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!OEE->getSubExpr()->walk(*this))
       return Action::Stop();
 
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
     // Manually walk to original arguments in order. We don't handle
     // OpaqueValueExpr here.
@@ -579,7 +562,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!callExpr->getFn()->walk(*this))
       return Action::Stop();
 
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
     // Ignore conversion expressions. We don't handle OpaqueValueExpr here
     // because it's only in conversion expressions. Instead, just walk into
@@ -587,7 +570,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!CUCE->getSubExpr()->walk(*this))
       return Action::Stop();
 
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
     // Walk into mapped value.
     auto value = OpaqueValueMap.find(OVE);
@@ -595,7 +578,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       if (!value->second->walk(*this))
         return Action::Stop();
 
-      return doSkipChildren();
+      return Action::SkipChildren(E);
     }
   } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
     // Visit in source order.
@@ -604,10 +587,11 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
                        DMRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
-                                         OpAccess)))
+                                         OpAccess))) {
       return Action::Stop();
+    }
     // We already visited the children.
-    return doSkipChildren();
+    return Action::SkipChildren(E);
   } else if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
     // Add a reference to the macro if this is a true macro expansion *expression*.
     // If this is a `MacroExpansionExpr` that expands a declaration macro, the

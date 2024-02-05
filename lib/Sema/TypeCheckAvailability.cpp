@@ -3188,11 +3188,6 @@ public:
 
     ExprStack.push_back(E);
 
-    auto skipChildren = [&]() {
-      ExprStack.pop_back();
-      return Action::SkipNode(E);
-    };
-
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
                                   getEnclosingApplyExpr(), llvm::None);
@@ -3200,7 +3195,7 @@ public:
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
-      return skipChildren();
+      return Action::SkipChildren(E);
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagnoseDeclRefAvailability(OCDR->getDeclRef(),
@@ -3252,11 +3247,11 @@ public:
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
-      return skipChildren();
+      return Action::SkipChildren(E);
     }
     if (auto IO = dyn_cast<InOutExpr>(E)) {
       walkInOutExpr(IO);
-      return skipChildren();
+      return Action::SkipChildren(E);
     }
     if (auto T = dyn_cast<TypeExpr>(E)) {
       if (!T->isImplicit()) {
@@ -3282,7 +3277,7 @@ public:
     if (AbstractClosureExpr *closure = dyn_cast<AbstractClosureExpr>(E)) {
       if (shouldWalkIntoClosure(closure)) {
         walkAbstractClosure(closure);
-        return skipChildren();
+        return Action::SkipChildren(E);
       }
     }
     

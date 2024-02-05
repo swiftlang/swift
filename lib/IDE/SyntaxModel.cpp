@@ -672,17 +672,8 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
       subExpr->walk(*this);
     }
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(SE);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipNode(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    // We already visited the children.
+    return Action::SkipChildren(SE);
   } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
     // Don't visit the child expressions directly. Instead visit the arguments
     // of each appendStringLiteral/appendInterpolation CallExpr so we don't
@@ -694,17 +685,7 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
           arg.getExpr()->walk(*this);
       }
     });
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(E);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipNode(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    return Action::SkipChildren(E);
   }
 
   return Action::Continue(E);
@@ -845,10 +826,9 @@ ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         assert(RetS == Body);
         (void)RetS;
       }
-      walkToStmtPost(DeferS);
     }
     // Already walked children.
-    return Action::SkipNode(DeferS);
+    return Action::SkipChildren(DeferS);
   }
 
   return Action::Continue(S);
