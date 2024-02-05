@@ -336,10 +336,10 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // Find generic parameters or dependent member types.
       // Once such a type is found, don't recurse into its children.
       if (!ty->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
       if (ty->isTypeParameter()) {
         ReferencedGenericParams.insert(ty->getCanonicalType());
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       // Skip the count type, which is always a generic parameter;
@@ -347,7 +347,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // shape and not the metadata.
       if (auto *expansionTy = ty->getAs<PackExpansionType>()) {
         expansionTy->getPatternType().walk(*this);
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       // Don't walk into generic type alias substitutions. This does
@@ -357,7 +357,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       //   func foo<T>(_: Foo<T>) {}
       if (auto *aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
         Type(aliasTy->getSinglyDesugaredType()).walk(*this);
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       return Action::Continue;

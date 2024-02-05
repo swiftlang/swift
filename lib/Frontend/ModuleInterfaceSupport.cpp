@@ -693,7 +693,7 @@ public:
       proto->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // If 'nominal' is an actor, we do not synthesize its conformance
         // to the Actor protocol through a dummy extension.
@@ -702,14 +702,14 @@ public:
         // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // Do not synthesize an extension to print a conformance to an
         // invertible protocol, as their conformances are always re-inferred
         // using the interface itself.
         if (auto kp = inherited->getKnownProtocolKind())
           if (getInvertibleProtocolKind(*kp))
-            return TypeWalker::Action::SkipChildren;
+            return TypeWalker::Action::SkipNode;
 
         if (inherited->isSPI() && printOptions.printPublicInterface())
           return TypeWalker::Action::Continue;
@@ -721,7 +721,7 @@ public:
               inherited, availability, isUnchecked, otherAttrs);
           printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
                                     protoAndAvailability);
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
         }
 
         return TypeWalker::Action::Continue;

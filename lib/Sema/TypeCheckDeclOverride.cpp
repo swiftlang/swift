@@ -2220,7 +2220,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
       foundAny = true;
     }
 
-    return foundAny ? TypeWalker::Action::SkipChildren
+    return foundAny ? TypeWalker::Action::SkipNode
                     : TypeWalker::Action::Continue;
   });
 

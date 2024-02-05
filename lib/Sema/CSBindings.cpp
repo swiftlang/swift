@@ -1072,7 +1072,7 @@ findInferableTypeVars(Type type,
 
     Action walkToTypePre(Type ty) override {
       if (ty->is<DependentMemberType>())
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       if (auto typeVar = ty->getAs<TypeVariableType>())
         typeVars.insert(typeVar);

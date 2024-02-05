@@ -7275,16 +7275,16 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
       }
 
       if (ty->getRootGenericParam()->getDepth() > 0) {
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       if (!Sig->isValidTypeParameter(ty)) {
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       const auto concreteTy = Sig->getConcreteType(ty);
       if (concreteTy && !concreteTy->hasTypeParameter()) {
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       return Action::Stop;

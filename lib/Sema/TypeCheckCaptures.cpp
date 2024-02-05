@@ -109,7 +109,7 @@ public:
         if (ObjC) {
           if (auto clazz = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
             if (clazz->isTypeErasedGenericClass()) {
-              return Action::SkipChildren;
+              return Action::SkipNode;
             }
           }
         }

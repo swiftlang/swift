@@ -6269,7 +6269,7 @@ bool ClassDecl::walkSuperclasses(
     switch (fn(cls)) {
     case TypeWalker::Action::Stop:
       return true;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       return false;
     case TypeWalker::Action::Continue:
       cls = cls->getSuperclassDecl();
@@ -6597,7 +6597,7 @@ bool ProtocolDecl::walkInheritedProtocols(
       }
       break;
 
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       break;
     }
   }
