@@ -360,10 +360,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return Action::Continue(E);
     }
 
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      return Action::Continue(E);
-    }
-
     /// Visit each component of the keypath and emit a diagnostic if they
     /// refer to a member that has effects.
     void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {

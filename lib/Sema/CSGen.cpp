@@ -124,11 +124,7 @@ namespace {
       
       return Action::Continue(expr);
     }
-    
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      return Action::Continue(expr);
-    }
-    
+
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       return Action::SkipChildren(stmt);
@@ -848,11 +844,6 @@ namespace {
 
       return Action::Continue(expr);
     }
-    
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      return Action::Continue(expr);
-    }
-    
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       return Action::SkipChildren(stmt);
