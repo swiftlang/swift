@@ -441,8 +441,13 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
   };
 
   switch (*ip) {
-  case InvertibleProtocolKind::Escapable:
   case InvertibleProtocolKind::Copyable:
+    // If move-only classes is enabled, we'll check the markings.
+    if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
+      break;
+
+  LLVM_FALLTHROUGH;
+  case InvertibleProtocolKind::Escapable:
     // Always derive unconditional IP conformance for classes
     if (isa<ClassDecl>(nominal))
       return generateConformance(nominal);
@@ -462,8 +467,10 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return nullptr; // No positive IP conformance will be inferred.
 
   case InverseMarking::Kind::Inferred:
-    return generateConditionalConformance();
+    if (!isa<ClassDecl>(nominal))
+      return generateConditionalConformance();
 
+  LLVM_FALLTHROUGH;
   case InverseMarking::Kind::None:
     // All types already start with conformances to the invertible protocols in
     // this case, within `NominalTypeDecl::prepareConformanceTable`.

@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
+// rdar://122287787 (NCGenerics performance issues in regression tests)
+// UNSUPPORTED: noncopyable_generics
+
 // This needs a better diagnostic. The real problem is the 'C == G<I>'
 // requirement in P2 conflicts with the one in P1.
 

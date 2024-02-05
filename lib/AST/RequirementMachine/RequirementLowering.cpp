@@ -810,15 +810,9 @@ void swift::rewriting::applyInverses(
       return false;
 
     // Only consider requirements involving an invertible protocol.
-    llvm::Optional<InvertibleProtocolKind> proto;
-    if (auto kp = req.getProtocolDecl()->getKnownProtocolKind())
-      if (auto ip = getInvertibleProtocolKind(*kp))
-        proto = *ip;
-
-    if (!proto) {
-      assert(false && "suspicious!");
+    auto proto = req.getProtocolDecl()->getInvertibleProtocolKind();
+    if (!proto)
       return false;
-    }
 
     // See if this subject is in-scope.
     auto subject = req.getFirstType()->getCanonicalType();
