@@ -46,14 +46,18 @@ import SIL
 let booleanLiteralFolding = FunctionPass(name: "boolean-literal-folding") {
   (function: Function, context: FunctionPassContext) in
 
+  var changed = false
   for block in function.blocks {
     if let condBr = block.terminator as? CondBranchInst {
-      fold(condBranch: condBr, context)
+      changed = fold(condBranch: condBr, context) || changed
     }
+  }
+  if changed {
+    _ = context.removeDeadBlocks(in: function)
   }
 }
 
-private func fold(condBranch: CondBranchInst, _ context: FunctionPassContext) {
+private func fold(condBranch: CondBranchInst, _ context: FunctionPassContext) -> Bool {
   guard let structExtract = condBranch.condition as? StructExtractInst,
         let initApply = structExtract.struct as? ApplyInst,
         initApply.hasSemanticsAttribute("bool.literal_init"),
@@ -61,10 +65,11 @@ private func fold(condBranch: CondBranchInst, _ context: FunctionPassContext) {
         let literal = initApply.arguments[0] as? IntegerLiteralInst,
         let literalValue = literal.value else
   {
-    return
+    return false
   }
 
   let builder = Builder(before: condBranch, context)
   builder.createBranch(to: literalValue == 0 ? condBranch.falseBlock : condBranch.trueBlock)
   context.erase(instruction: condBranch)
+  return true
 }

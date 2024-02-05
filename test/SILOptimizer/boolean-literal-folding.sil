@@ -15,6 +15,9 @@ sil public_external [_semantics "bool.literal_init"] @wrong_bool_literal_init : 
 // CHECK:         struct_extract
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    br bb2
+// CHECK-NOT:   bb3
 // CHECK:       } // end sil function 'replace_true'
 sil [ossa] @replace_true : $@convention(thin) () -> () {
 bb0:
@@ -25,6 +28,7 @@ bb0:
   %4 = struct_extract %3 : $Bool, #Bool._value
   cond_br %4, bb1, bb2
 bb1:
+  debug_step
   br bb3
 bb2:
   br bb3
@@ -35,8 +39,10 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @replace_false :
 // CHECK:         struct_extract
-// CHECK-NEXT:    br bb2
+// CHECK-NEXT:    br bb1
 // CHECK:       bb1:
+// CHECK-NEXT:    br bb2
+// CHECK-NOT:   bb3
 // CHECK:       } // end sil function 'replace_false'
 sil [ossa] @replace_false : $@convention(thin) () -> () {
 bb0:
@@ -47,6 +53,7 @@ bb0:
   %4 = struct_extract %3 : $Bool, #Bool._value
   cond_br %4, bb1, bb2
 bb1:
+  debug_step
   br bb3
 bb2:
   br bb3
