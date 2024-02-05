@@ -620,6 +620,12 @@ extension Function {
     }
   }
 
+  func set(isPerformanceConstraint: Bool, _ context: FunctionPassContext) {
+    context.notifyEffectsChanged()
+    bridged.setIsPerformanceConstraint(isPerformanceConstraint)
+  }
+
+
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)
   }

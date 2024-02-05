@@ -1280,7 +1280,14 @@ The clang node owner.
 
 Specifies the performance constraints for the function, which defines which type
 of runtime functions are allowed to be called from the function.
+::
 
+  sil-function-attribute ::= '[perf_constraint]'
+
+Specifies that the optimizer and IRGen must not add runtime calls which are not
+in the function originally. This attribute is set for functions with performance
+constraints or functions which are called from functions with performance
+constraints.
 
 Argument Effects
 ````````````````
