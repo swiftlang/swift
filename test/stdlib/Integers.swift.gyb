@@ -852,6 +852,14 @@ tests.test("Strideable") {
   expectEqual(dist(UInt8.max, UInt8.min), -255)
   expectEqual(dist(Int8.min, Int8.max), 255)
   expectEqual(dist(Int8.max, Int8.min), -255)
+  
+  expectEqual(dist(UInt.max, UInt.max / 2), Int.min)
+  expectEqual(dist(Int.max, -1 as Int), Int.min)
+
+% if int(WORD_BITS) <= 64:
+  expectEqual(dist(UInt64(UInt.max), UInt64(UInt.max / 2)), Int.min)
+  expectEqual(dist(Int64(Int.max), Int64(-1 as Int)), Int.min)
+% end
 }
 
 tests.test("signum/generic") {

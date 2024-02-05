@@ -1585,25 +1585,22 @@ extension BinaryInteger {
   @inlinable
   @inline(__always)
   public func distance(to other: Self) -> Int {
-    if !Self.isSigned {
-      if self > other {
-        if let result = Int(exactly: self - other) {
-          return -result
-        }
+    if Self.isSigned {
+      if self.bitWidth <= Int.bitWidth && other.bitWidth <= Int.bitWidth {
+        return Int(truncatingIfNeeded: other) - Int(truncatingIfNeeded: self)
       } else {
-        if let result = Int(exactly: other - self) {
-          return result
-        }
+        return Int(other - self)
       }
     } else {
-      let isNegative = self < (0 as Self)
-      if isNegative == (other < (0 as Self)) {
-        if let result = Int(exactly: other - self) {
-          return result
+      if self > other {
+        let result: Self = self - other
+        if result.bitWidth < Int.bitWidth || result <= Self(truncatingIfNeeded: Int.min.magnitude) {
+          return ~Int(truncatingIfNeeded: result) &+ 1
         }
       } else {
-        if let result = Int(exactly: self.magnitude + other.magnitude) {
-          return isNegative ? result : -result
+        let result: Self = other - self
+        if result.bitWidth < Int.bitWidth || result <= Self(truncatingIfNeeded: Int.max.magnitude) {
+          return Int(truncatingIfNeeded: result)
         }
       }
     }
