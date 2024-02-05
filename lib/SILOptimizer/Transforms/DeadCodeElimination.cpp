@@ -46,12 +46,11 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value/end_lifetime have
+  // Even though begin_access/copy_value/end_lifetime have
   // side-effects, they can be DCE'ed if they do not have useful
   // dependencies/reverse dependencies
   if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
-      isa<EndBorrowInst>(I))
+      isa<EndLifetimeInst>(I) || isa<EndBorrowInst>(I))
     return false;
 
   // A load [copy] is okay to be DCE'ed if there are no useful dependencies
@@ -275,13 +274,18 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::DestroyValueInst: {
-        auto phi = PhiValue(I.getOperand(0));
-        // Disable DCE of phis which are lexical or may have a pointer escape.
-        if (phi && (phi->isLexical() || findPointerEscape(phi))) {
-          markInstructionLive(&I);
+        auto destroyOp = I.getOperand(0);
+        if (auto *load = dyn_cast<LoadInst>(destroyOp)) {
+          if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+            addReverseDependency(I.getOperand(0), &I);
+            continue;
+          }
         }
-        // The instruction is live only if it's operand value is also live
-        addReverseDependency(I.getOperand(0), &I);
+        if (isa<CopyValueInst>(destroyOp)) {
+          addReverseDependency(I.getOperand(0), &I);
+          continue;
+        }
+        markInstructionLive(&I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
