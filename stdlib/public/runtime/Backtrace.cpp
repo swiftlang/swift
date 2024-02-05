@@ -121,6 +121,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // outputTo,
   OutputTo::Auto,
 
+  // symbolicate
+  true,
+
   // swiftBacktracePath
   NULL,
 };
@@ -673,6 +676,8 @@ _swift_processBacktracingSetting(llvm::StringRef key,
                      "swift runtime: unknown output-to setting '%.*s'\n",
                      static_cast<int>(value.size()), value.data());
     }
+  } else if (key.equals_insensitive("symbolicate")) {
+    _swift_backtraceSettings.symbolicate = parseBoolean(value);
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();

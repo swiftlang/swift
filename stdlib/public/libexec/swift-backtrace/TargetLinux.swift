@@ -27,13 +27,18 @@ import _Backtracing
 
 @_implementationOnly import Runtime
 
+enum SomeBacktrace {
+  case raw(Backtrace)
+  case symbolicated(SymbolicatedBacktrace)
+}
+
 struct TargetThread {
   typealias ThreadID = pid_t
 
   var id: ThreadID
   var context: HostContext?
   var name: String
-  var backtrace: SymbolicatedBacktrace
+  var backtrace: SomeBacktrace
 }
 
 class Target {
@@ -105,7 +110,8 @@ class Target {
     return trimmed
   }
 
-  init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool) {
+  init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool,
+       symbolicate: Bool) {
     // fd #4 is reserved for the memory server
     let memserverFd: CInt = 4
 
@@ -130,7 +136,8 @@ class Target {
 
     do {
       try fetchThreads(threadListHead: Address(crashInfo.thread_list),
-                       limit: limit, top: top, cache: cache)
+                       limit: limit, top: top, cache: cache,
+                       symbolicate: symbolicate)
     } catch {
       print("swift-backtrace: failed to fetch thread information: \(error)")
       exit(1)
@@ -143,7 +150,7 @@ class Target {
   /// uninterruptible wait, we won't have a ucontext for it.
   func fetchThreads(
     threadListHead: Address,
-    limit: Int?, top: Int, cache: Bool
+    limit: Int?, top: Int, cache: Bool, symbolicate: Bool
   ) throws {
     var next = threadListHead
 
@@ -164,18 +171,26 @@ class Target {
                                             images: images,
                                             limit: limit,
                                             top: top)
-      guard let symbolicated
-              = backtrace.symbolicated(with: images,
-                                       sharedCacheInfo: nil,
-                                       useSymbolCache: cache) else {
-        print("unable to symbolicate backtrace for thread \(t.tid)")
-        exit(1)
-      }
 
-      threads.append(TargetThread(id: TargetThread.ThreadID(t.tid),
-                                  context: context,
-                                  name: getThreadName(tid: t.tid),
-                                  backtrace: symbolicated))
+      if symbolicate {
+        guard let symbolicated
+                = backtrace.symbolicated(with: images,
+                                         sharedCacheInfo: nil,
+                                         useSymbolCache: cache) else {
+          print("unable to symbolicate backtrace for thread \(t.tid)")
+          exit(1)
+        }
+
+        threads.append(TargetThread(id: TargetThread.ThreadID(t.tid),
+                                    context: context,
+                                    name: getThreadName(tid: t.tid),
+                                    backtrace: .symbolicated(symbolicated)))
+      } else {
+        threads.append(TargetThread(id: TargetThread.ThreadID(t.tid),
+                                    context: context,
+                                    name: getThreadName(tid: t.tid),
+                                    backtrace: .raw(backtrace)))
+      }
     }
 
     // Sort the threads by thread ID; the main thread always sorts
@@ -193,7 +208,7 @@ class Target {
     }
   }
 
-  func redoBacktraces(limit: Int?, top: Int, cache: Bool) {
+  func redoBacktraces(limit: Int?, top: Int, cache: Bool, symbolicate: Bool) {
     for (ndx, thread) in threads.enumerated() {
       guard let context = thread.context else {
         continue
@@ -208,14 +223,18 @@ class Target {
         continue
       }
 
-      guard let symbolicated = backtrace.symbolicated(with: images,
-                                                      sharedCacheInfo: nil,
-                                                      useSymbolCache: cache) else {
-        print("unable to symbolicate backtrace from context for thread \(ndx)")
-        continue
-      }
+      if symbolicate {
+        guard let symbolicated = backtrace.symbolicated(with: images,
+                                                        sharedCacheInfo: nil,
+                                                        useSymbolCache: cache) else {
+          print("unable to symbolicate backtrace from context for thread \(ndx)")
+          continue
+        }
 
-      threads[ndx].backtrace = symbolicated
+        threads[ndx].backtrace = .symbolicated(symbolicated)
+      } else {
+        threads[ndx].backtrace = .raw(backtrace)
+      }
     }
   }
 
