@@ -1624,17 +1624,15 @@ extension BinaryInteger {
   @inlinable
   @inline(__always)
   public func advanced(by n: Int) -> Self {
-    if !Self.isSigned {
+    if Self.isSigned {
+      return self.bitWidth < n.bitWidth
+        ? Self(Int(truncatingIfNeeded: self) + n)
+        : self + Self(truncatingIfNeeded: n)
+    } else {
       return n < (0 as Int)
-        ? self - Self(-n)
-        : self + Self(n)
+        ? self - Self(UInt(bitPattern: ~n &+ 1))
+        : self + Self(UInt(bitPattern: n))
     }
-    if (self < (0 as Self)) == (n < (0 as Self)) {
-      return self + Self(n)
-    }
-    return self.magnitude < n.magnitude
-      ? Self(Int(self) + n)
-      : self + Self(n)
   }
 }
 
