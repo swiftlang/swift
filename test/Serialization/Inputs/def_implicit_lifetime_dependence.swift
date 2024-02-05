@@ -4,6 +4,9 @@ public struct BufferView : ~Escapable {
   public init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
+  public init(_ otherBV: borrowing BufferView) {
+    self.ptr = otherBV.ptr
+  }
 }
 
 public struct MutableBufferView : ~Escapable, ~Copyable {

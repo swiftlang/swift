@@ -3456,7 +3456,7 @@ static bool isNSObjectProtocol(ProtocolDecl *proto) {
   return proto->hasClangNode();
 }
 
-Type swift::getTupleConformanceTypeWitness(DeclContext *dc,
+static Type getTupleConformanceTypeWitness(DeclContext *dc,
                                            AssociatedTypeDecl *assocType) {
   auto genericSig = dc->getGenericSignatureOfContext();
   assert(genericSig.getGenericParams().size() == 1);
@@ -4751,15 +4751,28 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     return;
   }
 
-  // Now check that our associated conformances are at least as visible as
-  // the conformance itself.
+  bool isTupleConformance = isa<BuiltinTupleDecl>(dc->getSelfNominalTypeDecl());
+
   auto where = ExportContext::forConformance(dc, proto);
-  if (where.isImplicit())
-    return;
 
   conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                       Type type, TypeDecl *typeDecl) -> bool {
     checkObjCTypeErasedGenerics(conformance, assocType, type, typeDecl);
+
+    // Tuple conformances can only witness associated types by projecting them
+    // element-wise.
+    if (isTupleConformance) {
+      auto expectedTy = getTupleConformanceTypeWitness(dc, assocType);
+      if (!type->hasError() && !expectedTy->isEqual(type)) {
+        ctx.addDelayedConformanceDiag(conformance, true,
+              [dc, type, typeDecl, expectedTy](NormalProtocolConformance *conformance) {
+          dc->getASTContext().Diags.diagnose(
+              getLocForDiagnosingWitness(conformance, typeDecl),
+              diag::protocol_type_witness_tuple,
+              type, expectedTy);
+        });
+      }
+    }
 
     if (typeDecl && !typeDecl->isImplicit()) {
       auto requiredAccessScope = evaluateOrDefault(
@@ -4807,6 +4820,11 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
                                                       where.getDeclContext());
     return false;
   });
+
+  // Now check that our associated conformances are at least as visible as
+  // the conformance itself.
+  if (where.isImplicit())
+    return;
 
   conformance->forEachAssociatedConformance(
     [&](Type depTy, ProtocolDecl *proto, unsigned index) {

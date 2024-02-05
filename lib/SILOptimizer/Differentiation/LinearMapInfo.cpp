@@ -143,7 +143,9 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
       decl->setInterfaceType(astCtx.TheRawPointerType);
     } else { // Otherwise the payload is the linear map tuple.
       auto *linearMapStructTy = getLinearMapTupleType(predBB);
-      assert(linearMapStructTy && "must have linear map struct type for predecessor BB");
+      // Do not create entries for unreachable predecessors
+      if (!linearMapStructTy)
+        continue;
       auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
       decl->setInterfaceType(
           canLinearMapStructTy->hasArchetype()

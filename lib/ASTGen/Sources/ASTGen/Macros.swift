@@ -515,7 +515,8 @@ func expandFreestandingMacroIPC(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: pluginMacroRole,
     discriminator: discriminator,
-    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!
+    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!,
+    lexicalContext: pluginLexicalContext(of: expansionSyntax)
   )
   do {
     let result = try macro.plugin.sendMessageAndWait(message)
@@ -571,6 +572,7 @@ func expandFreestandingMacroInProcess(
   sourceManager.insert(sourceFilePtr)
 
   let context = sourceManager.createMacroExpansionContext(
+    lexicalContext: lexicalContext(of: expansionSyntax),
     discriminator: discriminator
   )
 
@@ -764,6 +766,20 @@ func expandAttachedMacro(
   )
 }
 
+/// Produce the full lexical context of the given node to pass along to
+/// macro expansion.
+private func lexicalContext(of node: some SyntaxProtocol) -> [Syntax] {
+  // FIXME: Should we query the source manager to get the macro expansion
+  // information?
+  node.allMacroLexicalContexts()
+}
+
+/// Produce the full lexical context of the given node to pass along to
+/// macro expansion.
+private func pluginLexicalContext(of node: some SyntaxProtocol) -> [PluginMessage.Syntax] {
+  lexicalContext(of: node).compactMap { .init(syntax: $0) }
+}
+
 func expandAttachedMacroIPC(
   diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
@@ -841,6 +857,7 @@ func expandAttachedMacroIPC(
     conformanceListSyntax = .init(syntax: Syntax(placeholderDecl))!
   }
 
+
   // Send the message.
   let message = HostToPluginMessage.expandAttachedMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
@@ -850,7 +867,8 @@ func expandAttachedMacroIPC(
     declSyntax: declSyntax,
     parentDeclSyntax: parentDeclSyntax,
     extendedTypeSyntax: extendedTypeSyntax,
-    conformanceListSyntax: conformanceListSyntax
+    conformanceListSyntax: conformanceListSyntax,
+    lexicalContext: pluginLexicalContext(of: declarationNode)
   )
   do {
     let expandedSource: String?
@@ -938,6 +956,7 @@ func expandAttachedMacroInProcess(
 
   // Create an expansion context
   let context = sourceManager.createMacroExpansionContext(
+    lexicalContext: lexicalContext(of: declarationNode),
     discriminator: discriminator
   )
 

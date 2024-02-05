@@ -3367,6 +3367,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
   }
 
+  if (isPerformanceConstraint())
+    OS << "[perf_constraint] ";
+
   if (getEffectsKind() == EffectsKind::ReadOnly)
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)

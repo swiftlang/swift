@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // -----
 
@@ -52,8 +53,9 @@ protocol P3 {
 
 protocol P4 : P3 {}
 
-protocol DeclaredP : P3, // expected-warning{{redundant conformance constraint 'Self' : 'P3'}}
-P4 {}
+// CHECK-LABEL: .DeclaredP@
+// CHECK-NEXT: Requirement signature: <Self where Self : P4>
+protocol DeclaredP : P3, P4 {}
 
 struct Y3 : DeclaredP {
 }
@@ -76,8 +78,10 @@ protocol Gamma {
   associatedtype Delta: Alpha
 }
 
+// CHECK-LABEL: .Epsilon@
+// CHECK-NEXT: Generic signature: <T, U where T : Alpha, T == U.[Gamma]Delta, U == T.[Alpha]Beta>
 struct Epsilon<T: Alpha,
-               U: Gamma> // expected-warning{{redundant conformance constraint 'U' : 'Gamma'}}
+               U: Gamma>
   where T.Beta == U,
         U.Delta == T {}
 

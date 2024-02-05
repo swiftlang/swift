@@ -672,6 +672,10 @@ void BridgedFunction::setNeedStackProtection(bool needSP) const {
   getFunction()->setNeedStackProtection(needSP);
 }
 
+void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
+  getFunction()->setIsPerformanceConstraint(isPerfConstraint);
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
   return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
                                        getFunction()->getResilienceExpansion());

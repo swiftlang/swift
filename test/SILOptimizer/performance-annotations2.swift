@@ -7,7 +7,7 @@ public struct Stack<T> {
     var size = 42
 }
 
-// CHECK-LABEL: sil [no_allocation] @$s4test11createStackyyF :
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] @$s4test11createStackyyF :
 // CHECK:         [[F:%[0-9]+]] = function_ref @$s4test5StackVACyxGycfCSi_Tgm5
 // CHECK:         [[S:%[0-9]+]] = apply [[F]]()
 // CHECK:         debug_value [[S]]

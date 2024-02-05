@@ -71,15 +71,19 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
       return []
     }
 
+    // Warning: To use a backslash escape in `typeIdentifier`, it needs to be double escaped. This is because
+    // the string is serialized to a String literal (an argument to `@_DebugDescriptionProperty`), which
+    // effectively "consumes" one level of escaping. To avoid mistakes, dots are matched with `[.]` instead
+    // of the more conventional `\.`.
     var typeIdentifier: String
     if let typeParameters = declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause?.parameters, typeParameters.count > 0 {
       let typePatterns = Array(repeating: ".+", count: typeParameters.count).joined(separator: ",")
       // A regex matching that matches the generic type.
-      typeIdentifier = "^\(moduleName)\\.\(typeName)<\(typePatterns)>"
+      typeIdentifier = "^\(moduleName)[.]\(typeName)<\(typePatterns)>"
     } else if declaration.is(ExtensionDeclSyntax.self) {
       // When attached to an extension, the type may or may not be a generic type.
       // This regular expression handles both cases.
-      typeIdentifier = "^\(moduleName)\\.\(typeName)(<.+>)?$"
+      typeIdentifier = "^\(moduleName)[.]\(typeName)(<.+>)?$"
     } else {
       typeIdentifier = "\(moduleName).\(typeName)"
     }
@@ -249,7 +253,7 @@ fileprivate let ENCODING_VERSION: UInt = 1
 
 /// Construct an LLDB type summary record.
 ///
-/// The record is serializeed as a tuple of `UInt8` bytes.
+/// The record is serialized as a tuple of `UInt8` bytes.
 ///
 /// The record contains the following:
 ///   * Version number of the record format
@@ -352,7 +356,7 @@ extension DeclGroupSyntax {
     case .actorDecl, .classDecl, .enumDecl, .structDecl:
       return self.asProtocol(NamedDeclSyntax.self)?.name.text
     case .extensionDecl:
-      return self.as(ExtensionDeclSyntax.self)?.extendedType.description
+      return self.as(ExtensionDeclSyntax.self)?.extendedType.trimmedDescription
     default:
       // New types of decls are not presumed to be valid.
       return nil

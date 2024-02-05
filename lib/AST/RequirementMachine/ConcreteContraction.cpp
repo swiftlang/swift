@@ -691,24 +691,7 @@ bool ConcreteContraction::performConcreteContraction(
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
     SmallVector<InverseRequirement, 4> ignoreInverses;
-    if (req.inferred) {
-      // Discard errors from desugaring a substituted requirement that
-      // was inferred. For example, if we have something like
-      //
-      //   <T, U where T == Int, U == Set<T>>
-      //
-      // The inferred requirement 'T : Hashable' from 'Set<>' will
-      // be substituted with 'T == Int' to get 'Int : Hashable'.
-      //
-      // Desugaring will diagnose a redundant conformance requirement,
-      // but we want to ignore that, since the user did not explicitly
-      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
-      SmallVector<RequirementError, 4> discardErrors;
-      desugarRequirement(substReq, SourceLoc(), reqs,
-                         ignoreInverses, discardErrors);
-    } else {
-      desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
-    }
+    desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
 
     for (auto desugaredReq : reqs) {
       if (Debug) {
@@ -716,7 +699,7 @@ bool ConcreteContraction::performConcreteContraction(
         desugaredReq.dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
-      result.push_back({desugaredReq, req.loc, req.inferred});
+      result.push_back({desugaredReq, req.loc});
     }
 
     if (preserveSameTypeRequirement(req.req) &&
@@ -730,7 +713,7 @@ bool ConcreteContraction::performConcreteContraction(
 
       // Make the duplicated requirement 'inferred' so that we don't diagnose
       // it as redundant.
-      result.push_back({req.req, SourceLoc(), /*inferred=*/true});
+      result.push_back({req.req, SourceLoc()});
     }
   }
 

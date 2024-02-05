@@ -28,7 +28,26 @@ func testBasic() {
   }
 }
 
+func testInitializers() {
+  let capacity = 4
+  let a = Array(0..<capacity)
+  a.withUnsafeBytes {
+    let view1 = BufferView($0)
+    let view2 = BufferView(view1)
+    let view3 = BufferView(view2)
+    use(view3)
+  }
+}
+
+func unsafetest(_ ptr: UnsafeRawBufferPointer) {
+  let view1 = BufferView(ptr)
+  let view2 = BufferView(view1)
+  let view3 = BufferView(view2)
+  use(view3)
+}
+
 // CHECK: sil @$s32def_implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _borrow(1) @owned BufferView
 // CHECK: sil @$s32def_implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView
 // CHECK: sil @$s32def_implicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _borrow(1) @owned BufferView
+// CHECK: sil @$s32def_implicit_lifetime_dependence10BufferViewVyA2ChcfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _borrow(1) @owned BufferView
 

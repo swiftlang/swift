@@ -493,9 +493,10 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
       ConstructorDecl(name, structDecl->getLoc(),
                       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
+                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), emptyPL,
-                      /*GenericParams=*/nullptr, structDecl);
+                      /*GenericParams=*/nullptr, structDecl,
+                      /*LifetimeDependentReturnTypeRepr*/ nullptr);
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -623,9 +624,10 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
       ConstructorDecl(name, structDecl->getLoc(),
                       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
+                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), paramList,
-                      /*GenericParams=*/nullptr, structDecl);
+                      /*GenericParams=*/nullptr, structDecl,
+                      /*LifetimeDependentReturnTypeRepr*/ nullptr);
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1271,13 +1273,14 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
   auto paramPL = ParameterList::createWithoutLoc(param);
 
   DeclName name(C, DeclBaseName::createConstructor(), paramPL);
-  auto *ctorDecl = new (C)
-      ConstructorDecl(name, enumDecl->getLoc(),
-                      /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
-                      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
-                      /*ThrownType=*/TypeLoc(), paramPL,
-                      /*GenericParams=*/nullptr, enumDecl);
+  auto *ctorDecl =
+      new (C) ConstructorDecl(name, enumDecl->getLoc(),
+                              /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              /*ThrownType=*/TypeLoc(), paramPL,
+                              /*GenericParams=*/nullptr, enumDecl,
+                              /*LifetimeDependentReturnTypeRepr*/ nullptr);
   ctorDecl->setImplicit();
   ctorDecl->setAccess(AccessLevel::Public);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);

@@ -107,6 +107,7 @@ param(
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
+  [switch] $Summary,
   [switch] $ToBatch
 )
 
@@ -203,6 +204,8 @@ $HostArch = switch ($NativeProcessorArchName) {
   "ARM64" { $ArchARM64 }
   default { throw "Unsupported processor architecture" }
 }
+
+$TimingData = New-Object System.Collections.Generic.List[System.Object]
 
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
@@ -760,6 +763,15 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.ShortName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
+
+  if ($Summary) {
+    $TimingData.Add([PSCustomObject]@{
+      Arch = $Arch.ShortName
+      Checkout = $Src.Replace($SourceCache, '')
+      BuildID = Split-Path -Path $Bin -Leaf
+      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
+    })
+  }
 }
 
 function Build-SPMProject {
@@ -768,6 +780,7 @@ function Build-SPMProject {
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
+    [switch] $Test = $false,
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
   )
@@ -804,12 +817,22 @@ function Build-SPMProject {
       $Arguments += @("-debug-info-format", "none")
     }
 
-    Invoke-Program "$ToolchainInstallRoot\usr\bin\swift.exe" "build" @Arguments @AdditionalArguments
+    $Action = if ($Test) { "test" } else { "build" }
+    Invoke-Program "$ToolchainInstallRoot\usr\bin\swift.exe" $Action @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.ShortName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
+  }
+
+  if ($Summary) {
+    $TimingData.Add([PSCustomObject]@{
+      Arch = $Arch.ShortName
+      Checkout = $Src.Replace($SourceCache, '')
+      BuildID = Split-Path -Path $Bin -Leaf
+      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
+    })
   }
 }
 
@@ -1580,14 +1603,14 @@ function Build-Certificates($Arch) {
 }
 
 function Build-PackageManager($Arch) {
-  $SrcPath = "$SourceCache\swift-package-manager"
-  if (-not (Test-Path -PathType Container $SrcPath)) {
-    # The Apple CI clones this repo as "swiftpm"
-    $SrcPath = "$SourceCache\swiftpm"
+  $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
+    "$SourceCache\swift-package-manager"
+  } else {
+    "$SourceCache\swiftpm"
   }
 
   Build-CMakeProject `
-    -Src $SrcPath `
+    -Src $SrcDir `
     -Bin $BinaryCache\12 `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
@@ -1725,6 +1748,25 @@ function Build-DocC() {
       -Bin $OutDir `
       -Arch $HostArch `
       --product docc
+  }
+}
+
+function Test-PackageManager() {
+  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-package-manager
+  $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
+    "$SourceCache\swift-package-manager"
+  } else {
+    "$SourceCache\swiftpm"
+  }
+
+  Isolate-EnvVars {
+    $env:SWIFTCI_USE_LOCAL_DEPS=1
+    Build-SPMProject `
+      -Test `
+      -Src $SrcDir `
+      -Bin $OutDir `
+      -Arch $HostArch `
+      -Xcc -Xclang -Xcc -fno-split-cold-code -Xcc "-I$LibraryRoot\sqlite-3.43.2\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.43.2\usr\lib"
   }
 }
 
@@ -1875,6 +1917,7 @@ if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }
 if ($Test -contains "foundation") { Build-Foundation $HostArch -Test }
 if ($Test -contains "xctest") { Build-XCTest $HostArch -Test }
 if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
+if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
 
 # Custom exception printing for more detailed exception information
 } catch {
@@ -1902,4 +1945,8 @@ if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   }
 
   exit 1
+} finally {
+  if ($Summary) {
+    $TimingData | Select Arch,Checkout,BuildID,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+  }
 }

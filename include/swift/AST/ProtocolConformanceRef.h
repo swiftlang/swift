@@ -17,7 +17,6 @@
 #define SWIFT_AST_PROTOCOLCONFORMANCEREF_H
 
 #include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
@@ -36,6 +35,7 @@ class BuiltinProtocolConformance;
 class ConcreteDeclRef;
 class PackConformance;
 class ProtocolConformance;
+class Requirement;
 enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which

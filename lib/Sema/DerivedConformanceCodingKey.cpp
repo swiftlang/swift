@@ -133,7 +133,8 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             /*ThrownType=*/TypeLoc(),
                             paramList,
-                            /*GenericParams=*/nullptr, parentDC);
+                            /*GenericParams=*/nullptr, parentDC,
+                            /*LifetimeDependentReturnTypeRepr*/ nullptr);
 
   initDecl->setImplicit();
 

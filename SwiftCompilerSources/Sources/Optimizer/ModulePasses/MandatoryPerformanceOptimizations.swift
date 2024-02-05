@@ -50,6 +50,12 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
+      // It's not required to set the perf_constraint flag on all functions in embedded mode.
+      // Embedded mode already implies that flag.
+      if !moduleContext.options.enableEmbeddedSwift {
+        f.set(isPerformanceConstraint: true, context)
+      }
+
       optimize(function: f, context, &worklist)
     }
 

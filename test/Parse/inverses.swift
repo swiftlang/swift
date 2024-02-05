@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: noncopyable_generics
 
@@ -25,21 +25,17 @@ func blah<T>(_ t: borrowing T) where T: ~Copyable,
 func foo<T: ~Copyable>(x: borrowing T) {}
 
 struct Buurap<T: ~Copyable> where T: ~Copyable {}
-// expected-warning@-1 {{redundant constraint 'T' : '~Copyable'}}
 
 struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
 struct ExtraNoncopyEnum: ~Copyable, ~Copyable {}
 
 protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
-// expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
 
 protocol Foo: ~Copyable
          where Self: ~Copyable {
-         // expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
 
     associatedtype Touch : ~Copyable,
                            ~Copyable
-    // expected-warning@-1 {{redundant constraint 'Self.Touch' : '~Copyable'}}
 
     func test<T>(_ t: T) where T: ~Self  // expected-error {{type 'Self' is not invertible}}
 }

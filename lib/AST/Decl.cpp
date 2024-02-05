@@ -3579,6 +3579,8 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   } else if (auto *MD = dyn_cast<MacroDecl>(this)) {
     returnRepr = MD->resultType.getTypeRepr();
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(this)) {
+    returnRepr = CD->getResultTypeRepr();
   }
 
   return returnRepr;
@@ -10419,7 +10421,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  TypeLoc ThrownType,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
-                                 DeclContext *Parent)
+                                 DeclContext *Parent, TypeRepr *ResultTyR)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
                          Async, AsyncLoc, Throws, ThrowsLoc, ThrownType,
                          /*HasImplicitSelfDecl=*/true,
@@ -10429,7 +10431,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 {
   if (BodyParams)
     setParameters(BodyParams);
-  
+
+  InitRetType = TypeLoc(ResultTyR);
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
@@ -10450,9 +10453,14 @@ ConstructorDecl *ConstructorDecl::createImported(
                       failable, failabilityLoc, 
                       async, asyncLoc,
                       throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
-                      bodyParams, genericParams, parent);
+                      bodyParams, genericParams, parent,
+                      /*LifetimeDependenceTypeRepr*/ nullptr);
   ctor->setClangNode(clangNode);
   return ctor;
+}
+
+void ConstructorDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
+  InitRetType = ResultTyR;
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
@@ -10466,6 +10474,10 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
     return false;
 
   return params->get(0)->getInterfaceType()->isVoid();
+}
+
+bool ConstructorDecl::hasLifetimeDependentReturn() const {
+  return isa_and_nonnull<LifetimeDependentReturnTypeRepr>(getResultTypeRepr());
 }
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)

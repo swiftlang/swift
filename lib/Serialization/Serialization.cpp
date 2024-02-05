@@ -4780,6 +4780,12 @@ public:
     writeGenericParams(ctor->getGenericParams());
     writeParameterList(ctor->getParameters());
 
+    auto fnType = ty->getAs<FunctionType>();
+    if (fnType && fnType->hasLifetimeDependenceInfo()) {
+      assert(!fnType->getLifetimeDependenceInfo().empty());
+      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    }
+
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
     if (auto asyncConvention = ctor->getForeignAsyncConvention())

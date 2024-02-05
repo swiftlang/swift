@@ -318,11 +318,21 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
-  Opts.SkipNonExportableDecls |=
-      Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-  Opts.SkipNonExportableDecls |=
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
-      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  if (Args.hasArg(OPT_enable_library_evolution)) {
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+        Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  } else {
+    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-skip-non-exportable-decls",
+                     "-enable-library-evolution");
+  }
+
   // HACK: The driver currently erroneously passes all flags to module interface
   // verification jobs. -experimental-skip-non-exportable-decls is not
   // appropriate for verification tasks and should be ignored, though.

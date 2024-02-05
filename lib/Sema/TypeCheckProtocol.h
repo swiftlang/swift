@@ -218,9 +218,6 @@ void diagnoseConformanceFailure(Type T,
                                 DeclContext *DC,
                                 SourceLoc ComplainLoc);
 
-Type getTupleConformanceTypeWitness(DeclContext *dc,
-                                    AssociatedTypeDecl *assocType);
-
 /// Find an associated type declaration that provides a default definition.
 AssociatedTypeDecl *findDefaultedAssociatedType(
     DeclContext *dc, NominalTypeDecl *adoptee,

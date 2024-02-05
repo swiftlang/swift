@@ -1,4 +1,4 @@
-//===--- Diagnostics.cpp - Redundancy and conflict diagnostics ------------===//
+//===--- Diagnostics.cpp - Requirement conflict diagnostics ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -143,20 +143,6 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::RedundantInverseRequirement: {
-      // We only emit redundant requirement warnings if the user passed
-      // the -warn-redundant-requirements frontend flag.
-      if (!ctx.LangOpts.WarnRedundantRequirements)
-        break;
-
-      auto inverse = error.getInverse();
-      auto protoName = getKnownProtocolKind(inverse.getKind());
-      ctx.Diags.diagnose(loc, diag::redundant_inverse_constraint,
-                         inverse.subject,
-                         getProtocolName(protoName));
-      break;
-    }
-
     case RequirementError::Kind::ConflictingInverseRequirement: {
       auto inverse = error.getInverse();
       auto protoKind = getKnownProtocolKind(inverse.getKind());
@@ -234,45 +220,6 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::RedundantRequirement: {
-      // We only emit redundant requirement warnings if the user passed
-      // the -warn-redundant-requirements frontend flag.
-      if (!ctx.LangOpts.WarnRedundantRequirements)
-        break;
-
-      auto requirement = error.getRequirement();
-      if (requirement.hasError())
-        break;
-
-      switch (requirement.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
-
-      case RequirementKind::SameType:
-        ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-        break;
-      case RequirementKind::Conformance:
-        ctx.Diags.diagnose(loc, diag::redundant_conformance_constraint,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-        break;
-      case RequirementKind::Superclass:
-        ctx.Diags.diagnose(loc, diag::redundant_superclass_constraint,
-                           requirement.getFirstType(),
-                           requirement.getSecondType());
-        break;
-      case RequirementKind::Layout:
-        ctx.Diags.diagnose(loc, diag::redundant_layout_constraint,
-                           requirement.getFirstType(),
-                           requirement.getLayoutConstraint());
-        break;
-      }
-
-      break;
-    }
-
     case RequirementError::Kind::UnsupportedSameElement: {
       if (error.getRequirement().hasError())
         break;
@@ -285,184 +232,6 @@ bool swift::rewriting::diagnoseRequirementErrors(
   }
 
   return diagnosedError;
-}
-
-/// Determine whether this is a redundantly inheritable Objective-C protocol.
-///
-/// A redundantly-inheritable Objective-C protocol is one where we will
-/// silently accept a directly-stated redundant conformance to this protocol,
-/// and emit this protocol in the list of "inherited" protocols. There are
-/// two cases where we allow this:
-///
-//    1) For a protocol defined in Objective-C, so that we will match Clang's
-///      behavior, and
-///   2) For an @objc protocol defined in Swift that directly inherits from
-///      JavaScriptCore's JSExport, which depends on this behavior.
-static bool isRedundantlyInheritableObjCProtocol(const ProtocolDecl *inheritingProto,
-                                                 const ProtocolDecl *proto) {
-  if (!proto->isObjC()) return false;
-
-  // Check the two conditions in which we will suppress the diagnostic and
-  // emit the redundant inheritance.
-  if (!inheritingProto->hasClangNode() && !proto->getName().is("JSExport"))
-    return false;
-
-  // If the inheriting protocol already has @_restatedObjCConformance with
-  // this protocol, we're done.
-  for (auto *attr : inheritingProto->getAttrs()
-                      .getAttributes<RestatedObjCConformanceAttr>()) {
-    if (attr->Proto == proto) return true;
-  }
-
-  // Otherwise, add @_restatedObjCConformance.
-  auto &ctx = proto->getASTContext();
-  const_cast<ProtocolDecl *>(inheritingProto)
-      ->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(
-          const_cast<ProtocolDecl *>(proto)));
-  return true;
-}
-
-/// Computes the set of explicit redundant requirements to
-/// emit warnings for in the source code.
-void RewriteSystem::computeRedundantRequirementDiagnostics(
-    SmallVectorImpl<RequirementError> &errors) {
-  // Collect all rule IDs for each unique requirement ID.
-  llvm::SmallDenseMap<unsigned, llvm::SmallVector<unsigned, 2>>
-      rulesPerRequirement;
-
-  // Collect non-explicit requirements that are not redundant.
-  llvm::SmallDenseSet<unsigned, 2> nonExplicitNonRedundantRules;
-
-  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
-       ruleID < e; ++ruleID) {
-    auto &rule = getRules()[ruleID];
-
-    if (rule.isPermanent())
-      continue;
-
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
-      continue;
-
-    // Concrete conformance rules do not map to requirements in the minimized
-    // signature; we don't consider them to be 'non-explicit non-redundant',
-    // so that a conformance rule (T.[P] => T) expressed in terms of a concrete
-    // conformance (T.[concrete: C : P] => T) is still diagnosed as redundant.
-    if (auto optSymbol = rule.isPropertyRule()) {
-      if (optSymbol->getKind() == Symbol::Kind::ConcreteConformance)
-        continue;
-    }
-
-    auto requirementID = rule.getRequirementID();
-
-    if (!requirementID.has_value()) {
-      if (!rule.isRedundant())
-        nonExplicitNonRedundantRules.insert(ruleID);
-
-      continue;
-    }
-
-    rulesPerRequirement[*requirementID].push_back(ruleID);
-  }
-
-  // Compute the set of redundant rules which transitively reference a
-  // non-explicit non-redundant rule. This updates nonExplicitNonRedundantRules.
-  //
-  // Since earlier redundant paths might reference rules which appear later in
-  // the list but not vice versa, walk the redundant paths in reverse order.
-  for (const auto &pair : llvm::reverse(RedundantRules)) {
-    // Pre-condition: the replacement path only references redundant rules
-    // which we have already seen. If any of those rules transitively reference
-    // a non-explicit, non-redundant rule, they have been inserted into the
-    // nonExplicitNonRedundantRules set on previous iterations.
-    unsigned ruleID = pair.first;
-    const auto &rewritePath = pair.second;
-
-    // Check if this rewrite path references a rule that is already known to
-    // either be non-explicit and non-redundant, or reference such a rule via
-    // it's redundancy path.
-    for (auto step : rewritePath) {
-      switch (step.Kind) {
-      case RewriteStep::Rule: {
-        if (nonExplicitNonRedundantRules.count(step.getRuleID())) {
-          nonExplicitNonRedundantRules.insert(ruleID);
-          continue;
-        }
-
-        break;
-      }
-
-      case RewriteStep::LeftConcreteProjection:
-      case RewriteStep::Decompose:
-      case RewriteStep::PrefixSubstitutions:
-      case RewriteStep::Shift:
-      case RewriteStep::Relation:
-      case RewriteStep::DecomposeConcrete:
-      case RewriteStep::RightConcreteProjection:
-        break;
-      }
-    }
-
-    // Post-condition: If the current replacement path transitively references
-    // any non-explicit, non-redundant rules, then nonExplicitNonRedundantRules
-    // contains the current rule.
-  }
-
-  // We diagnose a redundancy if the rule is redundant, and if its replacement
-  // path does not transitively involve any non-explicit, non-redundant rules.
-  auto isRedundantRule = [&](unsigned ruleID) {
-    const auto &rule = getRules()[ruleID];
-
-    if (!rule.isRedundant())
-      return false;
-
-    if (nonExplicitNonRedundantRules.count(ruleID) > 0)
-      return false;
-
-    if (rule.isProtocolRefinementRule(Context) &&
-        isRedundantlyInheritableObjCProtocol(rule.getLHS()[0].getProtocol(),
-                                             rule.getLHS()[1].getProtocol()))
-      return false;
-
-    return true;
-  };
-
-  // Finally walk through the written requirements, diagnosing any that are
-  // redundant.
-  for (auto requirementID : indices(WrittenRequirements)) {
-    auto requirement = WrittenRequirements[requirementID];
-
-    // Inferred requirements can be re-stated without warning.
-    if (requirement.inferred)
-      continue;
-
-    auto pairIt = rulesPerRequirement.find(requirementID);
-
-    // If there are no rules for this structural requirement, then the
-    // requirement is unnecessary in the source code.
-    //
-    // This means the requirement was determined to be vacuous by
-    // requirement lowering and produced no rules, or the rewrite rules were
-    // trivially simplified by RewriteSystem::addRule().
-    if (pairIt == rulesPerRequirement.end()) {
-      errors.push_back(
-          RequirementError::forRedundantRequirement(requirement.req,
-                                                    requirement.loc));
-      continue;
-    }
-
-    // If all rules derived from this structural requirement are redundant,
-    // then the requirement is unnecessary in the source code.
-    //
-    // This means the rules derived from this requirement were all
-    // determined to be redundant by homotopy reduction.
-    const auto &ruleIDs = pairIt->second;
-    if (llvm::all_of(ruleIDs, isRedundantRule)) {
-      auto requirement = WrittenRequirements[requirementID];
-      errors.push_back(
-          RequirementError::forRedundantRequirement(requirement.req,
-                                                    requirement.loc));
-    }
-  }
 }
 
 static Requirement
@@ -557,7 +326,6 @@ void RequirementMachine::computeRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors,
     ArrayRef<InverseRequirement> inverses,
     SourceLoc signatureLoc) {
-  System.computeRedundantRequirementDiagnostics(errors);
   System.computeConflictingRequirementDiagnostics(errors, signatureLoc, Map,
                                                   getGenericParams());
   System.computeRecursiveRequirementDiagnostics(errors, signatureLoc, Map,

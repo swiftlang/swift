@@ -552,48 +552,53 @@ public:
   }
 
   std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
-                                                       CanGenericSignature sig) {
+                                                       CanGenericSignature sig,
+                                                       bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOb");
+    appendOperator(noValueWitness ? "WOB" : "WOb");
     return finalize();
   }
   std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
-                                                       CanGenericSignature sig) {
+                                                       CanGenericSignature sig,
+                                                       bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOc");
+    appendOperator(noValueWitness ? "WOC" : "WOc");
     return finalize();
   }
   std::string mangleOutlinedAssignWithTakeFunction(CanType t,
-                                                   CanGenericSignature sig) {
+                                                   CanGenericSignature sig,
+                                                   bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOd");
+    appendOperator(noValueWitness ? "WOD" : "WOd");
     return finalize();
   }
   std::string mangleOutlinedAssignWithCopyFunction(CanType t,
-                                                   CanGenericSignature sig) {
+                                                   CanGenericSignature sig,
+                                                   bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOf");
+    appendOperator(noValueWitness ? "WOF" : "WOf");
     return finalize();
   }
   std::string mangleOutlinedDestroyFunction(CanType t,
-                                            CanGenericSignature sig) {
+                                            CanGenericSignature sig,
+                                            bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOh");
+    appendOperator(noValueWitness ? "WOH" : "WOh");
     return finalize();
   }
 

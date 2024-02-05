@@ -116,6 +116,11 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
         return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+      if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
+        if (CD->hasLifetimeDependentReturn()) {
+          return CD->getResultInterfaceType();
+        }
+      }
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();

@@ -2087,7 +2087,10 @@ bool PullbackCloner::Implementation::run() {
       originalBlocks.push_back(BB);
 
       for (auto *nextBB : BB->getPredecessorBlocks()) {
-        workqueue.pushIfNotVisited(nextBB);
+        // If there is no linear map tuple for predecessor BB, then BB is
+        // unreachable from function entry. Do not run pullback cloner on it.
+        if (getPullbackInfo().getLinearMapTupleType(nextBB))
+          workqueue.pushIfNotVisited(nextBB);
       }
     }
   }
@@ -2803,6 +2806,11 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   SmallDenseMap<SILValue, TrampolineBlockSet> pullbackTrampolineBlockMap;
   SmallDenseMap<SILBasicBlock *, SILBasicBlock *> origPredpullbackSuccBBMap;
   for (auto *predBB : bb->getPredecessorBlocks()) {
+    // If there is no linear map tuple for predecessor BB, then BB is
+    // unreachable from function entry. There is no branch tracing enum for it
+    // as well, so we should not create any branching to it in the pullback.
+    if (!getPullbackInfo().getLinearMapTupleType(predBB))
+      continue;
     auto *pullbackSuccBB =
         buildPullbackSuccessor(bb, predBB, pullbackTrampolineBlockMap);
     origPredpullbackSuccBBMap[predBB] = pullbackSuccBB;

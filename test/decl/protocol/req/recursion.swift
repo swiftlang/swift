@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
+// rdar://122287787 (NCGenerics performance issues in regression tests)
+// UNSUPPORTED: noncopyable_generics
+
 protocol SomeProtocol {
 	associatedtype T
 }

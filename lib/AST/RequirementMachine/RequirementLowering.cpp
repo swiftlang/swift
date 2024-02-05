@@ -127,7 +127,7 @@
 //
 // The desugaring process eliminates requirements where both sides are
 // concrete by evaluating them immediately, reporting an error if the
-// requirement does not hold, or a warning if it is trivially true.
+// requirement does not hold, or silently discarding it otherwise.
 //
 // Conformance requirements with protocol compositions on the right hand side
 // are broken down into multiple conformance requirements.
@@ -186,8 +186,6 @@ static void desugarSameTypeRequirement(
     SmallVector<Position, 2> stack;
 
   public:
-    bool recordedErrors = false;
-
     explicit Matcher(SourceLoc loc,
                      SmallVectorImpl<Requirement> &result,
                      SmallVectorImpl<RequirementError> &errors)
@@ -226,7 +224,6 @@ static void desugarSameTypeRequirement(
       if (firstType->isParameterPack() != secondType->isParameterPack()) {
         errors.push_back(RequirementError::forSameElement(
             {kind, sugaredFirstType, secondType}, loc));
-        recordedErrors = true;
         return true;
       }
 
@@ -247,23 +244,11 @@ static void desugarSameTypeRequirement(
 
       errors.push_back(RequirementError::forConflictingRequirement(
           {RequirementKind::SameType, sugaredFirstType, secondType}, loc));
-      recordedErrors = true;
       return true;
     }
   } matcher(loc, result, errors);
 
   (void) matcher.match(req.getFirstType(), req.getSecondType());
-
-  // If neither side is directly a type parameter, the type parameter
-  // must be in structural position where the enclosing type is redundant.
-  if (!req.getFirstType()->isTypeParameter() &&
-      !req.getSecondType()->isTypeParameter() &&
-      !matcher.recordedErrors) {
-    // FIXME: Add a tailored error message when requirements were
-    // recorded, e.g. Array<Int> == Array<T>. The outer type is
-    // redundant, but the inner requirement T == Int is not.
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
-  }
 }
 
 static void desugarSuperclassRequirement(
@@ -282,7 +267,6 @@ static void desugarSuperclassRequirement(
   switch (req.checkRequirement(subReqs)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
     break;
 
   case CheckRequirementResult::RequirementFailure:
@@ -316,7 +300,6 @@ static void desugarLayoutRequirement(
   switch (req.checkRequirement(subReqs)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
     break;
 
   case CheckRequirementResult::RequirementFailure:
@@ -359,7 +342,6 @@ static void desugarConformanceRequirement(
     case CheckRequirementResult::Success:
     case CheckRequirementResult::PackRequirement:
     case CheckRequirementResult::ConditionalConformance:
-      errors.push_back(RequirementError::forRedundantRequirement(req, loc));
       break;
 
     case CheckRequirementResult::RequirementFailure:
@@ -473,17 +455,11 @@ void swift::rewriting::desugarRequirements(
   SmallVector<StructuralRequirement, 2> result;
   for (auto req : reqs) {
     SmallVector<Requirement, 2> desugaredReqs;
-    SmallVector<RequirementError, 2> ignoredErrors;
-
-    if (req.inferred)
-      desugarRequirement(req.req, SourceLoc(), desugaredReqs,
-                         inverses, ignoredErrors);
-    else
-      desugarRequirement(req.req, req.loc, desugaredReqs,
-                         inverses, errors);
+    desugarRequirement(req.req, req.loc, desugaredReqs,
+                       inverses, errors);
 
     for (auto desugaredReq : desugaredReqs)
-      result.push_back({desugaredReq, req.loc, req.inferred});
+      result.push_back({desugaredReq, req.loc});
   }
 
   std::swap(reqs, result);
@@ -528,11 +504,11 @@ static void realizeTypeRequirement(DeclContext *dc,
   if (constraintType->isConstraintType()) {
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
-                      loc, /*wasInferred=*/false});
+                      loc});
   } else if (constraintType->getClassOrBoundGenericClass()) {
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
-                      loc, /*wasInferred=*/false});
+                      loc});
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -558,6 +534,9 @@ struct InferRequirementsWalker : public TypeWalker {
     // don't have enough info to do any useful substitutions.
     if (ty->is<UnboundGenericType>())
       return Action::Stop;
+
+    if (!ty->hasTypeParameter())
+      return Action::SkipChildren;
 
     return Action::Continue;
   }
@@ -588,7 +567,7 @@ struct InferRequirementsWalker : public TypeWalker {
         if (skipRequirement(rawReq, decl))
           continue;
 
-        reqs.push_back({rawReq.subst(subMap), SourceLoc(), /*inferred=*/true});
+        reqs.push_back({rawReq.subst(subMap), SourceLoc()});
       }
 
       return Action::Continue;
@@ -604,7 +583,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto countType = packExpansion->getCountType();
       for (auto pack : packReferences)
         reqs.push_back({Requirement(RequirementKind::SameShape, countType, pack),
-                        SourceLoc(), /*inferred=*/true});
+                        SourceLoc()});
     }
 
     // Infer requirements from `@differentiable` function types.
@@ -618,7 +597,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
         reqs.push_back({Requirement(RequirementKind::Conformance, type,
                                     protocol->getDeclaredInterfaceType()),
-                        SourceLoc(), /*inferred=*/true});
+                        SourceLoc()});
       };
 
       auto &ctx = module->getASTContext();
@@ -632,7 +611,7 @@ struct InferRequirementsWalker : public TypeWalker {
               ->substBaseType(module, firstType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
-                          SourceLoc(), /*inferred=*/true});
+                          SourceLoc()});
         };
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
@@ -680,7 +659,7 @@ struct InferRequirementsWalker : public TypeWalker {
       if (skipRequirement(rawReq, decl))
         continue;
 
-      reqs.push_back({rawReq.subst(subMap), SourceLoc(), /*inferred=*/true});
+      reqs.push_back({rawReq.subst(subMap), SourceLoc()});
     }
 
     return Action::Continue;
@@ -749,7 +728,7 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
     }
 
-    result.push_back({req, loc, /*wasInferred=*/false});
+    result.push_back({req, loc});
     break;
   }
 
@@ -766,7 +745,7 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
     }
 
-    result.push_back({req, loc, /*wasInferred=*/false});
+    result.push_back({req, loc});
     break;
   }
   }
@@ -810,11 +789,8 @@ void swift::rewriting::applyInverses(
 
     // Check if this inverse has already been seen.
     auto inverseKind = inverse.getKind();
-    if (state.contains(inverseKind)) {
-      errors.push_back(
-          RequirementError::forRedundantInverseRequirement(inverse));
+    if (state.contains(inverseKind))
       continue;
-    }
 
     state.insert(inverseKind);
     inverses[canSubject] = state;
@@ -833,20 +809,10 @@ void swift::rewriting::applyInverses(
     if (req.getKind() != RequirementKind::Conformance)
       return false;
 
-    // Only consider requirements from defaults-expansion...
-    if (!structReq.fromDefault)
+    // Only consider requirements involving an invertible protocol.
+    auto proto = req.getProtocolDecl()->getInvertibleProtocolKind();
+    if (!proto)
       return false;
-
-    // involving an invertible protocol.
-    llvm::Optional<InvertibleProtocolKind> proto;
-    if (auto kp = req.getProtocolDecl()->getKnownProtocolKind())
-      if (auto ip = getInvertibleProtocolKind(*kp))
-        proto = *ip;
-
-    if (!proto) {
-      assert(false && "suspicious!");
-      return false;
-    }
 
     // See if this subject is in-scope.
     auto subject = req.getFirstType()->getCanonicalType();
@@ -876,14 +842,6 @@ void swift::rewriting::realizeInheritedRequirements(
         inheritedTypes.getResolvedType(index, TypeResolutionStage::Structural);
 
     if (!inheritedType) continue;
-
-    // Ignore trivially circular protocol refinement (protocol P : P)
-    // since we diagnose that elsewhere. Adding a rule here would emit
-    // a useless redundancy warning.
-    if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
-      if (inheritedType->isEqual(protoDecl->getDeclaredInterfaceType()))
-        continue;
-    }
 
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
@@ -946,7 +904,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
       result.push_back({
           Requirement(RequirementKind::Conformance,
                       selfTy, inheritedProto->getDeclaredInterfaceType()),
-          SourceLoc(), /*wasInferred=*/false});
+          SourceLoc()});
     }
   }
 
@@ -965,7 +923,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     auto layout = LayoutConstraint::getLayoutConstraint(
         LayoutConstraintKind::Class, ctx);
     result.push_back({Requirement(RequirementKind::Layout, selfTy, layout),
-                      proto->getLoc(), /*inferred=*/true});
+                      SourceLoc()});
 
     desugarRequirements(result, inverses, errors);
     InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
@@ -1029,8 +987,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
             selfTy, typeAliasDecl->getName());
         Requirement req(RequirementKind::SameType, subjectType,
                         underlyingType);
-        result.push_back({req, typeAliasDecl->getLoc(),
-                          /*inferred=*/false});
+        result.push_back({req, typeAliasDecl->getLoc()});
       }
     }
   }

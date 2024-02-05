@@ -33,15 +33,15 @@ struct Basics: ~Copyable {
     repeat {
       switch c {
       case .red:
-        fatalError("bah!") // expected-error {{must consume 'self' before exiting method that discards self}}
+        fatalError("bah!")
       case .blue:
-        throw E.someError // expected-error {{must consume 'self' before exiting method that discards self}}
+        throw E.someError
       case .green:
         self = Basics()
       default: print("hi")
       }
     } while true
-    discard self // expected-note 2{{discarded self here}}
+    discard self
   }
 
   consuming func test2_fixed(_ c: Color) throws {

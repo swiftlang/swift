@@ -1820,6 +1820,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     : IRGenFunction(IGM,
                     IGM.getAddrOfSILFunction(f, ForDefinition,
                                              f->isDynamicallyReplaceable()),
+                    f->isPerformanceConstraint(),
                     f->getOptimizationMode(), f->getDebugScope(),
                     f->getLocation()),
       CurSILFn(f) {

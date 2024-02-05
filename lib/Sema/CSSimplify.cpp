@@ -5222,6 +5222,13 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  auto hasAnyRestriction = [&]() {
+    return llvm::any_of(conversionsOrFixes,
+                        [](const RestrictionOrFix &correction) {
+                          return bool(correction.getRestriction());
+                        });
+  };
+
   // Check whether this is a tuple with a single unlabeled element
   // i.e. `(_: Int)` and return type of that element if so. Note that
   // if the element is pack expansion type the tuple is significant.
@@ -5247,6 +5254,40 @@ bool ConstraintSystem::repairFailures(
     return true;
   }
 
+  auto maybeRepairKeyPathResultFailure = [&](KeyPathExpr *kpExpr) {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      return false;
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) ||
+        hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
+      return false;
+
+    auto i = kpExpr->getComponents().size() - 1;
+    auto lastCompLoc =
+        getConstraintLocator(kpExpr, LocatorPathElt::KeyPathComponent(i));
+    if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
+      return true;
+
+    auto *keyPathLoc = getConstraintLocator(anchor);
+
+    if (hasFixFor(keyPathLoc))
+      return true;
+
+    if (auto contextualInfo = getContextualTypeInfo(anchor)) {
+      if (hasFixFor(getConstraintLocator(
+              keyPathLoc,
+              LocatorPathElt::ContextualType(contextualInfo->purpose))))
+        return true;
+    }
+
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs,
+        getConstraintLocator(keyPathLoc, ConstraintLocator::KeyPathValue)));
+    return true;
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -5266,9 +5307,9 @@ bool ConstraintSystem::repairFailures(
     // instance fix recorded.
     if (auto *kpExpr = getAsExpr<KeyPathExpr>(anchor)) {
       if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
-        // If we have keypath capabilities for both sides and one of the bases
-        // is unresolved, it is too early to record fix.
-        if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        // If we have a conversion happening here, we should let fix happen in
+        // simplifyRestrictedConstraint.
+        if (hasAnyRestriction())
           return false;
       }
 
@@ -5668,10 +5709,7 @@ bool ConstraintSystem::repairFailures(
 
     // If there are any restrictions here we need to wait and let
     // `simplifyRestrictedConstraintImpl` handle them.
-    if (llvm::any_of(conversionsOrFixes,
-                     [](const RestrictionOrFix &correction) {
-                       return bool(correction.getRestriction());
-                     }))
+    if (hasAnyRestriction())
       break;
 
     if (auto *fix = fixPropertyWrapperFailure(
@@ -6090,10 +6128,7 @@ bool ConstraintSystem::repairFailures(
 
     // If there are any restrictions here we need to wait and let
     // `simplifyRestrictedConstraintImpl` handle them.
-    if (llvm::any_of(conversionsOrFixes,
-                     [](const RestrictionOrFix &correction) {
-                       return bool(correction.getRestriction());
-                     }))
+    if (hasAnyRestriction())
       break;
 
     // `lhs` - is an result type and `rhs` is a contextual type.
@@ -6110,6 +6145,10 @@ bool ConstraintSystem::repairFailures(
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       return true;
+    }
+
+    if (auto *kpExpr = getAsExpr<KeyPathExpr>(anchor)) {
+      return maybeRepairKeyPathResultFailure(kpExpr);
     }
 
     auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
@@ -6683,37 +6722,9 @@ bool ConstraintSystem::repairFailures(
     return true;
   }
   case ConstraintLocator::KeyPathValue: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
-    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
-      break;
-
-    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) ||
-        hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
-      return false;
-
-    auto kpExpr = castToExpr<KeyPathExpr>(anchor);
-    auto i = kpExpr->getComponents().size() - 1;
-    auto lastCompLoc =
-        getConstraintLocator(kpExpr, LocatorPathElt::KeyPathComponent(i));
-    if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
+    if (maybeRepairKeyPathResultFailure(getAsExpr<KeyPathExpr>(anchor)))
       return true;
 
-    auto *keyPathLoc = getConstraintLocator(anchor);
-
-    if (hasFixFor(keyPathLoc))
-      return true;
-
-    if (auto contextualInfo = getContextualTypeInfo(anchor)) {
-      if (hasFixFor(getConstraintLocator(
-              keyPathLoc,
-              LocatorPathElt::ContextualType(contextualInfo->purpose))))
-        return true;
-    }
-
-    conversionsOrFixes.push_back(IgnoreContextualType::create(
-        *this, lhs, rhs,
-        getConstraintLocator(keyPathLoc, ConstraintLocator::KeyPathValue)));
     break;
   }
   default:
@@ -12257,12 +12268,26 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     if (auto fnTy = contextualTy->getAs<FunctionType>()) {
       assert(fnTy->getParams().size() == 1);
-      // Match up the root and value types to the function's param and return
-      // types. Note that we're using the type of the parameter as referenced
-      // from inside the function body as we'll be transforming the code into:
-      // { root in root[keyPath: kp] }.
-      contextualRootTy = fnTy->getParams()[0].getParameterType();
-      contextualValueTy = fnTy->getResult();
+      // Key paths may be converted to a function of compatible type. We will
+      // later form from this key path an implicit closure of the form
+      // `{ root in root[keyPath: kp] }` so any conversions that are valid with
+      // a source type of `(Root) -> Value` should be valid here too.
+      auto rootParam = AnyFunctionType::Param(rootTy);
+      auto kpFnTy = FunctionType::get(rootParam, valueTy, fnTy->getExtInfo());
+
+      // Note: because the keypath is applied to `root` as a parameter internal
+      // to the closure, we use the function parameter's "parameter type" rather
+      // than the raw type. This enables things like:
+      // ```
+      // let countKeyPath: (String...) -> Int = \.count
+      // ```
+      auto paramTy = fnTy->getParams()[0].getParameterType();
+      auto paramParam = AnyFunctionType::Param(paramTy);
+      auto paramFnTy = FunctionType::get(paramParam, fnTy->getResult(),
+                                         fnTy->getExtInfo());
+
+      return !matchTypes(kpFnTy, paramFnTy, ConstraintKind::Conversion,
+                         subflags, locator).isFailure();
     }
 
     assert(contextualRootTy && contextualValueTy);

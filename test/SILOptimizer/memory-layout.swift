@@ -5,7 +5,7 @@
 // Check that constant propagation of MemoryLayout is also done at -Onone to ensure that
 // no metadata is created at runtime - which would violate the performance annotation.
 
-// CHECK-LABEL: sil [no_locks] @$s4test7getSizeSiyF
+// CHECK-LABEL: sil [no_locks] [perf_constraint] @$s4test7getSizeSiyF
 // CHECK:         [[I:%[0-9]+]] = integer_literal {{.*}}, 4
 // CHECK:         [[S:%[0-9]+]] = struct {{.*}}([[I]]
 // CHECK:         return [[S]]
@@ -15,7 +15,7 @@ public func getSize() -> Int {
   return MemoryLayout<Int32>.size
 }
 
-// CHECK-LABEL: sil [no_locks] @$s4test12getAlignmentSiyF
+// CHECK-LABEL: sil [no_locks] [perf_constraint] @$s4test12getAlignmentSiyF
 // CHECK:         [[I:%[0-9]+]] = integer_literal {{.*}}, 4
 // CHECK:         [[S:%[0-9]+]] = struct {{.*}}([[I]]
 // CHECK:         return [[S]]
@@ -25,7 +25,7 @@ public func getAlignment() -> Int {
   return MemoryLayout<Int32>.alignment
 }
 
-// CHECK-LABEL: sil [no_locks] @$s4test9getStrideSiyF
+// CHECK-LABEL: sil [no_locks] [perf_constraint] @$s4test9getStrideSiyF
 // CHECK:         [[I:%[0-9]+]] = integer_literal {{.*}}, 4
 // CHECK:         [[S:%[0-9]+]] = struct {{.*}}([[I]]
 // CHECK:         return [[S]]

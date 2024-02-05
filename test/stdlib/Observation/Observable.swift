@@ -225,6 +225,12 @@ class GuardedAvailability {
   }()
 }
 
+@Observable class Parent {
+  class Nested {}
+}
+
+extension Parent.Nested {}
+
 struct CowContainer {
   final class Contents { }
   

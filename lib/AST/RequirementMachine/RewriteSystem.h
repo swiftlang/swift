@@ -134,11 +134,9 @@ public:
 
   void initialize(
       bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
-      std::vector<StructuralRequirement> &&writtenRequirements,
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             llvm::Optional<unsigned>>> &&requirementRules);
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
@@ -183,14 +181,12 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       llvm::Optional<unsigned> requirementID);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
 
   void addRules(
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             llvm::Optional<unsigned>>> &&requirementRules);
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
@@ -229,8 +225,6 @@ public:
   /// Diagnostics
   ///
   //////////////////////////////////////////////////////////////////////////////
-
-  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,

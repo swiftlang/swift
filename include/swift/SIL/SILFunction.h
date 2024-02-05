@@ -445,6 +445,14 @@ private:
 
   unsigned HasResultDependsOnSelf : 1;
 
+  /// True, if this function or a caller (transitively) has a performance
+  /// constraint.
+  /// If true, optimizations must not introduce new runtime calls or metadata
+  /// creation, which are not there after SILGen.
+  /// Note that this flag is not serialized, because it's computed locally
+  /// within a module by the MandatoryOptimizations pass.
+  unsigned IsPerformanceConstraint : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -1029,6 +1037,13 @@ public:
 
   void setPerfConstraints(PerformanceConstraints perfConstr) {
     perfConstraints = perfConstr;
+  }
+
+  // see `IsPerformanceConstraint`
+  bool isPerformanceConstraint() const { return IsPerformanceConstraint; }
+
+  void setIsPerformanceConstraint(bool flag = true) {
+    IsPerformanceConstraint = flag;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),

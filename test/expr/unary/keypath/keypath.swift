@@ -123,12 +123,14 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   _ = \(() -> ()).noMember
 
   let _: (A) -> Prop = \.property
+  let _: (A) -> Prop? = \.property
   let _: PartialKeyPath<A> = \.property
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
   //expected-error@-1 {{cannot convert key path type 'WritableKeyPath<A, Prop>' to contextual type 'ReferenceWritableKeyPath<A, Prop>'}}
 
+  let _: (A) -> A? = \.[sub]
   let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
@@ -136,6 +138,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
   //expected-error@-1 {{cannot convert key path type 'WritableKeyPath<A, A>' to contextual type 'ReferenceWritableKeyPath<A, A>'}}
 
+  let _: (A) -> Prop?? = \.optProperty?
   let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
@@ -144,6 +147,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
+  let _: (A) -> A?? = \.optProperty?[sub]
   let _: (A) -> A? = \.optProperty?[sub]
   let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
@@ -157,6 +161,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
   let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
+  let _: (C<A>) -> A? = \.value
   let _: (C<A>) -> A = \.value
   let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
@@ -164,6 +169,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
   // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<C<A>, A>' to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
+  let _: (C<A>) -> A? = \C.value
   let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
@@ -171,6 +177,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
+  let _: (Prop) -> B? = \.nonMutatingProperty
   let _: (Prop) -> B = \.nonMutatingProperty
   let _: PartialKeyPath<Prop> = \.nonMutatingProperty
   let _: KeyPath<Prop, B> = \.nonMutatingProperty
@@ -716,6 +723,8 @@ var identity10: PartialKeyPath<Container> = \.self
 var identity11: AnyKeyPath = \Container.self
 var identity12: (Container) -> Container = \Container.self
 var identity13: (Container) -> Container = \.self
+var identity14: (Container) -> Container? = \Container.self
+var identity15: (Container) -> Container? = \.self
 
 var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
 
@@ -1242,4 +1251,68 @@ func test_leading_dot_key_path_without_context() {
   func test(_: AnyKeyPath?) {}
   test(\.utf8)
   // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
+}
+
+func keypath_function_transitive_conversions() {
+  class Base {
+    var derived: Derived { Derived() }
+    var base: Base { Base() }
+    var int: Int { 0 }
+  }
+
+  class Derived: Base {
+    override var derived: Derived { Derived() }
+    override var base: Base { Base() }
+  }
+
+  struct S {
+    var base: Base { Base() }
+    var derived: Derived { Derived() }
+  }
+
+  let _: (Base) -> Base = \Base.base
+  let _: (Base) -> Base = \Derived.base
+  let _: (Base) -> Base? = \Base?.self
+  let _: (Base) -> Base? = \Base?.self?.base
+  // FIXME: This error text is bogus due to KeyPath base covariance.
+  let _: (Base?) -> Base = \Base.base // expected-error {{value of optional type 'Base?' must be unwrapped to refer to member 'base' of wrapped base type 'Base'}} expected-note {{use unwrapped type 'Base' as key path root}} {{29-33=Base}}
+  let _: (Base) -> Base = \.base
+  let _: (Base) -> Base = \Base.derived
+  let _: (Base) -> Base = \.derived
+  let _: (Base) -> Int = \Base.int
+  let _: (Derived) -> Base = \Base.base
+  let _: (Derived) -> Base = \Derived.base
+  let _: (Derived) -> Base = \.base
+  let _: (Derived) -> Int = \Base.int
+  let _: (Derived) -> Int = \Derived.int
+  let _: (Derived) -> Int = \.int
+  let _: (Base) async throws -> Int = \.int
+
+  let _: (Derived) -> Base = \Base.derived
+
+  let _: (S) -> Base = \.derived
+  let _: (S) -> Derived = \.base // expected-error {{key path value type 'Base' cannot be converted to contextual type 'Derived'}}
+}
+
+func testMinimalKeypaths(_ arr: [Int?]) {
+  // These keypaths don't have any components that need 'resolving'. We still
+  // should not eagerly turn them into keypaths; they should get converted to
+  // functions instead
+  let _: [Int] = arr.compactMap(\.self)
+  let _: [Int] = arr.compactMap(\.?)
+  let _: [Int] = arr.map(\.!)
+}
+
+func testKeyPathInout() {
+  let _: (inout String) -> Int = \.count
+  let _: (inout String) -> Int = \String.count
+  let _: (inout String) -> Int? = \.count
+
+  func takesInout(_: (inout String) -> Int) {}
+  func takesInoutOpt(_: (inout String) -> Int?) {}
+
+  takesInout(\.count)
+  takesInout(\String.count)
+  takesInoutOpt(\.count)
+  takesInoutOpt(\String.count)
 }

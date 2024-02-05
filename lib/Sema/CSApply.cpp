@@ -4971,20 +4971,18 @@ namespace {
       // Resolve each of the components.
       bool didOptionalChain = false;
       bool isFunctionType = false;
-      Type baseTy, leafTy;
+      auto baseTy = cs.simplifyType(solution.getKeyPathRootType(E));
+      Type leafTy;
       Type exprType = cs.getType(E);
       if (auto fnTy = exprType->getAs<FunctionType>()) {
-        baseTy = fnTy->getParams()[0].getParameterType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
       } else if (auto *existential = exprType->getAs<ExistentialType>()) {
         auto layout = existential->getExistentialLayout();
         auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
-        baseTy = keyPathTy->getGenericArgs()[0];
         leafTy = keyPathTy->getGenericArgs()[1];
       } else {
         auto keyPathTy = exprType->castTo<BoundGenericType>();
-        baseTy = keyPathTy->getGenericArgs()[0];
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
@@ -5103,13 +5101,11 @@ namespace {
         assert(!resolvedComponents.empty());
         componentTy = resolvedComponents.back().getComponentType();
       }
-      
+
       // Wrap a non-optional result if there was chaining involved.
       if (didOptionalChain && componentTy &&
           !componentTy->hasUnresolvedType() &&
           !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
-        assert(leafTy->getOptionalObjectType()->isEqual(
-            componentTy->getWithoutSpecifierType()));
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         componentTy = leafTy;
@@ -5122,11 +5118,6 @@ namespace {
       // See whether there's an equivalent ObjC key path string we can produce
       // for interop purposes.
       checkAndSetObjCKeyPathString(E);
-      
-      // The final component type ought to line up with the leaf type of the
-      // key path.
-      assert(!componentTy || componentTy->hasUnresolvedType()
-             || componentTy->getWithoutSpecifierType()->isEqual(leafTy));
 
       if (!isFunctionType)
         return E;
@@ -9846,6 +9837,21 @@ Type Solution::getType(ASTNode node) const {
 Type Solution::getType(const KeyPathExpr *KP, unsigned I) const {
   assert(hasType(KP, I) && "Expected type to have been set!");
   return keyPathComponentTypes.find(std::make_pair(KP, I))->second;
+}
+
+TypeVariableType *
+Solution::getKeyPathRootType(const KeyPathExpr *keyPath) const {
+  auto result = getKeyPathRootTypeIfAvailable(keyPath);
+  assert(result);
+  return result;
+}
+
+TypeVariableType *
+Solution::getKeyPathRootTypeIfAvailable(const KeyPathExpr *keyPath) const {
+  auto result = KeyPaths.find(keyPath);
+  if (result != KeyPaths.end())
+    return std::get<0>(result->second);
+  return nullptr;
 }
 
 Type Solution::getResolvedType(ASTNode node) const {

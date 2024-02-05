@@ -19,6 +19,9 @@ extension SourceManager {
     /// The source manager.
     private let sourceManager: SourceManager
 
+    /// The lexical context for this expansion.
+    let lexicalContext: [Syntax]
+
     /// The set of diagnostics that were emitted as part of expanding the
     /// macro.
     var diagnostics: [Diagnostic] = []
@@ -35,18 +38,25 @@ extension SourceManager {
     /// Used in conjunction with `expansionDiscriminator`.
     private var uniqueNames: [String: Int] = [:]
 
-    init(sourceManager: SourceManager, discriminator: String) {
+    init(
+      sourceManager: SourceManager,
+      lexicalContext: [Syntax],
+      discriminator: String
+    ) {
       self.sourceManager = sourceManager
+      self.lexicalContext = lexicalContext
       self.discriminator = discriminator
     }
   }
 
   /// Create a new macro expansion context
   func createMacroExpansionContext(
+    lexicalContext: [Syntax],
     discriminator: String = ""
   ) -> MacroExpansionContext {
     return MacroExpansionContext(
       sourceManager: self,
+      lexicalContext: lexicalContext,
       discriminator: discriminator
     )
   }

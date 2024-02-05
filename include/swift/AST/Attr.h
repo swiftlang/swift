@@ -27,7 +27,6 @@
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
-#include "swift/AST/Requirement.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
