@@ -292,6 +292,10 @@ _T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int)
 _$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> ()
 _$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWOy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
+_T0SqWOC ---> outlined init with copy of Swift.Optional
+_T0SqWOD ---> outlined assign with take of Swift.Optional
+_T0SqWOF ---> outlined assign with copy of Swift.Optional
+_T0SqWOH ---> outlined destroy of Swift.Optional
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]

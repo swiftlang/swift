@@ -573,6 +573,10 @@ private:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedDestroy:
+    case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
+    case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
+    case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
+    case Node::Kind::OutlinedDestroyNoValueWitness:
     case Node::Kind::OutlinedEnumTagStore:
     case Node::Kind::OutlinedEnumGetTag:
     case Node::Kind::OutlinedEnumProjectDataForLoad:
@@ -1381,18 +1385,22 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedInitializeWithCopy:
+  case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
     Printer << "outlined init with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithTake:
+  case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
     Printer << "outlined assign with take of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithCopy:
+  case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
     Printer << "outlined assign with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedDestroy:
+  case Node::Kind::OutlinedDestroyNoValueWitness:
     Printer << "outlined destroy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
