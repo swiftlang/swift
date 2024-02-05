@@ -136,4 +136,36 @@ BoundsCheckTraps.test("ContiguousArrayUncheckedBounds")
   _blackHole(value)
 }
 
+@available(SwiftStdlib 5.11, *)
+extension Collection where Index == Int {
+  func uncheckedReverse(upTo endIndex: Int) -> [Element] {
+    var result: [Element] = []
+    for i in (0..<endIndex).reversed() {
+      result.append(self[unchecked: i])
+    }
+    return result
+  }
+}
+
+BoundsCheckTraps.test("CollectionUnchecked")
+  .skip(.custom(
+    { _isDebugAssertConfiguration() },
+    reason: "this will trap in debug builds"))
+  .code {
+  if #available(SwiftStdlib 5.11, *) {
+    var array = [1, 2, 3]
+    let reversed = array.withUnsafeBufferPointer { outerBuffer in
+      // Artificially shrink the unsafe buffer so that the "reverse" operation
+      // below will require out-of-bounds access. This ensures that [unchecked:]
+      // is actually not checking.
+      let innerBuffer = UnsafeBufferPointer<Int>(start: outerBuffer.baseAddress, count: 2)
+      return innerBuffer.uncheckedReverse(upTo: 3)
+    }
+    if reversed != [3, 2, 1] {
+      fatalError("uncheckedReversed() failed?")
+    }
+    _blackHole(array)
+  }
+}
+
 runAllTests()
