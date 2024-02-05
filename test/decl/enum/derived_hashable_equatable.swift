@@ -8,14 +8,14 @@ enum Simple: Hashable {
   case b
 
   // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: Simple, _ b: Simple) -> Bool {
-  // CHECK-NEXT:     private var index_a: Int
+  // CHECK-NEXT:     var index_a: Int
   // CHECK-NEXT:     switch a {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_a = 0
   // CHECK-NEXT:     case .b:
   // CHECK-NEXT:       index_a = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     private var index_b: Int
+  // CHECK-NEXT:     var index_b: Int
   // CHECK-NEXT:     switch b {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_b = 0
@@ -26,7 +26,7 @@ enum Simple: Hashable {
   // CHECK-NEXT:   }
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     private var discriminator: Int
+  // CHECK-NEXT:     var discriminator: Int
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       discriminator = 0
@@ -101,14 +101,14 @@ enum HasUnavailableElement: Hashable {
   case b
 
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasUnavailableElement, _ b: HasUnavailableElement) -> Bool {
-  // CHECK-NEXT:    private var index_a: Int
+  // CHECK-NEXT:    var index_a: Int
   // CHECK-NEXT:    switch a {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_a = 0
   // CHECK-NEXT:    case .b:
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    private var index_b: Int
+  // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_b = 0
@@ -119,7 +119,7 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:  }
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    private var discriminator: Int
+  // CHECK-NEXT:    var discriminator: Int
   // CHECK-NEXT:    switch self {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      discriminator = 0
@@ -185,14 +185,14 @@ enum UnavailableEnum: Hashable {
   case b
 
   // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: UnavailableEnum, _ b: UnavailableEnum) -> Bool {
-  // CHECK-NEXT:     private var index_a: Int
+  // CHECK-NEXT:     var index_a: Int
   // CHECK-NEXT:     switch a {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_a = 0
   // CHECK-NEXT:     case .b:
   // CHECK-NEXT:       index_a = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     private var index_b: Int
+  // CHECK-NEXT:     var index_b: Int
   // CHECK-NEXT:     switch b {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_b = 0
@@ -203,7 +203,7 @@ enum UnavailableEnum: Hashable {
   // CHECK-NEXT:   }
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     private var discriminator: Int
+  // CHECK-NEXT:     var discriminator: Int
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       discriminator = 0
