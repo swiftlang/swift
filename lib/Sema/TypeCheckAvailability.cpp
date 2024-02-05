@@ -551,6 +551,10 @@ private:
       return true;
     }
 
+    if (isa<ExtensionDecl>(D)) {
+      return true;
+    }
+
     return false;
   }
 
