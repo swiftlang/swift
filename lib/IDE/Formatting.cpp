@@ -1405,6 +1405,9 @@ private:
       return Action::SkipNode();
     }
 
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren());
   }
 
@@ -1414,6 +1417,9 @@ private:
       if (auto IndentCtx = getIndentContextFrom(S, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren(), S);
   }
 
@@ -1433,6 +1439,9 @@ private:
       if (auto Ctx = getIndentContextFrom(Args, Action.Trailing, ContextLoc))
         InnermostCtx = Ctx;
     }
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren(), Args);
   }
 
@@ -1506,6 +1515,9 @@ private:
       }
     }
 
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren(), E);
   }
 
@@ -1515,6 +1527,9 @@ private:
       if (auto IndentCtx = getIndentContextFrom(P, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren(), P);
   }
 
@@ -1524,6 +1539,9 @@ private:
       if (auto IndentCtx = getIndentContextFrom(T, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
+    // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
+    // need to ensure the AST is walked in source order (currently not the case
+    // for things like postfix operators).
     return Action::VisitNodeIf(Action.shouldVisitChildren());
   }
 
