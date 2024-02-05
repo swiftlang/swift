@@ -2493,24 +2493,18 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return type;
 
-  GenericSignature sigWithoutReqts;
-  if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    // For generic functions, build a new generic function... but strip off
-    // the requirements. They don't add value.
-    sigWithoutReqts
-      = GenericSignature::get(genericFn->getGenericParams(), {});
-  }
-
   // For functions, strip off the 'Self' parameter clause.
-  if (isa<AbstractFunctionDecl>(decl))
-    type = type->castTo<AnyFunctionType>()->getResult();
+  if (isa<AbstractFunctionDecl>(decl)) {
+    if (auto genericFn = type->getAs<GenericFunctionType>()) {
+      auto sig = genericFn->getGenericSignature();
+      auto resultFn = genericFn->getResult()->castTo<FunctionType>();
+      return GenericFunctionType::get(sig,
+                                      resultFn->getParams(),
+                                      resultFn->getResult(),
+                                      resultFn->getExtInfo());
+    }
 
-  if (sigWithoutReqts) {
-    auto resultFn = type->castTo<AnyFunctionType>();
-    return GenericFunctionType::get(sigWithoutReqts,
-                                    resultFn->getParams(),
-                                    resultFn->getResult(),
-                                    resultFn->getExtInfo());
+    return type->castTo<FunctionType>()->getResult();
   }
 
   return type;
@@ -2800,18 +2794,18 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
+    auto witnessType = getTypeForDisplay(module, match.Witness);
+
     if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
       computeFixitsForOverriddenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
-                              getTypeForDisplay(module, match.Witness),
-                              withAssocTypes);
+                              witnessType, withAssocTypes);
       });
     } else {
       diags.diagnose(match.Witness,
                      diag::protocol_witness_type_conflict,
-                     getTypeForDisplay(module, match.Witness),
-                     withAssocTypes);
+                     witnessType, withAssocTypes);
     }
     break;
   }
@@ -4367,6 +4361,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // Determine the type that the requirement is expected to have.
       Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
                                                   conformance, requirement);
+
       auto &diags = dc->getASTContext().Diags;
       auto diagnosticMessage = diag::ambiguous_witnesses;
       if (ignoringNames) {
