@@ -139,7 +139,7 @@ void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
   if (!T.hasLocalArchetype() &&
-      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+      !IGF.outliningCanCallValueWitnesses()) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
@@ -235,13 +235,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
-                                                           manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.initializeWithTake(IGF, dest, src, T, true);
         } else {
@@ -256,13 +256,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
-                                                           manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.initializeWithCopy(IGF, dest, src, T, true);
         } else {
@@ -277,13 +277,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedAssignWithTakeFunction(manglingBits.first,
-                                                        manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
          const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.assignWithTake(IGF, dest, src, T, true);
         } else {
@@ -298,13 +298,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     IRGenMangler().mangleOutlinedAssignWithCopyFunction(manglingBits.first,
-                                                        manglingBits.second);
+        manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
       T, ti, collector, funcName,
       [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
              const TypeInfo &ti) {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.assignWithCopy(IGF, dest, src, T, true);
         } else {
@@ -334,7 +334,9 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
         generator(IGF, dest, src, T, ti);
         IGF.Builder.CreateRet(dest.getAddress());
       },
-      true /*setIsNoInline*/);
+      true /*setIsNoInline*/,
+      false /*forPrologue*/,
+      collector.IGF.isPerformanceConstraint);
 }
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
@@ -344,7 +346,7 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
     return;
 
   if (!T.hasLocalArchetype() &&
-      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+      !IGF.outliningCanCallValueWitnesses()) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
@@ -385,7 +387,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
   IRGenMangler mangler;
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
-                                                        manglingBits.second);
+                     manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
@@ -397,7 +399,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
         Explosion params = IGF.collectParameters();
         Address addr = ti.getAddressForPointer(params.claimNext());
         collector.bindMetadataParameters(IGF, params);
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+        if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.destroy(IGF, addr, T, true);
         } else {
@@ -406,7 +408,9 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
 
         IGF.Builder.CreateRet(addr.getAddress());
       },
-      true /*setIsNoInline*/);
+      true /*setIsNoInline*/,
+      false /*forPrologue*/,
+      collector.IGF.isPerformanceConstraint);
 }
 
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,

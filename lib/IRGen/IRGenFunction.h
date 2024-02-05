@@ -74,6 +74,7 @@ public:
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
+  bool isPerformanceConstraint;
 
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
@@ -82,6 +83,7 @@ public:
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 llvm::Optional<SILLocation> DbgLoc = llvm::None);
@@ -251,6 +253,8 @@ public:
   /// Whether metadata/wtable packs allocated on the stack must be eagerly
   /// heapified.
   bool canStackPromotePackMetadata() const;
+
+  bool outliningCanCallValueWitnesses() const;
 
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }

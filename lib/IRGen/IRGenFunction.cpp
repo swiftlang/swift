@@ -40,12 +40,14 @@ static llvm::cl::opt<bool> EnableTrapDebugInfo(
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             bool isPerformanceConstraint,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
                              llvm::Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
+      OptMode(OptMode), isPerformanceConstraint(isPerformanceConstraint),
+      CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -81,6 +83,12 @@ OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
 bool IRGenFunction::canStackPromotePackMetadata() const {
   return IGM.getSILModule().getOptions().EnablePackMetadataStackPromotion &&
          !packMetadataStackPromotionDisabled;
+}
+
+bool IRGenFunction::outliningCanCallValueWitnesses() const {
+  if (!IGM.getOptions().UseTypeLayoutValueHandling)
+    return false;
+  return !isPerformanceConstraint && !IGM.Context.LangOpts.hasFeature(Feature::Embedded);
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {
