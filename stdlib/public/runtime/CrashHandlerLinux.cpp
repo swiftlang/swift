@@ -813,6 +813,8 @@ const char *backtracer_argv[] = {
   "true",                       // 28
   "--output-to",                // 29
   "stdout",                     // 30
+  "--symbolicate",              // 31
+  "true",                       // 32
   NULL
 };
 
@@ -922,6 +924,7 @@ run_backtracer(int memserver_fd)
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
+  backtracer_argv[32] = trueOrFalse(_swift_backtraceSettings.symbolicate);
 
   _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
 

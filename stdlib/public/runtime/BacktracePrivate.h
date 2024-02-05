@@ -112,6 +112,7 @@ struct BacktraceSettings {
   Preset           preset;
   bool             cache;
   OutputTo         outputTo;
+  bool             symbolicate;
   const char      *swiftBacktracePath;
 };
 
