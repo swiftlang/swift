@@ -2585,7 +2585,7 @@ namespace {
       // Skip expressions that didn't make it to solution application
       // because the constraint system diagnosed an error.
       if (!expr->getType())
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
@@ -2654,7 +2654,7 @@ namespace {
 
             partialApply->base->walk(*this);
 
-            return Action::SkipChildren(expr);
+            return Action::SkipNode(expr);
           }
         }
 
@@ -2687,7 +2687,7 @@ namespace {
       // expressions tend to violate restrictions on the use of instance
       // methods.
       if (isa<ObjCSelectorExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       // Track the capture contexts for variables.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {

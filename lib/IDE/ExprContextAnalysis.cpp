@@ -129,19 +129,19 @@ public:
       FoundExpr = E;
       return Action::Stop();
     }
-    return Action::VisitChildrenIf(isInterstingRange(E), E);
+    return Action::VisitNodeIf(isInterstingRange(E), E);
   }
 
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-    return Action::VisitChildrenIf(isInterstingRange(P), P);
+    return Action::VisitNodeIf(isInterstingRange(P), P);
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    return Action::VisitChildrenIf(isInterstingRange(S), S);
+    return Action::VisitNodeIf(isInterstingRange(S), S);
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // anonymous namespace

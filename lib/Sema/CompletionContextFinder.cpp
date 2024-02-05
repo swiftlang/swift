@@ -68,7 +68,7 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     }
     // Code completion in key paths is modelled by a code completion component
     // Don't walk the key path's parsed expressions.
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   return Action::Continue(E);

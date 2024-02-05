@@ -5752,20 +5752,20 @@ public:
     reprStack.push_back(T);
 
     if (T->isInvalid())
-      return Action::SkipChildren();
+      return Action::SkipNode();
     if (auto memberTR = dyn_cast<MemberTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
       visit(memberTR->getLastComponent());
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     // Arbitrary protocol constraints are OK on opaque types.
     if (isa<OpaqueReturnTypeRepr>(T))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // Arbitrary protocol constraints are okay for 'any' types.
     if (isa<ExistentialTypeRepr>(T))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     visit(T);
     return Action::Continue();
@@ -5782,11 +5782,11 @@ public:
       return Action::Continue(S);
     }
 
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipChildrenIf(checkStatements);
+    return Action::SkipNodeIf(checkStatements);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {

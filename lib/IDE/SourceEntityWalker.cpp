@@ -109,7 +109,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPre(Decl *D) {
     // call walkToDeclPre on SEWalker. The corresponding walkToDeclPost call
     // on SEWalker will be prevented by the check for shouldIgnore in
     // walkToDeclPost in SemaAnnotator.
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 
   SEWalker.beginBalancedASTOrderDeclVisit(D);
@@ -210,7 +210,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
           Member.walk(*this);
         }
       }
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   } else if (auto *MD = dyn_cast<MacroExpansionDecl>(D)) {
     if (auto *macro =
@@ -231,7 +231,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
   if (IsExtension && ShouldVisitChildren) {
     ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
   }
-  return Action::VisitChildrenIf(ShouldVisitChildren);
+  return Action::VisitNodeIf(ShouldVisitChildren);
 }
 
 ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPost(Decl *D) {
@@ -290,10 +290,10 @@ ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
         return Action::Stop();
 
       // Already walked children.
-      return Action::SkipChildren(DeferS);
+      return Action::SkipNode(DeferS);
     }
   }
-  return Action::VisitChildrenIf(TraverseChildren, S);
+  return Action::VisitNodeIf(TraverseChildren, S);
 }
 
 ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {
@@ -329,7 +329,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (ExprsToSkip.count(E) != 0) {
     // We are skipping the expression. Call neither walkToExprPr nor
     // walkToExprPost on it
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   // Skip the synthesized curry thunks and just walk over the unwrapped
@@ -339,12 +339,12 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       if (!SubExpr->walk(*this))
         return Action::Stop();
 
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   }
 
   if (!SEWalker.walkToExprPre(E)) {
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   auto doSkipChildren = [&]() -> PreWalkResult<Expr *> {
@@ -359,7 +359,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     case PostWalkAction::Stop:
       return Action::Stop();
     case PostWalkAction::Continue:
-      return Action::SkipChildren(*postWalkResult.Value);
+      return Action::SkipNode(*postWalkResult.Value);
     }
     llvm_unreachable("Unhandled case in switch!");
   };
@@ -688,7 +688,7 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
 ASTWalker::PreWalkResult<Pattern *>
 SemaAnnotator::walkToPatternPre(Pattern *P) {
   if (!SEWalker.walkToPatternPre(P))
-    return Action::SkipChildren(P);
+    return Action::SkipNode(P);
 
   if (P->isImplicit())
     return Action::Continue(P);
@@ -711,7 +711,7 @@ SemaAnnotator::walkToPatternPre(Pattern *P) {
   // If the typed pattern was propagated from somewhere, just walk the
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
-  return Action::SkipChildren(P);
+  return Action::SkipNode(P);
 }
 
 ASTWalker::PostWalkResult<Pattern *>

@@ -8570,12 +8570,12 @@ namespace {
 
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
 
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -8651,20 +8651,20 @@ namespace {
         rewriteFunction(closure);
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
-          return Action::SkipChildren(rewriteClosure(closure));
+          return Action::SkipNode(rewriteClosure(closure));
         }
 
-        return Action::SkipChildren(closure);
+        return Action::SkipNode(closure);
       }
 
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
         rewriteSingleValueStmtExpr(SVE);
-        return Action::SkipChildren(SVE);
+        return Action::SkipNode(SVE);
       }
 
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
         rewriteTapExpr(tap);
-        return Action::SkipChildren(tap);
+        return Action::SkipNode(tap);
       }
 
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -8688,12 +8688,12 @@ namespace {
 
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
 
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     NullablePtr<Pattern>
@@ -9209,7 +9209,7 @@ static llvm::Optional<SequenceIterationInfo> applySolutionToForEachStmt(
                   C, /*tryLoc=*/call->getStartLoc(), call, call->getType());
               // Cannot stop here because we need to make sure that
               // the new expression gets injected into AST.
-              return Action::SkipChildren(tryExpr);
+              return Action::SkipNode(tryExpr);
             }
           }
 
@@ -9291,7 +9291,7 @@ static llvm::Optional<PackIterationInfo> applySolutionToForEachStmt(
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<ForEachStmt>(S)) {
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       }
       return Action::Continue(S);
     }
@@ -9301,10 +9301,10 @@ static llvm::Optional<PackIterationInfo> applySolutionToForEachStmt(
         decl->setOpenedElementEnvironment(Environment);
       }
       if (isa<AbstractFunctionDecl>(D)) {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       if (isa<NominalTypeDecl>(D)) {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       return Action::Continue();
     }

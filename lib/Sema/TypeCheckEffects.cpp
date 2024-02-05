@@ -501,7 +501,7 @@ public:
     } else {
       recurse = ShouldNotRecurse;
     }
-    return Action::VisitChildrenIf(bool(recurse));
+    return Action::VisitNodeIf(bool(recurse));
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -541,7 +541,7 @@ public:
     else if (isa<KIND##Expr>(E)) return Action::Stop();
 #include "swift/AST/ExprNodes.def"
 
-    return Action::VisitChildrenIf(bool(recurse), E);
+    return Action::VisitNodeIf(bool(recurse), E);
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -554,7 +554,7 @@ public:
       recurse = asImpl().checkForEach(forEach);
     }
     if (!recurse)
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
 
     return Action::Continue(S);
   }
@@ -3641,7 +3641,7 @@ struct LocalFunctionEffectsChecker : ASTWalker {
       if (func->getDeclContext()->isLocalContext())
         TypeChecker::checkFunctionEffects(func);
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     return Action::Continue();

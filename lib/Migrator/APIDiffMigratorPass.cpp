@@ -1401,7 +1401,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 	}
       }
       // We only handle top-level expressions, so avoid visiting further.
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
   };
 

@@ -216,28 +216,27 @@ public:
       return {Continue(), std::move(node)};
     }
 
-    /// Continue the current walk, replacing the current node with \p node.
-    /// However, skip visiting the children of \p node, and instead resume the
-    /// walk of the parent node.
+    /// Skips visiting both the node's children and its post-visitation.
     template <typename T>
-    static _Detail::SkipChildrenIfWalkResult<T> SkipChildren(T node) {
-      return SkipChildrenIf(true, std::move(node));
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipNode(T node) {
+      return SkipNodeIf(true, std::move(node));
     }
 
-    /// If \p cond is true, this is equivalent to \c Action::SkipChildren(node).
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode(node).
     /// Otherwise, it is equivalent to \c Action::Continue(node).
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T>
-    SkipChildrenIf(bool cond, T node) {
-      return {SkipChildrenIf(cond), std::move(node)};
+    SkipNodeIf(bool cond, T node) {
+      return {SkipNodeIf(cond), std::move(node)};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue(node).
-    /// Otherwise, it is equivalent to \c Action::SkipChildren(node).
+    /// Otherwise, it is equivalent to \c Action::SkipNode(node).
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T>
-    VisitChildrenIf(bool cond, T node) {
-      return SkipChildrenIf(!cond, std::move(node));
+    VisitNodeIf(bool cond, T node) {
+      return SkipNodeIf(!cond, std::move(node));
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Stop().
@@ -250,22 +249,23 @@ public:
     /// Continue the current walk.
     static _Detail::ContinueWalkAction Continue() { return {}; }
 
-    /// Continue the current walk, but do not visit the children of the current
-    /// node. Instead, resume at the parent's post-walk.
-    static _Detail::SkipChildrenIfWalkAction SkipChildren() {
-      return SkipChildrenIf(true);
+    /// Skips visiting both the node's children and its post-visitation.
+    static _Detail::SkipChildrenIfWalkAction SkipNode() {
+      return SkipNodeIf(true);
     }
 
-    /// If \p cond is true, this is equivalent to \c Action::SkipChildren().
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode().
     /// Otherwise, it is equivalent to \c Action::Continue().
-    static _Detail::SkipChildrenIfWalkAction SkipChildrenIf(bool cond) {
+    static _Detail::SkipChildrenIfWalkAction
+    SkipNodeIf(bool cond) {
       return {cond};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue().
-    /// Otherwise, it is equivalent to \c Action::SkipChildren().
-    static _Detail::SkipChildrenIfWalkAction VisitChildrenIf(bool cond) {
-      return SkipChildrenIf(!cond);
+    /// Otherwise, it is equivalent to \c Action::SkipNode().
+    static _Detail::SkipChildrenIfWalkAction
+    VisitNodeIf(bool cond) {
+      return SkipNodeIf(!cond);
     }
 
     /// Terminate the walk, returning without visiting any other nodes.
@@ -281,14 +281,14 @@ public:
   /// A pre-visitation action for AST nodes that do not support being replaced
   /// while walking.
   struct PreWalkAction {
-    enum Kind { Stop, SkipChildren, Continue };
+    enum Kind { Stop, SkipNode, Continue };
     Kind Action;
 
     PreWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PreWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
 
     PreWalkAction(_Detail::SkipChildrenIfWalkAction action)
-        : Action(action.Cond ? SkipChildren : Continue) {}
+        : Action(action.Cond ? SkipNode : Continue) {}
 
     PreWalkAction(_Detail::StopIfWalkAction action)
         : Action(action.Cond ? Stop : Continue) {}

@@ -1608,7 +1608,7 @@ private:
             Elem.walk(*this);
           }
         }
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       return Action::Continue();
     }

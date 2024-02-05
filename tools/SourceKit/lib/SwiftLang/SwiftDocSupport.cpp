@@ -994,17 +994,17 @@ public:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return Action::SkipChildren(); // Skip body.
+      return Action::SkipNode(); // Skip body.
 
     if (FuncEnts.empty())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
       return Action::Continue();
 
     // Ignore things that don't come from this buffer.
     if (!SM.getRangeForBuffer(BufferID).contains(D->getLoc()))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -1017,14 +1017,14 @@ public:
         });
     }
     if (Found == FuncEnts.end() || (*Found)->LocOffset != Offset)
-      return Action::SkipChildren();
+      return Action::SkipNode();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(D)) {
       addParameters(FD, **Found, SM, BufferID);
     } else {
       addParameters(cast<SubscriptDecl>(D), **Found, SM, BufferID);
     }
     FuncEnts = llvm::MutableArrayRef<TextEntity*>(Found+1, FuncEnts.end());
-    return Action::SkipChildren(); // skip body.
+    return Action::SkipNode(); // skip body.
   }
 };
 } // end anonymous namespace

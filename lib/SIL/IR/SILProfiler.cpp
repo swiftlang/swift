@@ -216,7 +216,7 @@ visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
     Func();
     return ASTWalker::Action::Continue();
   }
-  return ASTWalker::Action::SkipChildren();
+  return ASTWalker::Action::SkipNode();
 }
 
 /// Whether to walk the children of a given expression.
@@ -232,7 +232,7 @@ shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
     // SILDeclRef is not for a closure, as it could be for a property
     // initializer instead.
     if (!Parent.isNull() || !Constant || !Constant.getAbstractClosureExpr())
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
   }
   return Action::Continue(E);
 }
@@ -328,7 +328,7 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(TLCD->getBody());
       return Action::Continue();
     }
-    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
+    return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -352,7 +352,7 @@ struct MapRegionCounters : public ASTWalker {
     // We don't walk into parameter lists. Default arguments should be visited
     // directly.
     // FIXME: We don't yet profile default argument generators at all.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -374,7 +374,7 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(E);
 
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
-    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+    if (WalkResult.Action.Action == PreWalkAction::SkipNode) {
       // We need to manually do the post-visit here since the ASTWalker will
       // skip it.
       // FIXME: The ASTWalker should do a post-visit.
@@ -690,7 +690,7 @@ struct PGOMapping : public ASTWalker {
       setKnownExecutionCount(TLCD->getBody());
       return Action::Continue();
     }
-    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
+    return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
@@ -761,7 +761,7 @@ struct PGOMapping : public ASTWalker {
     // We don't walk into parameter lists. Default arguments should be visited
     // directly.
     // FIXME: We don't yet profile default argument generators at all.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -796,7 +796,7 @@ struct PGOMapping : public ASTWalker {
       setKnownExecutionCount(E);
 
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
-    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+    if (WalkResult.Action.Action == PreWalkAction::SkipNode) {
       // We need to manually do the post-visit here since the ASTWalker will
       // skip it.
       // FIXME: The ASTWalker should do a post-visit.
@@ -1202,7 +1202,7 @@ public:
       ImplicitTopLevelBody = TLCD->getBody();
       return Action::Continue();
     }
-    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
+    return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -1328,7 +1328,7 @@ public:
       // Already visited the children.
       // FIXME: The ASTWalker should do a post-walk for SkipChildren.
       walkToStmtPost(S);
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
 
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
@@ -1488,7 +1488,7 @@ public:
     // benefit in these cases, as they're unlikely to have side effects, and
     // the values can be exercized explicitly, but we should probably at least
     // have a consistent behavior for both no matter what we choose here.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1551,10 +1551,10 @@ public:
       // Already visited the children.
       // FIXME: The ASTWalker should do a post-walk for SkipChildren.
       walkToExprPost(TE);
-      return Action::SkipChildren(TE);
+      return Action::SkipNode(TE);
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
-    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+    if (WalkResult.Action.Action == PreWalkAction::SkipNode) {
       // We need to manually do the post-visit here since the ASTWalker will
       // skip it.
       // FIXME: The ASTWalker should do a post-visit.

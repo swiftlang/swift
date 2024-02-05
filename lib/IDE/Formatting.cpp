@@ -481,7 +481,7 @@ private:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!walkCustomAttributes(D))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (D->isImplicit())
       return Action::Continue();
@@ -492,7 +492,7 @@ private:
         for (auto Member : Clause.Elements)
           Member.walk(*this);
       }
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     SourceLoc ContextLoc = D->getStartLoc();
@@ -1362,7 +1362,7 @@ private:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!walkCustomAttributes(D))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     auto Action = HandlePre(D, D->isImplicit());
     if (Action.shouldGenerateIndentContext()) {
@@ -1402,10 +1402,10 @@ private:
             Member.walk(*this);
         }
       }
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
-    return Action::VisitChildrenIf(Action.shouldVisitChildren());
+    return Action::VisitNodeIf(Action.shouldVisitChildren());
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -1414,7 +1414,7 @@ private:
       if (auto IndentCtx = getIndentContextFrom(S, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return Action::VisitChildrenIf(Action.shouldVisitChildren(), S);
+    return Action::VisitNodeIf(Action.shouldVisitChildren(), S);
   }
 
   PreWalkResult<ArgumentList *>
@@ -1433,7 +1433,7 @@ private:
       if (auto Ctx = getIndentContextFrom(Args, Action.Trailing, ContextLoc))
         InnermostCtx = Ctx;
     }
-    return Action::VisitChildrenIf(Action.shouldVisitChildren(), Args);
+    return Action::VisitNodeIf(Action.shouldVisitChildren(), Args);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1491,7 +1491,7 @@ private:
           StringLiteralRange =
               Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
     }
 
@@ -1502,11 +1502,11 @@ private:
           llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
           OE->walk(*this);
         }
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
     }
 
-    return Action::VisitChildrenIf(Action.shouldVisitChildren(), E);
+    return Action::VisitNodeIf(Action.shouldVisitChildren(), E);
   }
 
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
@@ -1515,7 +1515,7 @@ private:
       if (auto IndentCtx = getIndentContextFrom(P, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return Action::VisitChildrenIf(Action.shouldVisitChildren(), P);
+    return Action::VisitNodeIf(Action.shouldVisitChildren(), P);
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
@@ -1524,7 +1524,7 @@ private:
       if (auto IndentCtx = getIndentContextFrom(T, Action.Trailing))
         InnermostCtx = IndentCtx;
     }
-    return Action::VisitChildrenIf(Action.shouldVisitChildren());
+    return Action::VisitNodeIf(Action.shouldVisitChildren());
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {

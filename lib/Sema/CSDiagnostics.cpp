@@ -1151,7 +1151,7 @@ bool AttributedFuncToTypeConversionFailure::
   class TopLevelFuncReprFinder : public ASTWalker {
     PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
       FnRepr = dyn_cast<FunctionTypeRepr>(TR);
-      return Action::VisitChildrenIf(FnRepr == nullptr);
+      return Action::VisitNodeIf(FnRepr == nullptr);
     }
 
     /// Walk macro arguments.
@@ -6801,7 +6801,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (Params.empty())
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       auto *ident = dyn_cast<IdentTypeRepr>(T);
       if (!ident)

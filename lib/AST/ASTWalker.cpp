@@ -1455,7 +1455,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     switch (Pre.Action) {
     case PreWalkAction::Stop:
       return true;
-    case PreWalkAction::SkipChildren:
+    case PreWalkAction::SkipNode:
       return false;
     case PreWalkAction::Continue:
       break;
@@ -1479,7 +1479,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     switch (Pre.Action.Action) {
     case PreWalkAction::Stop:
       return nullptr;
-    case PreWalkAction::SkipChildren:
+    case PreWalkAction::SkipNode:
       assert(*Pre.Value && "Use Action::Stop instead of returning nullptr");
       return *Pre.Value;
     case PreWalkAction::Continue:

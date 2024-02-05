@@ -102,7 +102,7 @@ namespace {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
@@ -119,7 +119,7 @@ namespace {
           // we look at the assignment.
           isa<AssignExpr>(expr)) {
         LinkedExprs.push_back(expr);
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
       
       return Action::Continue(expr);
@@ -127,22 +127,22 @@ namespace {
 
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
     
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Ignore patterns.
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-      return Action::SkipChildren(pat);
+      return Action::SkipNode(pat);
     }
 
     /// Ignore types.
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
   
@@ -166,7 +166,7 @@ namespace {
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (isa<LiteralExpr>(expr)) {
         LTI.hasLiteral = true;
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (isa<CollectionExpr>(expr)) {
@@ -179,17 +179,17 @@ namespace {
           LTI.collectedTypes.insert(CS.getType(UDE).getPointer());
         
         // Don't recurse into the base expression.
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
 
       if (isa<ClosureExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
         LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -197,7 +197,7 @@ namespace {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
-          return Action::SkipChildren(expr);
+          return Action::SkipNode(expr);
         } 
       }             
 
@@ -206,8 +206,8 @@ namespace {
       // looking any further.
       if (isa<ApplyExpr>(expr) &&
           !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
-            isa<PostfixUnaryExpr>(expr))) {      
-        return Action::SkipChildren(expr);
+            isa<PostfixUnaryExpr>(expr))) {
+        return Action::SkipNode(expr);
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
@@ -217,7 +217,7 @@ namespace {
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
 
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Optimize branches of a conditional expression separately.
@@ -225,13 +225,13 @@ namespace {
         CS.optimizeConstraints(IE->getCondExpr());
         CS.optimizeConstraints(IE->getThenExpr());
         CS.optimizeConstraints(IE->getElseExpr());
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }      
 
       // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
       if (isa<TupleExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Coercion exprs have a rigid type, so there's no use in gathering info
@@ -242,7 +242,7 @@ namespace {
         // because that might lead to overly eager type variable merging.
         if (!coercion->isLiteralInit())
           LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Don't walk into subscript expressions - to do so would risk factoring
@@ -250,14 +250,14 @@ namespace {
       // if the index expression is a literal type that differs from the return
       // type of the subscript operation.)
       if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
       
       // Don't walk into unresolved member expressions - we avoid merging type
       // variables inside UnresolvedMemberExpr and those outside, since they
       // should be allowed to behave independently in CS.
       if (isa<UnresolvedMemberExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       return Action::Continue(expr);
@@ -265,22 +265,22 @@ namespace {
     
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
     
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Ignore patterns.
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-      return Action::SkipChildren(pat);
+      return Action::SkipNode(pat);
     }
 
     /// Ignore types.
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
   
@@ -813,7 +813,7 @@ namespace {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
@@ -840,18 +840,18 @@ namespace {
       }
 
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       return Action::Continue(expr);
     }
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
     
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 } // end anonymous namespace
@@ -3098,7 +3098,7 @@ namespace {
         virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
           // Don't walk into nested pack expansions
           if (isa<PackExpansionExpr>(E)) {
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
 
           if (isa<PackElementExpr>(E)) {
@@ -3127,7 +3127,7 @@ namespace {
         virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
           // Don't walk into nested pack expansions
           if (isa<PackExpansionTypeRepr>(T)) {
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
 
           if (isa<PackElementTypeRepr>(T)) {
@@ -4235,13 +4235,13 @@ namespace {
 
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
         if (CS.generateConstraints(SVE))
           return Action::Stop();
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Note that the subexpression of a #selector expression is
@@ -4274,7 +4274,7 @@ namespace {
           return Action::Stop();
 
         CS.setType(expr, closureType);
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur
@@ -4282,7 +4282,7 @@ namespace {
       // of an error in the closure's signature.
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (!coerceExpr->getSubExpr()) {
-          return Action::SkipChildren(expr);
+          return Action::SkipNode(expr);
         }
       }
 
@@ -4291,7 +4291,7 @@ namespace {
       // of an error in the closure's signature.
       if (auto *ternary = dyn_cast<TernaryExpr>(expr)) {
         if (!ternary->getThenExpr() || !ternary->getElseExpr())
-          return Action::SkipChildren(expr);
+          return Action::SkipNode(expr);
       }
 
       if (CS.isForCodeCompletion()) {
@@ -4357,12 +4357,12 @@ namespace {
 
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
 
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 } // end anonymous namespace

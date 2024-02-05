@@ -1576,7 +1576,7 @@ namespace {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -1613,7 +1613,7 @@ namespace {
 
       // Skip walking the children of any Decls that are also DeclContexts,
       // they will already have the right parent.
-      return Action::SkipChildrenIf(isa<DeclContext>(D));
+      return Action::SkipNodeIf(isa<DeclContext>(D));
     }
   };
 } // end anonymous namespace

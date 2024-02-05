@@ -350,7 +350,7 @@ public:
       }
     }
 
-    return Action::SkipChildren(expr);
+    return Action::SkipNode(expr);
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
@@ -370,13 +370,13 @@ public:
   }
 
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return Action::SkipChildren(pattern);
+    return Action::SkipNode(pattern);
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToParameterListPre(ParameterList *params) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // end anonymous namespace
@@ -1118,7 +1118,7 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
       if (isa<LoadExpr>(E))
         return Action::Stop();
 
-      return Action::SkipChildren(createLoadExpr(E));
+      return Action::SkipNode(createLoadExpr(E));
     }
 
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
@@ -2354,19 +2354,19 @@ void ConstraintSystem::forEachExpr(
 
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         if (!CS.participatesInInference(closure))
-          return Action::SkipChildren(NewE);
+          return Action::SkipNode(NewE);
       }
       return Action::Continue(NewE);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 

@@ -933,7 +933,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -945,7 +945,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       }

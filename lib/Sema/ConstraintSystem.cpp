@@ -887,7 +887,7 @@ static void extendDepthMap(
           llvm::SaveAndRestore<ParentTy> SavedParent(Parent, Closures.back());
           auto E = RS->getResult();
           E->walk(*this);
-          return Action::SkipChildren(S);
+          return Action::SkipNode(S);
         }
       }
 
@@ -3278,19 +3278,19 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
 
       // Don't walk into a 'try!' or 'try?'.
       if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       return Action::Continue(expr);
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(decl));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(decl));
     }
 
     bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
@@ -3400,7 +3400,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
         }
 
         // We've already walked all the children we care about.
-        return Action::SkipChildren(stmt);
+        return Action::SkipNode(stmt);
       }
 
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {

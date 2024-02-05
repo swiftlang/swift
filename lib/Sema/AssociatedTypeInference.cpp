@@ -1193,7 +1193,7 @@ struct TypeReprCycleCheckWalker : ASTWalker {
         }
       }
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     return Action::Continue();

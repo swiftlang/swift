@@ -386,7 +386,7 @@ static void writeDeclCommentTable(
       if (!shouldIncludeDecl(D, /*ForSourceInfo*/false)) {
         // Pattern binding decls don't have comments to serialize, but we should
         // still visit their vars.
-        return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+        return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
       }
       if (!shouldSerializeDoc(D))
         return Action::Continue();
@@ -414,16 +414,16 @@ static void writeDeclCommentTable(
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -666,16 +666,16 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
                            DocWriter(DocWriter) {}
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -700,7 +700,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     if (!shouldIncludeDecl(D, /*ForSourceInfo*/true)) {
       // Pattern binding decls don't have comments to serialize, but we should
       // still visit their vars.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
     if (!shouldSerializeSourceLoc(D))
       return Action::Continue();
