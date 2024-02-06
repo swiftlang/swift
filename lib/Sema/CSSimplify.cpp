@@ -7854,22 +7854,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
-  // literals and expressions representing an implicit return type of the single
-  // expression functions.
+  // literals and expressions representing an implied result of closures and
+  // if/switch expressions.
   if (auto elt = locator.last()) {
     if (kind >= ConstraintKind::Subtype &&
         (type1->isUninhabited() || type2->isVoid())) {
-      // A conversion from closure body type to its signature result type.
-      if (auto resultElt = elt->getAs<LocatorPathElt::ClosureBody>()) {
-        // If a single statement closure has explicit `return` let's
-        // forbid conversion to `Void` and report an error instead to
-        // honor user's intent.
-        if (type1->isUninhabited() || resultElt->hasImpliedReturn()) {
-          increaseScore(SK_FunctionConversion, locator);
-          return getTypeMatchSuccess();
-        }
-      }
-
       // Function with an implied `return`, e.g a single expression body.
       if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
         if (contextualType->isFor(CTP_ImpliedReturnStmt)) {
@@ -7878,26 +7867,34 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
-      // We also need to propagate this conversion into the branches for single
-      // value statements.
+      // Implied results can occur for closure bodies, returns, and if/switch
+      // expression branches.
       //
-      // As with the previous checks, we only allow the Void conversion in
-      // an implicit single-expression closure. In the more general case for
-      // implicit branches, we only allow the Never conversion. For explicit
-      // branches, no conversions are allowed.
+      // We only allow the Void conversion for implied results in a closure
+      // context. In the more general case, we only allow the Never conversion.
+      // For explicit branches, no conversions are allowed, unless this is for
+      // a single expression body closure, in which case we still allow the
+      // Never conversion.
       auto *loc = getConstraintLocator(locator);
-      if (auto branchKind = loc->isForSingleValueStmtBranch()) {
+      if (elt->is<LocatorPathElt::ClosureBody>() || 
+          loc->isForContextualType(CTP_ClosureResult) ||
+          loc->isForSingleValueStmtBranch()) {
         bool allowConversion = false;
-        switch (*branchKind) {
-        case SingleValueStmtBranchKind::Explicit:
-          allowConversion = false;
-          break;
-        case SingleValueStmtBranchKind::Implicit:
-          allowConversion = type1->isUninhabited();
-          break;
-        case SingleValueStmtBranchKind::ImplicitInSingleExprClosure:
-          allowConversion = true;
-          break;
+        if (auto *E = getAsExpr(simplifyLocatorToAnchor(loc))) {
+          if (auto kind = isImpliedResult(E)) {
+            switch (*kind) {
+            case ImpliedResultKind::Regular:
+              allowConversion = type1->isUninhabited();
+              break;
+            case ImpliedResultKind::ForClosure:
+              allowConversion = true;
+              break;
+            }
+          } else if (elt->is<LocatorPathElt::ClosureBody>()) {
+            // Even if explicit, we always allow uninhabited types in single
+            // expression closures.
+            allowConversion = type1->isUninhabited();
+          }
         }
         if (allowConversion) {
           increaseScore(SK_FunctionConversion, locator);

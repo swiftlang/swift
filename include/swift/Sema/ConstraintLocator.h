@@ -102,18 +102,6 @@ namespace constraints {
 class ConstraintSystem;
 enum class ConversionRestrictionKind;
 
-/// The kind of SingleValueStmtExpr branch the locator identifies.
-enum class SingleValueStmtBranchKind {
-  /// Explicitly written 'then <expr>'.
-  Explicit,
-
-  /// Implicitly written '<expr>'.
-  Implicit,
-
-  /// Implicitly written '<expr>' in a single expr closure body.
-  ImplicitInSingleExprClosure
-};
-
 /// Locates a given constraint within the expression being
 /// type-checked, which may refer down into subexpressions and parts of
 /// the types of those subexpressions.
@@ -301,6 +289,10 @@ public:
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
 
+  /// Determine whether this locator points to the contextual type for a given
+  /// purpose.
+  bool isForContextualType(ContextualTypePurpose ctp) const;
+
   /// Determine whether this locator points to the assignment expression.
   bool isForAssignment() const;
 
@@ -325,8 +317,8 @@ public:
   bool isForSingleValueStmtConjunctionOrBrace() const;
 
   /// Whether this locator identifies a conversion for a SingleValueStmtExpr
-  /// branch, and if so, the kind of branch.
-  llvm::Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
+  /// branch.
+  bool isForSingleValueStmtBranch() const;
 
   /// If the locator in question is for a pattern match, returns the pattern,
   /// otherwise \c nullptr.
@@ -815,21 +807,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TypeParameterRequirement;
-  }
-};
-
-class LocatorPathElt::ClosureBody final : public StoredIntegerElement<1> {
-  public:
-  ClosureBody(bool hasImpliedReturn)
-    : StoredIntegerElement(ConstraintLocator::ClosureBody, hasImpliedReturn) {}
-
-  /// Indicates whether body of the closure has an implied `return` statement,
-  /// this is the case for single expression bodies where the `return` was not
-  /// written explicitly.
-  bool hasImpliedReturn() const { return bool(getValue()); }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ClosureBody;
   }
 };
 

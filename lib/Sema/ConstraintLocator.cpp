@@ -638,6 +638,11 @@ bool ConstraintLocator::isForContextualType() const {
   return isLastElement<LocatorPathElt::ContextualType>();
 }
 
+bool ConstraintLocator::isForContextualType(ContextualTypePurpose ctp) const {
+  auto elt = getLastElementAs<LocatorPathElt::ContextualType>();
+  return elt && elt->getPurpose() == ctp;
+}
+
 bool ConstraintLocator::isForAssignment() const {
   return directlyAt<AssignExpr>();
 }
@@ -711,35 +716,19 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
   return ::isForSingleValueStmtConjunction(getAnchor(), path);
 }
 
-llvm::Optional<SingleValueStmtBranchKind>
-ConstraintLocator::isForSingleValueStmtBranch() const {
+bool ConstraintLocator::isForSingleValueStmtBranch() const {
+  if (!isExpr<SingleValueStmtExpr>(getAnchor()))
+    return false;
+
   // Ignore a trailing ContextualType path element.
   auto path = getPath();
   if (isLastElement<LocatorPathElt::ContextualType>())
     path = path.drop_back();
 
   if (path.empty())
-    return llvm::None;
+    return false;
 
-  auto resultElt = path.back().getAs<LocatorPathElt::SingleValueStmtResult>();
-  if (!resultElt)
-    return llvm::None;
-
-  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
-  if (!SVE)
-    return llvm::None;
-
-  // Check to see if we have an explicit result, i.e 'then <expr>'.
-  SmallVector<ThenStmt *, 4> scratch;
-  auto *TS = SVE->getThenStmts(scratch)[resultElt->getIndex()];
-  if (!TS->isImplicit())
-    return SingleValueStmtBranchKind::Explicit;
-
-  if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext())) {
-    if (CE->hasSingleExpressionBody() && !hasExplicitResult(CE))
-      return SingleValueStmtBranchKind::ImplicitInSingleExprClosure;
-  }
-  return SingleValueStmtBranchKind::Implicit;
+  return path.back().is<LocatorPathElt::SingleValueStmtResult>();
 }
 
 NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {
