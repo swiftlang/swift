@@ -122,7 +122,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   OutputTo::Auto,
 
   // symbolicate
-  true,
+  Symbolication::Full,
 
   // swiftBacktracePath
   NULL,
@@ -532,6 +532,22 @@ parseBoolean(llvm::StringRef value)
           || value.equals_insensitive("1"));
 }
 
+Symbolication
+parseSymbolication(llvm::StringRef value)
+{
+  if (value.equals_insensitive("on")
+      || value.equals_insensitive("true")
+      || value.equals_insensitive("yes")
+      || value.equals_insensitive("y")
+      || value.equals_insensitive("t")
+      || value.equals_insensitive("1")
+      || value.equals_insensitive("full"))
+    return Symbolication::Full;
+  if (value.equals_insensitive("fast"))
+    return Symbolication::Fast;
+  return Symbolication::Off;
+}
+
 void
 _swift_processBacktracingSetting(llvm::StringRef key,
                                  llvm::StringRef value)
@@ -677,7 +693,7 @@ _swift_processBacktracingSetting(llvm::StringRef key,
                      static_cast<int>(value.size()), value.data());
     }
   } else if (key.equals_insensitive("symbolicate")) {
-    _swift_backtraceSettings.symbolicate = parseBoolean(value);
+    _swift_backtraceSettings.symbolicate = parseSymbolication(value);
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();

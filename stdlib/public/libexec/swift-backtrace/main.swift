@@ -56,6 +56,12 @@ internal struct SwiftBacktrace {
     case stderr
   }
 
+  enum Symbolication {
+    case off
+    case fast
+    case full
+  }
+
   struct Arguments {
     var unwindAlgorithm: UnwindAlgorithm = .precise
     var demangle = false
@@ -72,7 +78,7 @@ internal struct SwiftBacktrace {
     var sanitize: Bool? = nil
     var cache = true
     var outputTo: OutputTo = .stdout
-    var symbolicate = true
+    var symbolicate: Symbolication = .full
   }
 
   static var args = Arguments()
@@ -204,9 +210,9 @@ Generate a backtrace for the parent process.
 -a <addr>               Provide a pointer to a platform specific CrashInfo
                         structure.  <addr> should be in hexadecimal.
 
---symbolicate [<bool>]  Set whether or not to resolve addresses into symbols.
-                        Also controls whether or not we look for inline frame
-                        data.
+--symbolicate [<mode>]  Set to "full" to fully symbolicate, including inline
+                        frames and source locations; "fast" to just do symbol
+                        lookup, of "off" to disable.  The default is "full".
 """, to: &standardError)
   }
 
@@ -426,9 +432,19 @@ Generate a backtrace for the parent process.
         }
       case "--symbolicate":
         if let v = value {
-          args.symbolicate = parseBool(v)
+          switch v.lowercased() {
+            case "off":
+              args.symbolicate = .off
+            case "fast":
+              args.symbolicate = .fast
+            case "full":
+              args.symbolicate = .full
+            default:
+              print("swift-backtrace: unknown symbolicate setting '\(v)'",
+                    to: &standardError)
+          }
         } else {
-          args.symbolicate = true
+          args.symbolicate = .full
         }
       default:
         print("swift-backtrace: unknown argument '\(arg)'",
@@ -1138,7 +1154,16 @@ Generate a backtrace for the parent process.
                   case "symbolicate":
                     let oldSymbolicate = args.symbolicate
 
-                    args.symbolicate = parseBool(value)
+                    switch value.lowercased() {
+                      case "off":
+                        args.symbolicate = .off
+                      case "fast":
+                        args.symbolicate = .fast
+                      case "full":
+                        args.symbolicate = .full
+                      default:
+                        writeln(theme.error("bad symbolicate value '\(value)'"))
+                    }
 
                     if args.symbolicate != oldSymbolicate {
                       changedBacktrace = true

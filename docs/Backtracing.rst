@@ -96,8 +96,9 @@ follows:
 |                 |         | standard error instead of standard output.  This |
 |                 |         | may be useful in some CI systems.                |
 +-----------------+---------+--------------------------------------------------+
-| symbolicate     | yes     | Set to ``no`` to disable symbolication.  This    |
-|                 |         | will also disable inline frame lookup.           |
+| symbolicate     | full    | Options are ``full``, ``fast``, or ``off``.      |
+|                 |         | Full means to look up source locations and       |
+|                 |         | inline frames.  Fast just does symbol lookup.    |
 +-----------------+---------+--------------------------------------------------+
 | swift-backtrace |         | If specified, gives the full path to the         |
 |                 |         | swift-backtrace binary to use for crashes.       |
