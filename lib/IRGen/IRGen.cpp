@@ -1087,7 +1087,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   auto tbdDesc = desc.getTBDGenDescriptor();
   tbdDesc.getOptions().PublicOrPackageSymbolsOnly = false;
   const auto *symbolMap =
-      llvm::cantFail(ctx.evaluator(SymbolSourceMapRequest{std::move(tbdDesc)}));
+      evaluateOrFatal(ctx.evaluator, SymbolSourceMapRequest{std::move(tbdDesc)});
 
   // Then split up the symbols so they can be emitted by the appropriate part
   // of the pipeline.
@@ -1134,7 +1134,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts,
                                               nullptr, llvm::None};
-    SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
+    SILMod = evaluateOrFatal(Ctx.evaluator, LoweredSILRequest{loweringDesc});
 
     // If there was an error, bail.
     if (Ctx.hadError())
@@ -1580,7 +1580,7 @@ GeneratedModule swift::performIRGeneration(
     // needed as return value.
     return GeneratedModule::null();
   }
-  return llvm::cantFail(M->getASTContext().evaluator(IRGenRequest{desc}));
+  return evaluateOrFatal(M->getASTContext().evaluator, IRGenRequest{desc});
 }
 
 GeneratedModule swift::
@@ -1597,7 +1597,7 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, PrivateDiscriminator,
       /*symsToEmit*/ llvm::None, outModuleHash);
-  return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
+  return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 
 void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
@@ -1696,7 +1696,7 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
   if (ctx.hadError())
     return GeneratedModule::null();
 
-  auto irMod = llvm::cantFail(evaluator(IRGenRequest{desc}));
+  auto irMod = evaluateOrFatal(ctx.evaluator, IRGenRequest{desc});
   if (!irMod)
     return irMod;
 

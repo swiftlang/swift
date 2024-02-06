@@ -10535,8 +10535,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   auto &ctx = cs.getASTContext();
 
   // Retrieve a corresponding ExprPattern which we can solve with ~=.
-  auto *EP =
-      llvm::cantFail(ctx.evaluator(EnumElementExprPatternRequest{pattern}));
+  auto *EP = evaluateOrFatal(ctx.evaluator,
+                             EnumElementExprPatternRequest{pattern});
 
   auto target = SyntacticElementTarget::forExprPattern(EP);
 

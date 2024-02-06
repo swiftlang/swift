@@ -385,7 +385,7 @@ void swift::executePassPipelinePlan(SILModule *SM,
                                     irgen::IRGenModule *IRMod) {
   auto &evaluator = SM->getASTContext().evaluator;
   SILPipelineExecutionDescriptor desc{SM, plan, isMandatory, IRMod};
-  (void)llvm::cantFail(evaluator(ExecuteSILPipelineRequest{desc}));
+  (void)evaluateOrFatal(evaluator, ExecuteSILPipelineRequest{desc});
 }
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
