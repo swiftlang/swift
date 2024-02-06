@@ -590,6 +590,13 @@ bool importer::isNSString(clang::QualType qt) {
   return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
 }
 
+bool importer::isNSNotificationName(clang::QualType type) {
+  if (auto *typealias = type->getAs<clang::TypedefType>()) {
+    return typealias->getDecl()->getName() == "NSNotificationName";
+  }
+  return false;
+}
+
 bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
   // Looking for: extern NSString *fooNotification;
 
