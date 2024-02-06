@@ -831,6 +831,8 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   // Must not have a type parameter!
   assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
 
+  assert(!type->hasUnboundGenericType() && "a UGT has no conformances!");
+
   assert(!type->is<PackExpansionType>());
 
   // The SIL types in the AST do not have real conformances, and should have

@@ -1817,6 +1817,10 @@ private:
       // Emit the protocols the archetypes conform to.
       SmallVector<llvm::Metadata *, 4> Protocols;
       for (auto *ProtocolDecl : Archetype->getConformsTo()) {
+        // Skip marker protocols, as they are not available at runtime.
+        if (ProtocolDecl->isMarkerProtocol())
+          continue;
+
         auto PTy =
             IGM.getLoweredType(ProtocolDecl->getInterfaceType()).getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(

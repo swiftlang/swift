@@ -1581,9 +1581,16 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 
 void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                                                       TypeDecl *attachingTo) {
+  unsigned flags = PrintInherited;
+
+  // The invertible protocols themselves do not need to state inverses in their
+  // inheritance clause, because they do not gain any default requirements.
+  if (!proto->getInvertibleProtocolKind())
+    flags |= PrintInverseRequirements;
+
   printRequirementSignature(
       proto, proto->getRequirementSignature(),
-      PrintInherited | PrintInverseRequirements,
+      flags,
       attachingTo);
 }
 
