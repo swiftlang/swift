@@ -150,19 +150,6 @@ func createContainer(_ fd: borrowing FileDescriptor) {
   let _: Container<Sendable> = Container(CopyableStruct())
 }
 
-func takeTwo<T: Sendable>(_ s1: T, _ s2: T) {}
-
-extension Sendable {
-  func doIllegalThings() {
-    return takeTwo(self, self)
-  }
-}
-
-func tryToDupe(_ fd: borrowing FileDescriptor) {
-  // FIXME: this should describe 'Self' as 'any Sendable' or something.
-  fd.doIllegalThings() // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'Self' in 'Sendable'}}
-}
-
 @_moveOnly
 struct PaperAirplaneFile {
   var fd: FileDescriptor

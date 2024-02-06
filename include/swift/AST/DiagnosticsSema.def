@@ -2537,8 +2537,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
-ERROR(synthesized_nominal_extension,none,
-      "cannot extend synthesized type %0", (Type))
+ERROR(cannot_extend_nominal,none,
+      "cannot extend %kind0", (const NominalTypeDecl *))
 
 ERROR(retroactive_not_in_extension_inheritance_clause,none,
       "'retroactive' attribute only applies in inheritance clauses in "
