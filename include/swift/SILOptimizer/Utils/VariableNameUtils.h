@@ -104,6 +104,11 @@ private:
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.
   SILValue findDebugInfoProvidingValue(SILValue searchValue);
+
+  /// Given an initialized once allocation inst without a ValueDecl or a
+  /// DebugVariable provided name, attempt to find a root value from its
+  /// initialization.
+  SILValue getRootValueForTemporaryAllocation(AllocationInst *allocInst);
 };
 
 } // namespace swift

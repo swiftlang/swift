@@ -11,9 +11,59 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/Test.h"
 
 using namespace swift;
+
+SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
+    AllocationInst *allocInst) {
+  struct AddressWalkerState {
+    bool foundError = false;
+    InstructionSet writes;
+    AddressWalkerState(SILFunction *fn) : writes(fn) {}
+  };
+
+  struct AddressWalker : public TransitiveAddressWalker<AddressWalker> {
+    AddressWalkerState &state;
+
+    AddressWalker(AddressWalkerState &state) : state(state) {}
+
+    bool visitUse(Operand *use) {
+      if (use->getUser()->mayWriteToMemory())
+        state.writes.insert(use->getUser());
+      return true;
+    }
+
+    void onError(Operand *use) { state.foundError = true; }
+  };
+
+  AddressWalkerState state(allocInst->getFunction());
+  AddressWalker walker(state);
+  if (std::move(walker).walk(allocInst) == AddressUseKind::Unknown ||
+      state.foundError)
+    return SILValue();
+
+  // Walk from our allocation to one of our writes. Then make sure that the
+  // write writes to our entire value.
+  for (auto &inst : allocInst->getParent()->getRangeStartingAtInst(allocInst)) {
+    if (!state.writes.contains(&inst))
+      continue;
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+      if (copyAddr->getDest() == allocInst &&
+          copyAddr->isInitializationOfDest()) {
+        return copyAddr->getSrc();
+      }
+    }
+
+    // If we do not identify the write... return SILValue(). We weren't able to
+    // understand the write.
+    return SILValue();
+  }
+
+  return SILValue();
+}
 
 SILValue
 VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
@@ -33,16 +83,11 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
       };
 
       if (!allocInstHasInfo(allocInst)) {
-        if (auto copy = allocInst->getSingleUserOfType<CopyAddrInst>()) {
-          if (copy->getDest() == allocInst && !copy->isTakeOfSrc() &&
-              copy->isInitializationOfDest()) {
-            searchValue = copy->getSrc();
-            continue;
-          }
+        if (auto value = getRootValueForTemporaryAllocation(allocInst)) {
+          searchValue = value;
+          continue;
         }
 
-        // If we didn't find anything and did not have a decl, return SILValue()
-        // so that we fail.
         return SILValue();
       }
 
@@ -160,6 +205,9 @@ static StringRef getNameFromDecl(Decl *d) {
 }
 
 void VariableNameInferrer::drainVariableNamePath() {
+  if (variableNamePath.empty())
+    return;
+
   // Walk backwards, constructing our string.
   while (true) {
     auto next = variableNamePath.pop_back_val();
