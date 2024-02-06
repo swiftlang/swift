@@ -310,6 +310,10 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Freestand
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
 
+list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
+  "${CMAKE_BINARY_DIR}/lib/swift/host/plugins#${CMAKE_BINARY_DIR}/bin/swift-plugin-server")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
+
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
 list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
