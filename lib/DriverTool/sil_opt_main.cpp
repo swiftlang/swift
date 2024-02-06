@@ -228,17 +228,10 @@ struct SILOptOptions {
   EnableExperimentalConcurrency = llvm::cl::opt<bool>("enable-experimental-concurrency",
                      llvm::cl::desc("Enable experimental concurrency model."));
 
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-  EnableLexicalLifetimes = llvm::cl::opt<llvm::cl::boolOrDefault>(
-      "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
-      llvm::cl::desc("Enable lexical lifetimes. Mutually exclusive with "
-                     "enable-lexical-borrow-scopes and "
-                     "disable-lexical-lifetimes."));
-
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-      EnableLexicalBorrowScopes = llvm::cl::opt<llvm::cl::boolOrDefault>("enable-lexical-borrow-scopes",
-                                llvm::cl::init(llvm::cl::BOU_UNSET),
-                                llvm::cl::desc("Enable lexical borrow scopes."));
+  llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes =
+      llvm::cl::opt<llvm::cl::boolOrDefault>(
+          "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+          llvm::cl::desc("Enable lexical lifetimes."));
 
   llvm::cl::opt<llvm::cl::boolOrDefault>
   EnableExperimentalMoveOnly = llvm::cl::opt<llvm::cl::boolOrDefault>(
@@ -771,32 +764,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   llvm::Optional<bool> enableLexicalLifetimes =
       toOptionalBool(options.EnableLexicalLifetimes);
-  llvm::Optional<bool> enableLexicalBorrowScopes =
-      toOptionalBool(options.EnableLexicalBorrowScopes);
 
-  // Enable lexical lifetimes if it is set or if experimental move only is
-  // enabled. This is because move only depends on lexical lifetimes being
-  // enabled and it saved some typing ; ).
-  bool specifiedLexicalLifetimesEnabled =
-      enableExperimentalMoveOnly && *enableExperimentalMoveOnly &&
-      enableLexicalLifetimes && *enableLexicalLifetimes;
-  if (specifiedLexicalLifetimesEnabled && enableLexicalBorrowScopes &&
-      !*enableLexicalBorrowScopes) {
-    fprintf(
-        stderr,
-        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
-        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
-    exit(-1);
-  }
   if (enableLexicalLifetimes)
     SILOpts.LexicalLifetimes =
         *enableLexicalLifetimes ? LexicalLifetimesOption::On
                                 : LexicalLifetimesOption::DiagnosticMarkersOnly;
-  if (enableLexicalBorrowScopes)
-    SILOpts.LexicalLifetimes =
-        *enableLexicalBorrowScopes
-            ? LexicalLifetimesOption::DiagnosticMarkersOnly
-            : LexicalLifetimesOption::Off;
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;

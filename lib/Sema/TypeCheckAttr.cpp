@@ -2390,9 +2390,6 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
-  if (!D->getASTContext().supportsMoveOnlyTypes())
-    D->diagnose(diag::moveOnly_requires_lexical_lifetimes);
-
   if (isa<StructDecl>(D) || isa<EnumDecl>(D))
     return;
 
