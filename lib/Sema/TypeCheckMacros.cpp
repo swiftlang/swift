@@ -148,15 +148,19 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   BridgedStringRef externalMacroName{nullptr, 0};
   ptrdiff_t *replacements = nullptr;
   ptrdiff_t numReplacements = 0;
+  ptrdiff_t *genericReplacements = nullptr;
+  ptrdiff_t numGenericReplacements = 0;
   auto checkResult = swift_ASTGen_checkMacroDefinition(
       &ctx.Diags, sourceFile->getExportedSourceFile(),
       macro->getLoc().getOpaquePointerValue(), &externalMacroName,
-      &replacements, &numReplacements);
+      &replacements, &numReplacements,
+      &genericReplacements, &numGenericReplacements);
 
   // Clean up after the call.
   SWIFT_DEFER {
     swift_ASTGen_freeBridgedString(externalMacroName);
     swift_ASTGen_freeExpansionReplacements(replacements, numReplacements);
+    // swift_ASTGen_freeExpansionGenericReplacements(genericReplacements, numGenericReplacements); // FIXME: !!!!!!
   };
 
   if (checkResult < 0 && ctx.CompletionCallback) {
@@ -177,6 +181,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   case BridgedExternalMacro: {
     // An external macro described as ModuleName.TypeName. Get both identifiers.
     assert(!replacements && "External macro doesn't have replacements");
+    assert(!genericReplacements && "External macro doesn't have genericReplacements");
     StringRef externalMacroStr = externalMacroName.unbridged();
     StringRef externalModuleName, externalTypeName;
     std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
@@ -232,8 +237,16 @@ MacroDefinition MacroDefinitionRequest::evaluate(
           static_cast<unsigned>(replacements[3*i+1]),
           static_cast<unsigned>(replacements[3*i+2])});
   }
+  // Copy over the genericReplacements.
+  SmallVector<ExpandedMacroReplacement, 2> genericReplacementsVec;
+  for (unsigned i: range(0, numGenericReplacements)) {
+    genericReplacementsVec.push_back(
+        { static_cast<unsigned>(genericReplacements[3*i]),
+          static_cast<unsigned>(genericReplacements[3*i+1]),
+          static_cast<unsigned>(genericReplacements[3*i+2])});
+  }
 
-  return MacroDefinition::forExpanded(ctx, expansionText, replacementsVec);
+  return MacroDefinition::forExpanded(ctx, expansionText, replacementsVec, genericReplacementsVec);
 #else
   macro->diagnose(diag::macro_unsupported);
   return MacroDefinition::forInvalid();
@@ -781,24 +794,68 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
 
 /// Expand a macro definition.
 static std::string expandMacroDefinition(
-    ExpandedMacroDefinition def, MacroDecl *macro, ArgumentList *args) {
+    ExpandedMacroDefinition def, MacroDecl *macro,
+    SubstitutionMap subs,
+    ArgumentList *args) {
   ASTContext &ctx = macro->getASTContext();
 
   std::string expandedResult;
 
   StringRef originalText = def.getExpansionText();
+
   unsigned startIdx = 0;
-  for (const auto replacement: def.getReplacements()) {
+  unsigned replacementsIdx = 0;
+  unsigned genericReplacementsIdx = 0;
+  auto totalReplacementsCount =
+      def.getReplacements().size() + def.getGenericReplacements().size();
+
+  while (replacementsIdx + genericReplacementsIdx < totalReplacementsCount) {
+    ExpandedMacroReplacement replacement;
+    bool isExpressionReplacement = true;
+
+    // Pick the "next" replacement, in order as they appear in the source text
+    auto canPickExpressionReplacement = replacementsIdx < def.getReplacements().size();
+    auto canPickGenericReplacement = genericReplacementsIdx < def.getGenericReplacements().size();
+    if (canPickExpressionReplacement && canPickGenericReplacement) {
+      auto expressionReplacement = def.getReplacements()[replacementsIdx];
+      auto genericReplacement =
+          def.getGenericReplacements()[genericReplacementsIdx];
+      isExpressionReplacement =
+          expressionReplacement.startOffset < genericReplacement.startOffset;
+      replacement =
+          isExpressionReplacement ? expressionReplacement : genericReplacement;
+    } else if (canPickExpressionReplacement) {
+      isExpressionReplacement = true;
+      replacement = def.getReplacements()[replacementsIdx];
+    } else if (canPickGenericReplacement) {
+      isExpressionReplacement = false;
+      replacement = def.getGenericReplacements()[replacementsIdx];
+    } else {
+      assert(false && "should always select a requirement explicitly rather "
+                      "than fall through");
+    }
+
+    replacementsIdx += isExpressionReplacement ? 1 : 0;
+    genericReplacementsIdx += isExpressionReplacement ? 0 : 1;
+
     // Add the original text up to the first replacement.
-    expandedResult.append(
-        originalText.begin() + startIdx,
-        originalText.begin() + replacement.startOffset);
+    expandedResult.append(originalText.begin() + startIdx,
+                          originalText.begin() + replacement.startOffset);
 
     // Add the replacement text.
-    auto argExpr = args->getArgExprs()[replacement.parameterIndex];
-    SmallString<32> argTextBuffer;
-    auto argText = extractInlinableText(ctx.SourceMgr, argExpr, argTextBuffer);
-    expandedResult.append(argText);
+    if (isExpressionReplacement) {
+      auto argExpr = args->getArgExprs()[replacement.parameterIndex];
+      SmallString<32> argTextBuffer;
+      auto argText =
+          extractInlinableText(ctx.SourceMgr, argExpr, argTextBuffer);
+      expandedResult.append(argText);
+    } else {
+      auto typeArgType = subs.getReplacementTypes()[replacement.parameterIndex];
+      std::string typeNameString;
+      llvm::raw_string_ostream os(typeNameString);
+      typeArgType.print(os);
+      expandedResult.append(typeNameString);
+    }
 
     // Update the starting position.
     startIdx = replacement.endOffset;
@@ -1093,6 +1150,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(macroDef.getExpanded(), macro,
+                                        expansion->getMacroRef().getSubstitutions(),
                                         expansion->getArgs());
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
@@ -1397,7 +1455,9 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
-        macroDef.getExpanded(), macro, attr->getArgs());
+        macroDef.getExpanded(), macro,
+        /*genericArgs=*/{}, // attached macros don't have generic parameters
+        attr->getArgs());
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
     break;

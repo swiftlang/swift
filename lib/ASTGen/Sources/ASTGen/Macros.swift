@@ -200,7 +200,9 @@ func checkMacroDefinition(
   macroLocationPtr: UnsafePointer<UInt8>,
   externalMacroOutPtr: UnsafeMutablePointer<BridgedStringRef>,
   replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
-  numReplacementsPtr: UnsafeMutablePointer<Int>
+  numReplacementsPtr: UnsafeMutablePointer<Int>,
+  genericReplacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
+  numGenericReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
   // Assert "out" parameters are initialized.
   assert(externalMacroOutPtr.pointee.isEmptyInitialized)
@@ -293,7 +295,7 @@ func checkMacroDefinition(
       )
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
-    case let .expansion(expansionSyntax, replacements: _)
+    case let .expansion(expansionSyntax, replacements: _, genericReplacements: _)
     where expansionSyntax.macroName.text == "externalMacro":
       // Extract the identifier from the "module" argument.
       guard let firstArg = expansionSyntax.arguments.first,
@@ -334,13 +336,15 @@ func checkMacroDefinition(
         allocateBridgedString("\(module).\(type)")
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
-    case let .expansion(expansionSyntax, replacements: replacements):
+    case let .expansion(expansionSyntax,
+      replacements: replacements, genericReplacements: genericReplacements):
       // Provide the expansion syntax.
       externalMacroOutPtr.pointee =
         allocateBridgedString(expansionSyntax.trimmedDescription)
 
       // If there are no replacements, we're done.
-      if replacements.isEmpty {
+      let totalReplacementsCount = replacements.count + genericReplacements.count
+      guard totalReplacementsCount > 0 else {
         return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
       }
 
@@ -355,9 +359,24 @@ func checkMacroDefinition(
           replacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
         replacementBuffer[index * 3 + 2] = replacement.parameterIndex
       }
-
       replacementsPtr.pointee = replacementBuffer.baseAddress
       numReplacementsPtr.pointee = replacements.count
+
+      // The replacements are triples: (startOffset, endOffset, parameter index).
+      let genericReplacementBuffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3 * genericReplacements.count)
+      for (index, genericReplacement) in genericReplacements.enumerated() {
+        let expansionStart = expansionSyntax.positionAfterSkippingLeadingTrivia.utf8Offset
+
+        genericReplacementBuffer[index * 3] =
+          genericReplacement.reference.positionAfterSkippingLeadingTrivia.utf8Offset - expansionStart
+        genericReplacementBuffer[index * 3 + 1] =
+          genericReplacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
+        genericReplacementBuffer[index * 3 + 2] =
+          genericReplacement.parameterIndex
+      }
+      genericReplacementsPtr.pointee = genericReplacementBuffer.baseAddress
+      numGenericReplacementsPtr.pointee = genericReplacements.count
+
       return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
 #if RESILIENT_SWIFT_SYNTAX
     @unknown default:

@@ -60,8 +60,16 @@ void SwiftLangSupport::expandMacroSyntactically(
                    reqReplacement.range.Length,
                /*parameterIndex=*/reqReplacement.parameterIndex});
         }
+        SmallVector<ExpandedMacroReplacement, 2> genericReplacements;
+        for (auto &genReqReplacement : expanded->genericReplacements) {
+          genericReplacements.push_back(
+              {/*startOffset=*/genReqReplacement.range.Offset,
+               /*endOffset=*/genReqReplacement.range.Offset +
+                   genReqReplacement.range.Length,
+               /*parameterIndex=*/genReqReplacement.parameterIndex});
+        }
         return MacroDefinition::forExpanded(ctx, expanded->expansionText,
-                                            replacements);
+                                            replacements, genericReplacements);
       } else if (auto *externalRef =
                      std::get_if<MacroExpansionInfo::ExternalMacroReference>(
                          &req.macroDefinition)) {

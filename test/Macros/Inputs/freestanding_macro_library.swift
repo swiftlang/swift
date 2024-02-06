@@ -18,3 +18,20 @@ public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "M
 
 @freestanding(declaration, names: named(value))
 public macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+// Macros that pass along generic arguments
+
+@freestanding(expression)
+public macro checkGeneric_root<DAS>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression)
+public macro checkGeneric<DAS>() = #checkGeneric_root<DAS>()
+
+@freestanding(expression)
+public macro checkGeneric2_root<A, B>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression)
+public macro checkGeneric2<A, B>() = #checkGeneric2_root<A, B>()
+
+@freestanding(expression)
+public macro checkGenericHashableCodable_root<A: Hashable, B: Codable>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression)
+public macro checkGenericHashableCodable<A: Hashable, B: Codable>() = #checkGenericHashableCodable_root<A, B>()

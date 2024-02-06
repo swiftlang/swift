@@ -73,7 +73,9 @@ ptrdiff_t swift_ASTGen_checkMacroDefinition(
     const void *_Nonnull macroSourceLocation,
     BridgedStringRef *_Nonnull expansionSourceOutPtr,
     ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
-    ptrdiff_t *_Nonnull numReplacements);
+    ptrdiff_t *_Nonnull numReplacements,
+    ptrdiff_t *_Nullable *_Nonnull genericReplacementsPtr,
+    ptrdiff_t *_Nonnull numGenericReplacements);
 void swift_ASTGen_freeExpansionReplacements(
     ptrdiff_t *_Nullable replacementsPtr, ptrdiff_t numReplacements);
 
