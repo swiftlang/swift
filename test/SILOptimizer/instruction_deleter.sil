@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+import Swift
+
 struct MOS : ~Copyable {}
 
 sil @getMOS : $() -> (@owned MOS)
