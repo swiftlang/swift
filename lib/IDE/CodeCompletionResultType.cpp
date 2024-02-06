@@ -428,8 +428,9 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
 
   auto Result = TypeRelation::Unrelated;
   for (auto expectedTy : typeContext.getPossibleTypes()) {
-    // Do not use Void type context for a single-expression body, since the
-    // implicit return does not constrain the expression.
+    // Do not use Void type context for an implied result such as a
+    // single-expression closure body, since the implicit return does not
+    // constrain the expression.
     //
     //     { ... -> ()  in x } // x can be anything
     //
@@ -437,16 +438,15 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
     //
     //     { ... -> Int in x }        // x must be Int
     //     { ... -> ()  in return x } // x must be Void
-    if (typeContext.isImplicitSingleExpressionReturn() && expectedTy->isVoid())
+    if (typeContext.isImpliedResult() && expectedTy->isVoid())
       continue;
 
     Result = std::max(Result, calculateTypeRelation(Ty, expectedTy, DC));
   }
 
-  // Map invalid -> unrelated when in a single-expression body, since the
-  // input may be incomplete.
-  if (typeContext.isImplicitSingleExpressionReturn() &&
-      Result == TypeRelation::Invalid)
+  // Map invalid -> unrelated for an implied result, since the input may be
+  // incomplete.
+  if (typeContext.isImpliedResult() && Result == TypeRelation::Invalid)
     Result = TypeRelation::Unrelated;
 
   return Result;

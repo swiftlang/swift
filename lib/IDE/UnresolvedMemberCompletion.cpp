@@ -43,7 +43,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::Result::merge(
     ExpectedTy = Other.ExpectedTy;
   }
 
-  IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;
+  IsImpliedResult |= Other.IsImpliedResult;
   IsInAsyncContext |= Other.IsInAsyncContext;
 }
 
@@ -62,17 +62,15 @@ void UnresolvedMemberTypeCheckCompletionCallback::addExprResult(
 
 void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-
   bool IsAsync = isContextAsync(S, DC);
 
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
   if (ExpectedTy) {
-    bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    Result Res = {ExpectedTy, SingleExprBody, IsAsync};
+    bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
+    Result Res = {ExpectedTy, IsImpliedResult, IsAsync};
     addExprResult(Res);
   }
 
@@ -81,9 +79,8 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
       return R.ExpectedTy->isEqual(PatternType);
     };
     if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
-      EnumPatternTypes.push_back({PatternType,
-                                  /*IsImplicitSingleExpressionReturn=*/false,
-                                  IsAsync});
+      EnumPatternTypes.push_back(
+          {PatternType, /*isImpliedResult=*/false, IsAsync});
     }
   }
 }
@@ -106,8 +103,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::collectResults(
     originalTypes.insert(Result.ExpectedTy->getCanonicalType());
 
   for (auto &Result : ExprResults) {
-    Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsImplicitSingleExpressionReturn,
+    Lookup.setExpectedTypes({Result.ExpectedTy}, Result.IsImpliedResult,
                             /*expectsNonVoid*/ true);
     Lookup.setIdealExpectedType(Result.ExpectedTy);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
@@ -133,7 +129,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::collectResults(
   // EnumElementPattern.
   for (auto &Result : EnumPatternTypes) {
     Type Ty = Result.ExpectedTy;
-    Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
+    Lookup.setExpectedTypes({Ty}, /*isImpliedResult=*/false,
                             /*expectsNonVoid=*/true);
     Lookup.setIdealExpectedType(Ty);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);

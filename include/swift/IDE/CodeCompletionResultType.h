@@ -44,12 +44,12 @@ class ExpectedTypeContext {
   /// Pre typechecked type of the expression at the completion position.
   Type IdealType;
 
-  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
+  /// Whether the `ExpectedTypes` comes from an implied result, e.g.
   /// `foo({ here })`.
   ///
   /// Since the input may be incomplete, we take into account that the types are
   /// only a hint.
-  bool IsImplicitSingleExpressionReturn = false;
+  bool IsImpliedResult = false;
   bool PreferNonVoid = false;
 
   /// If not empty, \c PossibleTypes are ignored and types that have an
@@ -86,7 +86,7 @@ public:
     if (!IdealType || !Other.IdealType || !IdealType->isEqual(Other.IdealType)) {
       IdealType = Type();
     }
-    IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;
+    IsImpliedResult |= Other.IsImpliedResult;
     PreferNonVoid &= Other.PreferNonVoid;
     ExpectedCustomAttributeKinds |= Other.ExpectedCustomAttributeKinds;
   }
@@ -96,7 +96,7 @@ public:
   void setIdealType(Type IdealType) { this->IdealType = IdealType; }
 
   bool requiresNonVoid() const {
-    if (IsImplicitSingleExpressionReturn)
+    if (IsImpliedResult)
       return false;
     if (PreferNonVoid)
       return true;
@@ -105,13 +105,12 @@ public:
     return llvm::all_of(PossibleTypes, [](Type Ty) { return !Ty->isVoid(); });
   }
 
-  bool isImplicitSingleExpressionReturn() const {
-    return IsImplicitSingleExpressionReturn;
+  bool isImpliedResult() const {
+    return IsImpliedResult;
   }
 
-  void
-  setIsImplicitSingleExpressionReturn(bool IsImplicitSingleExpressionReturn) {
-    this->IsImplicitSingleExpressionReturn = IsImplicitSingleExpressionReturn;
+  void setIsImpliedResult(bool IsImpliedResult) {
+    this->IsImpliedResult = IsImpliedResult;
   }
 
   bool getPreferNonVoid() const { return PreferNonVoid; }

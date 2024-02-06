@@ -64,7 +64,7 @@ void PostfixCompletionCallback::Result::merge(const Result &Other,
     ExpectedTypes.push_back(OtherExpectedTy);
   }
   ExpectsNonVoid &= Other.ExpectsNonVoid;
-  IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;
+  IsImpliedResult |= Other.IsImpliedResult;
   IsInAsyncContext |= Other.IsInAsyncContext;
 }
 
@@ -213,8 +213,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
     }
   }
 
-  bool IsImplicitSingleExpressionReturn =
-      isImplicitSingleExpressionReturn(CS, CompletionExpr);
+  bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
 
   bool IsInAsyncContext = isContextAsync(S, DC);
   llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
@@ -232,7 +231,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
       BaseIsStaticMetaType,
       ExpectedTypes,
       ExpectsNonVoid,
-      IsImplicitSingleExpressionReturn,
+      IsImpliedResult,
       IsInAsyncContext,
       ClosureActorIsolations
   };
@@ -448,8 +447,7 @@ void PostfixCompletionCallback::collectResults(
     if (!ProcessedBaseTypes.contains(Result.BaseTy)) {
       Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
     }
-    Lookup.setExpectedTypes(Result.ExpectedTypes,
-                            Result.IsImplicitSingleExpressionReturn,
+    Lookup.setExpectedTypes(Result.ExpectedTypes, Result.IsImpliedResult,
                             Result.ExpectsNonVoid);
     if (isDynamicLookup(Result.BaseTy))
       Lookup.setIsDynamicLookup();

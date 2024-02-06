@@ -234,11 +234,9 @@ public:
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
   void setExpectedTypes(
-      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
-      bool preferNonVoid = false,
+      ArrayRef<Type> Types, bool isImpliedResult, bool preferNonVoid = false,
       OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
-    expectedTypeContext.setIsImplicitSingleExpressionReturn(
-        isImplicitSingleExpressionReturn);
+    expectedTypeContext.setIsImpliedResult(isImpliedResult);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
     expectedTypeContext.setExpectedCustomAttributeKinds(
@@ -269,8 +267,8 @@ public:
     if (expectedTypeContext.empty() &&
         !expectedTypeContext.getPreferNonVoid()) {
       return CodeCompletionContext::TypeContextKind::None;
-    } else if (expectedTypeContext.isImplicitSingleExpressionReturn()) {
-      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else if (expectedTypeContext.isImpliedResult()) {
+      return CodeCompletionContext::TypeContextKind::Implied;
     } else {
       return CodeCompletionContext::TypeContextKind::Required;
     }
