@@ -33,11 +33,11 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
   while true {
     switch current.kind {
     // Known implemented kinds.
-    case .arrayType, .attributedType, .classRestrictionType, .compositionType,
+    case .arrayType, .attributedType, .classRestrictionType, .compositionType, .constType,
       .someOrAnyType, .dictionaryType, .functionType, .identifierType,
-      .implicitlyUnwrappedOptionalType, .memberType, .metatypeType,
+      .implicitlyUnwrappedOptionalType, .isolatedType, .lifetimeSpecifiedType, .memberType, .metatypeType,
       .namedOpaqueReturnType, .optionalType, .packElementType,
-      .packExpansionType, .suppressedType, .tupleType:
+      .packExpansionType, .resultDependsOnType, .suppressedType, .tupleType:
       break
 
     // Known unimplemented kinds.
@@ -73,6 +73,8 @@ extension ASTGenVisitor {
       return self.generate(classRestrictionType: node).asTypeRepr
     case .compositionType(let node):
       return self.generate(compositionType: node).asTypeRepr
+    case .constType(let node):
+      return self.generateTypeWithSpecifier(specifier: node.constKeyword, baseType: node.baseType)
     case .dictionaryType(let node):
       return self.generate(dictionaryType: node).asTypeRepr
     case .functionType(let node):
@@ -81,6 +83,12 @@ extension ASTGenVisitor {
       return self.generate(identifierType: node)
     case .implicitlyUnwrappedOptionalType(let node):
       return self.generate(implicitlyUnwrappedOptionalType: node).asTypeRepr
+    case .isolatedType(let node):
+      return self.generateTypeWithSpecifier(specifier: node.isolatedKeyword, baseType: node.baseType)
+    case .lifetimeDependenceType(let node):
+      preconditionFailure("TODO: Implement")
+    case .lifetimeSpecifiedType(let node):
+      return self.generateTypeWithSpecifier(specifier: node.lifetimeSpecifier, baseType: node.baseType)
     case .memberType(let node):
       return self.generate(memberType: node)
     case .metatypeType(let node):
@@ -95,6 +103,8 @@ extension ASTGenVisitor {
       return self.generate(packElementType: node).asTypeRepr
     case .packExpansionType(let node):
       return self.generate(packExpansionType: node).asTypeRepr
+    case .resultDependsOnType(let node):
+      return self.generateTypeWithSpecifier(specifier: node.resultDependsOnKeyword, baseType: node.baseType)
     case .someOrAnyType(let node):
       return self.generate(someOrAnyType: node)
     case .suppressedType(let node):
@@ -369,23 +379,24 @@ extension BridgedAttributedTypeSpecifier {
 }
 
 extension ASTGenVisitor {
+  func generateTypeWithSpecifier(specifier: TokenSyntax, baseType: TypeSyntax) -> BridgedTypeRepr {
+    var type = generate(type: baseType)
+
+    if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
+      return BridgedSpecifierTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifier: kind,
+        specifierLoc: self.generateSourceLoc(specifier)
+        ).asTypeRepr
+    } else {
+      self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+      return type
+    }
+  }
+
   func generate(attributedType node: AttributedTypeSyntax) -> BridgedTypeRepr {
     var type = generate(type: node.baseType)
-
-    // Handle specifiers.
-    if let specifier = node.specifier {
-      if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
-        type =
-          BridgedSpecifierTypeRepr.createParsed(
-            self.ctx,
-            base: type,
-            specifier: kind,
-            specifierLoc: self.generateSourceLoc(specifier)
-          ).asTypeRepr
-      } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
-      }
-    }
 
     // Handle type attributes.
     if !node.attributes.isEmpty {
