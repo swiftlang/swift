@@ -177,6 +177,30 @@ internal func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
 public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 #endif
 
+/// Called to indicate that a typed error will be thrown.
+@_silgen_name("swift_willThrowTypedImpl")
+@available(SwiftStdlib 5.11, *)
+@usableFromInline
+func _willThrowTypedImpl<E: Error>(_ error: E)
+
+#if !$Embedded
+/// Called when a typed error will be thrown.
+///
+/// On new-enough platforms, this will call through to the runtime to invoke
+/// the thrown error handler (if one is set).
+///
+/// On older platforms, the error will not be passed into the runtime, because
+/// doing so would require memory allocation (to create the 'any Error').
+@inlinable
+@_alwaysEmitIntoClient
+@_silgen_name("swift_willThrowTyped")
+public func _willThrowTyped<E: Error>(_ error: E) {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    _willThrowTypedImpl(error)
+  }
+}
+#endif
+
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")

@@ -17,9 +17,43 @@ func doesNotThrowConcrete() throws(MyError) { }
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B8ConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
 func throwsConcrete() throws(MyError) {
   // CHECK: [[ERROR:%[0-9]+]] = enum $MyError, #MyError.fail!enumelt
-  // CHECK-NOT: builtin "willThrow"
-  // CHECK: throw [[ERROR]] : $MyError
+  // CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $MyError
+  // CHECK: store [[ERROR]] to [trivial] [[ERROR_ALLOC]] : $*MyError
+  // CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply [[FN]]<MyError>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: [[ERROR_RELOAD:%.*]] = load [trivial] [[ERROR_ALLOC]]
+  // CHECK: dealloc_stack [[ERROR_ALLOC]] : $*MyError
+  // CHECK: throw [[ERROR_RELOAD]] : $MyError
   throw .fail
+}
+
+class ClassError: Error { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B10ClassErroryyAA0cD0CYKF : $@convention(thin) () -> @error ClassError
+// CHECK: [[META:%.*]] = metatype $@thick ClassError.Type
+// CHECK: [[INIT:%.*]] = function_ref @$s12typed_throws10ClassErrorCACycfC
+// CHECK: [[ERROR:%.*]] = apply [[INIT]]([[META]]) : $@convention(method) (@thick ClassError.Type) -> @owned ClassError
+// CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $ClassError
+// CHECK: store [[ERROR]] to [init] [[ERROR_ALLOC]] : $*ClassError
+// CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<ClassError>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[ERROR_RELOAD:%.*]] = load [take] [[ERROR_ALLOC]] : $*ClassError
+// CHECK: dealloc_stack [[ERROR_ALLOC]] : $*ClassError
+// CHECK: throw [[ERROR_RELOAD]] : $ClassError
+func throwsClassError() throws(ClassError) {
+  throw ClassError()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B13IndirectErroryyxxYKs0D0RzlF : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+// CHECK: [[ERROR_ALLOC:%.*]] = alloc_stack $E
+// CHECK: copy_addr %1 to [init] [[ERROR_ALLOC]] : $*E
+// CHECK: [[FN:%.*]] = function_ref @swift_willThrowTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<E>([[ERROR_ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: copy_addr [take] [[ERROR_ALLOC]] to [init] %0 : $*E
+// CHECK: dealloc_stack [[ERROR_ALLOC]] : $*E
+// CHECK-NEXT: throw_addr
+func throwsIndirectError<E: Error>(_ error: E) throws(E) {
+  throw error
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF

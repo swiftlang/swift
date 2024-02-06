@@ -254,3 +254,4 @@ Added: __swift_pod_destroy
 Added: __swift_pod_direct_initializeBufferWithCopyOfBuffer
 Added: __swift_pod_indirect_initializeBufferWithCopyOfBuffer
 Added: __swift_validatePrespecializedMetadata
+Added: _swift_willThrowTypedImpl

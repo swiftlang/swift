@@ -220,6 +220,11 @@ func throwJazzHands() throws {
   throw SillyError.JazzHands
 }
 
+@inline(never)
+func throwJazzHandsTyped() throws(SillyError) {
+  throw .JazzHands
+}
+
 // Error isn't allowed in a @convention(c) function when ObjC interop is
 // not available, so pass it through an UnsafeRawPointer.
 @available(SwiftStdlib 5.8, *)
@@ -248,6 +253,17 @@ ErrorTests.test("willThrow") {
     try throwJazzHands()
   } catch {}
   expectEqual(2, errors.count)
+  expectEqual(SillyError.self, type(of: errors.last!))
+
+  // Typed errors introduced in Swift 5.11
+  guard #available(SwiftStdlib 5.11, *) else {
+    return
+  }
+
+  do {
+    try throwJazzHandsTyped()
+  } catch {}
+  expectEqual(3, errors.count)
   expectEqual(SillyError.self, type(of: errors.last!))
 }
 #endif
