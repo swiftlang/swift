@@ -4,14 +4,14 @@
 // always be emitted.
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sBoD", 
-// CHECK-SAME: size: 64, num_extra_inhabitants: 2147483647, flags: DIFlagArtificial, 
+// CHECK-SAME: size: 64, num_extra_inhabitants: {{2147483647|4096}}, flags: DIFlagArtificial, 
 // CHECK-SAME: runtimeLang: DW_LANG_Swift)
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$syXlD", 
 // CHECK-SAME: size: 64,
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sBbD", 
-// CHECK-SAME: size: 64, num_extra_inhabitants: 2147483647, flags: DIFlagArtificial, 
+// CHECK-SAME: size: 64, num_extra_inhabitants: {{2147483647|4096}}, flags: DIFlagArtificial, 
 // CHECK-SAME: runtimeLang: DW_LANG_Swift)
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sBpD", 
