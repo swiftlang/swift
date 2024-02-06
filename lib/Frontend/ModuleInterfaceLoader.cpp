@@ -1768,6 +1768,10 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (LoaderOpts.disableImplicitSwiftModule) {
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
+    GenericArgs.push_back("-Xcc");
+    GenericArgs.push_back("-fno-implicit-modules");
+    GenericArgs.push_back("-Xcc");
+    GenericArgs.push_back("-fno-implicit-module-maps");
   }
   // If building an application extension, make sure API use
   // is restricted accordingly in downstream dependnecies.
@@ -1780,7 +1784,6 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   ParentInvocationTarget = langOpts.Target;
 
   // Pass down -explicit-swift-module-map-file
-  // FIXME: we shouldn't need this. Remove it?
   StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
     explicitSwiftModuleMap.str();

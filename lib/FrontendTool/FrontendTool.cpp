@@ -413,7 +413,13 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
   // and isntead directly use the current \c Instance for compilation.
-  if (FEOpts.ExplicitInterfaceBuild)
+  //
+  // FIXME: -typecheck-module-from-interface is the exception here because
+  // currently we need to ensure it still reads the flags written out
+  // in the .swiftinterface file itself. Instead, creation of that
+  // job should incorporate those flags.
+  if (FEOpts.ExplicitInterfaceBuild &&
+      !(FEOpts.isTypeCheckAction() && !FEOpts.EnableCaching))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
