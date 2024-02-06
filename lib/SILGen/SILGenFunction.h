@@ -272,6 +272,12 @@ struct MaterializedLValue {
       callbackStorage(callbackStorage) {}
 };
 
+/// The kind of operation under which we are querying a storage reference.
+enum class StorageReferenceOperationKind {
+  Borrow,
+  Consume
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -1517,6 +1523,12 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Given an expression, find the subexpression that can be emitted as a borrow formal access, if
+  /// any.
+  Expr *findStorageReferenceExprForMoveOnly(Expr *argExpr,
+                                            StorageReferenceOperationKind kind);
+  Expr *findStorageReferenceExprForBorrowExpr(Expr *argExpr);
 
   /// Emit the given expression as a +1 r-value.
   ///

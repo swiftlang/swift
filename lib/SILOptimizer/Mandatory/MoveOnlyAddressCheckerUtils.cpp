@@ -1851,6 +1851,10 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
+  
+  ASTContext &getASTContext() {
+    return markedValue->getFunction()->getASTContext();
+  }
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
@@ -2072,26 +2076,28 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     OSSACanonicalizer::LivenessState livenessState(moveChecker.canonicalizer,
                                                    li);
 
+    unsigned numDiagnostics =
+      moveChecker.diagnosticEmitter.getDiagnosticCount();
+
     // Before we do anything, run the borrow to destructure transform in case
     // we have a switch_enum user.
-    unsigned numDiagnostics =
-        moveChecker.diagnosticEmitter.getDiagnosticCount();
-    BorrowToDestructureTransform borrowToDestructure(
-        moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
-        moveChecker.poa);
-    if (!borrowToDestructure.transform()) {
-      assert(moveChecker.diagnosticEmitter
-                 .didEmitCheckerDoesntUnderstandDiagnostic());
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Failed to perform borrow to destructure transform!\n");
-      return false;
-    }
-
-    // If we emitted an error diagnostic, do not transform further and instead
-    // mark that we emitted an early diagnostic and return true.
-    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-      LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
-      return true;
+    if (!getASTContext().LangOpts.hasFeature(Feature::BorrowingSwitch)) {
+      BorrowToDestructureTransform borrowToDestructure(
+          moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
+          moveChecker.poa);
+      if (!borrowToDestructure.transform()) {
+        assert(moveChecker.diagnosticEmitter
+                   .didEmitCheckerDoesntUnderstandDiagnostic());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Failed to perform borrow to destructure transform!\n");
+        return false;
+      }
+      // If we emitted an error diagnostic, do not transform further and instead
+      // mark that we emitted an early diagnostic and return true.
+      if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+        LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
+        return true;
+      }
     }
 
     // Now, validate that what we will transform into a take isn't a take that

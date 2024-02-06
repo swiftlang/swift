@@ -3196,13 +3196,8 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
   return StorageRefResult();
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
-    SILGenFunction &SGF, StorageReferenceOperationKind kind) && {
-  if (!isExpr())
-    return nullptr;
-
-  auto argExpr = asKnownExpr();
-
+Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
+                                           StorageReferenceOperationKind kind) {
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3270,7 +3265,7 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   assert(type);
 
   SILType ty =
-      SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
+      getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
   bool isMoveOnly = ty.isMoveOnly(/*orWrapped=*/false);
   if (auto *pd = dyn_cast<ParamDecl>(storage)) {
     isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Borrowing;
@@ -3278,10 +3273,6 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   }
   if (!isMoveOnly)
     return nullptr;
-
-  // Claim the value of this argument since we found a storage reference that
-  // has a move only base.
-  (void)std::move(*this).asKnownExpr();
 
   // If we saw a subscript expr and the base of the subscript expr passed our
   // tests above, we can emit the call to the subscript directly as a borrowed
@@ -3292,11 +3283,22 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   return result.getTransitiveRoot();
 }
 
-Expr *
-ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
+Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
+    SILGenFunction &SGF, StorageReferenceOperationKind kind) && {
   if (!isExpr())
     return nullptr;
 
+  auto lvExpr = SGF.findStorageReferenceExprForMoveOnly(asKnownExpr(), kind);
+  if (lvExpr) {
+    // Claim the value of this argument since we found a storage reference that
+    // has a move only base.
+    (void)std::move(*this).asKnownExpr();
+  }
+  return lvExpr;
+}
+
+Expr *
+SILGenFunction::findStorageReferenceExprForBorrowExpr(Expr *argExpr) {
   // We support two patterns:
   //
   // (load_expr (borrow_expr))
@@ -3305,8 +3307,6 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   //
   // The first happens if a borrow is used on a non-self argument. The second
   // happens if we pass self as a borrow.
-  auto *argExpr = asKnownExpr();
-
   if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr))
     argExpr = parenExpr->getSubExpr();
 
@@ -3317,14 +3317,21 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!borrowExpr)
     return nullptr;
 
-  Expr *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr())
+  return ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr())
                      .getTransitiveRoot();
+}
 
+Expr *
+ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
+  if (!isExpr())
+    return nullptr;
+
+  auto lvExpr = SGF.findStorageReferenceExprForBorrowExpr(asKnownExpr());
   // Claim the value of this argument.
   if (lvExpr) {
     (void)std::move(*this).asKnownExpr();
   }
-
+  
   return lvExpr;
 }
 
@@ -3686,7 +3693,7 @@ private:
 
     // Try to find an expression we can emit as a borrowed l-value.
     auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
-        SGF, ArgumentSource::StorageReferenceOperationKind::Borrow);
+        SGF, StorageReferenceOperationKind::Borrow);
     if (!lvExpr)
       return false;
 
@@ -3760,7 +3767,7 @@ private:
 
     // Try to find an expression we can emit as a consumed l-value.
     auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
-        SGF, ArgumentSource::StorageReferenceOperationKind::Consume);
+                                  SGF, StorageReferenceOperationKind::Consume);
     if (!lvExpr)
       return false;
 
@@ -3791,7 +3798,7 @@ private:
   void
   emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
              AbstractionPattern origParamType, SILParameterInfo param,
-             llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {
+             llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {             
     ManagedValue value;
     auto loc = arg.getLocation();
 
