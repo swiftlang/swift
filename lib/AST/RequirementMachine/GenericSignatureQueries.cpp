@@ -305,7 +305,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
     Action walkToTypePre(Type component) override {
       if (!component->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       if (!component->isTypeParameter())
         return Action::Continue;
@@ -327,7 +327,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
       // The parent of a reduced type parameter might be non-reduced
       // because it is concrete.
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
   };
 

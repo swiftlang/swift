@@ -86,7 +86,7 @@ namespace {
         ParentDC = oldParentDC;
 
         TypeChecker::computeCaptures(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       } 
 
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
@@ -114,7 +114,7 @@ namespace {
           CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Caller-side default arguments need their @autoclosures checked.
@@ -134,7 +134,7 @@ namespace {
     PreWalkAction walkToDeclPre(Decl *D) override {
       // But we do want to walk into the initializers of local
       // variables.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
   private:
@@ -258,7 +258,7 @@ namespace {
       //   - non-local initializers
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
         if (CE->getRawDiscriminator() != AutoClosureExpr::InvalidDiscriminator)
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         assert(
             CE->getRawDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
@@ -268,7 +268,7 @@ namespace {
         // but parenting to the autoclosure instead of the outer closure.
         CE->getBody()->walk(*this);
 
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Explicit closures start their own sequence.
@@ -289,7 +289,7 @@ namespace {
           CE->getBody()->walk(innerVisitor);
         }
 
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Caller-side default arguments need their @autoclosures checked.
@@ -324,7 +324,7 @@ namespace {
 
       // But we do want to walk into the initializers of local
       // variables.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -2479,7 +2479,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             SM, brace->getSourceRange());
         // Unless this brace contains the loc, there's nothing to do.
         if (!braceCharRange.contains(Loc))
-          return Action::SkipChildren(S);
+          return Action::SkipNode(S);
 
         // Reset the node found in a parent context if it's not part of this
         // brace statement.
@@ -2539,16 +2539,16 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(Loc, E->getStartLoc()))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, E->getEndLoc());
       if (SM.isBeforeInBuffer(endLoc, Loc))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       // Don't walk into 'TapExpr'. They should be type checked with parent
       // 'InterpolatedStringLiteralExpr'.
       if (isa<TapExpr>(E))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       // If the location is within a result of a SingleValueStmtExpr, walk it
       // directly rather than as part of the brace. This ensures we type-check
@@ -2563,7 +2563,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             if (!result->walk(*this))
               return Action::Stop();
 
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
         }
         return Action::Continue(E);
@@ -2573,7 +2573,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.
         if (Loc == closure->getLoc())
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         DC = closure;
       }
@@ -3036,11 +3036,11 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     // We don't need to walk into closures, you can't jump out of them.
-    return Action::SkipChildrenIf(isa<AbstractClosureExpr>(E), E);
+    return Action::SkipNodeIf(isa<AbstractClosureExpr>(E), E);
   }
   PreWalkAction walkToDeclPre(Decl *D) override {
     // We don't need to walk into any nested local decls.
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 };
 } // end anonymous namespace

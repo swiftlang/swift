@@ -258,7 +258,7 @@ struct MaterializePackEmitter : public ASTWalker {
 
     // Don't walk into nested pack expansions.
     if (isa<PackExpansionExpr>(expr))
-      return Action::SkipChildren(expr);
+      return Action::SkipNode(expr);
 
     if (auto *packExpr = dyn_cast<MaterializePackExpr>(expr)) {
       auto *fromExpr = packExpr->getFromExpr();

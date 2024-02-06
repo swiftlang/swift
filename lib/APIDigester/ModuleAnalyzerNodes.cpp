@@ -2445,10 +2445,10 @@ class ConstExtractor: public ASTWalker {
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     if (handleSimpleReference(E)) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     return Action::Continue(E);
   }

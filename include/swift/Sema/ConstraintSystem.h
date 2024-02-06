@@ -2685,12 +2685,12 @@ private:
 
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipChildren(stmt);
+      return Action::SkipNode(stmt);
     }
 
     /// Ignore declarations.
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -6389,7 +6389,7 @@ public:
   PreWalkAction walkToDeclPre(Decl *D) override {
     // We only need to walk into PatternBindingDecls, other kinds of decls
     // cannot reference outer vars.
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 
   ArrayRef<TypeVariableType *> getTypeVars() const {

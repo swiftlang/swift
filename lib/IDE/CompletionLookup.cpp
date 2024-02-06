@@ -202,14 +202,14 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
         }
         return Action::Continue(E);
@@ -3388,7 +3388,7 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
 
       if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
         if (LS->getLabelInfo()) {
@@ -3409,7 +3409,7 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       return Action::Continue(E);
     }
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);

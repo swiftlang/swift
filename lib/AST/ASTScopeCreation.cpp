@@ -115,47 +115,45 @@ public:
           scopeCreator
               .constructExpandAndInsert<ClosureParametersScope>(
                   parent, closure);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
         if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
           scopeCreator
               .constructExpandAndInsert<CaptureListScope>(
                   parent, capture);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         // If we have a single value statement expression, we need to add any
         // scopes in the underlying statement.
         if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
           scopeCreator.addToScopeTree(SVE->getStmt(), parent);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         // If we have a try/try!/try?, we need to add a scope for it
         if (auto anyTry = dyn_cast<AnyTryExpr>(E)) {
           scopeCreator.constructExpandAndInsert<TryScope>(parent, anyTry);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         return Action::Continue(E);
       }
       PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-        if (isa<BraceStmt>(S)) { // closures hidden in here
-          return Action::Continue(S);
-        }
-        return Action::SkipChildren(S);
+        // Closures can occur in BraceStmts.
+        return Action::VisitNodeIf(isa<BraceStmt>(S), S);
       }
       PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-        return Action::SkipChildren(P);
+        return Action::SkipNode(P);
       }
       PreWalkAction walkToDeclPre(Decl *D) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
 
       MacroWalking getMacroWalkingBehavior() const override {

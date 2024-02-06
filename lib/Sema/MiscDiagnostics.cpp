@@ -57,8 +57,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 }
 
 ASTWalker::PreWalkAction BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return Action::VisitChildrenIf(isa<ClosureExpr>(D->getDeclContext()) &&
-                                 shouldWalkIntoDeclInClosureContext(D));
+  return Action::VisitNodeIf(isa<ClosureExpr>(D->getDeclContext()) &&
+                             shouldWalkIntoDeclInClosureContext(D));
 }
 
 bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
@@ -125,7 +125,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
@@ -357,10 +357,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         checkBorrowExpr(borrowExpr);
       }
 
-      return Action::Continue(E);
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       return Action::Continue(E);
     }
 
@@ -1841,7 +1837,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       if (memberLoc.isValid()) {
         emitFixIts(Diags, memberLoc, ACE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
       
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
@@ -2719,7 +2715,7 @@ public:
   // FIXME: peek into capture lists of nested functions.
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (isa<TypeDecl>(D))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // The body of #if clauses are not walked into, we need custom processing
     // for them.
@@ -2746,7 +2742,7 @@ public:
     // references the variable, but we don't want to consider it as a real
     // "use".
     if (isa<AccessorDecl>(D) && D->isImplicit())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this AFD is a setter, track the parameter and the getter for
@@ -2767,7 +2763,7 @@ public:
       // Don't walk into a body that has not yet been type checked. This should
       // only occur for top-level code.
       VarDecls.clear();
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -3157,7 +3153,7 @@ public:
       }
 
       Candidates.push_back({CurrentAvailability, candidate});
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     return Action::Continue(E);
@@ -3208,7 +3204,7 @@ public:
           Else->walk(*this);
         }
 
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       }
     }
 
@@ -3227,7 +3223,7 @@ public:
 
   // Don't descend into nested decls.
   PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 
@@ -3292,7 +3288,7 @@ public:
 
   // Don't descend into nested decls.
   PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 
@@ -3717,7 +3713,7 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   assert(AllExprsSeen.insert(E).second && "duplicate traversal");
@@ -3738,13 +3734,13 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, MRE));
       markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), RK_Read);
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   }
   if (auto SE = dyn_cast<SubscriptExpr>(E)) {
     SE->getArgs()->walk(*this);
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), RK_Read);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   // If this is an AssignExpr, see if we're mutating something that we know
@@ -3754,14 +3750,14 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     
     // Don't walk into the LHS of the assignment, only the RHS.
     assign->getSrc()->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // '&x' is a read and write of 'x'.
   if (auto *io = dyn_cast<InOutExpr>(E)) {
     markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
     // Don't bother walking into this.
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
@@ -3769,14 +3765,14 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
     oee->getSubExpr()->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
     if (auto mapping = OpaqueValueMap.lookup(ove))
       mapping->walk(*this);
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   
   // If we saw an ErrorExpr, take note of this.
@@ -4015,7 +4011,7 @@ private:
     }
     // We don't want to walk into any other decl, we will visit them as part of
     // typeCheckDecl.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // end anonymous namespace
@@ -4272,7 +4268,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     walkToArgumentListPre(ArgumentList *args) override {
       // Don't walk into an explicit argument list, as trailing closures that
       // appear in child arguments are fine.
-      return Action::VisitChildrenIf(args->isImplicit(), args);
+      return Action::VisitNodeIf(args->isImplicit(), args);
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -4285,7 +4281,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       case ExprKind::Closure:
         // If a trailing closure appears as a child of one of these types of
         // expression, don't diagnose it as there is no ambiguity.
-        return Action::VisitChildrenIf(E->isImplicit(), E);
+        return Action::VisitNodeIf(E->isImplicit(), E);
       case ExprKind::Call:
         diagnoseIt(cast<CallExpr>(E));
         break;
@@ -5260,7 +5256,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (IgnoredExprs.count(E))
         return Action::Continue(E);
@@ -5339,7 +5335,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
         visitKeyPathApplicationExpr(KPAE);
@@ -5419,11 +5415,11 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         maybeDiagnoseCallExpr(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5470,11 +5466,11 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
         tryDiagnoseExplicitLazyStorageVariableUse(MRE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5603,11 +5599,11 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *BE = dyn_cast<BinaryExpr>(E)) {
         tryDiagnoseComparisonWithNaN(BE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
@@ -5640,7 +5636,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       // If this is not an explicit 'self' reference, let's keep searching.

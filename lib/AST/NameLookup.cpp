@@ -3377,27 +3377,27 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
 
       // Don't allow variadic opaque parameter or return types.
       if (isa<PackExpansionTypeRepr>(repr) || isa<VarargTypeRepr>(repr))
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
         Reprs.push_back(opaqueRepr);
         if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
-          return Action::SkipChildren();
+          return Action::SkipNode();
       }
 
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
       
       if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!composition->isTypeReprAny())
           Reprs.push_back(composition);
-        return Action::SkipChildren();
+        return Action::SkipNode();
       } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
         if (generic->isProtocolOrProtocolComposition(dc)){
           Reprs.push_back(generic);
-          return Action::SkipChildren();
+          return Action::SkipNode();
         }
         return Action::Continue();
       } else if (auto declRef = dyn_cast<DeclRefTypeRepr>(repr)) {

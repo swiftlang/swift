@@ -181,7 +181,7 @@ public:
   PreWalkAction walkToDeclPre(Decl *D) override {
     /// Decls get type-checked separately, except for PatternBindingDecls,
     /// whose initializers we want to walk into.
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 
 private:

@@ -127,7 +127,7 @@ bool CallbackClassifier::hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes) {
       // Don't walk into ternary conditionals as they may have additional
       // conditions such as err != nil that make a force unwrap now valid.
       if (isa<TernaryExpr>(E))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       auto *FVE = dyn_cast<ForceValueExpr>(E);
       if (!FVE)
@@ -150,13 +150,13 @@ bool CallbackClassifier::hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes) {
       // Don't walk into new explicit scopes, we only want to consider force
       // unwraps in the immediate conditional body.
       if (!S->isImplicit() && startsNewScope(S))
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       return Action::Continue(S);
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       // Don't walk into new explicit DeclContexts.
-      return Action::VisitChildrenIf(D->isImplicit() || !isa<DeclContext>(D));
+      return Action::VisitNodeIf(D->isImplicit() || !isa<DeclContext>(D));
     }
   };
   for (auto Node : Nodes) {

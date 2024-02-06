@@ -786,11 +786,11 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      return Action::SkipChildren(expr);
+      return Action::SkipNode(expr);
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {

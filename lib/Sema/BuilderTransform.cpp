@@ -1297,7 +1297,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
 
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
@@ -1323,7 +1323,7 @@ public:
       if (HasError)
         return Action::Stop();
 
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   }
 
@@ -1332,7 +1332,7 @@ public:
     if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
       if (!returnStmt->isImplicit()) {
         ReturnStmts.push_back(returnStmt);
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       }
     }
 
@@ -1365,7 +1365,7 @@ public:
 
   /// Ignore patterns.
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-    return Action::SkipChildren(pat);
+    return Action::SkipNode(pat);
   }
 };
 

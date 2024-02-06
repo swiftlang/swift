@@ -510,14 +510,14 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
 
     PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));
+      return Action::SkipNodeIf(isa<NominalTypeDecl>(D));
     }
     
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
-        return Action::SkipChildren(E);
-      
+        return Action::SkipNode(E);
+
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)

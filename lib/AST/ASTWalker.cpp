@@ -1455,13 +1455,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     switch (Pre.Action) {
     case PreWalkAction::Stop:
       return true;
-    case PreWalkAction::SkipChildren:
+    case PreWalkAction::SkipNode:
       return false;
+    case PreWalkAction::SkipChildren:
+      break;
     case PreWalkAction::Continue:
+      if (VisitChildren())
+        return true;
       break;
     }
-    if (VisitChildren())
-      return true;
     switch (WalkPost().Action) {
     case PostWalkAction::Stop:
       return true;
@@ -1476,21 +1478,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   T *traverse(PreWalkResult<T *> Pre,
               llvm::function_ref<T *(T *)> VisitChildren,
               llvm::function_ref<PostWalkResult<T *>(T *)> WalkPost) {
+    auto Node = Pre.Value;
+    assert(!Node || *Node && "Use Action::Stop instead of returning nullptr");
     switch (Pre.Action.Action) {
     case PreWalkAction::Stop:
       return nullptr;
+    case PreWalkAction::SkipNode:
+      return *Node;
     case PreWalkAction::SkipChildren:
-      assert(*Pre.Value && "Use Action::Stop instead of returning nullptr");
-      return *Pre.Value;
-    case PreWalkAction::Continue:
+      break;
+    case PreWalkAction::Continue: {
+      auto NewNode = VisitChildren(*Node);
+      if (!NewNode)
+        return nullptr;
+
+      Node = NewNode;
       break;
     }
-    assert(*Pre.Value && "Use Action::Stop instead of returning nullptr");
-    auto Value = VisitChildren(*Pre.Value);
-    if (!Value)
-      return nullptr;
-
-    auto Post = WalkPost(Value);
+    }
+    auto Post = WalkPost(*Node);
     switch (Post.Action.Action) {
     case PostWalkAction::Stop:
       return nullptr;

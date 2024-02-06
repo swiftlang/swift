@@ -1076,32 +1076,32 @@ void ConstraintSystem::shrink(Expr *expr) {
                             CS.getContextualType(expr, /*forConstraint=*/false),
                             CS.getContextualTypePurpose(expr));
         // Don't try to walk into the dictionary.
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Let's not attempt to type-check closures or expressions
       // which constrain closures, because they require special handling
       // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
       // is determined by type checking the parent interpolated string literal.
       if (isa<TapExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Same as TapExpr and ClosureExpr, we'll handle SingleValueStmtExprs
       // separately.
       if (isa<SingleValueStmtExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (coerceExpr->isLiteralInit())
           ApplyExprs.push_back({coerceExpr, 1});
         visitCoerceExpr(coerceExpr);
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {

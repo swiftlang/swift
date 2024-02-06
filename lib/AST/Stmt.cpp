@@ -262,7 +262,7 @@ ASTNode BraceStmt::findAsyncNode() {
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       return Action::Continue(expr);
     }
@@ -276,7 +276,7 @@ ASTNode BraceStmt::findAsyncNode() {
         return Action::Continue();
       }
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
@@ -818,17 +818,17 @@ struct FallthroughFinder : ASTWalker {
   // Expressions, patterns and decls cannot contain fallthrough statements, so
   // there is no reason to walk into them.
   PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
-    return Action::SkipChildren(e);
+    return Action::SkipNode(e);
   }
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
-    return Action::SkipChildren(p);
+    return Action::SkipNode(p);
   }
 
   PreWalkAction walkToDeclPre(Decl *d) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   static FallthroughStmt *findFallthrough(Stmt *s) {

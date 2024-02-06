@@ -537,7 +537,7 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
 ASTWalker::PreWalkAction
 ModelASTWalker::walkToArgumentPre(const Argument &Arg) {
   if (isVisitedBefore(Arg.getExpr()))
-    return Action::SkipChildren();
+    return Action::SkipNode();
 
   auto *Elem = Arg.getExpr();
   if (isa<DefaultArgumentExpr>(Elem))
@@ -564,7 +564,7 @@ ModelASTWalker::walkToArgumentPre(const Argument &Arg) {
 
 ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
 
   if (E->isImplicit())
     return Action::Continue(E);
@@ -672,17 +672,8 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
       subExpr->walk(*this);
     }
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(SE);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipChildren(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    // We already visited the children.
+    return Action::SkipChildren(SE);
   } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
     // Don't visit the child expressions directly. Instead visit the arguments
     // of each appendStringLiteral/appendInterpolation CallExpr so we don't
@@ -694,17 +685,7 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
           arg.getExpr()->walk(*this);
       }
     });
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(E);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipChildren(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    return Action::SkipChildren(E);
   }
 
   return Action::Continue(E);
@@ -720,7 +701,7 @@ ASTWalker::PostWalkResult<Expr *> ModelASTWalker::walkToExprPost(Expr *E) {
 
 ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   if (isVisitedBefore(S)) {
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
                          SyntaxStructureNode &SN) {
@@ -845,7 +826,6 @@ ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         assert(RetS == Body);
         (void)RetS;
       }
-      walkToStmtPost(DeferS);
     }
     // Already walked children.
     return Action::SkipChildren(DeferS);
@@ -864,9 +844,9 @@ ASTWalker::PostWalkResult<Stmt *> ModelASTWalker::walkToStmtPost(Stmt *S) {
 
 ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   if (isVisitedBefore(D))
-    return Action::SkipChildren();
+    return Action::SkipNode();
   if (D->isImplicit())
-    return Action::SkipChildren();
+    return Action::SkipNode();
 
   // The attributes of EnumElementDecls and VarDecls are handled when visiting
   // their parent EnumCaseDecl/PatternBindingDecl (which the attributes are
@@ -874,7 +854,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   if (!isa<EnumElementDecl>(D) &&
       !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
     if (!handleAttrs(D->getParsedAttrs()))
-      return Action::SkipChildren();
+      return Action::SkipNode();
   }
 
   if (isa<AccessorDecl>(D)) {
@@ -971,7 +951,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       });
       if (Contained) {
         if (!handleAttrs(Contained->getParsedAttrs()))
-          return Action::SkipChildren();
+          return Action::SkipNode();
         break;
       }
     }
@@ -1018,7 +998,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     for (auto &Clause : ConfigD->getClauses()) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
       for (auto &Element : Clause.Elements) {
@@ -1043,7 +1023,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     // attach to enum element decls while syntactically locate before enum case decl.
     if (auto *element = EnumCaseD->getFirstElement()) {
       if (!handleAttrs(element->getParsedAttrs()))
-        return Action::SkipChildren();
+        return Action::SkipNode();
     }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not
@@ -1140,17 +1120,17 @@ ASTWalker::PostWalkAction ModelASTWalker::walkToDeclPost(swift::Decl *D) {
 ASTWalker::PreWalkAction ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (auto AttrT = dyn_cast<AttributedTypeRepr>(T)) {
     if (!handleAttrs(AttrT->getAttrs()))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
   } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
     if (!passTokenNodesUntil(IdT->getStartLoc(),
                              ExcludeNodeAtLocation).shouldContinue)
-      return Action::SkipChildren();
+      return Action::SkipNode();
     if (TokenNodes.empty() ||
         TokenNodes.front().Range.getStart() != IdT->getStartLoc())
-      return Action::SkipChildren();
+      return Action::SkipNode();
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
-      return Action::SkipChildren();
+      return Action::SkipNode();
     TokenNodes = TokenNodes.slice(1);
   }
   return Action::Continue();

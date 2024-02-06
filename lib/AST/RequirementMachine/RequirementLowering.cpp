@@ -536,7 +536,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Stop;
 
     if (!ty->hasTypeParameter())
-      return Action::SkipChildren;
+      return Action::SkipNode;
 
     return Action::Continue;
   }

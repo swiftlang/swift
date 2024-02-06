@@ -3664,7 +3664,7 @@ public:
     default:
       break;
     }
-    return PreWalkAction::Continue;
+    return Action::Continue();
   }
 };
 } // namespace

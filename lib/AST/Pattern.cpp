@@ -211,23 +211,23 @@ namespace {
     // that is, don't walk into a closure body.
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ClosureExpr>(E)) {
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
       return Action::Continue(E);
     }
 
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 } // end anonymous namespace

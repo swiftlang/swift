@@ -125,7 +125,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -141,7 +141,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -157,7 +157,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -170,7 +170,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 namespace {
@@ -401,7 +401,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue();
       cleanup(node);
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -419,7 +419,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -430,7 +430,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching post-visitation.

@@ -4610,7 +4610,7 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
 
         // 'Self.A' is OK.
         if (ty->is<DependentMemberType>())
-          return Action::SkipChildren;
+          return Action::SkipNode;
 
         return Action::Continue;
       }
@@ -4889,7 +4889,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 
     Action walkToTypePre(Type ty) override {
       if (!ty->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       auto *const dmt = ty->getAs<DependentMemberType>();
       if (!dmt)
@@ -4897,11 +4897,11 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 
       // We only care about 'Self'-rooted type parameters.
       if (!dmt->getRootGenericParam()->isEqual(Proto->getSelfInterfaceType()))
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       if (ty.subst(Subs)->hasError())
         return Action::Stop;
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
   };
 

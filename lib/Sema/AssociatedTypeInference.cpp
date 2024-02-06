@@ -1193,7 +1193,7 @@ struct TypeReprCycleCheckWalker : ASTWalker {
         }
       }
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     return Action::Continue();
@@ -4400,7 +4400,7 @@ ReferencedAssociatedTypesRequest::evaluate(Evaluator &eval,
             assocTypes.push_back(assocType);
         }
 
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       return Action::Continue;

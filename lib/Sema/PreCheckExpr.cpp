@@ -1137,7 +1137,7 @@ namespace {
             SequenceExprDepth++;
           ExprStack.push_back(expr);
         }
-        return Action::VisitChildrenIf(recursive, expr);
+        return Action::VisitNodeIf(recursive, expr);
       };
 
       // Resolve 'super' references.
@@ -1446,14 +1446,14 @@ namespace {
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
       // Constraint generation is responsible for pattern verification and
       // type-checking in the body of the closure and single value stmt expr,
       // so there is no need to walk into patterns.
-      return Action::SkipChildrenIf(
+      return Action::SkipNodeIf(
           isa<ClosureExpr>(DC) || SingleValueStmtExprDepth > 0, pattern);
     }
   };
@@ -1682,7 +1682,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
 
     virtual PreWalkAction walkToDeclPre(Decl *D) override {
       // We don't want to look inside decls.
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1774,7 +1774,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
       // There is never a CallExpr between an InterpolatedStringLiteralExpr
       // and an un-typechecked appendInterpolation(...) call, so whether we
       // changed E or not, we don't need to recurse any deeper.
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   };
 

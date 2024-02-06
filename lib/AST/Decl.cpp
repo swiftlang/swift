@@ -6271,7 +6271,7 @@ bool ClassDecl::walkSuperclasses(
     switch (fn(cls)) {
     case TypeWalker::Action::Stop:
       return true;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       return false;
     case TypeWalker::Action::Continue:
       cls = cls->getSuperclassDecl();
@@ -6599,7 +6599,7 @@ bool ProtocolDecl::walkInheritedProtocols(
       }
       break;
 
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       break;
     }
   }
@@ -8647,11 +8647,11 @@ swift::findWrappedValuePlaceholder(Expr *init) {
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
         placeholder = value;
-        return Action::SkipChildren(value);
+        return Action::SkipNode(value);
       }
 
       return Action::Continue(E);
@@ -9550,7 +9550,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (D->isImplicit())
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
         if (auto fp = idc->getBodyFingerprint())
@@ -9561,7 +9561,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
         for (auto *d : idc->getParsedMembers())
           const_cast<Decl *>(d)->walk(*this);
 
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
 
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {

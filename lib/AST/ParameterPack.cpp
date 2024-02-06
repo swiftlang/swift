@@ -109,7 +109,7 @@ struct PackReferenceCollector: TypeWalker {
       for (auto type : boundGenericType->getExpandedGenericArgs())
         type.walk(*this);
 
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
 
     if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
@@ -120,7 +120,7 @@ struct PackReferenceCollector: TypeWalker {
         for (auto type : typeAliasType->getExpandedGenericArgs())
           type.walk(*this);
 
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
     }
 
