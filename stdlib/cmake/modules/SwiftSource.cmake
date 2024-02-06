@@ -610,7 +610,6 @@ function(_compile_swift_files
   if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
     list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
     list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
-    list(APPEND swift_flags "-Xfrontend" "-disable-round-trip-debug-types") # NOTE: temporary until we fix mangling!
   endif()
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
