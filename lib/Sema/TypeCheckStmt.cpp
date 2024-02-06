@@ -122,9 +122,7 @@ namespace {
         if (DAE->isCallerSide() &&
             (DAE->getParamDecl()->isAutoClosure() ||
              (DAE->getParamDecl()->getDefaultArgumentKind() ==
-                  DefaultArgumentKind::ExpressionMacro &&
-              ParentDC->getASTContext().LangOpts.hasFeature(
-                  Feature::ExpressionMacroDefaultArguments))))
+              DefaultArgumentKind::ExpressionMacro)))
           DAE->getCallerSideDefaultExpr()->walk(*this);
 
       // Macro expansion expressions require a DeclContext as well.
