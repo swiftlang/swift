@@ -2463,10 +2463,6 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
 
-    // Only run this pass if the move only language feature is enabled.
-    if (!astContext.supportsMoveOnlyTypes())
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
