@@ -259,17 +259,17 @@ public:
   
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
-  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
-                                      SILType T,
-                                      Address enumAddr) const = 0;
+  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T,
+                                      Address enumAddr,
+                                      bool maskExtraTagBits = false) const = 0;
 
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
   ///
   /// Only ever called for fixed types.
-  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF,
-                                           SILType T,
-                                           Address enumAddr) const;
+  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                           Address enumAddr,
+                                           bool maskExtraTagBits = false) const;
   llvm::Value *emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                                            Address enumAddr) const;
 
