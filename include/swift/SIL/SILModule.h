@@ -1075,10 +1075,9 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
   case SILStage::Raw:
-    // In raw SIL, lexical markers are used for diagnostics.  These markers are
-    // present as long as the lexical lifetimes feature is not disabled
-    // entirely.
-    return LexicalLifetimes != LexicalLifetimesOption::Off;
+    // In raw SIL, lexical markers are used for diagnostics and are always
+    // present.
+    return true;
   case SILStage::Canonical:
   case SILStage::Lowered:
     // In Canonical SIL, lexical markers are used to ensure that object

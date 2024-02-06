@@ -6593,8 +6593,3 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
     return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
 }
-
-bool ASTContext::supportsMoveOnlyTypes() const {
-  // currently the only thing holding back whether the types can appear is this.
-  return SILOpts.LexicalLifetimes != LexicalLifetimesOption::Off;
-}

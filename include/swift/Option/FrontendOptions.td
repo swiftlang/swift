@@ -320,11 +320,6 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_lexical_borrow_scopes :
-  Joined<["-"], "enable-lexical-borrow-scopes=">,
-  HelpText<"Whether to emit lexical borrow scopes (default: true)">,
-  MetaVarName<"true|false">;
-
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
   HelpText<"Enable experimental move only">;

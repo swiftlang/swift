@@ -931,10 +931,6 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
     if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
       assert((isa<StructDecl, EnumDecl, ClassDecl>(decl)));
 
-      // FIXME: just never allow lexical-lifetimes to be disabled?
-      if (!ctx.supportsMoveOnlyTypes())
-        decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
-
       return InverseMarking::forInverse(Kind::LegacyExplicit,
                                         attr->getLocation());
     }

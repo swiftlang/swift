@@ -31,9 +31,6 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert lexical markers.
-  Off = 0,
-
   // Insert lexical markers via lexical borrow scopes and the lexical flag on
   // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
   // Raw SIL.

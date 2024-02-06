@@ -7690,10 +7690,6 @@ ERROR(copy_expression_not_passed_lvalue,none,
 ERROR(copy_expression_cannot_be_used_with_noncopyable_types,none,
       "'copy' cannot be applied to noncopyable types", ())
 
-ERROR(moveOnly_requires_lexical_lifetimes,none,
-      "noncopyable types require lexical borrow scopes "
-      "(add -enable-lexical-borrow-scopes=true)", ())
-
 // Experimental noncopyable feature diagnostics:
 ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental move only is disabled! Pass"
