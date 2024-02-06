@@ -940,13 +940,13 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring non-Sendable binding %0 could yield races with later accesses",
+      "transferring non-Sendable value %0 could yield races with later accesses",
       (Identifier))
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",
      (Identifier, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_info_isolated_capture, none,
-     "%1 binding %0 is captured by %2 closure. Later local uses could race",
+     "%1 value %0 is captured by %2 closure. Later local uses could race",
      (Identifier, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_arg_info, none,
      "Transferring task isolated function argument %0 could yield races with caller uses",

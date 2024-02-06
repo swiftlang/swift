@@ -123,7 +123,7 @@ func closureInOut(_ a: Actor) async {
 
   await a.useKlass(ns0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
-  // expected-tns-warning @-2 {{transferring non-Sendable binding 'ns0' could yield races with later accesses}}
+  // expected-tns-warning @-2 {{transferring non-Sendable value 'ns0' could yield races with later accesses}}
   // expected-tns-note @-3 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // We only emit a warning on the first use we see, so make sure we do both
@@ -146,13 +146,13 @@ func closureInOut2(_ a: Actor) async {
 
   var closure = {}
 
-  await a.useKlass(ns0) // expected-tns-warning {{transferring non-Sendable binding 'ns0' could yield races with later accesses}}
+  await a.useKlass(ns0) // expected-tns-warning {{transferring non-Sendable value 'ns0' could yield races with later accesses}}
   // expected-tns-note @-1 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure = { useInOut(&contents) } // expected-tns-note {{access here could race}}
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable binding 'ns1' could yield races with later accesses}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable value 'ns1' could yield races with later accesses}}
   // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
@@ -174,7 +174,7 @@ func closureNonInOut(_ a: Actor) async {
 
   closure = { useValue(contents) }
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable binding 'ns1' could yield races with later accesses}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable value 'ns1' could yield races with later accesses}}
   // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 

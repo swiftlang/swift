@@ -214,7 +214,7 @@ func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
   x = y
 
   // TODO: This should refer to the transferring parameter.
-  await transferToMain(x) // expected-warning {{transferring non-Sendable binding 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   useValue(x) // expected-note {{access here could race}}
