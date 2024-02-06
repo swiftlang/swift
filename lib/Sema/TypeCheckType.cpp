@@ -3771,8 +3771,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.
       if (auto SD = ty->getStructOrBoundGenericStruct()) {
-        if (getASTContext().LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
-            SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+        if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
             ownership == ParamSpecifier::InOut) {
           diagnose(eltTypeRepr->getLoc(),
                    diag::attr_static_exclusive_only_let_only_param,
