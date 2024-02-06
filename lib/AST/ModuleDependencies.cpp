@@ -590,6 +590,7 @@ SwiftDependencyScanningService::getDependenciesMap(
 }
 
 void SwiftDependencyScanningService::configureForContextHash(StringRef scanningContextHash) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
   auto knownContext = ContextSpecificCacheMap.find(scanningContextHash);
   if (knownContext == ContextSpecificCacheMap.end()) {
     // First time scanning with this context, initialize context-specific state.
@@ -599,7 +600,6 @@ void SwiftDependencyScanningService::configureForContextHash(StringRef scanningC
          kind != ModuleDependencyKind::LastKind; ++kind) {
       contextSpecificCache->ModuleDependenciesMap.insert({kind, ModuleNameToDependencyMap()});
     }
-    llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
     ContextSpecificCacheMap.insert({scanningContextHash.str(), std::move(contextSpecificCache)});
     AllContextHashes.push_back(scanningContextHash.str());
   }
