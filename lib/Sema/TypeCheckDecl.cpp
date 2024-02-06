@@ -954,10 +954,6 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return InverseMarking::forInverse(Kind::None);
 
-  // FIXME: just never allow lexical-lifetimes to be disabled?
-  if (!ctx.supportsMoveOnlyTypes())
-    decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
-
   /// The invertible protocol being targeted by this annotation request.
 
   std::function<bool(Type)> isTarget = [&](Type t) -> bool {

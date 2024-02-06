@@ -374,7 +374,8 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
 
   return buildGenericSignature(ctx, derivativeGenSig,
                                /*addedGenericParams*/ {},
-                               std::move(requirements));
+                               std::move(requirements),
+                               /*allowInverses=*/true);
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or

@@ -2883,19 +2883,19 @@ NOTE(no_witnesses,none,
      "protocol requires "
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
      "%select{|; add a stub for conformance}3",
-     (RequirementKind, const ValueDecl *, Type, bool))
+     (RequirementKind, const ValueDecl *, WitnessType, bool))
 NOTE(missing_witnesses_general,none, "add stubs for conformance",
      ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
      "subscript operators}0 with type %2",
-     (RequirementKind, const ValueDecl *, Type))
+     (RequirementKind, const ValueDecl *, WitnessType))
 NOTE(ambiguous_witnesses_wrong_name,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
      "subscript operators}0 with type %2",
-     (RequirementKind, const ValueDecl *, Type))
+     (RequirementKind, const ValueDecl *, WitnessType))
 NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; add nested type %0 for conformance",
      (const AssociatedTypeDecl *))
@@ -2982,7 +2982,7 @@ NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
-     "candidate has non-matching type %0%1", (Type, StringRef))
+     "candidate has non-matching type %0%1", (WitnessType, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))

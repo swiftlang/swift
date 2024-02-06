@@ -156,44 +156,6 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
   }
 }
 
-/// MARK: conformance queries
-
-static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
-  auto &ctx = type->getASTContext();
-
-  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(proto && "missing Copyable/Escapable from stdlib!");
-
-  // Must not have a type parameter!
-  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
-
-  assert(!type->is<PackExpansionType>());
-
-  // The SIL types in the AST do not have real conformances, and should have
-  // been handled in SILType instead.
-  assert(!(type->is<SILBoxType,
-                    SILMoveOnlyWrappedType,
-                    SILPackType,
-                    SILTokenType>()));
-
-  const bool conforms =
-      (bool) proto->getParentModule()->checkConformance(
-          type, proto,
-          /*allowMissing=*/false);
-
-  return conforms;
-}
-
-bool IsEscapableRequest::evaluate(Evaluator &evaluator,
-                                  CanType type) const {
-  return conformsToInvertible(type, InvertibleProtocolKind::Escapable);
-}
-
-bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
-                                    CanType type) const {
-  return !conformsToInvertible(type, InvertibleProtocolKind::Copyable);
-}
-
 /// MARK: conformance checking
 static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
                                              InvertibleProtocolKind ip) {
@@ -422,7 +384,8 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     for (auto param : params)
       reqs.push_back({RequirementKind::Conformance, param, protoTy});
 
-    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs);
+    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs,
+                                       /*allowInverses=*/false);
     ext->setGenericSignature(genericSig);
 
     // Bind the extension.

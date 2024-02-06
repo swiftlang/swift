@@ -536,14 +536,14 @@ enum SpecializedMetadataCanonicality : bool {
 /// known, but access to the metadata must go through the canonical specialized
 /// accessor so that initialization of the metadata can occur.
 bool isSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality,
     SpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor);
 
 /// Is the address of a specialization of the generic metadata which does not
 /// require runtime initialization statically known?
 bool isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality);
 
 /// Is the address of canonical metadata which may need to be initialized (e.g.

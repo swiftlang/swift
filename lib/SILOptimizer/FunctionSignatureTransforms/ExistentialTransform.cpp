@@ -330,7 +330,8 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   /// Compute the updated generic signature.
   NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
                                         std::move(GenericParams),
-                                        std::move(Requirements));
+                                        std::move(Requirements),
+                                        /*allowInverses=*/true);
 
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;

@@ -3889,19 +3889,21 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  // move-only types (and their metatypes) cannot match with existential types.
-  if (type1->getMetatypeInstanceType()->isNoncopyable()) {
-    // tailor error message
-    if (shouldAttemptFixes()) {
-      auto *fix = MustBeCopyable::create(*this,
-                                         type1,
-                                         NoncopyableMatchFailure::forExistentialCast(
-                                             type2),
-                                         getConstraintLocator(locator));
-      if (!recordFix(fix))
-        return getTypeMatchSuccess();
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    // move-only types (and their metatypes) cannot match with existential types.
+    if (type1->getMetatypeInstanceType()->isNoncopyable()) {
+      // tailor error message
+      if (shouldAttemptFixes()) {
+        auto *fix = MustBeCopyable::create(*this,
+                                           type1,
+                                           NoncopyableMatchFailure::forExistentialCast(
+                                               type2),
+                                           getConstraintLocator(locator));
+        if (!recordFix(fix))
+          return getTypeMatchSuccess();
+      }
+      return getTypeMatchFailure(locator);
     }
-    return getTypeMatchFailure(locator);
   }
 
   // FIXME: Feels like a hack.

@@ -2404,6 +2404,12 @@ public:
       LookUpConformanceInModule(moduleDecl));
     
     for (auto reqt : nomGenericSig.getRequirements()) {
+      // Skip conformance requirements to Copyable and Escapable.
+      if (reqt.getKind() == RequirementKind::Conformance &&
+          reqt.getProtocolDecl()->getInvertibleProtocolKind()) {
+        continue;
+      }
+
       substRequirements.push_back(reqt.subst(newSubMap));
     }
     
@@ -2685,7 +2691,8 @@ const {
 
   auto substSig = buildGenericSignature(TC.Context, GenericSignature(),
                                         std::move(visitor.substGenericParams),
-                                        std::move(visitor.substRequirements))
+                                        std::move(visitor.substRequirements),
+                                        /*allowInverses=*/false)
     .getCanonicalSignature();
   
   auto subMap = SubstitutionMap::get(substSig,

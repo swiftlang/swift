@@ -7546,11 +7546,13 @@ public:
 
       GenericSignature sig = substitutions.getGenericSignature();
 
+      // The substituted signature is printed without inverse requirement
+      // desugaring, but also we drop conformances to Copyable and Escapable
+      // when constructing it.
       sub->Printer << "@substituted ";
       sub->printGenericSignature(sig,
                                  PrintAST::PrintParams |
-                                 PrintAST::PrintRequirements |
-                                 PrintAST::PrintInverseRequirements);
+                                 PrintAST::PrintRequirements);
       sub->Printer << " ";
     }
 

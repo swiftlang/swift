@@ -213,10 +213,11 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   if (unwrappedDict->isTypeVariableOrMember())
     return nullptr;
 
-  if (!TypeChecker::conformsToKnownProtocol(
-          unwrappedDict, KnownProtocolKind::ExpressibleByDictionaryLiteral,
-          cs.DC->getParentModule()))
-    return nullptr;
+  auto &ctx = cs.getASTContext();
+
+  if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
+      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+        return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
   return new (cs.getAllocator())

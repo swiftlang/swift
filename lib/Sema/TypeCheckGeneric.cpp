@@ -118,7 +118,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         WhereClauseOwner(),
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
-        /*allowConcreteGenericParams=*/false};
+        /*isExtension=*/false,
+        /*allowInverses=*/true};
 
     interfaceSignature = evaluateOrDefault(
         ctx.evaluator, request, GenericSignatureWithError())
@@ -203,7 +204,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
                                                genericParamTypes,
-                                               std::move(requirements));
+                                               std::move(requirements),
+                                               /*allowInverses=*/true);
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;
@@ -650,7 +652,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
        return subscript->getGenericSignature();
 
-  bool allowConcreteGenericParams = false;
   auto *genericParams = GC->getGenericParams();
   const auto *where = GC->getTrailingWhereClause();
 
@@ -796,8 +797,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       return parentSig;
     }
 
-    // Extensions allow parameters to be equated with concrete types.
-    allowConcreteGenericParams = true;
   } else {
     llvm_unreachable("Unknown generic declaration kind");
   }
@@ -806,7 +805,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       parentSig.getPointer(),
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources,
-      allowConcreteGenericParams};
+      /*isExtension=*/isa<ExtensionDecl>(GC),
+      /*allowInverses=*/true};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

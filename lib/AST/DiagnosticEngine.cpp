@@ -755,7 +755,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
   }
 
   case DiagnosticArgumentKind::FullyQualifiedType:
-  case DiagnosticArgumentKind::Type: {
+  case DiagnosticArgumentKind::Type:
+  case DiagnosticArgumentKind::WitnessType: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
@@ -777,8 +778,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
-    } else {
-      assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
+    } else if (Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType) {
       type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
       if (type.isNull()) {
         // FIXME: We should never receive a nullptr here, but this is causing
@@ -791,6 +791,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
+    } else {
+      assert(Arg.getKind() == DiagnosticArgumentKind::WitnessType);
+      type = Arg.getAsWitnessType().getType()->getWithoutParens();
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
+      printOptions.PrintGenericRequirements = false;
+      printOptions.PrintInverseRequirements = false;
+      needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     }
 
     // If a type has an unresolved type, print it with syntax sugar removed for

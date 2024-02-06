@@ -547,7 +547,8 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
     return buildGenericSignature(
         Ptr->getASTContext(), GenericSignature(),
         SmallVector<GenericTypeParamType *>(getGenericParams()),
-        requirementsErased);
+        requirementsErased,
+        /*allowInverses=*/false);
   }
 
   return *this;
@@ -1159,7 +1160,8 @@ void swift::validateGenericSignature(ASTContext &context,
         AbstractGenericSignatureRequest{
             nullptr,
             genericParams,
-            requirements},
+            requirements,
+            /*allowInverses=*/false},
         GenericSignatureWithError());
 
     // If there were any errors, the signature was invalid.
@@ -1195,7 +1197,8 @@ void swift::validateGenericSignature(ASTContext &context,
         AbstractGenericSignatureRequest{
           nullptr,
           genericParams,
-          newRequirements},
+          newRequirements,
+          /*allowInverses=*/false},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
@@ -1252,13 +1255,15 @@ GenericSignature
 swift::buildGenericSignature(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
-                             SmallVector<Requirement, 2> addedRequirements) {
+                             SmallVector<Requirement, 2> addedRequirements,
+                             bool allowInverses) {
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         baseSignature.getPointer(),
         addedParameters,
-        addedRequirements},
+        addedRequirements,
+        allowInverses},
       GenericSignatureWithError()).getPointer();
 }
 

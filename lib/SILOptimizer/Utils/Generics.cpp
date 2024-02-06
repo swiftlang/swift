@@ -1101,7 +1101,8 @@ getGenericEnvironmentAndSignatureWithRequirements(
 
   auto NewGenSig = buildGenericSignature(M.getASTContext(),
                                          OrigGenSig, { },
-                                         std::move(RequirementsCopy));
+                                         std::move(RequirementsCopy),
+                                         /*allowInverses=*/false);
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1776,7 +1777,8 @@ FunctionSignaturePartialSpecializer::
 
   // Finalize the archetype builder.
   auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
-                                      AllGenericParams, AllRequirements);
+                                      AllGenericParams, AllRequirements,
+                                      /*allowInverses=*/false);
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }

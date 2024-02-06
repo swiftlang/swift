@@ -18,7 +18,8 @@
 SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
               GenericSignatureWithError (const GenericSignatureImpl *,
                                          SmallVector<GenericTypeParamType *, 2>,
-                                         SmallVector<Requirement, 2>),
+                                         SmallVector<Requirement, 2>,
+                                         bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), Cached, NoLocationInfo)
@@ -196,7 +197,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          GenericParamList *,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
-                                         SmallVector<TypeLoc, 2>, bool),
+                                         SmallVector<TypeLoc, 2>, bool, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(ModuleDecl *), Cached, NoLocationInfo)
@@ -221,12 +222,6 @@ SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InvertibleAnnotationRequest,
               InverseMarking(TypeDecl *, InvertibleProtocolKind),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsNoncopyableRequest,
-              bool (CanType),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsEscapableRequest,
-              bool (CanType),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)

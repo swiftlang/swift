@@ -367,7 +367,8 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     // signature.
     ASTContext &ctx = genericFnType->getASTContext();
     genericSig = buildGenericSignature(ctx, GenericSignature(),
-                                       genericParams, requirements);
+                                       genericParams, requirements,
+                                       /*allowInverses=*/false);
   } else {
     // Use the mapped generic signature.
     genericSig = GenericSignature::get(genericParams, requirements);

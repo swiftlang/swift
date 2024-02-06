@@ -105,6 +105,14 @@ namespace swift {
     Type getType() const { return t; }
   };
 
+  struct WitnessType {
+    Type t;
+
+    WitnessType(Type t) : t(t) {}
+
+    Type getType() { return t; }
+  };
+
   /// Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -117,6 +125,7 @@ namespace swift {
     Type,
     TypeRepr,
     FullyQualifiedType,
+    WitnessType,
     DescriptivePatternKind,
     SelfAccessKind,
     ReferenceOwnership,
@@ -151,6 +160,7 @@ namespace swift {
       Type TypeVal;
       TypeRepr *TyR;
       FullyQualified<Type> FullyQualifiedTypeVal;
+      WitnessType WitnessTypeVal;
       DescriptivePatternKind DescriptivePatternKindVal;
       SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
@@ -213,6 +223,10 @@ namespace swift {
     DiagnosticArgument(FullyQualified<Type> FQT)
         : Kind(DiagnosticArgumentKind::FullyQualifiedType),
           FullyQualifiedTypeVal(FQT) {}
+
+    DiagnosticArgument(WitnessType WT)
+        : Kind(DiagnosticArgumentKind::WitnessType),
+          WitnessTypeVal(WT) {}
 
     DiagnosticArgument(const TypeLoc &TL) {
       if (TypeRepr *tyR = TL.getTypeRepr()) {
@@ -327,6 +341,11 @@ namespace swift {
     FullyQualified<Type> getAsFullyQualifiedType() const {
       assert(Kind == DiagnosticArgumentKind::FullyQualifiedType);
       return FullyQualifiedTypeVal;
+    }
+
+    WitnessType getAsWitnessType() const {
+      assert(Kind == DiagnosticArgumentKind::WitnessType);
+      return WitnessTypeVal;
     }
 
     DescriptivePatternKind getAsDescriptivePatternKind() const {

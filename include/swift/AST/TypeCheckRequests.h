@@ -475,43 +475,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given type is Escapable.
-class IsEscapableRequest
-    : public SimpleRequest<IsEscapableRequest, bool(CanType),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
-/// Determine whether the given type is noncopyable. Assumes type parameters
-/// have become archetypes.
-class IsNoncopyableRequest
-    : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, CanType type) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 /// Determine whether the given declaration is 'dynamic''.
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,
@@ -2012,7 +1975,8 @@ class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
-                                                    SmallVector<Requirement, 2>),
+                                                    SmallVector<Requirement, 2>,
+                                                    bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2025,7 +1989,8 @@ private:
   evaluate(Evaluator &evaluator,
            const GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
-           SmallVector<Requirement, 2> addedRequirements) const;
+           SmallVector<Requirement, 2> addedRequirements,
+           bool allowInverses) const;
 
 public:
   // Separate caching.
@@ -2044,7 +2009,7 @@ class InferredGenericSignatureRequest :
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeLoc, 2>,
-                                                    bool),
+                                                    bool, bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2060,7 +2025,7 @@ private:
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
-           bool allowConcreteGenericParams) const;
+           bool isExtension, bool allowInverses) const;
 
 public:
   // Separate caching.

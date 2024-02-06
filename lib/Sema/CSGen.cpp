@@ -2083,10 +2083,12 @@ namespace {
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
+      auto &ctx = CS.getASTContext();
+
       // An array expression can be of a type T that conforms to the
       // ExpressibleByArrayLiteral protocol.
-      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
-          CS.getASTContext(), expr->getLoc(),
+      auto *arrayProto = TypeChecker::getProtocol(
+          ctx, expr->getLoc(),
           KnownProtocolKind::ExpressibleByArrayLiteral);
       if (!arrayProto) {
         return Type();
@@ -2140,12 +2142,15 @@ namespace {
         auto *M = CS.DC->getParentModule();
 
         auto type = contextualType->lookThroughAllOptionalTypes();
-        if (TypeChecker::conformsToKnownProtocol(
-                type, KnownProtocolKind::ExpressibleByArrayLiteral, M))
+
+        if (M->lookupConformance(type, arrayProto))
           return false;
 
-        return TypeChecker::conformsToKnownProtocol(
-            type, KnownProtocolKind::ExpressibleByDictionaryLiteral, M);
+        if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
+          if (M->lookupConformance(type, proto))
+            return true;
+
+        return false;
       };
 
       if (isDictionaryContextualType(contextualType)) {
@@ -2197,7 +2202,7 @@ namespace {
 
       // The array element type defaults to 'Any'.
       CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                       CS.getASTContext().getAnyExistentialType(), locator);
+                       ctx.getAnyExistentialType(), locator);
 
       return arrayTy;
     }
