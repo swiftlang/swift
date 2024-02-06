@@ -2550,37 +2550,21 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
     if (!BS)
       continue;
 
-    if (auto *S = BS->getSingleActiveStatement()) {
-      if (mustBeExpr) {
-        // If this must be an expression, we can eagerly wrap any exhaustive if,
-        // switch, and do statement.
-        if (auto *IS = dyn_cast<IfStmt>(S)) {
-          if (!IS->isSyntacticallyExhaustive())
-            continue;
-        } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
-            continue;
-          if (!DCS->isSyntacticallyExhaustive())
-            continue;
-        } else if (isa<DoStmt>(S)) {
-          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
-            continue;
-        } else if (!isa<SwitchStmt>(S)) {
-          continue;
-        }
-      } else {
-        // Otherwise do the semantic checking to verify that we can wrap the
-        // branch.
-        if (!S->mayProduceSingleValue(ctx))
-          continue;
-      }
-      BS->setLastElement(SingleValueStmtExpr::createWithWrappedBranches(
-          ctx, S, DC, mustBeExpr));
-    }
+    // Check to see if we can wrap an implicit last element of the brace.
+    if (!isLastElementImplicitResult(BS, ctx, mustBeExpr))
+      continue;
 
-    // Wrap single expression branches in an implicit 'then <expr>'.
-    if (auto *E = BS->getSingleActiveExpression())
-      BS->setLastElement(ThenStmt::createImplicit(ctx, E));
+    auto &result = BS->getElements().back();
+    assert(result.is<Expr *>() || result.is<Stmt *>());
+
+    // Wrap a statement in a SingleValueStmtExpr.
+    if (auto *S = result.dyn_cast<Stmt *>()) {
+      result = SingleValueStmtExpr::createWithWrappedBranches(ctx, S, DC,
+                                                              mustBeExpr);
+    }
+    // Wrap an expression in an implicit 'then <expr>'.
+    if (auto *E = result.dyn_cast<Expr *>())
+      result = ThenStmt::createImplicit(ctx, E);
   }
   return SVE;
 }
@@ -2628,6 +2612,50 @@ SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
   SVEFinder finder;
   E->walk(finder);
   return finder.FoundSVE;
+}
+
+bool SingleValueStmtExpr::isLastElementImplicitResult(
+    BraceStmt *BS, ASTContext &ctx, bool mustBeSingleValueStmt) {
+  if (BS->empty())
+    return false;
+
+  // We must either be allowing implicit last expressions, or we must have a
+  // single active element, which is guaranteed to be the last element.
+  if (!ctx.LangOpts.hasFeature(Feature::ImplicitLastExprResults) &&
+      !BS->getSingleActiveElement()) {
+    return false;
+  }
+  auto elt = BS->getLastElement();
+
+  // Expressions are always valid.
+  if (elt.is<Expr *>())
+    return true;
+
+  if (auto *S = elt.dyn_cast<Stmt *>()) {
+    if (mustBeSingleValueStmt) {
+      // If this must be a SingleValueStmtExpr, we can eagerly take any
+      // exhaustive if, switch, and do statement.
+      if (auto *IS = dyn_cast<IfStmt>(S))
+        return IS->isSyntacticallyExhaustive();
+
+      // Guaranteed to be exhaustive.
+      if (isa<SwitchStmt>(S))
+        return true;
+
+      if (ctx.LangOpts.hasFeature(Feature::DoExpressions)) {
+        if (auto *DCS = dyn_cast<DoCatchStmt>(S))
+          return DCS->isSyntacticallyExhaustive();
+
+        if (isa<DoStmt>(S))
+          return true;
+      }
+      return false;
+    }
+    // Otherwise do the semantic checking to verify the statement produces
+    // a single value.
+    return S->mayProduceSingleValue(ctx).isValid();
+  }
+  return false;
 }
 
 ThenStmt *SingleValueStmtExpr::getThenStmtFrom(BraceStmt *BS) {

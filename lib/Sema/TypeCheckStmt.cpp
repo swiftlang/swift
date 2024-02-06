@@ -3057,26 +3057,6 @@ static bool doesBraceEndWithThrow(BraceStmt *BS) {
   return isa<ThrowStmt>(S);
 }
 
-/// Whether the given brace statement is considered to produce a result for
-/// an if/switch expression.
-static bool doesBraceProduceResult(BraceStmt *BS, ASTContext &ctx) {
-  if (BS->empty())
-    return false;
-
-  // We consider the branch as having a result if there is:
-  // - A single active expression or statement that can be turned into an
-  //   expression.
-  // - 'then <expr>' as the last statement.
-  if (BS->getSingleActiveExpression())
-    return true;
-
-  if (auto *S = BS->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(ctx))
-      return true;
-  }
-  return SingleValueStmtExpr::hasResult(BS);
-}
-
 IsSingleValueStmtResult
 areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
@@ -3094,8 +3074,10 @@ areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    // Check to see if a result is produced from the branch.
-    if (doesBraceProduceResult(BS, ctx)) {
+    // Must either have an explicit or implicit result for the branch.
+    if (SingleValueStmtExpr::hasResult(BS) ||
+        SingleValueStmtExpr::isLastElementImplicitResult(
+            BS, ctx, /*mustBeSingleValueStmt*/ false)) {
       hadResult = true;
       continue;
     }

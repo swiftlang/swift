@@ -3922,8 +3922,9 @@ private:
               continue;
             }
           }
-          // TODO: If 'then' statements are enabled by default, the wording of
-          // this diagnostic should be tweaked.
+          // TODO: The wording of this diagnostic will need tweaking if either
+          // implicit last expressions or 'then' statements are enabled by
+          // default.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
