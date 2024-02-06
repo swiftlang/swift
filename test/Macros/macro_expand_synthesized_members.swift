@@ -141,3 +141,19 @@ func testC2() {
   // CHECK: deinit was called
 }
 testC2()
+
+@attached(member, names: arbitrary)
+macro GenerateStubs() = #externalMacro(module: "MacroDefinition", type: "GenerateStubMemberMacro")
+
+@freestanding(declaration, names: arbitrary)
+macro generateMemberStubs() = #externalMacro(module: "MacroDefinition", type: "GenerateStubsFreestandingMacro")
+
+@freestanding(declaration, names: named(member()))
+macro generateMember() = #externalMacro(module: "MacroDefinition", type: "SingleMemberStubMacro")
+
+@GenerateStubs
+struct NestedMacroExpansion {}
+
+func callNestedExpansionMember() {
+  NestedMacroExpansion.member()
+}

@@ -2091,6 +2091,35 @@ public struct SendableMacro: ExtensionMacro {
   }
 }
 
+public struct GenerateStubMemberMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["#generateMemberStubs"]
+  }
+}
+
+public struct GenerateStubsFreestandingMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["#generateMember"]
+  }
+}
+
+public struct SingleMemberStubMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["static func member() {}"]
+  }
+}
+
 public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
