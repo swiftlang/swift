@@ -2558,7 +2558,8 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   // Validate the presence of ownership for a parameter with an inverse applied.
-  if (diagnoseMissingOwnership(ctx, dc, ownership,
+  if (!Ty->hasUnboundGenericType() &&
+      diagnoseMissingOwnership(ctx, dc, ownership,
                                decl->getTypeRepr(), Ty, options)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
