@@ -418,7 +418,18 @@ run_backtracer()
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
-  backtracer_argv[32] = trueOrFalse(_swift_backtraceSettings.symbolicate);
+
+  switch (_swift_backtraceSettings.symbolicate) {
+  case Symbolication::Off:
+    backtracer_argv[32] = "off";
+    break;
+  case Symbolication::Fast:
+    backtracer_argv[32] = "fast";
+    break;
+  case Symbolication::Full:
+    backtracer_argv[32] = "full";
+    break;
+  }
 
   _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
 
