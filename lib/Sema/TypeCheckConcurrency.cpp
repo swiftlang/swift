@@ -2147,21 +2147,25 @@ namespace {
 
         auto behavior = DiagnosticBehavior::Error;
 
+        // Limit behavior if @preconcurrency detected
+        if (errors.front().preconcurrency)
+          behavior = DiagnosticBehavior::Warning;
+
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
           if (missingGlobalActorOnContext(
                   const_cast<DeclContext *>(getDeclContext()),
                   isolation.getGlobalActor(), behavior) &&
               errors.size() > 1) {
-            behavior= DiagnosticBehavior::Note;
+            behavior = DiagnosticBehavior::Note;
           }
         }
 
         for (IsolationError error : errors) {
           // Diagnose actor_isolated_non_self_reference as note
-          // if fix-it provided in missingGlobalActorOnContext
+          // if there are multiple of these diagnostics
           ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehaviorUntilSwiftVersion(behavior, 6);
+            .limitBehaviorUntilSwiftVersion(behavior, 6);
         }
       }
 
@@ -2172,21 +2176,26 @@ namespace {
 
         auto behavior = DiagnosticBehavior::Error;
 
+        // Limit behavior if @preconcurrency detected
+        if (errors.front().preconcurrency)
+          behavior = DiagnosticBehavior::Warning;
+
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
           if (missingGlobalActorOnContext(
                   const_cast<DeclContext *>(getDeclContext()),
                   isolation.getGlobalActor(), behavior) &&
               errors.size() > 1) {
-            behavior= DiagnosticBehavior::Note;
+            behavior = DiagnosticBehavior::Note;
           }
         }
 
         for (IsolationError error : errors) {
           // Diagnose actor_isolated_call as note if
-          // fix-it provided in missingGlobalActorOnContext
-          ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehaviorUntilSwiftVersion(behavior, 6);
+          // if there are multiple actor-isolated function calls
+          // from outside the actor
+            ctx.Diags.diagnose(error.loc, error.diag)
+            .limitBehaviorUntilSwiftVersion(behavior, 6);
         }
       }
 
@@ -3449,8 +3458,11 @@ namespace {
 
           IsolationError mismatch([calleeDecl, apply, unsatisfiedIsolation, getContextIsolation]() {
             if (calleeDecl) {
+              auto preconcurrency = getContextIsolation().preconcurrency() || getActorIsolation(calleeDecl).preconcurrency();
+
               return IsolationError(
                              apply->getLoc(),
+                             preconcurrency,
                              Diagnostic(diag::actor_isolated_call_decl,
                                         *unsatisfiedIsolation,
                                         calleeDecl,
@@ -3458,6 +3470,7 @@ namespace {
             } else {
               return IsolationError(
                              apply->getLoc(),
+                             getContextIsolation().preconcurrency(),
                              Diagnostic(diag::actor_isolated_call,
                                         *unsatisfiedIsolation,
                                         getContextIsolation()));
@@ -3475,8 +3488,8 @@ namespace {
           }
         } else {
           if (calleeDecl) {
-            auto preconcurrency = getContextIsolation().preconcurrency() ||
-                getActorIsolation(calleeDecl).preconcurrency();
+            auto preconcurrency = getContextIsolation().preconcurrency() || getActorIsolation(calleeDecl).preconcurrency();
+
             ctx.Diags.diagnose(
                                apply->getLoc(), diag::actor_isolated_call_decl,
                                *unsatisfiedIsolation,
@@ -3979,6 +3992,7 @@ namespace {
 
         if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
           IsolationError mismatch = IsolationError(loc,
+              preconcurrencyContext,
               Diagnostic(diag::actor_isolated_non_self_reference,
                   decl, useKind, refKind + 1, refGlobalActor,
                   result.isolation));
