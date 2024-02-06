@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+#include "swift/SIL/Test.h"
 
 using namespace swift;
 
@@ -191,3 +192,30 @@ void VariableNameInferrer::drainVariableNamePath() {
     resultingString += '.';
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
+
+namespace swift::test {
+
+// Arguments:
+// - SILValue: value to emit a name for.
+// Dumps:
+// - The inferred name
+// - The inferred value.
+static FunctionTest VariableNameInferrerTests(
+    "variable-name-inference", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      SmallString<64> finalString;
+      VariableNameInferrer inferrer(&function, finalString);
+      SILValue rootValue =
+          inferrer.inferByWalkingUsesToDefsReturningRoot(value);
+      llvm::outs() << "Input Value: " << *value;
+      if (!rootValue) {
+        llvm::outs() << "Name: 'unknown'\nRoot: 'unknown'\n";
+        return;
+      }
+      llvm::outs() << "Name: '" << finalString << "'\nRoot: " << rootValue;
+    });
+} // namespace swift::test
