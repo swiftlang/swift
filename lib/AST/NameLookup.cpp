@@ -1903,24 +1903,37 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     // Collect all macro introduced names, along with its corresponding macro
     // reference. We need the macro reference to prevent adding auxiliary decls
     // that weren't introduced by the macro.
-    MacroIntroducedNameTracker nameTracker;
-    if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
-      forEachPotentialResolvedMacro(
-          dc->getModuleScopeContext(), med->getMacroName(),
-          MacroRole::Declaration, nameTracker);
-    } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
-      forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
-    }
 
-    // Expand macros on this member.
-    if (nameTracker.shouldExpandForName(name)) {
-      member->visitAuxiliaryDecls([&](Decl *decl) {
-        auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
-        // Bail out if the auxiliary decl was not produced by a macro.
-        if (!sf || sf->Kind != SourceFileKind::MacroExpansion) return;
-        table.addMember(decl);
-      });
+    std::deque<Decl *> mightIntroduceNames;
+    mightIntroduceNames.push_back(member);
+
+    while (!mightIntroduceNames.empty()) {
+      auto *member = mightIntroduceNames.front();
+
+      MacroIntroducedNameTracker nameTracker;
+      if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
+        forEachPotentialResolvedMacro(
+            dc->getModuleScopeContext(), med->getMacroName(),
+            MacroRole::Declaration, nameTracker);
+      } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
+        nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+        forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
+      }
+
+      // Expand macros on this member.
+      if (nameTracker.shouldExpandForName(name)) {
+        member->visitAuxiliaryDecls([&](Decl *decl) {
+          auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+          // Bail out if the auxiliary decl was not produced by a macro.
+          if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+            return;
+
+          mightIntroduceNames.push_back(decl);
+          table.addMember(decl);
+        });
+      }
+
+      mightIntroduceNames.pop_front();
     }
   }
 }
