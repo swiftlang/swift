@@ -1334,7 +1334,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   switch (OpCode) {
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::DeallocPackMetadataInst:
     llvm_unreachable("not supported");

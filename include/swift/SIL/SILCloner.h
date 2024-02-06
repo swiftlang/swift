@@ -3124,10 +3124,9 @@ void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitTestSpecificationInst(
-    TestSpecificationInst *Inst) {
+void SILCloner<ImplClass>::visitSpecifyTestInst(SpecifyTestInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createTestSpecificationInst(
+  recordClonedInstruction(Inst, getBuilder().createSpecifyTestInst(
                                     getOpLocation(Inst->getLoc()),
                                     Inst->getArgumentsSpecification()));
 }

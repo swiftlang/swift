@@ -546,15 +546,15 @@ IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
   return Inst;
 }
 
-TestSpecificationInst *
-TestSpecificationInst::create(SILDebugLocation Loc,
-                              StringRef ArgumentsSpecification, SILModule &M) {
+SpecifyTestInst *SpecifyTestInst::create(SILDebugLocation Loc,
+                                         StringRef ArgumentsSpecification,
+                                         SILModule &M) {
   auto ArgumentsSpecificationLength = ArgumentsSpecification.size();
   auto Size = totalSizeToAlloc<char>(ArgumentsSpecificationLength);
-  auto Buffer = M.allocateInst(Size, alignof(TestSpecificationInst));
+  auto Buffer = M.allocateInst(Size, alignof(SpecifyTestInst));
 
   auto *Inst =
-      ::new (Buffer) TestSpecificationInst(Loc, ArgumentsSpecificationLength);
+      ::new (Buffer) SpecifyTestInst(Loc, ArgumentsSpecificationLength);
   std::uninitialized_copy(ArgumentsSpecification.begin(),
                           ArgumentsSpecification.end(),
                           Inst->getTrailingObjects<char>());

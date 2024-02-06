@@ -5309,22 +5309,21 @@ public:
   }
 };
 
-class TestSpecificationInst final
-    : public InstructionBase<SILInstructionKind::TestSpecificationInst,
+class SpecifyTestInst final
+    : public InstructionBase<SILInstructionKind::SpecifyTestInst,
                              NonValueInstruction>,
-      private llvm::TrailingObjects<TestSpecificationInst, char> {
+      private llvm::TrailingObjects<SpecifyTestInst, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
   llvm::StringMap<SILValue> values;
   unsigned ArgumentsSpecificationLength;
 
-  TestSpecificationInst(SILDebugLocation Loc,
-                        unsigned ArgumentsSpecificationLength)
+  SpecifyTestInst(SILDebugLocation Loc, unsigned ArgumentsSpecificationLength)
       : InstructionBase(Loc),
         ArgumentsSpecificationLength(ArgumentsSpecificationLength) {}
 
-  static TestSpecificationInst *
+  static SpecifyTestInst *
   create(SILDebugLocation Loc, StringRef argumentsSpecification, SILModule &M);
 
 public:

@@ -1440,7 +1440,7 @@ public:
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
-  void visitTestSpecificationInst(TestSpecificationInst *i) {
+  void visitSpecifyTestInst(SpecifyTestInst *i) {
     llvm_unreachable("test-only instruction in Lowered SIL?!");
   }
 
