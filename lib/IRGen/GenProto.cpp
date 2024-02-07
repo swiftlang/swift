@@ -548,13 +548,14 @@ private:
   // was a class-pointer source?
   bool isClassPointerSource(unsigned paramIndex);
 
-  // If we are building a protocol witness thunk for a
-  // `DistributedActorSystem.remoteCall` requirement we
-  // need to supply witness tables associated with `Res`
-  // generic parameter which are not expressible on the
-  // requirement because they come from `SerializationRequirement`
+  // If we are building a protocol witness thunks for
+  // `DistributedActorSystem.remoteCall` or
+  // `DistributedTargetInvocationEncoder.record{Argument, ReturnType}`
+  // requirements we need to supply witness tables associated with `Res`,
+  // `Argument`, `R` generic parameters which are not expressible on the
+  // protocol requirement because they come from `SerializationRequirement`
   // associated type.
-  void injectAdHocDistributedRemoteCallRequirements();
+  void injectAdHocDistributedRequirements();
 };
 
 } // end anonymous namespace
@@ -730,7 +731,7 @@ bool EmitPolymorphicParameters::isClassPointerSource(unsigned paramIndex) {
   return false;
 }
 
-void EmitPolymorphicParameters::injectAdHocDistributedRemoteCallRequirements() {
+void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   // FIXME: We need a better way to recognize that function is
   // a thunk for witness of `remoteCall` requirement.
   if (!Fn.hasLocation())
@@ -738,27 +739,45 @@ void EmitPolymorphicParameters::injectAdHocDistributedRemoteCallRequirements() {
 
   auto loc = Fn.getLocation();
 
+  Type genericParam;
+
   auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
-  if (!(funcDecl && funcDecl->isDistributedActorSystemRemoteCall(
-                        /*isVoidReturn=*/false)))
+  if (!(funcDecl && funcDecl->isGeneric()))
+    return;
+
+  // DistributedActorSystem.remoteCall
+  if (funcDecl->isDistributedActorSystemRemoteCall(
+          /*isVoidReturn=*/false)) {
+    genericParam = funcDecl->getResultInterfaceType();
+  }
+
+  // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+  if (funcDecl->isDistributedTargetInvocationEncoderRecordArgument() ||
+      funcDecl->isDistributedTargetInvocationEncoderRecordReturnType()) {
+    auto *argParam = funcDecl->getGenericParams()->getParams().front();
+    genericParam = argParam->getDeclaredInterfaceType();
+  }
+
+  if (!genericParam)
     return;
 
   auto sig = funcDecl->getGenericSignature();
-  auto resultInterfaceTy = funcDecl->getResultInterfaceType();
-  auto resultArchetypeTy =
-      getTypeInContext(resultInterfaceTy->getCanonicalType());
-  llvm::Value *resultMetadata = IGF.emitTypeMetadataRef(resultArchetypeTy);
+  auto requirements = sig->getLocalRequirements(genericParam);
+  if (requirements.protos.empty())
+    return;
 
-  auto resultRequirements = sig->getLocalRequirements(resultInterfaceTy);
-  for (auto *proto : resultRequirements.protos) {
+  auto archetypeTy = getTypeInContext(genericParam->getCanonicalType());
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(archetypeTy);
+
+  for (auto *proto : requirements.protos) {
     // Lookup the witness table for this protocol dynamically via
     // swift_conformsToProtocol(<<archetype>>, <<protocol>>)
     auto *witnessTable = IGF.Builder.CreateCall(
         IGM.getConformsToProtocolFunctionPointer(),
-        {resultMetadata, IGM.getAddrOfProtocolDescriptor(proto)});
+        {metadata, IGM.getAddrOfProtocolDescriptor(proto)});
 
     IGF.setUnscopedLocalTypeData(
-        resultArchetypeTy,
+        archetypeTy,
         LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
         witnessTable);
   }
@@ -2617,8 +2636,9 @@ void EmitPolymorphicParameters::emit(EntryPointArgumentEmission &emission,
   // Bind all the fulfillments we can from the formal parameters.
   bindParameterSources(getParameter);
 
-  // Inject ad-hoc `remoteCall` requirements if any.
-  injectAdHocDistributedRemoteCallRequirements();
+  // Inject ad-hoc requirements related to `SerializationRequirement`
+  // associated type.
+  injectAdHocDistributedRequirements();
 }
 
 MetadataResponse

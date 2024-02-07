@@ -8591,9 +8591,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return recordConformance(synthesized);
         };
 
-        if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
-          if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
-            return synthesizeConformance();
+        if (witness->isGeneric()) {
+          // `DistributedActorSystem.remoteCall`
+          if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
+            if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
+              return synthesizeConformance();
+          }
+
+          // `DistributedTargetInvocationEncoder.record{Argument, ResultType}`
+          if (witness->isDistributedTargetInvocationEncoderRecordArgument() ||
+              witness->isDistributedTargetInvocationEncoderRecordReturnType()) {
+            auto genericParams = witness->getGenericParams()->getParams();
+            if (GP->isEqual(genericParams.front()->getDeclaredInterfaceType()))
+              return synthesizeConformance();
+          }
         }
       }
     }

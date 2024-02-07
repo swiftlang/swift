@@ -749,13 +749,11 @@ public protocol DistributedTargetInvocationEncoder {
   /// - Parameter type: a generic substitution type to be recorded for this invocation.
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record an argument of `Argument` type.
-//  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Value: SerializationRequirement>(
-//    _ argument: DistributedTargetArgument<Value>
-//  ) throws
+  /// Record an argument of `Argument` type.
+  /// This will be invoked for every argument of the target, in declaration order.
+  mutating func recordArgument<Value/*: SerializationRequirement*/>(
+    _ argument: RemoteCallArgument<Value>
+  ) throws
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.
@@ -763,11 +761,9 @@ public protocol DistributedTargetInvocationEncoder {
   /// - Parameter type: the type of error that was declared to be thrown by the invocation target. Currently this can only ever be `Error.self`.
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record the return type of the distributed method.
-//  /// This method will not be invoked if the target is returning `Void`.
-//  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
+  /// Record the return type of the distributed method.
+  /// This method will not be invoked if the target is returning `Void`.
+  mutating func recordReturnType<R/*: SerializationRequirement*/>(_ type: R.Type) throws
 
   /// Invoked to signal to the encoder that no further `record...` calls will be made on it.
   ///
