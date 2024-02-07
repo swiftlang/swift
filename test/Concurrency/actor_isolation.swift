@@ -1719,3 +1719,27 @@ class InferIsolationViaOverride: SuperWithIsolatedMethod {
     // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
   }
 }
+
+func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
+
+actor InvalidInheritedActorIsolation {
+  func actorFunction() {}
+
+  func test() {
+    // expected-warning@+1 {{actor-isolated function cannot be converted to a synchronous '@Sendable' function type; this is an error in Swift 6}}
+    requireSendableInheritContext {
+      self.actorFunction()
+    }
+  }
+}
+
+@MainActor
+class InvalidInheritedGlobalActorIsolation {
+  func mainActorFunction() {}
+
+  func test() {
+    // expected-warning@+1 {{main actor-isolated function cannot be converted to a synchronous '@Sendable' function type; this is an error in Swift 6}}
+    requireSendableInheritContext {
+      self.mainActorFunction()
+    }
+}
