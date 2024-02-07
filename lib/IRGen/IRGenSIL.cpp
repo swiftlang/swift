@@ -1405,7 +1405,7 @@ public:
   void visitBeginApplyInst(BeginApplyInst *i);
   void visitEndApplyInst(EndApplyInst *i);
   void visitAbortApplyInst(AbortApplyInst *i);
-  void visitEndApply(BeginApplyInst *i, EndApplyInst *ei = nullptr);
+  void visitEndApply(BeginApplyInst *i, bool isAbort);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitBranchInst(BranchInst *i);
@@ -4081,29 +4081,38 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
   if (isAsync()) {
-    emitCoroutineOrAsyncExit(false);
+    emitCoroutineOrAsyncExit();
     return;
   }
   Builder.CreateUnreachable();
 }
 
-void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
-  // Create end block and branch to it.
-  auto coroEndBB = createBasicBlock(isUnwind ? "coro.end.unwind" : "coro.end");
+void IRGenFunction::emitCoroutineOrAsyncExit() {
+  // The LLVM coroutine representation demands that there be a
+  // unique call to llvm.coro.end.
+
+  // If the coroutine exit block already exists, just branch to it.
+  if (auto coroEndBB = CoroutineExitBlock) {
+    Builder.CreateBr(coroEndBB);
+    return;
+  }
+
+  // Otherwise, create it and branch to it.
+  auto coroEndBB = createBasicBlock("coro.end");
+  CoroutineExitBlock = coroEndBB;
   Builder.CreateBr(coroEndBB);
 
   // Emit the block.
   Builder.emitBlock(coroEndBB);
+  auto handle = getCoroutineHandle();
   if (isAsync())
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async,
-                                { getCoroutineHandle(),
-                                  isUnwind ? Builder.getTrue() : Builder.getFalse()});
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse()});
   else
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                                { getCoroutineHandle(),
-                                  isUnwind ? Builder.getTrue() : Builder.getFalse(),
-                                  llvm::ConstantTokenNone::get(Builder.getContext())});
-
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse()});
   Builder.CreateUnreachable();
 }
 
@@ -4111,6 +4120,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
                            SILType resultTy,
                            Explosion &result,
                            CanSILFunctionType fnType) {
+  // If we're generating a coroutine, just call coro.end.
+  if (IGF.isCoroutine() && !IGF.isAsync()) {
+    assert(result.empty() &&
+           "coroutines do not currently support non-void returns");
+    IGF.emitCoroutineOrAsyncExit();
+    return;
+  }
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
                               IGF.getSILModule());
 
@@ -4124,24 +4140,6 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     }
     return llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   };
-
-  // If we're generating a coroutine, just call coro.end.
-  if (IGF.isCoroutine() && !IGF.isAsync()) {
-    if (fnType->getCoroutineKind() == SILCoroutineKind::YieldOnce) {
-      assert(IGF.CurSILFn->getLoweredFunctionType()->getLanguage() ==
-             SILFunctionLanguage::Swift);
-      auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
-        conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
-
-      emitYieldOnceCoroutineResult(IGF, result, funcResultType, resultTy);
-      return;
-    }
-
-    assert(result.empty() &&
-           "coroutines do not currently support non-void returns");
-    IGF.emitCoroutineOrAsyncExit(false);
-    return;
-  }
 
   // The invariant on the out-parameter is that it's always zeroed, so
   // there's nothing to do here.
@@ -4301,8 +4299,9 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
 }
 
 void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
-  // Just call coro.end marking unwind return
-  emitCoroutineOrAsyncExit(true);
+  // Just call coro.end; there's no need to distinguish 'unwind'
+  // and 'return' at the LLVM level.
+  emitCoroutineOrAsyncExit();
 }
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
@@ -4339,16 +4338,15 @@ void IRGenSILFunction::visitBeginApplyInst(BeginApplyInst *i) {
 }
 
 void IRGenSILFunction::visitEndApplyInst(EndApplyInst *i) {
-  visitEndApply(i->getBeginApply(), i);
+  visitEndApply(i->getBeginApply(), false);
 }
 
 void IRGenSILFunction::visitAbortApplyInst(AbortApplyInst *i) {
-  visitEndApply(i->getBeginApply());
+  visitEndApply(i->getBeginApply(), true);
 }
 
-void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
+void IRGenSILFunction::visitEndApply(BeginApplyInst *i, bool isAbort) {
   const auto &coroutine = getLoweredCoroutine(i->getTokenResult());
-  bool isAbort = ei == nullptr;
 
   auto sig = Signature::forCoroutineContinuation(IGM, i->getOrigCalleeType());
 
@@ -4356,6 +4354,7 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   auto continuation = coroutine.Continuation;
   continuation = Builder.CreateBitCast(continuation,
                                        sig.getType()->getPointerTo());
+
 
   auto schemaAndEntity =
     getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
@@ -4365,21 +4364,10 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   auto callee = FunctionPointer::createSigned(i->getOrigCalleeType(),
                                               continuation, pointerAuth, sig);
 
-  auto *call = Builder.CreateCall(callee, {
-      coroutine.Buffer.getAddress(),
-      llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
-    });
-
-  if (!isAbort) {
-    auto resultType = call->getType();
-    if (!resultType->isVoidTy()) {
-      Explosion e;
-      // FIXME: Do we need to handle ABI-related conversions here?
-      // It seems we cannot have C function convention for coroutines, etc.
-      extractScalarResults(*this, resultType, call, e);
-      setLoweredExplosion(ei, e);
-    }
-  }
+  Builder.CreateCall(callee, {
+    coroutine.Buffer.getAddress(),
+    llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
+  });
 
   coroutine.Temporaries.destroyAll(*this);
 

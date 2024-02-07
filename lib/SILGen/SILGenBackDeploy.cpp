@@ -121,14 +121,12 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
-    SGF.B.createEndApply(loc, token,
-                         SILType::getEmptyTupleType(SGF.getASTContext()));
+    SGF.B.createEndApply(loc, token);
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
-    SGF.B.createEndApply(loc, token,
-                         SILType::getEmptyTupleType(SGF.getASTContext()));
+    SGF.B.createEndApply(loc, token);
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }
