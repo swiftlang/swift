@@ -2046,6 +2046,7 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
+                         const LangOptions &LangOpts,
                          const FrontendOptions &FEOpts,
                          const TypeCheckerOptions &TCOpts,
                          DiagnosticEngine &Diags,
@@ -2134,6 +2135,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.AssertConfig = SILOptions::Release;
     } else if (Configuration == "Unchecked") {
       Opts.AssertConfig = SILOptions::Unchecked;
+    } else if (Configuration == "ReleaseWithBoundsSafety") {
+      Opts.AssertConfig = SILOptions::ReleaseWithBoundsSafety;
     } else {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
@@ -2147,7 +2150,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Set the assert configuration according to the optimization level if it
     // has not been set by the -Ounchecked flag.
     Opts.AssertConfig =
-        (IRGenOpts.shouldOptimize() ? SILOptions::Release : SILOptions::Debug);
+        IRGenOpts.shouldOptimize()
+         ? (LangOpts.hasFeature(Feature::UnsafePointerBoundsSafety)
+              ? SILOptions::ReleaseWithBoundsSafety
+              : SILOptions::Release)
+         : SILOptions::Debug;
   }
 
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
@@ -3180,7 +3187,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, LangOpts, FrontendOpts,
                    TypeCheckerOpts, Diags,
                    LangOpts.Target, ClangImporterOpts)) {
     return true;

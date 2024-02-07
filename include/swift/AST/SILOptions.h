@@ -195,6 +195,7 @@ public:
     Debug = 0,     // Enables all asserts.
     Release = 1,   // Disables asserts.
     Unchecked = 2, // Disables asserts, preconditions, and runtime checks.
+    ReleaseWithBoundsSafety = 3, // Enables all asserts + bounds checks for unsafe pointers
 
     // Leave the assert_configuration instruction around.
     DisableReplacement = UINT_MAX

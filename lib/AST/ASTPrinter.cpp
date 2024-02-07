@@ -3919,6 +3919,10 @@ static bool usesFeatureDynamicActorIsolation(Decl *decl) {
 
 static bool usesFeatureBorrowingSwitch(Decl *decl) { return false; }
 
+static bool usesFeatureUnsafePointerBoundsSafety(Decl *decl) {
+  return false;
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

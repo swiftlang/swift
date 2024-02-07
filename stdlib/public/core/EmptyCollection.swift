@@ -110,12 +110,12 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   @inlinable // trivial-implementation
   public subscript(bounds: Range<Index>) -> SubSequence {
     get {
-      _debugPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      _boundsCheckPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
         "Index out of range")
       return self
     }
     set {
-      _debugPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
+      _boundsCheckPrecondition(bounds.lowerBound == 0 && bounds.upperBound == 0,
         "Index out of range")
     }
   }
@@ -128,7 +128,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
 
   @inlinable // trivial-implementation
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _debugPrecondition(i == startIndex && n == 0, "Index out of range")
+    _boundsCheckPrecondition(i == startIndex && n == 0, "Index out of range")
     return i
   }
 
@@ -136,7 +136,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    _debugPrecondition(i == startIndex && limit == startIndex,
+    _boundsCheckPrecondition(i == startIndex && limit == startIndex,
       "Index out of range")
     return n == 0 ? i : nil
   }
@@ -144,23 +144,23 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   /// The distance between two indexes (always zero).
   @inlinable // trivial-implementation
   public func distance(from start: Index, to end: Index) -> Int {
-    _debugPrecondition(start == 0, "From must be startIndex (or endIndex)")
-    _debugPrecondition(end == 0, "To must be endIndex (or startIndex)")
+    _boundsCheckPrecondition(start == 0, "From must be startIndex (or endIndex)")
+    _boundsCheckPrecondition(end == 0, "To must be endIndex (or startIndex)")
     return 0
   }
 
   @inlinable // trivial-implementation
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
-    _debugPrecondition(index == 0, "out of bounds")
-    _debugPrecondition(bounds == indices, "invalid bounds for an empty collection")
+    _boundsCheckPrecondition(index == 0, "out of bounds")
+    _boundsCheckPrecondition(bounds == indices, "invalid bounds for an empty collection")
   }
 
   @inlinable // trivial-implementation
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {
-    _debugPrecondition(range == indices, "invalid range for an empty collection")
-    _debugPrecondition(bounds == indices, "invalid bounds for an empty collection")
+    _boundsCheckPrecondition(range == indices, "invalid range for an empty collection")
+    _boundsCheckPrecondition(bounds == indices, "invalid bounds for an empty collection")
   }
 }
 

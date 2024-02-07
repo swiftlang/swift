@@ -636,7 +636,7 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
 
   let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
 
-  // Find the offset.
+  // Find the offset in this buffer.
   let buffer = sourceFilePtr.pointee.buffer
   let offset = sourceLocationPtr - buffer.baseAddress!
   if offset < 0 || offset >= buffer.count {

@@ -301,8 +301,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   ///   index.
   @inlinable
   public subscript(position: Index) -> Element {
-    // FIXME: swift-3-indexing-model: tests for the range check.
-    _debugPrecondition(self.contains(position), "Index out of range")
+    _boundsCheckPrecondition(self.contains(position), "Index out of range")
     return position
   }
 }

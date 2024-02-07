@@ -130,6 +130,8 @@ UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
 
 
+EXPERIMENTAL_FEATURE(UnsafePointerBoundsSafety, true)
+
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)

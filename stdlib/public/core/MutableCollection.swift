@@ -539,7 +539,7 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   let p1 = Builtin.addressof(&a)
   let p2 = Builtin.addressof(&b)
 #endif
-  _debugPrecondition(
+  _boundsCheckPrecondition(
     p1 != p2,
     "swapping a location with itself is not supported")
 

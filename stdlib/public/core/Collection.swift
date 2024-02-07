@@ -425,6 +425,15 @@ public protocol Collection<Element>: Sequence {
   @_borrowed
   subscript(position: Index) -> Element { get }
 
+  /// Accesses the element at the specified position without bounds checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @available(SwiftStdlib 5.11, *)
+  @_borrowed
+  subscript(unchecked position: Index) -> Element { get }
+
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// For example, using a `PartialRangeFrom` range expression with an array
@@ -462,6 +471,15 @@ public protocol Collection<Element>: Sequence {
   ///
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
+
+  /// Accesses a contiguous subrange of the collection's elements without
+  /// bounds checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @available(SwiftStdlib 5.11, *)
+  subscript(uncheckedBounds bounds: Range<Index>) -> SubSequence { get }
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
@@ -1688,5 +1706,24 @@ extension Collection where SubSequence == Self {
         "Can't remove more items from a collection than it contains")
     }
     self = self[idx..<endIndex]
+  }
+}
+
+extension Collection {
+  /// Default implementation of `[_:]` that uses the checked
+  /// subscript implementation.
+  @inlinable
+  @_alwaysEmitIntoClient
+  @_borrowed
+  public subscript(unchecked position: Index) -> Element {
+    self[position]
+  }
+
+  /// Default implementation of `[uncheckedBounds:]` that uses the checked
+  /// subscript implementation.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public subscript(uncheckedBounds bounds: Range<Index>) -> SubSequence {
+    self[bounds]
   }
 }

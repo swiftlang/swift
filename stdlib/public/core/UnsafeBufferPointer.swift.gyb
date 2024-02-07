@@ -66,9 +66,9 @@ public struct Unsafe${Mutable}BufferPointer<Element> {
   public init(
     @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
   ) {
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
@@ -200,15 +200,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // NOTE: Wrapping math because we allow unsafe buffer pointers not to verify
-    // index preconditions in release builds. Our (optimistic) assumption is
-    // that the caller is already ensuring that indices are valid, so we can
-    // elide the usual checks to help the optimizer generate better code.
-    // However, we still check for overflow in debug mode.
     let result = i.addingReportingOverflow(1)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     return result.partialValue
   }
 
@@ -216,12 +209,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   public func formIndex(after i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
-    // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.addingReportingOverflow(1)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     i = result.partialValue
   }
 
@@ -230,11 +219,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.subtractingReportingOverflow(1)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     return result.partialValue
   }
 
@@ -243,11 +229,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.subtractingReportingOverflow(1)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     i = result.partialValue
   }
 
@@ -256,11 +239,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.addingReportingOverflow(n)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     return result.partialValue
   }
 
@@ -269,11 +249,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
-    // See note on wrapping arithmetic in `index(after:)` above.
     let maxOffset = limit.subtractingReportingOverflow(i)
-    _debugPrecondition(!maxOffset.overflow)
+    _boundsCheckPrecondition(!maxOffset.overflow)
     let l = maxOffset.partialValue
 
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
@@ -281,7 +258,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     }
 
     let result = i.addingReportingOverflow(n)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     return result.partialValue
   }
 
@@ -290,30 +267,27 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
     // optimizer is not capable of creating partial specializations yet.
-    // NOTE: Range checks are not performed here, because it is done later by
-    // the subscript function.
     // NOTE: We allow the subtraction to silently overflow in release builds
     // to eliminate a superfluous check when `start` and `end` are both valid
     // indices. (The operation can only overflow if `start` is negative, which
     // implies it's an invalid index.) `Collection` does not specify what
     // `distance` should return when given an invalid index pair.
     let result = end.subtractingReportingOverflow(start)
-    _debugPrecondition(!result.overflow)
+    _boundsCheckPrecondition(!result.overflow)
     return result.partialValue
   }
 
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-    // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(index >= bounds.lowerBound)
-    _debugPrecondition(index < bounds.upperBound)
+    _boundsCheckPrecondition(index >= bounds.lowerBound && index < bounds.upperBound)
   }
 
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-    // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(range.lowerBound >= bounds.lowerBound)
-    _debugPrecondition(range.upperBound <= bounds.upperBound)
+    _boundsCheckPrecondition(
+      range.lowerBound >= bounds.lowerBound &&
+      range.upperBound <= bounds.upperBound
+    )
   }
 
   @inlinable // unsafe-performance
@@ -364,6 +338,28 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   ///   range `0..<count`.
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Element {
+    get {
+      _boundsCheckPrecondition(i >= 0)
+      _boundsCheckPrecondition(i < endIndex)
+      return _position._unsafelyUnwrappedUnchecked[i]
+    }
+%if Mutable:
+    nonmutating _modify {
+      _boundsCheckPrecondition(i >= 0)
+      _boundsCheckPrecondition(i < endIndex)
+      yield &_position._unsafelyUnwrappedUnchecked[i]
+    }
+%end
+  }
+
+  /// Accesses the element at the specified position without bounds
+  /// checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(unchecked i: Int) -> Element {
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
@@ -438,6 +434,38 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     -> Slice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
+      _boundsCheckPrecondition(bounds.lowerBound >= startIndex)
+      _boundsCheckPrecondition(bounds.upperBound <= endIndex)
+      return Slice(
+        base: self, bounds: bounds)
+    }
+%  if Mutable:
+    nonmutating set {
+      _boundsCheckPrecondition(bounds.lowerBound >= startIndex)
+      _boundsCheckPrecondition(bounds.upperBound <= endIndex)
+      _boundsCheckPrecondition(bounds.count == newValue.count)
+
+      // FIXME: swift-3-indexing-model: tests.
+      if !newValue.isEmpty {
+        (_position! + bounds.lowerBound).update(
+          from: newValue.base._position! + newValue.startIndex,
+          count: newValue.count)
+      }
+    }
+%  end
+  }
+
+  /// Accesses a contiguous subrange of the buffer's elements without
+  /// bounds checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(uncheckedBounds bounds: Range<Int>)
+    -> Slice<Unsafe${Mutable}BufferPointer<Element>>
+  {
+    get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
       return Slice(
@@ -449,7 +477,6 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
       _debugPrecondition(bounds.upperBound <= endIndex)
       _debugPrecondition(bounds.count == newValue.count)
 
-      // FIXME: swift-3-indexing-model: tests.
       if !newValue.isEmpty {
         (_position! + bounds.lowerBound).update(
           from: newValue.base._position! + newValue.startIndex,
@@ -458,6 +485,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     }
 %  end
   }
+
 % if mutable:
 
   /// Exchanges the values at the specified indices of the buffer.
@@ -472,8 +500,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public func swapAt(_ i: Int, _ j: Int) {
     guard i != j else { return }
-    _debugPrecondition(i >= 0 && j >= 0)
-    _debugPrecondition(i < endIndex && j < endIndex)
+    _boundsCheckPrecondition(i >= 0 && j >= 0)
+    _boundsCheckPrecondition(i < endIndex && j < endIndex)
     let pi = (_position! + i)
     let pj = (_position! + j)
     let tmp = pi.move()
@@ -499,7 +527,7 @@ extension Unsafe${Mutable}BufferPointer {
   ) rethrows -> R? {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
     defer { 
-      _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
+      _boundsCheckPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
       "UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
     } 
     return try body(&self)
@@ -554,7 +582,7 @@ extension Unsafe${Mutable}BufferPointer {
     // We only do this in debug builds to prevent a measurable performance
     // degradation wrt passing around pointers not wrapped in a BufferPointer
     // construct.
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
       "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
@@ -1029,7 +1057,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func initializeElement(at index: Index, to value: Element) {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.initialize(to: value)
   }
@@ -1047,7 +1075,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func moveElement(from index: Index) -> Element {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     return baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
   }
 
@@ -1062,7 +1090,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func deinitializeElement(at index: Index) {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.deinitialize(count: 1)
   }
@@ -1140,7 +1168,7 @@ extension Unsafe${Mutable}BufferPointer {
       return try body(.init(start: nil, count: 0))
     }
 
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0,
       "baseAddress must be a properly aligned pointer for types Element and T"
     )
@@ -1150,7 +1178,7 @@ extension Unsafe${Mutable}BufferPointer {
       newCount = count
     } else {
       newCount = count * MemoryLayout<Element>.stride / MemoryLayout<T>.stride
-      _debugPrecondition(
+      _boundsCheckPrecondition(
         MemoryLayout<T>.stride > MemoryLayout<Element>.stride
         ? MemoryLayout<T>.stride % MemoryLayout<Element>.stride == 0
         : MemoryLayout<Element>.stride % MemoryLayout<T>.stride == 0,

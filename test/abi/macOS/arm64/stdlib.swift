@@ -248,6 +248,24 @@ Added: _$sSMsSmRzrlE15removeSubrangesyys8RangeSetVy5IndexSlQzGF
 // (extension in Swift):Swift.MutableCollection.moveSubranges(_: Swift.RangeSet<A.Index>, to: A.Index) -> Swift.Range<A.Index>
 Added: _$sSMsE13moveSubranges_2toSny5IndexQzGs8RangeSetVyADG_ADtF
 
+// Collection.subscript(unchecked:) and Collection.subscript(uncheckedBounds:)
+Added: _$sSl15uncheckedBounds11SubSequenceQzSny5IndexQzG_tcigTj
+Added: _$sSl15uncheckedBounds11SubSequenceQzSny5IndexQzG_tcigTq
+Added: _$sSl9unchecked7ElementQz5IndexQz_tcirTj
+Added: _$sSl9unchecked7ElementQz5IndexQz_tcirTq
+
+// Property descriptors for newly-added, @_alwaysEmitIntoClient properties
+Added: _$sSR15uncheckedBoundss5SliceVySRyxGGSnySiG_tcipMV
+Added: _$sSR9uncheckedxSi_tcipMV
+Added: _$sSa15uncheckedBoundss10ArraySliceVyxGSnySiG_tcipMV
+Added: _$sSa9uncheckedxSi_tcipMV
+Added: _$sSr15uncheckedBoundss5SliceVySryxGGSnySiG_tcipMV
+Added: _$sSr9uncheckedxSi_tcipMV
+Added: _$ss15ContiguousArrayV15uncheckedBoundss0B5SliceVyxGSnySiG_tcipMV
+Added: _$ss15ContiguousArrayV9uncheckedxSi_tcipMV
+Added: _$sSlsE15uncheckedBounds11SubSequenceQzSny5IndexQzG_tcipMV
+Added: _$sSlsE9unchecked7ElementQz5IndexQz_tcipMV
+
 // Runtime Symbols
 Added: __swift_pod_copy
 Added: __swift_pod_destroy

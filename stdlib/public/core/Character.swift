@@ -174,7 +174,7 @@ extension Character :
   public init(_ s: String) {
     _precondition(!s.isEmpty,
       "Can't form a Character from an empty String")
-    _debugPrecondition(s.index(after: s.startIndex) == s.endIndex,
+    _boundsCheckPrecondition(s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     if _fastPath(s._guts._object.isPreferredRepresentation) {

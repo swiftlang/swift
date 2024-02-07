@@ -110,7 +110,7 @@ public func precondition(
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     let error = !condition()
     Builtin.condfail_message(error._value,
       StaticString("precondition failure").unsafeRawPointer)
@@ -130,7 +130,7 @@ public func precondition(
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     let error = !condition()
     Builtin.condfail_message(error._value,
       StaticString("precondition failure").unsafeRawPointer)
@@ -229,7 +229,7 @@ public func preconditionFailure(
   if _isDebugAssertConfiguration() {
     _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     Builtin.condfail_message(true._value,
       StaticString("precondition failure").unsafeRawPointer)
   }
@@ -246,7 +246,7 @@ public func preconditionFailure(
   if _isDebugAssertConfiguration() {
     _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     Builtin.condfail_message(true._value,
       StaticString("precondition failure").unsafeRawPointer)
   }
@@ -300,7 +300,7 @@ internal func _precondition(
       _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     let error = !condition()
     Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
@@ -377,6 +377,31 @@ internal func _debugPreconditionFailure(
 #endif
 }
 
+/// Precondition checks for bounds-checking of unsafe pointers.
+///
+/// Debug library precondition checks are on in debug mode and in release
+/// mode with additional bounds safety enabled. If release and unchecked
+/// modes, they are disabled.
+/// They are meant to be used for bounds-safety checks.
+@usableFromInline @_transparent @_alwaysEmitIntoClient
+internal func _boundsCheckPrecondition(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  _precondition(condition(), message, file: file, line: line)
+#else
+  // Only check in debug and release w/ bounds checks.
+  if _isDebugAssertConfiguration() ||
+      _isReleaseAssertWithBoundsSafetyConfiguration() {
+    if !_fastPath(condition()) {
+      _fatalErrorMessage("Fatal error", message, file: file, line: line,
+        flags: _fatalErrorFlags())
+    }
+  }
+#endif
+}
+
 /// Internal checks.
 ///
 /// Internal checks are to be used for checking correctness conditions in the
@@ -441,7 +466,7 @@ internal func _precondition(
       _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
-  } else if _isReleaseAssertConfiguration() {
+  } else if _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() {
     let error = (!condition() && _isExecutableLinkedOnOrAfter(version))
     Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
