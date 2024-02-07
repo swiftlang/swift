@@ -2984,8 +2984,13 @@ bool AbstractStorageDecl::isFormallyResilient() const {
 bool AbstractStorageDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-
-  return getModuleContext()->isResilient();
+  if (!getModuleContext()->isResilient())
+    return false;
+  // Allows bypassing resilience checks for package decls
+  // at use site within a package if opted in, whether the
+  // loaded module was built resiliently or not.
+  return !getDeclContext()->allowBypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
+                                                                                /*treatUsableFromInlineAsPublic=*/true).isPackage());
 }
 
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
@@ -4220,13 +4225,6 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
-bool ValueDecl::hasPackageAccess() const {
-  AccessLevel access =
-      getAdjustedFormalAccess(this, /*useDC*/ nullptr,
-                              /*treatUsableFromInlineAsPublic*/ false);
-  return access == AccessLevel::Package;
-}
-
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
 /// \@_spi imports, and enclosing access levels into account.
@@ -5067,8 +5065,13 @@ bool NominalTypeDecl::isFormallyResilient() const {
 bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-
-  return getModuleContext()->isResilient();
+  if (!getModuleContext()->isResilient())
+    return false;
+  // Allows bypassing resilience checks for package decls
+  // at use site within a package if opted in, whether the
+  // loaded module was built resiliently or not.
+  return !getDeclContext()->allowBypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
+                                                                                /*treatUsableFromInlineAsPublic=*/true).isPackage());
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
@@ -6388,7 +6391,11 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Non-public, non-versioned enums are always exhaustive.
   AccessScope accessScope = getFormalAccessScope(/*useDC*/nullptr,
                                                  /*respectVersioned*/true);
-  if (!accessScope.isPublic())
+  // Both public and package enums should behave the same unless
+  // package enum is optimized with bypassing resilience checks.
+  if (!accessScope.isPublicOrPackage())
+    return true;
+  if (useDC && useDC->allowBypassResilienceInPackage(accessScope.isPackage()))
     return true;
 
   // All other checks are use-site specific; with no further information, the
