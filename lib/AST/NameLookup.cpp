@@ -160,13 +160,13 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
   }
 
   switch (reason) {
-  case DeclVisibilityKind::LocalVariable:
+  case DeclVisibilityKind::LocalDecl:
   case DeclVisibilityKind::FunctionParameter:
     // Skip if Loc is before the found decl if the decl is a var/let decl.
     // Type and func decls can be referenced before its declaration, or from
     // within nested type decls.
     if (isa<VarDecl>(D)) {
-      if (reason == DeclVisibilityKind::LocalVariable) {
+      if (reason == DeclVisibilityKind::LocalDecl) {
         // Workaround for fast-completion. A loc in the current context might be
         // in a loc
         auto tmpLoc = Loc;
@@ -240,7 +240,7 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
       return;
 
     switch (shadowingReason) {
-    case DeclVisibilityKind::LocalVariable:
+    case DeclVisibilityKind::LocalDecl:
     case DeclVisibilityKind::FunctionParameter:
       // Local func and var/let with a conflicting name.
       //   func foo() {
@@ -251,7 +251,7 @@ void UsableFilteringDeclConsumer::foundDecl(ValueDecl *D,
       // So, for confilicting local values in the same decl context, even if the
       // 'var value' is reported after 'func value', don't shadow it, but we
       // shadow everything with the name after that.
-      if (reason == DeclVisibilityKind::LocalVariable &&
+      if (reason == DeclVisibilityKind::LocalDecl &&
           isa<VarDecl>(D) && !isa<VarDecl>(shadowingD) &&
           shadowingD->getDeclContext() == D->getDeclContext()) {
         // Replace the shadowing decl so we shadow subsequent conflicting decls.
@@ -3980,7 +3980,7 @@ void FindLocalVal::checkStmtCondition(const StmtCondition &Cond) {
     if (auto *P = entry.getPatternOrNull()) {
       SourceRange previousConditionsToHere = SourceRange(start, entry.getEndLoc());
       if (!isReferencePointInRange(previousConditionsToHere))
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+        checkPattern(P, DeclVisibilityKind::LocalDecl);
     }
   }
 }
@@ -4030,7 +4030,7 @@ void FindLocalVal::visitForEachStmt(ForEachStmt *S) {
     return;
   visit(S->getBody());
   if (!isReferencePointInRange(S->getParsedSequence()->getSourceRange()))
-    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
+    checkPattern(S->getPattern(), DeclVisibilityKind::LocalDecl);
 }
 
 void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
@@ -4074,7 +4074,7 @@ void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
   std::function<void(Decl *)> visitDecl;
   visitDecl = [&](Decl *D) {
     if (auto *VD = dyn_cast<ValueDecl>(D))
-      checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
+      checkValueDecl(VD, DeclVisibilityKind::LocalDecl);
     D->visitAuxiliaryDecls(visitDecl);
   };
   for (auto elem : S->getElements()) {
@@ -4124,7 +4124,7 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
     for (const auto &CLI : items) {
       auto guard = CLI.getGuardExpr();
       if (guard && isReferencePointInRange(guard->getSourceRange())) {
-        checkPattern(CLI.getPattern(), DeclVisibilityKind::LocalVariable);
+        checkPattern(CLI.getPattern(), DeclVisibilityKind::LocalDecl);
         break;
       }
     }
@@ -4132,7 +4132,7 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
 
   if (!inPatterns && !items.empty()) {
     for (auto *vd : S->getCaseBodyVariablesOrEmptyArray()) {
-      checkValueDecl(vd, DeclVisibilityKind::LocalVariable);
+      checkValueDecl(vd, DeclVisibilityKind::LocalDecl);
     }
   }
   visit(S->getBody());

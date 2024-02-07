@@ -394,7 +394,7 @@ CompletionLookup::getSemanticContext(const Decl *D, DeclVisibilityKind Reason,
     return *ForcedSemanticContext;
 
   switch (Reason) {
-  case DeclVisibilityKind::LocalVariable:
+  case DeclVisibilityKind::LocalDecl:
   case DeclVisibilityKind::FunctionParameter:
   case DeclVisibilityKind::GenericParameter:
     return SemanticContextKind::Local;
@@ -2976,7 +2976,7 @@ void CompletionLookup::getGenericRequirementCompletions(
   // qualified by the current type. Thus also suggest current self type so the
   // user can do a memberwise lookup on it.
   if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
-    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalVariable,
+    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalDecl,
                       DynamicLookupInfo());
   }
 

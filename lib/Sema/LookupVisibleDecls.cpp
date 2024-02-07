@@ -794,12 +794,12 @@ namespace llvm {
 
 template <> struct DenseMapInfo<FoundDeclTy> {
   static inline FoundDeclTy getEmptyKey() {
-    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable, {}};
+    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalDecl, {}};
   }
 
   static inline FoundDeclTy getTombstoneKey() {
     return FoundDeclTy{reinterpret_cast<ValueDecl *>(0x1),
-                       DeclVisibilityKind::LocalVariable,
+                       DeclVisibilityKind::LocalDecl,
                        {}};
   }
 
@@ -988,7 +988,7 @@ public:
                 VD->getFormalAccess() > OtherVD->getFormalAccess());
             if (preferVD) {
               FilteredResults.remove(
-                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalDecl, {}));
               FilteredResults.insert(DeclAndReason);
               *I = VD;
             }

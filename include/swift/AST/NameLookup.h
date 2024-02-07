@@ -261,7 +261,7 @@ inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
   /// Declaration is a local variable or type.
-  LocalVariable,
+  LocalDecl,
 
   /// Declaration is a function parameter.
   FunctionParameter,
