@@ -8583,9 +8583,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // but they are verified by Sema so it's okay to omit them here and lookup
       // dynamically during IRGen.
       if (auto *witness = dyn_cast<FuncDecl>(witnessInfo->first)) {
+        auto synthesizeConformance = [&]() {
+          ProtocolConformanceRef synthesized(protocol);
+          auto witnessLoc = getConstraintLocator(
+              /*anchor=*/{}, LocatorPathElt::Witness(witness));
+          SynthesizedConformances.insert({witnessLoc, synthesized});
+          return recordConformance(synthesized);
+        };
+
         if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
           if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
-            return recordConformance(ProtocolConformanceRef(protocol));
+            return synthesizeConformance();
         }
       }
     }

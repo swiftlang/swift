@@ -254,6 +254,10 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEltGenericEnv : PackElementGenericEnvironments)
     solution.PackElementGenericEnvironments.push_back(packEltGenericEnv);
 
+  for (const auto &synthesized : SynthesizedConformances) {
+    solution.SynthesizedConformances.insert(synthesized);
+  }
+
   return solution;
 }
 
@@ -404,6 +408,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
     ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  }
+
+  for (auto &synthesized : solution.SynthesizedConformances) {
+    SynthesizedConformances.insert(synthesized);
   }
 
   // Register any fixes produced along this path.
@@ -686,6 +694,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
+  numSynthesizedConformances = cs.SynthesizedConformances.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -831,6 +840,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any implicitly generated root expressions for `.callAsFunction`
   // which are no longer in scope.
   truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
+
+  // Remove any implicitly synthesized conformances.
+  truncate(cs.SynthesizedConformances, numSynthesizedConformances);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

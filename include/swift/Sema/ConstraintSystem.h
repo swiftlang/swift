@@ -1627,6 +1627,11 @@ public:
   llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
       ImplicitCallAsFunctionRoots;
 
+  /// The set of conformances synthesized during solving (i.e. for
+  /// ad-hoc distributed `SerializationRequirement` conformances).
+  llvm::MapVector<ConstraintLocator *, ProtocolConformanceRef>
+      SynthesizedConformances;
+
   /// Record a new argument matching choice for given locator that maps a
   /// single argument to a single parameter.
   void recordSingleArgMatchingChoice(ConstraintLocator *locator);
@@ -2415,6 +2420,11 @@ public:
   llvm::SmallMapVector<ConstraintLocator *, UnresolvedDotExpr *, 2>
       ImplicitCallAsFunctionRoots;
 
+  /// The set of conformances synthesized during solving (i.e. for
+  /// ad-hoc distributed `SerializationRequirement` conformances).
+  llvm::MapVector<ConstraintLocator *, ProtocolConformanceRef>
+      SynthesizedConformances;
+
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -2937,6 +2947,9 @@ public:
 
     /// The length of \c ImplicitCallAsFunctionRoots.
     unsigned numImplicitCallAsFunctionRoots;
+
+    /// The length of \c SynthesizedConformances.
+    unsigned numSynthesizedConformances;
 
     /// The previous score.
     Score PreviousScore;
