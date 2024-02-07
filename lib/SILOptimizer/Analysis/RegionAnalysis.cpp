@@ -1434,8 +1434,12 @@ public:
 
     if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst)) {
       foundResults.emplace_back(tryApplyInst->getNormalBB()->getArgument(0));
-      if (tryApplyInst->getErrorBB()->getNumArguments() > 0)
+      if (tryApplyInst->getErrorBB()->getNumArguments() > 0) {
         foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
+      }
+      for (auto indirectResults : tryApplyInst->getIndirectSILResults()) {
+        foundResults.emplace_back(indirectResults);
+      }
       return;
     }
 
@@ -1800,10 +1804,10 @@ public:
     };
 
     if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutSelf());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
       handleSILSelf(&applySite.getSelfArgumentOperand());
     } else {
-      handleSILOperands(applySite->getAllOperands());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
     }
 
     // non-sendable results can't be returned from cross-isolation calls without
