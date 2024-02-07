@@ -2872,7 +2872,7 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
     return true;
   // Exclude overrides in an @_objcImplementation extension; the decl they're
   // overriding is declared elsewhere.
-  if (VD->isImplicit() && VD->getOverriddenDecl()) {
+  if (VD->getOverriddenDecl()) {
     auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
     if (ED && ED->isObjCImplementation())
       return true;
