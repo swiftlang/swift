@@ -1076,7 +1076,8 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createEndApply(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
+                                        getOpValue(Inst->getOperand()),
+                                        getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

@@ -1548,7 +1548,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
   case SILInstructionKind::AbortApplyInst:
-  case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::IsEscapingClosureInst:
@@ -1595,6 +1594,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                                                      : false;
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::EndApplyInst: {
+    const auto *eai = cast<EndApplyInst>(&SI);
+    writeOneTypeOneOperandLayout(
+      eai->getKind(), 0, eai->getType(), eai->getOperand());
     break;
   }
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
