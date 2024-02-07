@@ -132,7 +132,6 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *borrowLifetimeParamIndices;
-  IndexSubset *mutateLifetimeParamIndices;
 
   static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
                                                  unsigned index,
@@ -147,21 +146,17 @@ class LifetimeDependenceInfo {
 public:
   LifetimeDependenceInfo()
       : inheritLifetimeParamIndices(nullptr),
-        borrowLifetimeParamIndices(nullptr),
-        mutateLifetimeParamIndices(nullptr) {}
+        borrowLifetimeParamIndices(nullptr) {}
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
-                         IndexSubset *borrowLifetimeParamIndices,
-                         IndexSubset *mutateLifetimeParamIndices)
+                         IndexSubset *borrowLifetimeParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
-        borrowLifetimeParamIndices(borrowLifetimeParamIndices),
-        mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
+        borrowLifetimeParamIndices(borrowLifetimeParamIndices) {}
 
   operator bool() const { return !empty(); }
 
   bool empty() const {
     return inheritLifetimeParamIndices == nullptr &&
-           borrowLifetimeParamIndices == nullptr &&
-           mutateLifetimeParamIndices == nullptr;
+           borrowLifetimeParamIndices == nullptr;
   }
 
   bool hasInheritLifetimeParamIndices() const {
@@ -169,9 +164,6 @@ public:
   }
   bool hasBorrowLifetimeParamIndices() const {
     return borrowLifetimeParamIndices != nullptr;
-  }
-  bool hasMutateLifetimeParamIndices() const {
-    return mutateLifetimeParamIndices != nullptr;
   }
 
   std::string getString() const;

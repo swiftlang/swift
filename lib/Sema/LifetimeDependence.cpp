@@ -44,10 +44,6 @@ std::string LifetimeDependenceInfo::getString() const {
     lifetimeDependenceString +=
         "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
   }
-  if (mutateLifetimeParamIndices && !mutateLifetimeParamIndices->isEmpty()) {
-    lifetimeDependenceString +=
-        "_mutate(" + getOnIndices(mutateLifetimeParamIndices) + ")";
-  }
   return lifetimeDependenceString;
 }
 
@@ -57,9 +53,6 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   }
   if (borrowLifetimeParamIndices) {
     borrowLifetimeParamIndices->Profile(ID);
-  }
-  if (mutateLifetimeParamIndices) {
-    mutateLifetimeParamIndices->Profile(ID);
   }
 }
 
@@ -71,18 +64,12 @@ LifetimeDependenceInfo LifetimeDependenceInfo::getForParamIndex(
   auto indexSubset = IndexSubset::get(ctx, capacity, {index});
   if (ownership == ValueOwnership::Owned) {
     return LifetimeDependenceInfo{/*inheritLifetimeParamIndices*/ indexSubset,
-                                  /*borrowLifetimeParamIndices*/ nullptr,
-                                  /*mutateLifetimeParamIndices*/ nullptr};
+                                  /*borrowLifetimeParamIndices*/ nullptr};
   }
-  if (ownership == ValueOwnership::Shared) {
-    return LifetimeDependenceInfo{/*inheritLifetimeParamIndices*/ nullptr,
-                                  /*borrowLifetimeParamIndices*/ indexSubset,
-                                  /*mutateLifetimeParamIndices*/ nullptr};
-  }
-  assert(ownership == ValueOwnership::InOut);
+  assert(ownership == ValueOwnership::Shared ||
+         ownership == ValueOwnership::InOut);
   return LifetimeDependenceInfo{/*inheritLifetimeParamIndices*/ nullptr,
-                                /*borrowLifetimeParamIndices*/ nullptr,
-                                /*mutateLifetimeParamIndices*/ indexSubset};
+                                /*borrowLifetimeParamIndices*/ indexSubset};
 }
 
 void LifetimeDependenceInfo::getConcatenatedData(
@@ -107,9 +94,6 @@ void LifetimeDependenceInfo::getConcatenatedData(
   if (hasBorrowLifetimeParamIndices()) {
     pushData(borrowLifetimeParamIndices);
   }
-  if (hasMutateLifetimeParamIndices()) {
-    pushData(mutateLifetimeParamIndices);
-  }
 }
 
 llvm::Optional<LifetimeDependenceInfo>
@@ -124,7 +108,6 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
 
   SmallBitVector inheritLifetimeParamIndices(capacity);
   SmallBitVector borrowLifetimeParamIndices(capacity);
-  SmallBitVector mutateLifetimeParamIndices(capacity);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDependenceSpecifier specifier,
                                           unsigned paramIndexToSet,
@@ -167,11 +150,10 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
     if (kind == LifetimeDependenceKind::Copy ||
         kind == LifetimeDependenceKind::Consume) {
       inheritLifetimeParamIndices.set(paramIndexToSet);
-    } else if (kind == LifetimeDependenceKind::Borrow) {
-      borrowLifetimeParamIndices.set(paramIndexToSet);
     } else {
-      assert(kind == LifetimeDependenceKind::Mutate);
-      mutateLifetimeParamIndices.set(paramIndexToSet);
+      assert(kind == LifetimeDependenceKind::Borrow ||
+             kind == LifetimeDependenceKind::Mutate);
+      borrowLifetimeParamIndices.set(paramIndexToSet);
     }
     return false;
   };
@@ -247,9 +229,6 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
           : nullptr,
       borrowLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, borrowLifetimeParamIndices)
-          : nullptr,
-      mutateLifetimeParamIndices.any()
-          ? IndexSubset::get(ctx, mutateLifetimeParamIndices)
           : nullptr);
 }
 

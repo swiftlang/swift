@@ -3517,8 +3517,7 @@ private:
     LifetimeDependenceLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
-        lifetimeDependenceInfo.hasBorrowLifetimeParamIndices(),
-        lifetimeDependenceInfo.hasMutateLifetimeParamIndices(), paramIndices);
+        lifetimeDependenceInfo.hasBorrowLifetimeParamIndices(), paramIndices);
   }
 
   void writeGenericParams(const GenericParamList *genericParams) {
