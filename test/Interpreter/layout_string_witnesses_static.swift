@@ -1103,6 +1103,35 @@ func testNotBitwiseTakableBridge() {
 
 testNotBitwiseTakableBridge()
 
+// Regression test for rdar://121868127
+func testMultiPayloadEnumNested() {
+    let ptr = UnsafeMutablePointer<NestedMultiPayloadOuter>.allocate(capacity: 1)
+
+    do {
+        testInit(ptr, to: .b(.b(SimpleClass(x: 23))))
+    }
+
+    do {
+        let y = NestedMultiPayloadOuter.b(.b(SimpleClass(x: 23)))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadEnumNested()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)

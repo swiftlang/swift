@@ -517,7 +517,8 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
         auto enumAddr = typeInfo->getAddressForPointer(castEnumPtr);
 
         auto &strategy = getEnumImplStrategy(IGM, entry.ty);
-        auto tag = strategy.emitFixedGetEnumTag(IGF, entry.ty, enumAddr);
+        auto tag = strategy.emitFixedGetEnumTag(IGF, entry.ty, enumAddr,
+                                                /*maskExtraTagBits*/ true);
         IGF.Builder.CreateRet(tag);
       });
 
