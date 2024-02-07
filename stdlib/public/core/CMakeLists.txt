@@ -313,6 +313,8 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCo
 list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
   "${CMAKE_BINARY_DIR}/lib/swift/host/plugins#${CMAKE_BINARY_DIR}/bin/swift-plugin-server")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
+# temporary debugging of CI failure
+list(APPEND swift_stdlib_compile_flags "-v" "-Rmacro-loading")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
