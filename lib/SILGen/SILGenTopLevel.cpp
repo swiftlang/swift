@@ -20,23 +20,6 @@
 using namespace swift;
 using namespace Lowering;
 
-static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl) {
-  // Synthesize an exit function with this interface.
-  // @_extern(c)
-  // func exit(_: Int32) -> Never
-  ParameterList *params =
-      ParameterList::createWithoutLoc(ParamDecl::createImplicit(
-          ctx, Identifier(), Identifier(), ctx.getInt32Type(), moduleDecl));
-  FuncDecl *exitFuncDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None,
-      DeclName(ctx, DeclBaseName(ctx.getIdentifier("exit")), params), {},
-      /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
-      ctx.getNeverType(), moduleDecl);
-  exitFuncDecl->getAttrs().add(new (ctx) ExternAttr(
-      llvm::None, llvm::None, ExternKind::C, /*implicit*/ true));
-  return exitFuncDecl;
-}
-
 void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
 
   auto EntryRef = SILDeclRef::getMainFileEntryPoint(SF);
@@ -102,10 +85,7 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
   SILType returnType;
   if (isAsyncTopLevel) {
     FuncDecl *exitFuncDecl = getExit();
-    if (!exitFuncDecl) {
-      // If it doesn't exist, we can conjure one up instead of crashing
-      exitFuncDecl = synthesizeExit(getASTContext(), TopLevel->getModule().getSwiftModule());
-    }
+    assert(exitFuncDecl && "Failed to find exit function declaration");
     exitFunc = getFunction(
         SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
         NotForDefinition);
@@ -234,10 +214,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
     B.createReturn(loc, exitCode);
   } else {
     FuncDecl *exitFuncDecl = SGM.getExit();
-    if (!exitFuncDecl) {
-      // If it doesn't exist, we can conjure one up instead of crashing
-      exitFuncDecl = synthesizeExit(getASTContext(), mainFunc->getModuleContext());
-    }
+    assert(exitFuncDecl && "Failed to find exit function declaration");
     SILFunction *exitSILFunc = SGM.getFunction(
         SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
         NotForDefinition);
