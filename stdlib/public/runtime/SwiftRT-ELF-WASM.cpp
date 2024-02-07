@@ -36,31 +36,40 @@ static const void *__backtraceRef __attribute__((used))
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
 #if defined(__ELF__)
-# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"aR\"\n");
+# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"a\"\n");
+# define DECLARE_EMPTY_RETAINED_METADATA_SECTION(name) __asm__("\t.section " #name ",\"aR\"\n");
 #elif defined(__wasm__)
 # define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"\",@\n");
+# define DECLARE_EMPTY_RETAINED_METADATA_SECTION(name) DECLAREDECLARE_EMPTY_METADATA_SECTION(name)
 #endif
 
-#define DECLARE_SWIFT_SECTION(name)                                                          \
-  DECLARE_EMPTY_METADATA_SECTION(name)                                                                \
+#define DECLARE_SWIFT_ENCAPSULATION_SYMBOLS(name) \
   __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __start_##name; \
   __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __stop_##name;
 
+#define DECLARE_SWIFT_SECTION(name) \
+  DECLARE_EMPTY_METADATA_SECTION(name) \
+  DECLARE_SWIFT_ENCAPSULATION_SYMBOLS(name)
+
+#define DECLARE_SWIFT_RETAINED_SECTION(name) \
+  DECLARE_EMPTY_RETAINED_METADATA_SECTION(name) \
+  DECLARE_SWIFT_ENCAPSULATION_SYMBOLS(name)
+
 extern "C" {
-DECLARE_SWIFT_SECTION(swift5_protocols)
-DECLARE_SWIFT_SECTION(swift5_protocol_conformances)
-DECLARE_SWIFT_SECTION(swift5_type_metadata)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_protocols)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_protocol_conformances)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_type_metadata)
 
 DECLARE_SWIFT_SECTION(swift5_typeref)
 DECLARE_SWIFT_SECTION(swift5_reflstr)
-DECLARE_SWIFT_SECTION(swift5_fieldmd)
-DECLARE_SWIFT_SECTION(swift5_assocty)
-DECLARE_SWIFT_SECTION(swift5_replace)
-DECLARE_SWIFT_SECTION(swift5_replac2)
-DECLARE_SWIFT_SECTION(swift5_builtin)
-DECLARE_SWIFT_SECTION(swift5_capture)
-DECLARE_SWIFT_SECTION(swift5_mpenum)
-DECLARE_SWIFT_SECTION(swift5_accessible_functions)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_fieldmd)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_assocty)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_replace)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_replac2)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_builtin)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_capture)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_mpenum)
+DECLARE_SWIFT_RETAINED_SECTION(swift5_accessible_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
 }
 
