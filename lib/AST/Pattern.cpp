@@ -775,13 +775,19 @@ Pattern::getOwnership(
     }
     
     void visitNamedPattern(NamedPattern *p) {
-      // `var` and `let` bindings consume the matched value.
-      // TODO: borrowing/mutating/consuming parameters
       switch (p->getDecl()->getIntroducer()) {
       case VarDecl::Introducer::Let:
       case VarDecl::Introducer::Var:
-        // `let` and `var` consume the bound value to move it into a new
-        // independent variable.
+        // If the subpattern type is copyable, then we can bind the variable
+        // by copying without requiring more than a borrow of the original.
+        if (!p->hasType() || !p->getType()->isNoncopyable()) {
+          break;
+        }
+        // TODO: An explicit `consuming` binding kind consumes regardless of
+        // type.
+      
+        // Noncopyable `let` and `var` consume the bound value to move it into
+        // a new independent variable.
         increaseOwnership(ValueOwnership::Owned, p);
         break;
         
@@ -805,9 +811,9 @@ Pattern::getOwnership(
     }
     
     void visitIsPattern(IsPattern *p) {
-      // Casting currently always consumes.
-      // TODO: Sometimes maybe it doesn't need to be.
-      increaseOwnership(ValueOwnership::Owned, p);
+      // Casting has to either be possible by borrowing or copying the subject,
+      // or can't be supported in a pattern match.
+      /* no change */
     }
     
     void visitEnumElementPattern(EnumElementPattern *p) {
@@ -821,11 +827,9 @@ Pattern::getOwnership(
     }
     
     void visitExprPattern(ExprPattern *p) {
-      // We can't get the ownership reliably if the pattern hasn't been resolved.
-      if (!p->isResolved()) {
-        return;
-      }
-      increaseOwnership(p->getMatchOperandOwnership(), p);
+      // A `~=` operator has to be able to either borrow or copy the operand,
+      // or can't be used.
+      /* no change */
     }
   };
   
