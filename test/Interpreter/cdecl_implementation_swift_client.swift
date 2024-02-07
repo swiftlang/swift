@@ -1,5 +1,5 @@
-// Test doesn't pass on all platforms (rdar://101543397)
-// REQUIRES: OS=macosx
+// Test doesn't pass on devices or against OS dylibs (rdar://101543397)
+// UNSUPPORTED: remote_run
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

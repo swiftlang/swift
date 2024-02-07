@@ -1,3 +1,8 @@
+// Test doesn't pass on devices or against OS dylibs (rdar://101543397)
+// UNSUPPORTED: remote_run
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // RUN: %empty-directory(%t/include)
 // RUN: %empty-directory(%t/bin)
 
