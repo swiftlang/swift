@@ -57,6 +57,13 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
       }
     }
 
+    if (auto *si = dyn_cast<StoreInst>(&inst)) {
+      if (si->getDest() == allocInst &&
+          si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign) {
+        return si->getSrc();
+      }
+    }
+
     // If we do not identify the write... return SILValue(). We weren't able to
     // understand the write.
     return SILValue();
