@@ -6067,14 +6067,6 @@ executing the ``begin_apply``) were being "called" by the ``yield``:
   or move the value from that position before ending or aborting the
   coroutine.
 
-A coroutine optionally may produce normal results. These do not have
-``@yields`` annotation in the result type tuple.
-::
-  (%float, %token) = begin_apply %0() : $@yield_once () -> (@yields Float, Int)
-
-Normal results of a coroutine are produced by the corresponding ``end_apply``
-instruction.
-
 A ``begin_apply`` must be uniquely either ended or aborted before
 exiting the function or looping to an earlier portion of the function.
 
@@ -6104,9 +6096,9 @@ end_apply
 `````````
 ::
 
-  sil-instruction ::= 'end_apply' sil-value 'as' sil-type
+  sil-instruction ::= 'end_apply' sil-value
 
-  end_apply %token as $()
+  end_apply %token
 
 Ends the given coroutine activation, which is currently suspended at
 a ``yield`` instruction.  Transfers control to the coroutine and takes
@@ -6116,8 +6108,8 @@ when the coroutine reaches a ``return`` instruction.
 The operand must always be the token result of a ``begin_apply``
 instruction, which is why it need not specify a type.
 
-The result of ``end_apply`` is the normal result of the coroutine function (the
-operand of the ``return`` instruction)."
+``end_apply`` currently has no instruction results.  If coroutines were
+allowed to have normal results, they would be producted by ``end_apply``.
 
 When throwing coroutines are supported, there will need to be a
 ``try_end_apply`` instruction.

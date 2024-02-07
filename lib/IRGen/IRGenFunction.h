@@ -155,16 +155,6 @@ public:
     CoroutineHandle = handle;
   }
 
-  llvm::BasicBlock *getCoroutineExitBlock() const {
-    return CoroutineExitBlock;
-  }
-
-  void setCoroutineExitBlock(llvm::BasicBlock *block) {
-    assert(CoroutineExitBlock == nullptr && "already set exit BB");
-    assert(block != nullptr && "setting a null exit BB");
-    CoroutineExitBlock = block;
-  }
-
   llvm::Value *getAsyncTask();
   llvm::Value *getAsyncContext();
   void storeCurrentAsyncContext(llvm::Value *context);
@@ -246,7 +236,7 @@ private:
   bool callsAnyAlwaysInlineThunksWithForeignExceptionTraps = false;
 
 public:
-  void emitCoroutineOrAsyncExit(bool isUnwind);
+  void emitCoroutineOrAsyncExit();
 
 //--- Helper methods -----------------------------------------------------------
 public:

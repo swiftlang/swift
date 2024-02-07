@@ -4729,27 +4729,24 @@ public:
   using Representation = SILExtInfoBuilder::Representation;
 
 private:
-  unsigned NumParameters = 0;
+  unsigned NumParameters;
 
-  // These are *normal* results
-  unsigned NumAnyResults = 0;         // Not including the ErrorResult.
-  unsigned NumAnyIndirectFormalResults = 0; // Subset of NumAnyResults.
-  unsigned NumPackResults = 0; // Subset of NumAnyIndirectFormalResults.
-  // These are *yield* results
-  unsigned NumAnyYieldResults = 0;  // Not including the ErrorResult.
-  unsigned NumAnyIndirectFormalYieldResults = 0; // Subset of NumAnyYieldResults.
-  unsigned NumPackYieldResults = 0; // Subset of NumAnyIndirectFormalYieldResults.
+  // These are *normal* results if this is not a coroutine and *yield* results
+  // otherwise.
+  unsigned NumAnyResults;         // Not including the ErrorResult.
+  unsigned NumAnyIndirectFormalResults; // Subset of NumAnyResults.
+  unsigned NumPackResults; // Subset of NumAnyIndirectFormalResults.
 
   // [NOTE: SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
-  //   SILResultInfo[NumAnyResults]
+  //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
   //   SILResultInfo?    // if hasErrorResult()
-  //   SILYieldInfo[NumAnyYieldResults]
+  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   SubstitutionMap[HasPatternSubs + HasInvocationSubs]
-  //   CanType?          // if NumAnyResults > 1, formal result cache
-  //   CanType?          // if NumAnyResults > 1, all result cache
+  //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
+  //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
   CanGenericSignature InvocationGenericSig;
   ProtocolConformanceRef WitnessMethodConformance;
@@ -4788,7 +4785,7 @@ private:
 
   /// Do we have slots for caches of the normal-result tuple type?
   bool hasResultCache() const {
-    return NumAnyResults > 1;
+    return NumAnyResults > 1 && !isCoroutine();
   }
 
   CanType &getMutableFormalResultsCache() const {
@@ -4876,14 +4873,14 @@ public:
   ArrayRef<SILYieldInfo> getYields() const {
     return const_cast<SILFunctionType *>(this)->getMutableYields();
   }
-  unsigned getNumYields() const { return NumAnyYieldResults; }
+  unsigned getNumYields() const { return isCoroutine() ? NumAnyResults : 0; }
 
   /// Return the array of all result information. This may contain inter-mingled
   /// direct and indirect results.
   ArrayRef<SILResultInfo> getResults() const {
     return const_cast<SILFunctionType *>(this)->getMutableResults();
   }
-  unsigned getNumResults() const { return NumAnyResults; }
+  unsigned getNumResults() const { return isCoroutine() ? 0 : NumAnyResults; }
 
   ArrayRef<SILResultInfo> getResultsWithError() const {
     return const_cast<SILFunctionType *>(this)->getMutableResultsWithError();
@@ -4920,17 +4917,17 @@ public:
   // indirect property, not the SIL indirect property, should be consulted to
   // determine whether function reabstraction is necessary.
   unsigned getNumIndirectFormalResults() const {
-    return NumAnyIndirectFormalResults;
+    return isCoroutine() ? 0 : NumAnyIndirectFormalResults;
   }
   /// Does this function have any formally indirect results?
   bool hasIndirectFormalResults() const {
     return getNumIndirectFormalResults() != 0;
   }
   unsigned getNumDirectFormalResults() const {
-    return NumAnyResults - NumAnyIndirectFormalResults;
+    return isCoroutine() ? 0 : NumAnyResults - NumAnyIndirectFormalResults;
   }
   unsigned getNumPackResults() const {
-    return NumPackResults;
+    return isCoroutine() ? 0 : NumPackResults;
   }
   bool hasIndirectErrorResult() const {
     return hasErrorResult() && getErrorResult().isFormalIndirect();
@@ -4988,17 +4985,17 @@ public:
                                      TypeExpansionContext expansion);
 
   unsigned getNumIndirectFormalYields() const {
-    return NumAnyIndirectFormalYieldResults;
+    return isCoroutine() ? NumAnyIndirectFormalResults : 0;
   }
   /// Does this function have any formally indirect yields?
   bool hasIndirectFormalYields() const {
     return getNumIndirectFormalYields() != 0;
   }
   unsigned getNumDirectFormalYields() const {
-    return NumAnyYieldResults - NumAnyIndirectFormalYieldResults;
+    return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
   }
   unsigned getNumPackYields() const {
-    return NumPackYieldResults;
+    return isCoroutine() ? NumPackResults : 0;
   }
 
   struct IndirectFormalYieldFilter {

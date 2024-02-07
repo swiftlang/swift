@@ -207,16 +207,13 @@ public:
     // instructions in the caller.  That means this entire path is
     // unreachable.
     if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
-      ReturnInst *retInst = dyn_cast<ReturnInst>(terminator);
-      auto *returnBB = retInst ? EndApplyReturnBB : AbortApplyReturnBB;
-      if (retInst && EndApply)
-        EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
+      bool isNormal = isa<ReturnInst>(terminator);
+      auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
       if (returnBB) {
         Builder->createBranch(Loc, returnBB);
       } else {
         Builder->createUnreachable(Loc);
       }
-
       return true;
     }
 
