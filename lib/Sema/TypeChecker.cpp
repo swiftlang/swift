@@ -529,7 +529,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   auto request = InferredGenericSignatureRequest{
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
-      {}, {},
+      {}, {}, genericParams->getLAngleLoc(),
       /*isExtension=*/false,
       allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,

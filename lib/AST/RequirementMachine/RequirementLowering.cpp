@@ -676,8 +676,7 @@ struct InferRequirementsWalker : public TypeWalker {
 /// We automatically infer 'T : Hashable' from the fact that 'struct Set'
 /// declares a Hashable requirement on its generic parameter.
 void swift::rewriting::inferRequirements(
-    Type type, SourceLoc loc,
-    ModuleDecl *module, DeclContext *dc,
+    Type type, ModuleDecl *module, DeclContext *dc,
     SmallVectorImpl<StructuralRequirement> &result) {
   if (!type)
     return;
@@ -707,13 +706,8 @@ void swift::rewriting::realizeRequirement(
     auto secondType = req.getSecondType();
 
     if (shouldInferRequirements) {
-      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
-
-      auto secondLoc = (reqRepr ? reqRepr->getConstraintRepr()->getStartLoc()
-                                : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
+      inferRequirements(secondType, moduleForInference, dc, result);
     }
 
     realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
@@ -723,9 +717,7 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::Layout: {
     if (shouldInferRequirements) {
       auto firstType = req.getFirstType();
-      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
     }
 
     result.push_back({req, loc});
@@ -735,14 +727,10 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameType: {
     if (shouldInferRequirements) {
       auto firstType = req.getFirstType();
-      auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
 
       auto secondType = req.getSecondType();
-      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
-                                : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
+      inferRequirements(secondType, moduleForInference, dc, result);
     }
 
     result.push_back({req, loc});
@@ -843,13 +831,13 @@ void swift::rewriting::realizeInheritedRequirements(
 
     if (!inheritedType) continue;
 
-    auto *typeRepr = inheritedTypes.getTypeRepr(index);
-    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-
     if (shouldInferRequirements) {
-      inferRequirements(inheritedType, loc, moduleForInference,
+      inferRequirements(inheritedType, moduleForInference,
                         decl->getInnermostDeclContext(), result);
     }
+
+    auto *typeRepr = inheritedTypes.getTypeRepr(index);
+    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }

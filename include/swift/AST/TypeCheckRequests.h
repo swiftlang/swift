@@ -2008,9 +2008,9 @@ class InferredGenericSignatureRequest :
                                                     GenericParamList *,
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
-                                                    SmallVector<TypeLoc, 2>,
-                                                    bool, bool),
-                         RequestFlags::Cached> {
+                                                    SmallVector<TypeBase *, 2>,
+                                                    SourceLoc, bool, bool),
+                         RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -2024,13 +2024,10 @@ private:
            GenericParamList *genericParams,
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
-           SmallVector<TypeLoc, 2> inferenceSources,
-           bool isExtension, bool allowInverses) const;
+           SmallVector<TypeBase *, 2> inferenceSources,
+           SourceLoc loc, bool isExtension, bool allowInverses) const;
 
 public:
-  // Separate caching.
-  bool isCached() const { return true; }
-
   /// Inferred generic signature requests don't have source-location info.
   SourceLoc getNearestLoc() const {
     return SourceLoc();

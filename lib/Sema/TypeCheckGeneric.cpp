@@ -118,6 +118,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         WhereClauseOwner(),
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
+        repr->getLoc(),
         /*isExtension=*/false,
         /*allowInverses=*/true};
 
@@ -681,9 +682,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   GenericSignature parentSig;
-  SmallVector<TypeLoc, 2> inferenceSources;
+  SmallVector<TypeBase *, 2> inferenceSources;
   SmallVector<Requirement, 2> extraReqs;
+  SourceLoc loc;
+
   if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
+    loc = VD->getLoc();
+
     parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
 
     auto func = dyn_cast<AbstractFunctionDecl>(VD);
@@ -728,7 +733,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         const auto type =
             resolution.withOptions(paramOptions).resolveType(typeRepr);
 
-        inferenceSources.emplace_back(typeRepr, type);
+        inferenceSources.push_back(type.getPointer());
       }
 
       // Handle the thrown error type.
@@ -743,7 +748,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
               .resolveType(thrownTypeRepr);
 
           // Add this type as an inference source.
-          inferenceSources.emplace_back(thrownTypeRepr, thrownType);
+          inferenceSources.push_back(thrownType.getPointer());
 
           // Add conformance of this type to the Error protocol.
           if (auto errorProtocol = ctx.getErrorDecl()) {
@@ -771,10 +776,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
             resolution.withOptions(TypeResolverContext::FunctionResult)
                 .resolveType(resultTypeRepr);
 
-        inferenceSources.emplace_back(resultTypeRepr, resultType);
+        inferenceSources.push_back(resultType.getPointer());
       }
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
+    loc = ext->getLoc();
+
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
@@ -804,7 +811,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   auto request = InferredGenericSignatureRequest{
       parentSig.getPointer(),
       genericParams, WhereClauseOwner(GC),
-      extraReqs, inferenceSources,
+      extraReqs, inferenceSources, loc,
       /*isExtension=*/isa<ExtensionDecl>(GC),
       /*allowInverses=*/true};
   return evaluateOrDefault(ctx.evaluator, request,
