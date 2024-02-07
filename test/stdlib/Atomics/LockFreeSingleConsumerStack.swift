@@ -17,8 +17,8 @@ class LockFreeSingleConsumerStack<Element> {
   }
   typealias NodePtr = UnsafeMutablePointer<Node>
 
-  private var _last = Atomic<NodePtr?>(nil)
-  private var _consumerCount = Atomic<Int>(0)
+  private let _last = Atomic<NodePtr?>(nil)
+  private let _consumerCount = Atomic<Int>(0)
   private var foo = 0
 
   deinit {
