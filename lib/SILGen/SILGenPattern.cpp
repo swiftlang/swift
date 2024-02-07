@@ -531,7 +531,8 @@ private:
                                bool forIrrefutableRow, bool hasMultipleItems);
                                
   // Bind noncopyable variable bindings as borrows.
-  void bindIrrefutableBorrows(const ClauseRow &row, ArgArray args);
+  void bindIrrefutableBorrows(const ClauseRow &row, ArgArray args,
+                               bool forIrrefutableRow, bool hasMultipleItems);
   
   // End the borrow of the subject and derived values during a move-only match.
   void unbindAndEndBorrows(const ClauseRow &row, ArgArray args);
@@ -1187,7 +1188,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
     // If the final pattern match is only borrowing as well,
     // we can bind the variables immediately here too.
     if (*ownership <= ValueOwnership::Shared) {
-      bindIrrefutableBorrows(clauses[row], args);
+      bindIrrefutableBorrows(clauses[row], args,
+                             !hasGuard, hasMultipleItems);
     }
     
     if (hasGuard) {
@@ -1286,7 +1288,9 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
 }
 
 void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
-                                                  ArgArray args) {
+                                                  ArgArray args,
+                                                   bool forIrrefutableRow,
+                                                   bool hasMultipleItems) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
     if (!row[i]) // We use null patterns to mean artificial AnyPatterns
@@ -1301,7 +1305,16 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
-      bindBorrow(pattern, named->getDecl(), args[i]);
+      // If the subpattern matches a copyable type, and the match isn't
+      // explicitly `borrowing`, then we can bind it as a normal copyable
+      // value.
+      if (named->getDecl()->getIntroducer() != VarDecl::Introducer::Borrowing
+          && !named->getType()->isNoncopyable()) {
+        bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
+                     hasMultipleItems);
+      } else {
+        bindBorrow(pattern, named->getDecl(), args[i]);
+      }
       break;
     }
     default:
@@ -1391,14 +1404,25 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   assert(value.getFinalConsumption() == CastConsumptionKind::BorrowAlways);
   
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
-  if (bindValue.getType().isMoveOnly()) {
-    if (bindValue.getType().isObject()) {
-      // Create a notional copy for the borrow checker to use.
-      bindValue = bindValue.copy(SGF, pattern);
+
+  // Borrow bindings of copyable type should still be no-implicit-copy.
+  if (!bindValue.getType().isMoveOnly()) {
+    if (bindValue.getType().isAddress()) {
+      bindValue = ManagedValue::forBorrowedAddressRValue(
+        SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
+    } else {
+      bindValue =
+        SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(pattern, bindValue);
     }
-    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
-                MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
   }
+
+  if (bindValue.getType().isObject()) {
+    // Create a notional copy for the borrow checker to use.
+    bindValue = bindValue.copy(SGF, pattern);
+  }
+  bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+
   SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
 }
 
@@ -1420,7 +1444,9 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
     // subject yet.
     if (auto ownership = getNoncopyableOwnership()) {
       if (*ownership > ValueOwnership::Shared) {
-        bindIrrefutableBorrows(row, args);
+        bindIrrefutableBorrows(row, args,
+                               /*irrefutable*/ false,
+                               /*multiple items*/ false);
       }
     }
     testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();

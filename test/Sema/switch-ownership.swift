@@ -31,7 +31,7 @@ func test(value: A) {
     case C():
         break
     // CHECK: (case_stmt
-    // CHECK:   (case_label_item ownership=consuming
+    // CHECK:   (case_label_item ownership=borrowing
     // CHECK:     (pattern_expr type="A" ownership=consuming
     case D():
         break
@@ -46,7 +46,7 @@ func test(value: A) {
     case F():
         break
     // CHECK: (case_stmt
-    // CHECK:   (case_label_item ownership=consuming
+    // CHECK:   (case_label_item ownership=borrowing
     // CHECK:     (pattern_expr type="A" ownership=consuming
     case G():
         break
