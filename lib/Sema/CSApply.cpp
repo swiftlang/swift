@@ -105,6 +105,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
     subs[opened.first] = type;
   }
 
+  auto *DC = constraintSystem->DC;
   auto lookupConformanceFn =
       [&](CanType original, Type replacement,
           ProtocolDecl *protoType) -> ProtocolConformanceRef {
@@ -115,8 +116,25 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
     }
 
     // FIXME: Retrieve the conformance from the solution itself.
-    return getConstraintSystem().DC->getParentModule()->lookupConformance(
-        replacement, protoType, /*allowMissing=*/true);
+    auto conformance =
+        getConstraintSystem().DC->getParentModule()->lookupConformance(
+            replacement, protoType, /*allowMissing=*/true);
+
+    if (conformance.isInvalid()) {
+      if (auto *funcDecl = dyn_cast<FuncDecl>(decl.getPtrOrNull())) {
+        if (funcDecl->isDistributedActorSystemRemoteCall(
+                /*isVoidResult=*/false)) {
+          // `Res` conformances would be looked by at runtime but are
+          // guaranteed to be there by Sema because all distributed
+          // methods and accessors are checked to conform to
+          // `SerializationRequirement` of `DistributedActorSystem`.
+          if (original->isEqual(funcDecl->getResultInterfaceType()))
+            return ProtocolConformanceRef(protoType);
+        }
+      }
+    }
+
+    return conformance;
   };
 
   return SubstitutionMap::get(sig,
