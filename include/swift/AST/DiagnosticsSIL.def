@@ -894,8 +894,20 @@ NOTE(sil_referencebinding_inout_binding_here, none,
       "inout binding here",
       ())
 
-// Warnings arising from the flow-sensitive checking of Sendability of
-// non-Sendable values
+//===----------------------------------------------------------------------===//
+//                  MARK: Region Based Isolation Diagnostics
+//===----------------------------------------------------------------------===//
+
+NOTE(regionbasedisolation_maybe_race, none,
+     "access here could race", ())
+ERROR(regionbasedisolation_unknown_pattern, none,
+      "pattern that the region based isolation checker does not understand how to check. Please file a bug",
+      ())
+
+//===---
+// Old Transfer Non Sendable Diagnostics
+//
+
 ERROR(regionbasedisolation_selforargtransferred, none,
       "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
 ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
@@ -919,14 +931,28 @@ ERROR(regionbasedisolation_arg_transferred, none,
 ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
       "task isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
       (Type))
-NOTE(regionbasedisolation_maybe_race, none,
-     "access here could race", ())
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
      "value is %0 since it is in the same region as %1",
      (StringRef, DeclBaseName))
-ERROR(regionbasedisolation_unknown_pattern, none,
-      "pattern that the region based isolation checker does not understand how to check. Please file a bug",
-      ())
+
+//===---
+// New Transfer Non Sendable Diagnostics
+//
+
+ERROR(regionbasedisolation_named_transfer_yields_race, none,
+      "transferring non-Sendable value %0 could yield races with later accesses",
+      (Identifier))
+NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
+     "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",
+     (Identifier, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_named_info_isolated_capture, none,
+     "%1 value %0 is captured by %2 closure. Later local uses could race",
+     (Identifier, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_named_arg_info, none,
+     "Transferring task isolated function argument %0 could yield races with caller uses",
+     (Identifier))
+NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
+     "Cannot access a transferring parameter after the parameter has been transferred", ())
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,

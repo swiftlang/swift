@@ -101,11 +101,12 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 }
 
 @GlobalActor func useGlobalActor6() async {
-  var x = StructContainingValue()
+  var x = StructContainingValue() // expected-tns-note {{variable defined here}}
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring value of non-Sendable type 'StructContainingValue' from global actor 'GlobalActor'-isolated context to nonisolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
 }

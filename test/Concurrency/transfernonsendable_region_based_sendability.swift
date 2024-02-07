@@ -247,8 +247,8 @@ func test_indirect_regions(a : A, b : Bool) async {
 
     // same aux value points to both 0 and 1
     let ns5_aux = NonSendable();
-    let ns5_0 = ns5_aux.x;
-    let ns5_1 = ns5_aux.y;
+    let ns5_0 = ns5_aux.x; // expected-tns-note {{variable defined here}}
+    let ns5_1 = ns5_aux.y; // expected-tns-note {{variable defined here}}
 
     // now check for each pair that consuming half of it consumed the other half
 
@@ -353,8 +353,9 @@ func test_indirect_regions(a : A, b : Bool) async {
     }
 
     if (b) {
-        await a.foo(ns5_0) // expected-tns-warning {{transferring value of non-Sendable type 'Any' from nonisolated context to actor-isolated context; later accesses could race}}
-        // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
+        await a.foo(ns5_0) // expected-tns-warning {{transferring non-Sendable value 'ns5_0' could yield races with later accesses}}
+        // expected-tns-note @-1 {{'ns5_0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+        // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
         if b {
           print(ns5_0) // expected-tns-note {{access here could race}}
@@ -362,8 +363,9 @@ func test_indirect_regions(a : A, b : Bool) async {
           print(ns5_1) // expected-tns-note {{access here could race}}
         }
     } else {
-        await a.foo(ns5_1) // expected-tns-warning {{transferring value of non-Sendable type 'Any' from nonisolated context to actor-isolated context; later accesses could race}}
-        // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
+        await a.foo(ns5_1) // expected-tns-warning {{transferring non-Sendable value 'ns5_1' could yield races with later accesses}}
+        // expected-tns-note @-1 {{'ns5_1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
+        // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
         if b {
           print(ns5_0) // expected-tns-note {{access here could race}}

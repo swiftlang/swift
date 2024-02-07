@@ -90,12 +90,16 @@ func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) 
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // expected-note @-1:54 {{variable defined here}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   await transferToMain(x) // expected-note {{access here could race}}
 }
 
 func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // expected-note @-1 {{variable defined here}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   useValue(x) // expected-note {{access here could race}}
 }
 
@@ -109,12 +113,16 @@ actor MyActor {
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
-    await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from actor-isolated context to main actor-isolated context; later accesses could race}}
+    // expected-note @-1 {{variable defined here}}
+    await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+    // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     await transferToMain(x) // expected-note {{access here could race}}
   }
 
   func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
-    await transferToMain(x)  // expected-warning {{transferring value of non-Sendable type 'Klass' from actor-isolated context to main actor-isolated context; later accesses could race}}
+    // expected-note @-1 {{variable defined here}}
+    await transferToMain(x)  // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     useValue(x) // expected-note {{access here could race}}
   }
 
@@ -151,8 +159,10 @@ func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
 }
 
 func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
+  // expected-note @-1 {{variable defined here}}
   let _ = x
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   let _ = x // expected-note {{access here could race}}
 }
 
@@ -205,14 +215,17 @@ func canTransferAfterAssign(_ x: transferring Any) async {
 }
 
 func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
+  // expected-note @-1:44 {{variable defined here}}
+
   // Ok, this is disconnected.
   let y = getAny()
 
   // y is transferred into x.
   x = y
 
-  // TODO: Change this to refer to task context? Or to transferring parameter?
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Any' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // TODO: This should refer to the transferring parameter.
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   useValue(x) // expected-note {{access here could race}}
 }
@@ -233,13 +246,16 @@ func assignToEntireValueEliminatesEarlierTransfer(_ x: transferring Any) async {
 }
 
 func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) async {
+  // expected-note @-1 {{variable defined here}}
+
   // Ok, this is disconnected.
   let y = Klass()
 
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context; later accesses could race}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.
   x.first = y
@@ -248,13 +264,16 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
 }
 
 func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) async {
+  // expected-note @-1 {{variable defined here}}
+
   // Ok, this is disconnected.
   let y = Klass()
 
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context; later accesses could race}}
+  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.
   x.first = y // expected-warning {{transferring value of non-Sendable type 'Klass' into transferring parameter; later accesses could race}}

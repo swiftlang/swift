@@ -126,13 +126,17 @@ struct UseDefChainVisitor
     // do not want to treat this as a merge.
     if (auto p = Projection(inst)) {
       switch (p.getKind()) {
+      // Currently if we load and then project_box from a memory location,
+      // we treat that as a projection. This follows the semantics/notes in
+      // getAccessProjectionOperand.
+      case ProjectionKind::Box:
+        return cast<ProjectBoxInst>(inst)->getOperand();
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
       case ProjectionKind::BlockStorageCast:
       case ProjectionKind::BitwiseCast:
-      case ProjectionKind::TailElems:
-      case ProjectionKind::Box:
       case ProjectionKind::Class:
+      case ProjectionKind::TailElems:
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
         // Index is always a merge.
@@ -1289,8 +1293,7 @@ class PartitionOpTranslator {
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
-              if (isNonSendableType(
-                      pbi->getType().getSILBoxFieldType(function))) {
+              if (isNonSendableType(pbi->getType())) {
                 auto trackVal = getTrackableValue(val, true);
                 (void)trackVal;
                 continue;
@@ -1431,8 +1434,12 @@ public:
 
     if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst)) {
       foundResults.emplace_back(tryApplyInst->getNormalBB()->getArgument(0));
-      if (tryApplyInst->getErrorBB()->getNumArguments() > 0)
+      if (tryApplyInst->getErrorBB()->getNumArguments() > 0) {
         foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
+      }
+      for (auto indirectResults : tryApplyInst->getIndirectSILResults()) {
+        foundResults.emplace_back(indirectResults);
+      }
       return;
     }
 
@@ -1797,10 +1804,10 @@ public:
     };
 
     if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutSelf());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
       handleSILSelf(&applySite.getSelfArgumentOperand());
     } else {
-      handleSILOperands(applySite->getAllOperands());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
     }
 
     // non-sendable results can't be returned from cross-isolation calls without
@@ -2109,6 +2116,7 @@ public:
     }
 
     case TranslationSemantics::Asserting:
+      llvm::errs() << "BannedInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found banned instruction?!");
       return;
@@ -2119,6 +2127,7 @@ public:
             return ::isNonSendableType(value->getType(), inst->getFunction());
           }))
         return;
+      llvm::errs() << "BadInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found instruction that is not allowed to "
           "have non-Sendable parameters with such parameters?!");
@@ -2304,7 +2313,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
 CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
-CONSTANT_TRANSLATION(RefToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
@@ -2414,6 +2422,8 @@ CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
 // Require of the value we extract the metatype from.
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
+// These can take a parameter. If it is non-Sendable, use a require.
+CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Require)
 
 //===---
 // Asserting If Non Sendable Parameter
@@ -2454,7 +2464,6 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 // (UnsafeContinuation and UnsafeThrowingContinuation).
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
 
 //===---
@@ -2613,6 +2622,13 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitRefToBridgeObjectInst(RefToBridgeObjectInst *r) {
+  translateSILLookThrough(
+      SILValue(r), r->getOperand(RefToBridgeObjectInst::ConvertedOperand));
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
