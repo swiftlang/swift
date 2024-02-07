@@ -173,6 +173,11 @@ accessible_function_scan_begin(llvm::StringRef name) {
   return {};
 }
 
+static inline ScanTraceState
+distributed_accessible_function_scan_begin(llvm::StringRef name) {
+  return {};
+}
+
 static inline ScanTraceState metadata_scan_begin(Demangle::NodePointer node) {
   return {};
 }

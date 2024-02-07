@@ -89,9 +89,10 @@ void swift::initializeAccessibleFunctionsLookup() {
   void *dstart;
   uintptr_t dsize;
   GET_SECTION_START_AND_SIZE(dstart, dsize, MachOTextSegment,
-                             MachODistributedAccessibleFunctionsSection);
+                             MachOAccessibleProtocolFunctionsSection);
   if (dstart != nullptr && dsize > 0) {
-    addImageDistributedAccessibleFunctionsBlockCallbackUnsafe(__dso_handle, dstart, dsize);
+    addImageAccessibleProtocolFunctionsBlockCallbackUnsafe(__dso_handle, dstart,
+                                                           dsize);
   }
 
 }

@@ -4414,16 +4414,13 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 void IRGenModule::addAccessibleFunction(SILFunction *func) {
   AccessibleFunctions.push_back(func);
 }
+
 void IRGenModule::addAccessibleFunctionDistributedAliased(
     std::string mangledRecordName,
     std::optional<std::string> mangledActorTypeName,
     SILFunction *func) {
-  AliasedAccessibleFunctions.push_back(
-      DistributedAccessibleFunctionData(
-          func,
-          mangledRecordName,
-          mangledActorTypeName
-          ));
+  AccessibleProtocolFunctions.push_back(AccessibleProtocolFunctionsData(
+      func, mangledRecordName, mangledActorTypeName));
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4652,9 +4649,9 @@ void IRGenModule::emitAccessibleFunction(
     std::optional<std::string> mangledActorName,
     std::string mangledFunctionName, SILFunction* func) {
 
-  auto recordTy = func->isDistributed() && mangledActorName.has_value()
-                        ? DistributedAccessibleFunctionRecordTy
-                        : AccessibleFunctionRecordTy;
+  auto recordTy = mangledActorName.has_value()
+                      ? AccessibleProtocolRequirementFunctionRecordTy
+                      : AccessibleFunctionRecordTy;
 
   auto var = new llvm::GlobalVariable(
       Module, recordTy, /*isConstant=*/true,
@@ -4662,24 +4659,28 @@ void IRGenModule::emitAccessibleFunction(
       mangledRecordName);
 
   ConstantInitBuilder builder(*this);
+
+  // ==== Store fields of 'TargetAccessibleFunctionRecord'
   ConstantStructBuilder fields =
       builder.beginStruct(recordTy);
 
-  llvm::Constant *name = getAddrOfGlobalString(
-      // mangledFunctionName, /*willBeRelativelyAddressed=*/true);
-      mangledRecordName, /*willBeRelativelyAddressed=*/true);
-  fields.addRelativeAddress(name);
-
-  if (func->isDistributed()) {
-    fprintf(stderr, "[%s:%d](%s) STORE distributed actor name: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            mangledActorName->c_str());
-    if (mangledActorName) {
-      llvm::Constant *mangledActorNameAddr =
-          getAddrOfGlobalString(*mangledActorName, /*willBeRelativelyAddressed=*/true);
-      fields.addRelativeAddress(mangledActorNameAddr);
+  // -- Field: Name (record name)
+  {
+    llvm::Constant *recordName = nullptr;
+    if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
+      recordName = getAddrOfGlobalString(mangledRecordName,
+                                         /*willBeRelativelyAddressed=*/true);
+    } else if (recordTy == AccessibleFunctionRecordTy) {
+      recordName = getAddrOfGlobalString(mangledFunctionName,
+                                         /*willBeRelativelyAddressed=*/true);
+    } else {
+      assert(false && "Unknown recordTy");
     }
+    assert(recordName && "record name must be initialized");
+    fields.addRelativeAddress(recordName);
   }
 
+  // -- Field: GenericEnvironment
   llvm::Constant *genericEnvironment = nullptr;
 
   GenericSignature signature;
@@ -4691,14 +4692,15 @@ void IRGenModule::emitAccessibleFunction(
     genericEnvironment =
         getAddrOfGenericEnvironment(signature.getCanonicalSignature());
   }
-
   fields.addRelativeAddressOrNull(genericEnvironment);
 
+  // -- Field: FunctionType
   llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
                                     MangledTypeRefRole::Metadata)
                              .first;
   fields.addRelativeAddress(type);
 
+  // -- Field: Function
   llvm::Constant *funcAddr = nullptr;
   if (func->isDistributed()) {
     funcAddr = getAddrOfAsyncFunctionPointer(
@@ -4711,9 +4713,30 @@ void IRGenModule::emitAccessibleFunction(
 
   fields.addRelativeAddress(funcAddr);
 
+  // -- Field: Flags
   AccessibleFunctionFlags flags;
   flags.setDistributed(func->isDistributed());
   fields.addInt32(flags.getOpaqueValue());
+
+  // ---- End of 'TargetAccessibleFunctionRecord' fields
+
+  // -- Field: ConcreteActorName
+  if (func->isDistributed()) {
+    if (mangledActorName) {
+      assert(recordTy == AccessibleProtocolRequirementFunctionRecordTy &&
+             "Only store additional actor type when record type is the "
+             "extended one.");
+      llvm::Constant *mangledActorNameAddr = getAddrOfGlobalString(
+          *mangledActorName, /*willBeRelativelyAddressed=*/true);
+      fields.addRelativeAddress(mangledActorNameAddr);
+    }
+  }
+  // -- Field: ConcreteWitnessMethodName
+  if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
+    llvm::Constant *witnessMethodName = getAddrOfGlobalString(
+        mangledFunctionName, /*willBeRelativelyAddressed=*/true);
+    fields.addRelativeAddress(witnessMethodName);
+  }
 
   fields.finishAndSetAsInitializer(var);
   var->setSection(sectionName);
@@ -4723,9 +4746,10 @@ void IRGenModule::emitAccessibleFunction(
 }
 
 void IRGenModule::emitAccessibleFunctions() {
-  if (AccessibleFunctions.empty())
+  if (AccessibleFunctions.empty() && AccessibleProtocolFunctions.empty())
     return;
 
+  // TODO: remove the repetition here
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
@@ -4779,29 +4803,18 @@ void IRGenModule::emitAccessibleFunctions() {
         /*mangledActorName=*/{}, mangledFunctionName, func);
   }
 
-  for (auto accessibleInfo : AliasedAccessibleFunctions) {
+  for (auto accessibleInfo : AccessibleProtocolFunctions) {
     auto func = accessibleInfo.function;
 
     std::string mangledRecordName =
         accessibleInfo.mangledRecordName
             ? (*accessibleInfo.mangledRecordName)
             : LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-//    std::string mangledFunctionName =
-//        accessibleInfo.specificMangledActorName
-//            LinkEntity::forSILFunction(func).mangleAsString();
     std::string mangledFunctionName =
         LinkEntity::forSILFunction(func).mangleAsString();
-    std::string mangledActorName =
-        accessibleInfo.specificMangledActorName
-          ? *accessibleInfo.specificMangledActorName
-          : "<none>";
-
-    fprintf(stderr, "[%s:%d](%s) XXX: Store extra accessible;                    mangledRecordName:   %s \n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            mangledRecordName.c_str());
-    fprintf(stderr, "[%s:%d](%s) XXX:                                      ----> mangledFunctionName: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            mangledFunctionName.c_str());
-    fprintf(stderr, "[%s:%d](%s) XXX:                                      ----> mangledActorName:    %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            mangledActorName.c_str());
+    std::string mangledActorName = accessibleInfo.concreteMangledTypeName
+                                       ? *accessibleInfo.concreteMangledTypeName
+                                       : "<none>";
 
     emitAccessibleFunction(
         sectionName2, mangledRecordName,

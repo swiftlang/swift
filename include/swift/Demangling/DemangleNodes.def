@@ -359,7 +359,7 @@ NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
 // Added in Swift 5.10
-NODE(DistributedAccessibleFunctionRecord)
+NODE(AccessibleProtocolRequirementFunctionRecord)
 
 // Added in Swift 5.7
 NODE(BackDeploymentThunk)

@@ -3712,8 +3712,9 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleDistributedAccessibleFunctionRecord(Node *node,
-                                                                   unsigned depth) {
+ManglingError
+Remangler::mangleAccessibleProtocolRequirementFunctionRecord(Node *node,
+                                                             unsigned depth) {
   Buffer << "DF";
   return ManglingError::Success;
 }

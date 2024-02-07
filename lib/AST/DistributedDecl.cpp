@@ -65,7 +65,8 @@ using namespace swift;
 /******************************************************************************/
 
 // TODO(distributed): make into a request
-Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *anyValue) {
+Type swift::getConcreteReplacementForProtocolActorSystemType(
+    ValueDecl *anyValue) {
   auto &C = anyValue->getASTContext();
 
   // FIXME(distributed): clean this up, we want a method that gets us AS type
@@ -84,8 +85,6 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *anyValue
   if (auto classDecl = DC->getSelfClassDecl()) {
     return getDistributedActorSystemType(classDecl);
   }
-
-  DC->getSelfProtocolDecl()->dump();
 
   /// === Maybe the value is declared in a protocol?
   if (auto protocol = DC->getSelfProtocolDecl()) {
@@ -395,9 +394,8 @@ llvm::TinyPtrVector<ValueDecl *>
 AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
 
-  // Only a 'distributed' decl can witness 'distributed' protocol requirements
+  // Only a 'distributed' decl can witness 'distributed' protocol
   if (!isDistributed()) {
-    assert(false);
     return {};
   }
 

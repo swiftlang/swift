@@ -4970,7 +4970,7 @@ public:
 /// and then called through a fully-abstracted entry point whose arguments
 /// can be constructed in code.
 template <typename Runtime>
-struct TargetAccessibleFunctionRecord final {
+struct TargetAccessibleFunctionRecord {
 public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
@@ -4994,38 +4994,22 @@ public:
 
 /// More advanced than AccessibleFunctionRecord and contains Actor name
 template <typename Runtime>
-struct TargetDistributedAccessibleFunctionRecord final {
+struct TargetAccessibleProtocolRequirementFunctionRecord
+    : public TargetAccessibleFunctionRecord<Runtime> {
 public:
-  /// The name of the function, which is a unique string assigned to the
-  /// function so it can be looked up later.
-  ///
-  /// For witnesses of distributed protocol methods this will be the mangled
-  /// of the protocol method -- including the protocol name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Name;
-
   /// The concrete Actor type for this accessor.
   RelativeDirectPointer<const char, /*nullable*/ false> ConcreteActorName;
 
-  // TODO: make this a pointer to the normal record?
-
-  /// The generic environment associated with this accessor function.
-  RelativeDirectPointer<GenericEnvironmentDescriptor, /*nullable*/ true>
-      GenericEnvironment;
-
-  /// The Swift function type, encoded as a mangled name.
-  RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;
-
-  /// The fully-abstracted function to call.
-  ///
-  /// Could be a sync or async function pointer depending on flags.
-  RelativeDirectPointer<void *, /*nullable*/ false> Function;
-
-  /// Flags providing more information about the function.
-  AccessibleFunctionFlags Flags;
+  /// The concrete witness method mangled name.
+  /// The record name for such record is the mangled name of the protocol
+  /// method. This is the mangled name of the concrete witness method.
+  RelativeDirectPointer<const char, /*nullable*/ false>
+      ConcreteWitnessMethodName;
 };
 
 using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
-using DistributedAccessibleFunctionRecord = TargetDistributedAccessibleFunctionRecord<InProcess>;
+using AccessibleProtocolRequirementFunctionRecord =
+    TargetAccessibleProtocolRequirementFunctionRecord<InProcess>;
 
 enum class PackLifetime : uint8_t {
   OnStack = 0,

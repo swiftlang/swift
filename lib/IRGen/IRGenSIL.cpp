@@ -2476,30 +2476,16 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
 
-//    fprintf(stderr, "[%s:%d](%s) CLANG:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    val->dump();
     if (auto val = CurSILFn->getLocation().castToASTNode<ValueDecl>()) {
       if (auto attr =
               val->getAttrs().getAttribute<DistributedThunkTargetAttr>()) {
-        fprintf(stderr, "[%s:%d](%s) HAS DistributedThunkTargetAttr: %s\n",
-                __FILE_NAME__, __LINE__, __FUNCTION__,
-                attr->getTargetFunction()->getNameStr().str().c_str());
-
-        fprintf(stderr, "[%s:%d](%s) add accessible function: %s\n",
-                __FILE_NAME__, __LINE__, __FUNCTION__,
-                CurSILFn->getName().str().c_str());
 
         // the original `distributed func`
         auto func = attr->getTargetFunction();
 
         auto distributedRequirements = func->getDistributedMethodWitnessedProtocolRequirements();
         if (distributedRequirements.size() == 1) {
-          fprintf(stderr, "[%s:%d](%s) IMPLS REQUIREMENT!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
           auto protocolFunc = distributedRequirements.front();
-          if (auto clazz = func->getDeclContext()->getSelfNominalTypeDecl()) {
-            fprintf(stderr, "[%s:%d](%s) THE CLAZZ: %s\n", __FILE_NAME__,
-                    __LINE__, __FUNCTION__, clazz->getNameStr().str().c_str());
-          }
           Mangle::ASTMangler mangler;
           // The mangled name of the requirement is the name of the record
           auto mangledProtocolFuncName =
@@ -2518,11 +2504,6 @@ void IRGenSILFunction::emitSILFunction() {
               /*mangledActorTypeName=*/mangledActorTypeName,
               CurSILFn);
         }
-
-      } else {
-        fprintf(stderr,
-                "[%s:%d](%s) DOES NOT HAVE DistributedThunkTargetAttr\n",
-                __FILE_NAME__, __LINE__, __FUNCTION__);
       }
     }
   }
