@@ -890,20 +890,18 @@ public protocol DistributedTargetInvocationDecoder {
   /// - Throws: if decoding substitutions fails.
   mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
-//  /// Ad-hoc protocol requirement
-//  ///
-//  /// Attempt to decode the next argument from the underlying buffers into pre-allocated storage
-//  /// pointed at by 'pointer'.
-//  ///
-//  /// This method should throw if it has no more arguments available, if decoding the argument failed,
-//  /// or, optionally, if the argument type we're trying to decode does not match the stored type.
-//  ///
-//  /// The result of the decoding operation must be stored into the provided 'pointer' rather than
-//  /// returning a value. This pattern allows the runtime to use a heavily optimized, pre-allocated
-//  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
-//  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
-//  /// performs the actual distributed (local) instance method invocation.
-//  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
+  /// Attempt to decode the next argument from the underlying buffers into pre-allocated storage
+  /// pointed at by 'pointer'.
+  ///
+  /// This method should throw if it has no more arguments available, if decoding the argument failed,
+  /// or, optionally, if the argument type we're trying to decode does not match the stored type.
+  ///
+  /// The result of the decoding operation must be stored into the provided 'pointer' rather than
+  /// returning a value. This pattern allows the runtime to use a heavily optimized, pre-allocated
+  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
+  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
+  /// performs the actual distributed (local) instance method invocation.
+  mutating func decodeNextArgument<Argument/*: SerializationRequirement*/>() throws -> Argument
 
   /// Decode the specific error type that the distributed invocation target has recorded.
   /// Currently this effectively can only ever be `Error.self`.

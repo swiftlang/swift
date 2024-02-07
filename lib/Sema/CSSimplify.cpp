@@ -8599,8 +8599,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           }
 
           // `DistributedTargetInvocationEncoder.record{Argument, ResultType}`
+          // `DistributedTargetInvocationDecoder.decodeNextArgument`
           if (witness->isDistributedTargetInvocationEncoderRecordArgument() ||
-              witness->isDistributedTargetInvocationEncoderRecordReturnType()) {
+              witness->isDistributedTargetInvocationEncoderRecordReturnType() ||
+              witness->isDistributedTargetInvocationDecoderDecodeNextArgument()) {
             auto genericParams = witness->getGenericParams()->getParams();
             if (GP->isEqual(genericParams.front()->getDeclaredInterfaceType()))
               return synthesizeConformance();

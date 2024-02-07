@@ -551,6 +551,7 @@ private:
   // If we are building a protocol witness thunks for
   // `DistributedActorSystem.remoteCall` or
   // `DistributedTargetInvocationEncoder.record{Argument, ReturnType}`
+  // `DistributedTargetInvocationDecoder.decodeNextArgument`
   // requirements we need to supply witness tables associated with `Res`,
   // `Argument`, `R` generic parameters which are not expressible on the
   // protocol requirement because they come from `SerializationRequirement`
@@ -739,11 +740,11 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
 
   auto loc = Fn.getLocation();
 
-  Type genericParam;
-
   auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
   if (!(funcDecl && funcDecl->isGeneric()))
     return;
+
+  Type genericParam;
 
   // DistributedActorSystem.remoteCall
   if (funcDecl->isDistributedActorSystemRemoteCall(
@@ -752,8 +753,10 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   }
 
   // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+  // DistributedTargetInvocationDecoder.decodeNextArgument
   if (funcDecl->isDistributedTargetInvocationEncoderRecordArgument() ||
-      funcDecl->isDistributedTargetInvocationEncoderRecordReturnType()) {
+      funcDecl->isDistributedTargetInvocationEncoderRecordReturnType() ||
+      funcDecl->isDistributedTargetInvocationDecoderDecodeNextArgument()) {
     auto *argParam = funcDecl->getGenericParams()->getParams().front();
     genericParam = argParam->getDeclaredInterfaceType();
   }
