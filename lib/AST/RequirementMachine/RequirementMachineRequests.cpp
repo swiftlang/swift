@@ -746,6 +746,26 @@ AbstractGenericSignatureRequest::evaluate(
   }
 }
 
+/// If completion fails, build a dummy generic signature where everything is
+/// Copyable and Escapable, to avoid spurious downstream diagnostics
+/// concerning move-only types.
+static GenericSignature getPlaceholderGenericSignature(
+    ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
+  SmallVector<Requirement, 2> requirements;
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    for (auto param : genericParams) {
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        requirements.emplace_back(RequirementKind::Conformance, param,
+                                  proto->getDeclaredInterfaceType());
+      }
+    }
+  }
+
+  return GenericSignature::get(genericParams, requirements);
+}
+
 GenericSignatureWithError
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator,
@@ -857,7 +877,8 @@ InferredGenericSignatureRequest::evaluate(
   // generic parameters, as the outer parameters have already been expanded.
   SmallVector<Type, 4> paramTypes;
   if (allowInverses) {
-    paramTypes.append(genericParams.begin() + numOuterParams, genericParams.end());
+    paramTypes.append(genericParams.begin() + numOuterParams,
+                      genericParams.end());
   }
 
   SmallVector<StructuralRequirement, 2> defaults;
@@ -909,8 +930,7 @@ InferredGenericSignatureRequest::evaluate(
                          diag::requirement_machine_completion_rule,
                          rule);
 
-      auto result = GenericSignature::get(genericParams,
-                                          parentSig.getRequirements());
+      auto result = getPlaceholderGenericSignature(ctx, genericParams);
 
       if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
         rewriteCtx.endTimer("InferredGenericSignatureRequest");

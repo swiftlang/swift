@@ -346,6 +346,9 @@ void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return;
 
   SmallVector<ProtocolDecl*, NumInvertibleProtocols> defaults;
   expandDefaults(ctx, /*inverses=*/{}, defaults);
