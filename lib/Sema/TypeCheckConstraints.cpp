@@ -1957,29 +1957,33 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
 
   // A cast from a function type to an existential type (except `Any`)
   // or an archetype type (with constraints) cannot succeed
-  auto toArchetypeType = toType->is<ArchetypeType>();
-  auto fromFunctionType = fromType->is<FunctionType>();
-  auto toExistentialType = toType->isAnyExistentialType();
+  if (fromType->is<FunctionType>()) {
+    auto toArchetypeType = toType->is<ArchetypeType>();
+    auto toExistentialType = toType->isAnyExistentialType();
 
-  auto toConstrainedArchetype = false;
-  if (toArchetypeType) {
-    auto archetype = toType->castTo<ArchetypeType>();
-    toConstrainedArchetype = !archetype->getConformsTo().empty();
-  }
+    auto conformsToAllProtocols = true;
+    if (toArchetypeType) {
+      auto archetype = toType->castTo<ArchetypeType>();
+      conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
+        [&](ProtocolDecl *proto) {
+          return module->checkConformance(fromType, proto,
+                                          /*allowMissing=*/false);
+        });
+    }
 
-  if (fromFunctionType &&
-      (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
-    switch (contextKind) {
-    case CheckedCastContextKind::None:
-    case CheckedCastContextKind::ConditionalCast:
-    case CheckedCastContextKind::ForcedCast:
-      return CheckedCastKind::Unresolved;
+    if (toExistentialType || (toArchetypeType && !conformsToAllProtocols)) {
+      switch (contextKind) {
+      case CheckedCastContextKind::None:
+      case CheckedCastContextKind::ConditionalCast:
+      case CheckedCastContextKind::ForcedCast:
+        return CheckedCastKind::Unresolved;
 
-    case CheckedCastContextKind::IsPattern:
-    case CheckedCastContextKind::EnumElementPattern:
-    case CheckedCastContextKind::IsExpr:
-    case CheckedCastContextKind::Coercion:
-      break;
+      case CheckedCastContextKind::IsPattern:
+      case CheckedCastContextKind::EnumElementPattern:
+      case CheckedCastContextKind::IsExpr:
+      case CheckedCastContextKind::Coercion:
+        break;
+      }
     }
   }
 
