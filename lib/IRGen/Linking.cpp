@@ -673,6 +673,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     switch (getTypeMetadataAccessStrategy(getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    case MetadataAccessStrategy::PackageUniqueAccessor:
+      return getSILLinkage(FormalLinkage::PackageUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
     case MetadataAccessStrategy::PrivateAccessor:
@@ -724,7 +726,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
-      if (linkage == FormalLinkage::PublicUnique)
+      if (linkage == FormalLinkage::PublicUnique ||
+          linkage == FormalLinkage::PackageUnique)
         linkage = FormalLinkage::HiddenUnique;
     }
 

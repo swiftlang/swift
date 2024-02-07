@@ -75,12 +75,19 @@ class SILModule::SerializationCallback final
       // translation units in the same Swift module.
       decl->setLinkage(SILLinkage::Shared);
       return;
+    case SILLinkage::Package:
+      decl->setLinkage(SILLinkage::PackageExternal);
+      return;
+    case SILLinkage::PackageNonABI: // Same as PublicNonABI
+      decl->setLinkage(SILLinkage::Shared);
+      return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::Shared:
       return;
@@ -979,6 +986,8 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     linkage = SILLinkage::Hidden;
     break;
   case AccessLevel::Package:
+    linkage = SILLinkage::Package;
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     linkage = SILLinkage::Public;

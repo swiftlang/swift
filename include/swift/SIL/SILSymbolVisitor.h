@@ -31,8 +31,8 @@ struct SILSymbolVisitorOptions {
   /// are needed (e.g. decls with `@_originallyDefinedIn`.
   bool LinkerDirectivesOnly = false;
 
-  /// Whether to only visit symbols with public linkage.
-  bool PublicSymbolsOnly = true;
+  /// Whether to only visit symbols with public or package linkage.
+  bool PublicOrPackageSymbolsOnly = true;
 
   /// Whether LLVM IR Virtual Function Elimination is enabled.
   bool VirtualFunctionElimination = false;

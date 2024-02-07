@@ -34,6 +34,10 @@ enum class FormalLinkage {
   /// have a unique file that is known to define it.
   PublicNonUnique,
 
+  /// This entity is visible in multiple Swift modules within a package
+  /// and has a unique file that is known to define it.
+  PackageUnique,
+
   /// This entity is visible in only a single Swift module and has a
   /// unique file that is known to define it.
   HiddenUnique,

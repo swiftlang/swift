@@ -409,6 +409,8 @@ class DeadFunctionAndGlobalElimination {
       linkage = SILLinkage::Hidden;
       break;
     case AccessLevel::Package:
+      linkage = SILLinkage::Package;
+      break;
     case AccessLevel::Public:
     case AccessLevel::Open:
       linkage = SILLinkage::Public;

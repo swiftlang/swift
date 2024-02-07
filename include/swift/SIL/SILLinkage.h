@@ -58,6 +58,16 @@ enum class SILLinkage : uint8_t {
   /// PublicNonABI functions must be definitions.
   PublicNonABI,
 
+  /// Same as \c Public, except the definition is visible within a package
+  /// of modules.
+  Package,
+
+  /// Similar to \c PublicNonABI, this definition is used for symbols treated
+  /// as package but do not have package entry points in the generated binary.
+  /// It's used for default argument expressions and `@_alwaysEmitIntoClient`.
+  /// When deserialized, this will become \c Shared linkage.
+  PackageNonABI,
+
   /// This object definition is visible only to the current Swift
   /// module (and thus should not be visible across linkage-unit
   /// boundaries).  There are no other object definitions with this
@@ -90,6 +100,11 @@ enum class SILLinkage : uint8_t {
   /// object is a definition, it is semantically equivalent to that
   /// definition.
   PublicExternal,
+
+  /// Similar to \c PublicExternal.
+  /// Used to reference a \c Package definition in a different module
+  /// within a package.
+  PackageExternal,
 
   /// A Public or Hidden definition with the same name as this object
   /// will be defined by the current Swift module at runtime.
@@ -166,11 +181,23 @@ enum class SubclassScope : uint8_t {
 /// Strip external from public_external, hidden_external. Otherwise just return
 /// the linkage.
 inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
-  if (linkage == SILLinkage::PublicExternal)
+  switch (linkage) {
+  case SILLinkage::PublicExternal:
     return SILLinkage::Public;
-  if (linkage == SILLinkage::HiddenExternal)
+  case SILLinkage::PackageExternal:
+    return SILLinkage::Package;
+  case SILLinkage::HiddenExternal:
     return SILLinkage::Hidden;
-  return linkage;
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::Hidden:
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+    return linkage;
+  }
+  llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
 /// Add the 'external' attribute to \p linkage.
@@ -178,8 +205,11 @@ inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public:
     return SILLinkage::PublicExternal;
+  case SILLinkage::Package:
+    return SILLinkage::PackageExternal;
   case SILLinkage::PublicNonABI:
-    // An external reference to a public non-ABI function is only valid
+  case SILLinkage::PackageNonABI:
+    // An external reference to a public or package non-ABI function is only valid
     // if the function was emitted in another translation unit of the
     // same Swift module, so we treat it as hidden here.
     return SILLinkage::HiddenExternal;
@@ -188,6 +218,7 @@ inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
   case SILLinkage::Shared:
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
   case SILLinkage::HiddenExternal:
     return linkage;
   }
@@ -198,17 +229,43 @@ inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
 /// Return whether the linkage indicates that an object has a
 /// definition outside the current SILModule.
 inline bool isAvailableExternally(SILLinkage linkage) {
-  return linkage >= SILLinkage::PublicExternal;
+  switch (linkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::Hidden:
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+    return false;
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::HiddenExternal:
+    return true;
+  }
+  llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
 /// Return whether the given linkage indicates that an object's
 /// definition might be required outside the current SILModule.
 /// If \p is true then we are in whole-module compilation.
 inline bool isPossiblyUsedExternally(SILLinkage linkage, bool wholeModule) {
-  if (wholeModule) {
-    return linkage <= SILLinkage::PublicNonABI;
+  switch (linkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageNonABI:
+    return true;
+  case SILLinkage::Hidden:
+    return !wholeModule;
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::HiddenExternal:
+    return false;
   }
-  return linkage <= SILLinkage::Hidden;
+  llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
 SILLinkage getDeclSILLinkage(const ValueDecl *decl);
@@ -219,6 +276,9 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   case SILLinkage::PublicExternal:
   case SILLinkage::PublicNonABI:
     return true;
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::Hidden:
   case SILLinkage::Shared:
   case SILLinkage::Private:
@@ -236,6 +296,9 @@ inline bool hasSharedVisibility(SILLinkage linkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
   case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
   case SILLinkage::Private:
@@ -252,6 +315,9 @@ inline bool hasPrivateVisibility(SILLinkage linkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
   case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
   case SILLinkage::Shared:
@@ -265,12 +331,22 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
                                                  SubclassScope scope) {
   switch (scope) {
   case SubclassScope::External:
-    if (linkage == SILLinkage::Private || linkage == SILLinkage::Hidden)
-      return SILLinkage::Public;
-    if (linkage == SILLinkage::HiddenExternal)
-      return SILLinkage::PublicExternal;
+    switch (linkage) {
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+        return SILLinkage::Public;
+      case SILLinkage::HiddenExternal:
+        return SILLinkage::PublicExternal;
+      case SILLinkage::Public:
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::Package:
+      case SILLinkage::PackageNonABI:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::PackageExternal:
+      case SILLinkage::Shared:
+        break;
+    }
     break;
-
   case SubclassScope::Internal:
     if (linkage == SILLinkage::Private)
       return SILLinkage::Hidden;

@@ -471,6 +471,9 @@ enum class MetadataAccessStrategy {
   /// There is a unique public accessor function for the given type metadata.
   PublicUniqueAccessor,
 
+  /// There is a unique package accessor function for the given type metadata.
+  PackageUniqueAccessor,
+
   /// There is a unique hidden accessor function for the given type metadata.
   HiddenUniqueAccessor,
 
@@ -491,6 +494,7 @@ enum class MetadataAccessStrategy {
 static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
   switch (strategy) {
   case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::PackageUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
     return false;

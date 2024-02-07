@@ -610,6 +610,18 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     return SILLinkage::Hidden;
 
   case AccessLevel::Package:
+    switch (limit) {
+    case Limit::None:
+      return SILLinkage::Package;
+    case Limit::AlwaysEmitIntoClient:
+      return SILLinkage::PackageNonABI;
+    case Limit::OnDemand:
+      return SILLinkage::Shared;
+    case Limit::NeverPublic:
+      return SILLinkage::Hidden;
+    case Limit::Private:
+      llvm_unreachable("Already handled");
+    }
   case AccessLevel::Public:
   case AccessLevel::Open:
     switch (limit) {

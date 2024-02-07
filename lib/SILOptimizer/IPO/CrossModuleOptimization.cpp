@@ -433,6 +433,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::HiddenExternal:
     return false;
   case SILLinkage::Shared:
@@ -441,9 +442,11 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
       return true;
     return false;
   case SILLinkage::Public:
+  case SILLinkage::Package:
   case SILLinkage::Hidden:
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
     break;
   }
   return true;

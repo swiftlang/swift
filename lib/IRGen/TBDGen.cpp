@@ -502,7 +502,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   SILSymbolVisitorOptions opts;
   opts.VisitMembers = true;
   opts.LinkerDirectivesOnly = Opts.LinkerDirectivesOnly;
-  opts.PublicSymbolsOnly = Opts.PublicSymbolsOnly;
+  opts.PublicOrPackageSymbolsOnly = Opts.PublicOrPackageSymbolsOnly;
   opts.WitnessMethodElimination = Opts.WitnessMethodElimination;
   opts.VirtualFunctionElimination = Opts.VirtualFunctionElimination;
 

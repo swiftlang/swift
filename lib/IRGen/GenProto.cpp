@@ -2412,7 +2412,12 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
     break;
   case SILLinkage::Public:
-  default:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::HiddenExternal:
     if (IGM.getOptions().InternalizeAtLink) {
       vis = VCallVisibility::VCallVisibilityLinkageUnit;
     }
