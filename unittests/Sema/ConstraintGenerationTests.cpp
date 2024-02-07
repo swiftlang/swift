@@ -132,7 +132,7 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
                                             /*explicitResultType=*/nullptr, DC);
   closure->setImplicit();
   // Create a return statement so this is treated as a single expression.
-  auto *RS = ReturnStmt::forSingleExprBody(
+  auto *RS = ReturnStmt::createImplied(
       Context, TupleExpr::createImplicit(Context, {}, {}));
   closure->setBody(BraceStmt::createImplicit(Context, /*elements=*/{RS}));
 

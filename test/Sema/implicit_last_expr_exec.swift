@@ -24,6 +24,7 @@ print(testBinding(false))
 // CHECK-NEXT: 2
 
 func testReturn(_ cond: Bool) -> Int {
+  ()
   if cond {
     let a = 1
     a
@@ -91,3 +92,21 @@ func testNestedType(_ cond: Bool) -> Int {
 }
 print(testNestedType(true))
 // CHECK-NEXT: 1
+
+func testClosure(_ cond: Bool) -> Int {
+  let fn = {
+    ()
+    if cond {
+      let a = 1
+      a
+    } else {
+      let b = 1
+      if cond { b } else { b + 1 }
+    }
+  }
+  return fn()
+}
+print(testClosure(true))
+print(testClosure(false))
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2

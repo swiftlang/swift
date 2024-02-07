@@ -14,6 +14,43 @@ let b = do {
   if .random() { 5 } else { 6 }
 }
 
+let c = do {
+  print("hello")
+  if .random() {
+    print("hello")
+    5
+  } else {
+    6
+  }
+}
+
+func throwingFn() throws {}
+
+func testFn() -> Int {
+  print("hello")
+  do {
+    try throwingFn()
+    0
+  } catch {
+    print("error")
+    fatalError()
+  }
+}
+
+func testClosure() -> Int {
+  let fn = {
+    print("hello")
+    do {
+      try throwingFn()
+      0
+    } catch {
+      print("error")
+      fatalError()
+    }
+  }
+  return fn()
+}
+
 func nestedType1() -> Int {
   let x = do {
     struct S {
@@ -32,8 +69,6 @@ func nestedType2() -> Int {
     S(x: 0).x
   }
 }
-
-func throwingFn() throws {}
 
 func doCatch1() -> Int {
   do {

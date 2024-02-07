@@ -2662,15 +2662,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 }
 
 /// Insert an implicit return for a single expression body function if needed.
-static void addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
-  // Must have a single active element.
-  auto node = body->getSingleActiveElement();
+static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
+  if (body->empty())
+    return;
+
+  // Must have a single active element (which is guarenteed to be the last
+  // element), or we must be allowing implicit last expression results.
+  auto &ctx = dc->getASTContext();
+  if (!body->getSingleActiveElement() &&
+      !ctx.LangOpts.hasFeature(Feature::ImplicitLastExprResults)) {
+    return;
+  }
+  auto node = body->getLastElement();
   if (!node)
     return;
 
-  auto &ctx = dc->getASTContext();
   auto makeResult = [&](Expr *E) {
-    body->setLastElement(ReturnStmt::forSingleExprBody(ctx, E));
+    body->setLastElement(ReturnStmt::createImplied(ctx, E));
   };
 
   // For a constructor, we only support nil literals as the implicit result.
@@ -2730,8 +2738,8 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   assert(body && "Expected body");
   assert(!AFD->isBodyTypeChecked() && "Body already type-checked?");
 
-  // Insert an implicit return for a single expression body.
-  addSingleExprReturnIfNeeded(body, AFD);
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, AFD);
 
   // For constructors, we make sure that the body ends with a "return"
   // stmt, which we either implicitly synthesize, or the user can write.
@@ -2765,8 +2773,8 @@ BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
       }
     }
   }
-  // Insert an implicit return for a single expression body.
-  addSingleExprReturnIfNeeded(body, closure);
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, closure);
   return body;
 }
 

@@ -58,3 +58,25 @@ let e = if .random() {
     1 // expected-warning {{integer literal is unused}}
   } // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
 }
+
+func testFn1() -> Int {
+  print("hello")
+  0 // expected-warning {{integer literal is unused}}
+}
+
+func takesFn(_ fn: () -> Int) {}
+
+func testClosure1() {
+  takesFn {
+    ()
+    0 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testClosure2() {
+  let fn = {
+    ()
+    if .random() { 0 } else { 1 } // expected-warning 2{{integer literal is unused}}
+  }
+  takesFn(fn) // expected-error {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+}
