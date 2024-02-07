@@ -98,6 +98,14 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
       ValueDecl *decl = entry.getMethod().getDecl();
       module.getASTContext().Diags.diagnose(
           decl->getLoc(), diag::non_final_generic_class_function);
+
+      if (decl->getLoc().isInvalid()) {
+        auto demangledName = Demangle::demangleSymbolAsString(
+            method->getName(),
+            Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+        llvm::errs() << "in function " << demangledName << "\n";
+        llvm::errs() << "in class " << vtable->getClass()->getName() << "\n";
+      }
     }
   }
 
