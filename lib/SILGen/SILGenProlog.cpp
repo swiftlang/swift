@@ -1283,6 +1283,9 @@ void SILGenFunction::emitProlog(
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
           return false;
+
+        case ActorIsolation::Erased:
+          llvm_unreachable("deinit cannot have erased isolation");
         }
       }
 
@@ -1335,6 +1338,9 @@ void SILGenFunction::emitProlog(
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
+    case ActorIsolation::Erased:
+      llvm_unreachable("method cannot have erased isolation");
+
     case ActorIsolation::ActorInstance: {
       // Only produce an executor for actor-isolated functions that are async
       // or are local functions. The former require a hop, while the latter
@@ -1386,6 +1392,9 @@ void SILGenFunction::emitProlog(
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
       break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("closure cannot have erased isolation");
 
     case ActorIsolation::ActorInstance: {
       if (wantExecutor) {
@@ -1541,6 +1550,9 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
     return llvm::None;
+
+  case ActorIsolation::Erased:
+    llvm_unreachable("executor emission for erased isolation is unimplemented");
 
   case ActorIsolation::ActorInstance: {
     // "self" here means the actor instance's "self" value.

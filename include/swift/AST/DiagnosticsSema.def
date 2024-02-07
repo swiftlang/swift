@@ -5548,6 +5548,14 @@ ERROR(isolated_parameter_global_actor_type,none,
 ERROR(isolated_parameter_combined_nonisolated,none,
       "%0 with 'isolated' parameter cannot be 'nonisolated'",
       (DescriptiveDeclKind))
+ERROR(isolated_parameter_isolated_attr_type,none,
+      "function with 'isolated' parameter cannot also be '@isolated(%0)'",
+      (StringRef))
+ERROR(isolated_any_experimental,none,
+      "attribute requires '-enable-experimental-feature IsolatedAny'", ())
+ERROR(isolated_attr_global_actor_type,none,
+      "function type cannot have both a global actor and '@isolated(%0)'",
+      (StringRef))
 ERROR(isolation_macro_experimental,none,
       "#isolation macro is experimental", ())
 
@@ -6001,6 +6009,9 @@ ERROR(generic_function_type,none,
       "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
+ERROR(invalid_isolated_and_convention_attributes,none,
+      "'@convention(%0)' attribute is not allowed on '@isolated' types",
+      (StringRef))
 ERROR(unreferenced_generic_parameter,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(unexpected_ctype_for_non_c_convention,none,

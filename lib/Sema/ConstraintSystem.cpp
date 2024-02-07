@@ -7725,6 +7725,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       case ActorIsolation::NonisolatedUnsafe:
         break;
 
+      case ActorIsolation::Erased:
+        llvm_unreachable("storage cannot have opaque isolation");
+
       // A reference to an actor isolated state make key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:

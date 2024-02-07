@@ -4709,6 +4709,11 @@ public:
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
   
+  /// Subroutine of \c matchTypes()
+  bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
+                               ConstraintKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   TypeMatchResult matchSuperclassTypes(Type type1, Type type2,

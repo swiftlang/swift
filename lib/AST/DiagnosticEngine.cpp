@@ -954,6 +954,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       break;
     }
 
+    case ActorIsolation::Erased:
+      Out << "@isolated(any)";
+      break;
+
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:

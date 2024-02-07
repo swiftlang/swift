@@ -1711,6 +1711,14 @@ ERROR(expected_rparen_after_thrown_error_type,none,
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
 
+ERROR(attr_isolated_expected_lparen,none,
+      "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
+      ())
+ERROR(attr_isolated_expected_rparen,none,
+      "expected ')' after isolation kind", ())
+ERROR(attr_isolated_expected_kind,none,
+      "expected 'any' as the isolation kind", ())
+
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,

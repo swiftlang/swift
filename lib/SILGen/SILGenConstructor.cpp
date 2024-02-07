@@ -607,6 +607,9 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
     case ActorIsolation::ActorInstance:
       return true;
 
+    case ActorIsolation::Erased:
+      llvm_unreachable("constructor cannot have erased isolation");
+
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
@@ -1588,6 +1591,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
       break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("context cannot have erased isolation");
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::ActorInstance: {

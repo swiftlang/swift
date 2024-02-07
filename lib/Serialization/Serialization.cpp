@@ -1432,6 +1432,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Nonisolated)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
+  CASE(Erased)
 #undef CASE
   }
   llvm_unreachable("bad actor isolation");
@@ -5486,8 +5487,8 @@ public:
       return unsigned(FunctionTypeIsolation::NonIsolated);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
-    case swift::FunctionTypeIsolation::Kind::Dynamic:
-      return unsigned(FunctionTypeIsolation::Dynamic);
+    case swift::FunctionTypeIsolation::Kind::Erased:
+      return unsigned(FunctionTypeIsolation::Erased);
     case swift::FunctionTypeIsolation::Kind::GlobalActor:
       return unsigned(FunctionTypeIsolation::GlobalActorOffset)
                + S.addTypeRef(isolation.getGlobalActorType());

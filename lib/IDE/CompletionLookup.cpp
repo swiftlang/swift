@@ -799,6 +799,9 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
+  case ActorIsolation::Erased:
+    implicitlyAsync = true;
+    break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:

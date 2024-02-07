@@ -483,12 +483,14 @@ class FunctionTypeRef final : public TypeRef {
   std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
+  ExtendedFunctionTypeFlags ExtFlags;
   FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
   const TypeRef *GlobalActor;
   const TypeRef *ThrownError;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
                            const TypeRef *Result, FunctionTypeFlags Flags,
+                           ExtendedFunctionTypeFlags ExtFlags,
                            FunctionMetadataDifferentiabilityKind DiffKind,
                            const TypeRef *GlobalActor,
                            const TypeRef *ThrownError) {
@@ -500,6 +502,7 @@ class FunctionTypeRef final : public TypeRef {
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    ID.addInteger(static_cast<uint64_t>(ExtFlags.getIntValue()));
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     ID.addPointer(GlobalActor);
     ID.addPointer(ThrownError);
@@ -510,21 +513,23 @@ class FunctionTypeRef final : public TypeRef {
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags,
+                  ExtendedFunctionTypeFlags ExtFlags,
                   FunctionMetadataDifferentiabilityKind DiffKind,
                   const TypeRef *GlobalActor,
                   const TypeRef *ThrownError)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags), DifferentiabilityKind(DiffKind),
+        Flags(Flags), ExtFlags(ExtFlags), DifferentiabilityKind(DiffKind),
         GlobalActor(GlobalActor), ThrownError(ThrownError) {}
 
   template <typename Allocator>
   static const FunctionTypeRef *create(
       Allocator &A, std::vector<Param> Params, const TypeRef *Result,
-      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
+      FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
+      FunctionMetadataDifferentiabilityKind DiffKind,
       const TypeRef *GlobalActor, const TypeRef *ThrownError) {
     FIND_OR_CREATE_TYPEREF(
-        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor,
-        ThrownError);
+        A, FunctionTypeRef, Params, Result, Flags, ExtFlags, DiffKind,
+        GlobalActor, ThrownError);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -535,6 +540,10 @@ public:
 
   FunctionTypeFlags getFlags() const {
     return Flags;
+  }
+
+  ExtendedFunctionTypeFlags getExtFlags() const {
+    return ExtFlags;
   }
 
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {

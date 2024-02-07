@@ -1466,6 +1466,17 @@ BridgedTypeAttribute BridgedTypeAttribute_createSimple(
     BridgedASTContext cContext, BridgedTypeAttrKind cKind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
+  BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation,
+};
+
+SWIFT_NAME("BridgedTypeAttribute.createIsolated(_:atLoc:nameLoc:lpLoc:isolationKindLoc:isolationKind:rpLoc:)")
+BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
+    BridgedASTContext cContext,
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc,
+    BridgedSourceLoc cLPLoc, BridgedSourceLoc cIsolationLoc,
+    BridgedIsolatedTypeAttrIsolationKind cIsolation, BridgedSourceLoc cRPLoc);
+
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//

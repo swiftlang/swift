@@ -3059,6 +3059,9 @@ done:
     case ActorIsolation::ActorInstance:
       llvm_unreachable("default arg cannot be actor instance isolated");
 
+    case ActorIsolation::Erased:
+      llvm_unreachable("default arg cannot have erased isolation");
+
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
@@ -5644,6 +5647,9 @@ RValue SILGenFunction::emitApply(
       executor = emitLoadGlobalActorExecutor(
           implicitActorHopTarget->getGlobalActor());
       break;
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("hop to erased isolation currently unimplemented");
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:

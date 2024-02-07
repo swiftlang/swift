@@ -548,7 +548,8 @@ enum class ActorIsolation : uint8_t {
   Nonisolated,
   NonisolatedUnsafe,
   GlobalActor,
-  GlobalActorUnsafe
+  GlobalActorUnsafe,
+  Erased,
 };
 using ActorIsolationField = BCFixed<3>;
 
@@ -688,7 +689,7 @@ using PluginSearchOptionKindField = BCFixed<3>;
 enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
-  Dynamic,
+  Erased,
   GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;

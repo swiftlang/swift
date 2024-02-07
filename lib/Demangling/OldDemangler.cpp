@@ -1860,6 +1860,7 @@ private:
       globalActorNode->addChild(globalActorType, Factory);
       block->addChild(globalActorNode, Factory);
     }
+    // Is there any need to handle isolated(any) function types here?
 
     NodePointer in_node = Factory.createNode(Node::Kind::ArgumentTuple);
     block->addChild(in_node, Factory);

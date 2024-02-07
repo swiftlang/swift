@@ -84,6 +84,9 @@ extension ASTGenVisitor {
       case .opaqueReturnTypeOf:
         fatalError("unimplemented")
 
+      case .isolated:
+        return self.generateIsolatedTypeAttr(attribute: node)
+
       // SIL type attributes are not supported.
       case .autoreleased,
         .blockStorage,
@@ -131,5 +134,36 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
+  }
+
+  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+    guard case .argumentList(let isolatedArgs) = node.arguments,
+          isolatedArgs.count == 1,
+          let labelArg = isolatedArgs.first,
+          labelArg.label == nil,
+          let isolationKindExpr = labelArg.expression.as(DeclReferenceExprSyntax.self),
+          isolationKindExpr.argumentNames == nil
+    else {
+      // TODO: Diagnose.
+      return nil
+    }
+  
+
+    var isolationKind: BridgedIsolatedTypeAttrIsolationKind
+    switch isolationKindExpr.baseName {
+    case "any": isolationKind = .dynamicIsolation
+    default:
+      // TODO: Diagnose.
+      return nil
+    }
+
+    return BridgedTypeAttribute.createIsolated(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      lpLoc: self.generateSourceLoc(node.leftParen!),
+      isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
+      isolationKind: isolationKind,
+      rpLoc: self.generateSourceLoc(node.rightParen!))
   }
 }

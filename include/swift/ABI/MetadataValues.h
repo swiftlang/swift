@@ -1183,6 +1183,10 @@ template <typename int_type>
 class TargetExtendedFunctionTypeFlags {
   enum : int_type {
     TypedThrowsMask        = 0x00000001U,
+    IsolationMask          = 0x0000000EU, // three bits
+
+    // Values for the enumerated isolation kinds
+    IsolatedAny            = 0x00000002U,
   };
   int_type Data;
 
@@ -1196,7 +1200,22 @@ public:
                (Data & ~TypedThrowsMask) | (typedThrows ? TypedThrowsMask : 0));
   }
 
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withNonIsolated() const {
+    return TargetExtendedFunctionTypeFlags<int_type>(Data & ~IsolationMask);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withIsolatedAny() const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+              (Data & ~IsolationMask) | IsolatedAny);
+  }
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
+
+  bool isIsolatedAny() const {
+    return (Data & IsolationMask) == IsolatedAny;
+  }
 
   int_type getIntValue() const {
     return Data;

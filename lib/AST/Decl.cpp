@@ -2492,6 +2492,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::Erased: // really can't happen
             return true;
         }
       }
@@ -10953,6 +10954,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
+      case ActorIsolation::Erased:
         return false;
 
       case ActorIsolation::ActorInstance:
@@ -11413,6 +11415,13 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
   case NonisolatedUnsafe:
   case Unspecified:
     return true;
+
+  case Erased:
+    // Different functions with erased isolation have the same *kind* of
+    // isolation, but we must generally assume that they're not isolated
+    // the *same way*, which is what this function is apparently supposed
+    // to answer.
+    return false;
 
   case ActorInstance: {
     auto *lhsActor = lhs.getActorInstance();

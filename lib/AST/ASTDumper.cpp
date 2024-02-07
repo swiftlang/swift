@@ -2794,6 +2794,10 @@ public:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
+    case ActorIsolation::Erased:
+      printFlag(true, "dynamically_isolated", CapturesColor);
+      break;
+
     case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
                        "actor_isolated", CapturesColor);

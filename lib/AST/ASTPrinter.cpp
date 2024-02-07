@@ -3201,24 +3201,24 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
       [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
-static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
-  auto typeMatches = [kind](Type type) {
-    return type.findIf([&](Type type) {
-      if (auto builtinTy = type->getAs<BuiltinType>())
-        return builtinTy->getBuiltinTypeKind() == kind;
-
-      return false;
-    });
-  };
-
+/// Does the interface of this declaration use a type for which the
+/// given predicate returns true?
+static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      if (typeMatches(type))
-        return true;
+      return type.findIf(fn);
     }
   }
 
   return false;
+}
+
+static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
+  return usesTypeMatching(decl, [=](Type type) {
+    if (auto builtinTy = type->getAs<BuiltinType>())
+      return builtinTy->getBuiltinTypeKind() == kind;
+    return false;
+  });
 }
 
 static bool usesFeatureBuiltinJob(Decl *decl) {
@@ -3918,6 +3918,15 @@ static bool usesFeatureDynamicActorIsolation(Decl *decl) {
 }
 
 static bool usesFeatureBorrowingSwitch(Decl *decl) { return false; }
+
+static bool usesFeatureIsolatedAny(Decl *decl) {
+  return usesTypeMatching(decl, [](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      return fnType->getIsolation().isErased();
+    }
+    return false;
+  });
+}
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -7148,10 +7157,21 @@ public:
       }
     }
 
-    if (Type globalActor = info.getGlobalActor()) {
+    auto isolation = info.getIsolation();
+    switch (isolation.getKind()) {
+    case FunctionTypeIsolation::Kind::NonIsolated:
+    case FunctionTypeIsolation::Kind::Parameter:
+      break;
+
+    case FunctionTypeIsolation::Kind::GlobalActor:
       Printer << "@";
-      visit(globalActor);
+      visit(isolation.getGlobalActorType());
       Printer << " ";
+      break;
+
+    case FunctionTypeIsolation::Kind::Erased:
+      Printer << "@isolated(any) ";
+      break;
     }
 
     if (!Options.excludeAttrKind(TypeAttrKind::Sendable) && info.isSendable()) {

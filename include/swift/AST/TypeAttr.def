@@ -65,6 +65,7 @@ SIMPLE_TYPE_ATTR(preconcurrency, Preconcurrency)
 SIMPLE_TYPE_ATTR(_local, Local)
 SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata)
 TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
+TYPE_ATTR(isolated, Isolated)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(block_storage, BlockStorage)

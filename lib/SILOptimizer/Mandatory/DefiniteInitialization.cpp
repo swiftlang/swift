@@ -1044,6 +1044,9 @@ void LifetimeChecker::injectActorHops() {
   case ActorIsolation::ActorInstance:
     break;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("constructor cannot have erased isolation");
+
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:

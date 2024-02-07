@@ -3848,6 +3848,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     TypeAttrSet *attrs) {
 
+  auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
+
   AnyFunctionType::Representation representation =
     FunctionType::Representation::Swift;
   const clang::Type *parsedClangFunctionType = nullptr;
@@ -3881,6 +3883,17 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           representation = FunctionType::Representation::Swift;
           parsedClangFunctionType = nullptr;
         }
+      }
+
+      // Don't allow `@isolated` to be combined with non-default
+      // conventions.
+      if (isolatedAttr &&
+          representation != FunctionType::Representation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_isolated_and_convention_attributes,
+                        conventionAttr->getConventionName());
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
       }
     }
   }
@@ -3918,6 +3931,12 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // forms (and should cause conflict diagnostics).
   if (numIsolatedParams > 0) {
     isolation = FunctionTypeIsolation::forParameter();
+
+    if (isolatedAttr) {
+      diagnose(repr->getLoc(), diag::isolated_parameter_isolated_attr_type,
+               isolatedAttr->getIsolationKindName());
+      isolatedAttr->setInvalid();
+    }
   }
 
   if (attrs) {
@@ -3925,12 +3944,27 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     Type globalActor = resolveGlobalActor(repr->getLoc(), parentOptions,
                                           globalActorAttr, *attrs);
     if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
-      if (numIsolatedParams == 0) {
-        isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
-      } else {
+      if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
             .warnUntilSwiftVersion(6);
         globalActorAttr->setInvalid();
+      } else if (isolatedAttr) {
+        diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
+                 isolatedAttr->getIsolationKindName());
+        globalActorAttr->setInvalid();
+      } else {
+        isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+      }
+    }
+
+    if (isolatedAttr && !isolatedAttr->isInvalid()) {
+      switch (isolatedAttr->getIsolationKind()) {
+      case IsolatedTypeAttr::IsolationKind::Dynamic:
+        if (!getASTContext().LangOpts.hasFeature(Feature::IsolatedAny)) {
+          diagnose(isolatedAttr->getAtLoc(), diag::isolated_any_experimental);
+        }
+        isolation = FunctionTypeIsolation::forErased();
+        break;
       }
     }
   }

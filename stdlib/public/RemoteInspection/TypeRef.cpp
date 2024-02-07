@@ -172,6 +172,9 @@ public:
       }
       Indent += 2;
     }
+    if (F->getExtFlags().isIsolatedAny()) {
+      printField("isolated", "any");
+    }
 
     stream << "\n";
     Indent += 2;
@@ -753,10 +756,14 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
+
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
       node->addChild(globalActorNode, Dem);
+      funcNode->addChild(node, Dem);
+    } else if (F->getExtFlags().isIsolatedAny()) {
+      auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
       funcNode->addChild(node, Dem);
     }
 
@@ -1177,14 +1184,18 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    auto extFlags = F->getExtFlags();
+
     const TypeRef *thrownErrorType = nullptr;
-    if (F->getThrownError())
+    if (F->getThrownError()) {
       thrownErrorType = visit(F->getThrownError());
+      // FIXME: fold Never and any Error to their canonical representation?
+    }
 
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags(),
+                                   SubstitutedResult, F->getFlags(), extFlags,
                                    F->getDifferentiabilityKind(),
                                    globalActorType, thrownErrorType);
   }
@@ -1314,16 +1325,21 @@ public:
 
     auto SubstitutedResult = visit(F->getResult());
 
+    auto flags = F->getFlags();
+    auto extFlags = F->getExtFlags();
+
     const TypeRef *globalActorType = nullptr;
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
     const TypeRef *thrownErrorType = nullptr;
-    if (F->getThrownError())
+    if (F->getThrownError()) {
       thrownErrorType = visit(F->getThrownError());
+      // FIXME: fold Never / any Error to their canonical representations?
+    }
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags(),
+                                   SubstitutedResult, flags, extFlags,
                                    F->getDifferentiabilityKind(),
                                    globalActorType, thrownErrorType);
   }

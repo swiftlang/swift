@@ -1125,8 +1125,8 @@ public:
       ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
       const TypeRef *globalActor, const TypeRef *thrownError) {
-    return FunctionTypeRef::create(*this, params, result, flags, diffKind,
-                                   globalActor, thrownError);
+    return FunctionTypeRef::create(*this, params, result, flags, extFlags,
+                                   diffKind, globalActor, thrownError);
   }
 
   const FunctionTypeRef *createImplFunctionType(
@@ -1139,6 +1139,7 @@ public:
     // reflection as capture types. For the reflection library's
     // purposes, the only part that matters is the convention.
     FunctionTypeFlags funcFlags;
+    ExtendedFunctionTypeFlags extFuncFlags;
     switch (flags.getRepresentation()) {
     case Demangle::ImplFunctionRepresentation::Thick:
     case Demangle::ImplFunctionRepresentation::Closure:
@@ -1183,8 +1184,8 @@ public:
     }
 
     auto result = createTupleType({}, llvm::ArrayRef<llvm::StringRef>());
-    return FunctionTypeRef::create(*this, {}, result, funcFlags, diffKind,
-                                   nullptr, nullptr);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags, extFuncFlags,
+                                   diffKind, nullptr, nullptr);
   }
 
   BuiltType createProtocolTypeFromDecl(BuiltProtocolDecl protocol) {
