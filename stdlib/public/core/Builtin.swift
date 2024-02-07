@@ -115,12 +115,14 @@ public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
 /// This cast can be useful for dispatching to specializations of generic
 /// functions.
 @_alwaysEmitIntoClient
+@_transparent
 public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
   guard T.self == U.self else {
     return nil
   }
 
-  return Builtin.reinterpretCast(x)
+  let result: U = Builtin.reinterpretCast(x)
+  return result
 }
 
 /// `unsafeBitCast` something to `AnyObject`.
