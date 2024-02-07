@@ -6671,10 +6671,10 @@ bool constraints::isTypeErasedKeyPathType(Type type) {
   return superclass ? isTypeErasedKeyPathType(superclass) : false;
 }
 
-bool constraints::hasExplicitResult(ClosureExpr *closure) {
+bool constraints::hasResultExpr(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           ClosureHasExplicitResultRequest{closure}, false);
+  return evaluateOrDefault(ctx.evaluator, ClosureHasResultExprRequest{closure},
+                           false);
 }
 
 Type constraints::getConcreteReplacementForProtocolSelfType(ValueDecl *member) {

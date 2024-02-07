@@ -3397,10 +3397,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether closure body has any explicit `return`
+/// Determine whether closure body has any `return`
 /// statements which could produce a non-void result.
-class ClosureHasExplicitResultRequest
-    : public SimpleRequest<ClosureHasExplicitResultRequest, bool(ClosureExpr *),
+class ClosureHasResultExprRequest
+    : public SimpleRequest<ClosureHasResultExprRequest, bool(ClosureExpr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;

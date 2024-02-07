@@ -1135,16 +1135,14 @@ private:
     // multi-statement closure.
     if (locator->directlyAt<ClosureExpr>()) {
       auto *closure = context.getAsClosureExpr().get();
-      // If this closure has an empty body and no explicit result type
-      // let's bind result type to `Void` since that's the only type empty
-      // body can produce. Otherwise, if (multi-statement) closure doesn't
-      // have an explicit result (no `return` statements) let's default it to
-      // `Void`.
+      // If this closure has an empty body or no `return` statements with
+      // results let's bind result type to `Void` since that's the only type
+      // empty body can produce.
       //
       // Note that result builder bodies always have a `return` statement
       // at the end, so they don't need to be defaulted.
       if (!cs.getAppliedResultBuilderTransform({closure}) &&
-          !hasExplicitResult(closure)) {
+          !hasResultExpr(closure)) {
         auto constraintKind =
             (closure->hasEmptyBody() && !closure->hasExplicitResultType())
                 ? ConstraintKind::Bind

@@ -6460,9 +6460,9 @@ bool isTypeErasedKeyPathType(Type type);
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 
-/// Determine whether given closure has any explicit `return`
+/// Determine whether given closure has any `return`
 /// statements that could produce non-void result.
-bool hasExplicitResult(ClosureExpr *closure);
+bool hasResultExpr(ClosureExpr *closure);
 
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.
