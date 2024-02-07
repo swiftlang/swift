@@ -645,8 +645,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.getLangOptions().enableFeature(
         Feature::OldOwnershipOperatorSpellings);
   }
-  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
-    Invocation.getLangOptions().enableFeature(Feature::NoncopyableGenerics);
 
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
