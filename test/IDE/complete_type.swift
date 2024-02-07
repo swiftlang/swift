@@ -755,3 +755,14 @@ var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_5?check=POSTFIX_BASE_MEMBER^#.Type
 // POSTFIX_BASE_MEMBER: Begin completions, 2 items
 // POSTFIX_BASE_MEMBER-DAG: Decl[Struct]/CurrNominal:           Nested[#HaveNested.Nested#];
 // POSTFIX_BASE_MEMBER-DAG: Keyword/None:                       Type[#HaveNested.Type#];
+
+func testGenericResultCompletion1<T>() -> #^GENERIC_RESULT1?check=GENERIC_RESULT^# {}
+func testGenericResultCompletion2<T>() -> [#^GENERIC_RESULT2?check=GENERIC_RESULT^#] {}
+func testGenericResultCompletion3<T>() -> (#^GENERIC_RESULT3?check=GENERIC_RESULT^#) {}
+func testGenericResultCompletion4<T>() -> (Int, #^GENERIC_RESULT4?check=GENERIC_RESULT^#) {}
+func testGenericResultCompletion5<T>() -> FooProtocol & #^GENERIC_RESULT5?check=GENERIC_RESULT^# {}
+func testGenericResultCompletion6<T>() -> [[#^GENERIC_RESULT6?check=GENERIC_RESULT^#]] {}
+func testGenericResultCompletion7<T>() -> Array< #^GENERIC_RESULT7?check=GENERIC_RESULT^#> {}
+func testGenericResultCompletion8<T>() -> Array<(Int, #^GENERIC_RESULT8?check=GENERIC_RESULT^#)> {}
+
+// GENERIC_RESULT-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T

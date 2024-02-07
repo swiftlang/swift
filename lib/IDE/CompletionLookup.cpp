@@ -2774,8 +2774,8 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
   FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Expr,
                               CodeCompletionFilterFlag::Type};
@@ -3258,8 +3258,8 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   Kind = LookupKind::TypeInDeclContext;
 
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
-  lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(AccessFilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Type};
   if (ModuleQualifier) {
@@ -3446,8 +3446,8 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
   // modules. For suggesting top level results, we need a way to filter cached
   // results.
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 }
 
 void CompletionLookup::addWithoutConstraintTypes() {
