@@ -265,6 +265,10 @@ def main():
     for param in args.param:
         test_args += ['--param', param]
 
+    # Enable colors if we're on a tty.
+    if sys.stdout.isatty():
+        test_args += ['--param', 'color_output']
+
     if args.result_dir:
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
                       '--xunit-xml-output=%s' % os.path.join(args.result_dir,
