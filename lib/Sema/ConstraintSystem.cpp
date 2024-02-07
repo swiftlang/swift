@@ -4423,7 +4423,6 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(PackEnvironments) +
          PackElementGenericEnvironments.size() +
          (DefaultedConstraints.size() * sizeof(void *)) +
-         ImplicitCallAsFunctionRoots.getMemorySize() +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +
          size_in_bytes(KeyPaths) +
