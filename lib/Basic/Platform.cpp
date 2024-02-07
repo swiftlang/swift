@@ -180,6 +180,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
+  case llvm::Triple::XROS:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
