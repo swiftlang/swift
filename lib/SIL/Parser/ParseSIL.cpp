@@ -3413,7 +3413,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDebugStep(InstLoc);
     break;
 
-  case SILInstructionKind::TestSpecificationInst: {
+  case SILInstructionKind::SpecifyTestInst: {
     // Parse the specification string.
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_sil_specify_test_body);
@@ -3424,7 +3424,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto ArgumentsSpecification =
       P.Tok.getText().drop_front(numQuotes).drop_back(numQuotes).trim();
     P.consumeToken(tok::string_literal);
-    auto *tsi = B.createTestSpecificationInst(InstLoc, ArgumentsSpecification);
+    auto *tsi = B.createSpecifyTestInst(InstLoc, ArgumentsSpecification);
     SmallVector<StringRef, 4> components;
     test::getTestSpecificationComponents(ArgumentsSpecification, components);
     for (auto component : components) {

@@ -842,7 +842,7 @@ NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugStepInst, debug_step,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(TestSpecificationInst, specify_test,
+NON_VALUE_INST(SpecifyTestInst, specify_test,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NON_VALUE_INST(Store##Name##Inst, store_##name, \

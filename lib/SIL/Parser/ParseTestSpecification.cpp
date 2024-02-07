@@ -41,20 +41,20 @@ void findAndDeleteTraceValues(SILFunction *function,
 bool isDeleteableTestInstruction(SILInstruction const *instruction) {
   if (auto *dvi = dyn_cast<DebugValueInst>(instruction))
     return dvi->hasTrace();
-  if (isa<TestSpecificationInst>(instruction))
+  if (isa<SpecifyTestInst>(instruction))
     return true;
   return false;
 }
 
-SILInstruction *findAnchorInstructionAfter(TestSpecificationInst *tsi) {
+SILInstruction *findAnchorInstructionAfter(SpecifyTestInst *tsi) {
   for (auto *instruction = tsi->getNextInstruction(); instruction;
        instruction = instruction->getNextInstruction()) {
     if (!isDeleteableTestInstruction(instruction))
       return instruction;
   }
-  // This can't happen because a TestSpecificationInst isn't a terminator itself
+  // This can't happen because a SpecifyTestInst isn't a terminator itself
   // nor are any deleteable instructions.
-  llvm_unreachable("found no anchor after TestSpecificationInst!?");
+  llvm_unreachable("found no anchor after SpecifyTestInst!?");
 }
 
 // Helpers: Looking up subobjects by index
@@ -701,7 +701,7 @@ void swift::test::getTestSpecifications(
     SmallVectorImpl<UnparsedSpecification> &specifications) {
   for (auto &block : *function) {
     for (SILInstruction &inst : block.deletableInstructions()) {
-      if (auto *tsi = dyn_cast<TestSpecificationInst>(&inst)) {
+      if (auto *tsi = dyn_cast<SpecifyTestInst>(&inst)) {
         auto ref = tsi->getArgumentsSpecification();
         auto *anchor = findAnchorInstructionAfter(tsi);
         specifications.push_back(

@@ -939,7 +939,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // sense to write those instructions at all.
     // TODO: decide if we want to serialize those instructions.
     return;
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
     // Instruction exists only for tests.  Ignore it.
     return;
   case SILInstructionKind::AllocPackMetadataInst:

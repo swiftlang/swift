@@ -70,7 +70,7 @@ private:
 
   /// Data structures used to perform name lookup for local values.
   llvm::StringMap<ValueBase *> LocalValues;
-  llvm::StringMap<llvm::SmallVector<TestSpecificationInst *>> TestSpecsWithRefs;
+  llvm::StringMap<llvm::SmallVector<SpecifyTestInst *>> TestSpecsWithRefs;
   llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
   Type performTypeResolution(TypeRepr *TyR, bool IsSILType,

@@ -1065,11 +1065,10 @@ public:
     return createDebugValue(Loc, src, Var);
   }
 
-  TestSpecificationInst *
-  createTestSpecificationInst(SILLocation Loc,
-                              StringRef ArgumentsSpecification) {
-    return insert(TestSpecificationInst::create(
-        getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
+  SpecifyTestInst *createSpecifyTestInst(SILLocation Loc,
+                                         StringRef ArgumentsSpecification) {
+    return insert(SpecifyTestInst::create(getSILDebugLocation(Loc),
+                                          ArgumentsSpecification, getModule()));
   }
 
   UnownedCopyValueInst *createUnownedCopyValue(SILLocation Loc,
