@@ -1661,6 +1661,10 @@ bool DroppedGlobalActorFunctionAttr::diagnoseAsError() {
   if (!fromGlobalActor)
     return false;
 
+  auto toFnType = getToType()->getAs<FunctionType>();
+  if (toFnType && toFnType->getIsolation().isErased())
+    return false;
+
   emitDiagnostic(
       diag::converting_func_loses_global_actor, getFromType(), getToType(),
       fromGlobalActor);

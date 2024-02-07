@@ -3232,6 +3232,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
+                                                       unsigned depth) {
+  Buffer << "YA";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleThrowsAnnotation(Node *node, unsigned depth) {
   Buffer << 'K';
   return ManglingError::Success;

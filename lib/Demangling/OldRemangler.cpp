@@ -846,6 +846,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
+                                                       unsigned depth) {
+  Buffer << "YA";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleFieldOffset(Node *node, unsigned depth) {
   Buffer << "Wv";
   return mangleChildNodes(node, depth + 1); // directness, entity

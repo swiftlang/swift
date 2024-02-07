@@ -454,6 +454,8 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forParameter();
   } else if (globalActor) {
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+  } else if (extFlags.isIsolatedAny()) {
+    isolation = FunctionTypeIsolation::forErased();
   }
 
   auto noescape =

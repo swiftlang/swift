@@ -846,9 +846,10 @@ protected:
 
         globalActorType = globalActorResult.getType();
         ++firstChildIdx;
+      } else if (Node->getChild(firstChildIdx)->getKind() ==
+                 NodeKind::IsolatedAnyFunctionType) {
+        extFlags = extFlags.withIsolatedAny();
       }
-
-      // FIXME: other kinds of isolation
 
       FunctionMetadataDifferentiabilityKind diffKind;
       if (Node->getChild(firstChildIdx)->getKind() ==

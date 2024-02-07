@@ -2003,6 +2003,26 @@ BridgedTypeAttribute BridgedTypeAttribute_createSimple(
                                      cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 
+BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
+    BridgedASTContext cContext,
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc,
+    BridgedSourceLoc cLPLoc, BridgedSourceLoc cIsolationLoc,
+    BridgedIsolatedTypeAttrIsolationKind cIsolation, BridgedSourceLoc cRPLoc) {
+  auto isolationKind = [=] {
+    switch (cIsolation) {
+    case BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation:
+      return IsolatedTypeAttr::IsolationKind::Dynamic;
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return new (cContext.unbridged()) IsolatedTypeAttr(cAtLoc.unbridged(),
+                                                     cNameLoc.unbridged(),
+                                                     {cLPLoc.unbridged(),
+                                                      cRPLoc.unbridged()},
+                                                     {isolationKind,
+                                                      cIsolationLoc.unbridged()});
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//

@@ -2936,6 +2936,10 @@ protected:
       : NumPadBits,
       Index : 32
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
+      Kind : 8
+    );
   } Bits;
   // clang-format on
 
@@ -3157,6 +3161,39 @@ public:
   SourceLoc getUUIDLoc() const {
     return ID.Loc;
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The @isolated function type attribute, not to be confused with the
+/// `isolated` declaration modifier (IsolatedAttr) or the `isolated`
+/// parameter specifier (IsolatedTypeRepr).
+class IsolatedTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Isolated> {
+public:
+  enum class IsolationKind : uint8_t {
+    Dynamic
+  };
+
+private:
+  SourceLoc KindLoc;
+
+public:
+  IsolatedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                   Located<IsolationKind> kind)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange), KindLoc(kind.Loc) {
+    Bits.IsolatedTypeAttr.Kind = uint8_t(kind.Item);
+  }
+
+  IsolationKind getIsolationKind() const {
+    return IsolationKind(Bits.IsolatedTypeAttr.Kind);
+  }
+  SourceLoc getIsolationKindLoc() const {
+    return KindLoc;
+  }
+  const char *getIsolationKindName() const {
+    return getIsolationKindName(getIsolationKind());
+  }
+  static const char *getIsolationKindName(IsolationKind kind);
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

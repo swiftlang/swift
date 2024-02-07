@@ -276,6 +276,9 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
+// Enable isolated(any) attribute on function types.
+EXPERIMENTAL_FEATURE(IsolatedAny, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

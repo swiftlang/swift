@@ -3444,9 +3444,6 @@ public:
       return getExtInfo().getIsolation();
     return FunctionTypeIsolation::forNonIsolated();
   }
-  bool isDynamicallyIsolated() const {
-    return getIsolation().isDynamic();
-  }
 
   /// Retrieve the "effective" thrown interface type, or llvm::None if
   /// this function cannot throw.

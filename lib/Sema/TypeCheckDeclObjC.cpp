@@ -488,6 +488,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     // in the generated header.
     return false;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("decl cannot have dynamic isolation");
+
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:

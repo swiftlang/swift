@@ -1714,6 +1714,10 @@ void swift::simple_display(
       out << "unspecified actor isolation";
       break;
 
+    case ActorIsolation::Erased:
+      out << "actor-isolated to a statically-unknown actor";
+      break;
+
     case ActorIsolation::GlobalActor:
       out << "actor-isolated to global actor ";
       if (state.isSILParsed()) {

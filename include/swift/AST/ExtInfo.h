@@ -62,8 +62,8 @@ public:
     /// the parameter list.
     Parameter,
 
-    /// The function is dynamically isolated.
-    Dynamic,
+    /// The function's isolation is statically erased with @isolated(any).
+    Erased,
   };
 
   static constexpr size_t NumBits = 3; // future-proof this slightly
@@ -85,8 +85,8 @@ public:
   static FunctionTypeIsolation forParameter() {
     return { Kind::Parameter };
   }
-  static FunctionTypeIsolation forDynamic() {
-    return { Kind::Dynamic };
+  static FunctionTypeIsolation forErased() {
+    return { Kind::Erased };
   }
 
   Kind getKind() const { return value.getInt(); }
@@ -103,8 +103,8 @@ public:
   bool isParameter() const {
     return getKind() == Kind::Parameter;
   }
-  bool isDynamic() const {
-    return getKind() == Kind::Dynamic;
+  bool isErased() const {
+    return getKind() == Kind::Erased;
   }
 
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,
@@ -543,8 +543,8 @@ public:
     return FunctionTypeIsolation::Kind(
              (bits & IsolationMask) >> IsolationMaskOffset);
   }
-  bool isDynamicallyIsolated() const {
-    return getIsolationKind() == FunctionTypeIsolation::Kind::Dynamic;
+  bool isIsolationStaticallyErased() const {
+    return getIsolationKind() == FunctionTypeIsolation::Kind::Erased;
   }
   static bool hasGlobalActorFromBits(unsigned bits) {
     return getIsolationKindFromBits(bits)

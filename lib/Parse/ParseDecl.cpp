@@ -4783,6 +4783,52 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // All the non-simple attributes should get explicit cases here.
 
+  case TypeAttrKind::Isolated: {
+    SourceLoc lpLoc = Tok.getLoc(), kindLoc, rpLoc;
+    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_isolated_expected_lparen);
+        // TODO: should we suggest removing the `@`?
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<IsolatedTypeAttr::IsolationKind> kind;
+    if (isIdentifier(Tok, "any")) {
+      kindLoc = consumeToken(tok::identifier);
+      kind = IsolatedTypeAttr::IsolationKind::Dynamic;
+
+    // Add new kinds of isolation here; be sure to update the text for
+    // attr_isolated_expected_kind.
+
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_isolated_expected_kind);
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_isolated_expected_rparen,
+                           lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(kind);
+
+    if (!justChecking) {
+      result = new (Context) IsolatedTypeAttr(AtLoc, attrLoc,
+                                              {lpLoc, rpLoc},
+                                              {*kind, kindLoc});
+    }
+    return makeParserSuccess();
+  }
+
   case TypeAttrKind::Opened: {
     // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
@@ -5293,11 +5339,14 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
   while (P.isParameterSpecifier()) {
 
     if (Tok.isContextualKeyword("isolated")) {
+      Tok.setKind(tok::contextual_keyword);
+      auto kwLoc = P.consumeToken();
+
       if (IsolatedLoc.isValid()) {
-        P.diagnose(Tok, diag::parameter_specifier_repeated)
+        P.diagnose(kwLoc, diag::parameter_specifier_repeated)
             .fixItRemove(SpecifierLoc);
       }
-      IsolatedLoc = P.consumeToken();
+      IsolatedLoc = kwLoc;
       continue;
     }
 

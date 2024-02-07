@@ -557,6 +557,7 @@ private:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
+    case Node::Kind::IsolatedAnyFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::TypedThrowsAnnotation:
@@ -877,6 +878,11 @@ private:
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind()
+            == Node::Kind::IsolatedAnyFunctionType) {
+      Printer << "@isolated(any) ";
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() ==
@@ -2913,6 +2919,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
+  case Node::Kind::IsolatedAnyFunctionType:
+    Printer << "@isolated(any) ";
+    return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer << " async";
     return nullptr;
