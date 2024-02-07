@@ -769,7 +769,7 @@ bool TypeBase::isSendableType() {
     return fas->isSendable();
 
   auto conformance = proto->getParentModule()->checkConformance(this, proto);
-  if (conformance.isInvalid())
+  if (conformance.isInvalid() || conformance.hasUnavailableConformance())
     return false;
 
   // Look for missing Sendable conformances.
