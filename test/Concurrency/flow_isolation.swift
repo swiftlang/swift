@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: asserts
-// REQUIRES: rdar120849093
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
