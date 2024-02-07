@@ -1065,19 +1065,15 @@ public:
       return RS;
     }
 
-    Expr *E = RS->getResult();
-    TypeCheckExprOptions options = {};
-
-    auto ctp = RS->isImplied() ? CTP_ImpliedReturnStmt : CTP_ReturnStmt;
-    auto exprTy =
-        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
-    RS->setResult(E);
-
-    if (!exprTy) {
-      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), E, ResultTy,
-                                              DC->getParentModule());
+    using namespace constraints;
+    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto resultTarget = TypeChecker::typeCheckTarget(target);
+    if (resultTarget) {
+      RS->setResult(resultTarget->getAsExpr());
+    } else {
+      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
+                                              ResultTy, DC->getParentModule());
     }
-
     return RS;
   }
 

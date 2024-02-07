@@ -1469,8 +1469,8 @@ struct PotentialThrowSite {
 };
 
 enum class ImpliedResultKind {
-  /// A regular implied result, this applies to e.g implied 'then' statements
-  /// outside of closures.
+  /// A regular implied result, this applies to e.g single expression bodies of
+  /// function decls, and implied 'then' statements outside of closures.
   Regular,
 
   /// An implied result for a closure, e.g a single expression body.

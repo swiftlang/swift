@@ -3863,7 +3863,6 @@ private:
     // Allowed in returns, throws, and bindings.
     switch (ctp) {
     case CTP_ReturnStmt:
-    case CTP_ImpliedReturnStmt:
     case CTP_ThrowStmt:
     case CTP_Initialization:
       markValidSingleValueStmt(E);

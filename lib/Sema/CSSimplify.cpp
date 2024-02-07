@@ -6077,8 +6077,7 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     auto purpose = getContextualTypePurpose(anchor);
-    if (rhs->isVoid() &&
-        (purpose == CTP_ReturnStmt || purpose == CTP_ImpliedReturnStmt)) {
+    if (rhs->isVoid() && purpose == CTP_ReturnStmt) {
       conversionsOrFixes.push_back(
           RemoveReturn::create(*this, lhs, getConstraintLocator(locator)));
       return true;
@@ -7859,14 +7858,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (auto elt = locator.last()) {
     if (kind >= ConstraintKind::Subtype &&
         (type1->isUninhabited() || type2->isVoid())) {
-      // Function with an implied `return`, e.g a single expression body.
-      if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
-        if (contextualType->isFor(CTP_ImpliedReturnStmt)) {
-          increaseScore(SK_FunctionConversion, locator);
-          return getTypeMatchSuccess();
-        }
-      }
-
       // Implied results can occur for closure bodies, returns, and if/switch
       // expression branches.
       //
@@ -7877,6 +7868,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Never conversion.
       auto *loc = getConstraintLocator(locator);
       if (elt->is<LocatorPathElt::ClosureBody>() || 
+          loc->isForContextualType(CTP_ReturnStmt) ||
           loc->isForContextualType(CTP_ClosureResult) ||
           loc->isForSingleValueStmtBranch()) {
         bool allowConversion = false;
@@ -15599,7 +15591,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   auto constraintKind = ConstraintKind::Conversion;
   switch (purpose) {
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
   case CTP_Initialization: {
     if (conversionType->is<OpaqueTypeArchetypeType>())
       constraintKind = ConstraintKind::Equal;

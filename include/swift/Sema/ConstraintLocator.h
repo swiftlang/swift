@@ -50,8 +50,6 @@ enum ContextualTypePurpose : uint8_t {
   CTP_Unused,            ///< No contextual type is specified.
   CTP_Initialization,    ///< Pattern binding initialization.
   CTP_ReturnStmt,        ///< Value specified to a 'return' statement.
-  CTP_ImpliedReturnStmt, ///< Value from an implied 'return', e.g a single expr
-                         ///  function body.
   CTP_YieldByValue,      ///< By-value yield operand.
   CTP_YieldByReference,  ///< By-reference yield operand.
   CTP_ThrowStmt,         ///< Value specified to a 'throw' statement.

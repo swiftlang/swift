@@ -156,10 +156,6 @@ void WithSolutionSpecificVarTypesRAII::setInterfaceType(VarDecl *VD, Type Ty) {
 }
 
 bool swift::ide::isImpliedResult(const Solution &S, Expr *CompletionExpr) {
-  auto &CS = S.getConstraintSystem();
-  if (CS.getContextualTypePurpose(CompletionExpr) == CTP_ImpliedReturnStmt)
-    return true;
-
   return S.isImpliedResult(CompletionExpr).has_value();
 }
 

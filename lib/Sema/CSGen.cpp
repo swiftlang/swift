@@ -4771,6 +4771,12 @@ bool ConstraintSystem::generateConstraints(
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
 
+    // If we have a parent return statement, record whether it's implied.
+    if (auto *RS = target.getParentReturnStmt()) {
+      if (RS->isImplied())
+        recordImpliedResult(expr, ImpliedResultKind::Regular);
+    }
+
     expr = buildTypeErasedExpr(expr, target.getDeclContext(),
                                target.getExprContextualType(),
                                target.getExprContextualTypePurpose());

@@ -91,6 +91,9 @@ private:
       /// pattern.
       Pattern *pattern;
 
+      /// The parent return statement if any.
+      ReturnStmt *parentReturnStmt;
+
       struct {
         /// The variable to which property wrappers have been applied, if
         /// this is an initialization involving a property wrapper.
@@ -260,6 +263,10 @@ public:
   forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
+
+  /// Form an expression target for a ReturnStmt.
+  static SyntacticElementTarget
+  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
 
   /// Form a target for a for-in loop.
   static SyntacticElementTarget
@@ -455,6 +462,11 @@ public:
     assert(kind == Kind::expression);
     assert(getExprContextualTypePurpose() == CTP_ExprPattern);
     return cast<ExprPattern>(expression.pattern);
+  }
+
+  ReturnStmt *getParentReturnStmt() const {
+    assert(kind == Kind::expression);
+    return expression.parentReturnStmt;
   }
 
   Type getClosureContextualType() const {
