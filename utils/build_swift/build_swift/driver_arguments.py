@@ -1093,6 +1093,10 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-swift-clang-overlays', toggle_true,
+           default=True,
+           help='Build Swift overlays for the clang builtin modules')
+
     option('--build-swift-remote-mirror', toggle_true,
            default=True,
            help='Build Remote Mirror')
