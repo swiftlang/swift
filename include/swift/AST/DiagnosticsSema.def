@@ -6310,10 +6310,6 @@ ERROR(objc_ambiguous_error_convention,none,
 NOTE(objc_ambiguous_error_convention_candidate,none,
      "%0 provides an error argument here", (const ValueDecl *))
 
-ERROR(nonlocal_bridged_to_objc,none,
-      "conformance of %0 to %1 can only be written in module %2",
-      (Identifier, Identifier, Identifier))
-
 ERROR(missing_bridging_function,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))

@@ -2389,29 +2389,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
   }
 
-  // Except in specific hardcoded cases for Foundation/Swift
-  // standard library compatibility, an _ObjectiveCBridgeable
-  // conformance must appear in the same module as the definition of
-  // the conforming type.
-  //
-  // Note that we check the module name to smooth over the difference
-  // between an imported Objective-C module and its overlay.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-    auto nominal = DC->getSelfNominalTypeDecl();
-    if (!Context.isTypeBridgedInExternalModule(nominal)) {
-      auto clangLoader = Context.getClangModuleLoader();
-      if (nominal->getParentModule() != DC->getParentModule() &&
-          !(clangLoader &&
-            clangLoader->isInOverlayModuleForImportedModule(DC, nominal))) {
-        auto nominalModule = nominal->getParentModule();
-        Context.Diags.diagnose(conformance->getLoc(),
-                               diag::nonlocal_bridged_to_objc,
-                               nominal->getName(), Proto->getName(),
-                               nominalModule->getName());
-      }
-    }
-  }
-
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
