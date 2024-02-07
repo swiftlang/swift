@@ -930,18 +930,15 @@ llvm::TinyPtrVector<ValueDecl *>
 GetDistributedMethodWitnessedProtocolRequirements::evaluate(
     Evaluator &evaluator,
     AbstractFunctionDecl *afd) const {
-  auto DC = afd->getDeclContext();
+  // Only a 'distributed' decl can witness 'distributed' protocol
+  assert(afd->isDistributed());
 
   auto result = llvm::TinyPtrVector<ValueDecl *>();
   for (auto witnessedRequirement : afd->getSatisfiedProtocolRequirements()) {
-    fprintf(stderr, "[%s:%d](%s) witnessed:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    witnessedRequirement->dump();
     if (witnessedRequirement->isDistributed()) {
       result.push_back(witnessedRequirement);
     }
   }
 
-  fprintf(stderr, "[%s:%d](%s) results.count = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          result.size());
   return result;
 }

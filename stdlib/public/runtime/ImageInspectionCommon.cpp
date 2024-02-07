@@ -135,7 +135,7 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
       reinterpret_cast<void *>(dist_accessible_funcs_section.start);
   if (dist_accessible_funcs_section.length) {
     swift::addImageAccessibleFunctionsBlockCallback(
-        baseAddress, dist_functions, dist_accessible_funcs_section.length)
+        baseAddress, dist_functions, dist_accessible_funcs_section.length);
   }
 
   // Register this section for future enumeration by clients. This should occur

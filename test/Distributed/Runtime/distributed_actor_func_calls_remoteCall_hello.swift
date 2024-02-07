@@ -34,7 +34,7 @@ func test() async throws {
 
   let response = try await ref.hello()
   // CHECK: >> remoteCall: on:main.Greeter, target:main.Greeter.hello(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
-
+  // CHECK: > execute distributed target: main.Greeter.hello(), identifier: $s4main7GreeterC5helloSSyYaKFTE
   print("response: \(response)")
   // CHECK: response: Hello, World!
 

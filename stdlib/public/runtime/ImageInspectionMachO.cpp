@@ -93,8 +93,8 @@ constexpr const char DynamicReplacementSomeSection[] =
     MachODynamicReplacementSomeSection;
 constexpr const char AccessibleFunctionsSection[] =
     MachOAccessibleFunctionsSection;
-constexpr const char DistributedAccessibleFunctionsSection[] =
-    MachODistributedAccessibleFunctionsSection;
+constexpr const char AccessibleProtocolFunctionsSection[] =
+    MachOAccessibleProtocolFunctionsSection;
 constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
@@ -291,9 +291,9 @@ void swift::initializeAccessibleFunctionsLookup() {
                        _dyld_section_location_text_swift5_ac_funcs,
                        addImageAccessibleFunctionsBlockCallbackUnsafe>);
   REGISTER_FUNC(
-      addImageCallback<TextSegment, DistributedAccessibleFunctionsSection,
+      addImageCallback<TextSegment, AccessibleProtocolFunctionsSection,
                        _dyld_section_location_text_swift5_dac_funcs,
-                       addImageDistributedAccessibleFunctionsBlockCallbackUnsafe>);
+                       addImageAccessibleProtocolFunctionsBlockCallbackUnsafe>);
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&

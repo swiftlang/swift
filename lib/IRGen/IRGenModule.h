@@ -771,7 +771,9 @@ public:
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
-  llvm::StructType *DistributedAccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32*, i32}
+  llvm::StructType
+      *AccessibleProtocolRequirementFunctionRecordTy; // { i32*, i32*, i32*,
+                                                      // i32, i32*, i32*}
 
   // clang-format off
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
@@ -1312,18 +1314,24 @@ private:
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
 
-  struct DistributedAccessibleFunctionData {
-     SILFunction* function;
-     std::optional<std::string> mangledRecordName;
-     std::optional<std::string> specificMangledActorName;
-     DistributedAccessibleFunctionData(
-         SILFunction *function,
-         const std::optional<std::string> &mangledRecordName,
-         const std::optional<std::string> &specificMangledActorName);
+  struct AccessibleProtocolFunctionsData {
+    SILFunction *function;
+    /// Mangled name of the requirement function.
+    std::optional<std::string> mangledRecordName;
+    std::optional<std::string> concreteMangledTypeName;
+    AccessibleProtocolFunctionsData(
+        SILFunction *function,
+        const std::optional<std::string> &mangledRecordName,
+        const std::optional<std::string> &concreteMangledTypeName);
   };
-  /// List of all of distributed functions which need to be recoded
-  /// using a different record name.
-  SmallVector<DistributedAccessibleFunctionData, 4> AliasedAccessibleFunctions;
+  /// List of all functions which are protocol *requirements* which may be
+  /// looked up by name at runtime. The record can be used to pair
+  /// a concrete implementation type with the protocol (record) name,
+  /// in order to locate the *witness* function name on this specific type.
+  ///
+  /// The witness function name can then be used to look up the witness at
+  /// runtime by inspecting `AccessibleFunctions`.
+  SmallVector<AccessibleProtocolFunctionsData, 4> AccessibleProtocolFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.

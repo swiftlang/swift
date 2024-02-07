@@ -464,13 +464,55 @@ extension DistributedActorSystem {
 
     // Get the expected parameter count of the func
     let targetName = target.identifier
-    let nameUTF8 = Array(targetName.utf8)
+    let targetNameUTF8 = Array(targetName.utf8)
+
+    let concreteTargetNameTypeNamePair: _SwiftNamePair?
+    if #available(SwiftStdlib 5.11, *) {
+      let dataAndLength = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        _getConcreteAccessibleWitnessName(on: actor,
+          targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))
+      }
+      // If the length is greater than zero it is a real value, nil otherwise
+      if dataAndLength.1 > 0 {
+        concreteTargetNameTypeNamePair = dataAndLength
+      } else {
+        concreteTargetNameTypeNamePair = nil
+      }
+    } else {
+      // protocol method targets not supported in previous Swift versions,
+      // the targetName can be assumed to be a concrete name
+      concreteTargetNameTypeNamePair = nil
+    }
+    let concreteTargetNameData = concreteTargetNameTypeNamePair?.0
+    let concreteTargetNameLength = (concreteTargetNameTypeNamePair?.1).map(UInt.init)
 
     // Gen the generic environment (if any) associated with the target.
-    let genericEnv = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-      _getGenericEnvironmentOfDistributedTarget(nameUTF8.baseAddress!,
-                                                UInt(nameUTF8.endIndex))
-    }
+//    let genericEnv =
+//      if #available(SwiftStdlib 5.11, *),
+//         let concreteTargetNameData,
+//         let concreteTargetNameLength {
+//        _getGenericEnvironmentOfDistributedTarget(
+//          on: actor,
+//          concreteTargetNameData, UInt(concreteTargetNameLength))
+//      } else {
+//        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+//          _deprecated_getGenericEnvironmentOfDistributedTarget(
+//            targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))
+//        }
+//      }
+    let genericEnv =
+//      if let concreteTargetNameData,
+//         let concreteTargetNameLength {
+//        _deprecated_getGenericEnvironmentOfDistributedTarget( // FIXME: not deprecated
+//          on: actor,
+//          concreteTargetNameData, UInt(concreteTargetNameLength))
+//      } else {
+        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+          _deprecated_getGenericEnvironmentOfDistributedTarget(
+            concreteTargetNameData ?? targetNameUTF8.baseAddress!,
+            concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
+        }
+//      }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
     var witnessTablesBuffer: UnsafeRawPointer? = nil
@@ -505,9 +547,12 @@ extension DistributedActorSystem {
       }
     }
 
-    let paramCount = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-      __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
-    }
+    let paramCount =
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        __getParameterCount(
+          concreteTargetNameData ?? targetNameUTF8.baseAddress!,
+          concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
+      }
 
     guard paramCount >= 0 else {
       throw ExecuteDistributedTargetError(
@@ -526,9 +571,10 @@ extension DistributedActorSystem {
     }
 
     // Demangle and write all parameter types into the prepared buffer
-    let decodedNum = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+    let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
       __getParameterTypeInfo(
-        nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+        concreteTargetNameData ?? targetNameUTF8.baseAddress!,
+        concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
         genericEnv,
         substitutionsBuffer,
         argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
@@ -539,7 +585,7 @@ extension DistributedActorSystem {
       throw ExecuteDistributedTargetError(
         message: """
                  Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
-                 (decoded: \(decodedNum), expected params: \(paramCount)
+                 decoded: \(decodedNum), expected params: \(paramCount)
                  mangled name: \(targetName)
                  """,
         errorCode: .invalidParameterCount)
@@ -559,9 +605,15 @@ extension DistributedActorSystem {
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
-    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: targetName,
-                                                                    genericEnv: genericEnv,
-                                                                    genericArguments: substitutionsBuffer) else {
+    let maybeReturnTypeFromTypeInfo =
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        __getReturnTypeInfo(
+          /*targetName:*/concreteTargetNameData ?? targetNameUTF8.baseAddress!,
+          /*targetLength:*/concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
+          /*genericEnv:*/genericEnv,
+          /*genericArguments:*/substitutionsBuffer)
+      }
+    guard let returnTypeFromTypeInfo: Any.Type = maybeReturnTypeFromTypeInfo else {
       throw ExecuteDistributedTargetError(
         message: "Failed to decode distributed target return type",
         errorCode: .typeDeserializationFailure)
@@ -583,19 +635,37 @@ extension DistributedActorSystem {
 
     do {
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
-      // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use?
+      // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
       // Execute the target!
-      try await _executeDistributedTarget(
-        on: actor,
-        targetName, UInt(targetName.count),
-        argumentDecoder: &invocationDecoder,
-        argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-        resultBuffer: resultBuffer._rawValue,
-        substitutions: UnsafeRawPointer(substitutionsBuffer),
-        witnessTables: witnessTablesBuffer,
-        numWitnessTables: UInt(numWitnessTables)
-      )
+      // Boilerplate invocation since types don't quite align between
+      // concreteTargetNameData and
+      if let concreteTargetNameData,
+         let concreteTargetNameLength {
+        try await _executeDistributedTarget(
+          on: actor,
+          /*targetNameData:*/concreteTargetNameData,
+          /*targetNameLength:*/concreteTargetNameLength,
+          argumentDecoder: &invocationDecoder,
+          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          resultBuffer: resultBuffer._rawValue,
+          substitutions: UnsafeRawPointer(substitutionsBuffer),
+          witnessTables: witnessTablesBuffer,
+          numWitnessTables: UInt(numWitnessTables)
+        )
+      } else {
+        try await _executeDistributedTarget(
+          on: actor,
+          /*targetNameData:*/targetName,
+          /*targetNameLength:*/UInt(targetName.count),
+          argumentDecoder: &invocationDecoder,
+          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          resultBuffer: resultBuffer._rawValue,
+          substitutions: UnsafeRawPointer(substitutionsBuffer),
+          witnessTables: witnessTablesBuffer,
+          numWitnessTables: UInt(numWitnessTables)
+        )
+      }
 
       if returnType == Void.self {
         try await handler.onReturnVoid()

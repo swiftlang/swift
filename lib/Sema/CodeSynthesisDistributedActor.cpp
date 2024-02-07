@@ -13,25 +13,25 @@
 #include "TypeCheckDistributed.h"
 
 #include "CodeSynthesis.h"
-#include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/ASTMangler.h"
-#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "DerivedConformances.h"
 
 using namespace swift;
 
@@ -526,11 +526,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto witnessedDistributedRequirements =
         func->getDistributedMethodWitnessedProtocolRequirements();
 
-    thunk->dump();
-    fprintf(stderr, "[%s:%d](%s) IS [%s] A WITNESS? result = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            thunk->getNameStr().str().c_str(),
-            witnessedDistributedRequirements.size());
-
     if (witnessedDistributedRequirements.size() == 1) {
       auto protocolFunc = witnessedDistributedRequirements.front();
 
@@ -538,10 +533,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       // otherwise we should have diagnosed errors about more than 1 already.
       std::string mangledString =
           mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
-      fprintf(stderr, "[%s:%d](%s)            THE MANGLING: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              mangledString.c_str());
-      fprintf(stderr, "[%s:%d](%s) REFERENCE THUNK EXAMPLE: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              "$s4main28GreeterP_ConcreteSystem_StubC5greetSSyYaKFTE");
       // FIXME: make it THUNK so the mangling is right
       // MUST BE LIKE: s4main28GreeterP_ConcreteSystem_StubC5greetSSyYaKFTE
 
@@ -678,9 +669,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 /// This is used both to create stub witnesses as well as distributed thunks.
 ///
 /// \param DC The declaration context of the newly created function
-static FuncDecl*
-createSameSignatureFunctionDecl(DeclContext *DC,
-                                FuncDecl *func,
+static FuncDecl *
+createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
                                 llvm::Optional<DeclName> nameOverride,
                                 bool forceAsync, bool forceThrows) {
   auto &C = func->getASTContext();
@@ -744,8 +734,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
 
-  // NOTE: So we don't need a thunk in the protocol, we should call the underlying
-  // thing instead, which MUST have a thunk, since it must be a distributed func as well...
+  // NOTE: So we don't need a thunk in the protocol, we should call the
+  // underlying thing instead, which MUST have a thunk, since it must be a
+  // distributed func as well...
   if (isa<ProtocolDecl>(DC)) {
     return nullptr;
   }
@@ -766,9 +757,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     thunkName = func->getName();
   }
 
-  FuncDecl *thunk = createSameSignatureFunctionDecl(
-      DC, func, thunkName,
-      /*forceAsync=*/true, /*forceThrows=*/true);
+  FuncDecl *thunk = createSameSignatureFunctionDecl(DC, func, thunkName,
+                                                    /*forceAsync=*/true,
+                                                    /*forceThrows=*/true);
   assert(thunk && "couldn't create a distributed thunk");
 
   thunk->setSynthesized(true);
@@ -780,12 +771,10 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   /// Record which function this is a thunk for, we'll need this to link back
   /// calls in case this is a distributed requirement witness.
-  thunk->getAttrs().add(
-      new (C) DistributedThunkTargetAttr(func));
+  thunk->getAttrs().add(new (C) DistributedThunkTargetAttr(func));
 
   return thunk;
 }
-
 
 /******************************************************************************/
 /*********************** CODABLE CONFORMANCE **********************************/
@@ -862,9 +851,8 @@ addDistributedActorCodableConformance(
 /******************************************************************************/
 /******************************************************************************/
 
-void swift::assertRequiredSynthesizedPropertyOrder(
-    ASTContext &Context,
-    NominalTypeDecl *nominal) {
+void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
+                                                   NominalTypeDecl *nominal) {
 #ifndef NDEBUG
   if (auto id = nominal->getDistributedActorIDProperty()) {
     if (auto system = nominal->getDistributedActorSystemProperty()) {
@@ -872,13 +860,15 @@ void swift::assertRequiredSynthesizedPropertyOrder(
         if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
           int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
           int idx = 0;
-          for (auto member: nominal->getMembers()) {
+          for (auto member : nominal->getMembers()) {
             if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
               if (binding->getSingleVar()->getName() == Context.Id_id) {
                 idIdx = idx;
-              } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
+              } else if (binding->getSingleVar()->getName() ==
+                         Context.Id_actorSystem) {
                 actorSystemIdx = idx;
-              } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
+              } else if (binding->getSingleVar()->getName() ==
+                         Context.Id_unownedExecutor) {
                 unownedExecutorIdx = idx;
               }
               idx += 1;
@@ -886,7 +876,8 @@ void swift::assertRequiredSynthesizedPropertyOrder(
           }
           if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
             // we have found all the necessary fields, let's assert their order
-            assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+            assert(idIdx < actorSystemIdx < unownedExecutorIdx &&
+                   "order of fields MUST be exact.");
           }
         }
       }
@@ -1058,4 +1049,3 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
   return addDistributedActorCodableConformance(classDecl,
                                                C.getProtocol(protoKind));
 }
-

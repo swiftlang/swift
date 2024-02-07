@@ -51,24 +51,30 @@ struct AccessibleFunctionsSection {
   const AccessibleFunctionRecord *end() const { return End; }
 };
 
-struct DistributedAccessibleFunctionsSection {
-  const DistributedAccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
-      Begin;
-  const DistributedAccessibleFunctionRecord *__ptrauth_swift_accessible_function_record
-      End;
+struct AccessibleProtocolFunctionsSection {
+  const AccessibleProtocolRequirementFunctionRecord
+      *__ptrauth_swift_accessible_protocol_requirement_function_record Begin;
+  const AccessibleProtocolRequirementFunctionRecord
+      *__ptrauth_swift_accessible_protocol_requirement_function_record End;
 
-  DistributedAccessibleFunctionsSection(const DistributedAccessibleFunctionRecord *begin,
-                             const DistributedAccessibleFunctionRecord *end)
+  AccessibleProtocolFunctionsSection(
+      const AccessibleProtocolRequirementFunctionRecord *begin,
+      const AccessibleProtocolRequirementFunctionRecord *end)
       : Begin(begin), End(end) {}
 
-  DistributedAccessibleFunctionsSection(const void *ptr, uintptr_t size) {
+  AccessibleProtocolFunctionsSection(const void *ptr, uintptr_t size) {
     auto bytes = reinterpret_cast<const char *>(ptr);
-    Begin = reinterpret_cast<const DistributedAccessibleFunctionRecord *>(ptr);
-    End = reinterpret_cast<const DistributedAccessibleFunctionRecord *>(bytes + size);
+    Begin =
+        reinterpret_cast<const AccessibleProtocolRequirementFunctionRecord *>(
+            ptr);
+    End = reinterpret_cast<const AccessibleProtocolRequirementFunctionRecord *>(
+        bytes + size);
   }
 
-  const DistributedAccessibleFunctionRecord *begin() const { return Begin; }
-  const DistributedAccessibleFunctionRecord *end() const { return End; }
+  const AccessibleProtocolRequirementFunctionRecord *begin() const {
+    return Begin;
+  }
+  const AccessibleProtocolRequirementFunctionRecord *end() const { return End; }
 };
 
 struct AccessibleFunctionCacheEntry {
@@ -105,10 +111,72 @@ public:
   }
 };
 
+struct AccessibleProtocolFunctionCacheKey {
+public:
+  llvm::StringRef TypeName;
+  llvm::StringRef TargetName;
+
+  friend llvm::hash_code
+  hash_value(const AccessibleProtocolFunctionCacheKey &value) {
+    return hash_value(llvm::hash_combine(value.TypeName, value.TargetName));
+  }
+};
+struct AccessibleProtocolFunctionCacheEntry {
+private:
+  const char *TypeName; // TODO(distributed): Optimize and use metadata pointer
+  size_t TypeNameLength;
+
+  const char *TargetName;
+  size_t TargetNameLength;
+
+  const AccessibleProtocolRequirementFunctionRecord
+      *__ptrauth_swift_accessible_protocol_requirement_function_record R;
+
+public:
+  AccessibleProtocolFunctionCacheEntry(
+      llvm::StringRef typeName, llvm::StringRef targetName,
+      const AccessibleProtocolRequirementFunctionRecord *record)
+      : R(record) {
+    char *TheTypeName = reinterpret_cast<char *>(malloc(typeName.size()));
+    memcpy(TheTypeName, typeName.data(), typeName.size());
+    this->TypeName = TheTypeName;
+    this->TypeNameLength = typeName.size();
+
+    char *TheTargetName = reinterpret_cast<char *>(malloc(targetName.size()));
+    memcpy(TheTargetName, targetName.data(), targetName.size());
+    this->TargetName = TheTargetName;
+    this->TargetNameLength = targetName.size();
+  }
+
+  const AccessibleProtocolRequirementFunctionRecord *getRecord() const {
+    return R;
+  }
+
+  bool matchesKey(AccessibleProtocolFunctionCacheKey key) {
+    return key.TypeName == llvm::StringRef{TypeName, TypeNameLength} &&
+           key.TargetName == llvm::StringRef{TargetName, TargetNameLength};
+  }
+
+  friend llvm::hash_code
+  hash_value(const AccessibleProtocolFunctionCacheEntry &value) {
+    return hash_value(llvm::hash_combine(
+        llvm::StringRef{value.TypeName, value.TypeNameLength},
+        llvm::StringRef{value.TargetName, value.TargetNameLength}));
+  }
+
+  template <class... T>
+  static size_t getExtraAllocationSize(T &&...ignored) {
+    return 0;
+  }
+};
+
 struct AccessibleFunctionsState {
-  ConcurrentReadableHashMap<AccessibleFunctionCacheEntry> Cache;
+  ConcurrentReadableHashMap<AccessibleFunctionCacheEntry> FunctionCache;
+  ConcurrentReadableHashMap<AccessibleProtocolFunctionCacheEntry>
+      ProtocolRequirementFunctionCache;
   ConcurrentReadableArray<AccessibleFunctionsSection> SectionsToScan;
-  ConcurrentReadableArray<DistributedAccessibleFunctionsSection> SectionsToScan2;
+  ConcurrentReadableArray<AccessibleProtocolFunctionsSection>
+      WitnessSectionsToScan;
 
   AccessibleFunctionsState() {
     initializeAccessibleFunctionsLookup();
@@ -124,9 +192,9 @@ static void _registerAccessibleFunctions(AccessibleFunctionsState &C,
   C.SectionsToScan.push_back(section);
 }
 
-static void _registerDistributedAccessibleFunctions(AccessibleFunctionsState &C,
-                                                    DistributedAccessibleFunctionsSection section) {
-  C.SectionsToScan2.push_back(section);
+static void _registerAccessibleProtocolFunctionss(
+    AccessibleFunctionsState &C, AccessibleProtocolFunctionsSection section) {
+  C.WitnessSectionsToScan.push_back(section);
 }
 
 void swift::addImageAccessibleFunctionsBlockCallbackUnsafe(
@@ -140,15 +208,15 @@ void swift::addImageAccessibleFunctionsBlockCallbackUnsafe(
   _registerAccessibleFunctions(C, AccessibleFunctionsSection{functions, size});
 }
 
-void swift::addImageDistributedAccessibleFunctionsBlockCallbackUnsafe(
-  const void *baseAddress,
-    const void *dfunctions, uintptr_t dsize) {
-  assert(
-      dsize % sizeof(DistributedAccessibleFunctionRecord) == 0 &&
-      "accessible distributed function section not a multiple of DistributedAccessibleFunctionRecord");
+void swift::addImageAccessibleProtocolFunctionsBlockCallbackUnsafe(
+    const void *baseAddress, const void *dfunctions, uintptr_t dsize) {
+  assert(dsize % sizeof(AccessibleProtocolRequirementFunctionRecord) == 0 &&
+         "accessible protocol function section not a multiple of "
+         "AccessibleProtocolRequirementFunctionRecord");
 
   auto &C = Functions.unsafeGetAlreadyInitialized();
-  _registerDistributedAccessibleFunctions(C, DistributedAccessibleFunctionsSection{dfunctions, dsize});
+  _registerAccessibleProtocolFunctionss(
+      C, AccessibleProtocolFunctionsSection{dfunctions, dsize});
 }
 
 void swift::addImageAccessibleFunctionsBlockCallback(
@@ -160,157 +228,139 @@ void swift::addImageAccessibleFunctionsBlockCallback(
       functions, size);
 }
 
-void swift::addImageDistributedAccessibleFunctionsBlockCallback(
-  const void *baseAddress,
-    const void *functions, uintptr_t size) {
+void swift::addImageAccessibleProtocolFunctionsBlockCallback(
+    const void *baseAddress, const void *functions, uintptr_t size) {
   Functions.get();
-  addImageDistributedAccessibleFunctionsBlockCallbackUnsafe(
-      baseAddress,
-      functions, size);
+  addImageAccessibleProtocolFunctionsBlockCallbackUnsafe(baseAddress, functions,
+                                                         size);
 }
 
 static const AccessibleFunctionRecord *
 _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
   auto traceState = runtime::trace::accessible_function_scan_begin(name);
-  fprintf(stderr, "[%s:%d](%s) ~~~~~ checking_searchForFunctionRecord\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
   for (const auto &section : S.SectionsToScan.snapshot()) {
     for (auto &record : section) {
       auto recordName =
           swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
-      fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              recordName.str().c_str());
-      if (recordName == name)
+      if (recordName == name) {
         return traceState.end(&record);
+      }
     }
   }
   return nullptr;
 }
 
-static const DistributedAccessibleFunctionRecord *
-_searchForDistributedFunctionRecord(AccessibleFunctionsState &S,
-                                    std::optional<llvm::StringRef> actorTypeName,
-                                    llvm::StringRef name) {
-  auto traceState = runtime::trace::distributed_accessible_function_scan_begin(name);
-  if (actorTypeName) {
-    fprintf(stderr, "[%s:%d](%s) ~~~~~ checking_searchForFunctionRecord, NAME=%s, TY=%s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            name.str().c_str(),
-            actorTypeName->str().c_str());
-  } else {
-    fprintf(stderr, "[%s:%d](%s) ~~~~~ checking_searchForFunctionRecord, NAME=%s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-      name.str().c_str());
-  }
-
-  for (const auto &section : S.SectionsToScan2.snapshot()) {
-    fprintf(stderr, "[%s:%d](%s) section...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+static const AccessibleProtocolRequirementFunctionRecord *
+_searchForProtocolRequirementFunctionRecord(
+    AccessibleFunctionsState &S, std::optional<llvm::StringRef> actorTypeName,
+    llvm::StringRef targetFuncName) {
+  auto traceState = runtime::trace::distributed_accessible_function_scan_begin(
+      targetFuncName);
+  for (const auto &section : S.WitnessSectionsToScan.snapshot()) {
     for (auto &record : section) {
-    fprintf(stderr, "[%s:%d](%s) record...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      auto recordName =
+      llvm::StringRef recordName =
           swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
-        fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [OK PROTOCOL...]: %s\n",
-                __FILE_NAME__, __LINE__, __FUNCTION__,
-                recordName.str().c_str());
 
-      if (recordName == name) {
-        fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [OK PROTOCOL...]: %s\n",
-        __FILE_NAME__, __LINE__, __FUNCTION__, "NAME OK");
+      if (recordName == targetFuncName) {
         if (actorTypeName) {
-          fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [OK PROTOCOL...]: %s\n",
-                  __FILE_NAME__, __LINE__, __FUNCTION__, "HAVE TYPE");
           auto recordConcreteActorName =
               swift::Demangle::makeSymbolicMangledNameStringRef(
                   record.ConcreteActorName.get());
-          if (recordConcreteActorName.endswith(*actorTypeName)) { // FIXME: this is missing the "$s" on right side
-            fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [OK PROTOCOL...]: %s\n",
-                    __FILE_NAME__, __LINE__, __FUNCTION__, "TYPE OK");
+          if (recordConcreteActorName.endswith(
+                  *actorTypeName)) { // FIXME: this is missing the "$s" on right
+                                     // side
             return traceState.end(&record);
-          } else {
-            fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [OK PROTOCOL...]: %s; %s != %s\n",
-                    __FILE_NAME__, __LINE__, __FUNCTION__, "TYPE BAD",
-                    recordConcreteActorName.str().c_str(),
-                    actorTypeName->str().c_str());
           }
         } else {
-          // it's a call directly identified by the record/method name,
-          // not a protocol call, so we return the record...
-          assert(false); // FIXME: what to do here
+          // it's a call directly identified by the record/method
+          // targetFuncName, not a protocol call, so we return the record...
+          // FIXME: what to do here
           return traceState.end(&record);
         }
-      } else {
-        fprintf(stderr, "[%s:%d](%s) ~~~~~ checking record [no]: %s\n",
-                __FILE_NAME__, __LINE__, __FUNCTION__,
-                recordName.str().c_str());
       }
     }
   }
-
-  fprintf(stderr, "[%s:%d](%s) ~~~~~ checking_searchForFunctionRecord, NOPE\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
   return nullptr;
 }
 
 SWIFT_RUNTIME_STDLIB_SPI
 const AccessibleFunctionRecord *
-swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
-                                             size_t targetNameLength) {
+swift::runtime::swift_findAccessibleFunctionForConcreteType(
+    bool findConcreteWitness, const char *targetActorTypeNameStart,
+    size_t targetActorTypeNameLength, const char *targetNameStart,
+    size_t targetNameLength) {
   auto &S = Functions.get();
 
-  llvm::StringRef name{targetNameStart, targetNameLength};
+  llvm::StringRef actorName{targetActorTypeNameStart,
+                            targetActorTypeNameLength};
+  llvm::StringRef targetFuncName{targetNameStart, targetNameLength};
 
-  // Look for an existing entry.
-  {
-    auto snapshot = S.Cache.snapshot();
-    if (auto E = snapshot.find(name))
+  // Look for an existing entry by name only
+  if (actorName.empty()) {
+    // Check cached functions, we may be looking for a concrete function
+    // directly
+    auto snapshot = S.FunctionCache.snapshot();
+    if (auto E = snapshot.find(targetFuncName)) {
       return E->getRecord();
+    }
+  } else {
+    // Check cached protocol requirement functions
+    auto snapshot = S.ProtocolRequirementFunctionCache.snapshot();
+    AccessibleProtocolFunctionCacheKey actorAndTarget = {actorName,
+                                                         targetFuncName};
+    if (auto E = snapshot.find(actorAndTarget)) {
+      return E->getRecord();
+    }
   }
 
   // If entry doesn't exist (either record doesn't exist, hasn't been loaded, or
   // requested yet), let's try to find it and add to the cache.
-
-  auto *record = _searchForFunctionRecord(S, name);
+  // FIXME: fix up the caching scheme we do here; Cache the protocol funcs too.
+  auto *record = _searchForFunctionRecord(S, targetFuncName);
   if (record) {
-    S.Cache.getOrInsert(
-        name, [&](AccessibleFunctionCacheEntry *entry, bool created) {
-          if (created)
-            ::new (entry) AccessibleFunctionCacheEntry{name, record};
-          return true;
-        });
+    if (actorName.empty()) {
+      S.FunctionCache.getOrInsert(
+          targetFuncName,
+          [&](AccessibleFunctionCacheEntry *entry, bool created) {
+            if (created)
+              ::new (entry)
+                  AccessibleFunctionCacheEntry{targetFuncName, record};
+            return true;
+          });
+    }
+  }
+
+  if (!record) {
+    // We did not find it directly, so let's scan protocol requirement funcs
+    auto requirementFuncRecord = _searchForProtocolRequirementFunctionRecord(
+        S, actorName, targetFuncName);
+
+    if (findConcreteWitness && requirementFuncRecord) {
+      assert(requirementFuncRecord->ConcreteWitnessMethodName);
+      auto witnessFuncName = swift::Demangle::makeSymbolicMangledNameStringRef(
+          requirementFuncRecord->ConcreteWitnessMethodName.get());
+
+      auto concreteRecord = swift_findAccessibleFunctionForConcreteType(
+          // don't try again, no recursive trying again forever
+          /*findConcreteWitness=*/false, targetActorTypeNameStart,
+          targetActorTypeNameLength, witnessFuncName.data(),
+          witnessFuncName.size());
+
+      return concreteRecord;
+    }
   }
 
   return record;
 }
 
 SWIFT_RUNTIME_STDLIB_SPI
-const DistributedAccessibleFunctionRecord *
-swift::runtime::swift_findDistributedAccessibleFunction(
-    const char *targetNameStart, size_t targetNameLength,
-    const char *actorTypeNameStart, size_t actorTypeNameLength) {
-  auto &S = Functions.get();
-
-  llvm::StringRef targetMethodName{targetNameStart, targetNameLength};
-  llvm::StringRef actorTypeName{actorTypeNameStart, actorTypeNameLength};
-
-  // TODO: re-enable caches
-  // Look for an existing entry.
-//  {
-//    auto snapshot = S.Cache.snapshot();
-//    if (auto E = snapshot.find(name))
-//      return E->getRecord();
-//  }
-
-  // If entry doesn't exist (either record doesn't exist, hasn't been loaded, or
-  // requested yet), let's try to find it and add to the cache.
-
-  // auto *record = _searchForFunctionRecord(S, name);
-  auto *record = _searchForDistributedFunctionRecord(S, actorTypeName, targetMethodName);
-//  if (record) { // FIXME: enable this
-//    S.Cache.getOrInsert(
-//        name, [&](AccessibleFunctionCacheEntry *entry, bool created) {
-//          if (created)
-//            ::new (entry) DistributedAccessibleFunctionCacheEntry{name, record};
-//          return true;
-//        });
-//  }
-
-  return record;
+const AccessibleFunctionRecord *
+swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
+                                             size_t targetNameLength) {
+  return swift_findAccessibleFunctionForConcreteType(
+      /*findConcreteWitness=*/false,
+      /*targetActorTypeNameStart=*/nullptr, /*targetActorTypeNameLength=*/0,
+      targetNameStart, targetNameLength);
 }

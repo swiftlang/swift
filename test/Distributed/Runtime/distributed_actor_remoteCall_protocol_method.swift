@@ -59,7 +59,6 @@ distributed actor GreeterImpl: GreeterDefinedSystemProtocol {
 @main struct Main {
   static func main() async throws {
     let roundtripSystem = FakeRoundtripActorSystem()
-    let localTestingSystem = LocalTestingDistributedActorSystem()
 
     let real: any GreeterDefinedSystemProtocol = GreeterImpl(actorSystem: roundtripSystem)
     let realGreeting = try await real.greet()

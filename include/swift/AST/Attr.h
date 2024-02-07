@@ -2611,10 +2611,10 @@ class DistributedThunkTargetAttr final
 
 public:
   DistributedThunkTargetAttr(AbstractFunctionDecl *target)
-      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(), SourceRange(),
+      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
+                      SourceRange(),
                       /*Implicit=*/false),
-        TargetFunction(target)
-  {}
+        TargetFunction(target) {}
 
   AbstractFunctionDecl *getTargetFunction() const {
     return TargetFunction;
