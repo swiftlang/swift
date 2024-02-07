@@ -288,13 +288,12 @@ func globalSendable(_ ns: NonSendable) async {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 func callNonisolatedAsyncClosure(
-  ns: NonSendable, // expected-tns-note {{value is task isolated since it is in the same region as 'ns'}}
+  ns: NonSendable,
   g: (NonSendable) async -> Void
 ) async {
   await g(ns)
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
-  // expected-tns-warning @-3 {{task isolated value of type '@noescape @async @callee_guaranteed (@guaranteed NonSendable) -> ()' transferred to nonisolated context; later accesses to value could race}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
