@@ -349,7 +349,6 @@ bool NormalProtocolConformance::isResilient() const {
   // individual witnesses.
   if (!getDeclContext()->getSelfNominalTypeDecl()->isResilient())
     return false;
-
   return getDeclContext()->getParentModule()->isResilient();
 }
 

@@ -480,6 +480,10 @@ public:
     return Identifier();
   }
 
+  bool inPackage(std::string packageName) {
+    return !getPackageName().empty() && getPackageName().str() == packageName;
+  }
+
   /// Get the package associated with this module
   PackageUnit *getPackage() const { return Package; }
 

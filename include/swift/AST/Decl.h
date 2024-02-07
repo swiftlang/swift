@@ -2920,10 +2920,6 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
-  /// Returns whether this declaration should be treated as having the \c
-  /// package access level.
-  bool hasPackageAccess() const;
-
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
 
