@@ -1,3 +1,8 @@
+package struct Star {
+  package var planet: Int = 123
+  package init() {}
+}
+
 package struct Point {
   package var x: Int // read-write stored property
   package let y: Int // read-only stored property

@@ -2924,6 +2924,11 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
+  /// True if opted in for bypassing resilience within a package. Allowed only on
+  /// access from the \p accessingModule to a package decl in the defining
+  /// binary (not interface) module within the same package.
+  bool bypassResilienceInPackage(ModuleDecl *accessingModule) const;
+
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
 

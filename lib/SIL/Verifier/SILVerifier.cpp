@@ -122,6 +122,11 @@ namespace {
 template <typename DeclType>
 bool checkResilience(DeclType *D, ModuleDecl *M,
                      ResilienceExpansion expansion) {
+//  auto acl = D->getFormalAccessScope(/*useDC=*/nullptr,
+//                                     /*treatUsableFromInlineAsPublic=*/true);
+//  if (D->getDeclContext()->bypassResilienceInPackage(acl.isPackage()))
+//    return false;
+
   return !D->getModuleContext()->getBypassResilience() &&
          D->isResilient(M, expansion);
 }

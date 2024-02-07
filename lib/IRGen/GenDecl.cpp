@@ -5979,6 +5979,7 @@ bool IRGenModule::isResilient(NominalTypeDecl *D,
 
   if (D->getModuleContext()->getBypassResilience())
     return false;
+
   if (expansion == ResilienceExpansion::Maximal &&
       Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
