@@ -253,7 +253,7 @@ expandSwiftInvocation(int argc, const char **argv, llvm::StringSaver &Saver,
                       llvm::SmallVectorImpl<const char *> &ArgsStorage) {
   ArgsStorage.reserve(argc);
   for (int i = 0; i < argc; ++i)
-    ArgsStorage.push_back(argv[i]);
+    ArgsStorage.push_back(Saver.save(argv[i]).data());
   swift::driver::ExpandResponseFilesWithRetry(Saver, ArgsStorage);
 
   // Drop the `-frontend` option if it is passed.
