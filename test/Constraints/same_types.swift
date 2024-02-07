@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 protocol Fooable {
   associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; add nested type 'Foo' for conformance}}
 

@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 // https://github.com/apple/swift/issues/49119
 
 protocol P {
