@@ -1246,38 +1246,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
             }))
           return true;
 
-        auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req);
-        // Conformance requirement between on `Res` and `SerializationRequirement`
-        // of `DistributedActorSystem.remoteCall` are not expressible at the moment
-        // but they are verified by Sema so it's okay to omit them here and lookup
-        // dynamically during IRGen.
-        if (funcDecl && funcDecl->isDistributedActorSystemRemoteCallRequirement(
-                            /*withResult=*/true)) {
-          if (llvm::all_of(solution.Fixes, [&witness](constraints::ConstraintFix
-                                                          *fix) {
-                auto conformance = dyn_cast<MissingConformance>(fix);
-                if (!conformance)
-                  return false;
-
-                auto *locator = fix->getLocator();
-                auto requirement = locator->getLastElementAs<
-                    LocatorPathElt::TypeParameterRequirement>();
-                if (!requirement)
-                  return false;
-
-                auto signature =
-                    locator->findLast<LocatorPathElt::OpenedGeneric>()
-                        ->getSignature();
-
-                auto subject =
-                    signature.getRequirements()[requirement->getIndex()]
-                        .getFirstType();
-                // `Res` is the result type so we can check against that.
-                return subject->isEqual(
-                    cast<FuncDecl>(witness)->getResultInterfaceType());
-              }))
-            return true;
-        }
         // In all other cases - disallow the match.
         return false;
       };

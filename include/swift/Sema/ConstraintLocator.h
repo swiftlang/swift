@@ -1293,6 +1293,37 @@ public:
     return false;
   }
 
+  std::optional<std::pair</*witness=*/ValueDecl *, GenericTypeParamType *>>
+  isForWitnessGenericParameterRequirement() const {
+    SmallVector<LocatorPathElt, 2> path;
+    getLocatorParts(path);
+
+    // -> witness -> generic env -> requirement
+    if (path.size() < 3)
+      return std::nullopt;
+
+    GenericTypeParamType *GP = nullptr;
+    if (auto reqLoc =
+            path.back().getAs<LocatorPathElt::TypeParameterRequirement>()) {
+      path.pop_back();
+      if (auto openedGeneric =
+              path.back().getAs<LocatorPathElt::OpenedGeneric>()) {
+        auto signature = openedGeneric->getSignature();
+        auto requirement = signature.getRequirements()[reqLoc->getIndex()];
+        GP = requirement.getFirstType()->getAs<GenericTypeParamType>();
+      }
+    }
+
+    if (!GP)
+      return std::nullopt;
+
+    auto witness = path.front().getAs<LocatorPathElt::Witness>();
+    if (!witness)
+      return std::nullopt;
+
+    return std::make_pair(witness->getDecl(), GP);
+  }
+
   /// Checks whether this locator is describing an argument application for a
   /// non-ephemeral parameter.
   bool isNonEphemeralParameterApplication() const {

@@ -8572,6 +8572,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance) {
       return recordConformance(conformance);
     }
+
+    // Account for ad-hoc requirements on some distributed actor
+    // requirements.
+    if (auto witnessInfo = locator.isForWitnessGenericParameterRequirement()) {
+      auto *GP = witnessInfo->second;
+
+      // Conformance requirement between on `Res` and `SerializationRequirement`
+      // of `DistributedActorSystem.remoteCall` are not expressible at the moment
+      // but they are verified by Sema so it's okay to omit them here and lookup
+      // dynamically during IRGen.
+      if (auto *witness = dyn_cast<FuncDecl>(witnessInfo->first)) {
+        if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
+          if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
+            return recordConformance(ProtocolConformanceRef(protocol));
+        }
+      }
+    }
   } break;
 
   default:
