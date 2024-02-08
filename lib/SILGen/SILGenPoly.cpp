@@ -279,7 +279,6 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
       SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
                                      fromInstanceType,
                                      toInstanceType,
-                                     /*skipConditionalRequirements=*/true,
                                      /*allowMissing=*/true);
 
   // Build result existential

@@ -797,7 +797,6 @@ Expr *addImplicitLoadExpr(
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         ModuleDecl *M,
-                                        bool skipConditionalRequirements=false,
                                         bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.

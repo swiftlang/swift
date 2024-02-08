@@ -5280,7 +5280,6 @@ void swift::diagnoseConformanceFailure(Type T,
 
 ProtocolConformanceRef
 TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
-                              bool skipConditionalRequirements,
                               bool allowMissing) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
@@ -5305,10 +5304,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
-      auto result =
-          (skipConditionalRequirements
-               ? M->lookupConformance(superclass, Proto, /*allowMissing=*/false)
-               : M->checkConformance(superclass, Proto, /*allowMissing=*/false));
+      auto result = M->lookupConformance(superclass, Proto,
+                                         /*allowMissing=*/false);
       if (result) {
         return result;
       }
@@ -5331,9 +5328,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return (skipConditionalRequirements
-          ? M->lookupConformance(T, Proto, allowMissing)
-          : M->checkConformance(T, Proto, allowMissing));
+  return M->lookupConformance(T, Proto, allowMissing);
 }
 
 bool TypeChecker::conformsToKnownProtocol(
