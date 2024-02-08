@@ -751,9 +751,8 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 /*********************** CODABLE CONFORMANCE **********************************/
 /******************************************************************************/
 
-static NormalProtocolConformance*
-addDistributedActorCodableConformance(
-    ClassDecl *actor, ProtocolDecl *proto) {
+static NormalProtocolConformance *
+addDistributedActorCodableConformance(ClassDecl *actor, ProtocolDecl *proto) {
   auto &C = actor->getASTContext();
   auto module = actor->getParentModule();
 
@@ -763,7 +762,8 @@ addDistributedActorCodableConformance(
   }
 
   if (actor->isGeneric()) {
-    auto idTy = C.getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
+    auto idTy =
+        C.getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
     if (idTy->hasError()) {
       return nullptr;
     }
@@ -774,7 +774,8 @@ addDistributedActorCodableConformance(
         idTy, C.getProtocol(swift::KnownProtocolKind::Decodable),
         /*allowMissing=*/true);
 
-    // the system's ID is not codable, thus the actor isn't as well -- don't add the conformance.
+    // the system's ID is not codable, thus the actor isn't as well -- don't add
+    // the conformance.
     if (encodableConf.isInvalid()) {
       return nullptr;
     }
@@ -981,8 +982,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   return addImplicitDistributedActorActorSystemProperty(classDecl);
 }
 
-NormalProtocolConformance *
-GetDistributedActorImplicitCodableRequest::evaluate(
+NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal,
     KnownProtocolKind protoKind) const {
   assert(nominal->isDistributedActor());
