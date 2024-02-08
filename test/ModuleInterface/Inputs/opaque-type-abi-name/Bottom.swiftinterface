@@ -1,0 +1,18 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Bottom -module-abi-name Top -module-interface-preserve-types-as-written
+
+import Swift
+
+public protocol Aspect {
+  associatedtype Orientation : Bottom.Aspect
+  var orientation: Self.Orientation { get }
+}
+
+public struct Parameter {
+}
+
+public struct ReferencesTop {
+  public func orientation(of parameter: Bottom.Parameter) -> some Bottom.Aspect
+
+  public typealias Orientation = @_opaqueReturnTypeOf("$s3Top13ReferencesTopV11orientation2ofQrAA9ParameterV_tF", 0) __
+}
