@@ -1259,3 +1259,6 @@ do {
     print($0)
   }
 }
+
+// Currently legal.
+let _: () -> Int = { return fatalError() }

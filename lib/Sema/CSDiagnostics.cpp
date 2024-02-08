@@ -306,10 +306,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // and its contextual requirements, it means that affected declaration
     // is a declarer of a contextual "result" type e.g. member of a
     // type, local function etc.
-    if (contextualPurpose == CTP_ReturnStmt ||
-        contextualPurpose == CTP_ImpliedReturnStmt) {
+    if (contextualPurpose == CTP_ReturnStmt)
       return cast<ValueDecl>(getDC()->getAsDecl());
-    }
 
     if (contextualPurpose == CTP_DefaultParameter ||
         contextualPurpose == CTP_AutoclosureDefaultParameter) {
@@ -772,7 +770,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_AssignSource:
     return diag::cannot_convert_assign;
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
     return diag::cannot_convert_to_return_type;
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
@@ -2487,7 +2484,7 @@ bool ContextualFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto path = getLocator()->getPath();
 
-  if (CTP == CTP_ImpliedReturnStmt || CTP == CTP_ReturnStmt) {
+  if (CTP == CTP_ReturnStmt) {
     // Special case the "conversion to void".
     if (getToType()->isVoid()) {
       emitDiagnostic(diag::cannot_return_value_from_void_func)
@@ -2828,7 +2825,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_Initialization:
     return diag::cannot_convert_initializer_value_nil;
 
-  case CTP_ImpliedReturnStmt:
   case CTP_ReturnStmt:
     return diag::cannot_convert_to_return_type_nil;
 
@@ -3572,8 +3568,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return forProtocol ? diag::cannot_convert_initializer_value_protocol
                        : diag::cannot_convert_initializer_value;
   }
-  case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt: {
+  case CTP_ReturnStmt: {
     if (contextualType->isAnyObject())
       return diag::cannot_convert_return_type_to_anyobject;
 

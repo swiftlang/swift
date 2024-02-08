@@ -346,8 +346,7 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
   for (auto &Result : Results) {
     if (Result.IncludeSignature) {
       Lookup.setHaveLParen(true);
-      Lookup.setExpectedTypes(ExpectedCallTypes,
-                              /*isImplicitSingleExpressionReturn=*/false);
+      Lookup.setExpectedTypes(ExpectedCallTypes, /*isImpliedResult=*/false);
 
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;

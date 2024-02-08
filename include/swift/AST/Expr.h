@@ -6204,12 +6204,19 @@ public:
   /// SingleValueStmtExpr.
   static SingleValueStmtExpr *tryDigOutSingleValueStmtExpr(Expr *E);
 
+  /// Whether the last ASTNode in the given BraceStmt can potentially be used as
+  /// the implicit result for a SingleValueStmtExpr. If \p mustBeSingleValueStmt
+  /// is \c true, a result will be considered even if it may not be valid.
+  static bool isLastElementImplicitResult(BraceStmt *BS, ASTContext &ctx,
+                                          bool mustBeSingleValueStmt);
+
   /// Retrieves a resulting ThenStmt from the given BraceStmt, or \c nullptr if
   /// the brace does not have a resulting ThenStmt.
   static ThenStmt *getThenStmtFrom(BraceStmt *BS);
 
   /// Whether the given BraceStmt has a result to be produced from a parent
-  /// SingleValueStmtExpr.
+  /// SingleValueStmtExpr. Note this does not consider elements that may
+  /// implicitly become results, check \c isLastElementImplicitResult for that.
   static bool hasResult(BraceStmt *BS) {
     return getThenStmtFrom(BS);
   }

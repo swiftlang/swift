@@ -51,6 +51,7 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.dc = dc;
   expression.contextualInfo = contextualInfo;
   expression.pattern = nullptr;
+  expression.parentReturnStmt = nullptr;
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
@@ -180,6 +181,18 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 }
 
 SyntacticElementTarget
+SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
+                                  DeclContext *dc) {
+  assert(contextTy);
+  assert(returnStmt->hasResult() && "Must have result to be type-checked");
+  ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
+  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
+                                /*isDiscarded*/ false);
+  target.expression.parentReturnStmt = returnStmt;
+  return target;
+}
+
+SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
                                        bool ignoreWhereClause,
                                        GenericEnvironment *packElementEnv) {
@@ -243,7 +256,6 @@ bool SyntacticElementTarget::infersOpaqueReturnType() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
     if (Type convertType = getExprContextualType())
       return convertType->hasOpaqueArchetype();
     return false;
@@ -261,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
     return true;
   case CTP_Unused:
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
   case CTP_YieldByValue:
   case CTP_YieldByReference:
   case CTP_CaseStmt:

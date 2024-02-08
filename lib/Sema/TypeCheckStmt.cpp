@@ -1065,19 +1065,15 @@ public:
       return RS;
     }
 
-    Expr *E = RS->getResult();
-    TypeCheckExprOptions options = {};
-
-    auto ctp = RS->isImplied() ? CTP_ImpliedReturnStmt : CTP_ReturnStmt;
-    auto exprTy =
-        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
-    RS->setResult(E);
-
-    if (!exprTy) {
-      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), E, ResultTy,
-                                              DC->getParentModule());
+    using namespace constraints;
+    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto resultTarget = TypeChecker::typeCheckTarget(target);
+    if (resultTarget) {
+      RS->setResult(resultTarget->getAsExpr());
+    } else {
+      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
+                                              ResultTy, DC->getParentModule());
     }
-
     return RS;
   }
 
@@ -2666,15 +2662,23 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 }
 
 /// Insert an implicit return for a single expression body function if needed.
-static void addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
-  // Must have a single active element.
-  auto node = body->getSingleActiveElement();
+static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
+  if (body->empty())
+    return;
+
+  // Must have a single active element (which is guarenteed to be the last
+  // element), or we must be allowing implicit last expression results.
+  auto &ctx = dc->getASTContext();
+  if (!body->getSingleActiveElement() &&
+      !ctx.LangOpts.hasFeature(Feature::ImplicitLastExprResults)) {
+    return;
+  }
+  auto node = body->getLastElement();
   if (!node)
     return;
 
-  auto &ctx = dc->getASTContext();
   auto makeResult = [&](Expr *E) {
-    body->setLastElement(ReturnStmt::forSingleExprBody(ctx, E));
+    body->setLastElement(ReturnStmt::createImplied(ctx, E));
   };
 
   // For a constructor, we only support nil literals as the implicit result.
@@ -2734,8 +2738,8 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   assert(body && "Expected body");
   assert(!AFD->isBodyTypeChecked() && "Body already type-checked?");
 
-  // Insert an implicit return for a single expression body.
-  addSingleExprReturnIfNeeded(body, AFD);
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, AFD);
 
   // For constructors, we make sure that the body ends with a "return"
   // stmt, which we either implicitly synthesize, or the user can write.
@@ -2769,8 +2773,8 @@ BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
       }
     }
   }
-  // Insert an implicit return for a single expression body.
-  addSingleExprReturnIfNeeded(body, closure);
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, closure);
   return body;
 }
 
@@ -3057,26 +3061,6 @@ static bool doesBraceEndWithThrow(BraceStmt *BS) {
   return isa<ThrowStmt>(S);
 }
 
-/// Whether the given brace statement is considered to produce a result for
-/// an if/switch expression.
-static bool doesBraceProduceResult(BraceStmt *BS, ASTContext &ctx) {
-  if (BS->empty())
-    return false;
-
-  // We consider the branch as having a result if there is:
-  // - A single active expression or statement that can be turned into an
-  //   expression.
-  // - 'then <expr>' as the last statement.
-  if (BS->getSingleActiveExpression())
-    return true;
-
-  if (auto *S = BS->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(ctx))
-      return true;
-  }
-  return SingleValueStmtExpr::hasResult(BS);
-}
-
 IsSingleValueStmtResult
 areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
@@ -3094,8 +3078,10 @@ areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    // Check to see if a result is produced from the branch.
-    if (doesBraceProduceResult(BS, ctx)) {
+    // Must either have an explicit or implicit result for the branch.
+    if (SingleValueStmtExpr::hasResult(BS) ||
+        SingleValueStmtExpr::isLastElementImplicitResult(
+            BS, ctx, /*mustBeSingleValueStmt*/ false)) {
       hadResult = true;
       continue;
     }

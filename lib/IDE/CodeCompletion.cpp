@@ -1834,8 +1834,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
     }
 
-    Lookup.setExpectedTypes(/*Types=*/{},
-                            /*isImplicitSingleExpressionReturn=*/false,
+    Lookup.setExpectedTypes(/*Types=*/{}, /*isImpliedResult=*/false,
                             /*preferNonVoid=*/false,
                             ExpectedCustomAttributeKinds);
 

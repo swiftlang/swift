@@ -231,6 +231,10 @@ EXPERIMENTAL_FEATURE(ThenStatements, false)
 /// Enable 'do' expressions.
 EXPERIMENTAL_FEATURE(DoExpressions, false)
 
+/// Enable implicitly treating the last expression in a function, closure,
+/// and 'if'/'switch' expression as the result.
+EXPERIMENTAL_FEATURE(ImplicitLastExprResults, false)
+
 /// Enable the `@_rawLayout` attribute.
 EXPERIMENTAL_FEATURE(RawLayout, true)
 

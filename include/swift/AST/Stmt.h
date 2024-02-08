@@ -269,8 +269,8 @@ public:
     return createImplicit(ctx, SourceLoc(), result);
   }
 
-  /// Create an implicit implied ReturnStmt for a single expression body.
-  static ReturnStmt *forSingleExprBody(ASTContext &ctx, Expr *result) {
+  /// Create an implicit implied ReturnStmt for e.g a single expression body.
+  static ReturnStmt *createImplied(ASTContext &ctx, Expr *result) {
     assert(result && "Result must be present to be implied");
     auto *RS = createImplicit(ctx, result);
     RS->Bits.ReturnStmt.IsImplied = true;

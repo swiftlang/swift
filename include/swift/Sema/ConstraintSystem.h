@@ -1468,6 +1468,15 @@ struct PotentialThrowSite {
   ConstraintLocator *locator;
 };
 
+enum class ImpliedResultKind {
+  /// A regular implied result, this applies to e.g single expression bodies of
+  /// function decls, and implied 'then' statements outside of closures.
+  Regular,
+
+  /// An implied result for a closure, e.g a single expression body.
+  ForClosure
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1514,6 +1523,11 @@ public:
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
   std::vector<ConstraintFix *> Fixes;
+
+  /// Maps expressions for implied results (e.g implicit 'then' statements,
+  /// implicit 'return' statements in single expression body closures) to their
+  /// result kind.
+  llvm::MapVector<const Expr *, ImpliedResultKind> ImpliedResults;
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
@@ -1669,6 +1683,16 @@ public:
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
     assert(DisjunctionChoices.count(locator));
     return DisjunctionChoices.find(locator)->second;
+  }
+
+  /// Whether the given expression is the implied result for either a ReturnStmt
+  /// or ThenStmt, and if so, the kind of implied result.
+  llvm::Optional<ImpliedResultKind> isImpliedResult(const Expr *E) const {
+    auto result = ImpliedResults.find(E);
+    if (result == ImpliedResults.end())
+      return llvm::None;
+
+    return result->second;
   }
 
   /// Retrieve the fixed score of this solution
@@ -2195,6 +2219,11 @@ private:
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+
+  /// Maps expressions for implied results (e.g implicit 'then' statements,
+  /// implicit 'return' statements in single expression body closures) to their
+  /// result kind.
+  llvm::MapVector<const Expr *, ImpliedResultKind> ImpliedResults;
 
   /// This is a *global* list of all result builder bodies that have
   /// been determined to be incorrect by failing constraint generation.
@@ -2869,6 +2898,9 @@ public:
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
 
+    /// The length of \c ImpliedResults.
+    unsigned numImpliedResults;
+
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
@@ -3075,6 +3107,24 @@ public:
   /// \c isArgumentIgnoredForCodeCompletion returns \c true.
   bool hasArgumentsIgnoredForCodeCompletion() const {
     return !IgnoredArguments.empty();
+  }
+
+  /// Record an implied result for a ReturnStmt or ThenStmt.
+  void recordImpliedResult(const Expr *E, ImpliedResultKind kind) {
+    assert(E);
+    auto inserted = ImpliedResults.insert({E, kind}).second;
+    assert(inserted && "Duplicate implied result?");
+    (void)inserted;
+  }
+
+  /// Whether the given expression is the implied result for either a ReturnStmt
+  /// or ThenStmt, and if so, the kind of implied result.
+  llvm::Optional<ImpliedResultKind> isImpliedResult(const Expr *E) const {
+    auto result = ImpliedResults.find(E);
+    if (result == ImpliedResults.end())
+      return llvm::None;
+
+    return result->second;
   }
 
   void setClosureType(const ClosureExpr *closure, FunctionType *type) {
@@ -6415,9 +6465,9 @@ bool isTypeErasedKeyPathType(Type type);
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 
-/// Determine whether given closure has any explicit `return`
+/// Determine whether given closure has any `return`
 /// statements that could produce non-void result.
-bool hasExplicitResult(ClosureExpr *closure);
+bool hasResultExpr(ClosureExpr *closure);
 
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.

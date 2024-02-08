@@ -39,10 +39,10 @@ public:
     /// There is no known contextual type. All types are equally good.
     None,
 
-    /// There is a contextual type from a single-expression closure/function
-    /// body. The context is a hint, and enables unresolved member completion,
-    /// but should not hide any results.
-    SingleExpressionBody,
+    /// There is a contextual type from e.g a single-expression closure/function
+    /// body, where the return is implied. The context is a hint, and enables
+    /// unresolved member completion, but should not hide any results.
+    Implied,
 
     /// There are known contextual types, or there aren't but a nonvoid type is
     /// expected.

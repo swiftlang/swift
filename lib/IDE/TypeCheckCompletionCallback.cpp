@@ -155,20 +155,8 @@ void WithSolutionSpecificVarTypesRAII::setInterfaceType(VarDecl *VD, Type Ty) {
                                             std::move(Ty));
 }
 
-bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
-                                                  Expr *CompletionExpr) {
-  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr)
-    return CS.getContextualTypePurpose(CompletionExpr) == CTP_ImpliedReturnStmt;
-
-  if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
-    if (ParentCE->hasSingleExpressionBody() &&
-        ParentCE->getSingleExpressionBody() == CompletionExpr) {
-      ASTNode Last = ParentCE->getBody()->getLastElement();
-      return !Last.isStmt(StmtKind::Return) || Last.isImplicit();
-    }
-  }
-  return false;
+bool swift::ide::isImpliedResult(const Solution &S, Expr *CompletionExpr) {
+  return S.isImpliedResult(CompletionExpr).has_value();
 }
 
 bool swift::ide::isContextAsync(const constraints::Solution &S,
