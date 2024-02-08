@@ -568,8 +568,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  SINGLE_VALUE_INST(EndApplyInst, end_apply,
-                    SILInstruction, MayHaveSideEffects, MayRelease)
 
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,
@@ -873,6 +871,8 @@ NON_VALUE_INST(UncheckedRefCastAddrInst, unchecked_ref_cast_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(AllocGlobalInst, alloc_global,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(EndApplyInst, end_apply,
+               SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AbortApplyInst, abort_apply,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(PackElementSetInst, pack_element_set,

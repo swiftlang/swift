@@ -4909,8 +4909,7 @@ public:
     if (forUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
-      SGF.B.createEndApply(l, ApplyToken,
-                           SILType::getEmptyTupleType(SGF.getASTContext()));
+      SGF.B.createEndApply(l, ApplyToken);
     }
   }
   
@@ -5960,8 +5959,7 @@ void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token,
-                   SILType::getEmptyTupleType(getASTContext()));
+  B.createEndApply(loc, token);
 }
 
 void SILGenFunction::emitYield(SILLocation loc,

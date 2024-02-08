@@ -576,11 +576,11 @@ public:
                                                    beginApply));
   }
 
-  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply, SILType ResultType) {
+  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply) {
     return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
-                                                 beginApply, ResultType));
+                                                 beginApply));
   }
-  
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {

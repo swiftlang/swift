@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
@@ -347,18 +346,14 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
   return Arg->getOwnershipKind();
 }
 
-// We have to separate out ResultType here as `begin_apply` does not produce
-// normal results, `end_apply` does and there might be multiple `end_apply`'s
-// that correspond to a single `begin_apply`.
-static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
-                                             SILType ResultType) {
-  auto *f = fai->getFunction();
-  bool isTrivial = ResultType.isTrivial(*f);
+ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
+  auto *f = ai->getFunction();
+  bool isTrivial = ai->getType().isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
+  SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
@@ -367,7 +362,7 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   // Otherwise, map our results to their ownership kinds and then merge them!
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(*f, fai.getSubstCalleeType());
+        return info.getOwnershipKind(*f, ai->getSubstCalleeType());
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -375,14 +370,6 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   }
 
   return mergedOwnershipKind;
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
-  return visitFullApplySite(ai, ai->getType());
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitEndApplyInst(EndApplyInst *eai) {
-  return visitFullApplySite(eai->getBeginApply(), eai->getType());
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
