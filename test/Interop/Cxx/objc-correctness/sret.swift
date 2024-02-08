@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-ir -I %t/Inputs -cxx-interoperability-mode=default %t/test.swift | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %t/Inputs -cxx-interoperability-mode=default %t/test.swift -target arm64-apple-macos12 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
