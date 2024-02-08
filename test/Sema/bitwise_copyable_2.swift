@@ -11,3 +11,7 @@
 struct S_Implicit_Nonescapable {}
 
 struct S_Implicit_Noncopyable : ~Copyable {}
+
+struct S_Explicit_With_Any_BitwiseCopyable : _BitwiseCopyable {
+  var a: any _BitwiseCopyable // expected-error {{non_bitwise_copyable_type_member}}
+}
