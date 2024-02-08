@@ -416,22 +416,6 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
       where Act: DistributedActor,
             Act.ID == ActorID,
             Err: Error
-
-  // Implementation notes:
-  // The `metatype` must be the type of `Value`, and it must conform to
-  // `SerializationRequirement`. If it does not, the method will crash at
-  // runtime. This is because we cannot express
-  // `Value: SerializationRequirement`, however the generic `Value` is still
-  // useful since it allows us to avoid boxing the value into an existential,
-  // before we'd right away unbox it as first thing in the implementation of
-  // this function.
-  /// Implementation synthesized by the compiler.
-  /// Not intended to be invoked explicitly from user code!
-  func invokeHandlerOnReturn(
-    handler: ResultHandler,
-    resultBuffer: UnsafeRawPointer,
-    metatype: Any.Type
-  ) async throws
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
@@ -619,11 +603,12 @@ extension DistributedActorSystem {
       if returnType == Void.self {
         try await handler.onReturnVoid()
       } else {
-        try await self.invokeHandlerOnReturn(
-          handler: handler,
-          resultBuffer: resultBuffer,
-          metatype: returnType
-        )
+        func invokeOnReturn<R>(_ returnType: R.Type) async throws {
+          let value = resultBuffer.load(as: returnType)
+          try await handler.onReturn(value: value)
+        }
+
+        try await _openExistential(returnType, do: invokeOnReturn)
       }
     } catch {
       try await handler.onThrow(error: error)
