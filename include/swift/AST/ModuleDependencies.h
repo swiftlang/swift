@@ -1036,6 +1036,14 @@ public:
   std::vector<ModuleDependencyID>
   getAllDependencies(const ModuleDependencyID &moduleID) const;
 
+  /// Query only direct import dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyDirectDependencies(const ModuleDependencyID &moduleID) const;
+
+  /// Query only Swift overlay dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyOverlayDependencies(const ModuleDependencyID &moduleID) const;
+
   /// Look for module dependencies for a module with the given ID
   ///
   /// \returns the cached result, or \c None if there is no cached entry.

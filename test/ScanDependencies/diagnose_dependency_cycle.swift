@@ -5,6 +5,6 @@
 
 // RUN: %FileCheck %s < %t/out.txt
 
-// CHECK: dependency scanner detected dependency cycle: 'CycleOne.swiftmodule -> CycleTwo.swiftmodule -> CycleThree.swiftmodule -> CycleOne.swiftmodule'
+// CHECK: module dependency cycle: 'CycleOne.swiftinterface -> CycleTwo.swiftinterface -> CycleThree.swiftinterface -> CycleOne.swiftinterface'
 
 import CycleOne

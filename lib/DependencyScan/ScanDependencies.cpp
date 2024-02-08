@@ -63,6 +63,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 using namespace swift;
 using namespace swift::dependencies;
@@ -1244,47 +1245,129 @@ computeTransitiveClosureOfExplicitDependencies(
   return result;
 }
 
+static std::vector<ModuleDependencyID>
+findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
+                 ModuleDependenciesCache &cache) {
+  std::unordered_set<ModuleDependencyID> visited;
+  std::vector<ModuleDependencyID> result;
+  std::stack<ModuleDependencyID, std::vector<ModuleDependencyID>> stack;
+
+  // Must be explicitly-typed to allow recursion
+  std::function<void(const ModuleDependencyID &)> visit;
+
+  visit = [&visit, &cache, &visited, &result, &stack,
+           to](const ModuleDependencyID &moduleID) {
+    if (!visited.insert(moduleID).second)
+      return;
+
+    if (moduleID == to) {
+      // Copy stack contents to the result
+      auto end = &stack.top() + 1;
+      auto begin = end - stack.size();
+      result.assign(begin, end);
+      return;
+    }
+
+    // Otherwise, visit each child node.
+    for (const auto &succID : cache.getAllDependencies(moduleID)) {
+      stack.push(succID);
+      visit(succID);
+      stack.pop();
+    }
+  };
+
+  stack.push(from);
+  visit(from);
+  return result;
+}
+
 static bool diagnoseCycle(CompilerInstance &instance,
                           ModuleDependenciesCache &cache,
                           ModuleDependencyID mainId) {
   ModuleDependencyIDSetVector openSet;
   ModuleDependencyIDSetVector closeSet;
-  // Start from the main module.
+
+  auto kindIsSwiftDependency = [&](const ModuleDependencyID &ID) {
+    return ID.Kind == swift::ModuleDependencyKind::SwiftInterface ||
+           ID.Kind == swift::ModuleDependencyKind::SwiftBinary;
+  };
+
+  auto emitModulePath = [&](const std::vector<ModuleDependencyID> path,
+                            llvm::SmallString<64> &buffer) {
+    llvm::interleave(
+        path,
+        [&buffer](const ModuleDependencyID &id) {
+          buffer.append(id.ModuleName);
+          switch (id.Kind) {
+          case swift::ModuleDependencyKind::SwiftInterface:
+            buffer.append(".swiftinterface");
+            break;
+          case swift::ModuleDependencyKind::SwiftBinary:
+            buffer.append(".swiftmodule");
+            break;
+          case swift::ModuleDependencyKind::Clang:
+            buffer.append(".pcm");
+            break;
+          default:
+            llvm::report_fatal_error(
+                Twine("Invalid Module Dependency Kind in cycle: ") +
+                id.ModuleName);
+            break;
+          }
+        },
+        [&buffer] { buffer.append(" -> "); });
+  };
+
+  auto emitCycleDiagnostic = [&](const ModuleDependencyID &dep) {
+    auto startIt = std::find(openSet.begin(), openSet.end(), dep);
+    assert(startIt != openSet.end());
+    std::vector cycleNodes(startIt, openSet.end());
+    cycleNodes.push_back(*startIt);
+    llvm::SmallString<64> errorBuffer;
+    emitModulePath(cycleNodes, errorBuffer);
+    instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::scanner_find_cycle, errorBuffer.str());
+
+    // TODO: for (std::tuple<const ModuleDependencyID&, const
+    // ModuleDependencyID&> v : cycleNodes | std::views::adjacent<2>)
+    for (auto it = cycleNodes.begin(), end = cycleNodes.end(); it != end;
+         it++) {
+      if (it + 1 == cycleNodes.end())
+        continue;
+
+      const auto &thisID = *it;
+      const auto &nextID = *(it + 1);
+      if (kindIsSwiftDependency(thisID) && kindIsSwiftDependency(nextID) &&
+          llvm::any_of(
+              cache.getOnlyOverlayDependencies(thisID),
+              [&](const ModuleDependencyID id) { return id == nextID; })) {
+        llvm::SmallString<64> noteBuffer;
+        auto clangDepPath = findClangDepPath(
+            thisID,
+            ModuleDependencyID{nextID.ModuleName, ModuleDependencyKind::Clang},
+            cache);
+        emitModulePath(clangDepPath, noteBuffer);
+        instance.getASTContext().Diags.diagnose(
+            SourceLoc(), diag::scanner_find_cycle_swift_overlay_path,
+            thisID.ModuleName, nextID.ModuleName, noteBuffer.str());
+      }
+    }
+  };
+
+  // Start from the main module and check direct and overlay dependencies
   openSet.insert(mainId);
   while (!openSet.empty()) {
-    auto &lastOpen = openSet.back();
+    auto lastOpen = openSet.back();
     auto beforeSize = openSet.size();
     assert(cache.findDependency(lastOpen).has_value() &&
            "Missing dependency info during cycle diagnosis.");
-
     for (const auto &dep : cache.getAllDependencies(lastOpen)) {
       if (closeSet.count(dep))
         continue;
       if (openSet.insert(dep)) {
         break;
       } else {
-        // Find a cycle, diagnose.
-        auto startIt = std::find(openSet.begin(), openSet.end(), dep);
-        assert(startIt != openSet.end());
-        llvm::SmallString<64> buffer;
-        for (auto it = startIt; it != openSet.end(); ++it) {
-          buffer.append(it->ModuleName);
-          buffer.append((it->Kind == ModuleDependencyKind::SwiftInterface ||
-                         it->Kind == ModuleDependencyKind::SwiftSource ||
-                         it->Kind == ModuleDependencyKind::SwiftBinary)
-                            ? ".swiftmodule"
-                            : ".pcm");
-          buffer.append(" -> ");
-        }
-        buffer.append(startIt->ModuleName);
-        buffer.append(
-            (startIt->Kind == ModuleDependencyKind::SwiftInterface ||
-             startIt->Kind == ModuleDependencyKind::SwiftSource ||
-             startIt->Kind == ModuleDependencyKind::SwiftBinary)
-                ? ".swiftmodule"
-                : ".pcm");
-        instance.getASTContext().Diags.diagnose(
-            SourceLoc(), diag::scanner_find_cycle, buffer.str());
+        emitCycleDiagnostic(dep);
         return true;
       }
     }
@@ -1297,6 +1380,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
     }
   }
   assert(openSet.empty());
+  closeSet.clear();
   return false;
 }
 
