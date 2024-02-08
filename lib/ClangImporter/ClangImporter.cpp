@@ -117,9 +117,10 @@ namespace {
         clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
         StringRef FileName, bool IsAngled, clang::CharSourceRange FilenameRange,
         clang::OptionalFileEntryRef File, StringRef SearchPath,
-        StringRef RelativePath, const clang::Module *Imported,
+        StringRef RelativePath, const clang::Module *SuggestedModule,
+        bool ModuleImported,
         clang::SrcMgr::CharacteristicKind FileType) override {
-      handleImport(Imported);
+      handleImport(ModuleImported ? Imported : nullptr);
     }
 
     void moduleImport(clang::SourceLocation ImportLoc,
