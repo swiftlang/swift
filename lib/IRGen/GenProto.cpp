@@ -745,23 +745,21 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   if (!(funcDecl && funcDecl->isGeneric()))
     return;
 
+  if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+    return;
+
   Type genericParam;
+
+  auto sig = funcDecl->getGenericSignature();
 
   // DistributedActorSystem.remoteCall
   if (funcDecl->isDistributedActorSystemRemoteCall(
           /*isVoidReturn=*/false)) {
     genericParam = funcDecl->getResultInterfaceType();
-  }
-
-  auto sig = funcDecl->getGenericSignature();
-
-  // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
-  // DistributedTargetInvocationDecoder.decodeNextArgument
-  // DistributedTargetInvocationResultHandler.onReturn
-  if (funcDecl->isDistributedTargetInvocationEncoderRecordArgument() ||
-      funcDecl->isDistributedTargetInvocationEncoderRecordReturnType() ||
-      funcDecl->isDistributedTargetInvocationDecoderDecodeNextArgument() ||
-      funcDecl->isDistributedTargetInvocationResultHandlerOnReturn()) {
+  } else {
+    // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+    // DistributedTargetInvocationDecoder.decodeNextArgument
+    // DistributedTargetInvocationResultHandler.onReturn
     genericParam = sig.getInnermostGenericParams().front();
   }
 
