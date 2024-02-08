@@ -278,50 +278,7 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
-/// Adds the inferred default protocols for an ExistentialLayout with respect
-/// to that existential's inverses and existing protocols. For example, if an
-/// inverse ~P exists, then P will not be added to the protocols list.
-///
-/// Similarly, if the protocols list has a protocol Q that already implies
-/// Copyable, then we will not add `Copyable` to the protocols list.
-///
-/// \param inverses the inverses '& ~P' that are in the existential's type.
-/// \param protocols the output vector of protocols for an ExistentialLayout
-///                  to be modified.
-static void expandDefaultProtocols(
-    ASTContext &ctx,
-    InvertibleProtocolSet inverses,
-    SmallVectorImpl<ProtocolDecl*> &protocols) {
 
-  // Skip unless noncopyable generics is enabled
-  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
-    return;
-
-  // Try to add all invertible protocols, unless:
-  //  - an inverse was provided
-  //  - an existing protocol already requires it
-  for (auto ip : InvertibleProtocolSet::full()) {
-    if (inverses.contains(ip))
-      continue;
-
-    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
-    bool alreadyRequired = false;
-    for (auto proto : protocols) {
-      if (proto->requiresInvertible(ip)) {
-        alreadyRequired = true;
-        break;
-      }
-    }
-
-    if (alreadyRequired)
-      continue;
-
-    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-    assert(proto && "missing Copyable/Escapable from stdlib!");
-
-    protocols.push_back(proto);
-  }
-}
 
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
@@ -336,7 +293,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   protocols.push_back(protoDecl);
 
   // NOTE: all the invertible protocols are usable from ObjC.
-  expandDefaultProtocols(type->getASTContext(), {}, protocols);
+  InverseRequirement::expandDefaults(type->getASTContext(), {}, protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
@@ -373,7 +330,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
       hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
 
   // NOTE: all the invertible protocols are usable from ObjC.
-  expandDefaultProtocols(type->getASTContext(), type->getInverses(), protocols);
+  InverseRequirement::expandDefaults(type->getASTContext(),
+                                     type->getInverses(),
+                                     protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -3939,7 +3898,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
                                   InvertibleProtocolSet Inverses,
                                   bool HasExplicitAnyObject) {
-  // Fast path for 'AnyObject' and 'Any'.
+  // Fast path for 'AnyObject', 'Any', and '~Copyable'.
   if (Members.empty()) {
     return build(C, Members, Inverses, HasExplicitAnyObject);
   }
@@ -3992,6 +3951,13 @@ Type ProtocolCompositionType::get(const ASTContext &C,
         CanTypes.push_back(it->second->getCanonicalType());
         continue;
       }
+    }
+
+    // Drop any explicitly provided invertible protocols.
+    if (auto ip = proto->getInvertibleProtocolKind()) {
+      // We diagnose '~Copyable & Copyable' before forming the PCT.
+      assert(!Inverses.contains(*ip) && "opposing invertible constraints!");
+      continue;
     }
 
     CanTypes.push_back(proto->getDeclaredInterfaceType());

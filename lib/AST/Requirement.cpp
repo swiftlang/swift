@@ -342,27 +342,64 @@ void InverseRequirement::enumerateDefaultedParams(
     add(gtpd->getDeclaredInterfaceType());
 }
 
-InvertibleProtocolSet InverseRequirement::expandDefault(Type gp) {
-  assert(gp->isTypeParameter());
-  return InvertibleProtocolSet::full();
-}
-
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+
+  SmallVector<ProtocolDecl*, NumInvertibleProtocols> defaults;
+  expandDefaults(ctx, /*inverses=*/{}, defaults);
+
+  // Fast-path.
+  if (defaults.empty())
     return;
 
   for (auto gp : gps) {
-    auto protos = InverseRequirement::expandDefault(gp);
-    for (auto ip : protos) {
-      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-      assert(proto && "missing Copyable/Escapable from stdlib!");
-      
+    for (auto *proto : defaults) {
       auto protoTy = proto->getDeclaredInterfaceType();
       result.push_back({{RequirementKind::Conformance, gp, protoTy},
                         SourceLoc()});
     }
+  }
+}
+
+void InverseRequirement::expandDefaults(
+    ASTContext &ctx,
+    InvertibleProtocolSet inverses,
+    SmallVectorImpl<ProtocolDecl*> &protocols) {
+
+  // Skip unless noncopyable generics is enabled
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
+    return;
+
+  // Try to add all invertible protocols, unless:
+  //  - an inverse was provided
+  //  - an existing protocol already requires it
+  for (auto ip : InvertibleProtocolSet::full()) {
+    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
+    bool alreadyRequired = false;
+    for (auto proto : protocols) {
+      if (proto->isSpecificProtocol(getKnownProtocolKind(ip))
+          || proto->requiresInvertible(ip)) {
+        alreadyRequired = true;
+        break;
+      }
+    }
+
+    // If some protocol member already implies P, then we don't need to
+    // add a requirement for P.
+    if (alreadyRequired) {
+      assert(!inverses.contains(ip) && "cannot require P and ~P");
+      continue;
+    }
+
+    // Nothing implies P, so unless there's an inverse ~P, add the requirement.
+    if (inverses.contains(ip))
+      continue;
+
+    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    assert(proto && "missing Copyable/Escapable from stdlib!");
+
+    protocols.push_back(proto);
   }
 }

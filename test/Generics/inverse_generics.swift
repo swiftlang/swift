@@ -80,6 +80,9 @@ struct ConditionalContainment<T: ~Copyable> {
 
 func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 
+// expected-note@+2 3{{add}}
+// expected-error@+1 {{parameter of noncopyable type 'some Escapable & ~Copyable' must specify ownership}}
+func dogDays(_ t: some Escapable & ~Copyable) {}
 
 /// ----------------
 
@@ -289,11 +292,14 @@ func conflict1<T>(_ t: T) where T: NeedsCopyable, T: ~Copyable {}
 func conflict2<T: ~Copyable>(_ t: AlwaysCopyable<T>) {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
-func conflict3<T: NeedsCopyable & ~Copyable>(_ t: T) {}
+func conflict3a<T: NeedsCopyable & ~Copyable>(_ t: T) {}
+// expected-error@-1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+
+func conflict3b<T>(_ t: T) where T: NeedsCopyable, T: ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
-func conflict4(_ t: some NeedsCopyable & ~Copyable) {}
-// expected-error@-1 {{'some NeedsCopyable & ~Copyable' required to be 'Copyable' but is marked with '~Copyable'}}
+func conflict4a(_ t: some NeedsCopyable & ~Copyable) {}
+// expected-error@-1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
 
 protocol Conflict5: ~Copyable {
   borrowing func whatever() -> AlwaysCopyable<Self> // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
@@ -322,7 +328,7 @@ func conflict9<U: ~Copyable>(_ u: Conflict9<U>) {}
 // expected-error@-1 {{'U' required to be 'Copyable' but is marked with '~Copyable'}}
 
 func conflict10<T>(_ t: T, _ u: some ~Copyable & Copyable)
-// expected-error@-1 {{'some ~Copyable & Copyable' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
   where T: Copyable,
         T: ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -378,6 +384,10 @@ func checkClassBound2<T>(_ t: T) where T: ~Escapable, T: AnyObject, T: ~Copyable
 func checkClassBound3<T>(_ t: T) where T: Soup & ~Copyable & ~Escapable {}
 // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
 
+func checkClassBound4<T>(_ t: T) where T: Soup, T: ~Copyable & ~Escapable {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-2 {{'T' required to be 'Escapable' but is marked with '~Escapable'}}
+
 public func checkAnyObjInv1<Result: AnyObject>(_ t: borrowing Result) where Result: ~Copyable {}
 // expected-error@-1 {{'Result' required to be 'Copyable' but is marked with '~Copyable'}}
 
@@ -390,8 +400,10 @@ public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {
 
 func checkExistentialAndClasses(
     _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
-    _ b: any Soup & Copyable & ~Escapable & ~Copyable, // expected-error {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
-    _ c: some (~Escapable & Removed) & Soup // expected-error {{composition involving class requirement 'Soup' cannot contain '~Escapable'}}
+    _ b: any Soup & Copyable & ~Escapable & ~Copyable,
+    // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
+    // expected-error@-2 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+    _ c: some (~Escapable & Removed) & Soup // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
     ) {}
 
 protocol HasNCBuddy: ~Copyable {
@@ -435,3 +447,13 @@ protocol Q: Copyable {}
 // expected-error@+1 {{parameter of noncopyable type 'Blahaj<T>' must specify ownership}}
 func testBlahaj<T, U: Q>(_ x: Blahaj<T>,
                          _ y: Blahaj<U>) {}
+
+extension Int: NeedsCopyable {}
+
+func checkExistentials() {
+    let _: any ~Escapable & (NeedsCopyable & ~Copyable) // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+    let _: any NeedsCopyable & ~Copyable = 1 // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+    let _: any NeedsCopyable & ~Escapable = 1 // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+    let _: any Copyable & ~Copyable = 1 // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+    let _: any Escapable & ~Escapable = 1 // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+}
