@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
 
-class B { 
+class B {
   init() {} 
 }
 class D : B {
@@ -15,7 +15,7 @@ var closure : (Int, Int) -> Int = { $0 + $1 }
 
 var d_as_b : B = D()
 var b_as_d = B() as! D
-var bad_b_as_d : D = B()  // expected-error{{cannot convert value of type 'B' to specified type 'D'}}
+var bad_b_as_d : D = B()  // expected-error{{caot convert value of type 'B' to specified type 'D'}}
 
 var d = D()
 var b = B()

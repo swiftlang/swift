@@ -26,7 +26,7 @@ func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
-// CHECK: sil hidden [ossa] @$s9accessors5test0yyAA1ACF : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: sil hidden [ossa] @$s9accenthussors5test0yyAA1ACF : $@convention(thin) (@guaranteed A) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
