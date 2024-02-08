@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/STLExtras.h"
@@ -328,11 +329,11 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
   if (!error)
     outs << Result;
 }
+} // end anonymous namespace
 
 /// diagnostics for '<unknown>:0' should be considered as unexpected.
-static bool
-verifyUnknown(SourceManager &SM,
-              std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) {
+bool DiagnosticVerifier::verifyUnknown(
+    std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
     if (CapturedDiagnostics[i].Loc.isValid())
@@ -346,11 +347,10 @@ verifyUnknown(SourceManager &SM,
             .str();
 
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
+    printDiagnostic(diag);
   }
   return HadError;
 }
-} // end anonymous namespace
 
 /// Return true if the given \p ExpectedFixIt is in the fix-its emitted by
 /// diagnostic \p D.
@@ -375,6 +375,13 @@ bool DiagnosticVerifier::checkForFixIt(
   }
 
   return false;
+}
+
+void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
+  raw_ostream &stream = llvm::errs();
+  ColoredStream coloredStream{stream};
+  raw_ostream &out = UseColor ? coloredStream : stream;
+  SM.getLLVMSourceMgr().PrintMessage(out, Diag);
 }
 
 std::string
@@ -1184,7 +1191,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Emit all of the queue'd up errors.
   for (auto Err : Errors)
-    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
+    printDiagnostic(Err);
 
   // If auto-apply fixits is on, rewrite the original source file.
   if (AutoApplyFixes)
@@ -1214,10 +1221,11 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
       break;
     }
 
-    SM.getLLVMSourceMgr().PrintMessage(
-        llvm::errs(), getRawLoc(diag.Loc), SMKind,
-        "diagnostic produced elsewhere: " + diag.Message.str(),
-        /*Ranges=*/{}, {});
+    auto message =
+        SM.GetMessage(diag.Loc, SMKind,
+                      "diagnostic produced elsewhere: " + diag.Message.str(),
+                      /*Ranges=*/{}, {});
+    printDiagnostic(message);
   }
 }
 
@@ -1288,7 +1296,7 @@ bool DiagnosticVerifier::finishProcessing() {
       Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
     }
   if (!IgnoreUnknown) {
-    bool HadError = verifyUnknown(SM, CapturedDiagnostics);
+    bool HadError = verifyUnknown(CapturedDiagnostics);
     Result.HadError |= HadError;
     // For <unknown>, all errors are unexpected.
     Result.HadUnexpectedDiag |= HadError;
