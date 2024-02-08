@@ -1543,6 +1543,15 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 // expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 class NonSendable {}
 
+protocol NonisolatedProtocol {
+  var ns: NonSendable { get } // expected-note {{'ns' declared here}}
+}
+
+actor ActorWithNonSendableLet: NonisolatedProtocol {
+  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in Swift 6}}
+  let ns = NonSendable()
+}
+
 actor ProtectNonSendable {
   // expected-note@+1 2 {{property declared here}}
   let ns = NonSendable()

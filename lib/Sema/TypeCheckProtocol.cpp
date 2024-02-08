@@ -3233,6 +3233,19 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
   }
 
+  // If the witness is a non-Sendable 'let', compiler versions <= 5.10
+  // didn't diagnose this code, so downgrade the error to an warning
+  // until Swift 6.
+  if (auto *var = dyn_cast<VarDecl>(witness)) {
+    ActorReferenceResult::Options options = llvm::None;
+    isLetAccessibleAnywhere(
+        witness->getDeclContext()->getParentModule(),
+        var, options);
+    if (options.contains(ActorReferenceResult::Flags::Preconcurrency)) {
+      behavior = DiagnosticBehavior::Warning;
+    }
+  }
+
   // Complain that this witness cannot conform to the requirement due to
   // actor isolation.
   witness->diagnose(diag::actor_isolated_witness,
