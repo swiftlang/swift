@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_swift_parser
 
 // CHECK-LABEL: nonisolatedFunc()
 @available(SwiftStdlib 5.1, *)
