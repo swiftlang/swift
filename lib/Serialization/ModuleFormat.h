@@ -2179,7 +2179,7 @@ namespace decls_block {
   using LifetimeDependenceLayout =
       BCRecordLayout<LIFETIME_DEPENDENCE,
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
-                     BCFixed<1>,         // hasBorrowLifetimeParamIndices
+                     BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
