@@ -381,6 +381,20 @@ public struct UnsafeRawPointer: _Pointer {
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )
+
+    return try _uncheckedWithMemoryRebound(to: type, capacity: count, body)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedWithMemoryRebound<T, Result>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    _internalInvariant(
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      "self must be a properly aligned pointer for type T"
+    )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -419,6 +433,18 @@ public struct UnsafeRawPointer: _Pointer {
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
+      "load from misaligned raw pointer")
+
+    return _uncheckedLoad(fromByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedLoad<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
@@ -473,6 +499,16 @@ public struct UnsafeRawPointer: _Pointer {
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
+
+    return _uncheckedLoadUnaligned(fromByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedLoadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(_isPOD(T.self))
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -950,6 +986,20 @@ public struct UnsafeMutableRawPointer: _Pointer {
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )
+
+    return try _uncheckedWithMemoryRebound(to: type, capacity: count, body)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedWithMemoryRebound<T, Result>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    _internalInvariant(
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      "self must be a properly aligned pointer for type T"
+    )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -1212,6 +1262,18 @@ public struct UnsafeMutableRawPointer: _Pointer {
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
+    return _uncheckedLoad(fromByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedLoad<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(0 == (UInt(bitPattern: self + offset)
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
+      "load from misaligned raw pointer")
+
     let rawPointer = (self + offset)._rawValue
 
 #if compiler(>=5.5) && $BuiltinAssumeAlignment
@@ -1263,6 +1325,16 @@ public struct UnsafeMutableRawPointer: _Pointer {
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
+
+    return _uncheckedLoadUnaligned(fromByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedLoadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(_isPOD(T.self))
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1318,6 +1390,17 @@ public struct UnsafeMutableRawPointer: _Pointer {
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(_isPOD(T.self))
+
+    _uncheckedStoreBytes(of: value, toByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedStoreBytes<T>(
+    of value: T,
+    toByteOffset offset: Int = 0,
+    as type: T.Type
+  ) {
+    _internalInvariant(_isPOD(T.self))
 
     withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
@@ -1386,6 +1469,19 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {
     _debugPrecondition(
       byteCount >= 0, "UnsafeMutableRawPointer.copyMemory with negative count")
+
+    _uncheckedCopyMemory(from: source, byteCount: byteCount)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedCopyMemory(
+    from source: UnsafeRawPointer,
+    byteCount: Int
+  ) {
+    _internalInvariant(
+      byteCount >= 0,
+      "UnsafeMutableRawPointer.copyMemory with negative count"
+    )
 
     _memmove(dest: self, src: source, size: UInt(byteCount))
   }

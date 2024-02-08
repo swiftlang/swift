@@ -1030,6 +1030,13 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   public func initializeElement(at index: Index, to value: Element) {
     _debugPrecondition(startIndex <= index && index < endIndex)
+
+    _uncheckedInitializeElement(at: index, to: value)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedInitializeElement(at index: Index, to value: Element) {
+    _internalInvariant(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.initialize(to: value)
   }
@@ -1048,6 +1055,13 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   public func moveElement(from index: Index) -> Element {
     _debugPrecondition(startIndex <= index && index < endIndex)
+
+    return _uncheckedMoveElement(from: index)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedMoveElement(from index: Index) -> Element {
+    _internalInvariant(startIndex <= index && index < endIndex)
     return baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
   }
 
@@ -1063,6 +1077,13 @@ extension Unsafe${Mutable}BufferPointer {
   @_alwaysEmitIntoClient
   public func deinitializeElement(at index: Index) {
     _debugPrecondition(startIndex <= index && index < endIndex)
+
+    _uncheckedDeinitializeElement(at: index)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedDeinitializeElement(at index: Index) {
+    _internalInvariant(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.deinitialize(count: 1)
   }
