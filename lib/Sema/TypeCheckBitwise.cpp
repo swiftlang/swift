@@ -115,6 +115,16 @@ bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
   storage = decl;
   SWIFT_DEFER { storage = nullptr; };
 
+  auto *element = dyn_cast<EnumElementDecl>(decl);
+  if (element && element->isIndirect()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_indirect_enum_element);
+      element->diagnose(diag::note_non_bitwise_copyable_type_indirect_enum_element);
+    }
+    invalid = true;
+    return true;
+  }
+
   // Fields with unowned(unsafe) ownership are bitwise-copyable.
   auto *roa = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
   if (roa && roa->get() == ReferenceOwnership::Unmanaged) {
@@ -240,6 +250,14 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_class);
+    }
+    return true;
+  }
+
+  auto *ed = dyn_cast<EnumDecl>(nominal);
+  if (ed && ed->isIndirect()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_indirect_enum);
     }
     return true;
   }
