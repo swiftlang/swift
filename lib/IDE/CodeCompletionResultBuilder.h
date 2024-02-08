@@ -145,8 +145,8 @@ public:
   /// This is not a single unique type because for code completion we consider
   /// e.g. \c Int as producing both an \c Int metatype and an \c Int instance
   /// type.
-  void setResultTypes(ArrayRef<Type> ResultTypes) {
-    this->ResultType = CodeCompletionResultType(ResultTypes);
+  void setResultType(Type ResultType) {
+    this->ResultType = CodeCompletionResultType(ResultType);
   }
 
   /// Set context in which this code completion item occurs. Used to compute the

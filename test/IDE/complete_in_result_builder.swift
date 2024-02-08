@@ -221,7 +221,7 @@ func testTypeRelationInResultBuilder() {
     @ViewBuilder2 var body: some View2 {
       #^SINGLE_ELEMENT^#
     }
-    // SINGLE_ELEMENT-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyText[#MyText#];
+    // SINGLE_ELEMENT-DAG: Decl[Struct]/Local: MyText[#MyText#];
 
     @ViewBuilder2 var body2: some View2 {
       MyText()
@@ -276,7 +276,7 @@ func testCompleteGlobalInResultBuilderIf() {
     }
   }
 
-  // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyView[#MyView#]; name=MyView
+  // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local: MyView[#MyView#]; name=MyView
 }
 
 func testInStringLiteralInResultBuilder() {

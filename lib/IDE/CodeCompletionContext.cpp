@@ -156,7 +156,7 @@ void CodeCompletionContext::addResultsFromModules(
       // back the contextual results.
       for (auto Result : Sink.Results) {
         assert(
-            Result->getContextFreeResult().getResultType().isBackedByUSRs() &&
+            Result->getContextFreeResult().getResultType().isBackedByUSR() &&
             "Results stored in the cache should have their result types backed "
             "by a USR because the cache might outlive the ASTContext the "
             "results were created from.");

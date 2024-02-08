@@ -415,7 +415,7 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
   if (Ty->isVoid() && typeContext.requiresNonVoid())
     return TypeRelation::Invalid;
   if (typeContext.getExpectedCustomAttributeKinds()) {
-    return (getCustomAttributeKinds(Ty) &
+    return (getCustomAttributeKinds(Ty->getMetatypeInstanceType()) &
             typeContext.getExpectedCustomAttributeKinds())
                ? TypeRelation::Convertible
                : TypeRelation::Unrelated;
@@ -452,34 +452,26 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
   return Result;
 }
 
-bool CodeCompletionResultType::isBackedByUSRs() const {
-  return llvm::all_of(
-      getResultTypes(),
-      [](const PointerUnion<Type, const USRBasedType *> &ResultType) {
-        return ResultType.is<const USRBasedType *>();
-      });
+bool CodeCompletionResultType::isBackedByUSR() const {
+  return getResultType().isNull() || getResultType().is<const USRBasedType *>();
 }
 
-llvm::SmallVector<const USRBasedType *, 1>
-CodeCompletionResultType::getUSRBasedResultTypes(
+const USRBasedType *CodeCompletionResultType::getUSRBasedResultType(
     USRBasedTypeArena &Arena) const {
   llvm::SmallVector<const USRBasedType *, 1> USRBasedTypes;
-  auto ResultTypes = getResultTypes();
-  USRBasedTypes.reserve(ResultTypes.size());
-  for (auto ResultType : ResultTypes) {
-    if (auto USRType = ResultType.dyn_cast<const USRBasedType *>()) {
-      USRBasedTypes.push_back(USRType);
-    } else {
-      USRBasedTypes.push_back(
-          USRBasedType::fromType(ResultType.get<Type>(), Arena));
-    }
+  auto ResultType = getResultType();
+  if (ResultType.isNull()) {
+    return nullptr;
+  } else if (auto USRType = ResultType.dyn_cast<const USRBasedType *>()) {
+    return USRType;
+  } else {
+    return USRBasedType::fromType(ResultType.get<Type>(), Arena);
   }
-  return USRBasedTypes;
 }
 
 CodeCompletionResultType
 CodeCompletionResultType::usrBasedType(USRBasedTypeArena &Arena) const {
-  return CodeCompletionResultType(this->getUSRBasedResultTypes(Arena));
+  return CodeCompletionResultType(this->getUSRBasedResultType(Arena));
 }
 
 TypeRelation CodeCompletionResultType::calculateTypeRelation(
@@ -493,19 +485,19 @@ TypeRelation CodeCompletionResultType::calculateTypeRelation(
     return TypeRelation::Unknown;
   }
 
+  auto ResultType = getResultType();
   TypeRelation Res = TypeRelation::Unknown;
-  for (auto Ty : getResultTypes()) {
-    if (auto USRType = Ty.dyn_cast<const USRBasedType *>()) {
-      if (!USRTypeContext) {
-        assert(false && "calculateTypeRelation must have a USRBasedTypeContext "
-                        "passed if it contains a USR-based result type");
-        continue;
-      }
-      Res = std::max(Res, USRTypeContext->typeRelation(USRType));
-    } else {
-      Res = std::max(
-          Res, calculateMaxTypeRelation(Ty.get<Type>(), *TypeContext, *DC));
+  if (ResultType.isNull()) {
+    return Res;
+  } else if (auto USRType = ResultType.dyn_cast<const USRBasedType *>()) {
+    if (!USRTypeContext) {
+      assert(false && "calculateTypeRelation must have a USRBasedTypeContext "
+                      "passed if it contains a USR-based result type");
     }
+    Res = std::max(Res, USRTypeContext->typeRelation(USRType));
+  } else {
+    Res = std::max(Res, calculateMaxTypeRelation(ResultType.get<Type>(),
+                                                 *TypeContext, *DC));
   }
   return Res;
 }

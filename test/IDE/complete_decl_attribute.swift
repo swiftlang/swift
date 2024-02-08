@@ -1,24 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY1 | %FileCheck %s -check-prefix=AVAILABILITY1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY2 | %FileCheck %s -check-prefix=AVAILABILITY2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD2 | %FileCheck %s -check-prefix=KEYWORD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3 | %FileCheck %s -check-prefix=KEYWORD3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD3_2 | %FileCheck %s -check-prefix=KEYWORD3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD4 | %FileCheck %s -check-prefix=KEYWORD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD5 | %FileCheck %s -check-prefix=KEYWORD5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_GLOBALVAR | %FileCheck %s -check-prefix=ON_GLOBALVAR
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_INIT | %FileCheck %s -check-prefix=ON_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PROPERTY | %FileCheck %s -check-prefix=ON_PROPERTY
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_METHOD | %FileCheck %s -check-prefix=ON_METHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PARAM_1 | %FileCheck %s -check-prefix=ON_PARAM
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PARAM_2 | %FileCheck %s -check-prefix=ON_PARAM
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_INDEPENDENT_1 | %FileCheck %s -check-prefix=ON_MEMBER_LAST
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_INDEPENDENT_2 | %FileCheck %s -check-prefix=ON_MEMBER_LAST
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_LAST | %FileCheck %s -check-prefix=ON_MEMBER_LAST
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE | %FileCheck %s -check-prefix=IN_CLOSURE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_INDEPENDENT_1 | %FileCheck %s -check-prefix=KEYWORD_LAST
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_INDEPENDENT_2 | %FileCheck %s -check-prefix=KEYWORD_LAST
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | %FileCheck %s -check-prefix=KEYWORD_LAST
-
+// RUN: %batch-code-completion
 struct MyStruct {}
 
 @propertyWrapper
@@ -134,7 +114,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 
-@#^KEYWORD3_2^#IB class C2 {}
+@#^KEYWORD3_2?check=KEYWORD3^#IB class C2 {}
 // Same as KEYWORD3.
 
 @#^KEYWORD4^# enum E {}
@@ -259,7 +239,7 @@ struct _S {
 
 
 
-  func bar(@#^ON_PARAM_1^#)
+  func bar(@#^ON_PARAM_1?check=ON_PARAM^#)
 // ON_PARAM-NOT: Keyword
 // ON_PARAM-DAG: Decl[Struct]/CurrModule:             MyStruct[#MyStruct#]; name=MyStruct
 // ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -268,18 +248,18 @@ struct _S {
 // ON_PARAM-NOT: Keyword
 
   func bar(
-    @#^ON_PARAM_2^#
+    @#^ON_PARAM_2?check=ON_PARAM^#
 
     arg: Int
   )
 // Same as ON_PARAM.
 
-  @#^ON_MEMBER_INDEPENDENT_1^#
+  @#^ON_MEMBER_INDEPENDENT_1?check=ON_MEMBER_LAST^#
 
   func dummy1() {}
 // Same as ON_MEMBER_LAST.
 
-  @#^ON_MEMBER_INDEPENDENT_2^#
+  @#^ON_MEMBER_INDEPENDENT_2?check=ON_MEMBER_LAST^#
   func dummy2() {}
 // Same as ON_MEMBER_LAST.
 
@@ -344,12 +324,12 @@ func takeClosure(_: () -> Void) {
 // IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 
 
-@#^KEYWORD_INDEPENDENT_1^#
+@#^KEYWORD_INDEPENDENT_1?check=KEYWORD_LAST^#
 
 func dummy1() {}
 // Same as KEYWORD_LAST.
 
-@#^KEYWORD_INDEPENDENT_2^#
+@#^KEYWORD_INDEPENDENT_2?check=KEYWORD_LAST^#
 func dummy2() {}
 // Same as KEYWORD_LAST.
 

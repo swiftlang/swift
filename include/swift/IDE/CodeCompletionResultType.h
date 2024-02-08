@@ -288,101 +288,50 @@ public:
 /// the following:
 ///  - NotApplicable: The completion result doesn't produce something that's
 ///    valid inside an expression like a keyword
-///  - An empty list of types if the completion result produces something that's
-///    valid inside an expression but the result type isn't known
-///  - A list of proper type if the type produced by this completion result is
-///    known
-/// A \c CodeCompletionResultType does not have a single unique type because for
-/// code completion we consider e.g. the expression \c Int as producing both an
-/// \c Int metatype and an \c Int instance type. Thus we consider both the
-/// instance and the metatype as result types of the expression \c Int.
+///  - An null type if the completion result produces something that's valid
+///    inside an expression but the result type isn't known
+///  - A proper type if the type produced by this completion result is known
 class CodeCompletionResultType {
-  /// \c ResultType1AndIsApplicable and \c ResultType2 store the following
-  /// information:
-  ///  - Whether the type is not applicable (see above). In this case
-  ///    \c ResultType1 and \c ResultType2 should be \c nullptr.
-  ///  - \c ResultType1 and \c ResultType2 form a collection of at most two
-  ///    result types. A \c CodeCompletionResultType cannot have a single unique
-  ///    type because for code completion we consider e.g. \c Int as producing
-  ///    both an \c Int metatype and an \c Int instance.
-  ///    It would be nice if we could use a SmallVector to store those types
-  ///    instead but \c CodeCompletionResultType is allocated in a bump
-  ///    allocator and freeing the bump allocator does not call the
-  ///    SmallVecotor's destructor, leaking potential heap memory. Since we only
-  ///    need two result types at the moment, I decided to implement it in a
-  ///    hacky way with two pointers.
-  /// The \c getResultTypes and \c isApplicable methods mask away this
-  /// implementation detail.
   llvm::PointerIntPair<PointerUnion<Type, const USRBasedType *>, 1, bool>
-      ResultType1AndIsApplicable;
-  PointerUnion<Type, const USRBasedType *> ResultType2;
+      ResultTypeAndIsApplicable;
 
-  llvm::SmallVector<PointerUnion<Type, const USRBasedType *>, 1>
-  getResultTypes() const {
-    if (ResultType1AndIsApplicable.getPointer() && ResultType2) {
-      return {ResultType1AndIsApplicable.getPointer(), ResultType2};
-    } else if (ResultType1AndIsApplicable.getPointer()) {
-      return {ResultType1AndIsApplicable.getPointer()};
-    } else {
-      assert(
-          !ResultType2 &&
-          "We shouldn't have a second result type if there was no first one");
-      return {};
-    }
+  PointerUnion<Type, const USRBasedType *> getResultType() const {
+    return ResultTypeAndIsApplicable.getPointer();
   }
 
   /// Memberwise initializer
   CodeCompletionResultType(bool IsApplicable,
-                           PointerUnion<Type, const USRBasedType *> ResultType1,
-                           PointerUnion<Type, const USRBasedType *> ResultType2)
-      : ResultType1AndIsApplicable(ResultType1, IsApplicable),
-        ResultType2(ResultType2) {}
+                           PointerUnion<Type, const USRBasedType *> ResultType)
+      : ResultTypeAndIsApplicable(ResultType, IsApplicable) {}
 
 public:
   static CodeCompletionResultType notApplicable() {
     return CodeCompletionResultType(/*IsApplicable=*/true,
-                                    /*ResultType1=*/nullptr,
-                                    /*ResultType2=*/nullptr);
+                                    /*ResultType=*/nullptr);
   }
 
   static CodeCompletionResultType unknown() {
-    return CodeCompletionResultType(ArrayRef<Type>());
+    return CodeCompletionResultType(Type());
   }
 
-  explicit CodeCompletionResultType(ArrayRef<Type> Types)
-      : CodeCompletionResultType(
-            /*IsApplicable=*/false,
-            /*ResultType1=*/Types.size() > 0 ? Types[0] : nullptr,
-            /*ResultType2=*/Types.size() > 1 ? Types[1] : nullptr) {
-    assert(Types.size() <= 2 && "Can only store two different result types in "
-                                "CodeCompletionResultType");
-  }
+  explicit CodeCompletionResultType(Type type)
+      : CodeCompletionResultType(/*IsApplicable=*/false, /*ResultType=*/type) {}
 
-  explicit CodeCompletionResultType(Type Ty)
-      : CodeCompletionResultType(ArrayRef<Type>(Ty)) {}
-
-  explicit CodeCompletionResultType(ArrayRef<const USRBasedType *> Types)
-      : CodeCompletionResultType(
-            /*IsApplicable=*/false,
-            /*ResultType1=*/Types.size() > 0 ? Types[0] : nullptr,
-            /*ResultType2=*/Types.size() > 1 ? Types[1] : nullptr) {
-    assert(Types.size() <= 2 && "Can only store two different result types in "
-                                "CodeCompletionResultType");
-  }
+  explicit CodeCompletionResultType(const USRBasedType *type)
+      : CodeCompletionResultType(/*IsApplicable=*/false, type) {}
 
   /// Returns whether the \c CodeCompletionResult type is backed by USRs and
   /// thus not associated with any AST.
   /// Intended to be used in assertions.
-  bool isBackedByUSRs() const;
+  bool isBackedByUSR() const;
 
   /// Returns whether the \c CodeCompletionREsultType is considered not
   /// applicable (see comment on \c CodeCompletionResultType).
-  bool isNotApplicable() const { return ResultType1AndIsApplicable.getInt(); }
+  bool isNotApplicable() const { return ResultTypeAndIsApplicable.getInt(); }
 
-  /// Return the result types as a \c USRBasedTypes, converting an AST-bound
-  /// type to a \c USRBasedTypes if necessary.
-  llvm::SmallVector<const USRBasedType *, 1>
-  getUSRBasedResultTypes(USRBasedTypeArena &Arena) const;
+  /// Return the result type as a \c USRBasedType, converting an AST-bound
+  /// type to a \c USRBasedType if necessary.
+  const USRBasedType *getUSRBasedResultType(USRBasedTypeArena &Arena) const;
 
   /// Return the same \c CodeCompletionResultType with the guarantee that it is
   /// backed by USRs instead of AST-bound types
