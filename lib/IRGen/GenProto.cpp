@@ -552,6 +552,7 @@ private:
   // `DistributedActorSystem.remoteCall` or
   // `DistributedTargetInvocationEncoder.record{Argument, ReturnType}`
   // `DistributedTargetInvocationDecoder.decodeNextArgument`
+  // `DistributedTargetInvocationResultHandler.onReturn`
   // requirements we need to supply witness tables associated with `Res`,
   // `Argument`, `R` generic parameters which are not expressible on the
   // protocol requirement because they come from `SerializationRequirement`
@@ -752,19 +753,21 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
     genericParam = funcDecl->getResultInterfaceType();
   }
 
+  auto sig = funcDecl->getGenericSignature();
+
   // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
   // DistributedTargetInvocationDecoder.decodeNextArgument
+  // DistributedTargetInvocationResultHandler.onReturn
   if (funcDecl->isDistributedTargetInvocationEncoderRecordArgument() ||
       funcDecl->isDistributedTargetInvocationEncoderRecordReturnType() ||
-      funcDecl->isDistributedTargetInvocationDecoderDecodeNextArgument()) {
-    auto *argParam = funcDecl->getGenericParams()->getParams().front();
-    genericParam = argParam->getDeclaredInterfaceType();
+      funcDecl->isDistributedTargetInvocationDecoderDecodeNextArgument() ||
+      funcDecl->isDistributedTargetInvocationResultHandlerOnReturn()) {
+    genericParam = sig.getInnermostGenericParams().front();
   }
 
   if (!genericParam)
     return;
 
-  auto sig = funcDecl->getGenericSignature();
   auto requirements = sig->getLocalRequirements(genericParam);
   if (requirements.protos.empty())
     return;

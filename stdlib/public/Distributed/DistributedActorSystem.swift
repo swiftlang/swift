@@ -947,11 +947,9 @@ public protocol DistributedTargetInvocationResultHandler {
   /// The serialization requirement that the value passed to `onReturn` is required to conform to.
   associatedtype SerializationRequirement
 
-//  /// Ad-hoc protocol requirement
-//  ///
-//  /// Invoked when the distributed target execution returns successfully.
-//  /// The `value` is the return value of the executed distributed invocation target.
-//  func onReturn<Success: SerializationRequirement>(value: Success) async throws
+  /// Invoked when the distributed target execution returns successfully.
+  /// The `value` is the return value of the executed distributed invocation target.
+  func onReturn<Success/*: SerializationRequirement*/>(value: Success) async throws
 
   /// Invoked when the distributed target execution of a `Void` returning
   /// function has completed successfully.
