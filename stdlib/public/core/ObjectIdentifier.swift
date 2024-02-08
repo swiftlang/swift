@@ -87,17 +87,21 @@ public struct ObjectIdentifier: Sendable {
 #endif
 
 @_unavailableInEmbedded
-@_DebugDescription
 extension ObjectIdentifier: CustomDebugStringConvertible {
   /// A textual representation of the identifier, suitable for debugging.
   public var debugDescription: String {
     return "ObjectIdentifier(\(_rawPointerToString(_value)))"
   }
+}
 
+#if !$Embedded
+@_DebugDescription
+extension ObjectIdentifier {
   var _debugDescription: String {
     return "ObjectIdentifier(\(_value))"
   }
 }
+#endif
 
 extension ObjectIdentifier: Equatable {
   @inlinable // trivial-implementation
