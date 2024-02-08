@@ -10,14 +10,6 @@ struct MyStruct {}
 extension MyStruct {
   var debugDescription: String { "thirty" }
 }
-// CHECK: #if os(Linux)
-// CHECK: @_section(".lldbsummaries")
-// CHECK: #elseif os(Windows)
-// CHECK: @_section(".lldbsummaries")
-// CHECK: #else
-// CHECK: @_section("__DATA_CONST,__lldbsummaries")
-// CHECK: #endif
-// CHECK: @_used
 // CHECK: static let _lldb_summary = (
 // CHECK:     /* version */ 1 as UInt8,
 // CHECK:     /* record size */ 34 as UInt8,

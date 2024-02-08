@@ -218,7 +218,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
         #elseif os(Windows)
         @_section(".lldbsummaries")
         #else
-        @_section("__DATA_CONST,__lldbsummaries")
+        @_section("__TEXT,__lldbsummaries")
         #endif
         @_used
         static let _lldb_summary = (
