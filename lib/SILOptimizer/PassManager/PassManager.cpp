@@ -16,6 +16,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include "../../IRGen/IRGenModule.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
@@ -1805,3 +1806,64 @@ void BridgedCloner::clone(BridgedInstruction inst) {
   cloner->cloneInst(inst.unbridged());
 }
 
+BridgedDemangler::BridgedDemangler()
+    : demangler(new swift::Demangle::Demangler()) {}
+
+BridgedDemangler::BridgedDemangler(
+    swift::Demangle::Demangler *_Nonnull demangler)
+    : demangler(demangler) {}
+
+void BridgedDemangler::destroy() const {
+  if (demangler)
+    delete demangler;
+}
+
+void BridgedDemangler::providePreallocatedMemory(
+    BridgedDemangler &borrowFrom) const {
+  demangler->providePreallocatedMemory(*borrowFrom.demangler);
+}
+
+OptionalBridgedNode
+BridgedDemangler::demangleSymbol(BridgedStringRef mangledName) const {
+  return {demangler->demangleSymbol(mangledName.unbridged())};
+}
+
+BridgedStackAllocatedDemangler::BridgedStackAllocatedDemangler()
+    : demangler(new swift::Demangle::StackAllocatedDemangler<1024>()) {}
+
+BridgedDemangler BridgedStackAllocatedDemangler::asBridgedDemangler() const {
+  return {static_cast<swift::Demangle::Demangler *>(demangler)};
+}
+
+BridgedFunctionSignatureSpecializationMangler::
+    BridgedFunctionSignatureSpecializationMangler(
+        BridgedSpecializationPass bridgedSpecializationPass, bool isSerialized,
+        BridgedFunction function) {
+  auto specializationPass = static_cast<swift::Demangle::SpecializationPass>(
+      static_cast<SwiftUInt>(bridgedSpecializationPass));
+  IsSerialized_t isSerialized_t = isSerialized ? IsSerialized : IsNotSerialized;
+
+  this->specializationMangler =
+      new swift::Mangle::FunctionSignatureSpecializationMangler(
+          specializationPass, isSerialized_t, function.getFunction());
+}
+
+void BridgedFunctionSignatureSpecializationMangler::setArgumentClosureProp(
+    SwiftUInt argIndex, BridgedInstruction instruction) const {
+  if (auto *pai = instruction.getAs<PartialApplyInst>()) {
+    specializationMangler->setArgumentClosureProp(argIndex, pai);
+  } else {
+    auto *tttfi = instruction.getAs<ThinToThickFunctionInst>();
+    specializationMangler->setArgumentClosureProp(argIndex, tttfi);
+  }
+}
+
+BridgedOwnedString
+BridgedFunctionSignatureSpecializationMangler::mangle() const {
+  return {specializationMangler->mangle()};
+}
+
+template <typename ImplClass>
+BridgedBuilder &BridgedSILClonerWithScopes<ImplClass>::getBuilder() {
+  return {cloner->getBuilder()};
+}

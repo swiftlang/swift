@@ -96,8 +96,85 @@
 
 import SIL
 
+private let verbose = true
+
+private func log(_ message: @autoclosure () -> String) {
+  if verbose {
+    print("### \(message())")
+  }
+}
+
+// =========== Entry point into the pass =========== //
 let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialize") {
     (function: Function, context: FunctionPassContext) in
 
-    for block in function.blocks {}
+    // 1\ Don't optimize functions that are marked with the opt.never attribute
+    // 2\ If F is an external declaration, there is nothing to specialize
+    // 3\ Specialize
+    // 4\ Eliminate dead closures
+    // 5\ Invalidate everything using `invalidateAnalysis` since we delete calls 
+    //    as well as add new calls and branches
+    
+    // var stackAllocDemangler = StackAllocatedDemangler().asDemangler()
+    // let demangler = Demangler()
+    // demangler.providePreallocatedMemory(parent: &stackAllocDemangler)
+    // demangler.demangleSymbol(mangledName: function.name.string)
+}
+
+// =========== AutodiffClosureSpecializer ========== //
+struct AutodiffClosureSpecializer: ClosureSpecializer {
+    typealias PropagatedClosure = SingleValueInstruction
+
+    func gatherCallSites(_ caller: Function) -> Stack<CallSiteDescriptor> {
+        fatalError("Not implemented")
+    }
+
+    func specialize(_ caller: Function) -> Stack<PropagatedClosure> {
+        fatalError("Not implemented")
+    }
+}
+
+// ===================== Types ===================== //
+
+/// Represents all the information required to
+/// represent a closure in isolation, i.e., outside of
+/// a callsite context where the closure may be getting
+/// passed as an argument.
+///
+/// Composed with other information inside a `ClosureArgDescriptor`
+/// to represent a closure as an argument at a callsite.
+class ClosureInfo {
+    private let closure: SingleValueInstruction
+    private let lifetimeFrontier: InstructionRange
+
+    init(closure: SingleValueInstruction, lifetimeFrontier: InstructionRange) {
+        self.closure = closure
+        self.lifetimeFrontier = lifetimeFrontier
+    }
+}
+
+/// Represents a closure as an argument at a callsite.
+struct ClosureArgDescriptor {
+    private let closureInfo: ClosureInfo
+    /// The index of the closure in the callsite's argument list.
+    private let closureIndex: UInt
+    private let parameterInfo: ParameterInfo
+    /// This is only needed if we have guaranteed parameters. In most cases
+    /// it will have only one element, a return inst. 
+    private let nonFailureExitBBs: Stack<BasicBlock>
+}
+
+/// Represents a callsite containing one or more closure arguments.
+struct CallSiteDescriptor {
+    private let applySite: ApplySite
+    private let closureArgDescriptors: [ClosureArgDescriptor]
+    private let silArgIndexToClosureArgDescIndex: [UInt: UInt]
+}
+
+/// A type capable of performing closure specialization on SIL functions
+protocol ClosureSpecializer {
+    typealias PropagatedClosure = SingleValueInstruction
+
+    func gatherCallSites(_ caller: Function) -> Stack<CallSiteDescriptor>
+    func specialize(_ caller: Function) -> Stack<PropagatedClosure>
 }

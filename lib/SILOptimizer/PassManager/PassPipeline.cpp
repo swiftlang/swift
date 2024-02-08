@@ -752,6 +752,8 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   // Specialize closure.
   P.addClosureSpecializer();
 
+  P.addAutodiffClosureSpecialization();
+
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
 

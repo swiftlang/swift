@@ -55,6 +55,17 @@ class SwiftPassInvocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 class SILVTable;
+namespace Demangle {
+class Node;
+class Demangler;
+template <size_t Size>
+class StackAllocatedDemangler;
+} // namespace Demangle
+namespace Mangle {
+class FunctionSignatureSpecializationMangler;
+}
+template <typename ImplClass>
+class SILClonerWithScopes;
 }
 
 struct BridgedPassContext;
@@ -158,6 +169,89 @@ struct BridgedCloner {
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
   bool isValueCloned(BridgedValue v) const;
   void clone(BridgedInstruction inst);
+};
+
+enum class BridgedNodeKind : SwiftUInt {
+#define NODE(ID) ID,
+#include "swift/Demangling/DemangleNodes.def"
+};
+
+using DemangledNodeKind = BridgedNodeKind;
+
+struct OptionalBridgedNode {
+  swift::Demangle::Node *_Nullable node;
+
+  BRIDGED_INLINE OptionalBridgedNode() : node(nullptr) {}
+  BRIDGED_INLINE OptionalBridgedNode(swift::Demangle::Node *_Nullable node)
+      : node(node) {}
+};
+
+struct BridgedNode {
+  swift::Demangle::Node *_Nonnull node;
+
+  BRIDGED_INLINE BridgedNode(swift::Demangle::Node *_Nonnull node);
+  BRIDGED_INLINE BridgedNodeKind getKind() const;
+  BRIDGED_INLINE OptionalBridgedNode getFirstChild() const;
+  BRIDGED_INLINE OptionalBridgedNode getChild(SwiftUInt index) const;
+  BRIDGED_INLINE SwiftUInt getNumChildren() const;
+  BRIDGED_INLINE SwiftUInt getIndex() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getText() const;
+};
+
+struct BridgedDemangler {
+  swift::Demangle::Demangler *_Nonnull demangler;
+
+  SWIFT_IMPORT_UNSAFE BridgedDemangler();
+  SWIFT_IMPORT_UNSAFE
+  BridgedDemangler(swift::Demangle::Demangler *_Nonnull demangler);
+  void destroy() const;
+  void providePreallocatedMemory(BridgedDemangler &borrowFrom) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedNode
+  demangleSymbol(BridgedStringRef mangledName) const;
+};
+
+// TODO: Is there a way to parameterize the size of the stack-allocated
+// demangler?
+struct BridgedStackAllocatedDemangler {
+  swift::Demangle::StackAllocatedDemangler<1024> *_Nonnull demangler;
+
+  SWIFT_IMPORT_UNSAFE BridgedStackAllocatedDemangler();
+  SWIFT_IMPORT_UNSAFE BridgedDemangler asBridgedDemangler() const;
+};
+
+enum class BridgedSpecializationPass : SwiftUInt {
+  AllocBoxToStack = 0,
+  ClosureSpecializer,
+  CapturePromotion,
+  CapturePropagation,
+  FunctionSignatureOpts,
+  GenericSpecializer,
+  MoveDiagnosticInOutToOut,
+  AsyncDemotion,
+  LAST = AsyncDemotion
+};
+
+using SpecializationPass = BridgedSpecializationPass;
+
+struct BridgedFunctionSignatureSpecializationMangler {
+  swift::Mangle::FunctionSignatureSpecializationMangler
+      *_Nonnull specializationMangler;
+
+  SWIFT_IMPORT_UNSAFE BridgedFunctionSignatureSpecializationMangler(
+      BridgedSpecializationPass specializationPass, bool isSerialized,
+      BridgedFunction function);
+  void setArgumentClosureProp(SwiftUInt argIndex,
+                              BridgedInstruction instruction) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangle() const;
+};
+
+// TODO: How can I make this available in Swift so I can extend
+// it and create a custom cloner for closure specialization?
+template <typename ImplClass>
+struct BridgedSILClonerWithScopes {
+  swift::SILClonerWithScopes<ImplClass> *_Nonnull cloner;
+
+  SWIFT_IMPORT_UNSAFE BridgedBuilder &getBuilder();
 };
 
 struct BridgedPassContext {

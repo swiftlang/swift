@@ -19,11 +19,12 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 
-#include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
@@ -128,6 +129,28 @@ void BridgedNodeSet::eraseInstruction(BridgedInstruction inst) const {
 BridgedFunction BridgedNodeSet::getFunction() const {
   return {set->getFunction()};
 }
+
+//===----------------------------------------------------------------------===//
+//                            BridgedNode
+//===----------------------------------------------------------------------===//
+BridgedNode::BridgedNode(swift::Demangle::Node *_Nonnull node) : node(node) {}
+
+BridgedNodeKind BridgedNode::getKind() const {
+  return static_cast<BridgedNodeKind>(static_cast<SwiftUInt>(node->getKind()));
+}
+
+OptionalBridgedNode BridgedNode::getFirstChild() const {
+  return {node->getFirstChild()};
+}
+
+OptionalBridgedNode BridgedNode::getChild(SwiftUInt index) const {
+  return {node->getChild(index)};
+}
+
+SwiftUInt BridgedNode::getNumChildren() const { return node->getNumChildren(); }
+SwiftUInt BridgedNode::getIndex() const { return node->getIndex(); }
+
+BridgedStringRef BridgedNode::getText() const { return {node->getText()}; }
 
 //===----------------------------------------------------------------------===//
 //                            BridgedPassContext
