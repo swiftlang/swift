@@ -1621,7 +1621,8 @@ private:
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
-                                  SmallVectorImpl<Decl *> &members);
+                                  SmallVectorImpl<Decl *> &members,
+                                  DeclContext *expectedDC = nullptr);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds

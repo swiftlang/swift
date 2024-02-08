@@ -1277,6 +1277,10 @@ public:
   /// Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
+  /// Add the members of the extension to the lookup table, if necessary
+  /// registering it for future lazy member loading.
+  void addExtension(ExtensionDecl *ext);
+
   void addExtensionWithLazyMembers(ExtensionDecl *ext) {
     ExtensionsWithLazyMembers.push_back(ext);
   }
@@ -1467,6 +1471,21 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
+void MemberLookupTable::addExtension(ExtensionDecl *ext) {
+  // If we can lazy-load this extension, only take the members we've loaded
+  // so far.
+  if (ext->hasLazyMembers()) {
+    addMembers(ext->getCurrentMembersWithoutLoading());
+    clearLazilyCompleteCache();
+    clearLazilyCompleteForMacroExpansionCache();
+    addExtensionWithLazyMembers(ext);
+  } else {
+    // Else, load all the members into the table.
+    addMembers(ext->getMembers());
+  }
+  addContainerWithMacroExpansions(ext);
+}
+
 void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   if (!LookupTable.getInt())
     return;
@@ -1474,16 +1493,7 @@ void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   auto *table = LookupTable.getPointer();
   assert(table);
 
-  if (ext->wasDeserialized() || ext->hasClangNode()) {
-    table->addMembers(ext->getCurrentMembersWithoutLoading());
-    table->clearLazilyCompleteCache();
-    table->clearLazilyCompleteForMacroExpansionCache();
-    table->addExtensionWithLazyMembers(ext);
-  } else {
-    table->addMembers(ext->getMembers());
-  }
-
-  table->addContainerWithMacroExpansions(ext);
+  table->addExtension(ext);
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
@@ -1603,8 +1613,6 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
       continue;
     }
 
-    assert(e->wasDeserialized() || e->hasClangNode() &&
-           "Extension without deserializable content has lazy members!");
     assert(!e->hasUnparsedMembers());
 
     populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e);
@@ -1965,21 +1973,7 @@ void NominalTypeDecl::prepareLookupTable() {
 
   // Note: this calls prepareExtensions()
   for (auto e : getExtensions()) {
-    // If we can lazy-load this extension, only take the members we've loaded
-    // so far.
-    //
-    // FIXME: This should be 'e->hasLazyMembers()' but that crashes` because
-    // some imported extensions don't have a Clang node, and only support
-    // LazyMemberLoader::loadAllMembers() and not
-    // LazyMemberLoader::loadNamedMembers().
-    if (e->wasDeserialized() || e->hasClangNode()) {
-      table->addMembers(e->getCurrentMembersWithoutLoading());
-      table->addExtensionWithLazyMembers(e);
-      continue;
-    }
-
-    // Else, load all the members into the table.
-    table->addMembers(e->getMembers());
+    table->addExtension(e);
   }
 
   // Any extensions added after this point will add their members to the
