@@ -294,18 +294,19 @@ private:
                           bool IsAngled, clang::CharSourceRange FilenameRange,
                           clang::OptionalFileEntryRef File,
                           StringRef SearchPath, StringRef RelativePath,
-                          const clang::Module *Imported,
+                          const clang::Module *SuggestedModule,
+                          bool ModuleImported,
                           clang::SrcMgr::CharacteristicKind FileType) override {
-    if (!Imported) {
+    if (!ModuleImported) {
       if (File)
         Impl.BridgeHeaderFiles.insert(*File);
       return;
     }
     // Synthesize identifier locations.
     SmallVector<clang::SourceLocation, 4> IdLocs;
-    for (unsigned I = 0, E = getNumModuleIdentifiers(Imported); I != E; ++I)
+    for (unsigned I = 0, E = getNumModuleIdentifiers(SuggestedModule); I != E; ++I)
       IdLocs.push_back(HashLoc);
-    handleImport(HashLoc, IdLocs, Imported);
+    handleImport(HashLoc, IdLocs, SuggestedModule);
   }
 
   void moduleImport(clang::SourceLocation ImportLoc,
