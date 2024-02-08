@@ -120,7 +120,7 @@ namespace {
         StringRef RelativePath, const clang::Module *SuggestedModule,
         bool ModuleImported,
         clang::SrcMgr::CharacteristicKind FileType) override {
-      handleImport(ModuleImported ? Imported : nullptr);
+      handleImport(ModuleImported ? SuggestedModule : nullptr);
     }
 
     void moduleImport(clang::SourceLocation ImportLoc,
