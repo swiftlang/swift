@@ -15,3 +15,13 @@ struct S_Implicit_Noncopyable : ~Copyable {}
 struct S_Explicit_With_Any_BitwiseCopyable : _BitwiseCopyable {
   var a: any _BitwiseCopyable // expected-error {{non_bitwise_copyable_type_member}}
 }
+
+struct S {}
+
+indirect enum E_Explicit_Indirect : _BitwiseCopyable { // expected-error {{non_bitwise_copyable_type_indirect_enum}}
+  case s(S)
+}
+
+enum E_Explicit_Indirect_Case : _BitwiseCopyable { // expected-error {{non_bitwise_copyable_type_indirect_enum_element}}
+  indirect case s(S) // expected-note {{note_non_bitwise_copyable_type_indirect_enum_element}}
+}

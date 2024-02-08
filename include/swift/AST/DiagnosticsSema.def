@@ -7609,6 +7609,12 @@ ERROR(escapable_requires_feature_flag,none,
       ())
 ERROR(non_bitwise_copyable_type_class,none,
       "class cannot conform to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_type_indirect_enum,none,
+      "indirect enum cannot conform to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_type_indirect_enum_element,none,
+      "enum with indirect case cannot conform to 'BitwiseCopyable'", ())
+NOTE(note_non_bitwise_copyable_type_indirect_enum_element,none,
+     "indirect case is here", ())
 ERROR(non_bitwise_copyable_type_noncopyable,none,
       "noncopyable type cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_nonescapable,none,
