@@ -8134,6 +8134,23 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
                                   /*isUnchecked=*/true);
     }
   }
+
+  // Special handling of `NSNotificationName` static immutable properties.
+  //
+  // These constants could be used with observer APIs from a different isolation
+  // context, so it's more convenient to import them as `nonisolated` unless
+  // they are explicitly isolated to a MainActor.
+  if (!seenMainActorAttr) {
+    auto *DC = MappedDecl->getDeclContext();
+    if (DC->isTypeContext() && isa<VarDecl>(MappedDecl)) {
+      auto *mappedVar = cast<VarDecl>(MappedDecl);
+      if (mappedVar->isStatic() && mappedVar->isLet() &&
+          isNSNotificationName(cast<clang::ValueDecl>(ClangDecl)->getType())) {
+        MappedDecl->getAttrs().add(new (SwiftContext) NonisolatedAttr(
+            /*unsafe=*/false, /*implicit=*/true));
+      }
+    }
+  }
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
