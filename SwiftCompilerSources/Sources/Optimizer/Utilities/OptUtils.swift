@@ -184,6 +184,49 @@ extension Builder {
 }
 
 extension Value {
+  /// Return true if all elements occur on or after `instruction` in
+  /// control flow order. If this returns true, then zero or more uses
+  /// of `self` may be operands of `instruction` itself.
+  ///
+  /// This performs a backward CFG walk from `instruction` to `self`.
+  func usesOccurOnOrAfter(instruction: Instruction, _ context: some Context)
+  -> Bool {
+    var users = InstructionSet(context)
+    defer { users.deinitialize() }
+    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+
+    let pushPreds = { (block: BasicBlock) in
+      block.predecessors.lazy.map({ pred in pred.terminator }).forEach {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+    if let prev = instruction.previous {
+      worklist.pushIfNotVisited(prev)
+    } else {
+      pushPreds(instruction.parentBlock)
+    }
+    let definingInst = self.definingInstruction
+    while let lastInst = worklist.pop() {
+      for inst in ReverseInstructionList(first: lastInst) {
+        if users.contains(inst) {
+          return false
+        }
+        if inst == definingInst {
+          break
+        }
+      }
+      if lastInst.parentBlock != self.parentBlock {
+        pushPreds(lastInst.parentBlock)
+      }
+    }
+    return true
+  }
+}
+
+extension Value {
   /// Makes this new owned value available to be used in the block `destBlock`.
   ///
   /// Inserts required `copy_value` and `destroy_value` operations in case the `destBlock`
