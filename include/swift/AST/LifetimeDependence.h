@@ -182,6 +182,10 @@ public:
 
   static llvm::Optional<LifetimeDependenceInfo>
   get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
+
+  static LifetimeDependenceInfo
+  get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
+      const SmallBitVector &scopeLifetimeIndices);
 };
 
 } // namespace swift
