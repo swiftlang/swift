@@ -262,6 +262,14 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
+  auto *sd = dyn_cast<StructDecl>(nominal);
+  if (sd && sd->isCxxNonTrivial()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_cxx_nontrivial);
+    }
+    return true;
+  }
+
   BitwiseCopyableStorageVisitor visitor(nominal, dc, check);
 
   return visitor.visit(nominal, dc) || visitor.invalid;
