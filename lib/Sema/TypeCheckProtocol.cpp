@@ -3126,6 +3126,12 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       break;
     }
 
+    // Witnessing `async` requirement with an isolated synchronous
+    // declaration is done via async witness thunk which requires
+    // a hop to the expected concurrency domain.
+    if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+      return refResult.isolation;
+
     // Otherwise, we're done.
     return llvm::None;
 
