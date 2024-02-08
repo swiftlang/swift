@@ -4121,8 +4121,7 @@ LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
   case TypeKind::Function:
     return cast<FunctionType>(this)->getLifetimeDependenceInfo();
   case TypeKind::GenericFunction:
-    // TODO: Handle GenericFunction
-    return LifetimeDependenceInfo();
+    return cast<GenericFunctionType>(this)->getLifetimeDependenceInfo();
 
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
