@@ -162,23 +162,18 @@ public:
   bool hasInheritLifetimeParamIndices() const {
     return inheritLifetimeParamIndices != nullptr;
   }
-  bool hasBorrowLifetimeParamIndices() const {
+  bool hasScopeLifetimeParamIndices() const {
     return scopeLifetimeParamIndices != nullptr;
   }
   
   bool checkInherit(int index) const {
-    assert(!empty());
-    return inheritLifetimeParamIndices->contains(index);
+    return inheritLifetimeParamIndices
+      && inheritLifetimeParamIndices->contains(index);
   }
 
-  bool checkBorrow(int index) const {
-    assert(!empty());
-    return borrowLifetimeParamIndices->contains(index);
-  }
-
-  bool checkMutate(int index) const {
-    assert(!empty());
-    return mutateLifetimeParamIndices->contains(index);
+  bool checkScope(int index) const {
+    return scopeLifetimeParamIndices
+      && scopeLifetimeParamIndices->contains(index);
   }
 
   std::string getString() const;

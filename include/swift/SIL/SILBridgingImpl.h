@@ -90,14 +90,9 @@ bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
   return info->checkInherit(index);
 }
 
-bool BridgedLifetimeDependenceInfo::checkBorrow(SwiftInt index) const {
+bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
   assert(info);
-  return info->checkBorrow(index);
-}
-
-bool BridgedLifetimeDependenceInfo::checkMutate(SwiftInt index) const {
-  assert(info);
-  return info->checkMutate(index);
+  return info->checkScope(index);
 }
 
 BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
@@ -499,16 +494,6 @@ BridgedBasicBlock BridgedArgument::getParent() const {
   return {getArgument()->getParent()};
 }
 
-BridgedArgumentConvention BridgedArgument::getConvention() const {
-  auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
-  return castToArgumentConvention(fArg->getArgumentConvention());
-}
-
-bool BridgedArgument::isSelf() const {
-  auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
-  return fArg->isSelf();
-}
-
 bool BridgedArgument::hasResultDependsOn() const {
   auto *fArg = static_cast<swift::SILFunctionArgument*>(getArgument());
   return fArg->hasResultDependsOn();
@@ -598,18 +583,6 @@ SwiftInt BridgedFunction::getNumIndirectFormalResults() const {
 
 bool BridgedFunction::hasIndirectErrorResult() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
-}
-
-SwiftInt BridgedFunction::getNumParameters() const {
-  return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumParameters();
-}
-
-SwiftInt BridgedFunction::getSelfArgumentIndex() const {
-  swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
-  swift::CanSILFunctionType fTy = getFunction()->getLoweredFunctionType();
-  if (!fTy->hasSelfParam())
-    return -1;
-  return conv.getNumParameters() + conv.getNumIndirectSILResults() - 1;
 }
 
 SwiftInt BridgedFunction::getNumSILArguments() const {

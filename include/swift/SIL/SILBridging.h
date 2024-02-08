@@ -233,8 +233,7 @@ struct BridgedLifetimeDependenceInfo {
 
   BRIDGED_INLINE bool empty() const;
   BRIDGED_INLINE bool checkInherit(SwiftInt index) const;
-  BRIDGED_INLINE bool checkBorrow(SwiftInt index) const;
-  BRIDGED_INLINE bool checkMutate(SwiftInt index) const;
+  BRIDGED_INLINE bool checkScope(SwiftInt index) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
 };
@@ -537,8 +536,6 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getLastBlock() const;
   BRIDGED_INLINE SwiftInt getNumIndirectFormalResults() const;
   BRIDGED_INLINE bool hasIndirectErrorResult() const;
-  BRIDGED_INLINE SwiftInt getNumParameters() const;
-  BRIDGED_INLINE SwiftInt getSelfArgumentIndex() const;
   BRIDGED_INLINE SwiftInt getNumSILArguments() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSILArgumentType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSILResultType() const;
@@ -962,8 +959,6 @@ struct BridgedArgument {
 
   BRIDGED_INLINE swift::SILArgument * _Nonnull getArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
-  BRIDGED_INLINE BridgedArgumentConvention getConvention() const;
-  BRIDGED_INLINE bool isSelf() const;
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool hasResultDependsOn() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getVarDecl() const;

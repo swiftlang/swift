@@ -12,15 +12,21 @@
 
 import SILBridging
 
-/// SIL function convention based on the AST function type and SIL stage.
+/// SIL function parameter and result conventions based on the AST
+/// function type and SIL stage.
 ///
-/// Provides Results and Parameters collections. ArgumentConventions
-/// maps these to SIL arguments.
+/// Provides Results and Parameters collections. This does not know
+/// anything about FunctionArguments. Use ArgumentConventions instead to
+/// maps FunctionArguments down to these conventions.
+///
+/// The underlying FunctionType must be contextual and expanded. SIL
+/// has no use for interface types or unexpanded types.
 public struct FunctionConvention : CustomStringConvertible {
   let bridgedFunctionType: BridgedASTType
   let hasLoweredAddresses: Bool
 
   init(for bridgedFunctionType: BridgedASTType, in function: Function) {
+    assert(!bridgedFunctionType.hasTypeParameter(), "requires contextual type")
     self.bridgedFunctionType = bridgedFunctionType
     self.hasLoweredAddresses = function.hasLoweredAddresses
   }
@@ -75,8 +81,9 @@ public struct FunctionConvention : CustomStringConvertible {
     if deps.empty() {
       return nil
     }
-    return ResultDependencies(bridged: deps, parameterCount: parameters.count,
-                              hasSelfParameter: hasSelfParameter)
+    return ResultDependencies(bridged: deps,
+                                         parameterCount: parameters.count,
+                                         hasSelfParameter: hasSelfParameter)
   }
 
   public var description: String {
@@ -97,7 +104,7 @@ public struct ResultInfo : CustomStringConvertible {
   /// calling convention of the parameter.
   ///
   /// TODO: For most purposes, you probably want \c returnValueType.
-  public let interfaceType: BridgedASTType
+  public let type: BridgedASTType
   public let convention: ResultConvention
   public let hasLoweredAddresses: Bool
 
@@ -107,7 +114,7 @@ public struct ResultInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirect:
-      return hasLoweredAddresses || interfaceType.isOpenedExistentialWithError()
+      return hasLoweredAddresses || type.isOpenedExistentialWithError()
     case .pack:
       return true
     case .owned, .unowned, .unownedInnerPointer, .autoreleased:
@@ -117,7 +124,7 @@ public struct ResultInfo : CustomStringConvertible {
 
   public var description: String {
     convention.description + ": "
-    + String(taking: interfaceType.getDebugDescription())
+    + String(taking: type.getDebugDescription())
   }
 }
 
@@ -144,7 +151,7 @@ extension FunctionConvention {
 public struct ParameterInfo : CustomStringConvertible {
   /// The parameter type that describes the abstract calling
   /// convention of the parameter.
-  public let interfaceType: BridgedASTType
+  public let type: BridgedASTType
   public let convention: ArgumentConvention
   public let options: UInt8
   public let hasLoweredAddresses: Bool
@@ -156,7 +163,7 @@ public struct ParameterInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirectIn, .indirectInGuaranteed:
-      return hasLoweredAddresses || interfaceType.isOpenedExistentialWithError()
+      return hasLoweredAddresses || type.isOpenedExistentialWithError()
     case .indirectInout, .indirectInoutAliasable:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
@@ -170,7 +177,7 @@ public struct ParameterInfo : CustomStringConvertible {
 
   public var description: String {
     convention.description + ": "
-    + String(taking: interfaceType.getDebugDescription())
+    + String(taking: type.getDebugDescription())
   }
 }
 
@@ -214,10 +221,18 @@ extension FunctionConvention {
   }
 }
 
-public enum LifetimeDependenceConvention {
+public enum LifetimeDependenceConvention : CustomStringConvertible {
   case inherit
-  case borrow
-  case mutate
+  case scope
+
+  public var description: String {
+    switch self {
+    case .inherit:
+      return "inherit"
+    case .scope:
+      return "scope"
+    }
+  }
 }
 
 extension FunctionConvention {
@@ -245,18 +260,13 @@ extension FunctionConvention {
 
     public subscript(_ index: Int) -> LifetimeDependenceConvention? {
       let inherit = bridged.checkInherit(bridgedIndex(parameterIndex: index))
-      let borrow = bridged.checkBorrow(bridgedIndex(parameterIndex: index))
-      let mutate = bridged.checkMutate(bridgedIndex(parameterIndex: index))
+      let scope = bridged.checkScope(bridgedIndex(parameterIndex: index))
       if inherit {
-        assert(!borrow && !mutate, "mutualy exclusive lifetime specifiers")
+        assert(!scope, "mutualy exclusive lifetime specifiers")
         return .inherit
       }
-      if borrow {
-        assert(!mutate, "mutualy exclusive lifetime specifiers")
-        return .borrow
-      }
-      if mutate {
-        return .mutate
+      if scope {
+        return .scope
       }
       return nil
     }
@@ -272,7 +282,8 @@ extension FunctionConvention {
     }
 
     public var description: String {
-      String(taking: bridged.getDebugDescription())
+      String(taking: bridged.getDebugDescription()) +
+        "\nparamCount: \(paramCount) self: \(hasSelfParam)"
     }
   }
 }
@@ -331,12 +342,12 @@ public enum ResultConvention : CustomStringConvertible {
 
 extension ResultInfo {
   init(bridged: BridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.interfaceType = BridgedASTType(type: bridged.type)
+    self.type = BridgedASTType(type: bridged.type)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
   init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.interfaceType = BridgedASTType(type: bridged.type!)
+    self.type = BridgedASTType(type: bridged.type!)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
@@ -359,13 +370,13 @@ extension ResultConvention {
 
 extension ParameterInfo {
   init(bridged: BridgedParameterInfo, hasLoweredAddresses: Bool) {
-    self.interfaceType = BridgedASTType(type: bridged.type)
+    self.type = BridgedASTType(type: bridged.type)
     self.convention = bridged.convention.convention
     self.options = bridged.options
     self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   public var _bridged: BridgedParameterInfo {
-    BridgedParameterInfo(interfaceType.type!, convention.bridged, options)
+    BridgedParameterInfo(type.type!, convention.bridged, options)
   }
 }

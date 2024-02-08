@@ -8610,10 +8610,10 @@ bool ModuleFile::maybeReadLifetimeDependence(
     return false;
   }
 
-  bool hasInheritLifetimeParamIndices, hasBorrowLifetimeParamIndices;
+  bool hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(scratch, hasInheritLifetimeParamIndices,
-                                       hasBorrowLifetimeParamIndices,
+                                       hasScopeLifetimeParamIndices,
                                        lifetimeDependenceData);
 
   unsigned startIndex = 0;
@@ -8631,7 +8631,7 @@ bool ModuleFile::maybeReadLifetimeDependence(
   if (hasInheritLifetimeParamIndices) {
     pushData(LifetimeDependenceKind::Consume);
   }
-  if (hasBorrowLifetimeParamIndices) {
+  if (hasScopeLifetimeParamIndices) {
     pushData(LifetimeDependenceKind::Borrow);
   }
   return true;

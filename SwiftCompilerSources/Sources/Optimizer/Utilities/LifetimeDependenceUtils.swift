@@ -1071,3 +1071,20 @@ let lifetimeDependenceUseTest = FunctionTest("lifetime_dependence_use") {
   defer { printer.deinitialize() }
   _ = printer.walkDown(root: value)
 }
+
+
+// SIL Unit tests
+
+let argumentConventionsTest = FunctionTest("argument_conventions") {
+  function, arguments, context in
+  if arguments.hasUntaken {
+    let value = arguments.takeValue()
+    let applySite = value.definingInstruction as! ApplySite
+    print("Conventions for call: \(applySite)")
+    print(applySite.calleeArgumentConventions)
+  } else {
+    print("Conventions for function: \(function.name)")
+    print(function.argumentConventions)
+  }
+  // TODO: print ~Escapable conformance and lifetime dependencies
+}

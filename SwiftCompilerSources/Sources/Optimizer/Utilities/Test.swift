@@ -136,18 +136,19 @@ extension BridgedTestArguments {
 public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
-      parseTestSpecificationTest,
-      forwardingUseDefTest,
-      forwardingDefUseTest,
-      borrowIntroducersTest,
-      enclosingValuesTest,
-      linearLivenessTest,
-      interiorLivenessTest,
-      variableIntroducerTest,
-      lifetimeDependenceScopeTest,
-      lifetimeDependenceRootTest,
-      lifetimeDependenceUseTest
-    )
+    argumentConventionsTest,
+    borrowIntroducersTest,
+    enclosingValuesTest,
+    forwardingDefUseTest,
+    forwardingUseDefTest,
+    interiorLivenessTest,
+    lifetimeDependenceRootTest,
+    lifetimeDependenceScopeTest,
+    lifetimeDependenceUseTest,
+    linearLivenessTest,
+    parseTestSpecificationTest,
+    variableIntroducerTest
+  )
 
   // Finally register the thunk they all call through.
   registerFunctionTestThunk(functionTestThunk)
@@ -253,4 +254,3 @@ FunctionTest("test_specification_parsing") { function, arguments, context in
     }
   }
 }
-
