@@ -224,12 +224,16 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
       KnownProtocolKind::BitwiseCopyable));
 
   if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isNoncopyable()) {
-    nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
+    }
     return true;
   }
 
   if (!dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isEscapable()) {
-    nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
+    }
     return true;
   }
 

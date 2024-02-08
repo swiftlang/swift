@@ -193,6 +193,11 @@ struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-err
 
 struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
 
+struct S_Implicit_Nonescapable : ~Escapable {}
+
+struct S_Implicit_Noncopyable : ~Copyable {}
+
+
 func passUnmanaged<T : AnyObject>(_ u: Unmanaged<T>) { take3(u) }
 
 struct S_Explicit_With_Unmanaged<T : AnyObject> : _BitwiseCopyable {
