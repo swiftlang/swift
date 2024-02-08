@@ -474,7 +474,7 @@ namespace {
 
   private:
     const TypeInfo &expand(SILParameterInfo param);
-    llvm::Type *addIndirectResult();
+    llvm::Type *addIndirectResult(SILType resultType);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -532,9 +532,7 @@ namespace {
 } // end namespace irgen
 } // end namespace swift
 
-llvm::Type *SignatureExpansion::addIndirectResult() {
-  auto resultType = getSILFuncConventions().getSILResultType(
-      IGM.getMaximalTypeExpansionContext());
+llvm::Type *SignatureExpansion::addIndirectResult(SILType resultType) {
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   auto storageTy = resultTI.getStorageType();
   addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
@@ -931,7 +929,7 @@ SignatureExpansion::expandDirectResult() {
     auto &ti = IGM.getTypeInfo(resultType);
     auto &native = ti.nativeReturnValueSchema(IGM);
     if (native.requiresIndirect())
-      return std::make_pair(addIndirectResult(), nullptr);
+      return std::make_pair(addIndirectResult(resultType), nullptr);
 
     // Disable the use of sret if we have a non-trivial direct result.
     if (!native.empty()) CanUseSRet = false;
@@ -1572,6 +1570,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
 
   // If we return indirectly, that is the first parameter type.
   if (returnInfo.isIndirect()) {
+    auto resultType = getSILFuncConventions().getSingleSILResultType(
+        IGM.getMaximalTypeExpansionContext());
     if (IGM.Triple.isWindowsMSVCEnvironment() &&
         FnType->getRepresentation() ==
             SILFunctionTypeRepresentation::CXXMethod) {
@@ -1579,9 +1579,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       // returned indirect values.
       emitArg(0);
       firstParamToLowerNormally = 1;
-      addIndirectResult();
+      addIndirectResult(resultType);
     } else
-      addIndirectResult();
+      addIndirectResult(resultType);
   }
 
   // Use a special IR type for passing block pointers.
@@ -2007,7 +2007,7 @@ void SignatureExpansion::expandAsyncEntryType() {
   auto &ti = IGM.getTypeInfo(resultType);
   auto &native = ti.nativeReturnValueSchema(IGM);
   if (native.requiresIndirect())
-    addIndirectResult();
+    addIndirectResult(resultType);
 
   // Add the indirect result types.
   expandIndirectResults();
@@ -3257,7 +3257,13 @@ llvm::CallBase *IRBuilder::CreateCallOrInvoke(
     for (unsigned argIndex = 0; argIndex < func->arg_size(); ++argIndex) {
       if (func->hasParamAttribute(argIndex, llvm::Attribute::StructRet)) {
         llvm::AttrBuilder builder(func->getContext());
-        builder.addStructRetAttr(func->getParamStructRetType(argIndex));
+        // See if there is a sret parameter in the signature. There are cases
+        // where the called function has a sret parameter, but the signature
+        // doesn't (e.g., noreturn functions).
+        llvm::Type *ty = attrs.getParamStructRetType(argIndex);
+        if (!ty)
+          ty = func->getParamStructRetType(argIndex);
+        builder.addStructRetAttr(ty);
         attrs = attrs.addParamAttributes(func->getContext(), argIndex, builder);
       }
       if (func->hasParamAttribute(argIndex, llvm::Attribute::ByVal)) {

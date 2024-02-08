@@ -45,8 +45,6 @@ func test(c : C, s : S) {
 
 // CHECK: %[[TSO1SV:.*]] = type <{ %[[TS5INT32V:.*]] }>
 // CHECK: %[[TS5INT32V]] = type <{ i32 }>
-// CHECK: %[[SWIFT_OPAQUE:.*]] = type opaque
-// CHECK: %[[CLASS_S:.*]] = type { i32 }
 
 // CHECK: define hidden swiftcc void @"$s4testAA1c1sySo1CC_So1SVtF"(ptr %[[V0:.*]], ptr {{.*}}%[[V1:.*]])
 // CHECK: %[[V2:.*]] = alloca %[[TSO1SV]], align 4
@@ -57,16 +55,16 @@ func test(c : C, s : S) {
 // CHECK: %[[V7:.*]] = alloca %[[TSO1SV]], align 4
 // CHECK: call void @llvm.lifetime.start.p0(i64 4, ptr %[[V2]])
 // CHECK: %[[V8:.*]] = load ptr, ptr @"\01L_selector(getS:)", align 8
-// CHECK: invoke void @objc_msgSend(ptr noalias nocapture sret(%[[SWIFT_OPAQUE]]) %[[V2]], ptr %[[V0]], ptr %[[V8]], i32 1)
+// CHECK: invoke void @objc_msgSend(ptr noalias sret(%[[TSO1SV]]) %[[V2]], ptr %[[V0]], ptr %[[V8]], i32 1)
 
 // CHECK: %[[V10:.*]] = load ptr, ptr @"OBJC_CLASS_REF_$_C", align 8
 // CHECK: %[[V11:.*]] = call ptr @objc_opt_self(ptr %[[V10]])
 // CHECK: %[[V12:.*]] = load ptr, ptr @"\01L_selector(getS:)", align 8
-// CHECK: invoke void @objc_msgSend(ptr noalias nocapture sret(%[[SWIFT_OPAQUE]]) %[[V3]], ptr %[[V11]], ptr %[[V12]], i32 1)
+// CHECK: invoke void @objc_msgSend(ptr noalias sret(%[[TSO1SV]]) %[[V3]], ptr %[[V11]], ptr %[[V12]], i32 1)
 
 // CHECK: %[[V14:.*]] = call ptr @_ZN1SC1Ev(ptr %[[V4]])
-// CHECK: invoke void @_Z4getSi(ptr noalias nocapture sret(%[[CLASS_S]]) %[[V5]], i32 1)
+// CHECK: invoke void @_Z4getSi(ptr noalias sret(%[[TSO1SV]]) %[[V5]], i32 1)
 
-// CHECK: invoke void @_ZNK1S4getSEi(ptr noalias nocapture sret(%[[CLASS_S]]) %[[V6]], ptr %[[V1]], i32 1)
+// CHECK: invoke void @_ZNK1S4getSEi(ptr noalias sret(%[[TSO1SV]]) %[[V6]], ptr %[[V1]], i32 1)
 
-// CHECK: invoke void @_ZN1S10getSStaticEi(ptr noalias nocapture sret(%[[CLASS_S]]) %[[V7]], i32 1)
+// CHECK: invoke void @_ZN1S10getSStaticEi(ptr noalias sret(%[[TSO1SV]]) %[[V7]], i32 1)
