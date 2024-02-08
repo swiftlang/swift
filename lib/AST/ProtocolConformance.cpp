@@ -1076,19 +1076,9 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
-  const bool haveNoncopyableGenerics =
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
-
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
-
-    // No synthesized conformances for move-only nominals.
-    if (!haveNoncopyableGenerics && !canBeCopyable()) {
-      // assumption is Sendable gets synthesized elsewhere.
-      assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-      return;
-    }
 
     if (protocols.count(proto) == 0) {
       ConformanceTable->addSynthesizedConformance(
@@ -1099,12 +1089,22 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Synthesize the unconditional conformances to invertible protocols.
   // For conditional ones, see findSynthesizedConformances .
-  if (haveNoncopyableGenerics) {
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    bool missingOne = false;
     for (auto ip : InvertibleProtocolSet::full()) {
       auto invertible = getMarking(ip);
       if (!invertible.getInverse() || bool(invertible.getPositive()))
         addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+      else
+        missingOne = true;
     }
+
+    // FIXME: rdar://122289155 (NCGenerics: convert Equatable, Hashable, and RawRepresentable to ~Copyable.)
+    if (missingOne)
+      return;
+
+  } else if (!canBeCopyable()) {
+    return; // No synthesized conformances for move-only nominals.
   }
 
   // Add protocols for any synthesized protocol attributes.

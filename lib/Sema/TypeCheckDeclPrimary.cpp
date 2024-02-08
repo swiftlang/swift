@@ -3676,6 +3676,16 @@ public:
     return true;
   }
 
+  /// Compiler-known marker protocols cannot be extended with members.
+  static void diagnoseExtensionOfMarkerProtocol(ExtensionDecl *ED) {
+    auto *nominal = ED->getExtendedNominal();
+    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(nominal)) {
+      if (proto->getKnownProtocolKind() && proto->isMarkerProtocol()) {
+        ED->diagnose(diag::cannot_extend_nominal, nominal);
+      }
+    }
+  }
+
   static void checkTupleExtension(ExtensionDecl *ED) {
     auto *nominal = ED->getExtendedNominal();
     if (!nominal || !isa<BuiltinTupleDecl>(nominal))
@@ -3878,6 +3888,7 @@ public:
       TypeChecker::checkDistributedActor(SF, nominal);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
+    diagnoseExtensionOfMarkerProtocol(ED);
 
     checkTupleExtension(ED);
   }

@@ -3,6 +3,7 @@
 
 import StdlibUnittest
 
+defer { runAllTests() }
 
 var ProtocolExtensionTestSuite = TestSuite("ProtocolExtensions")
 
@@ -363,4 +364,12 @@ ProtocolExtensionTestSuite.test("WitnessSelf") {
   }
 }
 
-runAllTests()
+@_marker protocol Addable {}
+extension Addable {
+    func increment(this x: Int) -> Int { return x + 100 }
+}
+extension String: Addable {}
+
+ProtocolExtensionTestSuite.test("MarkerProtocolExtensions") {
+    expectTrue("hello".increment(this: 11) == 111)
+}

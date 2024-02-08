@@ -26,3 +26,7 @@ enum namespace {
 
   func Copyable() -> Copyable { return 0 }
 }
+
+extension Copyable { // expected-error {{cannot extend protocol 'Copyable'}}
+  func hello() {}
+}

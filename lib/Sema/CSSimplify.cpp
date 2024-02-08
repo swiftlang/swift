@@ -12004,9 +12004,10 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
 
-  // Noncopyable types can't be involved in bridging conversions since a bridged
-  // type assumes the ability to copy.
-  if (type1->isNoncopyable()) {
+  // Noncopyable & Nonescapable types can't be involved in bridging conversions
+  // since a bridged type assumes such abilities are granted.
+  if (!type1->hasTypeVariable()
+      && (type1->isNoncopyable() || !type1->isEscapable())) {
     return SolutionKind::Error;
   }
 

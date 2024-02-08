@@ -350,21 +350,16 @@ func test_leading_dot_syntax_with_typelias() {
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
-extension Copyable where Self == Int {
+// User-defined marker protocols do gain the inference for members, since they
+// support extensions.
+@_marker protocol SomeMarkerProto {}
+extension Int: SomeMarkerProto {}
+
+extension SomeMarkerProto where Self == Int {
   static func answer() -> Int { 42 }
 }
 
-extension Escapable where Self == String {
-  static func question() -> String { "" }
-}
-
 do {
-  func testCopyable<T: Copyable>(_: T) {}
-  func testEscapable<T: Escapable>(_: T) {}
-
-  testCopyable(.answer())
-  // expected-error@-1 {{cannot infer contextual base in reference to member 'answer'}}
-
-  testEscapable(.question())
-  // expected-error@-1 {{cannot infer contextual base in reference to member 'question'}}
+  func testSomeMarkerProto<T: SomeMarkerProto>(_: T) {}
+  testSomeMarkerProto(.answer())
 }

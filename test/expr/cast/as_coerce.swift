@@ -119,6 +119,7 @@ protocol P_48579 {}
 do {
   func f1() -> Any {}
   func f2() {}
+  @Sendable func f3() {}
 
   _ = f1 is P_48579 // expected-warning {{cast from '() -> Any' to unrelated type 'any P_48579' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{9-9=()}}
   _ = f1 as! P_48579 // expected-warning {{cast from '() -> Any' to unrelated type 'any P_48579' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{9-9=()}}
@@ -133,20 +134,32 @@ do {
   _ = f2 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
 
 
-  func test1<T: P_48579>(_: T.Type) {
+  func test1<T: P_48579, V: P_48579 & Sendable>(_: T.Type, _: V.Type) {
     _ = f1 is T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
-    _ = f1 as! T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
+    _ = f1 as! V // expected-warning {{cast from '() -> Any' to unrelated type 'V' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
     _ = f1 as? T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
     _ = f2 is T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
-    _ = f2 as! T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+    _ = f2 as! V // expected-warning {{cast from '() -> ()' to unrelated type 'V' always fails}}
     _ = f2 as? T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+    _ = f3 is T // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'T' always fails}}
+    _ = f3 as! V // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'V' always fails}}
+    _ = f3 as? T // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'T' always fails}}
   }
 
-  func test2<U>(_: U.Type) {
+  func test2<U, S: Sendable>(_: U.Type, _: S.Type) {
+    _ = f1 is U  // Okay
     _ = f1 as! U // Okay
     _ = f1 as? U // Okay
+    _ = f1 is U  // Okay
     _ = f2 as! U // Okay
     _ = f2 as? U // Okay
+
+    _ = f2 is S   // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f2 as! S  // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f2 as? S  // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f3 is S   // Okay
+    _ = f3 as! S  // Okay
+    _ = f3 as? S  // Okay
   }
 }
 
