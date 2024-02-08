@@ -64,6 +64,35 @@
   \_SwiftConcurrencyShims used to declare the `exit` function, even though it
   might not be available. The declaration has been removed, and must be imported
   from the appropriate C library module (e.g. Darwin or SwiftGlibc)
+  
+* [SE-0270][]:
+
+  The Standard Library now provides APIs for performing collection operations
+  over noncontiguous elements. For example:
+  
+  ```swift
+  var numbers = Array(1...15)
+
+  // Find the indices of all the even numbers
+  let indicesOfEvens = numbers.indices(where: { $0.isMultiple(of: 2) })
+
+  // Perform an operation with just the even numbers
+  let sumOfEvens = numbers[indicesOfEvens].reduce(0, +)
+  // sumOfEvens == 56
+
+  // You can gather the even numbers at the beginning
+  let rangeOfEvens = numbers.moveSubranges(indicesOfEvens, to: numbers.startIndex)
+  // numbers == [2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+  // numbers[rangeOfEvens] == [2, 4, 6, 8, 10, 12, 14]
+  ```
+  
+  The standard library now provides a new `indices(where:)` function which creates
+  a `RangeSet` - a new type representing a set of discontiguous indices. `RangeSet`
+  is generic over its index type and can be used to execute operations over
+  noncontiguous indices such as collecting, moving, or removing elements from a
+  collection. Additionally, `RangeSet` is generic over any `Comparable` collection
+  index and can be used to represent a selection of items in a list or a refinement
+  of a filter or search result.
 
 ## Swift 5.10
 
