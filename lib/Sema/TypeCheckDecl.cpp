@@ -688,8 +688,16 @@ bool
 ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
   // Marker protocols always self-conform.
-  if (decl->isMarkerProtocol())
+  if (decl->isMarkerProtocol()) {
+    // Except for BitwiseCopyable an existential of which is non-trivial.
+    auto *bitwiseCopyableProtocol =
+        decl->getASTContext().getProtocol(KnownProtocolKind::BitwiseCopyable);
+    if (decl->getASTContext().LangOpts.hasFeature(Feature::BitwiseCopyable) &&
+        decl == bitwiseCopyableProtocol) {
+      return false;
+    }
     return true;
+  }
 
   // Otherwise, if it's not @objc, it conforms to itself only if it has a
   // self-conformance witness table.
