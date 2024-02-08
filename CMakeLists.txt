@@ -895,11 +895,13 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
 if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX)
-  # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
-  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  # HOSTTOOLS is the only supported configuration when Swift parser integration
+  # is enabled.
+  if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
