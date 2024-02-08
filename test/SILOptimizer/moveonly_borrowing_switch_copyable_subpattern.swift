@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch -disable-experimental-parser-round-trip %s
+// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
 
 struct Payload: ~Copyable {
     var x: Int

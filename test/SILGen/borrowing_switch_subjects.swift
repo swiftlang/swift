@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature BorrowingSwitch -disable-experimental-parser-round-trip %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature BorrowingSwitch %s | %FileCheck %s
 
 struct Inner: ~Copyable {}
 
