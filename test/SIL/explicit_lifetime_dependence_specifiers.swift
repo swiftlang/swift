@@ -5,7 +5,6 @@
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics \
 // RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
-// REQUIRES: asserts
 // REQUIRES: noncopyable_generics
 
 import Builtin
@@ -48,7 +47,6 @@ struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
-/*
 // rdar://121983770
 func testBasic() {
   let capacity = 4
@@ -60,7 +58,6 @@ func testBasic() {
     use(newView)    
   }
 }
-*/
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _borrow(1) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> _borrow(x) BufferView {

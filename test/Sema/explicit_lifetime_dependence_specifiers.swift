@@ -129,10 +129,3 @@ struct Wrapper : ~Escapable {
     return view
   } 
 }
-
-struct ArrayOfBufferView : ~Escapable {
-    let arr: [BufferView]
-    subscript(index: Int) -> _borrow(self) BufferView {
-        return arr[index]
-    }
-}
