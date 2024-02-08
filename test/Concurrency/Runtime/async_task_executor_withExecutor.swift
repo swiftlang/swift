@@ -7,9 +7,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// rdar://120430239
-// UNSUPPORTED: CPU=arm64e
-
 import Dispatch
 @_spi(ConcurrencyExecutors) import _Concurrency
 
