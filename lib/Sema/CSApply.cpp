@@ -113,8 +113,8 @@ Solution::computeSubstitutions(GenericSignature sig,
     }
 
     // FIXME: Retrieve the conformance from the solution itself.
-    return getConstraintSystem().DC->getParentModule()->checkConformance(
-        replacement, protoType);
+    return getConstraintSystem().DC->getParentModule()->lookupConformance(
+        replacement, protoType, /*allowMissing=*/true);
   };
 
   return SubstitutionMap::get(sig,
