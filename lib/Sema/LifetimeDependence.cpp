@@ -40,9 +40,9 @@ std::string LifetimeDependenceInfo::getString() const {
     lifetimeDependenceString =
         "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ")";
   }
-  if (borrowLifetimeParamIndices && !borrowLifetimeParamIndices->isEmpty()) {
+  if (scopeLifetimeParamIndices && !scopeLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString +=
-        "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
+        "_scope(" + getOnIndices(scopeLifetimeParamIndices) + ")";
   }
   return lifetimeDependenceString;
 }
@@ -51,8 +51,8 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   if (inheritLifetimeParamIndices) {
     inheritLifetimeParamIndices->Profile(ID);
   }
-  if (borrowLifetimeParamIndices) {
-    borrowLifetimeParamIndices->Profile(ID);
+  if (scopeLifetimeParamIndices) {
+    scopeLifetimeParamIndices->Profile(ID);
   }
 }
 
@@ -64,12 +64,12 @@ LifetimeDependenceInfo LifetimeDependenceInfo::getForParamIndex(
   auto indexSubset = IndexSubset::get(ctx, capacity, {index});
   if (ownership == ValueOwnership::Owned) {
     return LifetimeDependenceInfo{/*inheritLifetimeParamIndices*/ indexSubset,
-                                  /*borrowLifetimeParamIndices*/ nullptr};
+                                  /*scopeLifetimeParamIndices*/ nullptr};
   }
   assert(ownership == ValueOwnership::Shared ||
          ownership == ValueOwnership::InOut);
   return LifetimeDependenceInfo{/*inheritLifetimeParamIndices*/ nullptr,
-                                /*borrowLifetimeParamIndices*/ indexSubset};
+                                /*scopeLifetimeParamIndices*/ indexSubset};
 }
 
 void LifetimeDependenceInfo::getConcatenatedData(
@@ -92,7 +92,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
     pushData(inheritLifetimeParamIndices);
   }
   if (hasBorrowLifetimeParamIndices()) {
-    pushData(borrowLifetimeParamIndices);
+    pushData(scopeLifetimeParamIndices);
   }
 }
 
@@ -107,7 +107,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       cast<LifetimeDependentReturnTypeRepr>(afd->getResultTypeRepr());
 
   SmallBitVector inheritLifetimeParamIndices(capacity);
-  SmallBitVector borrowLifetimeParamIndices(capacity);
+  SmallBitVector scopeLifetimeParamIndices(capacity);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDependenceSpecifier specifier,
                                           unsigned paramIndexToSet,
@@ -143,7 +143,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       return true;
     }
     if (inheritLifetimeParamIndices.test(paramIndexToSet) ||
-        borrowLifetimeParamIndices.test(paramIndexToSet)) {
+        scopeLifetimeParamIndices.test(paramIndexToSet)) {
       diags.diagnose(loc, diag::lifetime_dependence_duplicate_param_id);
       return true;
     }
@@ -153,7 +153,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
     } else {
       assert(kind == LifetimeDependenceKind::Borrow ||
              kind == LifetimeDependenceKind::Mutate);
-      borrowLifetimeParamIndices.set(paramIndexToSet);
+      scopeLifetimeParamIndices.set(paramIndexToSet);
     }
     return false;
   };
@@ -227,8 +227,8 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       inheritLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
           : nullptr,
-      borrowLifetimeParamIndices.any()
-          ? IndexSubset::get(ctx, borrowLifetimeParamIndices)
+      scopeLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr);
 }
 
@@ -323,4 +323,5 @@ LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
   }
   return LifetimeDependenceInfo::infer(afd, resultType);
 }
+
 } // namespace swift

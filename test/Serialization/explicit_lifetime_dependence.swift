@@ -39,11 +39,11 @@ func testInitializers() {
     use(mysteryView)
   }
 }
-// CHECK: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _borrow(1) @owned BufferView
+// CHECK: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView
 // CHECK: sil @$s32def_explicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView
-// CHECK: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _borrow(1) @owned BufferView
-// CHECK: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVAD_ADtF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _borrow(1, 2) @owned BufferView
+// CHECK: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView
+// CHECK: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVAD_ADtF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(1, 2) @owned BufferView
 
-// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _borrow(2) @owned BufferView
+// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView
 
-// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGADhtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Int>, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_borrow(3) @owned BufferView
+// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGADhtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Int>, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_scope(3) @owned BufferView
