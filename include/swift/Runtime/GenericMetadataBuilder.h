@@ -289,9 +289,13 @@ public:
           extraDataPattern->SizeInWords, extraDataPattern->OffsetInWords);
       auto patternPointers =
           patternBuffer.resolvePointer(&extraDataPattern->Pattern);
+      if (!patternPointers)
+        return *patternPointers.getError();
       for (unsigned i = 0; i < extraDataPattern->SizeInWords; i++) {
         auto patternPointer =
             patternPointers->resolvePointer(&patternPointers->ptr[i]);
+        if (!patternPointer)
+          return *patternPointer.getError();
         data.writePointer(
             &metadataExtraData[i + extraDataPattern->OffsetInWords],
             patternPointer->template cast<const StoredPointer>());
@@ -303,6 +307,8 @@ public:
     // necessary.
     auto valueWitnesses =
         patternBuffer.resolvePointer(&pattern->ValueWitnesses);
+    if (!valueWitnesses)
+      return *valueWitnesses.getError();
     METADATA_BUILDER_LOG("Setting initial value witnesses");
     data.writePointer(&fullMetadata->ValueWitnesses, *valueWitnesses);
 

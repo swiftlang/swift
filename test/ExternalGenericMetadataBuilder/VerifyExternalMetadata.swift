@@ -1,17 +1,18 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %s -o %t/VerifyExternalMetadata
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -enable-experimental-feature Extern %s -o %t/VerifyExternalMetadata
 // RUN: %target-codesign %t/VerifyExternalMetadata
 //
-// RUN: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
+// RUN: %host-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -Xlinker -rpath -Xlinker %swift-lib-dir -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
+// no: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
 // RUN: %target-codesign %t/buildMetadataJSON
 //
-// RUN: %target-build-swift %S/Inputs/json2c.swift -o %t/json2c
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/json2c.swift -o %t/json2c
 // RUN: %target-codesign %t/json2c
 //
 // RUN: %target-run %t/VerifyExternalMetadata getJSON > %t/names.json
-// RUN: %target-run %t/buildMetadataJSON arm64 %t/VerifyExternalMetadata %stdlib_dir/libswiftCore.dylib < %t/names.json > %t/libswiftPrespecialized.json
+// RUN: %target-run %t/buildMetadataJSON %target-arch %t/VerifyExternalMetadata %stdlib_dir/libswiftCore.dylib < %t/names.json > %t/libswiftPrespecialized.json
 // RUN: %target-run %t/json2c %t/libswiftPrespecialized.json > %t/libswiftPrespecialized.c
-// RUN: %clang -isysroot %sdk -bundle %t/libswiftPrespecialized.c -L%stdlib_dir -lswiftCore -bundle_loader %t/VerifyExternalMetadata -o %t/libswiftPrespecialized.bundle
+// RUN: %clang -isysroot %sdk -target %target-triple -bundle %t/libswiftPrespecialized.c -L%stdlib_dir -lswiftCore -bundle_loader %t/VerifyExternalMetadata -o %t/libswiftPrespecialized.bundle
 //
 //
 // RUN: env SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING=y SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH=%t/libswiftPrespecialized.bundle %target-run %t/VerifyExternalMetadata

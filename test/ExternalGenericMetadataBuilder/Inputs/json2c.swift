@@ -7,9 +7,16 @@ enum ParseError: Error {
   case invalidHex(Substring)
 }
 
+struct Ptrauth: Decodable {
+  var key: Int8
+  var addr: Bool
+  var diversity: UInt
+}
+
 struct Fixup: Decodable {
   var target: String
   var addend: Int64
+  var authPtr: Ptrauth?
 }
 
 enum AtomContent: Decodable {
@@ -99,8 +106,18 @@ func printDeclarations(_ document: Document) {
       switch content {
         case .bytes(let bytes):
           print("  uint8_t \(name)[\(bytes.count)];")
-        case .pointer(_):
-          print("  const char *\(name);")
+        case .pointer(let fixup):
+          let ptrauthQualifier: String
+          if let ptrauth = fixup.authPtr {
+            ptrauthQualifier = """
+              __ptrauth(\(ptrauth.key),
+                        \(ptrauth.addr ? 1 : 0),
+                        \(ptrauth.diversity))
+            """
+          } else {
+            ptrauthQualifier = ""
+          }
+          print("  const char *\(ptrauthQualifier) \(name);")
       }
     }
     print("};")
