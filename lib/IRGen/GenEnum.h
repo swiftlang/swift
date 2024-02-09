@@ -518,6 +518,20 @@ public:
     return false;
   }
 
+  struct SpareBitsMaskInfo {
+    const llvm::APInt bits;
+    const uint32_t byteOffset;
+    const uint32_t bytesInMask;
+
+    uint64_t wordsInMask() const { return (bytesInMask + 3) / 4; }
+  };
+
+  /// Calculates the spare bits mask for the enum. Returns none if the type
+  /// should not emit the spare bits.
+  virtual std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const {
+    return {};
+  };
+
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;

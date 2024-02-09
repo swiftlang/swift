@@ -5836,6 +5836,32 @@ namespace {
       tagBits.append(APInt(extraTagSize, (1U << ExtraTagBitCount) - 1U));
       return tagBits.build();
     }
+
+    std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const override {
+      SpareBitVector spareBits;
+      for (auto enumCase : getElementsWithPayload()) {
+        cast<FixedTypeInfo>(enumCase.ti)
+            ->applyFixedSpareBitsMask(IGM, spareBits);
+      }
+      // Trim leading/trailing zero bytes, then pad to a multiple of 32 bits
+      llvm::APInt bits = spareBits.asAPInt();
+      uint32_t byteOffset = bits.countTrailingZeros() / 8;
+      bits.lshrInPlace(byteOffset * 8); // Trim zero bytes from bottom end
+
+      auto bitsInMask = bits.getActiveBits(); // Ignore high-order zero bits
+      uint32_t bytesInMask = (bitsInMask + 7) / 8;
+      auto wordsInMask = (bytesInMask + 3) / 4;
+      bits = bits.zextOrTrunc(wordsInMask * 32);
+
+      // Never write an MPE descriptor bigger than 16k
+      // The runtime will fall back on its own internal
+      // spare bits calculation for this (very rare) case.
+      if (bytesInMask > 16384) {
+        return {};
+      }
+
+      return {{bits, byteOffset, bytesInMask}};
+    }
   };
 
   class ResilientEnumImplStrategy final
