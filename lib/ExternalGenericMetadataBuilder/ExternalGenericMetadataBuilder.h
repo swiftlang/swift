@@ -54,6 +54,15 @@ SWIFT_ATTRIBUTE_FOR_EXPORTS
 const char *swift_externalMetadataBuilder_readNamesJSON(
     struct SwiftExternalMetadataBuilder *, const char *names_json);
 
+// Set the log level of the library. Accepted values are:
+// 0 - Only fatal errors.
+// 1 - Warnings.
+// 2 - Informational messages.
+// 3 - Detailed informational messages.
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+void swift_externalMetadataBuilder_setLogLevel(
+    struct SwiftExternalMetadataBuilder *, int level);
+
 // Returns an error string if the dylib could not be added. The builder owns the
 // string, so the caller does not have to free it. The string remains valid
 // until at least the next call to the builder.

@@ -42,15 +42,16 @@ namespace swift {
 // conditional eventually. LOG_ENABLED can be used to gate work that's needed
 // for log statements but not for anything else.
 enum class LogLevel {
-  Detail,
-  Info,
-  Warning,
+  None = 0,
+  Warning = 1,
+  Info = 2,
+  Detail = 3,
 };
-static const LogLevel logLevel = LogLevel::Warning;
+
 #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #define LOG(level, fmt, ...)                                                   \
   do {                                                                         \
-    if (level >= logLevel)                                                     \
+    if (level <= getLogLevel())                                                \
       fprintf(stderr, "%s:%d:%s: " fmt "\n", METADATA_BUILDER_LOG_FILE_NAME,   \
               __LINE__, __func__, __VA_ARGS__);                                \
   } while (0)
@@ -649,6 +650,14 @@ public:
   ExternalGenericMetadataBuilderContext &
   operator=(const ExternalGenericMetadataBuilderContext &) = delete;
 
+  LogLevel getLogLevel() {
+    return logLevel;
+  }
+
+  void setLogLevel(int level) {
+    logLevel = LogLevel(level);
+  }
+
   template <typename T>
   WritableData<T> allocate(size_t size) {
     auto atom = allocateAtom(size);
@@ -703,6 +712,7 @@ private:
   void populateMachOFixups(MachOFile *file);
 
   void readMachOSections(MachOFile *file);
+  BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(Demangle::NodePointer BoundGenericNode);
   BuilderErrorOr<std::optional<typename Builder::ConstructedMetadata>>
   constructMetadataForMangledTypeName(llvm::StringRef typeName);
   BuilderErrorOr<std::optional<typename Builder::ConstructedMetadata>>
@@ -719,6 +729,9 @@ private:
           &symbolReferences);
   void writeJSONSerialization(llvm::json::OStream &J, unsigned platform,
                               const std::string &platformVersion);
+
+  // The current log level.
+  LogLevel logLevel = LogLevel::None;
 
   // The architecture being targeted.
   std::string arch;
@@ -825,6 +838,10 @@ public:
     ReaderWriter &readerWriter;
     Demangle::Demangler &dem;
 
+    LogLevel getLogLevel() {
+      return readerWriter.getLogLevel();
+    }
+
   public:
     ResolveToDemangling(ReaderWriter &readerWriter, Demangle::Demangler &dem)
         : readerWriter(readerWriter), dem(dem) {}
@@ -893,11 +910,18 @@ public:
   ReaderWriter(ExternalGenericMetadataBuilderContext<Runtime> *context)
       : context(context) {}
 
-  bool isLoggingEnabled() { return true; }
+  bool isLoggingEnabled() { return getLogLevel() >= LogLevel::Info; }
+
+  LogLevel getLogLevel() {
+    return context->getLogLevel();
+  }
 
   SWIFT_FORMAT(5, 6)
   void log(const char *filename, unsigned line, const char *function,
            const char *fmt, ...) {
+    if (!isLoggingEnabled())
+      return;
+
     va_list args;
     va_start(args, fmt);
 
@@ -1826,19 +1850,7 @@ void ExternalGenericMetadataBuilderContext<Runtime>::readMachOSections(
 }
 
 template <typename Runtime>
-BuilderErrorOr<std::optional<typename ExternalGenericMetadataBuilderContext<
-    Runtime>::Builder::ConstructedMetadata>>
-ExternalGenericMetadataBuilderContext<
-    Runtime>::constructMetadataForMangledTypeName(llvm::StringRef typeName) {
-  auto node = demangleCtx.demangleTypeAsNode(typeName);
-  if (!node) {
-    return BuilderError("Failed to demangle '%s'.", typeName.str().c_str());
-  }
-  LOG(LogLevel::Detail, "Result: %s", nodeToString(node).c_str());
-  return constructMetadataForNode(node);
-}
-
-static BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(
+BuilderErrorOr<std::string> ExternalGenericMetadataBuilderContext<Runtime>::_mangledNominalTypeNameForBoundGenericNode(
     Demangle::NodePointer BoundGenericNode) {
   LOG(LogLevel::Detail, "BoundGenericNode:\n%s",
       getNodeTreeAsString(BoundGenericNode).c_str());
@@ -1866,6 +1878,19 @@ static BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(
   }
 
   return mangling.result();
+}
+
+template <typename Runtime>
+BuilderErrorOr<std::optional<typename ExternalGenericMetadataBuilderContext<
+    Runtime>::Builder::ConstructedMetadata>>
+ExternalGenericMetadataBuilderContext<
+    Runtime>::constructMetadataForMangledTypeName(llvm::StringRef typeName) {
+  auto node = demangleCtx.demangleTypeAsNode(typeName);
+  if (!node) {
+    return BuilderError("Failed to demangle '%s'.", typeName.str().c_str());
+  }
+  LOG(LogLevel::Detail, "Result: %s", nodeToString(node).c_str());
+  return constructMetadataForNode(node);
 }
 
 // Returns the constructed metadata, or no value if the node doesn't contain a
@@ -2341,6 +2366,11 @@ swift_externalMetadataBuilder_create(int platform, const char *arch) {
 void swift_externalMetadataBuilder_destroy(
     struct SwiftExternalMetadataBuilder *builder) {
   delete builder;
+}
+
+void swift_externalMetadataBuilder_setLogLevel(
+    struct SwiftExternalMetadataBuilder *builder, int level) {
+  builder->withContext([&](auto *context) { context->setLogLevel(level); });
 }
 
 const char *swift_externalMetadataBuilder_readNamesJSON(
