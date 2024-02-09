@@ -65,9 +65,9 @@ extension Sample1: ClientProtocol {}
 
 struct Sample7: @retroactive SampleProtocol1 {} // expected-error {{'retroactive' attribute only applies in inheritance clauses in extensions}}
 
-extension Sample7: @retroactive ClientProtocol {} // expected-error {{'retroactive' attribute does not apply; 'Sample7' is declared in this module}}
+extension Sample7: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'Sample7' is declared in this module}}
 
-extension Int: @retroactive ClientProtocol {} // expected-error {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}
+extension Int: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}
 
 func f(_ x: @retroactive Int) {} // expected-error {{'retroactive' attribute only applies in inheritance clauses in extensions}}
 
