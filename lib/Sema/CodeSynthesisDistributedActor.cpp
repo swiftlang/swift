@@ -346,7 +346,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // --- Recording invocation details
   // -- recordGenericSubstitution(s)
-  if (thunk->isGeneric() || nominal->isGeneric()) {
+  if (auto genEnv = thunk->getGenericEnvironment()) {
     auto recordGenericSubstitutionDecl =
         C.getRecordGenericSubstitutionOnDistributedInvocationEncoder(invocationEncoderDecl);
     assert(recordGenericSubstitutionDecl);
@@ -354,10 +354,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         UnresolvedDeclRefExpr::createImplicit(
             C, recordGenericSubstitutionDecl->getName());
 
-    auto signature = thunk->getGenericSignature();
-    for (auto genParamType : signature.getGenericParams()) {
-
-      auto tyExpr = TypeExpr::createImplicit(thunk->mapTypeIntoContext(genParamType), C);
+    for (auto genParamType : genEnv->getGenericParams()) {
+      auto tyExpr = TypeExpr::createImplicit(genEnv->mapTypeIntoContext(genParamType), C);
       auto subTypeExpr = new (C) DotSelfExpr(
           tyExpr,
           sloc, sloc, tyExpr->getType());
