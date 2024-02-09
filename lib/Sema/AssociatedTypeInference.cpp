@@ -2035,9 +2035,26 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       return true;
     }
 
-    /// FIXME: Recheck the type of Self against the second type?
     bool mismatch(GenericTypeParamType *selfParamType,
                   TypeBase *secondType, Type sugaredFirstType) {
+      if (selfParamType->isEqual(Conformance->getProtocol()->getSelfInterfaceType())) {
+        // A DynamicSelfType always matches the Self parameter.
+        if (secondType->is<DynamicSelfType>())
+          return true;
+
+        // Otherwise, 'Self' should at least have a matching nominal type.
+        if (secondType->getAnyNominal() == Conformance->getType()->getAnyNominal())
+          return true;
+
+        return false;
+      }
+
+      // Any other generic parameter type is an inner generic parameter type
+      // of the requirement. If we're matching it with something that is not a
+      // generic parameter type, we cannot hope to succeed.
+      if (!secondType->is<GenericTypeParamType>())
+        return false;
+
       return true;
     }
   };
