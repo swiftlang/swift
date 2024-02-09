@@ -693,6 +693,10 @@ swift::SILGlobalVariable * _Nonnull BridgedGlobalVar::getGlobal() const {
   return static_cast<swift::SILGlobalVariable *>(obj);
 }
 
+BridgedNullableVarDecl BridgedGlobalVar::getDecl() const {
+  return getGlobal()->getDecl();
+}
+
 BridgedStringRef BridgedGlobalVar::getName() const {
   return getGlobal()->getName();
 }

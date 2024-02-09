@@ -594,6 +594,7 @@ struct BridgedGlobalVar {
 
   BridgedGlobalVar(SwiftObject obj) : obj(obj) {}
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILGlobalVariable * _Nonnull getGlobal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getDecl() const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
