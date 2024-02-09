@@ -243,6 +243,10 @@ struct BridgedASTType {
 
   BRIDGED_INLINE bool isEscapable() const;
 
+  BRIDGED_INLINE bool isNoEscape() const;
+
+  inline bool mayEscape() const { return !isNoEscape() && isEscapable(); }
+
   // =========================================================================//
   //                              SILFunctionType
   // =========================================================================//

@@ -93,6 +93,10 @@ bool BridgedASTType::isEscapable() const {
   return unbridged()->isEscapable();
 }
 
+bool BridgedASTType::isNoEscape() const {
+  return unbridged()->isNoEscape();
+}
+
 BridgedResultInfoArray
 BridgedASTType::SILFunctionType_getResultsWithError() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError();

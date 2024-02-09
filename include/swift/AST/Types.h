@@ -657,6 +657,9 @@ public:
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
+  /// Returns true if this contextual type is (Escapable && !isNoEscape).
+  bool mayEscape() { return !isNoEscape() && isEscapable(); }
+
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 

@@ -58,11 +58,13 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
-  public var isEscapable: Bool { bridged.isEscapable() }
 
   public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
+
+  public var isEscapable: Bool { bridged.isEscapable() }
+  public var mayEscape: Bool { !isNoEscapeFunction && isEscapable }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
