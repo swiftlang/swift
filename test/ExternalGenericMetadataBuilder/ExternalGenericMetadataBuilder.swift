@@ -80,15 +80,43 @@ ExternalGenericMetadataBuilderTests.test("JSON output") {
   let outputJSONObject = try! JSONSerialization.jsonObject(with: outputJSON!.data(using: .utf8)!)
   let expectedJSONObject = try! JSONSerialization.jsonObject(with: expectedJSON.data(using: .utf8)!)
 
-  let outputJSONDictionary = outputJSONObject as? NSDictionary
+  // Before comparing the JSONs, strip out things that might not be consistent
+  // from one build to the next. In particular, pointer targets with large
+  // addends are things that will depend on the specific layout of data within
+  // the binary, because we've ended up referring to an adjacent symbol, so we
+  // should replace those with something generic.
+  func prepareForComparison(_ value: Any) -> Any {
+    if let array = value as? [Any] {
+      return array.map(prepareForComparison)
+    }
+
+    if let dictionary = value as? [String: Any] {
+      // See if this dictionary contains a large addend.
+      if let addend = dictionary["addend"] as? Int64 {
+        if !(-8...8).contains(addend) {
+          // Return a placeholder value that will always match.
+          return "Target with large addend removed."
+        }
+      }
+
+      return dictionary.mapValues(prepareForComparison)
+    }
+    return value;
+  }
+
+  let outputJSONPrepped = prepareForComparison(outputJSONObject)
+  let expectedJSONPrepped = prepareForComparison(expectedJSONObject)
+
+  let outputJSONDictionary = outputJSONPrepped as? NSDictionary
   expectNotNil(outputJSONDictionary)
-  let expectedJSONDictionary = expectedJSONObject as? NSDictionary
+  let expectedJSONDictionary = expectedJSONPrepped as? NSDictionary
   expectNotNil(expectedJSONDictionary)
 
   // Don't use expectEqual, as it will print the strings on one line with \n
   // escapes, which is unreadable here.
   expectTrue(outputJSONDictionary!.isEqual(expectedJSONDictionary),
-             "Output JSON does not match expected:\n\(outputJSON!)")
+             "Output JSON does not match expected:\n\(outputJSONDictionary!)" +
+             "\nExpected:\n\(expectedJSONDictionary!)")
 
   swift_externalMetadataBuilder_destroy(builder)
 }
