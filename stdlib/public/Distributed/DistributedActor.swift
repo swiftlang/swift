@@ -372,6 +372,15 @@ extension DistributedActor {
       return nil
     }
   }
+
+  // ABI: Historical whenLocal, rethrows was changed to typed throws `throws(E)`
+  @_silgen_name("$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbKXEYaKs8SendableRd__lF")
+  @usableFromInline
+  nonisolated func __abi_whenLocal<T: Sendable>(
+    _ body: @Sendable (isolated Self) async throws -> T
+  ) async rethrows -> T? {
+    try await whenLocal(body)
+  }
 }
 
 /// Supports the operation to produce an any Actor instance from a local
