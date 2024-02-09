@@ -751,30 +751,35 @@ struct InferredTypeWitnessesSolution {
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_USED
 #endif
-  void dump() const;
+  void dump(llvm::raw_ostream &out) const;
 };
 
-void InferredTypeWitnessesSolution::dump() const {
+void InferredTypeWitnessesSolution::dump(llvm::raw_ostream &out) const {
+  out << "Value witnesses in protocol extensions: "
+      << NumValueWitnessesInProtocolExtensions << "\n";
   const auto numValueWitnesses = ValueWitnesses.size();
-  llvm::errs() << "Type Witnesses:\n";
+  out << "Type Witnesses:\n";
   for (auto &typeWitness : TypeWitnesses) {
-    llvm::errs() << "  " << typeWitness.first->getName() << " := ";
-    typeWitness.second.first->print(llvm::errs());
+    out << "  " << typeWitness.first->getName() << " := ";
+    typeWitness.second.first->print(out);
     if (typeWitness.second.second == numValueWitnesses) {
-      llvm::errs() << ", abstract";
+      out << ", abstract";
     } else {
-      llvm::errs() << ", inferred from $" << typeWitness.second.second;
+      out << ", inferred from $" << typeWitness.second.second;
     }
-    llvm::errs() << '\n';
+    out << '\n';
   }
-  llvm::errs() << "Value Witnesses:\n";
+  out << "Value Witnesses:\n";
   for (unsigned i : indices(ValueWitnesses)) {
     const auto &valueWitness = ValueWitnesses[i];
-    llvm::errs() << '$' << i << ":\n  ";
-    valueWitness.first->dumpRef(llvm::errs());
-    llvm::errs() << " ->\n  ";
-    valueWitness.second->dumpRef(llvm::errs());
-    llvm::errs() << '\n';
+    out << '$' << i << ":\n  ";
+    valueWitness.first->dumpRef(out);
+    out << " ->\n  ";
+    if (valueWitness.second)
+      valueWitness.second->dumpRef(out);
+    else
+      out << "<skipped>";
+    out << '\n';
   }
 }
 
@@ -2929,18 +2934,12 @@ void AssociatedTypeInference::findSolutions(
 
   for (auto solution : solutions) {
     LLVM_DEBUG(llvm::dbgs() << "=== Valid solution:\n";);
-    for (auto pair : solution.TypeWitnesses) {
-      LLVM_DEBUG(llvm::dbgs() << pair.first->getName() << " := "
-                              << pair.second.first << "\n";);
-    }
+    LLVM_DEBUG(solution.dump(llvm::dbgs()));
   }
 
   for (auto solution : nonViableSolutions) {
     LLVM_DEBUG(llvm::dbgs() << "=== Invalid solution:\n";);
-    for (auto pair : solution.TypeWitnesses) {
-      LLVM_DEBUG(llvm::dbgs() << pair.first->getName() << " := "
-                              << pair.second.first << "\n";);
-    }
+    LLVM_DEBUG(solution.dump(llvm::dbgs()));
   }
 }
 
