@@ -18,6 +18,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
@@ -36,61 +37,6 @@ using namespace swift;
 using namespace swift::markup;
 
 namespace {
-  class ColoredStream : public raw_ostream {
-    raw_ostream &Underlying;
-  public:
-    explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() override { flush(); }
-
-    raw_ostream &changeColor(Colors color, bool bold = false,
-                             bool bg = false) override {
-      Underlying.changeColor(color, bold, bg);
-      return *this;
-    }
-    raw_ostream &resetColor() override {
-      Underlying.resetColor();
-      return *this;
-    }
-    raw_ostream &reverseColor() override {
-      Underlying.reverseColor();
-      return *this;
-    }
-    bool has_colors() const override {
-      return true;
-    }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override {
-      return 0;
-    }
-  };
-
-  /// A stream which drops all color settings.
-  class NoColorStream : public raw_ostream {
-    raw_ostream &Underlying;
-
-  public:
-    explicit NoColorStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~NoColorStream() override { flush(); }
-
-    bool has_colors() const override { return false; }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override { return 0; }
-  };
-
 // MARK: Markdown Printing
     class TerminalMarkupPrinter : public MarkupASTVisitor<TerminalMarkupPrinter> {
       llvm::raw_ostream &OS;
