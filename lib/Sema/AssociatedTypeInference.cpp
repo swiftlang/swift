@@ -3214,10 +3214,6 @@ void AssociatedTypeInference::findSolutionsRec(
       // conflicts, there is no solution.
       auto known = typeWitnesses.begin(typeWitness.first);
       if (known != typeWitnesses.end()) {
-        // Don't overwrite a defaulted associated type witness.
-        if (isa<TypeDecl>(valueWitnesses[known->second].second))
-          continue;
-
         // If witnesses for two different requirements inferred the same
         // type, we're okay.
         if (known->first->isEqual(typeWitness.second))
@@ -3232,6 +3228,14 @@ void AssociatedTypeInference::findSolutionsRec(
           if (typeWitness.second->hasTypeParameter() ||
               typeWitness.second->hasDependentMember())
             continue;
+
+          // Don't overwrite a _Default_Foo type alias.
+          if (isa<TypeAliasDecl>(valueWitnesses[known->second].second))
+            continue;
+
+          LLVM_DEBUG(llvm::dbgs() << "Overwriting tentative witness for "
+                     << typeWitness.first->getName() << ": ";
+                     typeWitness.second.dump(llvm::dbgs()););
 
           known->first = typeWitness.second;
           continue;
