@@ -100,4 +100,4 @@ typealias Z5 = (~Int) -> Void // expected-error {{type 'Int' is not invertible}}
 typealias Z6 = ~() -> () // expected-error {{single argument function types require parentheses}}
                          // expected-error@-1 {{type '()' is not invertible}}
 typealias Z7 = ~(Copyable & Hashable) // expected-error {{type 'Hashable' is not invertible}}
-typealias Z8 = ~Copyable & Hashable
+typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
