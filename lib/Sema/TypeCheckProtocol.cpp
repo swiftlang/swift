@@ -603,6 +603,11 @@ RequirementMatch swift::matchWitness(
       }
 
       case PolymorphicEffectKind::Always:
+        // If the witness is using typed throws in a manner that looks
+        // like rethrows, allow it.
+        if (isRethrowLikeTypedThrows(funcWitness))
+          break;
+
         return RequirementMatch(witness, MatchKind::RethrowsConflict);
       }
     }
