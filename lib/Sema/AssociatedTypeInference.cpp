@@ -3116,6 +3116,11 @@ void AssociatedTypeInference::findSolutionsRec(
   // looking for solutions involving each one.
   const auto &inferredReq = inferred[reqDepth];
   for (const auto &witnessReq : inferredReq.second) {
+    // If this witness had invalid bindings, don't consider it since it can
+    // never lead to a valid solution.
+    if (!witnessReq.NonViable.empty())
+      continue;
+
     llvm::SaveAndRestore<unsigned> savedNumTypeWitnesses(numTypeWitnesses);
 
     // If we had at least one tautological witness, we must consider the
