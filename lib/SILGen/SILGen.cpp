@@ -1889,7 +1889,10 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
-      return !decl->isFormallyResilient();
+      // Assert here as key path component cannot refer to a static var.
+      assert(!decl->isStatic());
+      // By this point, decl is a fixed layout or its enclosing type is non-resilient.
+      return true;
     }
 
     // If the type is computed and doesn't have a setter that's hidden from

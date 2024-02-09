@@ -5833,13 +5833,6 @@ public:
                                    ModuleDecl *module,
                                    ResilienceExpansion expansion) const;
 
-  /// Should this declaration behave as if it must be accessed
-  /// resiliently, even when we're building a non-resilient module?
-  ///
-  /// This is used for diagnostics, because we do not want a behavior
-  /// change between builds with resilience enabled and disabled.
-  bool isFormallyResilient() const;
-
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
   bool isResilient() const;
