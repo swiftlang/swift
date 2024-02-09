@@ -2952,15 +2952,13 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::isFormallyResilient() const {
+bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
-  // If we're an instance property of a nominal type, query the type.
-  auto *dc = getDeclContext();
   if (!isStatic())
-    if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
+    if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
 
   // Non-public global and static variables always have a
@@ -2969,19 +2967,14 @@ bool AbstractStorageDecl::isFormallyResilient() const {
                             /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
     return false;
 
-  return true;
-}
-
-bool AbstractStorageDecl::isResilient() const {
-  if (!isFormallyResilient())
-    return false;
   if (!getModuleContext()->isResilient())
     return false;
+
   // Allows bypassing resilience checks for package decls
   // at use site within a package if opted in, whether the
   // loaded module was built resiliently or not.
-  return !getDeclContext()->allowBypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                                /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
+                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
 }
 
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
@@ -5057,8 +5050,8 @@ bool NominalTypeDecl::isResilient() const {
   // Allows bypassing resilience checks for package decls
   // at use site within a package if opted in, whether the
   // loaded module was built resiliently or not.
-  return !getDeclContext()->allowBypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                                /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
+                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
@@ -6382,7 +6375,7 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // package enum is optimized with bypassing resilience checks.
   if (!accessScope.isPublicOrPackage())
     return true;
-  if (useDC && useDC->allowBypassResilienceInPackage(accessScope.isPackage()))
+  if (useDC && useDC->bypassResilienceInPackage(accessScope.isPackage()))
     return true;
 
   // All other checks are use-site specific; with no further information, the

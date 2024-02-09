@@ -535,7 +535,7 @@ public:
   /// (possibly also public types later) if opted-in, client and defining module
   /// are in the same package, and the defining module is a binary module.
   LLVM_READONLY
-  bool allowBypassResilienceInPackage(bool isForPackageDecl) const;
+  bool bypassResilienceInPackage(bool isForPackageDecl) const;
 
   /// Returns the module context that contains this context.
   LLVM_READONLY

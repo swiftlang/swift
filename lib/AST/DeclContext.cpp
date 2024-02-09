@@ -300,23 +300,12 @@ PackageUnit *DeclContext::getPackageContext(bool lookupIfNotCurrent) const {
   return nullptr;
 }
 
-bool DeclContext::allowBypassResilienceInPackage(bool isForPackageDecl) const {
-  // Bypassing resilience checks only applies to package types.
-  if (!isForPackageDecl)
-    return false;
-
-  auto shouldAllow = true;
-  // Check if the enclosing type is non-resilient.
-  if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(this)) {
-    shouldAllow = !enclosingNominal->isResilient();
-  } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(this)) {
-    if (auto extNominal = enclosingExt->getExtendedNominal())
-      shouldAllow = !extNominal->isResilient();
-  }
-
-  // Check if opted-in for bypassing resilience checks, client and defining
-  // module are in the same package, and defining module is a binary module.
-  return shouldAllow &&
+bool DeclContext::bypassResilienceInPackage(bool isForPackageDecl) const {
+  // Bypassing resilience checks only applies to package types (and possibly
+  // public types in a package in the future). Allowed only if opted-in for
+  // bypassing checks, client and defining module are in the same package,
+  // and defining module is a binary module.
+  return isForPackageDecl &&
          getASTContext().LangOpts.EnableBypassResilienceInPackage &&
          getParentModule()->inPackage(getASTContext().LangOpts.PackageName) &&
          !getParentModule()->isBuiltFromInterface();
