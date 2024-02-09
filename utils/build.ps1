@@ -449,9 +449,9 @@ function Fetch-Dependencies {
   $ProgressPreference = "SilentlyContinue"
 
   $WebClient = New-Object Net.WebClient
-  $WiXVersion = "4.0.3"
+  $WiXVersion = "4.0.4"
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41"
+  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
 
   if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
     Write-Output "WiX not found. Downloading from nuget.org ..."
@@ -1866,7 +1866,7 @@ function Stage-BuildArtifacts($Arch) {
   } else {
     New-Item -Type Directory -Path "$($Arch.BinaryCache)\installer\$($Arch.VSName)\" -ErrorAction Ignore | Out-Null
   }
-  Invoke-Program "$BinaryCache\wix-4.0.3\tools\net6.0\any\wix.exe" -- burn detach "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($Arch.BinaryCache)\installer\$($Arch.VSName)\"
+  Invoke-Program "$BinaryCache\wix-4.0.4\tools\net6.0\any\wix.exe" -- burn detach "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($Arch.BinaryCache)\installer\$($Arch.VSName)\"
 }
 
 #-------------------------------------------------------------------
