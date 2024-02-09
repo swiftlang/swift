@@ -48,4 +48,5 @@ target_sources(swiftSILOptimizer PRIVATE
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  RegionAnalysisInvalidationTransform.cpp
   OwnershipModelEliminator.cpp)
