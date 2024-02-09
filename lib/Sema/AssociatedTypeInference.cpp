@@ -1514,6 +1514,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
 
     if (cycleCheck.checkForPotentialCycle(witness)) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping witness to avoid request cycle\n");
+
+      // We must consider the possibility that none of the witnesses for this
+      // requirement can be chosen.
+      hadTautologicalWitness = true;
       continue;
     }
 
