@@ -38,16 +38,26 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   auto &impl = importer->Impl;
 
-  if (passedDecl->hasClangNode()) {
-    // `passedDecl` *could* be an interface.
+  // We need the full list of interfaces for a given implementation, but that's
+  // only available through `InterfacesByImplementation`. So we must first
+  // figure out the key into that cache, which might require a reverse lookup in
+  // `ImplementationsByInterface`.
+
+  Decl *implDecl = nullptr;
+  if (!passedDecl->hasClangNode()) {
+    // `passedDecl` *could* be an implementation.
     auto iter = impl.ImplementationsByInterface.find(passedDecl);
     if (iter != impl.ImplementationsByInterface.end())
-      return ObjCInterfaceAndImplementation(passedDecl, iter->second);
+      implDecl = iter->second;
   } else {
-    // `passedDecl` *could* be an implementation.
-    auto iter = impl.InterfacesByImplementation.find(passedDecl);
+    // `passedDecl` *could* be an interface.
+    implDecl = passedDecl;
+  }
+
+  if (implDecl) {
+    auto iter = impl.InterfacesByImplementation.find(implDecl);
     if (iter != impl.InterfacesByImplementation.end())
-      return ObjCInterfaceAndImplementation(iter->second, passedDecl);
+      return ObjCInterfaceAndImplementation(iter->second, implDecl);
   }
 
   // Nothing in the caches, so we must need to compute this.
@@ -69,10 +79,11 @@ cacheResult(ObjCInterfaceAndImplementation value) const {
   auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   auto &impl = importer->Impl;
 
-  impl.ImplementationsByInterface.insert({ value.interfaceDecl,
-                                           value.implementationDecl });
   impl.InterfacesByImplementation.insert({ value.implementationDecl,
-                                           value.interfaceDecl });
+                                           value.interfaceDecls });
+  for (auto interfaceDecl : value.interfaceDecls)
+    impl.ImplementationsByInterface.insert({ interfaceDecl,
+                                             value.implementationDecl });
 
   // If this was a duplicate implementation, cache a null so we don't recompute.
   if (!passedDecl->hasClangNode() && passedDecl != value.implementationDecl) {

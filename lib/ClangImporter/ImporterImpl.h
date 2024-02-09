@@ -587,7 +587,7 @@ public:
 
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
-  llvm::DenseMap<Decl *, Decl *> InterfacesByImplementation;
+  llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;
 
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();

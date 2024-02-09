@@ -1167,10 +1167,23 @@ public:
   }
 
   /// If this is the Swift implementation of a declaration imported from ObjC,
-  /// returns the imported declaration. Otherwise return \c nullptr.
+  /// returns the imported declaration. (If there are several, only the main
+  /// class body will be returned.) Otherwise return \c nullptr.
   ///
   /// \seeAlso ExtensionDecl::isObjCInterface()
-  Decl *getImplementedObjCDecl() const;
+  Decl *getImplementedObjCDecl() const {
+    auto impls = getAllImplementedObjCDecls();
+    if (impls.empty())
+      return nullptr;
+    return impls.front();
+  }
+
+  /// If this is the Swift implementation of a declaration imported from ObjC,
+  /// returns the imported declarations. (There may be several for a main class
+  /// body; if so, the first will be the class itself.) Otherwise return an empty list.
+  ///
+  /// \seeAlso ExtensionDecl::isObjCInterface()
+  llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
 
   /// If this is the ObjC interface of a declaration implemented in Swift,
   /// returns the implementating declaration. Otherwise return \c nullptr.
@@ -1835,8 +1848,8 @@ public:
   bool isEquivalentToExtendedContext() const;
 
   /// Returns the name of the category specified by the \c \@_objcImplementation
-  /// attribute, or \c None if the name is invalid. Do not call unless
-  /// \c isObjCImplementation() returns \c true.
+  /// attribute, or \c None if the name is invalid or
+  /// \c isObjCImplementation() is false.
   llvm::Optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   /// If this extension represents an imported Objective-C category, returns the
@@ -4920,11 +4933,14 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  /// Return the imported declaration for the category with the given name; this
-  /// will always be an Objective-C-backed \c ExtensionDecl or, if \p name is
-  /// empty, \c ClassDecl. Returns \c nullptr if the class was not imported from
-  /// Objective-C or does not have an imported category by that name.
-  IterableDeclContext *getImportedObjCCategory(Identifier name) const;
+  /// Return the imported declaration(s) for the category with the given name; this
+  /// will either be a single imported \c ExtensionDecl, an imported
+  /// \c ClassDecl followed by zero or more imported \c ExtensionDecl s (if
+  /// \p name is empty; the extensions are for any class extensions), or empty
+  /// if the class was not imported from Objective-C or does not have a
+  /// category by that name.
+  llvm::TinyPtrVector<Decl *>
+  getImportedObjCCategory(Identifier name) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
