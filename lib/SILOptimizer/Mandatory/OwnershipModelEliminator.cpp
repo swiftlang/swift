@@ -451,7 +451,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       
       // If this is a nontrivial value argument, insert the mark_dependence.
       auto mdi = b.createMarkDependence(loc, newValue, op,
-                                        /*isNonEscaping*/false);
+                                        MarkDependenceKind::Escaping);
       if (!firstNewMDI)
         firstNewMDI = mdi;
       newValue = mdi;

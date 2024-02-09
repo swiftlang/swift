@@ -2530,7 +2530,12 @@ public:
     *this << getIDAndType(CBOI->getOperand());
   }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
-    if (MDI->isNonEscaping()) {
+    switch (MDI->dependenceKind()) {
+    case MarkDependenceKind::Unresolved:
+      *this << "[unresolved] ";
+    case MarkDependenceKind::Escaping:
+      break;
+    case MarkDependenceKind::NonEscaping:
       *this << "[nonescaping] ";
     }
     *this << getIDAndType(MDI->getValue()) << " on "

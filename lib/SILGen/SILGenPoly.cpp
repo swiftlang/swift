@@ -5701,7 +5701,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   thunkedFn = emitManagedRValueWithCleanup(
     B.createMarkDependence(loc, thunkedFn.forward(*this),
                            noEscapingFunctionValue.getValue(),
-                           /*isNonEscaping*/false));
+                           MarkDependenceKind::Escaping));
 
   return thunkedFn;
 }
