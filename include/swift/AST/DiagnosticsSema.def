@@ -7635,6 +7635,9 @@ NOTE(add_nominal_bitwise_copyable_conformance,none,
 NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
      "consider making generic parameter %0 conform to the 'BitwiseCopyable' protocol",
      (Type))
+ERROR(bitwise_copyable_outside_module,none,
+      "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
+      (const ValueDecl *))
 
 // -- older ones below --
 
