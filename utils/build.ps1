@@ -420,7 +420,7 @@ function Fetch-Dependencies {
   $WebClient = New-Object Net.WebClient
   $WiXVersion = "4.0.4"
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41"
+  $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
 
   if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
     Write-Output "WiX not found. Downloading from nuget.org ..."
