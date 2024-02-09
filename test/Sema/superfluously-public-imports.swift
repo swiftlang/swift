@@ -20,10 +20,13 @@
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/SPIOnlyUsedInSPI.swift -o %t -I %t
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
+// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify \
+// RUN:   -experimental-spi-only-imports
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
@@ -102,6 +105,11 @@ public func notAnAPIFunc() -> NotAnAPIType { return NotAnAPIType() }
 public struct PackageType {}
 public func packageFunc() -> PackageType { return PackageType() }
 
+//--- ExportedUnused.swift
+
+//--- SPIOnlyUsedInSPI.swift
+public struct ToUseFromSPI {}
+
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport // expected-error {{ambiguous implicit access level for import of 'UnusedImport'; it is imported as 'public' elsewhere}}
@@ -132,6 +140,9 @@ package import UnusedImport // expected-warning {{package import of 'UnusedImpor
 package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
 public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
 public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
+
+@_exported public import ExportedUnused
+@_spiOnly public import SPIOnlyUsedInSPI
 
 public func useInSignature(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
 public func exportedTypeUseInSignature(_ a: ExportedType) {} // expected-remark {{struct 'ExportedType' is imported via 'Exporter', which reexports definition from 'Exportee'}}
@@ -213,6 +224,9 @@ func implicitlyInternalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 
 // For package decls we only remark on types used in signatures, not for inlinable code.
 package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
+
+@_spi(X)
+public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
 
 /// Tests for imports of clang modules.
 //--- module.modulemap

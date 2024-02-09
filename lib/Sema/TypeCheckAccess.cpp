@@ -2472,6 +2472,10 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
     if (importedModule->getTopLevelModule() != importedModule)
       continue;
 
+    // Ignore @_exported as by themselves the import is meaningful.
+    if (import.options.contains(ImportFlags::Exported))
+      continue;
+
     AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(importedModule);
     if (import.accessLevel <= levelUsed)
       continue;
