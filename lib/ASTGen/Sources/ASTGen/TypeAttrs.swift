@@ -113,6 +113,7 @@ extension ASTGenVisitor {
         .silUnmanaged,
         .silUnowned,
         .silWeak,
+        .silTransferring,
         .unownedInnerPointer:
         break;
 

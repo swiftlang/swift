@@ -3435,6 +3435,12 @@ public:
     printFoot();
   }
 
+  void visitTransferringTypeRepr(TransferringTypeRepr *T, StringRef label) {
+    printCommon("transferring", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, StringRef label) {
     printCommon("_const", label);
     printRec(T->getBase());

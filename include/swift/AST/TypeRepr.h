@@ -1139,7 +1139,8 @@ public:
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
            T->getKind() == TypeReprKind::ResultDependsOn ||
-           T->getKind() == TypeReprKind::LifetimeDependentReturn;
+           T->getKind() == TypeReprKind::LifetimeDependentReturn ||
+           T->getKind() == TypeReprKind::Transferring;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1223,6 +1224,21 @@ public:
     return T->getKind() == TypeReprKind::ResultDependsOn;
   }
   static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
+};
+
+/// A transferring type.
+/// \code
+///   x : transferring Int
+/// \endcode
+class TransferringTypeRepr : public SpecifierTypeRepr {
+public:
+  TransferringTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+      : SpecifierTypeRepr(TypeReprKind::Transferring, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Transferring;
+  }
+  static bool classof(const TransferringTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1626,6 +1642,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
+  case TypeReprKind::Transferring:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
   case TypeReprKind::ResultDependsOn:

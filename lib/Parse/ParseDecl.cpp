@@ -5372,6 +5372,25 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
                    false, getFeatureName(Feature::TransferringArgsAndResults));
       }
+
+      // Do not allow for transferring to be parsed after a specifier has been
+      // parsed.
+      //
+      // Example: We want to force users to write transferring consuming, not
+      // consuming transferring.
+      if (SpecifierLoc.isValid()) {
+        P.diagnose(Tok, diag::transferring_after_parameter_specifier,
+                   getNameForParamSpecifier(Specifier))
+            .fixItRemove(Tok.getLoc());
+      }
+
+      // Only allow for transferring to be written once.
+      if (TransferringLoc.isValid()) {
+        P.diagnose(Tok, diag::transferring_repeated).fixItRemove(Tok.getLoc());
+      }
+
+      TransferringLoc = P.consumeToken();
+      continue;
     }
 
     if (Tok.isLifetimeDependenceToken()) {
@@ -5398,8 +5417,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
           Specifier = ParamDecl::Specifier::LegacyOwned;
         } else if (Tok.getRawText().equals("borrowing")) {
           Specifier = ParamDecl::Specifier::Borrowing;
-        } else if (Tok.getRawText().equals("transferring")) {
-          Specifier = ParamDecl::Specifier::ImplicitlyCopyableConsuming;
         } else if (Tok.getRawText().equals("consuming")) {
           Specifier = ParamDecl::Specifier::Consuming;
         }

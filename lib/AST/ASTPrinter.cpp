@@ -3890,7 +3890,7 @@ static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
   if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->getSpecifier() == ParamSpecifier::ImplicitlyCopyableConsuming)
+    if (pd->isTransferring())
       return true;
 
   // TODO: Results.
@@ -4571,7 +4571,7 @@ static void printParameterFlags(ASTPrinter &printer,
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
   if (flags.isTransferring())
-    printer.printAttrName("@transferring ");
+    printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -4593,7 +4593,8 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("__owned", options, " ");
     break;
   case ParamSpecifier::ImplicitlyCopyableConsuming:
-    printer.printKeyword("implicitly_copyable_consuming", options, " ");
+    // Nothing... we infer from transferring.
+    assert(flags.isTransferring() && "Only valid when transferring is enabled");
     break;
   }
   
@@ -8353,7 +8354,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
 
   if (options.contains(SILParameterInfo::Transferring)) {
     options -= SILParameterInfo::Transferring;
-    Printer << "@transferring ";
+    Printer << "@sil_transferring ";
   }
 
   if (options.contains(SILParameterInfo::Isolated)) {

@@ -537,13 +537,22 @@ bool TrackableValue::isTransferringParameter() const {
 
   // See if we are initialized from a transferring parameter and are the only
   // use of the parameter.
-  for (auto *use : asi->getUses()) {
+  OperandWorklist worklist(asi->getFunction());
+  worklist.pushResultOperandsIfNotVisited(asi);
+
+  while (auto *use = worklist.pop()) {
     auto *user = use->getUser();
+
+    // Look through instructions that we don't care about.
+    if (isa<MarkUnresolvedNonCopyableValueInst,
+            MoveOnlyWrapperToCopyableAddrInst>(user)) {
+      worklist.pushResultOperandsIfNotVisited(user);
+    }
 
     if (auto *si = dyn_cast<StoreInst>(user)) {
       // Check if our store inst is from a function argument that is
-      // transferring. If not, then this isn't the consuming parameter
-      // alloc_stack.
+      // transferring and for which the store is the only use of the function
+      // argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
       if (!fArg || !fArg->isTransferring())
         return false;
@@ -551,9 +560,8 @@ bool TrackableValue::isTransferringParameter() const {
     }
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
-      // Check if our store inst is from a function argument that is
-      // transferring. If not, then this isn't the consuming parameter
-      // alloc_stack.
+      // Check if our copy_addr is from a function argument that is transferring
+      // and for which the copy_addr is the only use of the function argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
       if (!fArg || !fArg->isTransferring())
         return false;
@@ -1328,20 +1336,21 @@ public:
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
       if (auto state = tryToTrackValue(arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
-
         // If we can transfer our parameter, just add it to
         // nonSendableSeparateIndices.
         //
         // NOTE: We do not support today the ability to have multiple parameters
         // transfer together as part of the same region.
         if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
+          LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID()
+                                  << " (transferring): " << *arg);
           nonSendableSeparateIndices.push_back(state->getID());
           continue;
         }
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
         valueMap.addNeverTransferredValueID(state->getID());
         nonSendableJoinedIndices.push_back(state->getID());
       }

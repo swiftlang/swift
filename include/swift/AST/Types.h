@@ -2212,6 +2212,8 @@ enum class ParamSpecifier : uint8_t {
   ImplicitlyCopyableConsuming = 6,
 };
 
+StringRef getNameForParamSpecifier(ParamSpecifier name);
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {

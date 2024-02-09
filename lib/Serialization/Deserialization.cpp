@@ -3812,6 +3812,7 @@ public:
     bool isAutoClosure;
     bool isIsolated;
     bool isCompileTimeConst;
+    bool isTransferring;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -3822,6 +3823,7 @@ public:
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
+                                         isTransferring,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -3861,6 +3863,7 @@ public:
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
     param->setCompileTimeConst(isCompileTimeConst);
+    param->setTransferring(isTransferring);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -6422,6 +6425,11 @@ getActualSILParameterOptions(uint8_t raw) {
   if (options.contains(serialization::SILParameterInfoFlags::Isolated)) {
     options -= serialization::SILParameterInfoFlags::Isolated;
     result |= SILParameterInfo::Isolated;
+  }
+
+  if (options.contains(serialization::SILParameterInfoFlags::Transferring)) {
+    options -= serialization::SILParameterInfoFlags::Transferring;
+    result |= SILParameterInfo::Transferring;
   }
 
   // Check if we have any remaining options and return none if we do. We found

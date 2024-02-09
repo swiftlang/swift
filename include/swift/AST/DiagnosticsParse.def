@@ -2209,5 +2209,11 @@ ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
       "expected Self return type for initializers with lifetime dependence "
       "specifiers",
       ())
+
+ERROR(transferring_after_parameter_specifier,none,
+      "'transferring' must be placed before specifier '%0'", (StringRef))
+ERROR(transferring_repeated,none,
+      "parameter may have at most one 'transferring' specifier", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

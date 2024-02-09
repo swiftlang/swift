@@ -7799,8 +7799,7 @@ bool ParamDecl::isAnonClosureParam() const {
 
 bool ParamDecl::isVariadic() const {
   (void) getInterfaceType();
-
-  return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+  return getOptions().contains(Flag::IsVariadic);
 }
 
 ParamDecl::Specifier ParamDecl::getSpecifier() const {
@@ -8222,8 +8221,7 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   auto *Clone = new (Ctx) ParamDecl(
       SourceLoc(), SourceLoc(), PD->getArgumentName(),
       SourceLoc(), PD->getParameterName(), PD->getDeclContext());
-  Clone->DefaultValueAndFlags.setPointerAndInt(
-      nullptr, PD->DefaultValueAndFlags.getInt());
+  Clone->setOptionsAndPointers(nullptr, nullptr, PD->getOptions());
   Clone->Bits.ParamDecl.defaultArgumentKind =
       PD->Bits.ParamDecl.defaultArgumentKind;
 
@@ -8441,8 +8439,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn(),
-      getSpecifier() == ParamDecl::Specifier::ImplicitlyCopyableConsuming /*is transferring*/);
+      hasResultDependsOn(), isTransferring());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
