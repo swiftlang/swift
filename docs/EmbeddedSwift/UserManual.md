@@ -98,6 +98,32 @@ Segment __TEXT: 16384
 ...
 ```
 
+## Conditionalizing compilation for Embedded Swift
+
+It's often useful to have source code be compilable under both regular Swift and Embedded Swift. The following syntax is available for that (but note that as the rest of Embedded Swift, it's experimental, subject to change and not considered source stable):
+
+```swift
+func sayHello() {
+  #if hasFeature(Embedded)
+  print("I'm Embedded Swift")
+  #else
+  print("I'm regular Swift")
+  #endif
+}
+```
+
+Additionally, you can also use an attribute (also experimental, and not source stable) to make entire functions, types and other declarations unavailable in Embedded Swift. This can be particularly useful to explicitly mark your own code (and also entire types and conformances) that relies on features unavailable in Embedded Swift, e.g. existentials or strings -- it is explicitly allowed to use those in unavailable contexts:
+
+```swift
+@_unavailableInEmbedded
+func useAnExistential(_: Any) { ... }
+
+@_unavailableInEmbedded
+extension MyStruct: CustomStringConvertible {
+  var description: String { return "..." }
+}
+```
+
 ## Embedded Swift is a subset of Swift
 
 Embedded Swift is a subset of the Swift language, and some features are not available in Embedded Swift, however features are available, including: Generics, protocols, enums with associated values, tuples, optionals, classes (instances are allocated on the heap and refcounted just like in regular Swift), inheritance, runtime polymorphism, arrays (heap-allocated copy-on-write just like in regular Swift) and many more.
@@ -119,7 +145,7 @@ Traditional library build and use model of Swift is that library code is compile
 
 The library model in Embedded Swift works slightly differently: All Swift source code of a library is promoted into being inlineable and visible to client builds (this is necessary for generic code, and beneficial for optimizations for non-generic code), and ends up serialized into the .swiftmodule, the interface of the library. Therefore, the compiled code of a library is never needed, and doesn't even need to be produced. For example:
 
-```
+```bash
 # Build the library, only as a .swiftmomodule. Notice that we never build the .o or .a for the library.
 $ swiftc -target <target> -enable-experimental-feature Embedded -wmo \
   a.swift b.swift -module-name MyLibrary -emit-module -emit-module-path ./MyLibrary.swiftmodule
