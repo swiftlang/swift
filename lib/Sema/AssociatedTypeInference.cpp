@@ -298,6 +298,12 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
       aliasDecl->getAttrs().add(attr);
     }
 
+    // Construct the availability of the type witnesses based on the
+    // availability of the enclosing type and the associated type.
+    const Decl * availabilitySources[2] = {dc->getAsDecl(), assocType };
+    AvailabilityInference::applyInferredAvailableAttrs(
+        aliasDecl, availabilitySources, ctx);
+
     if (nominal == dc) {
       nominal->addMember(aliasDecl);
     } else {
