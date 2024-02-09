@@ -1632,13 +1632,15 @@ next_witness:;
   return result;
 }
 
-/// Determine whether this is AsyncIteratorProtocol.Failure associated type.
+/// Determine whether this is AsyncIteratorProtocol.Failure or
+/// AsyncSequenceProtoco.Failure associated type.
 static bool isAsyncIteratorProtocolFailure(AssociatedTypeDecl *assocType) {
   auto proto = assocType->getProtocol();
-  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol))
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
+      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
     return false;
 
-  return assocType->getName().str().equals("Failure");
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
 }
 
 /// Determine whether this is AsyncIteratorProtocol.next() function.
@@ -2149,22 +2151,10 @@ llvm::Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeFailureTypeWitness(
     AssociatedTypeDecl *assocType,
     ArrayRef<std::pair<ValueDecl *, ValueDecl *>> valueWitnesses) const {
-  // Inference only applies to AsyncIteratorProtocol.Failure.
+  // Inference only applies to AsyncIteratorProtocol.Failure and
+  // AsyncSequence.Failure.
   if (!isAsyncIteratorProtocolFailure(assocType))
     return llvm::None;
-
-  // If there is a generic parameter named Failure, don't try to use next()
-  // to infer Failure.
-  if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig.getGenericParams()) {
-      // Packs cannot witness associated type requirements.
-      if (gp->isParameterPack())
-        continue;
-
-      if (gp->getName() == assocType->getName())
-        return llvm::None;
-    }
-  }
 
   // Look for AsyncIteratorProtocol.next() and infer the Failure type from
   // it.
@@ -2179,8 +2169,6 @@ AssociatedTypeInference::computeFailureTypeWitness(
         if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>())
           return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
 
-        // Otherwise, we need to derive the Failure type from a type parameter
-        // that conforms to AsyncIteratorProtocol or AsyncSequence.
         for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
           if (req.getKind() == RequirementKind::Conformance) {
             auto proto = req.getProtocolDecl();
@@ -2206,7 +2194,8 @@ AssociatedTypeInference::computeFailureTypeWitness(
 llvm::Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
-  // Ignore the default for AsyncIteratorProtocol.Failure
+  // Ignore the default for AsyncIteratorProtocol.Failure and
+  // AsyncSequence.Failure.
   if (isAsyncIteratorProtocolFailure(assocType))
     return llvm::None;
 
@@ -2304,13 +2293,14 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
     return typeWitness;
 
+  // Ignore the default for AsyncIteratorProtocol.Failure and
+  // AsyncSequence.Failure. We use the next() function to do inference.
+  if (isAsyncIteratorProtocolFailure(assocType))
+    return llvm::None;
+
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    bool wantAllGenericParams = isAsyncIteratorProtocolFailure(assocType);
-    auto genericParams = wantAllGenericParams 
-        ? genericSig.getGenericParams()
-        : genericSig.getInnermostGenericParams();
-    for (auto gp : genericParams) {
+    for (auto gp : genericSig.getInnermostGenericParams()) {
       // Packs cannot witness associated type requirements.
       if (gp->isParameterPack())
         continue;
@@ -2342,6 +2332,11 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
   // through same-type requirements of protocols.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto *const assocType : unresolvedAssocTypes) {
+      // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
+      // AsyncSequence.Failure.
+      if (isAsyncIteratorProtocolFailure(assocType))
+        continue;
+
       for (auto *gp : genericSig.getInnermostGenericParams()) {
         // Packs cannot witness associated type requirements.
         if (gp->isParameterPack())
