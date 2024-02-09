@@ -4,6 +4,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
+// RUN:   -swift-version 5 \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -enable-experimental-feature SendableCompletionHandlers \
 // RUN:   -module-name main -I %t -verify
@@ -113,9 +114,21 @@ func test_sendable_attr_in_type_context(test: Test) {
 }
 
 class TestConformanceWithStripping : InnerSendableTypes {
-  func test(_ options: [String: Any]) { // Ok
+  // expected-error@-1 {{type 'TestConformanceWithStripping' does not conform to protocol 'InnerSendableTypes'}}
+
+  func test(_ options: [String: Any]) {
+    // expected-note@-1 {{candidate has non-matching type '([String : Any]) -> ()'}}
   }
 
-  func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) { // Ok
+  func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) {
+    // expected-note@-1 {{candidate has non-matching type '(String, @escaping @MainActor ([String : Any], (any Error)?) -> Void) -> ()'}}
+  }
+}
+
+class TestConformanceWithoutStripping : InnerSendableTypes {
+  func test(_ options: [String: any Sendable]) { // Ok
+  }
+
+  func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
   }
 }

@@ -1173,7 +1173,17 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // which means that we need to maintain status quo to avoid breaking
     // witness matching by stripping everything concurrency related from
     // inner types.
-    if (req->isObjC()) {
+    auto shouldStripConcurrency = [&]() {
+      if (!req->isObjC())
+        return false;
+
+      auto &ctx = dc->getASTContext();
+      return !(ctx.isSwiftVersionAtLeast(6) ||
+               ctx.LangOpts.StrictConcurrencyLevel ==
+                   StrictConcurrency::Complete);
+    };
+
+    if (shouldStripConcurrency()) {
       if (reqType->is<FunctionType>()) {
         auto *fnTy = reqType->castTo<FunctionType>();
         SmallVector<AnyFunctionType::Param, 4> params;
