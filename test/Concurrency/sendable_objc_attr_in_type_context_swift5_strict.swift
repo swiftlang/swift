@@ -4,6 +4,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
+// RUN:   -swift-version 5 \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -enable-experimental-feature SendableCompletionHandlers \
 // RUN:   -module-name main -I %t -verify
@@ -14,6 +15,7 @@
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
 #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
+#define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 
 #pragma clang assume_nonnull begin
 
@@ -54,6 +56,11 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 
 @interface TestWithSendableSuperclass<T: MyValue *SWIFT_SENDABLE> : NSObject
 -(void) add: (T) object;
+@end
+
+@protocol InnerSendableTypes
+-(void) test:(NSDictionary<NSString *, SWIFT_SENDABLE id> *)options;
+-(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
 
 #pragma clang assume_nonnull end
@@ -104,4 +111,24 @@ func test_sendable_attr_in_type_context(test: Test) {
   // TOOD(diagnostics): Duplicate diagnostics
   TestWithSendableSuperclass().add(MyValue())
   // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+}
+
+class TestConformanceWithStripping : InnerSendableTypes {
+  // expected-error@-1 {{type 'TestConformanceWithStripping' does not conform to protocol 'InnerSendableTypes'}}
+
+  func test(_ options: [String: Any]) {
+    // expected-note@-1 {{candidate has non-matching type '([String : Any]) -> ()'}}
+  }
+
+  func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) {
+    // expected-note@-1 {{candidate has non-matching type '(String, @escaping @MainActor ([String : Any], (any Error)?) -> Void) -> ()'}}
+  }
+}
+
+class TestConformanceWithoutStripping : InnerSendableTypes {
+  func test(_ options: [String: any Sendable]) { // Ok
+  }
+
+  func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
+  }
 }
