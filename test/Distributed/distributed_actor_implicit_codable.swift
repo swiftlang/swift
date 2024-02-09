@@ -7,10 +7,6 @@
 import Distributed
 import FakeDistributedActorSystems
 
-
-// FIXME: handle this; don't add the typealias
-// typealias DefaultDistributedActorSystem = FakeActorSystem
-
 func takeCodable<A: Codable>(actor: A) {}
 // expected-note@-1{{where 'A' = 'DAG<FakeActorSystem>'}}
 // expected-note@-2{{where 'A' = 'DAG<FakeActorSystem>'}}
@@ -21,10 +17,15 @@ func takeCodable<A: Codable>(actor: A) {}
 // expected-note@-7{{where 'A' = 'DAG_ActorSystem_ActorID<FakeActorSystem>'}}
 // expected-note@-8{{where 'A' = 'DAG_ID<FakeActorSystem>'}}
 
-// ==== ------------------------------------------------------------------------
+// ==== Actors -----------------------------------------------------------------
 
 distributed actor DA {
   typealias ActorSystem = FakeActorSystem
+}
+
+distributed actor DAG_ActorSystem_ActorID_SerializableButNotCodable_Explicitly<ActorSystem>: SerializableButNotCodable
+  where ActorSystem: DistributedActorSystem<any SerializableButNotCodable>,
+  ActorSystem.ActorID: SerializableButNotCodable {
 }
 
 func test_DA(actorSystem: FakeActorSystem) {
@@ -92,10 +93,6 @@ func test_DAG_ActorSystem_ActorID_Custom<ActorSystem>(actorSystem: ActorSystem)
   takeCodable(actor: DAG_ActorSystem_ActorID_Custom<ActorSystem>(actorSystem: actorSystem))
 }
 
-distributed actor DAG_ActorSystem_ActorID_SerializableButNotCodable_Explicitly<ActorSystem>: SerializableButNotCodable
-  where ActorSystem: DistributedActorSystem<any SerializableButNotCodable>,
-  ActorSystem.ActorID: SerializableButNotCodable {
-}
 func test_DAG_ActorSystem_ActorID_SerializableButNotCodable_Explicitly<ActorSystem>(actorSystem: ActorSystem)
     where ActorSystem: DistributedActorSystem<any SerializableButNotCodable>,
           ActorSystem.ActorID: SerializableButNotCodable {
