@@ -125,11 +125,13 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   SearchPathOptions searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions clangOpts = ctx.ClangImporterOpts;
   SILOptions silOpts = ctx.SILOpts;
+  CASOptions casOpts = ctx.CASOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
-                                  clangOpts, symbolOpts, tmpSM, tmpDiags);
+  auto &tmpCtx =
+      *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+                       symbolOpts, casOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 

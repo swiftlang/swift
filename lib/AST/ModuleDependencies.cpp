@@ -480,12 +480,12 @@ SwiftDependencyTracker::createTreeFromDependencies() {
 
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
-  if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
+  if (!Instance.getInvocation().getCASOptions().EnableCaching)
     return false;
 
   if (CASOpts) {
     // If CASOption matches, the service is initialized already.
-    if (*CASOpts == Instance.getInvocation().getFrontendOptions().CASOpts)
+    if (*CASOpts == Instance.getInvocation().getCASOptions().CASOpts)
       return false;
 
     // CASOption mismatch, return error.
@@ -496,7 +496,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   }
 
   // Setup CAS.
-  CASOpts = Instance.getInvocation().getFrontendOptions().CASOpts;
+  CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
 
   // Add SDKSetting file.
@@ -552,7 +552,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       ClangScanningFormat,
-      Instance.getInvocation().getFrontendOptions().CASOpts,
+      Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       UseClangIncludeTree ? nullptr : CacheFS);
 

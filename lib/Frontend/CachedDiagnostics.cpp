@@ -752,7 +752,7 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     : Impl(*new Implementation(Instance)) {
   Impl.serializedOutputCallback = [&](StringRef Output) {
     LLVM_DEBUG(llvm::dbgs() << Output << "\n";);
-    if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
+    if (!Instance.getInvocation().getCASOptions().EnableCaching)
       return false;
 
     // compress the YAML file.

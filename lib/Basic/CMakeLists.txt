@@ -45,6 +45,7 @@ add_swift_host_library(swiftBasic STATIC
   BasicBridging.cpp
   BasicSourceInfo.cpp
   Cache.cpp
+  CASOptions.cpp
   ClusteredBitVector.cpp
   DiverseStack.cpp
   Edit.cpp

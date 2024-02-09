@@ -596,12 +596,12 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
       const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-      const ClangImporterOptions &ClangOpts, StringRef CacheDir,
-      StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
-      StringRef ModuleName, StringRef InPath,
+      const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+      StringRef CacheDir, StringRef PrebuiltCacheDir,
+      StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
-      bool SerializeDependencyHashes,
-      bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
+      bool SerializeDependencyHashes, bool TrackSystemDependencies,
+      ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
       RequireNoncopyableGenerics_t RequireNCGenerics,
       bool silenceInterfaceDiagnostics);
@@ -657,6 +657,7 @@ private:
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
+                                     const CASOptions &casOpts,
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules,
                                      RequireNoncopyableGenerics_t requireNCGenerics);
@@ -668,12 +669,11 @@ public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
       const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
-      const ClangImporterOptions &clangImporterOpts,
+      const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
-      StringRef backupModuleInterfaceDir,
-      bool serializeDependencyHashes, bool trackSystemDependencies,
-      RequireOSSAModules_t requireOSSAModules,
+      StringRef backupModuleInterfaceDir, bool serializeDependencyHashes,
+      bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules,
       RequireNoncopyableGenerics_t requireNCGenerics);
 
   template<typename ...ArgTypes>

@@ -27,6 +27,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
@@ -239,10 +240,9 @@ class ASTContext final {
       LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
-      );
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -257,10 +257,9 @@ public:
   get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
-      );
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -286,6 +285,9 @@ public:
 
   /// The symbol graph generation options used by this AST context.
   symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts;
+
+  /// The CAS options used by this AST context.
+  const CASOptions &CASOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;

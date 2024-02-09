@@ -884,12 +884,6 @@ namespace swift {
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
 
-    /// clang CASOptions.
-    llvm::Optional<clang::CASOptions> CASOpts;
-
-    /// Cache key for imported bridging header.
-    std::string BridgingHeaderPCHCacheKey;
-
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 

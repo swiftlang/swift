@@ -157,7 +157,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   ScanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       ScanASTContext.SourceMgr, &ScanASTContext.Diags,
       ScanASTContext.SearchPathOpts, ScanASTContext.LangOpts,
-      ScanASTContext.ClangImporterOpts, LoaderOpts,
+      ScanASTContext.ClangImporterOpts, ScanASTContext.CASOpts, LoaderOpts,
       /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
       FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
