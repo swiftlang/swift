@@ -20,7 +20,7 @@ extension Actor {
 func testA<T: Actor>(
   a: isolated A,  // expected-note{{previous 'isolated' parameter 'a'}}
   b: isolated T,  // expected-warning{{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
-  c: isolated Int // expected-error {{'isolated' parameter has non-actor type 'Int'}}
+  c: isolated Int // expected-error {{'isolated' parameter type 'Int' does not conform to 'Actor' or 'DistributedActor'}}
 ) {
   a.f()
   a.g()
@@ -350,14 +350,14 @@ func getValues(
 }
 
 func isolated_generic_bad_1<T>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 func isolated_generic_bad_2<T: Equatable>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 
 func isolated_generic_bad_4<T>(_ t: isolated Array<T>) {}
-// expected-error@-1 {{'isolated' parameter has non-actor type 'Array<T>'}}
+// expected-error@-1 {{'isolated' parameter type 'Array<T>' does not conform to 'Actor' or 'DistributedActor'}}
 
 func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}
 
@@ -473,3 +473,7 @@ func preciseIsolated(a: isolated MyActor) async {
 nonisolated func fromNonisolated(ns: NotSendable) async -> NotSendable {
   await pass(value: ns, isolation: nil)
 }
+
+func invalidIsolatedClosureParam<A: AnyActor> (
+  _: (isolated A) async throws -> Void // expected-error {{'isolated' parameter type 'A' does not conform to 'Actor' or 'DistributedActor'}}
+) {}
