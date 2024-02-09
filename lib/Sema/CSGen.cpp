@@ -4604,12 +4604,15 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         TypeChecker::getForEachIteratorNextFunction(dc, stmt->getForLoc(), isAsync);
     Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
                                : ctx.Id_next;
+    TinyPtrVector<Identifier> labels;
+    if (nextFn && nextFn->getParameters()->size() == 1)
+      labels.push_back(ctx.Id_isolation);
     auto *nextRef = UnresolvedDotExpr::createImplicit(
         ctx,
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true),
-        nextId, /*labels=*/ArrayRef<Identifier>());
-    nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+        nextId, labels);
+    nextRef->setFunctionRefKind(FunctionRefKind::Compound);
 
     ArgumentList *nextArgs;
     if (nextFn && nextFn->getParameters()->size() == 1) {

@@ -392,7 +392,7 @@ extension AsyncStream: AsyncSequence {
     /// `next()` might return `nil` immediately, or return `nil` on
     /// subsequent calls.
     @available(SwiftStdlib 5.11, *)
-    public mutating func next(_ actor: isolated (any Actor)?) async -> Element? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
       await context.produce()
     }
   }
@@ -551,7 +551,7 @@ extension AsyncStream {
     
     @available(SwiftStdlib 5.11, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-    public mutating func next(_ actor: isolated (any Actor)?) async -> Element? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
   }

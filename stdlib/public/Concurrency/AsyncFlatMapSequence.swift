@@ -267,20 +267,21 @@ extension AsyncFlatMapSequence: AsyncSequence {
 
     /// Produces the next element in the flat map sequence.
     ///
-    /// This iterator calls `next()` on its base iterator; if this call
-    /// returns `nil`, `next()` returns `nil`. Otherwise, `next()`
-    /// calls the transforming closure on the received element, takes the
-    /// resulting asynchronous sequence, and creates an asynchronous iterator
-    /// from it.  `next()` then consumes values from this iterator until
-    /// it terminates.  At this point, `next()` is ready to receive the
-    /// next value from the base sequence.
+    /// This iterator calls `next(isolation:)` on its base iterator; if this
+    /// call returns `nil`, `next(isolation:)` returns `nil`. Otherwise,
+    /// `next(isolation:)` calls the transforming closure on the received
+    /// element, takes the resulting asynchronous sequence, and creates an
+    /// asynchronous iterator from it.  `next(isolation:)` then consumes values
+    /// from this iterator until it terminates.  At this point,
+    /// `next(isolation:)` is ready to receive the next value from the base
+    /// sequence.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {
         if var iterator = currentIterator {
           do {
-            let optElement = try await iterator.next(actor)
+            let optElement = try await iterator.next(isolation: actor)
             guard let element = optElement else {
               currentIterator = nil
               continue
@@ -293,7 +294,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
             throw error as! Failure
           }
         } else {
-          let optItem = try await baseIterator.next(actor)
+          let optItem = try await baseIterator.next(isolation: actor)
           guard let item = optItem else {
             finished = true
             return nil
@@ -301,7 +302,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
           do {
             let segment = await transform(item)
             var iterator = segment.makeAsyncIterator()
-            let optElement = try await iterator.next(actor)  
+            let optElement = try await iterator.next(isolation: actor)  
             guard let element = optElement else {
               currentIterator = nil
               continue
