@@ -418,9 +418,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   // currently we need to ensure it still reads the flags written out
   // in the .swiftinterface file itself. Instead, creation of that
   // job should incorporate those flags.
-  if (FEOpts.ExplicitInterfaceBuild &&
-      !(FEOpts.isTypeCheckAction() &&
-        !Invocation.getCASOptions().EnableCaching))
+  if (FEOpts.ExplicitInterfaceBuild && !(FEOpts.isTypeCheckAction()))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
