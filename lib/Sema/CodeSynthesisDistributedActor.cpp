@@ -355,7 +355,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
             C, recordGenericSubstitutionDecl->getName());
 
     for (auto genParamType : genEnv->getGenericParams()) {
-      auto tyExpr = TypeExpr::createImplicit(thunk->mapTypeIntoContext(genParamType), C);
+      auto tyExpr = TypeExpr::createImplicit(genEnv->mapTypeIntoContext(genParamType), C);
       auto subTypeExpr = new (C) DotSelfExpr(
           tyExpr,
           sloc, sloc, tyExpr->getType());
