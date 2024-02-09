@@ -14,6 +14,7 @@
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
 #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
+#define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 
 #pragma clang assume_nonnull begin
 
@@ -54,6 +55,11 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 
 @interface TestWithSendableSuperclass<T: MyValue *SWIFT_SENDABLE> : NSObject
 -(void) add: (T) object;
+@end
+
+@protocol InnerSendableTypes
+-(void) test:(NSDictionary<NSString *, SWIFT_SENDABLE id> *)options;
+-(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
 
 #pragma clang assume_nonnull end
@@ -104,4 +110,12 @@ func test_sendable_attr_in_type_context(test: Test) {
   // TOOD(diagnostics): Duplicate diagnostics
   TestWithSendableSuperclass().add(MyValue())
   // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+}
+
+class TestConformanceWithStripping : InnerSendableTypes {
+  func test(_ options: [String: Any]) { // Ok
+  }
+
+  func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) { // Ok
+  }
 }

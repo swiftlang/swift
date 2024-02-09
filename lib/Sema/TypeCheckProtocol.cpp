@@ -1169,6 +1169,33 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   // Match a type in the requirement to a type in the witness.
   auto matchTypes = [&](Type reqType,
                         Type witnessType) -> llvm::Optional<RequirementMatch> {
+    // `swift_attr` attributes in the type context were ignored before,
+    // which means that we need to maintain status quo to avoid breaking
+    // witness matching by stripping everything concurrency related from
+    // inner types.
+    if (req->isObjC()) {
+      if (reqType->is<FunctionType>()) {
+        auto *fnTy = reqType->castTo<FunctionType>();
+        SmallVector<AnyFunctionType::Param, 4> params;
+        llvm::transform(fnTy->getParams(), std::back_inserter(params),
+                        [&](const AnyFunctionType::Param &param) {
+                          return param.withType(
+                              param.getPlainType()->stripConcurrency(
+                                  /*recursive=*/true,
+                                  /*dropGlobalActor=*/true));
+                        });
+
+        auto resultTy =
+            fnTy->getResult()->stripConcurrency(/*recursive=*/true,
+                                                /*dropGlobalActor=*/true);
+
+        reqType = FunctionType::get(params, resultTy, fnTy->getExtInfo());
+      } else {
+        reqType = reqType->stripConcurrency(/*recursive=*/true,
+                                            /*dropGlobalActor=*/true);
+      }
+    }
+
     cs->addConstraint(ConstraintKind::Bind, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
     return llvm::None;
