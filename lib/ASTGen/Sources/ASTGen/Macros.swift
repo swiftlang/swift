@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-@_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
+@_spi(PluginMessage) @_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
