@@ -3512,6 +3512,12 @@ namespace {
       auto isolation = getActorIsolationOfContext(
           const_cast<DeclContext *>(getDeclContext()),
                                     getClosureActorIsolation);
+      auto *dc = const_cast<DeclContext *>(getDeclContext());
+
+      // Note that macro expansions are never implicit. They have
+      // valid source locations in their macro expansion buffer, they
+      // do not cause implicit 'self' capture diagnostics, etc.
+
       Expr *actorExpr = nullptr;
       Type optionalAnyActorType = isolationExpr->getType();
       switch (isolation) {
@@ -3533,7 +3539,7 @@ namespace {
         }
         actorExpr = new (ctx) DeclRefExpr(
             const_cast<VarDecl *>(var), DeclNameLoc(loc),
-            /*Implicit=*/true);
+            /*implicit=*/false);
 
         // For a distributed actor, we need to retrieve the local
         // actor.
@@ -3547,10 +3553,11 @@ namespace {
         // Form a <global actor type>.shared reference.
         Type globalActorType = getDeclContext()->mapTypeIntoContext(
             isolation.getGlobalActor());
-        auto typeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+        auto typeExpr = TypeExpr::createForDecl(
+            DeclNameLoc(loc), globalActorType->getAnyNominal(), dc);
         actorExpr = new (ctx) UnresolvedDotExpr(
-            typeExpr, loc, DeclNameRef(ctx.Id_shared), DeclNameLoc(),
-            /*implicit=*/true);
+            typeExpr, loc, DeclNameRef(ctx.Id_shared), DeclNameLoc(loc),
+            /*implicit=*/false);
         break;
       }
 
@@ -3560,14 +3567,14 @@ namespace {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
-        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/true);
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
       }
 
 
       // Convert the actor argument to the appropriate type.
       (void)TypeChecker::typeCheckExpression(
-          actorExpr, const_cast<DeclContext *>(getDeclContext()),
+          actorExpr, dc,
           constraints::ContextualTypeInfo(
             optionalAnyActorType, CTP_CallArgument));
 
