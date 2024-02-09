@@ -507,24 +507,19 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
 
           // Handle:
           //
-          // bb0(%0 : $*Type): // in_guaranteed
           //   %1 = load_borrow %0
           //   %2 = copy_value %1
           //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
           if (auto *lbi = dyn_cast<LoadBorrowInst>(i->getOperand(0))) {
-            if (auto *arg = dyn_cast<SILFunctionArgument>(lbi->getOperand())) {
-              if (arg->getKnownParameterInfo().isIndirectInGuaranteed()) {
-                for (auto *use : markedInst->getConsumingUses()) {
-                  destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-                }
-                while (!destroys.empty())
-                  destroys.pop_back_val()->eraseFromParent();
-                markedInst->replaceAllUsesWith(lbi);
-                markedInst->eraseFromParent();
-                cvi->eraseFromParent();
-                continue;
-              }
+            for (auto *use : markedInst->getConsumingUses()) {
+              destroys.push_back(cast<DestroyValueInst>(use->getUser()));
             }
+            while (!destroys.empty())
+              destroys.pop_back_val()->eraseFromParent();
+            markedInst->replaceAllUsesWith(lbi);
+            markedInst->eraseFromParent();
+            cvi->eraseFromParent();
+            continue;
           }
           
           // Handle:

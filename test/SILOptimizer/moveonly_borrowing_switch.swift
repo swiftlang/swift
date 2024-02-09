@@ -15,19 +15,43 @@ enum Bar: ~Copyable {
     case noPayload
 }
 
-enum Bas: ~Copyable {
-    case loadablePayload(Foo)
-    case aoPayload(Any)
+struct AOPayload: ~Copyable {
+    var x: Any
 }
 
-@_silgen_name("condition")
-func condition(_: borrowing Payload) -> Bool
+enum AOBar: ~Copyable {
+    case loadablePayload(Foo)
+    case aoPayload(AOPayload)
+}
 
-@_silgen_name("hungryCondition")
-func hungryCondition(_: consuming Payload) -> Bool
+enum AOBas: ~Copyable {
+    case payload(AOBar)
+    case noPayload
+}
+
+func condition(_: borrowing Payload) -> Bool { fatalError() }
+func condition(_: borrowing AOPayload) -> Bool { fatalError() }
+func condition(_: borrowing Foo) -> Bool { fatalError() }
+func condition(_: borrowing AOBar) -> Bool { fatalError() }
+func condition(_: borrowing AOBas) -> Bool { fatalError() }
+
+func hungryCondition(_: consuming Payload) -> Bool { fatalError() }
+func hungryCondition(_: consuming AOPayload) -> Bool { fatalError() }
+func hungryCondition(_: consuming Foo) -> Bool { fatalError() }
+func hungryCondition(_: consuming AOBar) -> Bool { fatalError() }
+func hungryCondition(_: consuming AOBas) -> Bool { fatalError() }
+
+func nibble(payload: borrowing Payload) {}
+func nibble(payload: borrowing AOPayload) {}
+func nibble(payload: borrowing Foo) {}
+func nibble(payload: borrowing AOBar) {}
+func nibble(payload: borrowing AOBas) {}
 
 func eat(payload: consuming Payload) {}
-func nibble(payload: borrowing Payload) {}
+func eat(payload: consuming AOPayload) {}
+func eat(payload: consuming Foo) {}
+func eat(payload: consuming AOBar) {}
+func eat(payload: consuming AOBas) {}
 
 func test(consuming foo: consuming Bar) { // expected-error{{'foo' used after consume}}
     switch foo {
@@ -100,3 +124,121 @@ func test(borrowing foo: borrowing Bar) { // expected-error{{'foo' is borrowed a
         ()
     }
 }
+
+func testOuterAO(borrowing bas: borrowing AOBas) {
+    switch bas {
+    case _borrowing x // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case _borrowing x // expected-error 2 {{'x' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x)  // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x) // expected-error 2 {{'x' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x)  // expected-note {{consumed here}}
+    case .payload(.loadablePayload(_borrowing x)) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note{{consumed here}}
+    case .payload(.loadablePayload(.payload(_borrowing x))) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note{{consumed here}}
+    case .payload(.aoPayload(_borrowing x)) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x): // expected-error{{'x' is borrowed and cannot be consumed}}
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .noPayload:
+        break
+    }
+}
+
+func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used after consume}}
+    switch bas {
+    case _borrowing x // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case _borrowing x // expected-error 2 {{'x' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x)  // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x) // expected-error 2 {{'x' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x)  // expected-note {{consumed here}}
+    case .payload(.loadablePayload(_borrowing x)) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note{{consumed here}}
+    case .payload(.loadablePayload(.payload(_borrowing x))) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note{{consumed here}}
+    case .payload(.aoPayload(_borrowing x)) // expected-error{{'x' is borrowed and cannot be consumed}}
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .payload(_borrowing x): // expected-error{{'x' is borrowed and cannot be consumed}}
+        nibble(payload: x)
+        eat(payload: x) // expected-note {{consumed here}}
+    case .noPayload:
+        break
+    }
+
+    switch bas { // expected-note {{consumed here}}
+    case let x
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x)
+    case let x // expected-error {{borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(let x)
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(let x) // expected-error {{'unknown' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note {{consumed here}}
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(.loadablePayload(let x))
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(.loadablePayload(.payload(let x))) // expected-error{{'unknown' is borrowed and cannot be consumed}}
+      where hungryCondition(x): // expected-note{{consumed here}}
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(.aoPayload(let x))
+      where condition(x):
+        nibble(payload: x)
+        eat(payload: x)
+    case .payload(let x):
+        nibble(payload: x)
+        eat(payload: x)
+    case .noPayload:
+        break
+    }
+
+    switch bas { // expected-note{{used here}}
+    case _borrowing x: // expected-warning{{}}
+        break
+    }
+}
+

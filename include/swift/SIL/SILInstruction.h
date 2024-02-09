@@ -8659,15 +8659,31 @@ public:
     /// like class initializers.
     InitableButNotConsumable,
   };
+  
+  /// During SILGen, we have not yet done escape analysis on local variables,
+  /// so we conservatively emit them as boxed and let the AllocBoxToStack
+  /// pass promote unescaped local variables. As part of this promotion,
+  /// non-strict `NoConsumeOrAssign` accesses can be promoted to
+  /// `ConsumableAndAssignable` since the variable is locally owned
+  /// if it doesn't escape. "Strict" accesses on the other hand preserve
+  /// their stricter access constraints. This is useful for representing things
+  /// like `borrow` bindings.
+  enum IsStrict_t : bool {
+    IsNotStrict = false,
+    IsStrict = true,
+  };
 
 private:
   CheckKind kind;
+  IsStrict_t strict;
 
   MarkUnresolvedNonCopyableValueInst(SILDebugLocation DebugLoc,
-                                     SILValue operand, CheckKind checkKind)
+                                     SILValue operand, CheckKind checkKind,
+                                     IsStrict_t strict = IsNotStrict)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
                              operand->getOwnershipKind()),
-        kind(checkKind) {
+        kind(checkKind),
+        strict(strict) {
     assert(operand->getType().isMoveOnly() &&
            "mark_unresolved_non_copyable_value can only take a move only typed "
            "value");
@@ -8688,6 +8704,10 @@ public:
     case CheckKind::InitableButNotConsumable:
       return true;
     }
+  }
+  
+  IsStrict_t isStrict() const {
+    return strict;
   }
 };
 

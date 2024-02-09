@@ -1420,8 +1420,12 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
     // Create a notional copy for the borrow checker to use.
     bindValue = bindValue.copy(SGF, pattern);
   }
+  // We mark the borrow check as "strict" because we don't want to allow
+  // consumes through the binding, even if the original value manages to be
+  // stack promoted during AllocBoxToStack or anything like that.
   bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
-              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+              MarkUnresolvedNonCopyableValueInst::IsStrict);
 
   SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
 }
@@ -3198,6 +3202,26 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
 }
 
+class EndAccessCleanup final : public Cleanup {
+  SILValue beginAccess;
+public:
+  EndAccessCleanup(SILValue beginAccess)
+    : beginAccess(beginAccess)
+  {}
+  
+  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
+  override {
+    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
+  }
+  
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "EndAccessCleanup\n";
+    if (beginAccess) {
+      beginAccess->print(llvm::errs());
+    }
+  }
+};
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
              S->dump(llvm::dbgs());
@@ -3385,12 +3409,22 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           if (!subjectMV.isPlusZero()) {
             subjectMV = subjectMV.borrow(*this, S);
           }
-          if (subjectMV.getType().isAddress() &&
-              subjectMV.getType().isLoadable(F)) {
-            // Load a borrow if the type is loadable.
-            subjectMV = subjectUndergoesFormalAccess
-              ? B.createFormalAccessLoadBorrow(S, subjectMV)
-              : B.createLoadBorrow(S, subjectMV);
+          if (subjectMV.getType().isAddress()) {
+            if (subjectMV.getType().isLoadable(F)) {
+              // Load a borrow if the type is loadable.
+              subjectMV = subjectUndergoesFormalAccess
+                ? B.createFormalAccessLoadBorrow(S, subjectMV)
+                : B.createLoadBorrow(S, subjectMV);
+            } else {
+              // Initiate a read access on the memory, to ensure that even
+              // if the underlying memory is mutable or consumable, the pattern
+              // match is not allowed to modify it.
+              auto access = B.createBeginAccess(S, subjectMV.getValue(),
+                SILAccessKind::Read,
+                SILAccessEnforcement::Static, false, false);
+              Cleanups.pushCleanup<EndAccessCleanup>(access);
+              subjectMV = ManagedValue::forBorrowedAddressRValue(access);
+            }
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
           

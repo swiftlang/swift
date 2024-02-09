@@ -2384,11 +2384,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
     using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
     auto Ty = MF->getType(TyID);
-    auto CKind = CheckKind(Attr);
+    auto CKind = CheckKind(Attr & 7);
+    auto Strict = Attr & (1 << 3)
+      ? MarkUnresolvedNonCopyableValueInst::IsStrict
+      : MarkUnresolvedNonCopyableValueInst::IsNotStrict;
     ResultInst = Builder.createMarkUnresolvedNonCopyableValueInst(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        CKind);
+        CKind, Strict);
     break;
   }
   case SILInstructionKind::StoreInst: {
