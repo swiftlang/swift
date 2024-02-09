@@ -221,7 +221,7 @@ public func memoryLayoutDotSizeWithResilientStruct() -> Int {
 // CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s18package_resilience40memoryLayoutDotStrideWithResilientStructSiyF"()
 public func memoryLayoutDotStrideWithResilientStruct() -> Int {
   // CHECK: ret [[INT]] [[#WORDSIZE + WORDSIZE]]
-  return MemoryLayout<Size>.size
+  return MemoryLayout<Size>.stride
 }
 
 // CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s18package_resilience43memoryLayoutDotAlignmentWithResilientStructSiyF"()

@@ -480,8 +480,8 @@ public:
     return Identifier();
   }
 
-  bool inPackage(std::string packageName) {
-    return !getPackageName().empty() && getPackageName().str() == packageName;
+  bool inSamePackage(ModuleDecl *other) {
+    return !getPackageName().empty() && getPackageName() == other->getPackageName();
   }
 
   /// Get the package associated with this module

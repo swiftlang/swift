@@ -2957,14 +2957,16 @@ bool AbstractStorageDecl::isResilient() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
+  // If we're an instance property of a nominal type, query the type.
   if (!isStatic())
     if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
 
   // Non-public global and static variables always have a
   // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
+  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
+                                          /*treatUsableFromInlineAsPublic=*/true);
+  if (!accessScope.isPublicOrPackage())
     return false;
 
   if (!getModuleContext()->isResilient())
@@ -2973,8 +2975,7 @@ bool AbstractStorageDecl::isResilient() const {
   // Allows bypassing resilience checks for package decls
   // at use site within a package if opted in, whether the
   // loaded module was built resiliently or not.
-  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
 }
 
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
@@ -5050,8 +5051,9 @@ bool NominalTypeDecl::isResilient() const {
   // Allows bypassing resilience checks for package decls
   // at use site within a package if opted in, whether the
   // loaded module was built resiliently or not.
-  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
+                                          /*treatUsableFromInlineAsPublic=*/true);
+  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {

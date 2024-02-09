@@ -13,6 +13,17 @@
 
 //--- Utils.swift
 
+package enum PkgEnum {
+  case one
+  case two(Int)
+}
+
+@usableFromInline
+package enum UfiPkgEnum {
+  case one
+  case two(Int)
+}
+
 public enum PublicEnum {
   case one
   case two(Int)
@@ -20,31 +31,6 @@ public enum PublicEnum {
 
 @frozen
 public enum FrozenPublicEnum {
-  case one
-  case two(Int)
-}
-
-package enum PkgEnum {
-  case one
-  case two(Int)
-}
-
-public struct PublicStruct {
-  public var publicVar: Int
-}
-
-package enum PkgEnumWithPublicCase {
-  case one
-  case two(PublicStruct)
-}
-
-package enum PkgEnumWithExistentialCase {
-  case one
-  case two(any StringProtocol)
-}
-
-@usableFromInline
-package enum UfiPkgEnum {
   case one
   case two(Int)
 }
@@ -61,7 +47,16 @@ func f(_ arg: PkgEnum) -> Int {
   }
 }
 
-public func g(_ arg: PublicEnum) -> Int {
+func g(_ arg: UfiPkgEnum) -> Int {
+  switch arg { // expected-warning {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+  case .one:
+    return 1
+  case .two(let val):
+    return 2 + val
+  }
+}
+
+public func h(_ arg: PublicEnum) -> Int {
   switch arg { // expected-warning {{switch covers known cases, but 'PublicEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
   case .one:
     return 1
@@ -70,7 +65,7 @@ public func g(_ arg: PublicEnum) -> Int {
   }
 }
 
-public func h(_ arg: FrozenPublicEnum) -> Int {
+public func k(_ arg: FrozenPublicEnum) -> Int {
   switch arg { // no-warning
   case .one:
     return 1
@@ -92,8 +87,19 @@ func f(_ arg: PkgEnum) -> Int {
   }
 }
 
+// Warning still shows up for usableFromInline package enum as the optimization is targeted for
+// decls with package access, not the elevated public access. This might be allowed later.
+func g(_ arg: UfiPkgEnum) -> Int {
+  switch arg { // expected-warning {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+  case .one:
+    return 1
+  case .two(let val):
+    return 2 + val
+  }
+}
+
 // Warning still shows up for public enum as the optimization is targeted for package types.
-public func g(_ arg: PublicEnum) -> Int {
+public func h(_ arg: PublicEnum) -> Int {
   switch arg { // expected-warning {{switch covers known cases, but 'PublicEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
   case .one:
     return 1
@@ -102,7 +108,7 @@ public func g(_ arg: PublicEnum) -> Int {
   }
 }
 
-public func h(_ arg: FrozenPublicEnum) -> Int {
+public func k(_ arg: FrozenPublicEnum) -> Int {
   switch arg { // no-warning
   case .one:
     return 1
