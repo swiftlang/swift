@@ -3064,6 +3064,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //               unowned(unsafe) var o: AnyObject
     //             }
     // (5) being defined in a different module
+    // (6) being defined in a module built from interface
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3085,8 +3086,15 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal->isResilient())
             return true;
 
+          auto *module = nominal->getModuleContext();
+
+          // Types in modules built from interfaces may not conform (case (6)).
+          if (module && module->isBuiltFromInterface()) {
+            return false;
+          }
+
           // Trivial types from other modules may not conform (case (5)).
-          return nominal->getModuleContext() != &M;
+          return module != &M;
         },
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
@@ -3145,8 +3153,15 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (nominal->isResilient())
             return false;
 
+          auto *module = nominal->getModuleContext();
+
+          // Types in modules built from interfaces may not conform (case (6)).
+          if (module && module->isBuiltFromInterface()) {
+            return false;
+          }
+
           // Trivial types from other modules may not conform (case (5)).
-          return nominal->getModuleContext() == &M;
+          return module == &M;
         });
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
