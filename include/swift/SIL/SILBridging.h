@@ -239,6 +239,8 @@ struct BridgedASTType {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
 
+  BRIDGED_INLINE bool hasTypeParameter() const;
+
   BRIDGED_INLINE bool isOpenedExistentialWithError() const;
 
   BRIDGED_INLINE bool isEscapable() const;

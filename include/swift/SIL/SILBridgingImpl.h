@@ -85,6 +85,10 @@ BridgedOwnedString BridgedASTType::getDebugDescription() const {
   return BridgedOwnedString(unbridged().getString());
 }
 
+bool BridgedASTType::hasTypeParameter() const {
+  return unbridged()->hasTypeParameter();
+}
+
 bool BridgedASTType::isOpenedExistentialWithError() const {
   return unbridged()->isOpenedExistentialWithError();
 }
