@@ -261,21 +261,18 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
 
   /// Type of ``DistributedTargetInvocationEncoder`` that should be used when the Swift runtime needs to encode
   /// a distributed target call into an encoder, before passing it off to `remoteCall(...)`.
-  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
+  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder<SerializationRequirement>
   /// Type of ``DistributedTargetInvocationDecoder`` that should be used when decoding invocations during
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)`` calls.
-  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
+  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder<SerializationRequirement>
 
   /// The type of the result handler which will be offered the results
   /// returned by a distributed function invocation called via
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)``.
-  associatedtype ResultHandler: DistributedTargetInvocationResultHandler
+  associatedtype ResultHandler: DistributedTargetInvocationResultHandler<SerializationRequirement>
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
   associatedtype SerializationRequirement // TODO: constrain SerializationRequirement in type-system to only be ok with protocol or class here
-    where SerializationRequirement == InvocationEncoder.SerializationRequirement,
-          SerializationRequirement == InvocationDecoder.SerializationRequirement,
-          SerializationRequirement == ResultHandler.SerializationRequirement
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity
@@ -724,7 +721,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder, DA: Distri
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationEncoder {
+public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `recordArgument` and `recordReturnType` are required to conform to.
   associatedtype SerializationRequirement
 
@@ -861,7 +858,7 @@ public struct RemoteCallArgument<Value> {
 /// }
 /// ```
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationDecoder {
+public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
   /// The type returned by `decodeReturnType` is also expected to conform to this associated type requirement.
   associatedtype SerializationRequirement
@@ -928,7 +925,7 @@ public protocol DistributedTargetInvocationDecoder {
 /// func onReturn<Success: SerializationRequirement>(value: Success) async throws
 /// ```
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationResultHandler {
+public protocol DistributedTargetInvocationResultHandler<SerializationRequirement> {
   /// The serialization requirement that the value passed to `onReturn` is required to conform to.
   associatedtype SerializationRequirement
 
