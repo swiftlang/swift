@@ -47,6 +47,13 @@ LangOptions::LangOptions() {
 #endif
 
   // Note: Introduce default-on language options here.
+
+  // Default-on NoncopyableGenerics when the build-script setting is enabled.
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    Features.insert(Feature::NoncopyableGenerics);
+    EnableExperimentalAssociatedTypeInference = true;
+  }
+
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \

@@ -7578,6 +7578,9 @@ ERROR(inverse_with_class_constraint, none,
       "composition involving %select{class requirement %2|'AnyObject'}0 "
       "cannot contain '~%1'",
       (bool, StringRef, Type))
+ERROR(inverse_conflicts_explicit_composition, none,
+      "composition cannot contain '~%0' when another member requires '%0'",
+      (StringRef))
 ERROR(inverse_extension, none,
       "cannot apply inverse %0 to extension",
       (Type))

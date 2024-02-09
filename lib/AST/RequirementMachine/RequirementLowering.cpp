@@ -926,8 +926,11 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                       SourceLoc()});
 
     desugarRequirements(result, inverses, errors);
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
-    applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
+
+    SmallVector<StructuralRequirement, 2> defaults;
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
+    applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+    result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
@@ -994,11 +997,13 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   desugarRequirements(result, inverses, errors);
 
+  SmallVector<StructuralRequirement, 2> defaults;
   // We do not expand defaults for invertible protocols themselves.
   if (!proto->getInvertibleProtocolKind())
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
+  applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+  result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);

@@ -895,11 +895,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.enableFeature(Feature::LayoutPrespecialization);
 
-  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
-    Opts.enableFeature(Feature::NoncopyableGenerics);
-    Opts.EnableExperimentalAssociatedTypeInference = true;
-  }
-
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
   Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;

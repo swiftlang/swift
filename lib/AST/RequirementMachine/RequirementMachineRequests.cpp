@@ -667,8 +667,10 @@ AbstractGenericSignatureRequest::evaluate(
       paramsAsTypes.push_back(gtpt);
   }
 
-  InverseRequirement::expandDefaults(ctx, paramsAsTypes, requirements);
-  applyInverses(ctx, paramsAsTypes, inverses, requirements, errors);
+  SmallVector<StructuralRequirement, 2> defaults;
+  InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
+  applyInverses(ctx, paramsAsTypes, inverses, defaults, errors);
+  requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
 
@@ -882,8 +884,10 @@ InferredGenericSignatureRequest::evaluate(
     paramTypes.append(genericParams.begin() + numOuterParams, genericParams.end());
   }
 
-  InverseRequirement::expandDefaults(ctx, paramTypes, requirements);
-  applyInverses(ctx, paramTypes, inverses, requirements, errors);
+  SmallVector<StructuralRequirement, 2> defaults;
+  InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
+  applyInverses(ctx, paramTypes, inverses, defaults, errors);
+  requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
 

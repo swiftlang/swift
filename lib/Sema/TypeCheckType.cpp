@@ -5401,6 +5401,46 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, ctx);
 }
 
+/// \returns the inverse ~P that is conflicted if a protocol in \c tys
+/// requires P. For example, `Q & ~Copyable` is a conflict, if `Q` requires
+/// or is equal to `Copyable`
+static std::optional<InvertibleProtocolKind>
+hasConflictedInverse(ArrayRef<Type> tys, InvertibleProtocolSet inverses) {
+  // Fast-path: no inverses that could be conflicted!
+  if (inverses.empty())
+    return std::nullopt;
+
+  for (auto ty : tys) {
+    // Handle nested PCT's recursively since we haven't flattened them away yet.
+    if (auto pct = dyn_cast<ProtocolCompositionType>(ty)) {
+      if (auto conflict = hasConflictedInverse(pct->getMembers(), inverses))
+        return conflict;
+      continue;
+    }
+
+    // Dig out a protocol.
+    ProtocolDecl *decl = nullptr;
+    if (auto protoTy = dyn_cast<ProtocolType>(ty))
+      decl = protoTy->getDecl();
+    else if (auto paramProtoTy = dyn_cast<ParameterizedProtocolType>(ty))
+      decl = paramProtoTy->getProtocol();
+
+    if (!decl)
+      continue;
+
+    // If an inverse ~I exists for this protocol member of the PCT that
+    // requires I, then it's a conflict.
+    for (auto inverse : inverses) {
+      if (decl->isSpecificProtocol(getKnownProtocolKind(inverse))
+          || decl->requiresInvertible(inverse)) {
+        return inverse;
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 NeverNullType
 TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                      TypeResolutionOptions options) {
@@ -5496,6 +5536,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     IsInvalid = true;
   }
 
+  // Cannot provide an inverse in the same composition requiring the protocol.
+  if (auto conflict = hasConflictedInverse(Members, Inverses)) {
+    diagnose(repr->getLoc(),
+       diag::inverse_conflicts_explicit_composition,
+       getProtocolName(getKnownProtocolKind(*conflict)));
+    IsInvalid = true;
+  }
 
   if (IsInvalid) {
     repr->setInvalid();

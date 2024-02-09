@@ -255,15 +255,26 @@ struct InverseRequirement {
   static void enumerateDefaultedParams(GenericContext *decl,
                                        SmallVectorImpl<Type> &result);
 
-  /// \returns the protocols that are required by default for the given type
-  /// parameter. These are not inverses themselves.
-  static InvertibleProtocolSet expandDefault(Type gp);
-
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
   static void expandDefaults(ASTContext &ctx,
                              ArrayRef<Type> gps,
                              SmallVectorImpl<StructuralRequirement> &result);
+
+  /// Adds the inferred default protocols for an assumed generic parameter with
+  /// respect to that parameter's inverses and existing required protocols.
+  /// For example, if an inverse ~P exists, then P will not be added to the
+  /// protocols list.
+  ///
+  /// Similarly, if the protocols list has a protocol Q that already implies
+  /// Copyable, then we will not add `Copyable` to the protocols list.
+  ///
+  /// \param inverses the inverses '& ~P' that are applied to the generic param.
+  /// \param protocols the existing required protocols, to which defaults will
+  ///                  be appended.
+  static void expandDefaults(ASTContext &ctx,
+                             InvertibleProtocolSet inverses,
+                             SmallVectorImpl<ProtocolDecl*> &protocols);
 };
 
 } // end namespace swift
