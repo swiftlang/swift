@@ -3927,18 +3927,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       repr->setWarned();
   }
 
-  // Use parameter isolation if we have any.  This overrides all other
-  // forms (and should cause conflict diagnostics).
-  if (numIsolatedParams > 0) {
-    isolation = FunctionTypeIsolation::forParameter();
-
-    if (isolatedAttr) {
-      diagnose(repr->getLoc(), diag::isolated_parameter_isolated_attr_type,
-               isolatedAttr->getIsolationKindName());
-      isolatedAttr->setInvalid();
-    }
-  }
-
   if (attrs) {
     CustomAttr *globalActorAttr = nullptr;
     Type globalActor = resolveGlobalActor(repr->getLoc(), parentOptions,
@@ -3995,6 +3983,18 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   options |= parentOptions.withoutContext().getFlags();
   auto params =
       resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options, diffKind);
+
+  // Use parameter isolation if we have any.  This overrides all other
+  // forms (and should cause conflict diagnostics).
+  if (hasIsolatedParameter(params)) {
+    isolation = FunctionTypeIsolation::forParameter();
+
+    if (isolatedAttr) {
+      diagnose(repr->getLoc(), diag::isolated_parameter_isolated_attr_type,
+               isolatedAttr->getIsolationKindName());
+      isolatedAttr->setInvalid();
+    }
+  }
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
@@ -4891,14 +4891,18 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
     unwrappedType = dynamicSelfType->getSelfType();
   }
+  // here
 
-  // isolated parameters must be of actor type
-  if (!unwrappedType->isTypeParameter() &&
-      !unwrappedType->isAnyActorType() &&
-      !unwrappedType->hasError()) {
-    diagnoseInvalid(
-        repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
-    return ErrorType::get(type);
+  if (inStage(TypeResolutionStage::Interface)) {
+    if (auto *env = resolution.getGenericSignature().getGenericEnvironment())
+      unwrappedType = env->mapTypeIntoContext(unwrappedType);
+
+    if (!unwrappedType->isAnyActorType() && !unwrappedType->hasError()) {
+      diagnoseInvalid(
+          repr, repr->getSpecifierLoc(),
+          diag::isolated_parameter_not_actor, type);
+      return ErrorType::get(type);
+    }
   }
 
   return type;
