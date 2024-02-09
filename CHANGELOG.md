@@ -10015,6 +10015,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md>
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/main/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/main/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0270]: <https://github.com/apple/swift-evolution/blob/main/proposals/0270-rangeset-and-collection-operations.md>
 [SE-0274]: <https://github.com/apple/swift-evolution/blob/main/proposals/0274-magic-file.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/main/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/main/proposals/0279-multiple-trailing-closures.md>
