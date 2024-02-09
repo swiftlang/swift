@@ -3038,6 +3038,15 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
 
+  if (auto *nominal = substType.getAnyNominal()) {
+    auto *module = nominal->getModuleContext();
+    if (module && module->isBuiltFromInterface()) {
+      // Don't verify for types in modules built from interfaces; the feature
+      // may not have been enabled in them.
+      return;
+    }
+  }
+
   if (lowering.isTrivial() && !conformance) {
     // A trivial type can lack a conformance in a few cases:
     // (1) containing or being a resilient type
@@ -3054,6 +3063,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //             struct S {
     //               unowned(unsafe) var o: AnyObject
     //             }
+    // (5) being defined in a different module
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3072,7 +3082,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           }
 
           // Resilient trivial types may not conform (case (1)).
-          return nominal->isResilient();
+          if (nominal->isResilient())
+            return true;
+
+          // Trivial types from other modules may not conform (case (5)).
+          return nominal->getModuleContext() != &M;
         },
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
@@ -3128,7 +3142,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           }
 
           // Resilient trivial types may not conform (case (1)).
-          return !nominal->isResilient();
+          if (nominal->isResilient())
+            return false;
+
+          // Trivial types from other modules may not conform (case (5)).
+          return nominal->getModuleContext() == &M;
         });
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
