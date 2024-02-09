@@ -156,6 +156,10 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
+@protocol NSMutableCopying
+- (id)mutableCopyWithZone:(nullable NSZone *)zone;
+@end
+
 @interface NSDictionary<KeyType, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
