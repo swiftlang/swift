@@ -461,7 +461,8 @@ public:
 
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
-                                    ManagedValue base, bool isNonEscaping);
+                                    ManagedValue base,
+                                    MarkDependenceKind dependencekind);
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,

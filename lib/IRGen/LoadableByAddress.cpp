@@ -2854,7 +2854,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     auto instr = cast<MarkDependenceInst>(convInstr);
     newInstr = convBuilder.createMarkDependence(
       instr->getLoc(), instr->getValue(), instr->getBase(),
-      instr->isNonEscaping());
+      instr->dependenceKind());
     break;
   }
   case SILInstructionKind::DifferentiableFunctionInst: {
@@ -3885,7 +3885,7 @@ protected:
     auto builder = assignment.getBuilder(m->getIterator());
     auto opdAddr = assignment.getAddressForValue(m->getBase());
     auto newValue = builder.createMarkDependence(m->getLoc(), m->getValue(),
-                                                 opdAddr, m->isNonEscaping());
+                                                 opdAddr, m->dependenceKind());
     m->replaceAllUsesWith(newValue);
     assignment.markForDeletion(m);
   }

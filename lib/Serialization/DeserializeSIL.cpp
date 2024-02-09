@@ -2006,7 +2006,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
-        /*nonEscaping*/Attr);
+        MarkDependenceKind(Attr));
     break;
   }
   case SILInstructionKind::BeginDeallocRefInst: {

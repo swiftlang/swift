@@ -8353,6 +8353,11 @@ public:
   }
 };
 
+enum class MarkDependenceKind {
+  Unresolved, Escaping, NonEscaping
+};
+static_assert(2 == SILNode::NumMarkDependenceKindBits, "Size mismatch");
+
 /// Indicates that the validity of the first operand ("the value") depends on
 /// the value of the second operand ("the base").  Operations that would destroy
 /// the base must not be moved before any instructions which depend on the
@@ -8397,12 +8402,10 @@ class MarkDependenceInst
 
   MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
                      ValueOwnershipKind forwardingOwnershipKind,
-                     bool isNonEscaping)
+                     MarkDependenceKind dependenceKind)
       : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
         Operands{this, value, base} {
-    if (isNonEscaping) {
-      sharedUInt8().MarkDependenceInst.nonEscaping = true;
-    }
+    sharedUInt8().MarkDependenceInst.dependenceKind = uint8_t(dependenceKind);
   }
 
 public:
@@ -8422,8 +8425,19 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
+  MarkDependenceKind dependenceKind() const {
+    return MarkDependenceKind(sharedUInt8().MarkDependenceInst.dependenceKind);
+  }
+
   bool isNonEscaping() const {
-    return sharedUInt8().MarkDependenceInst.nonEscaping;
+    return dependenceKind() == MarkDependenceKind::NonEscaping;
+  }
+
+  /// An unresolved escape is semantically an escaping dependence, but this
+  /// form is only valid prior to lifetime dependence diagnostics which will
+  /// convert it to NonEscaping if the program is valid.
+  bool hasUnresolvedEscape() const {
+    return dependenceKind() == MarkDependenceKind::Unresolved;
   }
 
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.

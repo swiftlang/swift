@@ -414,8 +414,8 @@ public struct Builder {
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 
-  public func createMarkDependence(value: Value, base: Value, isNonEscaping: Bool) -> MarkDependenceInst {
-    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, isNonEscaping)
+  public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceInst.Kind) -> MarkDependenceInst {
+    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, kind)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
 }

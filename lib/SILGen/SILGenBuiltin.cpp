@@ -1446,7 +1446,7 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
   // Now create a mark dependence on our base and return the result.
   return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV,
-                                    /*isNonEscaping*/false);
+                                    MarkDependenceKind::Escaping);
 }
 
 // Emit SIL for the named builtin: getCurrentAsyncTask.

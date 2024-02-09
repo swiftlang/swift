@@ -124,6 +124,7 @@ public:
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
+  enum { NumMarkDependenceKindBits = 2 };
 
 protected:
   friend class SILInstruction;
@@ -277,7 +278,7 @@ protected:
                  fromVarDecl : 1);
 
     SHARED_FIELD(MarkDependenceInst, uint8_t
-                 nonEscaping : 1);
+                 dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;

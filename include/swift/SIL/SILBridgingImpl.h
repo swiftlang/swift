@@ -1098,8 +1098,8 @@ SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
   return (SwiftInt)getAs<swift::AssignInst>()->getOwnershipQualifier();
 }
 
-bool BridgedInstruction::MarkDependenceInst_isNonEscaping() const {
-  return getAs<swift::MarkDependenceInst>()->isNonEscaping();
+BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_dependenceKind() const {
+  return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }
 
 BridgedInstruction::AccessKind BridgedInstruction::BeginAccessInst_getAccessKind() const {
@@ -1709,8 +1709,8 @@ BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, b
                                            keepUnique)};
 }
 
-BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, bool isNonEscaping) const {
-  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), isNonEscaping)};
+BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

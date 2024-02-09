@@ -1022,14 +1022,15 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
   return ManagedValue::forBorrowedAddressRValue(pbi);
 }
 
-ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
-                                                 ManagedValue value,
-                                                 ManagedValue base,
-                                                 bool isNonEscaping) {
+ManagedValue SILGenBuilder::createMarkDependence(
+  SILLocation loc,
+  ManagedValue value,
+  ManagedValue base,
+  MarkDependenceKind dependenceKind) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
                                    base.forward(getSILGenFunction()),
-                                   isNonEscaping);
+                                   dependenceKind);
   return cloner.clone(mdi);
 }
 
