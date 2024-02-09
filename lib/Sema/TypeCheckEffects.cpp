@@ -708,14 +708,9 @@ static Expr *removeErasureToExistentialError(Expr *expr) {
 
   return expr;
 }
+}
 
-/// Determine whether the given function uses typed throws in a manner
-/// than is structurally similar to 'rethrows', e.g.,
-///
-/// \code
-/// func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T]
-/// \endcode
-static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
+bool swift::isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
   // This notion is only for compatibility in Swift 5 and is disabled
   // when FullTypedThrows is enabled.
   ASTContext &ctx = func->getASTContext();
@@ -761,6 +756,8 @@ static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
 
   return true;
 }
+
+namespace {
 
 /// Determine whether the given rethrows context is only allowed to be
 /// rethrowing because of the historically-rethrowing behavior of
