@@ -33,7 +33,7 @@ extension A {
     // CHECK: rewritten=current_context_isolation_expr
     // CHECK-NEXT: inject_into_optional
     // CHECK-NEXT: erasure_expr
-    // CHECK: declref_expr implicit type="A"{{.*}}self@
+    // CHECK: declref_expr type="A"{{.*}}self@
     _ = #isolation
   }
 }
@@ -45,7 +45,7 @@ func actorIsolationToParam(_ isolatedParam: isolated A) {
   // CHECK: rewritten=current_context_isolation_expr
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
-  // CHECK: declref_expr implicit type="A"{{.*}}isolatedParam@
+  // CHECK: declref_expr type="A"{{.*}}isolatedParam@
   _ = #isolation
 }
 
@@ -57,8 +57,8 @@ func mainActorIsolated() {
   // CHECK: rewritten=current_context_isolation_expr
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
-  // CHECK: member_ref_expr implicit type="MainActor" decl="_Concurrency.(file).MainActor.shared"
-  // CHECK-NEXT: type_expr implicit type="MainActor.Type"
+  // CHECK: member_ref_expr type="MainActor" location=@__swiftmacro_{{.*}} decl="_Concurrency.(file).MainActor.shared"
+  // CHECK-NEXT: type_expr type="MainActor.Type"
   _ = #isolation
 }
 
@@ -72,9 +72,24 @@ func closureIsolatedToOuterParam(_ isolatedParam: isolated A) {
   // CHECK: rewritten=current_context_isolation_expr
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
-  // CHECK: declref_expr implicit type="A"{{.*}}isolatedParam@
+  // CHECK: declref_expr type="A"{{.*}}isolatedParam@
   acceptClosure {
     _ = #isolation
     print(isolatedParam)
   }
+}
+
+func acceptEscapingClosure(_ fn: @escaping () -> Void) { }
+
+@available(SwiftStdlib 5.1, *)
+extension A {
+  func f() {
+    // Make sure this doesn't diagnose a use of implicit 'self'
+    acceptEscapingClosure {
+      _ = #isolation
+      self.g()
+    }
+  }
+
+  func g() {}
 }
