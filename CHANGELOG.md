@@ -4,6 +4,29 @@
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 5.11
+* [SE-0417][]:
+  Tasks now gain the ability to respect Task Executor preference.
+  This allows tasks executing default actors (which do not declare a custom executor),
+  and nonisolated asynchronous functions to fall back to a preferred executor, rather than always
+  executing on the default global pool.
+
+  The executor preference may be stated using the `withTaskExecutorPreference` function:
+
+  ```swift
+  nonisolated func doSomething() async { ... }
+  
+  await withTaskExecutorPreference(preferredExecutor) {
+    doSomething()
+  ```
+
+  Or when creating new unstructured or child-tasks (e.g. in a task group):
+
+  ```swift
+  Task(executorPreference: preferredExecutor) {
+    // executes on 'preferredExecutor'
+    await doSomething() // doSomething body would execute on 'preferredExecutor'
+  }
+  ```
 
 * [SE-0413][]:
 
@@ -10080,6 +10103,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
+[SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
