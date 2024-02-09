@@ -3999,13 +3999,24 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
   // represent the minimal composition.
   auto sig = useDC->getGenericSignatureOfContext();
   const auto Sig = Ctx.getOpenedExistentialSignature(CanTy, sig);
-  const auto &Reqs = Sig.getRequirements();
+  SmallVector<Requirement, 2> Reqs;
+  SmallVector<InverseRequirement, 2> Inverses;
+  Sig->getRequirementsWithInverses(Reqs, Inverses);
+
   if (Reqs.size() == 1) {
     return Reqs.front().getSecondType()->getCanonicalType();
   }
 
   // The set of inverses is already minimal.
   auto MinimalInverses = Composition->getInverses();
+
+#ifndef NDEBUG
+  // Check that the generic signature's inverses matches.
+  InvertibleProtocolSet genSigInverses;
+  for (InverseRequirement ireq : Inverses)
+    genSigInverses.insert(ireq.getKind());
+  assert(genSigInverses == MinimalInverses);
+#endif
 
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
