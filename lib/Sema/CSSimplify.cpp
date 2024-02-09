@@ -8705,7 +8705,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
 
     // If this is a failure to conform to Copyable, tailor the error message.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    if (kind == ConstraintKind::ConformsTo &&
+        protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       auto *fix =
           MustBeCopyable::create(*this,
                                  type,
