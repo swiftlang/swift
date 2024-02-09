@@ -740,7 +740,11 @@ struct InferredTypeWitnessesSolution {
 
   /// The number of value witnesses that occur in protocol
   /// extensions.
-  unsigned NumValueWitnessesInProtocolExtensions;
+  unsigned NumValueWitnessesInProtocolExtensions = 0;
+
+  /// The number of type witnesses inferred via same-type requirements or
+  /// defaults.
+  unsigned NumAbstractTypeWitnesses = 0;
 
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_USED
@@ -761,6 +765,8 @@ struct InferredTypeWitnessesSolution {
 void InferredTypeWitnessesSolution::dump(llvm::raw_ostream &out) const {
   out << "Value witnesses in protocol extensions: "
       << NumValueWitnessesInProtocolExtensions << "\n";
+  out << "Abstract type witnesses: "
+      << NumAbstractTypeWitnesses << "\n";
   const auto numValueWitnesses = ValueWitnesses.size();
   out << "Type Witnesses:\n";
   for (auto &typeWitness : TypeWitnesses) {
@@ -2960,7 +2966,7 @@ void AssociatedTypeInference::findSolutionsRec(
     TypeWitnessesScope typeWitnessesScope(typeWitnesses);
 
     // Filter out the associated types that remain unresolved.
-    SmallVector<AssociatedTypeDecl *, 4> stillUnresolved;
+    SmallVector<AssociatedTypeDecl *, 4> abstractTypeWitnesses;
     for (auto *const assocType : unresolvedAssocTypes) {
       auto typeWitness = typeWitnesses.begin(assocType);
 
@@ -2977,7 +2983,7 @@ void AssociatedTypeInference::findSolutionsRec(
       }
 
       if (typeWitness == typeWitnesses.end()) {
-        stillUnresolved.push_back(assocType);
+        abstractTypeWitnesses.push_back(assocType);
       } else {
         // If an erroneous type witness has already been recorded for one of
         // the associated types, give up.
@@ -2992,10 +2998,18 @@ void AssociatedTypeInference::findSolutionsRec(
       }
     }
 
+    // If this solution will end up with more abstract type witnesses than the
+    // best solution so far, give up before trying to infer abstract type
+    // witnesses.
+    if (!solutions.empty() &&
+        solutions.front().NumAbstractTypeWitnesses < abstractTypeWitnesses.size()) {
+      return;
+    }
+
     // Attempt to infer abstract type witnesses for associated types that
     // could not be resolved otherwise.
     if (auto *const assocType =
-            inferAbstractTypeWitnesses(stillUnresolved, reqDepth)) {
+            inferAbstractTypeWitnesses(abstractTypeWitnesses, reqDepth)) {
       // The solution is decisively incomplete; record the associated type
       // we failed on and bail out.
       if (!missingTypeWitness)
@@ -3057,8 +3071,8 @@ void AssociatedTypeInference::findSolutionsRec(
 
     // Copy the value witnesses.
     solution.ValueWitnesses = valueWitnesses;
-    solution.NumValueWitnessesInProtocolExtensions
-      = numValueWitnessesInProtocolExtensions;
+    solution.NumValueWitnessesInProtocolExtensions = numValueWitnessesInProtocolExtensions;
+    solution.NumAbstractTypeWitnesses = abstractTypeWitnesses.size();
 
     // We fold away non-viable solutions that have the same type witnesses.
     if (invalid) {
@@ -3428,6 +3442,14 @@ bool AssociatedTypeInference::isBetterSolution(
 
   if (first.NumValueWitnessesInProtocolExtensions >
       second.NumValueWitnessesInProtocolExtensions)
+    return false;
+
+  if (first.NumAbstractTypeWitnesses <
+      second.NumAbstractTypeWitnesses)
+    return true;
+
+  if (first.NumAbstractTypeWitnesses >
+      second.NumAbstractTypeWitnesses)
     return false;
 
   // Dear reader: this is not a lexicographic order on tuple of value witnesses;
