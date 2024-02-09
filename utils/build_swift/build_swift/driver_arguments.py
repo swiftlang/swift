@@ -572,6 +572,9 @@ def create_argument_parser():
            metavar='LITARGS',
            help='lit args to use when testing')
 
+    option('--color-in-tests', toggle_true, default=True,
+           help='Enable color output in lit tests')
+
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
