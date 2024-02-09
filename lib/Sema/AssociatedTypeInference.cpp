@@ -300,7 +300,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 
     // Construct the availability of the type witnesses based on the
     // availability of the enclosing type and the associated type.
-    const Decl * availabilitySources[2] = {dc->getAsDecl(), assocType };
+    const Decl *availabilitySources[2] = { dc->getAsDecl(), assocType };
     AvailabilityInference::applyInferredAvailableAttrs(
         aliasDecl, availabilitySources, ctx);
 
@@ -2299,10 +2299,29 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
     return typeWitness;
 
-  // Ignore the default for AsyncIteratorProtocol.Failure and
-  // AsyncSequence.Failure. We use the next() function to do inference.
-  if (isAsyncIteratorProtocolFailure(assocType))
+  // Don't consider the generic parameter names for AsyncSequence.Failure or
+  // AsyncIteratorProtocol.Failure; we always rely on inference from next() or
+  // next(_:).
+  if (isAsyncIteratorProtocolFailure(assocType)) {
+    // If this is specifically AsyncSequence.Failure with the older associated
+    // type inference implementation, our abstract witness is
+    // "AsyncIterator.Failure". The new implementation is smart enough to do
+    // this from the same-type constraint.
+    if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference &&
+        proto == assocType->getProtocol() &&
+        proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
+      auto iterAssoc = proto->getAssociatedType(ctx.Id_AsyncIterator);
+      auto iteratorProto =
+          ctx.getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+      auto iteratorFailure = iteratorProto->getAssociatedType(ctx.Id_Failure);
+      Type iterType = DependentMemberType::get(
+          proto->getSelfInterfaceType(), iterAssoc);
+      Type depType = DependentMemberType::get(iterType, iteratorFailure);
+      return AbstractTypeWitness(assocType, depType);
+    }
+
     return llvm::None;
+  }
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
