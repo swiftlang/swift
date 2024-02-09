@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main %import-libdispatch -j2 -parse-as-library -Xfrontend -disable-availability-checking -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
