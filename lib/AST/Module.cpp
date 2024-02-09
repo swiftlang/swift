@@ -3906,10 +3906,6 @@ FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
 }
 
 bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
-  // stdlib is non-user by definition
-  if (mod->isStdlibModule())
-    return true;
-  
   // If there's no SDK path, fallback to checking whether the module was
   // in the system search path or a clang system module
   SearchPathOptions &searchPathOpts = mod->getASTContext().SearchPathOpts;
