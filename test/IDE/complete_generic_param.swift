@@ -53,3 +53,7 @@ func someFunction() {
 }
 
 // GENERIC_PARAM_ON_NESTED_TYPE-DAG: Decl[Struct]/CurrModule:            S2[#S2#];
+
+func testGenericWithImplicitSome<T>(_ x: some P1) -> #^GENERIC_WITH_IMPLICIT_SOME^# {}
+
+// GENERIC_WITH_IMPLICIT_SOME-DAG: Decl[GenericTypeParam]/Local:       T[#T#]; name=T

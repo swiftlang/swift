@@ -98,9 +98,9 @@ func test002() {
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local:               text[#String#]; name=text{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e1[#Error1#]; name=e1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e2[#Error2#]; name=e2{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local:                           text[#String#]; name=text{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e1[#Error1#]; name=e1{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e2[#Error2#]; name=e2{{$}}
 }
 
 func test003() {

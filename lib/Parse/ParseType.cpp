@@ -669,15 +669,24 @@ ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
 }
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
+  auto codeCompleteResult = [&]() {
+    // Synthesize an ErrorTypeRepr here to ensure we extend the result type of
+    // a decl up to the code completion token, allowing the ASTScope to cover
+    // it.
+    return makeParserCodeCompletionResult(
+        ErrorTypeRepr::create(Context, getTypeErrorLoc()));
+  };
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeTypeDeclResultBeginning();
     }
     consumeToken(tok::code_complete);
-    return makeParserCodeCompletionStatus();
+    return codeCompleteResult();
   }
 
   auto result = parseTypeWithOpaqueParams(MessageID);
+  if (result.hasCodeCompletion())
+    return codeCompleteResult();
 
   if (!result.isParseErrorOrHasCompletion()) {
     if (Tok.is(tok::r_square)) {

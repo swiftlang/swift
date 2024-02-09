@@ -630,8 +630,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                              /*includeProtocolExtensionMembers*/true,
                              genericSig);
   } else {
-    lookupVisibleDecls(consumer, DC, /*top level*/ true,
-                       corrections.Loc.getBaseNameLoc());
+    lookupVisibleDecls(consumer, corrections.Loc.getBaseNameLoc(), DC,
+                       /*top level*/ true);
   }
 
   // Impose a maximum distance from the best score.
