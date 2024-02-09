@@ -585,6 +585,10 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  // Caches used by ObjCInterfaceAndImplementationRequest.
+  llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
+  llvm::DenseMap<Decl *, Decl *> InterfacesByImplementation;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }

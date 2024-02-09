@@ -355,7 +355,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -381,7 +381,12 @@ protected:
     Hoisted : 1,
 
     /// Whether the set of semantic attributes has been computed.
-    SemanticAttrsComputed : 1
+    SemanticAttrsComputed : 1,
+
+    /// True if \c ObjCInterfaceAndImplementationRequest has been computed
+    /// and did \em not find anything. This is the fast path where we can bail
+    /// out without checking other caches or computing anything.
+    LacksObjCInterfaceOrImplementation : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -816,13 +821,6 @@ protected:
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
 
-  /// The imported Clang declaration representing the \c @_objcInterface for
-  /// this declaration (or vice versa), or \c nullptr if there is none.
-  ///
-  /// If \c this (an otherwise nonsensical value), the value has not yet been
-  /// computed.
-  Decl *CachedObjCImplementationDecl;
-
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
@@ -840,7 +838,7 @@ private:
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
-    : Context(context), CachedObjCImplementationDecl(this) {
+    : Context(context) {
     Bits.OpaqueBits = 0;
     Bits.Decl.Kind = unsigned(kind);
     Bits.Decl.Invalid = false;
@@ -848,6 +846,7 @@ protected:
     Bits.Decl.FromClang = false;
     Bits.Decl.EscapedFromIfConfig = false;
     Bits.Decl.Hoisted = false;
+    Bits.Decl.LacksObjCInterfaceOrImplementation = false;
   }
 
   /// Get the Clang node associated with this declaration.
@@ -1179,18 +1178,12 @@ public:
   /// \seeAlso ExtensionDecl::isObjCInterface()
   Decl *getObjCImplementationDecl() const;
 
-  llvm::Optional<Decl *> getCachedObjCImplementationDecl() const {
-    if (CachedObjCImplementationDecl == this)
-      return llvm::None;
-    return CachedObjCImplementationDecl;
+  bool getCachedLacksObjCInterfaceOrImplementation() const {
+    return Bits.Decl.LacksObjCInterfaceOrImplementation;
   }
 
-  void setCachedObjCImplementationDecl(Decl *decl) {
-    assert((CachedObjCImplementationDecl == this
-              || CachedObjCImplementationDecl == decl)
-               && "can't change CachedObjCInterfaceDecl once it's computed");
-    assert(decl != this && "can't form circular reference");
-    CachedObjCImplementationDecl = decl;
+  void setCachedLacksObjCInterfaceOrImplementation(bool value) {
+    Bits.Decl.LacksObjCInterfaceOrImplementation = value;
   }
 
   /// Return the GenericContext if the Decl has one.
