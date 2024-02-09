@@ -658,10 +658,15 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
   }
-  if (getOperandIndex() == MarkDependenceInst::Base && mdi->isNonEscaping()) {
+  if (mdi->isNonEscaping()) {
     // This creates a "dependent value", just like on-stack partial_apply, which
     // we treat like a borrow.
     return OperandOwnership::Borrow;
+  }
+  if (mdi->hasUnresolvedEscape()) {
+    // This creates a dependent value that may extend beyond the parent's
+    // lifetime.
+    return OperandOwnership::UnownedInstantaneousUse;
   }
   // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous

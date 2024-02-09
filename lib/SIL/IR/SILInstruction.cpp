@@ -1805,6 +1805,15 @@ static bool visitRecursivelyLifetimeEndingUses(
       }
       continue;
     }
+    if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
+      auto fnTy = ret->getFunction()->getLoweredFunctionType();
+      assert(!fnTy->getLifetimeDependenceInfo().empty());
+      if (!func(use)) {
+        return false;
+      }
+      continue;
+    }
+    // FIXME: Handle store to indirect result
     
     // There shouldn't be any dead-end consumptions of a nonescaping
     // partial_apply that don't forward it along, aside from destroy_value.
