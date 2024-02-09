@@ -1689,8 +1689,10 @@ static void diagnoseRetroactiveConformances(
               extTypeModule->isSameModuleLookingThroughOverlays(module);
           auto incorrectTypeName = typeIsSameModule ? 
               extendedNominalDecl->getName() : proto->getName();
-          diags.diagnose(loc, diag::retroactive_attr_does_not_apply, 
-              incorrectTypeName)
+          diags
+              .diagnose(loc, diag::retroactive_attr_does_not_apply,
+                        incorrectTypeName)
+              .warnUntilSwiftVersion(6)
               .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
           return TypeWalker::Action::Stop;
         }
