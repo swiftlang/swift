@@ -746,6 +746,16 @@ struct InferredTypeWitnessesSolution {
   LLVM_ATTRIBUTE_USED
 #endif
   void dump(llvm::raw_ostream &out) const;
+
+  bool operator==(const InferredTypeWitnessesSolution &other) const {
+    for (const auto &otherTypeWitness : other.TypeWitnesses) {
+      auto typeWitness = TypeWitnesses.find(otherTypeWitness.first);
+      if (!typeWitness->second.first->isEqual(otherTypeWitness.second.first))
+        return false;
+    }
+
+    return true;
+  }
 };
 
 void InferredTypeWitnessesSolution::dump(llvm::raw_ostream &out) const {
@@ -3052,17 +3062,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
     // We fold away non-viable solutions that have the same type witnesses.
     if (invalid) {
-      auto matchesSolution = [&](const InferredTypeWitnessesSolution &other) {
-        for (const auto &otherTypeWitness : other.TypeWitnesses) {
-          auto typeWitness = solution.TypeWitnesses.find(otherTypeWitness.first);
-          if (!typeWitness->second.first->isEqual(otherTypeWitness.second.first))
-            return false;
-        }
-
-        return true;
-      };
-
-      if (llvm::any_of(nonViableSolutions, matchesSolution)) {
+      if (llvm::find(nonViableSolutions, solution) != nonViableSolutions.end()) {
         LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                    << "+ Duplicate invalid solution found\n";);
         ++NumDuplicateSolutionStates;
@@ -3869,7 +3869,13 @@ auto AssociatedTypeInference::solve()
     }
   }
 
-  // Happy case: we found exactly one viable solution.
+  // If we still have multiple solutions, they might have identical
+  // type witnesses.
+  while (solutions.size() > 1 && solutions.front() == solutions.back()) {
+    solutions.pop_back();
+  }
+
+  // Happy case: we found exactly one unique viable solution.
   if (solutions.size() == 1) {
     // Form the resulting solution.
     auto &typeWitnesses = solutions.front().TypeWitnesses;
