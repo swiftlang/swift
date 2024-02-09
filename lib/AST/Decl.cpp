@@ -2977,25 +2977,30 @@ bool AbstractStorageDecl::isResilient() const {
                             /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
     return false;
 
-  if (!getModuleContext()->isResilient())
-    return false;
-
-  // Allows bypassing resilience checks for package decls
-  // at use site within a package if opted in, whether the
-  // loaded module was built resiliently or not.
-  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  return getModuleContext()->isResilient();
 }
 
-bool AbstractStorageDecl::isResilient(ModuleDecl *M,
+bool AbstractStorageDecl::isResilient(ModuleDecl *Client,
                                       ResilienceExpansion expansion) const {
+  auto resilient = false;
   switch (expansion) {
   case ResilienceExpansion::Minimal:
-    return isResilient();
+    resilient = isResilient();
+    break;
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    resilient = Client != getModuleContext() && isResilient();
+    break;
   }
-  llvm_unreachable("bad resilience expansion");
+
+  if (resilient && getASTContext().LangOpts.EnableBypassResilienceInPackage) {
+    auto isForPackageDecl = getFormalAccessScope(/*useDC=*/nullptr,
+                                                 /*treatUsableFromInlineAsPublic=*/true).isPackage();
+    auto bypassResilience = isForPackageDecl &&
+                            !getModuleContext()->isBuiltFromInterface() &&
+                            Client->getPackageName() == getModuleContext()->getPackageName();
+    return !bypassResilience;
+  }
+  return false;
 }
 
 bool AbstractStorageDecl::isValidKeyPathComponent() const {
@@ -5059,13 +5064,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
 bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-  if (!getModuleContext()->isResilient())
-    return false;
-  // Allows bypassing resilience checks for package decls
-  // at use site within a package if opted in, whether the
-  // loaded module was built resiliently or not.
-  return !getDeclContext()->bypassResilienceInPackage(getFormalAccessScope(/*useDC=*/nullptr,
-                                                                           /*treatUsableFromInlineAsPublic=*/true).isPackage());
+  return getModuleContext()->isResilient();
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
@@ -5088,16 +5087,18 @@ static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
   return D->getAlternateModuleName() == MD->getName().str();
 }
 
-bool NominalTypeDecl::isResilient(ModuleDecl *M,
+bool NominalTypeDecl::isResilient(ModuleDecl *Client,
                                   ResilienceExpansion expansion) const {
+  auto resilient = false;
   switch (expansion) {
   case ResilienceExpansion::Minimal:
-    return isResilient();
+    resilient = isResilient();
+    break;
   case ResilienceExpansion::Maximal:
     // We can access declarations from the same module
     // non-resiliently in a maximal context.
-    if (M == getModuleContext()) {
-      return false;
+    if (Client == getModuleContext()) {
+      resilient = false;
     }
     // If a protocol is originally declared in the current module, then we
     // directly expose protocol witness tables and their contents for any
@@ -5112,15 +5113,26 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
     // according to the library evolution ABI. This is an ABI compatibility
     // hack only for protocols. If you see other variations of `isResilient`
     // that don't check `isOriginallyDefinedIn`, they are probably correct.
-    if (isa<ProtocolDecl>(this)
-        && isOriginallyDefinedIn(this, M)) {
-      return false;
+    else if (isa<ProtocolDecl>(this)
+        && isOriginallyDefinedIn(this, Client)) {
+      resilient = false;
+    } else {
+      // Otherwise, we have to access the declaration resiliently if it's
+      // resilient anywhere.
+      resilient = isResilient();
     }
-    // Otherwise, we have to access the declaration resiliently if it's
-    // resilient anywhere.
-    return isResilient();
+    break;
   }
-  llvm_unreachable("bad resilience expansion");
+
+  if (resilient && getASTContext().LangOpts.EnableBypassResilienceInPackage) {
+    auto isForPackageDecl = getFormalAccessScope(/*useDC=*/nullptr,
+                                                 /*treatUsableFromInlineAsPublic=*/true).isPackage();
+    auto bypassResilience = isForPackageDecl &&
+    !getModuleContext()->isBuiltFromInterface() &&
+    Client->getPackageName() == getModuleContext()->getPackageName();
+    return !bypassResilience;
+  }
+  return false;
 }
 
 enum class DeclTypeKind : unsigned {
