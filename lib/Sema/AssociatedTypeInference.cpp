@@ -3133,17 +3133,11 @@ void AssociatedTypeInference::findSolutionsRec(
     // If we had at least one tautological witness, we must consider the
     // possibility that none of the remaining witnesses are chosen.
     if (witnessReq.Witness == nullptr) {
-      // Count tautological witnesses as if they come from protocol extensions,
-      // which ranks the solution lower than a more constrained one.
-      if (!isa<TypeDecl>(inferredReq.first))
-        ++numValueWitnessesInProtocolExtensions;
       valueWitnesses.push_back({inferredReq.first, nullptr});
       findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
                        valueWitnesses, numTypeWitnesses,
                        numValueWitnessesInProtocolExtensions, reqDepth + 1);
       valueWitnesses.pop_back();
-      if (!isa<TypeDecl>(inferredReq.first))
-        --numValueWitnessesInProtocolExtensions;
       continue;
     }
 
@@ -3165,10 +3159,16 @@ void AssociatedTypeInference::findSolutionsRec(
                    typeWitness.second.dump(llvm::dbgs()););
         typeWitnesses.insert(typeWitness.first, {typeWitness.second, reqDepth});
 
+        if (witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
+          ++numValueWitnessesInProtocolExtensions;
         valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
+
         findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,
                          valueWitnesses, numTypeWitnesses,
                          numValueWitnessesInProtocolExtensions, reqDepth + 1);
+
+        if (witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
+          --numValueWitnessesInProtocolExtensions;
         valueWitnesses.pop_back();
       }
 
@@ -3187,12 +3187,10 @@ void AssociatedTypeInference::findSolutionsRec(
                llvm::dbgs() << "\n";);
 
     valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
-    if (!isa<TypeDecl>(inferredReq.first) &&
-        witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
+    if (witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
       ++numValueWitnessesInProtocolExtensions;
     SWIFT_DEFER {
-      if (!isa<TypeDecl>(inferredReq.first) &&
-          witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
+      if (witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
         --numValueWitnessesInProtocolExtensions;
 
       valueWitnesses.pop_back();
