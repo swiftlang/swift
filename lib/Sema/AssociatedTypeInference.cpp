@@ -2482,15 +2482,15 @@ static void sanitizeProtocolRequirements(
   sanitizeType = [&](Type outerType) {
     return outerType.transformRec([&](TypeBase *type) -> llvm::Optional<Type> {
       if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-        if (!depMemTy->getAssocType() ||
-            depMemTy->getAssocType()->getProtocol() != proto) {
+        if ((!depMemTy->getAssocType() ||
+             depMemTy->getAssocType()->getProtocol() != proto) &&
+            proto->getGenericSignature()->requiresProtocol(depMemTy->getBase(), proto)) {
 
           if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
             Type sanitizedBase = sanitizeType(depMemTy->getBase());
             if (!sanitizedBase)
               return Type();
-            return Type(DependentMemberType::get(sanitizedBase,
-                                                  assocType));
+            return Type(DependentMemberType::get(sanitizedBase, assocType));
           }
 
           if (depMemTy->getBase()->is<GenericTypeParamType>())
