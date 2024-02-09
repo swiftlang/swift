@@ -86,6 +86,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     bridged.isExactSuperclassOf(type.bridged)
   }
 
+  public func isEmpty(in function: Function) -> Bool {
+    bridged.isEmpty(function.bridged)
+  }
+
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).

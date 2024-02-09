@@ -230,6 +230,10 @@ bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
 }
 
+bool BridgedType::isEmpty(BridgedFunction f) const {
+  return unbridged().isEmpty(*f.getFunction());
+}
+
 BridgedType::TraitResult BridgedType::canBeClass() const {
   return (TraitResult)unbridged().canBeClass();
 }
