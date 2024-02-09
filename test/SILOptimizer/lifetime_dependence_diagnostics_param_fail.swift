@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify \
 // RUN:   -module-name test \
 // RUN:   -enable-builtin-module \
+// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics=true \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics
 
