@@ -985,7 +985,6 @@ private:
 
   /// Infer associated type witnesses for the given associated type.
   InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType);
 
   /// Infer associated type witnesses for all relevant value requirements.
@@ -1682,8 +1681,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (assocTypes.count(assocType) == 0)
         continue;
 
-      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocTypes,
-                                                             assocType);
+      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocType);
       if (!reqInferred.empty())
         result.push_back({req, std::move(reqInferred)});
 
@@ -1831,8 +1829,36 @@ static Type removeSelfParam(ValueDecl *value, Type type) {
 
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
+  InferredAssociatedTypesByWitnesses result;
+
+  LLVM_DEBUG(llvm::dbgs() << "Considering associated type:\n";
+             assocType->dump(llvm::dbgs()));
+
+  // Look for a generic parameter with the same name as this associated type.
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    if (auto genericSig = dc->getGenericSignatureOfContext()) {
+      for (auto *gp : genericSig.getInnermostGenericParams()) {
+        // Packs cannot witness associated type requirements.
+        if (gp->isParameterPack())
+          continue;
+
+        if (gp->getName() == assocType->getName()) {
+          auto witnessType = dc->mapTypeIntoContext(gp);
+
+          // Add this result.
+          InferredAssociatedTypesByWitness inferred;
+          inferred.Witness = gp->getDecl();
+          inferred.Inferred.push_back({assocType, witnessType});
+          result.push_back(std::move(inferred));
+
+          LLVM_DEBUG(llvm::dbgs() << "Candidate generic parameter:\n";
+                     gp->dump(llvm::dbgs()));
+        }
+      }
+    }
+  }
+
   // Form the default name _Default_Foo.
   DeclNameRef defaultName;
   {
@@ -1858,8 +1884,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                       ? cast<ExtensionDecl>(dc)->getStartLoc()
                       : cast<NominalTypeDecl>(dc)->getStartLoc(),
                       subOptions, lookupResults);
-
-  InferredAssociatedTypesByWitnesses result;
 
   for (auto decl : lookupResults) {
     // We want type declarations.
@@ -2366,23 +2390,6 @@ getPeerConformances(NormalProtocolConformance *conformance) {
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
-  // Look for suitably-named generic parameters first, before we go digging
-  // through same-type requirements of protocols.
-  if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto *const assocType : unresolvedAssocTypes) {
-      for (auto *gp : genericSig.getInnermostGenericParams()) {
-        // Packs cannot witness associated type requirements.
-        if (gp->isParameterPack())
-          continue;
-
-        if (gp->getName() == assocType->getName()) {
-          system.addTypeWitness(assocType->getName(),
-                                dc->mapTypeIntoContext(gp));
-        }
-      }
-    }
-  }
-
   auto considerProtocolRequirements = [&](ProtocolDecl *conformedProto) {
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
