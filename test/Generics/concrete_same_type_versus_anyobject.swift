@@ -7,7 +7,7 @@ class C {}
 struct G1<T : AnyObject> {}
 
 // CHECK: ExtensionDecl line={{.*}} base=G1
-// CHECK-NEXT: Generic signature: <T>
+// CHECK-NEXT: Generic signature: <T where T : AnyObject, T == S>
 extension G1 where T == S {}
 // expected-error@-1 {{no type for 'T' can satisfy both 'T : AnyObject' and 'T == S'}}
 
@@ -18,7 +18,7 @@ extension G1 where T == C {}
 struct G2<U> {}
 
 // CHECK: ExtensionDecl line={{.*}} base=G2
-// CHECK-NEXT: Generic signature: <U>
+// CHECK-NEXT: Generic signature: <U where U : AnyObject, U == S>
 extension G2 where U == S, U : AnyObject {}
 // expected-error@-1 {{no type for 'U' can satisfy both 'U : AnyObject' and 'U == S'}}
 

@@ -39,7 +39,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1_EXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2_EXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_1 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WHERE_CLAUSE_WITH_EQUAL | %FileCheck %s -check-prefix=WHERE_CLAUSE_WITH_EQUAL
 
@@ -234,8 +234,11 @@ extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^#
 // EXT_ASSOC_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   Q;
 // EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Self.T.Type#];
 
+// This is kind of funny because we parse it as 'Int == T', so completing 'T'
+// shows members of 'Int'.
 extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^# 
-// Same as EXT_ASSOC_MEMBER
+// EXT_ASSOC_MEMBER_2: Begin completions, {{.*}} items
+// EXT_ASSOC_MEMBER_2: Keyword/None:                           Type[#Int.Type#];
 
 extension WithAssoc where Int == #^EXT_SECONDTYPE^# 
 // EXT_SECONDTYPE-DAG: Decl[AssociatedType]/CurrNominal:   T;

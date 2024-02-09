@@ -48,11 +48,12 @@ protocol P6 where A == Never { // expected-error {{no type for 'Self.A' can sati
 struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'}}
 
 protocol P7a where A == Never {
-  associatedtype A
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 // expected-error@+1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
 protocol P7b: P7a where A == Bool {}
 struct S7: P7b {}
+// expected-error@-1 {{type 'S7' does not conform to protocol 'P7a'}}
 
 protocol P8a where A == Never {
   associatedtype A
