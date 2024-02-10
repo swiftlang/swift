@@ -1587,20 +1587,39 @@ extension BinaryInteger {
   public func distance(to other: Self) -> Int {
     if Self.isSigned {
       if self.bitWidth <= Int.bitWidth && other.bitWidth <= Int.bitWidth {
-        return Int(truncatingIfNeeded: other) - Int(truncatingIfNeeded: self)
-      } else {
-        return Int(other - self)
-      }
-    } else {
-      if self > other {
-        let result: Self = self - other
-        if result.bitWidth < Int.bitWidth || result <= Self(truncatingIfNeeded: Int.min.magnitude) {
-          return ~Int(truncatingIfNeeded: result) &+ 1
+        let result = Int(truncatingIfNeeded: other).subtractingReportingOverflow(Int(truncatingIfNeeded: self))
+        if !result.overflow {
+          return result.partialValue
         }
       } else {
+        let isNegative = self < (0 as Self)
+        if isNegative == (other < (0 as Self)) {
+          if let result = Int(exactly: other - self) {
+            return result
+          }
+        } else {
+          let result: Magnitude = self.magnitude + other.magnitude
+          if isNegative {
+            if result <= Int.max.magnitude {
+              return Int(truncatingIfNeeded: result)
+            }
+          } else {
+            if result <= Int.min.magnitude {
+              return ~Int(truncatingIfNeeded: result) &+ 1
+            }
+          }
+        }
+      }
+    } else {
+      if self <= other {
         let result: Self = other - self
         if result.bitWidth < Int.bitWidth || result <= Self(truncatingIfNeeded: Int.max.magnitude) {
           return Int(truncatingIfNeeded: result)
+        }
+      } else {
+        let result: Self = self - other
+        if result.bitWidth < Int.bitWidth || result <= Self(truncatingIfNeeded: Int.min.magnitude) {
+          return ~Int(truncatingIfNeeded: result) &+ 1
         }
       }
     }
