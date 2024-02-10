@@ -2902,13 +2902,18 @@ static void maybeEmitFallbackConformanceDiagnostic(
   if (diagnostics.HadError)
     return;
 
-  diagnostics.HadError = true;
-
   auto *proto = conformance->getProtocol();
   auto *dc = conformance->getDeclContext();
   auto *sf = dc->getParentSourceFile();
+
+  // FIXME: There should probably still be a diagnostic even without a file.
+  if (!sf)
+    return;
+
   auto *mod = sf->getParentModule();
   assert(mod->isMainModule());
+
+  diagnostics.HadError = true;
 
   // If we have at least one primary file and the conformance is declared in a
   // non-primary file, emit a fallback diagnostic.
