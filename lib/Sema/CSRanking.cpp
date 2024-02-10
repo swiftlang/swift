@@ -344,9 +344,16 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
-          
-        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
-        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
+
+        int np1 =
+            llvm::count_if(sig1->getRequiredProtocols(p1), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+        int np2 =
+            llvm::count_if(sig2->getRequiredProtocols(p2), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+
         int aDelta = np1 - np2;
           
         if (aDelta)
