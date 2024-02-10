@@ -354,8 +354,6 @@ func testSender(
   sender.sendSendableSubclasses(nonSendableObject)
   // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
   sender.sendSendableSubclasses(sendableSubclassOfNonSendableObject)
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
-  // FIXME(rdar://89992569): Should allow for the possibility that NonSendableClass will have a Sendable subclass
 
   sender.sendProto(sendableProtos)
   sender.sendProto(nonSendableProtos)

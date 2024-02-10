@@ -8550,7 +8550,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
         type, protocol, DC->getParentModule(),
-        /*skipConditionalRequirements=*/true,
         /*allowMissing=*/true);
     if (conformance) {
       return recordConformance(conformance);

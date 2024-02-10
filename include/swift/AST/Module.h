@@ -862,11 +862,8 @@ public:
 
   /// Collect the conformances of \c fromType to each of the protocols of an
   /// existential type's layout.
-  ///
-  /// See `TypeChecker::containsProtocol` for details on the boolean arguments.
   ArrayRef<ProtocolConformanceRef>
   collectExistentialConformances(CanType fromType, CanType existential,
-                                 bool skipConditionalRequirements = true,
                                  bool allowMissing = false);
 
   /// Find a member named \p name in \p container that was declared in this

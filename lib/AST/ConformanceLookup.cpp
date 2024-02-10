@@ -47,14 +47,20 @@ using namespace swift;
 ArrayRef<ProtocolConformanceRef>
 ModuleDecl::collectExistentialConformances(CanType fromType,
                                            CanType existential,
-                                           bool skipConditionalRequirements,
                                            bool allowMissing) {
-  CollectExistentialConformancesRequest request{this,
-                                                fromType,
-                                                existential,
-                                                skipConditionalRequirements,
-                                                allowMissing};
-  return evaluateOrDefault(getASTContext().evaluator, request, /*default=*/{});
+  assert(existential.isAnyExistentialType());
+
+  auto layout = existential.getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto *proto : protocols) {
+    auto conformance = lookupConformance(fromType, proto, allowMissing);
+    assert(conformance);
+    conformances.push_back(conformance);
+  }
+
+  return getASTContext().AllocateCopy(conformances);
 }
 
 ProtocolConformanceRef
