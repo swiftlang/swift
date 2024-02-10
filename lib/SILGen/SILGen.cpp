@@ -1892,7 +1892,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
       // Assert here as key path component cannot refer to a static var.
       assert(!decl->isStatic());
       // By this point, decl is a fixed layout or its enclosing type is non-resilient.
-      return true;
+      return !decl->isResilient();
     }
 
     // If the type is computed and doesn't have a setter that's hidden from
