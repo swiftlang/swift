@@ -766,14 +766,17 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   if (!genericParam)
     return;
 
-  auto requirements = sig->getLocalRequirements(genericParam);
-  if (requirements.protos.empty())
+  auto protocols = sig->getRequiredProtocols(genericParam);
+  if (protocols.empty())
     return;
 
   auto archetypeTy = getTypeInContext(genericParam->getCanonicalType());
   llvm::Value *metadata = IGF.emitTypeMetadataRef(archetypeTy);
 
-  for (auto *proto : requirements.protos) {
+  for (auto *proto : protocols) {
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+
     // Lookup the witness table for this protocol dynamically via
     // swift_conformsToProtocol(<<archetype>>, <<protocol>>)
     auto *witnessTable = IGF.Builder.CreateCall(
