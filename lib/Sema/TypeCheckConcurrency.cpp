@@ -2460,6 +2460,7 @@ namespace {
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
         auto *context = localFunc.getAsDeclContext();
+        auto fnType = localFunc.getType()->getAs<AnyFunctionType>();
         if (!mayExecuteConcurrentlyWith(context, decl->getDeclContext()))
           continue;
 
@@ -2492,11 +2493,19 @@ namespace {
                                      diag::implicit_non_sendable_capture,
                                      decl->getName());
           }
+        } else if (fnType->isSendable()) {
+          diagnoseNonSendableTypes(type, getDeclContext(),
+                                   /*inDerivedConformance*/Type(),
+                                   capture.getLoc(),
+                                   diag::non_sendable_capture,
+                                   decl->getName(),
+                                   /*closure=*/closure != nullptr);
         } else {
           diagnoseNonSendableTypes(type, getDeclContext(),
                                    /*inDerivedConformance*/Type(),
                                    capture.getLoc(),
-                                   diag::non_sendable_capture, decl->getName(),
+                                   diag::non_sendable_isolated_capture,
+                                   decl->getName(),
                                    /*closure=*/closure != nullptr);
         }
       }
@@ -4026,15 +4035,30 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   if (useContext == defContext)
     return false;
 
-  // If both contexts are isolated to the same actor, then they will not
-  // execute concurrently.
+  bool isolatedStateMayEscape = false;
+
   auto useIsolation = getActorIsolationOfContext(
       const_cast<DeclContext *>(useContext), getClosureActorIsolation);
   if (useIsolation.isActorIsolated()) {
     auto defIsolation = getActorIsolationOfContext(
         const_cast<DeclContext *>(defContext), getClosureActorIsolation);
+    // If both contexts are isolated to the same actor, then they will not
+    // execute concurrently.
     if (useIsolation == defIsolation)
       return false;
+
+    // If the local function is not Sendable, its isolation differs
+    // from that of the context, and both contexts are actor isolated,
+    // then capturing non-Sendable values allows the closure to stash
+    // those values into actor isolated state. The original context
+    // may also stash those values into isolated state, enabling concurrent
+    // access later on.
+    auto &ctx = useContext->getASTContext();
+    bool regionIsolationEnabled =
+        ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
+    isolatedStateMayEscape =
+        (!regionIsolationEnabled &&
+        useIsolation.isActorIsolated() && defIsolation.isActorIsolated());
   }
 
   // Walk the context chain from the use to the definition.
@@ -4043,12 +4067,18 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
       if (isSendableClosure(closure, /*forActorIsolation=*/false))
         return true;
+
+      if (isolatedStateMayEscape)
+        return true;
     }
 
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
         // If the function is @Sendable... it can be run concurrently.
         if (func->isSendable())
+          return true;
+
+        if (isolatedStateMayEscape)
           return true;
       }
     }

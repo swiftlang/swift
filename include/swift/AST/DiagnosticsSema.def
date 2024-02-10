@@ -5436,6 +5436,10 @@ ERROR(non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in a `@Sendable` "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_isolated_capture,none,
+      "capture of %1 with non-sendable type %0 in an isolated "
+      "%select{local function|closure}2",
+      (Type, DeclName, bool))
 ERROR(implicit_async_let_non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in 'async let' binding",
       (Type, DeclName))
