@@ -4266,8 +4266,11 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
       // switch_enum.
       if (auto *pred = bb.getSinglePredecessorBlock()) {
         // switch_enum handles the basic block arguments independently.
-        if (isa<SwitchEnumInst>(pred->getTerminator()))
-          continue;
+        if (auto sw = dyn_cast<SwitchEnumInst>(pred->getTerminator())) {
+          if (assignment.isLargeLoadableType(sw->getOperand()->getType())) {
+              continue;
+          }
+        }
       }
 
       // Handle all other basic block arguments.
@@ -4282,7 +4285,8 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
           // Large try apply results have to be stored to their stack location
           // in the success block.
           if (auto *pred = bb.getSinglePredecessorBlock()) {
-            if (auto *term = dyn_cast<TryApplyInst>(pred->getTerminator())) {
+            if (isa<TryApplyInst>(pred->getTerminator()) ||
+                isa<SwitchEnumInst>(pred->getTerminator())) {
               assert(bb.getArguments().size() == 1);
               shouldDeleteBlockArgument = false;
               // We will emit the store to initialize after parsing all other
