@@ -18,3 +18,5 @@ struct S: P {
   func f(_: Float) {}
   func f(_: String) {}
 }
+
+let x: String.Type = S.A.self

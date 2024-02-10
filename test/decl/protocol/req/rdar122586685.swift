@@ -12,3 +12,5 @@ extension P {
     public subscript(index: Int) -> String { fatalError() }
     public func makeIterator() -> AnyIterator<String> { fatalError() }
 }
+
+let x: AnyIterator<String>.Type = S.Iterator.self
