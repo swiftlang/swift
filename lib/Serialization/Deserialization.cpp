@@ -6094,6 +6094,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Section_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::SectionDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) SectionAttr(blobData, isImplicit);
+        break;
+      }
+
       case decls_block::RawLayout_DECL_ATTR: {
         bool isImplicit;
         TypeID typeID;
