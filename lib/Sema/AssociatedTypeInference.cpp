@@ -423,26 +423,6 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     if (genericDecl->isGeneric())
       continue;
 
-    // As a narrow fix for a source compatibility issue with SwiftUI's
-    // swiftinterface, allow a 'typealias' type witness with an underlying type
-    // of 'Never' if it is declared in a context that does not satisfy the
-    // requirements of the conformance context.
-    //
-    // FIXME: Remove this eventually.
-    bool skipRequirementCheck = false;
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (typeAliasDecl->getParentModule()->getName().is("SwiftUI") &&
-          typeAliasDecl->getParentSourceFile() &&
-          typeAliasDecl->getParentSourceFile()->Kind == SourceFileKind::Interface) {
-        if (typeAliasDecl->getUnderlyingType()->isNever()) {
-          if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
-              dc->getSelfNominalTypeDecl()) {
-            skipRequirementCheck = true;
-          }
-        }
-      }
-    }
-
     // Skip typealiases with an unbound generic type as their underlying type.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl))
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
@@ -461,8 +441,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
     // If the type comes from a constrained extension or has a 'where'
     // clause, check those requirements now.
-    if (!skipRequirementCheck &&
-        !TypeChecker::checkContextualRequirements(
+    if (!TypeChecker::checkContextualRequirements(
             genericDecl, dc->getSelfInterfaceType(), SourceLoc(),
             dc->getParentModule(), dc->getGenericSignatureOfContext())) {
       continue;
