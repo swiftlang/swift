@@ -4892,7 +4892,6 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
     unwrappedType = dynamicSelfType->getSelfType();
   }
-  // here
 
   if (inStage(TypeResolutionStage::Interface)) {
     if (auto *env = resolution.getGenericSignature().getGenericEnvironment())
