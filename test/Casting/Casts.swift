@@ -1102,22 +1102,31 @@ CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
   @objc class C106973771: NSObject, P106973771 {
     func sayHello() { print("Hello") }
   }
+
   // A class instance clearly conforms to this protocol
   expectTrue(C106973771() is any P106973771)
+  expectNotNil(runtimeCast(C106973771(), to: (any P106973771).self))
   // But the metatype definitely does not
   expectFalse(C106973771.self is any P106973771)
-  // The cast should not succeed
   expectNil(C106973771.self as? any P106973771)
+  expectNil(runtimeCast(C106973771.self, to: (any P106973771).self))
   // The following will crash if the cast succeeds
   (C106973771.self as? any P106973771)?.sayHello()
 
   // We should also follow ObjC rules for
   // ObjC metatypes:
   expectTrue(C106973771.self is any NSObjectProtocol)
+  expectNotNil(runtimeCast(C106973771.self, to: (any NSObjectProtocol).self))
   expectTrue(C106973771.self is NSObject.Type)
-  expectTrue(C106973771.self is NSObject) // FIXME
+  expectNotNil(runtimeCast(C106973771.self, to: NSObject.Type.self))
+  // FIXME: Optimizer breaks this in -O and -Onone builds
+  // expectTrue(C106973771.self is NSObject)
+  // FIXME: Optimizer breaks this in -O builds
+  // expectNotNil(runtimeCast(C106973771.self, to: NSObject.self))
   expectTrue(C106973771.self as AnyObject is any P106973771a)
+  expectNotNil(runtimeCast(C106973771.self as AnyObject, to: (any P106973771a).self))
   expectTrue(C106973771.self is any P106973771a)
+  expectNotNil(runtimeCast(C106973771.self, to: (any P106973771a).self))
 }
 #endif
 
