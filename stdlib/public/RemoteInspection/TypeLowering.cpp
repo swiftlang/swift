@@ -2294,7 +2294,7 @@ public:
     // Uncomment the following line to dump the MPE section every time we come through here...
     //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
 
-    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
+    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumDescriptor(TR);
     if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
       auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
       auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
