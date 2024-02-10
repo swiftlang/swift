@@ -140,9 +140,9 @@ extension AsyncCompactMapSequence: AsyncSequence {
     /// that transforms to a non-`nil` value.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> ElementOfResult? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> ElementOfResult? {
       while true {
-        guard let element = try await baseIterator.next(actor) else {
+        guard let element = try await baseIterator.next(isolation: actor) else {
           return nil
         }
 
