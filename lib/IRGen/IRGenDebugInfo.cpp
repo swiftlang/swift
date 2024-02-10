@@ -1066,6 +1066,9 @@ private:
     for (VarDecl *VD : Decl->getStoredProperties()) {
       auto memberTy = BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD);
 
+      auto &TI = IGM.getTypeInfoForUnlowered(
+          IGM.getSILTypes().getAbstractionPattern(VD), memberTy);
+
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
               VD->getInterfaceType(),
               IGM.getTypeInfoForUnlowered(
@@ -1186,6 +1189,7 @@ private:
   llvm::DICompositeType *createVariantType(CompletedDebugTypeInfo DbgTy,
                                            EnumDecl *Decl,
                                            StringRef MangledName,
+                                           unsigned AlignInBits,
                                            llvm::DIScope *Scope,
                                            llvm::DIFile *File, unsigned Line,
                                            llvm::DINode::DIFlags Flags) {
@@ -1195,7 +1199,6 @@ private:
     StringRef Name = Decl->getName().str();
     unsigned SizeInBits = DbgTy.getSizeInBits();
     // Default, since Swift doesn't allow specifying a custom alignment.
-    unsigned AlignInBits = 0;
     auto NumExtraInhabitants = DbgTy.getNumExtraInhabitants();
 
     // A variant part should actually be a child to a DW_TAG_structure_type
@@ -1235,27 +1238,42 @@ private:
         Elements.push_back(MTy);
       }
     }
-    auto VPTy = DBuilder.createVariantPart(Scope, {}, File, Line, SizeInBits,
-                                           AlignInBits, Flags, nullptr,
-                                           DBuilder.getOrCreateArray(Elements));
+
+    APInt SpareBitsMask;
+    auto &EnumStrategy =
+        getEnumImplStrategy(IGM, DbgTy.getType()->getCanonicalType());
+
+    auto VariantOffsetInBits = 0;
+    if (auto SpareBitsMaskInfo = EnumStrategy.calculateSpareBitsMask()) {
+      SpareBitsMask = SpareBitsMaskInfo->bits;
+      // The offset of the variant mask in the overall enum.
+      VariantOffsetInBits = SpareBitsMaskInfo->byteOffset * 8;
+    }
+
+    auto VPTy = DBuilder.createVariantPart(
+        Scope, {}, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
+        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"",
+        VariantOffsetInBits, SpareBitsMask);
+
     auto DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
-        MangledName, NumExtraInhabitants ? *NumExtraInhabitants : 0);
+        MangledName, NumExtraInhabitants.value_or(0));
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
   }
 
   llvm::DICompositeType *createEnumType(CompletedDebugTypeInfo DbgTy,
                                         EnumDecl *Decl, StringRef MangledName,
+                                        unsigned AlignInBits,
                                         llvm::DIScope *Scope,
                                         llvm::DIFile *File, unsigned Line,
                                         llvm::DINode::DIFlags Flags) {
     if (Decl->hasRawType())
       return createRawEnumType(DbgTy, Decl, MangledName, Scope, File, Line,
                                Flags);
-    return createVariantType(DbgTy, Decl, MangledName, Scope, File, Line,
-                             Flags);
+    return createVariantType(DbgTy, Decl, MangledName, AlignInBits, Scope, File,
+                             Line, Flags);
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
@@ -1868,8 +1886,8 @@ private:
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
-          return createEnumType(*CompletedDbgTy, Decl, MangledName, Scope,
-                                L.File, L.Line, Flags);
+          return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
+                                Scope, L.File, L.Line, Flags);
       return createOpaqueStruct(Scope, Decl->getName().str(), L.File,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
                                 MangledName);
