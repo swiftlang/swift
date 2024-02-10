@@ -1321,7 +1321,7 @@ static bool diagnoseCycle(CompilerInstance &instance,
   auto emitCycleDiagnostic = [&](const ModuleDependencyID &dep) {
     auto startIt = std::find(openSet.begin(), openSet.end(), dep);
     assert(startIt != openSet.end());
-    std::vector cycleNodes(startIt, openSet.end());
+    std::vector<ModuleDependencyID> cycleNodes(startIt, openSet.end());
     cycleNodes.push_back(*startIt);
     llvm::SmallString<64> errorBuffer;
     emitModulePath(cycleNodes, errorBuffer);
