@@ -122,7 +122,10 @@ class ReflectionContext
   using super::readMetadata;
   using super::readObjCClassName;
   using super::readResolvedPointerValue;
-  llvm::DenseMap<typename super::StoredPointer, const RecordTypeInfo *> Cache;
+  llvm::DenseMap<std::pair<typename super::StoredPointer,
+                           remote::TypeInfoProvider::IdType>,
+                 const RecordTypeInfo *>
+      Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
   /// when this object is destroyed.
@@ -892,7 +895,8 @@ public:
   getMetadataTypeInfo(StoredPointer MetadataAddress,
                       remote::TypeInfoProvider *ExternalTypeInfo) {
     // See if we cached the layout already
-    auto found = Cache.find(MetadataAddress);
+    auto ExternalTypeInfoId = ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
+    auto found = Cache.find({MetadataAddress, ExternalTypeInfoId});
     if (found != Cache.end())
       return found->second;
 
@@ -922,7 +926,7 @@ public:
     }
 
     // Cache the result for future lookups
-    Cache[MetadataAddress] = TI;
+    Cache[{MetadataAddress, ExternalTypeInfoId}] = TI;
     return TI;
   }
 
