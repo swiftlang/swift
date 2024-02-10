@@ -3070,6 +3070,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       WhereClauseOwner(const_cast<AbstractFunctionDecl *>(FD), attr),
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
+      attr->getLocation(),
       /*isExtension=*/false,
       /*allowInverses=*/true};
 
@@ -5593,6 +5594,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         WhereClauseOwner(original, attr),
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
+        attr->getLocation(),
         /*isExtension=*/false,
         /*allowInverses=*/true};
 

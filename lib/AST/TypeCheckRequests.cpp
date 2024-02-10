@@ -438,23 +438,27 @@ bool WhereClauseOwner::visitRequirements(
     TypeResolutionStage stage,
     llvm::function_ref<bool(Requirement, RequirementRepr *)> callback)
     const && {
-  auto &evaluator = dc->getASTContext().evaluator;
+  auto &ctx = dc->getASTContext();
+  auto &evaluator = ctx.evaluator;
   auto requirements = getRequirements();
   for (unsigned index : indices(requirements)) {
     // Resolve to a requirement.
-    auto req = evaluator(RequirementRequest{*this, index, stage});
-    if (req) {
-      // Invoke the callback. If it returns true, we're done.
-      if (callback(*req, &requirements[index]))
-        return true;
-
+    bool hadCycle = false;
+    auto req = evaluator(RequirementRequest{*this, index, stage},
+                         [&ctx, &hadCycle]() {
+                           // If we encounter a cycle, just make a fake
+                           // same-type requirement. We will skip it below.
+                           hadCycle = true;
+                           return Requirement(RequirementKind::SameType,
+                                              ErrorType::get(ctx),
+                                              ErrorType::get(ctx));
+                         });
+    if (hadCycle)
       continue;
-    }
 
-    llvm::handleAllErrors(
-        req.takeError(), [](const CyclicalRequestError<RequirementRequest> &E) {
-          // cycle detected
-        });
+    // Invoke the callback. If it returns true, we're done.
+    if (callback(req, &requirements[index]))
+      return true;
   }
 
   return false;

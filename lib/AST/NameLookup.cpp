@@ -3175,16 +3175,10 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     // inheritance hierarchy by evaluating its superclass. This forces the
     // diagnostic at this point and then suppresses the superclass failure.
     if (superclass) {
-      auto result = Ctx.evaluator(SuperclassDeclRequest{superclass});
-      bool hadCycle = false;
-      if (auto err = result.takeError()) {
-        llvm::handleAllErrors(std::move(err),
-          [&hadCycle](const CyclicalRequestError<SuperclassDeclRequest> &E) {
-          hadCycle = true;
-          });
-
-        if (hadCycle)
-          return nullptr;
+      if (evaluateOrDefault(Ctx.evaluator,
+                            SuperclassDeclRequest{superclass},
+                            superclass) == superclass) {
+        return nullptr;
       }
 
       return superclass;

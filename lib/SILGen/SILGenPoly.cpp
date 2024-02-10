@@ -4495,13 +4495,18 @@ void ResultPlanner::planExpandedIntoDirect(AbstractionPattern innerOrigType,
              "optional nor are we under opaque value mode");
       assert(outerSubstType->isAny());
 
+      auto *module = SGF.getModule().getSwiftModule();
+      auto &ctx = SGF.getASTContext();
+
       auto opaque = AbstractionPattern::getOpaque();
       auto anyType = SGF.getLoweredType(opaque, outerSubstType);
       auto outerResultAddr = SGF.emitTemporaryAllocation(Loc, anyType);
+      auto conformances =
+        module->collectExistentialConformances(innerSubstType, outerSubstType);
 
       SILValue outerConcreteResultAddr = SGF.B.createInitExistentialAddr(
           Loc, outerResultAddr, innerSubstType,
-          SGF.getLoweredType(opaque, innerSubstType), /*conformances=*/{});
+          SGF.getLoweredType(opaque, innerSubstType), conformances);
 
       expandInnerTupleOuterIndirect(innerOrigType, innerSubstType,
                                     innerOrigType, innerSubstType,

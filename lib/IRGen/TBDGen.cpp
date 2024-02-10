@@ -651,13 +651,13 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
 
 std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   auto &evaluator = desc.getParentModule()->getASTContext().evaluator;
-  return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
+  return evaluateOrFatal(evaluator, PublicSymbolsRequest{desc});
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          const TBDGenOptions &opts) {
   auto &evaluator = M->getASTContext().evaluator;
   auto desc = TBDGenDescriptor::forModule(M, opts);
-  auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
+  auto file = evaluateOrFatal(evaluator, GenerateTBDRequest{desc});
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "TBD writing should be error-free");
 }
@@ -870,7 +870,7 @@ void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
   TBDGenOptions opts;
   auto &evaluator = M->getASTContext().evaluator;
   auto desc = TBDGenDescriptor::forModule(M, opts);
-  auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
+  auto api = evaluateOrFatal(evaluator, APIGenRequest{desc});
   api.writeAPIJSONFile(os, PrettyPrint);
 }
 

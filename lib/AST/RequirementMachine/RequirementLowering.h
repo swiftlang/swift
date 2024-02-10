@@ -47,8 +47,7 @@ void desugarRequirement(Requirement req, SourceLoc loc,
                         SmallVectorImpl<InverseRequirement> &inverses,
                         SmallVectorImpl<RequirementError> &errors);
 
-void inferRequirements(Type type, SourceLoc loc,
-                       ModuleDecl *module, DeclContext *dc,
+void inferRequirements(Type type, ModuleDecl *module, DeclContext *dc,
                        SmallVectorImpl<StructuralRequirement> &result);
 
 void realizeRequirement(DeclContext *dc,

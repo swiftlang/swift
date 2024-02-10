@@ -3764,6 +3764,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     // Validate the presence of ownership for a noncopyable parameter.
     if (inStage(TypeResolutionStage::Interface)
+        && !ty->hasUnboundGenericType()
         && !options.contains(TypeResolutionFlags::SILMode)) {
       diagnoseMissingOwnership(getASTContext(), dc, ownership,
                                eltTypeRepr, ty, options);
@@ -5341,6 +5342,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // since we should've diagnosed the inner tuple already.
     if (inStage(TypeResolutionStage::Interface)
         && !options.contains(TypeResolutionFlags::SILMode)
+        && !ty->hasUnboundGenericType()
         && isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext())
         && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)
         && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {

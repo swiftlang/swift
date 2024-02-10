@@ -4010,11 +4010,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   // we need to disallow conversions from types containing @noescape
   // functions to Any.
 
-  // Conformance to 'Any' always holds.
-  if (type2->isAny()) {
-    if (!type1->isNoEscape())
-      return getTypeMatchSuccess();
-
+  // FIXME: special case for nonescaping functions and tuples containing them
+  // shouldn't be needed, as functions have conformances to Escapable/Copyable.
+  if (type2->isAny() && type1->isNoEscape()) {
     if (shouldAttemptFixes()) {
       auto *fix = MarkExplicitlyEscaping::create(*this, type1, type2,
                                                  getConstraintLocator(locator));
@@ -8790,7 +8788,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
 
     // If this is a failure to conform to Copyable, tailor the error message.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    if (kind == ConstraintKind::ConformsTo &&
+        protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       auto *fix =
           MustBeCopyable::create(*this,
                                  type,
@@ -10621,8 +10620,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   auto &ctx = cs.getASTContext();
 
   // Retrieve a corresponding ExprPattern which we can solve with ~=.
-  auto *EP =
-      llvm::cantFail(ctx.evaluator(EnumElementExprPatternRequest{pattern}));
+  auto *EP = evaluateOrFatal(ctx.evaluator,
+                             EnumElementExprPatternRequest{pattern});
 
   auto target = SyntacticElementTarget::forExprPattern(EP);
 
