@@ -22,6 +22,7 @@
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/SPIOnlyUsedInSPI.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/RetroactiveConformance.swift -o %t -I %t
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
@@ -110,6 +111,11 @@ public func packageFunc() -> PackageType { return PackageType() }
 //--- SPIOnlyUsedInSPI.swift
 public struct ToUseFromSPI {}
 
+//--- RetroactiveConformance.swift
+public struct Extended {
+  public var count: Int { 42 }
+}
+
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
 import UnusedImport // expected-error {{ambiguous implicit access level for import of 'UnusedImport'; it is imported as 'public' elsewhere}}
@@ -143,6 +149,7 @@ public import ImportUsedInPackage // expected-warning {{public import of 'Import
 
 @_exported public import ExportedUnused
 @_spiOnly public import SPIOnlyUsedInSPI
+public import RetroactiveConformance
 
 public func useInSignature(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
 public func exportedTypeUseInSignature(_ a: ExportedType) {} // expected-remark {{struct 'ExportedType' is imported via 'Exporter', which reexports definition from 'Exportee'}}
@@ -227,6 +234,13 @@ package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {
 
 @_spi(X)
 public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
+
+public protocol Countable {
+  var count: Int { get } // expected-remark {{struct 'Int' is imported via 'Swift'}}
+}
+
+extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
+}
 
 /// Tests for imports of clang modules.
 //--- module.modulemap
