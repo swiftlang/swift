@@ -2125,50 +2125,104 @@ AssociatedTypeDecl *swift::findDefaultedAssociatedType(
   return results.size() == 1 ? results.front() : nullptr;
 }
 
+static SmallVector<ProtocolConformance *, 2>
+getPeerConformances(NormalProtocolConformance *conformance) {
+  auto *dc = conformance->getDeclContext();
+  IterableDeclContext *idc = dyn_cast<ExtensionDecl>(dc);
+  if (!idc)
+    idc = cast<NominalTypeDecl>(dc);
+
+  // NonStructural skips the Sendable synthesis which can cycle, and Sendable
+  // doesn't have associated types anyway.
+  return idc->getLocalConformances(ConformanceLookupKind::NonStructural);
+}
+
 Type AssociatedTypeInference::computeFixedTypeWitness(
                                             AssociatedTypeDecl *assocType) {
   Type resultType;
 
-  // Look at all of the inherited protocols to determine whether they
-  // require a fixed type for this associated type.
-  for (auto conformedProto : dc->getSelfNominalTypeDecl()->getAllProtocols()) {
-    if (conformedProto != assocType->getProtocol() &&
-        !conformedProto->inheritsFrom(assocType->getProtocol()))
-      continue;
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    auto selfTy = assocType->getProtocol()->getSelfInterfaceType();
 
-    auto sig = conformedProto->getGenericSignature();
+    // Look through other local conformances of our declaration context to see if
+    // any fix this associated type to a concrete type.
+    for (auto conformance : getPeerConformances(conformance)) {
+      auto *conformedProto = conformance->getProtocol();
+      auto sig = conformedProto->getGenericSignature();
 
-    // FIXME: The RequirementMachine will assert on re-entrant construction.
-    // We should find a more principled way of breaking this cycle.
-    if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
-        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
-        conformedProto->isComputingRequirementSignature())
-      continue;
-
-    auto selfTy = conformedProto->getSelfInterfaceType();
-    if (!sig->requiresProtocol(selfTy, assocType->getProtocol()))
-      continue;
-
-    auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
-    const auto ty = sig.getReducedType(structuralTy);
-
-    // A dependent member type with an identical base and name indicates that
-    // the protocol does not same-type constrain it in any way; move on to
-    // the next protocol.
-    if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
-      if (memberTy->getBase()->isEqual(selfTy) &&
-          memberTy->getName() == assocType->getName())
+      // FIXME: The RequirementMachine will assert on re-entrant construction.
+      // We should find a more principled way of breaking this cycle.
+      if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
+          ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
+          conformedProto->isComputingRequirementSignature())
         continue;
-    }
 
-    if (!resultType) {
-      resultType = ty;
-      continue;
-    }
+      auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
+      if (!sig->isValidTypeParameter(structuralTy))
+        continue;
 
-    // FIXME: Bailing out on ambiguity.
-    if (!resultType->isEqual(ty))
-      return Type();
+      const auto ty = sig.getReducedType(structuralTy);
+
+      // A dependent member type with an identical base and name indicates that
+      // the protocol does not same-type constrain it in any way; move on to
+      // the next protocol.
+      if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
+        if (memberTy->getBase()->isEqual(selfTy) &&
+            memberTy->getName() == assocType->getName())
+          continue;
+      }
+
+      if (!resultType) {
+        resultType = ty;
+        continue;
+      }
+
+      // FIXME: Bailing out on ambiguity.
+      if (!resultType->isEqual(ty))
+        return Type();
+    }
+  } else {
+    // Look at all of the inherited protocols to determine whether they
+    // require a fixed type for this associated type.
+    for (auto conformedProto : dc->getSelfNominalTypeDecl()->getAllProtocols()) {
+      if (conformedProto != assocType->getProtocol() &&
+          !conformedProto->inheritsFrom(assocType->getProtocol()))
+        continue;
+
+      auto sig = conformedProto->getGenericSignature();
+
+      // FIXME: The RequirementMachine will assert on re-entrant construction.
+      // We should find a more principled way of breaking this cycle.
+      if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
+          ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
+          conformedProto->isComputingRequirementSignature())
+        continue;
+
+      auto selfTy = conformedProto->getSelfInterfaceType();
+      if (!sig->requiresProtocol(selfTy, assocType->getProtocol()))
+        continue;
+
+      auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
+      const auto ty = sig.getReducedType(structuralTy);
+
+      // A dependent member type with an identical base and name indicates that
+      // the protocol does not same-type constrain it in any way; move on to
+      // the next protocol.
+      if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
+        if (memberTy->getBase()->isEqual(selfTy) &&
+            memberTy->getName() == assocType->getName())
+          continue;
+      }
+
+      if (!resultType) {
+        resultType = ty;
+        continue;
+      }
+
+      // FIXME: Bailing out on ambiguity.
+      if (!resultType->isEqual(ty))
+        return Type();
+    }
   }
 
   return resultType;
@@ -2357,18 +2411,6 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   return llvm::None;
-}
-
-static SmallVector<ProtocolConformance *, 2>
-getPeerConformances(NormalProtocolConformance *conformance) {
-  auto *dc = conformance->getDeclContext();
-  IterableDeclContext *idc = dyn_cast<ExtensionDecl>(dc);
-  if (!idc)
-    idc = cast<NominalTypeDecl>(dc);
-
-  // NonStructural skips the Sendable synthesis which can cycle, and Sendable
-  // doesn't have associated types anyway.
-  return idc->getLocalConformances(ConformanceLookupKind::NonStructural);
 }
 
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
