@@ -5,7 +5,7 @@ protocol P1 where A == Never {
   associatedtype A
 }
 // CHECK-LABEL: Abstract type witness system for conformance of S1 to P1: {
-// CHECK-NEXT: A => Never,
+// CHECK-NEXT: A => Never (preferred),
 // CHECK-NEXT: }
 struct S1: P1 {}
 
@@ -45,7 +45,7 @@ extension P4b {
   typealias B = Self
 }
 // CHECK-LABEL: Abstract type witness system for conformance of S4 to P4a: {
-// CHECK-NEXT: A => [Self.B],
+// CHECK-NEXT: A => [Self.B] (preferred),
 // CHECK-NEXT: }
 struct S4: P4a, P4b {}
 
@@ -75,7 +75,7 @@ protocol P7a where A == Never {
 // expected-error@+1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
 protocol P7b: P7a where A == Bool {}
 // CHECK-LABEL: Abstract type witness system for conformance of S7 to P7a: {
-// CHECK-NEXT: A => Never,
+// CHECK-NEXT: A => Never (preferred),
 // CHECK-NEXT: }
 struct S7: P7b {}
 
@@ -148,7 +148,7 @@ protocol P12 where A == B {
   func foo(arg: A)
 }
 // CHECK-LABEL: Abstract type witness system for conformance of S12 to P12: {
-// CHECK-NEXT: B => Self.A,
+// CHECK-NEXT: B => Self.A (preferred),
 // CHECK-NEXT: }
 struct S12: P12 {
   func foo(arg: Never) {}
@@ -174,7 +174,7 @@ protocol P14 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Outer<Element>.Conformer to P14: {
-  // CHECK-NEXT: A => Array<Self>,
+  // CHECK-NEXT: A => Array<Self> (preferred),
   // CHECK-NEXT: }
   struct Outer<Element> {
     struct Conformer: P14 {}
@@ -188,8 +188,8 @@ protocol P15a {
 protocol P15b: P15a where A == B {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P15a: {
-  // CHECK-NEXT: A => Never, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Never, [[EQUIV_CLASS]]
+  // CHECK-NEXT: A => Never (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Never (preferred), [[EQUIV_CLASS]]
   // CHECK-NEXT: }
   struct Conformer: P15b {}
 }
@@ -201,8 +201,8 @@ protocol P16a where A == B {
 protocol P16b: P16a {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P16a: {
-  // CHECK-NEXT: A => Never, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Never, [[EQUIV_CLASS]]
+  // CHECK-NEXT: A => Never (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Never (preferred), [[EQUIV_CLASS]]
   // CHECK-NEXT: }
   struct Conformer: P16b {}
 }
@@ -225,23 +225,23 @@ protocol P17d {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P17a: {
-  // CHECK-NEXT: A => Never,
+  // CHECK-NEXT: A => Never (preferred),
   // CHECK-NEXT: B => (unresolved){{$}}
   // CHECK-NEXT: }
   struct Conformer1: P17a {} // expected-error {{type 'Conformer1' does not conform to protocol 'P17a'}}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<A> to P17b: {
-  // CHECK-NEXT: A => A, [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: B => (unresolved)
   // CHECK-NEXT: }
   struct Conformer2<A>: P17b {} // expected-error {{type 'Conformer2<A>' does not conform to protocol 'P17b'}}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer3 to P17c: {
-  // CHECK-NEXT: A => Never, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Never, [[EQUIV_CLASS]]
+  // CHECK-NEXT: A => Never (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Never (preferred), [[EQUIV_CLASS]]
   // CHECK-NEXT: }
   struct Conformer3: P17c {}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer4<A> to P17d: {
-  // CHECK-NEXT: A => A, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Int, [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Int (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: }
   struct Conformer4<A>: P17d {}
 }
@@ -254,10 +254,10 @@ protocol P18 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<D> to P18: {
-  // CHECK-NEXT: A => (Self.D) -> Self.D, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => (Self.D) -> Self.D, [[EQUIV_CLASS]]
-  // CHECK-NEXT: C => (Self.D) -> Self.D, [[EQUIV_CLASS]]
-  // CHECK-NEXT: D => D,
+  // CHECK-NEXT: A => (Self.D) -> Self.D (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (Self.D) -> Self.D (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: C => (Self.D) -> Self.D (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: D => D (preferred),
   // CHECK-NEXT: }
   struct Conformer<D>: P18 {}
 }
@@ -268,8 +268,8 @@ protocol P19 where Self == A {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P19: {
-  // CHECK-NEXT: A => Self,
-  // CHECK-NEXT: B => (Self.A, Self.A),
+  // CHECK-NEXT: A => Self (preferred),
+  // CHECK-NEXT: B => (Self.A, Self.A) (preferred),
   // CHECK-NEXT: }
   struct Conformer: P19 {}
 }
@@ -281,8 +281,8 @@ protocol P20 where A == B.Element, B == B.SubSequence, C.Element == B.Element {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P20: {
-  // CHECK-NEXT: A => Self.B.Element,
-  // CHECK-NEXT: C => Array<Character>,
+  // CHECK-NEXT: A => Self.B.Element (preferred),
+  // CHECK-NEXT: C => Array<Character> (preferred),
   // CHECK-NEXT: }
   struct Conformer: P20 {
     typealias B = Substring
@@ -296,9 +296,9 @@ protocol P21 where A == B {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<C> to P21: {
-  // CHECK-NEXT: A => C, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => C, [[EQUIV_CLASS]]
-  // CHECK-NEXT: C => C, [[EQUIV_CLASS]]
+  // CHECK-NEXT: A => C (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => C (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: C => C (preferred), [[EQUIV_CLASS]]
   // CHECK-NEXT: }
   struct Conformer<C>: P21 {}
 }
@@ -311,10 +311,10 @@ protocol P22 where A == B, C == D {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<A> to P22: {
-  // CHECK-NEXT: A => A, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => A, [[EQUIV_CLASS]]
-  // CHECK-NEXT: C => A, [[EQUIV_CLASS]]
-  // CHECK-NEXT: D => A, [[EQUIV_CLASS]]
+  // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => A (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: C => A (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: D => A (preferred), [[EQUIV_CLASS]]
   // CHECK-NEXT: }
   struct Conformer<A>: P22 {}
 }
@@ -325,13 +325,13 @@ protocol P23 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P23: {
-  // CHECK-NEXT: A => Self.B.A,
-  // CHECK-NEXT: B => Self.A.B,
+  // CHECK-NEXT: A => Self.B.A (preferred),
+  // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer: P23 {} // expected-error {{type 'Conformer' does not conform to protocol 'P23'}}
   // CHECK-LABEL: Abstract type witness system for conformance of ConformerGeneric<T> to P23: {
-  // CHECK-NEXT: A => Self.B.A,
-  // CHECK-NEXT: B => Self.A.B,
+  // CHECK-NEXT: A => Self.B.A (preferred),
+  // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct ConformerGeneric<T>: P23 {} // expected-error {{type 'ConformerGeneric<T>' does not conform to protocol 'P23'}}
 }
@@ -342,13 +342,13 @@ protocol P24 where A == B.A {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P24: {
-  // CHECK-NEXT: A => Self.B.A,
-  // CHECK-NEXT: B => Self.A.B,
+  // CHECK-NEXT: A => Self.B.A (preferred),
+  // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer: P24 {} // expected-error {{type 'Conformer' does not conform to protocol 'P24'}}
   // CHECK-LABEL: Abstract type witness system for conformance of ConformerGeneric<T> to P24: {
-  // CHECK-NEXT: A => Self.B.A,
-  // CHECK-NEXT: B => Self.A.B,
+  // CHECK-NEXT: A => Self.B.A (preferred),
+  // CHECK-NEXT: B => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct ConformerGeneric<T>: P24 {} // expected-error {{type 'ConformerGeneric<T>' does not conform to protocol 'P24'}}
 }
@@ -371,15 +371,15 @@ protocol P25c_1: P25a_1, P25b {}
 protocol P25c_2: P25a_2, P25b {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<C> to P25a_1: {
-  // CHECK-NEXT: A => Int, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Int, [[EQUIV_CLASS]]
-  // CHECK-NEXT: C => C,
+  // CHECK-NEXT: A => Int (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Int (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: C => C (preferred),
   // CHECK-NEXT: }
   struct Conformer1<C: Sequence>: P25c_1 where C.Element == Int {}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<C> to P25a_2: {
-  // CHECK-NEXT: A => Int, [[EQUIV_CLASS:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Int, [[EQUIV_CLASS]]
-  // CHECK-NEXT: C => C,
+  // CHECK-NEXT: A => Int (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Int (preferred), [[EQUIV_CLASS]]
+  // CHECK-NEXT: C => C (preferred),
   // CHECK-NEXT: }
   struct Conformer2<C: Sequence>: P25c_2 where C.Element == Int {}
 }
@@ -397,13 +397,13 @@ protocol P26 where C == B, F == G {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<D> to P26: {
-  // CHECK-NEXT: A => Int, [[EQUIV_CLASS_1:0x[0-9a-f]+]]
-  // CHECK-NEXT: B => Int, [[EQUIV_CLASS_1]]
-  // CHECK-NEXT: C => Int, [[EQUIV_CLASS_1]]
-  // CHECK-NEXT: D => D, [[EQUIV_CLASS_2:0x[0-9a-f]+]]
-  // CHECK-NEXT: E => D, [[EQUIV_CLASS_2]]
-  // CHECK-NEXT: F => [Self.B], [[EQUIV_CLASS_3:0x[0-9a-f]+]]
-  // CHECK-NEXT: G => [Self.B], [[EQUIV_CLASS_3]]
+  // CHECK-NEXT: A => Int (preferred), [[EQUIV_CLASS_1:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => Int (preferred), [[EQUIV_CLASS_1]]
+  // CHECK-NEXT: C => Int (preferred), [[EQUIV_CLASS_1]]
+  // CHECK-NEXT: D => D (preferred), [[EQUIV_CLASS_2:0x[0-9a-f]+]]
+  // CHECK-NEXT: E => D (preferred), [[EQUIV_CLASS_2]]
+  // CHECK-NEXT: F => [Self.B] (preferred), [[EQUIV_CLASS_3:0x[0-9a-f]+]]
+  // CHECK-NEXT: G => [Self.B] (preferred), [[EQUIV_CLASS_3]]
   // CHECK-NEXT: }
   struct Conformer<D>: P26 {}
 }
@@ -419,15 +419,15 @@ protocol P27c_1: P27a, P27b {}
 protocol P27c_2: P27b, P27a {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<B> to P27a: {
-  // CHECK-NEXT: A => Int,
+  // CHECK-NEXT: A => Int (preferred),
   // CHECK-NEXT: }
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<B> to P27b: {
-  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: B => B (preferred),
   // CHECK-NEXT: }
   struct Conformer1<B: Sequence>: P27c_1 where B.Element == Int {}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<B> to P27b: {
-  // CHECK-NEXT: A => Int,
-  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: A => Int (preferred),
+  // CHECK-NEXT: B => B (preferred),
   // CHECK-NEXT: }
   struct Conformer2<B: Sequence>: P27c_2 where B.Element == Int {}
 }
@@ -590,7 +590,7 @@ protocol P33b where A == Int {
 protocol Q33: P33a, P33b {}
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P33a: {
-  // CHECK-NEXT: A => Int,
+  // CHECK-NEXT: A => Int (preferred),
   // CHECK-NEXT: }
   struct Conformer: Q33 {}
 }
@@ -609,13 +609,13 @@ protocol Q34c: P34a, P34b {
 do {
   // FIXME: should really be ambiguous (source-breaking)?
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P34a: {
-  // CHECK-NEXT: A => Void,
+  // CHECK-NEXT: A => Void (preferred),
   // CHECK-NEXT: }
   struct Conformer1: Q34a {}
 
   // FIXME: should really be ambiguous (source-breaking)?
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2 to P34b: {
-  // CHECK-NEXT: A => Never,
+  // CHECK-NEXT: A => Never (preferred),
   // CHECK-NEXT: }
   struct Conformer2: Q34b {}
 
@@ -633,18 +633,18 @@ protocol P35 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P35: {
-  // CHECK-NEXT: B => Array<Self.C>,
-  // CHECK-NEXT: C => Array<Self.D>,
-  // CHECK-NEXT: D => Array<Self.A>,
+  // CHECK-NEXT: B => Array<Self.C> (preferred),
+  // CHECK-NEXT: C => Array<Self.D> (preferred),
+  // CHECK-NEXT: D => Array<Self.A> (preferred),
   // CHECK-NEXT: }
   struct Conformer: P35 {
     typealias A = Never
   }
   // CHECK-LABEL: Abstract type witness system for conformance of ConformerGeneric<A> to P35: {
-  // CHECK-NEXT: A => A,
-  // CHECK-NEXT: B => Array<Self.C>,
-  // CHECK-NEXT: C => Array<Self.D>,
-  // CHECK-NEXT: D => Array<Self.A>,
+  // CHECK-NEXT: A => A (preferred),
+  // CHECK-NEXT: B => Array<Self.C> (preferred),
+  // CHECK-NEXT: C => Array<Self.D> (preferred),
+  // CHECK-NEXT: D => Array<Self.A> (preferred),
   // CHECK-NEXT: }
   struct ConformerGeneric<A>: P35 {}
 }
@@ -659,8 +659,8 @@ protocol P36 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P36: {
-  // CHECK-NEXT: A => G36<Self.B>,
-  // CHECK-NEXT: B => Never,
+  // CHECK-NEXT: A => G36<Self.B> (preferred),
+  // CHECK-NEXT: B => Never (preferred),
   // CHECK-NEXT: }
   struct Conformer: P36 {} // expected-error {{type 'Conformer' does not conform to protocol 'P36'}}
 }
@@ -674,7 +674,7 @@ protocol P37b {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<C> to P37b: {
-  // CHECK-NEXT: C => C,
+  // CHECK-NEXT: C => C (preferred),
   // CHECK-NEXT: }
   struct Conformer1<C>: P37b {
     struct Inner: P37a { typealias A = C }
@@ -683,7 +683,7 @@ do {
   }
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<T> to P37b: {
-  // CHECK-NEXT: C => Self.B.A,
+  // CHECK-NEXT: C => Self.B.A (preferred),
   // CHECK-NEXT: }
   struct Conformer2<T>: P37b {
     struct Inner: P37a { typealias A = T }
@@ -715,8 +715,8 @@ protocol P39 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P39: {
-  // CHECK-NEXT: B => Self.A.C,
-  // CHECK-NEXT: C => Never,
+  // CHECK-NEXT: B => Self.A.C (preferred),
+  // CHECK-NEXT: C => Never (preferred),
   // CHECK-NEXT: }
   struct Conformer: P39 {
     typealias A = Self
@@ -748,8 +748,8 @@ protocol P41 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P41: {
-  // CHECK-NEXT: A => Self.B.A,
-  // CHECK-NEXT: B => Self,
+  // CHECK-NEXT: A => Self.B.A (preferred),
+  // CHECK-NEXT: B => Self (preferred),
   // CHECK-NEXT: }
   struct Conformer: P41 {} // expected-error{{type 'Conformer' does not conform to protocol 'P41'}}
 }
@@ -762,11 +762,11 @@ protocol P42b: P42a {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P42b: {
-  // CHECK-NEXT: A => Self.B.A,
+  // CHECK-NEXT: A => Self.B.A (preferred),
   // CHECK-NEXT: }
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P42a: {
-  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: B => B (preferred),
   // CHECK-NEXT: }
   struct Conformer<B: P42b>: P42b {}
 }
@@ -780,11 +780,11 @@ protocol P43b: P43a {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P43b: {
-  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: C => Self.A.B (preferred),
   // CHECK-NEXT: }
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P43a: {
-  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: B => B (preferred),
   // CHECK-NEXT: }
   struct Conformer<B: P43a>: P43b {
     typealias A = Conformer<B.A>
@@ -798,7 +798,7 @@ protocol P44 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<T> to P44: {
-  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: C => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer1<T: P44>: P44 {
     typealias B = T.A
@@ -806,16 +806,16 @@ do {
   }
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<B> to P44: {
-  // CHECK-NEXT: B => B,
-  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: B => B (preferred),
+  // CHECK-NEXT: C => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer2<B: P44>: P44 {
     typealias A = Conformer2<B.A>
   }
 
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer3<B> to P44: {
-  // CHECK-NEXT: B => B,
-  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: B => B (preferred),
+  // CHECK-NEXT: C => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer3<B>: P44 {
     typealias A = Conformer3<Int>
@@ -829,10 +829,10 @@ protocol P45 {
   associatedtype D = Never
 }
 // CHECK-LABEL: Abstract type witness system for conformance of Conformer45<A> to P45: {
-// CHECK-NEXT: A => A,
-// CHECK-NEXT: B => Conformer45<Self.D>,
-// CHECK-NEXT: C => Self.B.A,
-// CHECK-NEXT: D => Never,
+// CHECK-NEXT: A => A (preferred),
+// CHECK-NEXT: B => Conformer45<Self.D> (preferred),
+// CHECK-NEXT: C => Self.B.A (preferred),
+// CHECK-NEXT: D => Never (preferred),
 // CHECK-NEXT: }
 struct Conformer45<A>: P45 {}
 
@@ -845,7 +845,7 @@ protocol P46 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer<T> to P46: {
-  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: C => Self.A.B (preferred),
   // CHECK-NEXT: }
   struct Conformer<T: P46>: P46 {
     typealias A = Conformer<T.A>
@@ -860,7 +860,7 @@ protocol P47 {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Outer<A>.Inner to P47: {
-  // CHECK-NEXT: A => A,
+  // CHECK-NEXT: A => A (preferred),
   // CHECK-NEXT: }
   struct Outer<A> {
     struct Inner: P47 {}
