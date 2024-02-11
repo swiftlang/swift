@@ -1830,6 +1830,32 @@ InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
+  InferredAssociatedTypesByWitnesses result;
+
+  // Check if this associated type is actually fixed to a fully concrete type by
+  // a same-type requirement in a protocol that our conforming type conforms to.
+  //
+  // A more general form of this analysis that also handles same-type
+  // requirements between type parameters is performed later in
+  // inferAbstractTypeWitnesses().
+  //
+  // We handle the fully concrete case here, which completely rules out
+  // certain invalid solutions.
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    if (auto fixedType = computeFixedTypeWitness(assocType)) {
+      if (!fixedType->hasTypeParameter()) {
+        InferredAssociatedTypesByWitness inferred;
+        inferred.Witness = assocType;
+        inferred.Inferred.push_back({assocType, fixedType});
+        result.push_back(std::move(inferred));
+
+        // That's it; we're forced into this binding, so we're not adding another
+        // tautology below.
+        return result;
+      }
+    }
+  }
+
   // Form the default name _Default_Foo.
   DeclNameRef defaultName;
   {
@@ -1855,8 +1881,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                       ? cast<ExtensionDecl>(dc)->getStartLoc()
                       : cast<NominalTypeDecl>(dc)->getStartLoc(),
                       subOptions, lookupResults);
-
-  InferredAssociatedTypesByWitnesses result;
 
   for (auto decl : lookupResults) {
     // We want type declarations.
