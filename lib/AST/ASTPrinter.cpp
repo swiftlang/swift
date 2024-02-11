@@ -1093,6 +1093,7 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        assert(Options.CurrentModule);
         auto Subs = CurrentType->getContextSubstitutionMap(
           Options.CurrentModule, NTD->getDeclContext());
         setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
