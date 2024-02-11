@@ -9,6 +9,7 @@ public class Klass {
 
 public struct NonTrivialStruct {
     var k = Klass()
+    let i = 0
 
     func doSomethingDefault() {}
     borrowing func doSomethingBorrowing() {}
@@ -228,6 +229,10 @@ func testLoadableConsumingEnum2(_ x: consuming LoadableEnum) {
 
 func testLoadableConsumingCopyOperator(_ x: consuming NonTrivialStruct) {
     _ = copy x
+}
+
+func testLoadableConsumingTrivialLetField(_ x: consuming NonTrivialStruct) -> Int {
+    return x.i
 }
 
 //////////////////////////////////////////
