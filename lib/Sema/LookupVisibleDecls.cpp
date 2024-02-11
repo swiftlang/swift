@@ -271,6 +271,11 @@ static void lookupTypeMembers(Type BaseType, NominalTypeDecl *LookupType,
   assert(!BaseType->hasTypeParameter());
   assert(LookupType && "should have a nominal type");
 
+  // Skip lookup on invertible protocols. They have no members.
+  if (auto *proto = dyn_cast<ProtocolDecl>(LookupType))
+    if (proto->getInvertibleProtocolKind())
+      return;
+
   Consumer.onLookupNominalTypeMembers(LookupType, Reason);
 
   SmallVector<ValueDecl*, 2> FoundDecls;
@@ -444,6 +449,10 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
   for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
+    // Skip conformances to invertible protocols. They have no members.
+    if (Proto->getInvertibleProtocolKind())
+      continue;
+
     if (!Proto->isAccessibleFrom(FromContext))
       continue;
 
