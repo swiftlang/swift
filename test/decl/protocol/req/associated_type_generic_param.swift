@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
-// RUN: not %target-typecheck-verify-swift -disable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
 
 protocol P {
   associatedtype A = Int
@@ -7,4 +7,5 @@ protocol P {
 
 struct S<A>: P {}
 
-let x: String.Type = S<String>.A.self
+// This is unfortunate but it is the behavior of Swift 5.10.
+let x: Int.Type = S<String>.A.self

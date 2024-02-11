@@ -214,7 +214,7 @@ do {
   // CHECK-NEXT: }
   struct Conformer1: P17a {} // expected-error {{type 'Conformer1' does not conform to protocol 'P17a'}}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<A> to P17b: {
-  // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: A => (unresolved), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: B => (unresolved)
   // CHECK-NEXT: }
   struct Conformer2<A>: P17b {} // expected-error {{type 'Conformer2<A>' does not conform to protocol 'P17b'}}
@@ -223,7 +223,7 @@ do {
   // CHECK-NEXT: }
   struct Conformer3: P17c {}
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer4<A> to P17d: {
-  // CHECK-NEXT: A => A (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: A => Int (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: B => Int (preferred), [[EQUIV_CLASS:0x[0-9a-f]+]]
   // CHECK-NEXT: }
   struct Conformer4<A>: P17d {}
@@ -645,7 +645,7 @@ protocol P37b {
 }
 do {
   // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<C> to P37b: {
-  // CHECK-NEXT: C => C (preferred),
+  // CHECK-NEXT: C => Self.B.A (preferred),
   // CHECK-NEXT: }
   struct Conformer1<C>: P37b {
     struct Inner: P37a { typealias A = C }

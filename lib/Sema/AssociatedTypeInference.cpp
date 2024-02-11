@@ -2440,29 +2440,6 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
-  // Look for suitably-named generic parameters first, before we go digging
-  // through same-type requirements of protocols.
-  if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto *const assocType : unresolvedAssocTypes) {
-      // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
-      // AsyncSequence.Failure.
-      if (isAsyncIteratorProtocolFailure(assocType))
-        continue;
-
-      for (auto *gp : genericSig.getInnermostGenericParams()) {
-        // Packs cannot witness associated type requirements.
-        if (gp->isParameterPack())
-          continue;
-
-        if (gp->getName() == assocType->getName()) {
-          system.addTypeWitness(assocType->getName(),
-                                dc->mapTypeIntoContext(gp),
-                                /*preferred=*/true);
-        }
-      }
-    }
-  }
-
   auto considerProtocolRequirements = [&](ProtocolDecl *conformedProto) {
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
@@ -2515,7 +2492,28 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
       system.addDefaultTypeWitness(typeWitness->getType(),
                                    typeWitness->getDefaultedAssocType(),
                                    preferred);
+    } else {
+      // As a last resort, look for a generic parameter that matches the name
+      // of the associated type.
+      if (auto genericSig = dc->getGenericSignatureOfContext()) {
+        // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
+        // AsyncSequence.Failure.
+        if (!isAsyncIteratorProtocolFailure(assocType)) {
+          for (auto *gp : genericSig.getInnermostGenericParams()) {
+            // Packs cannot witness associated type requirements.
+            if (gp->isParameterPack())
+              continue;
+
+            if (gp->getName() == assocType->getName()) {
+              system.addTypeWitness(assocType->getName(),
+                                    dc->mapTypeIntoContext(gp),
+                                    /*preferred=*/true);
+            }
+          }
+        }
+      }
     }
+
   }
 }
 
