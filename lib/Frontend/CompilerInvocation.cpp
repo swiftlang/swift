@@ -3764,6 +3764,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
                                       OPT_disable_layout_string_value_witnesses_instantiation,
                                       Opts.EnableLayoutStringValueWitnessesInstantiation);
+  Opts.AnnotateCondFailMessage =
+      Args.hasFlag(OPT_enable_cond_fail_message_annotation,
+                   OPT_disable_cond_fail_message_annotation,
+                   Opts.AnnotateCondFailMessage);
+
 
   if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
       !Opts.EnableLayoutStringValueWitnesses) {
