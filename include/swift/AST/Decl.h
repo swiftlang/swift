@@ -6776,7 +6776,7 @@ public:
       return true;
     case Specifier::Consuming:
     case Specifier::InOut:
-    case Specifier::Transferring:
+    case Specifier::ImplicitlyCopyableConsuming:
       return false;
     }
     llvm_unreachable("unhandled specifier");
@@ -6794,7 +6794,7 @@ public:
     case ParamSpecifier::LegacyShared:
       return ValueOwnership::Shared;
     case ParamSpecifier::Consuming:
-    case ParamSpecifier::Transferring:
+    case ParamSpecifier::ImplicitlyCopyableConsuming:
     case ParamSpecifier::LegacyOwned:
       return ValueOwnership::Owned;
     case ParamSpecifier::Default:

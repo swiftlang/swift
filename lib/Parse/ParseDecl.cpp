@@ -5399,7 +5399,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         } else if (Tok.getRawText().equals("borrowing")) {
           Specifier = ParamDecl::Specifier::Borrowing;
         } else if (Tok.getRawText().equals("transferring")) {
-          Specifier = ParamDecl::Specifier::Transferring;
+          Specifier = ParamDecl::Specifier::ImplicitlyCopyableConsuming;
         } else if (Tok.getRawText().equals("consuming")) {
           Specifier = ParamDecl::Specifier::Consuming;
         }

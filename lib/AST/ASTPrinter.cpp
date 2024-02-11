@@ -3890,7 +3890,7 @@ static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
   if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->getSpecifier() == ParamSpecifier::Transferring)
+    if (pd->getSpecifier() == ParamSpecifier::ImplicitlyCopyableConsuming)
       return true;
 
   // TODO: Results.
@@ -4592,8 +4592,8 @@ static void printParameterFlags(ASTPrinter &printer,
   case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
     break;
-  case ParamSpecifier::Transferring:
-    printer.printKeyword("transferring", options, " ");
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
+    printer.printKeyword("implicitly_copyable_consuming", options, " ");
     break;
   }
   

@@ -3683,7 +3683,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
         case TypeReprKind::Ownership:
           ownership = cast<OwnershipTypeRepr>(specifierRepr)->getSpecifier();
           nestedRepr = specifierRepr->getBase();
-          isTransferring = ownership == ParamSpecifier::Transferring;
+          isTransferring = ownership == ParamSpecifier::ImplicitlyCopyableConsuming;
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
@@ -4878,7 +4878,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::LegacyOwned:
   case ParamSpecifier::Borrowing:
     break;
-  case ParamSpecifier::Transferring:
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {

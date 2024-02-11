@@ -286,7 +286,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Context.LangOpts.hasFeature(
                          Feature::TransferringArgsAndResults) &&
                      Tok.isContextualKeyword("transferring")) {
-            param.SpecifierKind = ParamDecl::Specifier::Transferring;
+            param.SpecifierKind = ParamDecl::Specifier::ImplicitlyCopyableConsuming;
             param.SpecifierLoc = consumeToken();
           }
 

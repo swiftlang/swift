@@ -2207,9 +2207,9 @@ enum class ParamSpecifier : uint8_t {
   /// `__owned`, a legacy spelling of `consuming`.
   LegacyOwned = 5,
 
-  /// `transferring`. Indicating the transfer of a value from one isolation
-  /// domain to another.
-  Transferring = 6,
+  /// A convention that is similar to consuming a parameter that is mutable and
+  /// var like, but for which no implicit copy semantics are not implemented.
+  ImplicitlyCopyableConsuming = 6,
 };
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and

@@ -2884,7 +2884,7 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   CASE(Consuming)
   CASE(LegacyShared)
   CASE(LegacyOwned)
-  CASE(Transferring)
+  CASE(ImplicitlyCopyableConsuming)
   }
 #undef CASE
   return llvm::None;

@@ -7774,7 +7774,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
   // `inout` and `consuming` parameters are locally mutable.
   case ParamSpecifier::InOut:
   case ParamSpecifier::Consuming:
-  case ParamSpecifier::Transferring:
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
     introducer = VarDecl::Introducer::Var;
     break;
   }
@@ -7838,8 +7838,8 @@ StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
     return "__shared";
   case ParamSpecifier::LegacyOwned:
     return "__owned";
-  case ParamSpecifier::Transferring:
-    return "transferring";
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
+    return "implicitly_copyable_consuming";
   }
   llvm_unreachable("invalid ParamSpecifier");
 }
@@ -8442,7 +8442,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
       hasResultDependsOn(),
-      getSpecifier() == ParamDecl::Specifier::Transferring /*is transferring*/);
+      getSpecifier() == ParamDecl::Specifier::ImplicitlyCopyableConsuming /*is transferring*/);
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

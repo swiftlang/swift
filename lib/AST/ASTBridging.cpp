@@ -2176,7 +2176,7 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
   }
   case BridgedAttributedTypeSpecifierTransferring: {
     return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::Transferring, loc);
+        OwnershipTypeRepr(baseType, ParamSpecifier::ImplicitlyCopyableConsuming, loc);
   }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);
