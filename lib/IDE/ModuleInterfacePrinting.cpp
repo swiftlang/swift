@@ -177,6 +177,7 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
     PrintOptions Options = PrintOptions::printTypeInterface(
         Ty.getPointer(),
         Ty->getASTContext().TypeCheckerOpts.PrintFullConvention);
+    Options.CurrentModule = M;
     ND->print(Printer, Options);
     printTypeNameToString(Ty, TypeName);
     return false;

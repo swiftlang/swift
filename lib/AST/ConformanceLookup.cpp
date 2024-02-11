@@ -280,14 +280,21 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
 
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
-  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
-    return !silFnTy->isNoEscape();
-  }
+//  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+//    return !silFnTy->isNoEscape();
+//  }
+//
+//  auto functionType = eitherFnTy.get<const FunctionType *>();
+//
+//  // TODO: what about autoclosures?
+//  return !functionType->isNoEscape();
 
-  auto functionType = eitherFnTy.get<const FunctionType *>();
-
-  // TODO: what about autoclosures?
-  return !functionType->isNoEscape();
+  // FIXME: unify TypeBase::isNoEscape with TypeBase::isEscapable
+  // LazyConformanceEmitter::visitDestroyValueInst chokes on these instructions
+  // destroy_value %2 : $@convention(block) @noescape () -> ()
+  //
+  // Wrongly claim that all functions today conform to Escapable for now:
+  return true;
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {

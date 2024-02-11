@@ -78,7 +78,8 @@ static bool isOpenedAnyObject(Type type) {
     return false;
 
   return (archetype->requiresClass() &&
-          !archetype->hasRequirements());
+          archetype->getConformsTo().empty() &&
+          !archetype->getSuperclass());
 }
 
 SubstitutionMap

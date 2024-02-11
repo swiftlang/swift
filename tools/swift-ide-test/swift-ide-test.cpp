@@ -1372,9 +1372,17 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   if (names.empty())
     return;
 
+  SmallVector<NullTerminatedStringRef, 2> sortedNames;
+  sortedNames.append(names.begin(), names.end());
+  llvm::sort(sortedNames,
+     [](NullTerminatedStringRef a, NullTerminatedStringRef b) {
+        return a.compare(b) <= 0;
+  });
+
   OS << "LookedupTypeNames: [";
   llvm::interleave(
-      names.begin(), names.end(), [&](auto name) { OS << "'" << name << "'"; },
+      sortedNames.begin(), sortedNames.end(),
+      [&](auto name) { OS << "'" << name << "'"; },
       [&]() { OS << ", "; });
   OS << "]\n";
 }

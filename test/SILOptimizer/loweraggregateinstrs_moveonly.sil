@@ -3,6 +3,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 struct S : ~Copyable {
   deinit {}

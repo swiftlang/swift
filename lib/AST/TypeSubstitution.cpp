@@ -211,6 +211,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
+  assert(M && "null module in conformance lookup");
   return M->lookupConformance(conformingReplacementType,
                               conformedProtocol,
                               /*allowMissing=*/true);

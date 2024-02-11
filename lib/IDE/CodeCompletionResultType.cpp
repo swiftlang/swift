@@ -396,7 +396,7 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&
-             !ExpectedTy->castTo<ArchetypeType>()->hasRequirements();
+             ExpectedTy->castTo<ArchetypeType>()->getExistentialType()->isAny();
 
     if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true,
                                   const_cast<DeclContext &>(DC)))

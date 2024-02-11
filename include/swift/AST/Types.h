@@ -6405,11 +6405,6 @@ public:
     return *getSubclassTrailingObjects<LayoutConstraint>();
   }
 
-  /// Return true if the archetype has any requirements at all.
-  bool hasRequirements() const {
-    return !getConformsTo().empty() || getSuperclass();
-  }
-
   /// Retrieve the nested type with the given associated type.
   Type getNestedType(AssociatedTypeDecl *assocType);
 
