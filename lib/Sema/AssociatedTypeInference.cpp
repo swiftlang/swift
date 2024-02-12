@@ -986,7 +986,6 @@ private:
 
   /// Infer associated type witnesses for the given associated type.
   InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType);
 
   /// Infer associated type witnesses for all relevant value requirements.
@@ -1790,8 +1789,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (assocTypes.count(assocType) == 0)
         continue;
 
-      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocTypes,
-                                                             assocType);
+      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocType);
       if (!reqInferred.empty())
         result.push_back({req, std::move(reqInferred)});
 
@@ -1998,7 +1996,6 @@ static Type removeSelfParam(ValueDecl *value, Type type) {
 
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
   InferredAssociatedTypesByWitnesses result;
 
