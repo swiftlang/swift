@@ -1759,6 +1759,7 @@ static bool getConformancesForSubstitution(Parser &P,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   auto M = P.SF.getParentModule();
+  subReplacement = subReplacement->getReferenceStorageReferent();
 
   for (auto protoDecl : protocols) {
     auto conformance = M->lookupConformance(subReplacement, protoDecl);
@@ -1814,6 +1815,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
       [&](CanType dependentType, Type replacementType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
         auto M = SP.P.SF.getParentModule();
+        replacementType = replacementType->getReferenceStorageReferent();
         if (auto conformance = M->lookupConformance(replacementType, proto))
           return conformance;
 
