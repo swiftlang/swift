@@ -639,6 +639,8 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    case Node::Kind::ParamLifetimeDependence:
+    case Node::Kind::SelfLifetimeDependence:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -895,6 +897,11 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SelfLifetimeDependence) {
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
 
@@ -1710,6 +1717,33 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ParamLifetimeDependence: {
+    Printer << "lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope ";
+      break;
+    }
+    print(Node->getChild(1), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::SelfLifetimeDependence: {
+    Printer << "(self lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit) ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope) ";
+      break;
+    }
+    return nullptr;
+  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;

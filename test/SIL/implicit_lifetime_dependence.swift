@@ -16,11 +16,11 @@ struct BufferView : ~Escapable {
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChcfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlscfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _scope(1) @owned BufferView {
   init(_ otherBV: borrowing BufferView) {
     self.ptr = otherBV.ptr
   }
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CcfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> _inherit(1) @owned BufferView {
   init(_ otherBV: consuming BufferView) {
     self.ptr = otherBV.ptr
   }
@@ -34,7 +34,6 @@ struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
-// rdar://121983770
 func testBasic() {
   let capacity = 4
   let a = Array(0..<capacity)
@@ -46,12 +45,12 @@ func testBasic() {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr)
 }
 
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
   return BufferView(x.ptr)
 }
@@ -60,15 +59,16 @@ func use(_ x: borrowing BufferView) {}
 
 struct Wrapper : ~Escapable {
   let view: BufferView
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperVyAcA10BufferViewVYlicfC : $@convention(method) (@owned BufferView, @thin Wrapper.Type) -> _inherit(1) @owned Wrapper {
   init(_ view: consuming BufferView) {
     self.view = view
   }
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyF : $@convention(method) (@guaranteed Wrapper) -> _scope(0) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLsF : $@convention(method) (@guaranteed Wrapper) -> _scope(0) @owned BufferView {
   borrowing func getView1() -> BufferView {
     return view
   }
 
-// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyF : $@convention(method) (@owned Wrapper) -> _inherit(0) @owned BufferView {
+// CHECK:sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYLiF : $@convention(method) (@owned Wrapper) -> _inherit(0) @owned BufferView {
   consuming func getView2() -> BufferView {
     return view
   }

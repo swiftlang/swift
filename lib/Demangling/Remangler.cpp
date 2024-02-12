@@ -2098,6 +2098,19 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleParamLifetimeDependence(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "Yl" << (char)node->getFirstChild()->getIndex();
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSelfLifetimeDependence(Node *node,
+                                                      unsigned depth) {
+  Buffer << "YL" << (char)node->getIndex();
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleInfixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";

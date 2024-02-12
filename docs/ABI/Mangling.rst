@@ -664,7 +664,12 @@ Types
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
-
+ #if SWIFT_RUNTIME_VERSION >= 5.TBD
+  lifetime-dependence ::= 'Yli'              // inherit lifetime dependence on param
+  lifetime-dependence ::= 'Yls'              // scoped lifetime dependence on param
+  self-lifetime-dependence ::= 'YLi'         // inherit lifetime dependence on self
+  self-lifetime-dependence ::= 'YLs'         // scoped lifetime dependence on self
+#endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
