@@ -387,6 +387,10 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
 bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
   auto &C = getASTContext();
   auto module = getParentModule();
+  auto *DC = getDeclContext();
+
+  if (!DC->isTypeContext() || !isGeneric())
+    return false;
 
   // === Check the name
   auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
@@ -398,7 +402,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   ProtocolDecl *systemProto =
       C.getDistributedActorSystemDecl();
 
-  auto systemNominal = getDeclContext()->getSelfNominalTypeDecl();
+  auto systemNominal = DC->getSelfNominalTypeDecl();
   auto distSystemConformance = module->lookupConformance(
       systemNominal->getDeclaredInterfaceType(), systemProto);
 
