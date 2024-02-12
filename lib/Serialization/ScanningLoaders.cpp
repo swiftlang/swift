@@ -154,11 +154,13 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   // name for the module, which includes an appropriate hash.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   auto realModuleName = Ctx.getRealModuleName(moduleName);
+  StringRef sdkPath = Ctx.SearchPathOpts.getSDKPath();
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   llvm::Optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
-      realModuleName.str(), moduleInterfacePath.str(), StringRef(), SourceLoc(),
+      realModuleName.str(), moduleInterfacePath.str(), sdkPath,
+      StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
           ArrayRef<StringRef> PCMArgs, StringRef Hash) {
         assert(mainMod);

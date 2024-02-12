@@ -209,6 +209,7 @@ public:
 struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,
                                           StringRef interfacePath,
+                                          StringRef sdkPath,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -216,6 +217,7 @@ struct InterfaceSubContextDelegate {
                                        ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
+                                                   StringRef sdkPath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
                                                    bool silenceErrors,

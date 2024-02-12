@@ -693,6 +693,7 @@ public:
 
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
+                                  StringRef sdkPath,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -700,6 +701,7 @@ public:
                                        StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
+                                           StringRef sdkPath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
                                            bool silenceErrors,
@@ -710,9 +712,10 @@ public:
   /// includes a hash of relevant key data.
   StringRef computeCachedOutputPath(StringRef moduleName,
                                     StringRef UseInterfacePath,
+                                    StringRef sdkPath,
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
-  std::string getCacheHash(StringRef useInterfacePath);
+  std::string getCacheHash(StringRef useInterfacePath, StringRef sdkPath);
 };
 }
 
