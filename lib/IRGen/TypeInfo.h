@@ -95,6 +95,7 @@ class TypeInfo {
   friend class TypeConverter;
 
 protected:
+  // clang-format off
   union {
     uint64_t OpaqueBits;
 
@@ -143,6 +144,8 @@ protected:
       Size : 32
     );
   } Bits;
+  // clang-format on
+
   enum { InvalidSubclassKind = 0x7 };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsTriviallyDestroyable_t pod,
@@ -331,6 +334,9 @@ public:
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                                      const llvm::Twine &name) const = 0;
 
+  virtual StackAddress allocateVector(IRGenFunction &IGF, SILType T,
+                                      llvm::Value *capacity,
+                                      const Twine &name) const = 0;
   /// Deallocate a variable of this type.
   virtual void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                                SILType T) const = 0;

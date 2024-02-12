@@ -338,7 +338,6 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // The array can also be inferred to be [Any].
   _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
 
   // rdar://88334481 – Don't apply the compatibility logic for collection literals.
   typealias Magic<T> = T
@@ -718,4 +717,44 @@ func isHashable_is(_ error: Error) -> Bool {
 
 func isHashable_composition(_ error: Error & AnyObject) -> Bool {
   error is AnyHashable // OK
+}
+
+// rdar://109381194 - incorrect ambiguity while comparing collections
+do {
+  class A : Hashable, Equatable {
+    func hash(into hasher: inout Hasher) {
+    }
+
+    static func == (lhs: A, rhs: A) -> Bool {
+      false
+    }
+  }
+
+  class B : A {}
+
+  func test(a: [B], b: [String: B]) {
+    assert(Set(a) == Set(b.values.map { $0 as A })) // ok
+  }
+
+  func test(a: [A], b: [B]) {
+    assert(Set(a) == Set(b.map { $0 as A })) // Ok
+    assert(Set(b.map { $0 as A }) == Set(a)) // Ok
+  }
+}
+
+// https://github.com/apple/swift/issues/68825
+do {
+  func x(a: Any) { // expected-note 2 {{'a' declared here}}
+    _ = a is a // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    _ = a as a // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    _ = a is Issue68825 // expected-error {{cannot find type 'Issue68825' in scope}}
+    _ = a is String // OK
+  }
+}
+
+// rdar://115603144 - casting `any Sendable` to a collection warns about cast failure although the cast could succeed at runtime
+func test_existential_sendable_cast(v: any Sendable) {
+  let _ = v as! [Any] // Ok
+  let _ = v as! [String: Any] // Ok
+  let _ = v as! Set<Int> // Ok
 }

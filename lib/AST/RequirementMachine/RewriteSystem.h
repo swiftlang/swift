@@ -132,12 +132,11 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops,
-                  ArrayRef<const ProtocolDecl *> protos,
-                  std::vector<StructuralRequirement> &&writtenRequirements,
-                  std::vector<Rule> &&importedRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                  std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+  void initialize(
+      bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
@@ -182,18 +181,18 @@ public:
 
   bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                       Optional<unsigned> requirementID);
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
 
-  void addRules(std::vector<Rule> &&importedRules,
-                std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-                std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules);
+  void addRules(
+      std::vector<Rule> &&importedRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  Optional<unsigned>
-  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
-                        RewritePath *path=nullptr);
+  llvm::Optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                                 const PropertyMap *map,
+                                                 RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -227,17 +226,15 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
-  void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
-
   void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                                 SourceLoc signatureLoc,
                                                 const PropertyMap &map,
-                                                TypeArrayView<GenericTypeParamType> genericParams);
+                                                ArrayRef<GenericTypeParamType *> genericParams);
 
   void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
                                               SourceLoc signatureLoc,
                                               const PropertyMap &map,
-                                              TypeArrayView<GenericTypeParamType> genericParams);
+                                              ArrayRef<GenericTypeParamType *> genericParams);
 
 private:
   struct CriticalPair {
@@ -306,10 +303,9 @@ private:
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
-  bool
-  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
-                        Optional<unsigned> &lhsDifferenceID,
-                        Optional<unsigned> &rhsDifferenceID);
+  bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                             llvm::Optional<unsigned> &lhsDifferenceID,
+                             llvm::Optional<unsigned> &rhsDifferenceID);
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 
@@ -377,7 +373,7 @@ private:
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
 
-  Optional<std::pair<unsigned, unsigned>>
+  llvm::Optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);

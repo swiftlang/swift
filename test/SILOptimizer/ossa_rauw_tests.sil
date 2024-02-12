@@ -189,23 +189,21 @@ bb0(%0 : @owned $Klass):
 // CHECK-NOT: destroy_value
 //
 // CHECK: bb2:
-// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT: cond_br undef, bb3, bb4
 //
 // CHECK: bb3:
-// CHECK-NEXT: destroy_value [[COPY]]
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb4:
-// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[ARG]]
 // CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
 //
 // CHECK: bb5:
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
 // CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
 //
 // CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'unowned_to_owned_rauw_loop'
 sil [ossa] @unowned_to_owned_rauw_loop : $@convention(thin) (@owned Klass) -> @owned FakeOptional<Klass> {

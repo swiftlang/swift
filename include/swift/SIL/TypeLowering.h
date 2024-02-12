@@ -23,6 +23,7 @@
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 
@@ -175,6 +176,12 @@ enum IsLexical_t : bool {
   IsLexical = true,
 };
 
+/// Does this type contain any pack-like thing.
+enum HasPack_t : bool {
+  HasNoPack = false,
+  HasPack = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -191,10 +198,12 @@ public:
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
       LexicalFlag                = 1 << 7,
+      HasPackFlag                = 1 << 8,
     };
     // clang-format on
 
-    uint8_t Flags;
+    uint16_t Flags;
+
   public:
     /// Construct a default RecursiveProperties, which corresponds to
     /// a trivial, loadable, fixed-layout type.
@@ -206,14 +215,15 @@ public:
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
-        IsLexical_t isLexical = IsNotLexical)
+        IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
                 (hasRawPointer ? HasRawPointerFlag : 0U) |
-                (isLexical ? LexicalFlag : 0U)) {}
+                (isLexical ? LexicalFlag : 0U) |
+                (hasPack ? HasPackFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -235,7 +245,7 @@ public:
 
     static constexpr RecursiveProperties forOpaque() {
       return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical, HasNoPack};
     }
 
     static constexpr RecursiveProperties forResilient() {
@@ -249,8 +259,8 @@ public:
     IsTrivial_t isTrivial() const {
       return IsTrivial_t((Flags & NonTrivialFlag) == 0);
     }
-    IsTrivial_t isOrContainsRawPointer() const {
-      return IsTrivial_t((Flags & HasRawPointerFlag) != 0);
+    HasRawPointer_t isOrContainsRawPointer() const {
+      return HasRawPointer_t((Flags & HasRawPointerFlag) != 0);
     }
     IsFixedABI_t isFixedABI() const {
       return IsFixedABI_t((Flags & NonFixedABIFlag) == 0);
@@ -271,6 +281,9 @@ public:
     IsLexical_t isLexical() const {
       return IsLexical_t((Flags & LexicalFlag) != 0);
     }
+    HasPack_t isOrContainsPack() const {
+      return HasPack_t((Flags & HasPackFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -284,6 +297,7 @@ public:
     void setLexical(IsLexical_t isLexical) {
       Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
     }
+    void setHasPack() { Flags |= HasPackFlag; }
   };
 
 private:
@@ -392,6 +406,11 @@ public:
   /// Should a value of this type have its lifetime tied to its lexical scope?
   bool isLexical() const {
     return Properties.isLexical();
+  }
+
+  /// Does this type feature a pack at some level of its type tree.
+  bool isOrContainsPack() const {
+    return Properties.isOrContainsPack();
   }
 
   ResilienceExpansion getResilienceExpansion() const {
@@ -805,17 +824,17 @@ class TypeConverter {
   ///
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
-  
-  llvm::DenseMap<AbstractClosureExpr *, Optional<AbstractionPattern>>
-    ClosureAbstractionPatterns;
+
+  llvm::DenseMap<AbstractClosureExpr *, llvm::Optional<AbstractionPattern>>
+      ClosureAbstractionPatterns;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
   // Types converted during foreign bridging.
-#define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
-  Optional<CanType> BridgedType##Ty;
+#define BRIDGING_KNOWN_TYPE(BridgedModule, BridgedType)                        \
+  llvm::Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &getTypeLoweringForLoweredType(
@@ -1213,7 +1232,8 @@ public:
   /// This can be set using \c setAbstractionPattern , but only before
   /// the abstraction pattern is queried using this function. Once the
   /// abstraction pattern has been asked for, it may not be changed.
-  Optional<AbstractionPattern> getConstantAbstractionPattern(SILDeclRef constant);
+  llvm::Optional<AbstractionPattern>
+  getConstantAbstractionPattern(SILDeclRef constant);
   TypeExpansionContext getCaptureTypeExpansionContext(SILDeclRef constant);
   
   /// Set the preferred abstraction pattern for a closure.
@@ -1260,16 +1280,23 @@ private:
   /// Check the result of
   /// getTypeLowering(AbstractionPattern,Type,TypeExpansionContext).
   void verifyLowering(const TypeLowering &, AbstractionPattern origType,
-                      Type origSubstType, TypeExpansionContext forExpansion);
-  bool
-  visitAggregateLeaves(Lowering::AbstractionPattern origType, Type substType,
-                       TypeExpansionContext context,
-                       std::function<bool(Type, Lowering::AbstractionPattern,
-                                          ValueDecl *, Optional<unsigned>)>
-                           isLeafAggregate,
-                       std::function<bool(Type, Lowering::AbstractionPattern,
-                                          ValueDecl *, Optional<unsigned>)>
-                           visit);
+                      CanType origSubstType,
+                      TypeExpansionContext forExpansion);
+  void verifyLexicalLowering(const TypeLowering &, AbstractionPattern origType,
+                             CanType origSubstType,
+                             TypeExpansionContext forExpansion);
+  void verifyTrivialLowering(const TypeLowering &, AbstractionPattern origType,
+                             CanType origSubstType,
+                             TypeExpansionContext forExpansion);
+  bool visitAggregateLeaves(
+      Lowering::AbstractionPattern origType, CanType substType,
+      TypeExpansionContext context,
+      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
+                         llvm::Optional<unsigned>)>
+          isLeafAggregate,
+      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
+                         llvm::Optional<unsigned>)>
+          visit);
 #endif
 };
 
@@ -1278,9 +1305,9 @@ private:
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, TypeExpansionContext context,
     Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
-    SILExtInfo silExtInfo, Optional<SILDeclRef> origConstant = None,
-    Optional<SILDeclRef> constant = None,
-    Optional<SubstitutionMap> reqtSubs = None,
+    SILExtInfo silExtInfo, llvm::Optional<SILDeclRef> origConstant = llvm::None,
+    llvm::Optional<SILDeclRef> constant = llvm::None,
+    llvm::Optional<SubstitutionMap> reqtSubs = llvm::None,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 /// The thunk kinds used in the differentiation transform.
@@ -1305,16 +1332,13 @@ enum class DifferentiationThunkKind {
 
 /// Build the type of a function transformation thunk.
 CanSILFunctionType buildSILFunctionThunkType(
-    SILFunction *fn,
-    CanSILFunctionType &sourceType,
-    CanSILFunctionType &expectedType,
-    CanType &inputSubstType,
-    CanType &outputSubstType,
-    GenericEnvironment *&genericEnv,
-    SubstitutionMap &interfaceSubs,
-    CanType &dynamicSelfType,
+    SILFunction *fn, CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType, CanType &inputSubstType,
+    CanType &outputSubstType, GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs, CanType &dynamicSelfType,
     bool withoutActuallyEscaping,
-    Optional<DifferentiationThunkKind> differentiationThunkKind = None);
+    llvm::Optional<DifferentiationThunkKind> differentiationThunkKind =
+        llvm::None);
 
 } // namespace swift
 

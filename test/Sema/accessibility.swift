@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 -package-name mylib
 
 /// Test structs with protocols and extensions
 public protocol PublicProto {
@@ -654,7 +654,7 @@ public struct Methods {
   public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
   public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
   public func e(a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
-  public func f(a: Int, b: PackageStruct) -> PackageStruct { return PackageStruct() } // expected-error {{method cannot be declared public because its parameter uses a package type}}
+  public func f(a: Int, b: PackageStruct) -> PackageStruct { return PackageStruct() } // expected-error {{method cannot be declared public because its result uses a package type}}
 
   package func x(x: PrivateStruct, y: String) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
   package func y(x: String, y: PrivateStruct) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
@@ -721,7 +721,7 @@ public protocol AssocTypes {
   associatedtype PrivatePackageConformer: PrivateProto = PackageStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
 
   associatedtype PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  associatedtype PackagePackageDefaultConformer: PackageProto = PackageStruct // expected-error {{associated type in a public protocol uses a package type in its requirement}}
+  associatedtype PackagePackageDefaultConformer: PackageProto = PackageStruct // expected-error {{associated type in a public protocol uses a package type in its default definition}}
 
   associatedtype PublicPublicDefaultConformer: PublicProto = PublicStruct
 }
@@ -935,9 +935,9 @@ package struct PackageGenericIPReq<T: InternalProto> where T: PrivateProto {} //
 public func genericFunc<T: InternalProto>(_: T) {} // expected-error {{function cannot be declared public because its generic parameter uses an internal type}} {}
 public func genericFuncPackage<T: PackageProto>(_: T) {} // expected-error {{function cannot be declared public because its generic parameter uses a package type}} {}
 public class GenericClass<T: InternalProto> { // expected-error {{generic class cannot be declared public because its generic parameter uses an internal type}}
-  public init<T: PrivateProto>(_: T) {} // expected-error {{initializer cannot be declared public because its generic parameter uses a private type}}
-  public func genericMethod<T: PrivateProto>(_: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a private type}}
-  public func genericMethodPackage<T: PackageProto>(_: T) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a package type}}
+  public init<U: PrivateProto>(_: U) {} // expected-error {{initializer cannot be declared public because its generic parameter uses a private type}}
+  public func genericMethod<U: PrivateProto>(_: U) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a private type}}
+  public func genericMethodPackage<U: PackageProto>(_: U) {} // expected-error {{instance method cannot be declared public because its generic parameter uses a package type}}
 }
 public enum GenericEnum<T: InternalProto> { // expected-error {{generic enum cannot be declared public because its generic parameter uses an internal type}}
   case A
@@ -948,8 +948,8 @@ public enum GenericEnumPackage<T: PackageProto> { // expected-error {{generic en
 
 package func packageGenericFunc<T: InternalProto>(_: T) {} // expected-error {{function cannot be declared package because its generic parameter uses an internal type}} {}
 package class PackageGenericClassT<T: InternalProto> { // expected-error {{generic class cannot be declared package because its generic parameter uses an internal type}}
-  package init<T: PrivateProto>(_: T) {} // expected-error {{initializer cannot be declared package because its generic parameter uses a private type}}
-  package func packageGenericMethod<T: PrivateProto>(_: T) {} // expected-error {{instance method cannot be declared package because its generic parameter uses a private type}}
+  package init<U: PrivateProto>(_: U) {} // expected-error {{initializer cannot be declared package because its generic parameter uses a private type}}
+  package func packageGenericMethod<U: PrivateProto>(_: U) {} // expected-error {{instance method cannot be declared package because its generic parameter uses a private type}}
 }
 package enum PackageGenericEnumT<T: InternalProto> { // expected-error {{generic enum cannot be declared package because its generic parameter uses an internal type}}
   case A
@@ -1021,8 +1021,8 @@ public struct PublicWithInternalSettersConformPublic : PublicMutationOperations 
 }
 
 public struct PublicWithPackageSettersConformPublic : PublicMutationOperations {
-  public package(set) var size = 0 // FIXME: rdar://104987295 this should error
-  public package(set) subscript (_: Int) -> Int { // FIXME: rdar://104987295 this should error
+  public package(set) var size = 0 // expected-error {{setter for property 'size' must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the property as 'public' to satisfy the requirement}} {{10-23=}}
+  public package(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the subscript as 'public' to satisfy the requirement}} {{10-23=}}
     get { return 42 }
     set {}
   }
@@ -1471,7 +1471,11 @@ public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGen
   public func publicReq() {}
 }
 
-// FIXME: rdar://104987455 should have expected note and error 'class cannot be declared public because its superclass is internal'
+fileprivate typealias FilePrivateConcreteGenericCompositionPkg = InternalGenericClass<Int> & InternalProto
+public class DerivedFromFilePrivateConcreteGenericCompositionPkg : FilePrivateConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses an internal type as a generic parameter}}
+  public func internalReq() {}
+}
+
 internal typealias InternalConcreteGenericCompositionPkg = PackageGenericClass<Int> & PackageProto
 public class DerivedFromInternalConcreteGenericCompositionPkg : InternalConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses a package type as a generic parameter}}
   public func packageReq() {}

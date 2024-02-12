@@ -43,11 +43,17 @@ static bool requiresHeapHeader(LayoutKind kind) {
 
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM,
-                           NominalTypeDecl *decl,
+                           llvm::Optional<CanType> type,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
+  NominalTypeDecl *decl = nullptr;
+
+  if (type) {
+    decl = type->getAnyNominal();
+  }
+
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
@@ -63,43 +69,139 @@ StructLayout::StructLayout(IRGenModule &IGM,
     builder.addHeapHeader();
   }
 
-  bool nonEmpty = builder.addFields(Elements, strategy);
-
   auto deinit = (decl && decl->getValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = (decl && decl->isMoveOnly())
+  auto copyable = (decl && !decl->canBeCopyable())
     ? IsNotCopyable : IsCopyable;
 
-  // Special-case: there's nothing to store.
-  // In this case, produce an opaque type;  this tends to cause lovely
-  // assertions.
-  if (!nonEmpty) {
-    assert(!builder.empty() == requiresHeapHeader(layoutKind));
-    MinimumAlign = Alignment(1);
-    MinimumSize = Size(0);
-    headerSize = builder.getHeaderSize();
-    SpareBits.clear();
-    IsFixedLayout = true;
+  // Handle a raw layout specification on a struct.
+  RawLayoutAttr *rawLayout = nullptr;
+  if (decl) {
+    rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+  }
+  if (rawLayout && type) {
+    auto sd = cast<StructDecl>(decl);
     IsKnownTriviallyDestroyable = deinit;
     IsKnownBitwiseTakable = IsBitwiseTakable;
-    IsKnownAlwaysFixedSize = IsFixedSize;
+    SpareBits.clear();
+    assert(!copyable);
     IsKnownCopyable = copyable;
-    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
-  } else {
-    MinimumAlign = builder.getAlignment();
-    MinimumSize = builder.getSize();
-    headerSize = builder.getHeaderSize();
-    SpareBits = builder.getSpareBits();
-    IsFixedLayout = builder.isFixedLayout();
-    IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
-    IsKnownBitwiseTakable = builder.isBitwiseTakable();
-    IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-    IsKnownCopyable = copyable & builder.isCopyable();
-    if (typeToFill) {
-      builder.setAsBodyOfStruct(typeToFill);
-      Ty = typeToFill;
+    assert(builder.getHeaderSize() == Size(0));
+    headerSize = Size(0);
+    IsLoadable = false;
+
+    auto &Diags = IGM.Context.Diags;
+    // Fixed size and alignment specified.
+    if (auto sizeAndAlign = rawLayout->getSizeAndAlignment()) {
+      auto size = Size(sizeAndAlign->first);
+      auto requestedAlignment = Alignment(sizeAndAlign->second);
+      MinimumAlign = IGM.getCappedAlignment(requestedAlignment);
+      if (requestedAlignment > MinimumAlign) {
+        Diags.diagnose(rawLayout->getLocation(),
+                       diag::alignment_more_than_maximum,
+                       MinimumAlign.getValue());
+      }
+      
+      MinimumSize = size;
+      SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+      IsFixedLayout = true;
+      IsKnownAlwaysFixedSize = IsFixedSize;
+    } else if (auto likeType = rawLayout->getResolvedScalarLikeType(sd)) {
+      // If our likeType is dependent, then all calls to try and lay it out will
+      // be non-fixed, but in a concrete case we want a fixed layout, so try to
+      // substitute it out.
+      auto subs = (*type)->getContextSubstitutionMap(IGM.getSwiftModule(), decl);
+      auto loweredLikeType = IGM.getLoweredType(likeType->subst(subs));
+      const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredLikeType);
+                                      
+      // Take layout attributes from the like type.
+      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
+        MinimumSize = likeFixedType->getFixedSize();
+        SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+        MinimumAlign = likeFixedType->getFixedAlignment();
+        IsFixedLayout = true;
+        IsKnownAlwaysFixedSize = IsFixedSize;
+      } else {
+        MinimumSize = Size(0);
+        MinimumAlign = Alignment(1);
+        IsFixedLayout = false;
+        IsKnownAlwaysFixedSize = IsNotFixedSize;
+      }
+    } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(sd)) {
+      auto elementType = likeArray->first;
+      unsigned count = likeArray->second;
+      
+      auto subs = (*type)->getContextSubstitutionMap(IGM.getSwiftModule(), decl);
+      auto loweredElementType = IGM.getLoweredType(elementType.subst(subs));
+      const TypeInfo &likeTypeInfo = IGM.getTypeInfo(loweredElementType);
+      
+      // Take layout attributes from the like type.
+      if (const FixedTypeInfo *likeFixedType = dyn_cast<FixedTypeInfo>(&likeTypeInfo)) {
+        MinimumSize = likeFixedType->getFixedStride() * count;
+        SpareBits.extendWithClearBits(MinimumSize.getValueInBits());
+        MinimumAlign = likeFixedType->getFixedAlignment();
+        IsFixedLayout = true;
+        IsKnownAlwaysFixedSize = IsFixedSize;
+      } else {
+        MinimumSize = Size(0);
+        MinimumAlign = Alignment(1);
+        IsFixedLayout = false;
+        IsKnownAlwaysFixedSize = IsNotFixedSize;
+      }
     } else {
-      Ty = builder.getAsAnonStruct();
+      llvm_unreachable("unhandled raw layout variant?");
+    }
+    
+    // Set the LLVM struct type for a fixed layout according to the stride and
+    // alignment we determined.
+    if (IsKnownAlwaysFixedSize) {
+      auto eltTy = llvm::IntegerType::get(IGM.getLLVMContext(), 8);
+      auto bodyTy = llvm::ArrayType::get(eltTy, MinimumSize.getValue());
+      if (typeToFill) {
+        typeToFill->setBody(bodyTy, /*packed*/ true);
+        Ty = typeToFill;
+      } else {
+        Ty = llvm::StructType::get(IGM.getLLVMContext(), bodyTy, /*packed*/ true);
+      }
+    } else {
+      Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+    }
+  } else {
+    bool nonEmpty = builder.addFields(Elements, strategy);
+
+    // Special-case: there's nothing to store.
+    // In this case, produce an opaque type;  this tends to cause lovely
+    // assertions.
+    if (!nonEmpty) {
+      assert(!builder.empty() == requiresHeapHeader(layoutKind));
+      MinimumAlign = Alignment(1);
+      MinimumSize = Size(0);
+      headerSize = builder.getHeaderSize();
+      SpareBits.clear();
+      IsFixedLayout = true;
+      IsLoadable = true;
+      IsKnownTriviallyDestroyable = deinit;
+      IsKnownBitwiseTakable = IsBitwiseTakable;
+      IsKnownAlwaysFixedSize = IsFixedSize;
+      IsKnownCopyable = copyable;
+      Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+    } else {
+      MinimumAlign = builder.getAlignment();
+      MinimumSize = builder.getSize();
+      headerSize = builder.getHeaderSize();
+      SpareBits = builder.getSpareBits();
+      IsFixedLayout = builder.isFixedLayout();
+      IsLoadable = builder.isLoadable();
+      IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
+      IsKnownBitwiseTakable = builder.isBitwiseTakable();
+      IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
+      IsKnownCopyable = copyable & builder.isCopyable();
+      if (typeToFill) {
+        builder.setAsBodyOfStruct(typeToFill);
+        Ty = typeToFill;
+      } else {
+        Ty = builder.getAsAnonStruct();
+      }
     }
   }
 
@@ -122,6 +224,8 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
   auto &Diags = IGM.Context.Diags;
 
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
+    assert(!decl->getAttrs().hasAttribute<RawLayoutAttr>()
+           && "_alignment and _rawLayout not supported together");
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0
            && "alignment not a power of two!");
@@ -231,7 +335,34 @@ void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
   headerSize = CurSize;
 }
 
+void StructLayoutBuilder::addNonDefaultDistributedActorHeader(ElementLayout &elt) {
+  assert(StructFields.size() == 1 &&
+         StructFields[0] == IGM.RefCountedStructTy &&
+         "adding default actor header at wrong offset");
+
+  // These must match the NonDefaultDistributedActor class in Actor.h.
+  auto size = NumWords_NonDefaultDistributedActor * IGM.getPointerSize();
+  auto align = Alignment(Alignment_NonDefaultDistributedActor);
+  auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_NonDefaultDistributedActor);
+
+  // Note that we align the *entire structure* to the new alignment,
+  // not the storage we're adding.  Otherwise we would potentially
+  // get internal padding.
+  assert(CurSize.isMultipleOf(IGM.getPointerSize()));
+  assert(align >= CurAlignment);
+  assert(CurSize == getNonDefaultDistributedActorStorageFieldOffset(IGM));
+  elt.completeFixed(IsNotTriviallyDestroyable, CurSize, /*struct index*/ 1);
+  CurSize += size;
+  CurAlignment = align;
+  StructFields.push_back(ty);
+  headerSize = CurSize;
+}
+
 Size irgen::getDefaultActorStorageFieldOffset(IRGenModule &IGM) {
+  return IGM.RefCountedStructSize;
+}
+
+Size irgen::getNonDefaultDistributedActorStorageFieldOffset(IRGenModule &IGM) {
   return IGM.RefCountedStructSize;
 }
 
@@ -255,6 +386,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   IsKnownTriviallyDestroyable &= eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
+  IsLoadable &= eltTI.isLoadable();
 
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
@@ -308,7 +440,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
 
       // The padding can be used as spare bits by enum layout.
       auto numBits = Size(paddingRequired).getValueInBits();
-      auto mask = llvm::APInt::getAllOnesValue(numBits);
+      auto mask = llvm::APInt::getAllOnes(numBits);
       CurSpareBits.push_back(SpareBitVector::fromAPInt(mask));
     }
   }
@@ -417,8 +549,11 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   auto numFields =
     target->getStoredPropertiesAndMissingMemberPlaceholders().size();
   if (auto cls = dyn_cast<ClassDecl>(target)) {
-    if (cls->isRootDefaultActor())
+    if (cls->isRootDefaultActor()) {
       numFields++;
+    } else if (cls->isNonDefaultExplicitDistributedActor()) {
+      numFields++;
+    }
   }
   return numFields;
 }
@@ -426,8 +561,12 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
 void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (classDecl && classDecl->isRootDefaultActor()) {
-    fn(Field::DefaultActorStorage);
+  if (classDecl) {
+    if (classDecl->isRootDefaultActor()) {
+      fn(Field::DefaultActorStorage);
+    } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+      fn(Field::NonDefaultDistributedActorStorage);
+    }
   }
 
   for (auto decl :
@@ -450,6 +589,9 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
+  case Field::NonDefaultDistributedActorStorage:
+    return SILType::getPrimitiveObjectType(
+                             IGM.Context.TheNonDefaultDistributedActorStorageType);
   }
   llvm_unreachable("bad field kind");
 }
@@ -462,6 +604,8 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
+  case Field::NonDefaultDistributedActorStorage:
+    return IGM.Context.TheNonDefaultDistributedActorStorageType;
   }
   llvm_unreachable("bad field kind");
 }
@@ -474,6 +618,8 @@ StringRef Field::getName() const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
+  case Field::NonDefaultDistributedActorStorage:
+    return NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME;
   }
   llvm_unreachable("bad field kind");
 }

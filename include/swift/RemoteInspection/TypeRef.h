@@ -83,7 +83,7 @@ public:
     Bits.push_back(Integer >> 32);
   }
 
-  void addString(const std::string &String) {
+  void addString(llvm::StringRef String) {
     if (String.empty()) {
       Bits.push_back(0);
     } else {
@@ -120,7 +120,7 @@ public:
   };
 
 
-  bool operator==(const TypeRefID &Other) {
+  bool operator==(const TypeRefID &Other) const {
     return Bits == Other.Bits;
   }
 };
@@ -141,18 +141,55 @@ struct TypeRefLayoutConstraint {
   }
 };
 
-class TypeRefRequirement
-    : public RequirementBase<
-          const TypeRef *,
-          llvm::PointerIntPair<const TypeRef *, 3, RequirementKind>,
-          TypeRefLayoutConstraint> {
+class TypeRefRequirement {
+  llvm::PointerIntPair<const TypeRef *, 3, RequirementKind> FirstTypeAndKind;
+
+  /// The second element of the requirement. Its content is dependent
+  /// on the requirement kind.
+  /// The payload of the following enum should always match the kind!
+  /// Any access to the fields of this enum should first check if the
+  /// requested access matches the kind of the requirement.
+  union {
+    const TypeRef * SecondType;
+    TypeRefLayoutConstraint SecondLayout;
+  };
+
 public:
   TypeRefRequirement(RequirementKind kind, const TypeRef *first,
                      const TypeRef *second)
-      : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondType(second) {
+    assert(first);
+    assert(second);
+    assert(kind != RequirementKind::Layout);
+  }
+
   TypeRefRequirement(RequirementKind kind, const TypeRef *first,
                      TypeRefLayoutConstraint second)
-      : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondLayout(second) {
+    assert(first);
+    assert(second);
+    assert(kind == RequirementKind::Layout);
+  }
+
+  /// Determine the kind of requirement.
+  RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
+
+  /// Retrieve the first type.
+  const TypeRef *getFirstType() const {
+    return FirstTypeAndKind.getPointer();
+  }
+
+  /// Retrieve the second type.
+  const TypeRef *getSecondType() const {
+    assert(getKind() != RequirementKind::Layout);
+    return SecondType;
+  }
+
+  /// Retrieve the layout constraint.
+  TypeRefLayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementKind::Layout);
+    return SecondLayout;
+  }
 };
 
 // On 32-bit systems this needs more than just pointer alignment to fit the
@@ -173,11 +210,18 @@ public:
   /// Build a demangle tree from this TypeRef.
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
 
+  /// Build the mangled name from this TypeRef.
+  llvm::Optional<std::string> mangle(Demangle::Demangler &Dem) const;
+
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
 
   const TypeRef *subst(TypeRefBuilder &Builder,
                        const GenericArgumentMap &Subs) const;
+
+  const TypeRef *subst(TypeRefBuilder &Builder,
+                       const GenericArgumentMap &Subs,
+                       bool &DidSubstitute) const;
 
   llvm::Optional<GenericArgumentMap> getSubstMap() const;
 
@@ -323,47 +367,34 @@ public:
 class TupleTypeRef final : public TypeRef {
 protected:
   std::vector<const TypeRef *> Elements;
-  std::string Labels;
+  std::vector<std::string> Labels;
 
   static TypeRefID Profile(const std::vector<const TypeRef *> &Elements,
-                           const std::string &Labels) {
+                           const std::vector<std::string> &Labels) {
     TypeRefID ID;
     for (auto Element : Elements)
       ID.addPointer(Element);
-    ID.addString(Labels);
+    for (auto Label : Labels)
+      ID.addString(Label);
     return ID;
   }
 
 public:
-  TupleTypeRef(std::vector<const TypeRef *> Elements, std::string &&Labels)
+  TupleTypeRef(std::vector<const TypeRef *> Elements,
+               std::vector<std::string> Labels)
       : TypeRef(TypeRefKind::Tuple), Elements(std::move(Elements)),
-        Labels(Labels) {}
+        Labels(std::move(Labels)) {}
 
   template <typename Allocator>
   static const TupleTypeRef *create(Allocator &A,
                                     std::vector<const TypeRef *> Elements,
-                                    std::string &&Labels) {
+                                    const std::vector<std::string> Labels) {
     FIND_OR_CREATE_TYPEREF(A, TupleTypeRef, Elements, Labels);
   }
 
   const std::vector<const TypeRef *> &getElements() const { return Elements; };
-  const std::string &getLabelString() const { return Labels; };
-  std::vector<llvm::StringRef> getLabels() const {
-    std::vector<llvm::StringRef> Vec;
-    std::string::size_type End, Start = 0;
-    while (true) {
-      End = Labels.find(' ', Start);
-      if (End == std::string::npos)
-        break;
-      Vec.push_back(llvm::StringRef(Labels.data() + Start, End - Start));
-      Start = End + 1;
-    }
-    // A canonicalized TypeRef has an empty label string.
-    // Pad the vector with empty labels.
-    for (unsigned N = Vec.size(); N < Elements.size(); ++N)
-      Vec.push_back({});
-    return Vec;
-  };
+
+  const std::vector<std::string> &getLabels() const { return Labels; }
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;
@@ -452,13 +483,17 @@ class FunctionTypeRef final : public TypeRef {
   std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
+  ExtendedFunctionTypeFlags ExtFlags;
   FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
   const TypeRef *GlobalActor;
+  const TypeRef *ThrownError;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
                            const TypeRef *Result, FunctionTypeFlags Flags,
+                           ExtendedFunctionTypeFlags ExtFlags,
                            FunctionMetadataDifferentiabilityKind DiffKind,
-                           const TypeRef *GlobalActor) {
+                           const TypeRef *GlobalActor,
+                           const TypeRef *ThrownError) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -467,8 +502,10 @@ class FunctionTypeRef final : public TypeRef {
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    ID.addInteger(static_cast<uint64_t>(ExtFlags.getIntValue()));
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     ID.addPointer(GlobalActor);
+    ID.addPointer(ThrownError);
 
     return ID;
   }
@@ -476,19 +513,23 @@ class FunctionTypeRef final : public TypeRef {
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags,
+                  ExtendedFunctionTypeFlags ExtFlags,
                   FunctionMetadataDifferentiabilityKind DiffKind,
-                  const TypeRef *GlobalActor)
+                  const TypeRef *GlobalActor,
+                  const TypeRef *ThrownError)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags), DifferentiabilityKind(DiffKind),
-        GlobalActor(GlobalActor) {}
+        Flags(Flags), ExtFlags(ExtFlags), DifferentiabilityKind(DiffKind),
+        GlobalActor(GlobalActor), ThrownError(ThrownError) {}
 
   template <typename Allocator>
   static const FunctionTypeRef *create(
       Allocator &A, std::vector<Param> Params, const TypeRef *Result,
-      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
-      const TypeRef *GlobalActor) {
+      FunctionTypeFlags Flags, ExtendedFunctionTypeFlags ExtFlags,
+      FunctionMetadataDifferentiabilityKind DiffKind,
+      const TypeRef *GlobalActor, const TypeRef *ThrownError) {
     FIND_OR_CREATE_TYPEREF(
-        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor);
+        A, FunctionTypeRef, Params, Result, Flags, ExtFlags, DiffKind,
+        GlobalActor, ThrownError);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -501,6 +542,10 @@ public:
     return Flags;
   }
 
+  ExtendedFunctionTypeFlags getExtFlags() const {
+    return ExtFlags;
+  }
+
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind;
   }
@@ -509,6 +554,10 @@ public:
     return GlobalActor;
   }
 
+  const TypeRef *getThrownError() const {
+    return ThrownError;
+  }
+  
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Function;
   }
@@ -991,8 +1040,16 @@ protected:
       ID.addPointer(s.first);
       ID.addPointer(s.second);
     }
-    for (auto &r : Requirements)
-      ID.addInteger((uint64_t)(size_t)hash_value(hash_value(r)));
+    for (auto &r : Requirements) {
+      ID.addInteger(uint32_t(r.getKind()));
+      ID.addPointer(r.getFirstType());
+      if (r.getKind() != RequirementKind::Layout)
+        ID.addPointer(r.getSecondType());
+      else {
+        // FIXME: Implement TypeRefLayoutConstraint
+        ID.addInteger(uint32_t(0));
+      }
+    }
     return ID;
   }
 

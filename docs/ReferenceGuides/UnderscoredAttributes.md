@@ -218,6 +218,10 @@ Some conclusions:
 
 * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
 
+The `readnone` attribute cannot be used on functions that take
+nontrivial owned arguments for the reasons explained in the next
+section on `@_effects(readonly)`.
+
 ### `@_effects(readonly)`
 
 Defines that the function does not have any observable memory writes or any
@@ -225,7 +229,7 @@ other observable side effects, beside reading of memory.
 
 Similar to `readnone`, a `readonly` function is allowed to write to local objects.
 
-A function can be marked as `readonly` if it’s save to eliminate a call to such
+A function can be marked as `readonly` if it’s safe to eliminate a call to such
 a function in case its return value is not used.
 Example:
 
@@ -253,6 +257,44 @@ between those calls the member `i` of the class instance could be modified:
 ```
 
 The same conclusions as for `readnone` also apply to `readonly`.
+
+The `readonly` and `readnone` effects are sensitive to the ARC calling
+convention, which normally has no effect on language semantics. These
+effects attributes can only be used correctly by knowing whether the
+compiler will pass any nontrivial arguments as guaranteed or owned. If
+the function takes an owned argument, as is the case for initializers
+and setters, then `readonly` is likely invalid because removing the call
+would fail to release the argument. Additionally, the release itself
+may run a tree of deinitializers with potentially arbitrary side
+effects.
+
+In special situations, the library author may still want to use
+`readonly` for functions with owned arguments. They must be able to
+guarantee that the owned arguments are not effectively released from
+the caller's perspective. This could be because all paths through the
+function have an equivalent retain, or they may know that the argument
+is a tagged object for which a release has no effect. To make sure
+this is intentional, the library author must also explicitly specify
+`_effects(releasenone)` even though that is normally already implied
+by `readonly`.
+
+For example, it is valid to give the following trivial initializer
+`readonly` and `releasenone` attributes:
+
+    @_effects(readonly) @_effects(releasenone)
+    init(_ c: C) { self.c = c }
+
+If `C` is a class, then the value returned by the initializer must
+have at least one use in the form of a release. The optimizer,
+therefore, may not remove the call to the initializer without
+deliberately compensating for ownership.
+
+For the same reason that developers must take care regarding argument
+ownership, the compiler must always check for `readonly` and
+`readnone` effects attributes before transforming a function
+signature. Normally, this optimization can be done independent of
+language semantics, but such optimizations should be avoided for
+functions with these effects attributes.
 
 ### `@_effects(releasenone)`
 
@@ -384,6 +426,44 @@ in the generated C++ binding header.
 
 The optional "cxxName" string will be used as the name of
 the generated C++ declaration.
+
+### `_expose(wasm[, <"wasmExportName">])`
+
+Indicates that a particular function declaration should be
+exported from the linked WebAssembly.
+
+The optional "wasmExportName" string will be used as the
+the export name.
+
+It's the equivalent of clang's `__attribute__((export_name))`.
+
+## `@_extern(<language>)`
+
+Indicates that a particular declaration should be imported
+from the external environment.
+
+### `@_extern(wasm, module: <"moduleName">, name: <"fieldName">)`
+
+Indicates that a particular declaration should be imported
+through WebAssembly's import interface.
+
+It's the equivalent of clang's `__attribute__((import_module("module"), import_name("field")))`.
+
+### `@_extern(c, [, <"cName">])`
+
+Indicates that a particular declaration should refer to a
+C declaration with the given name. If the optional "cName"
+string is not specified, the Swift function name is used
+without Swift name mangling. Platform-specific mangling
+rules (leading underscore on Darwin) are still applied.
+
+Similar to `@_cdecl`, but this attribute is used to reference
+C declarations from Swift, while `@_cdecl` is used to define
+Swift functions that can be referenced from C.
+
+Also similar to `@_silgen_name`, but a function declared with
+`@_extern(c)` is assumed to use the C ABI, while `@_silgen_name`
+assumes the Swift ABI.
 
 ## `@_fixed_layout`
 
@@ -560,6 +640,15 @@ type are themselves `@_noEagerMove` as above.
 This is the default behavior, unless the type annotated is an aggregate that
 consists entirely of `@_eagerMove` or trivial values, in which case the
 attribute overrides the inferred type-level annotation.
+
+## `@_nonEscapable`
+
+Indicates that a type is non-escapable. All instances of this type are
+non-escaping values. A non-escaping value's lifetime must be confined
+to another "parent" lifetime.
+
+This is temporary until ~Escapable syntax is supported, which will
+also work as a generic type constraint.
 
 ## `@_marker`
 
@@ -832,6 +921,114 @@ Fully bypasses access control, allowing access to private declarations
 in the imported module. The imported module needs to be compiled with
 `-Xfrontend -enable-private-imports` for this to work.
 
+## `@_rawLayout(...)`
+
+Specifies the declared type consists of raw storage. The type must be
+noncopyable, and declare no stored properties.
+Raw storage is left almost entirely unmanaged by the language, and so
+can be used as storage for data structures with nonstandard access patterns
+including atomics and many kinds of locks such as `os_unfair_lock` on Darwin
+or `futex` on Linux, to replicate the behavior of things
+like C++'s `mutable` fields or Rust's `Cell<T>` type which allow for mutation
+in typically immutable contexts, and/or to provide inline storage for data
+structures that may be conditionally initialized, such as a "small vector"
+which stores up to N elements in inline storage but spills into heap allocation
+past a threshold.
+
+Programmers can safely make the following assumptions about
+the memory of the annotated type:
+
+- A value has a **stable address** until it is either consumed or moved.
+  No value of any type in Swift can ever be moved while it is being borrowed or
+  mutated, so for a `@_rawLayout` type, the address of `self` within a
+  `borrowing` or `mutating` method cannot change within the function body, and
+  the same is true more generally for the address of any `@_rawLayout` typed
+  parameter that is `borrowing` or `mutating` in any function or method.
+  Values that appear in a global variable or class stored property can never be
+  moved, and can only be consumed by the deallocation of the containing object
+  instance, so effectively has a stable address for their entire lifetime.
+- A value's memory **may be read and mutated at any time** independent of
+  formal accesses. In particular, pointers into the storage may be "escaped"
+  outside of scopes where the address is statically guaranteed to be stable,
+  and those pointers may be used freely for as long as the storage dynamically
+  isn't consumed or moved. It becomes the programmer's responsibility in this
+  case to ensure that reads and writes to the storage do not race across
+  threads, writes don't overlap with reads or writes coming from the same
+  thread, and that the pointer is not used after the value is moved or
+  consumed.
+- When the value is moved, a bitwise copy of its memory is performed to the new
+  address of the value in its new owner. As currently implemented, raw storage
+  types are not suitable for storing values which are not bitwise-movable, such
+  as nontrivial C++ types, Objective-C weak references, and data structures
+  such as `pthread_mutex_t` which are implemented in C as always requiring a
+  fixed address.
+
+Using the `@_rawLayout` attribute will suppress the annotated type from
+being implicitly `Sendable`. If the type is safe to access across threads, it
+may be declared to conform to `@unchecked Sendable`, with the usual level
+of programmer-assumed responsibility that involves. This generally means that
+any mutations must be done atomically or with a lock guard, and if the storage
+is ever mutated, then any reads of potentially-mutated state within the storage
+must also be atomic or lock-guarded, because the storage may be accessed
+simultaneously by multiple threads.
+
+A non-Sendable type's memory will be confined to accesses from a single thread
+or task; however, since most mutating operations in Swift still expect
+exclusivity while executing, a programmer must ensure that overlapping
+mutations cannot occur from aliasing, recursion, reentrancy, signal handlers, or
+other potential sources of overlapping access within the same thread.
+
+The parameters to the attribute specify the layout of the type. The following
+forms are currently accepted:
+
+- `@_rawLayout(size: N, alignment: M)` specifies the type's size and alignment
+  in bytes.
+- `@_rawLayout(like: T)` specifies the type's size and alignment should be
+  equal to the type `T`'s.
+- `@_rawLayout(likeArrayOf: T, count: N)` specifies the type's size should be
+  `MemoryLayout<T>.stride * N` and alignment should match `T`'s, like an
+  array of N contiguous elements of `T` in memory.
+
+A notable difference between `@_rawLayout(like: T)` and
+`@_rawLayout(likeArrayOf: T, count: 1)` is that the latter will pad out the
+size of the raw storage to include the full stride of the single element.
+This ensures that the buffer can be safely used with bulk array operations
+despite containing only a single element. `@_rawLayout(like: T)` by contrast
+will exactly match the size and stride of the original type `T`, allowing for
+other values to be stored in the tail padding when the raw layout type appears
+in a larger aggregate.
+
+```swift
+// struct Weird has size 5, stride 8, alignment 4
+struct Weird {
+    var x: Int32
+    var y: Int8
+}
+
+// struct LikeWeird has size 5, stride 8, alignment 4
+@_rawLayout(like: Weird)
+struct LikeWeird { }
+
+// struct LikeWeirdSingleArray has **size 8**, stride 8, alignment 4
+@_rawLayout(likeArrayOf: Weird, count: 1)
+struct LikeWeirdSingleArray { }
+```
+
+Although the `like:` and `likeArrayOf:count:` forms will produce raw storage
+with the size and alignment of another type, the memory is **not** implicitly
+*bound* to that type, as *bound* is defined by `UnsafePointer` and
+`UnsafeMutablePointer`. The memory can be accessed as raw memory
+if it is never explicitly bound using a typed pointer method like
+`withMemoryRebound(to:)` or `bindMemory(to:)`. However, if the raw memory is
+bound, it must only be used with compatible typed memory accesses for as long
+as the binding is active.
+
+## `@_section("section_name")`
+
+Places a global variable or a top-level function into a section of the object
+file with the given name. It's the equivalent of clang's
+`__attribute__((section))`.
+
 ## `@_semantics("uniquely.recognized.id")`
 
 Allows the optimizer to make use of some key invariants in performance critical
@@ -850,14 +1047,15 @@ By default, SourceKit hides underscored protocols from the generated
 swiftinterface (for all modules, not just the standard library), but this
 attribute can be used to override that behavior for the standard library.
 
-## `@_silgen_name("cName")`
+## `@_silgen_name([raw: ]"cName")`
 
-Changes the symbol name for a function, similar to an ASM label in C,
-except that the platform symbol mangling (leading underscore on Darwin)
-is maintained.
+Changes the symbol name for a function or a global, similar to an ASM label in
+C. Unlike ASM labels in C, the platform symbol mangling (leading underscore on
+Darwin) is maintained, unless "raw:" is used, in which case the name provided is
+expected to already be mangled.
 
 Since this has label-like behavior, it may not correspond to any declaration;
-if so, it is assumed that the function is implemented in C.
+if so, it is assumed that the function/global is implemented in C.
 
 A function defined by `@_silgen_name` is assumed to use the Swift ABI.
 
@@ -993,6 +1191,12 @@ for more details.
 ## `@_unsafeInheritExecutor`
 
 This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
+
+## `@_used`
+
+Marks a global variable or a top-level function as "used externally" even if it
+does not have visible users in the compilation unit. It's the equivalent of
+clang's `__attribute__((used))`.
 
 ## `@_weakLinked`
 

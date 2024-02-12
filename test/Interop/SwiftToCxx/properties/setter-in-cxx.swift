@@ -10,7 +10,8 @@ public struct FirstSmallStruct {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) FirstSmallStruct final {
 // CHECK: public:
-// CHECK:   SWIFT_INLINE_THUNK FirstSmallStruct(FirstSmallStruct &&)
+// CHECK:   SWIFT_INLINE_PRIVATE_HELPER FirstSmallStruct(FirstSmallStruct &&)
+// CHECK: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void setX(uint32_t value) SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   private:
@@ -31,7 +32,8 @@ public struct LargeStruct {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) LargeStruct final {
 // CHECK: public:
-// CHECK: SWIFT_INLINE_THUNK LargeStruct(LargeStruct &&)
+// CHECK: SWIFT_INLINE_PRIVATE_HELPER LargeStruct(LargeStruct &&)
+// CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX1() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: SWIFT_INLINE_THUNK void setX1(swift::Int value) SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getX2() const SWIFT_SYMBOL({{.*}});
@@ -109,7 +111,8 @@ public struct SmallStructWithProps {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) SmallStructWithProps final {
 // CHECK: public:
-// CHECK:   SWIFT_INLINE_THUNK SmallStructWithProps(SmallStructWithProps &&)
+// CHECK:   SWIFT_INLINE_PRIVATE_HELPER SmallStructWithProps(SmallStructWithProps &&)
+// CHECK: }
 // CHECK-NEXT:    SWIFT_INLINE_THUNK uint32_t getStoredInt() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:    SWIFT_INLINE_THUNK void setStoredInt(uint32_t value) SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:    SWIFT_INLINE_THUNK swift::Int getComputedInt() const SWIFT_SYMBOL({{.*}});
@@ -148,7 +151,7 @@ public func createFirstSmallStruct(_ x: UInt32) -> FirstSmallStruct {
 // CHECK-NEXT: }
 
 // CHECK:        SWIFT_INLINE_THUNK LargeStruct LargeStructWithProps::getStoredLargeStruct() const {
-// CHECK-NEXT:    return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:    return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s10Properties20LargeStructWithPropsV06storedbC0AA0bC0Vvg(result, _getOpaquePointer());
 // CHECK-NEXT:   });
 // CHECK-NEXT:   }
@@ -156,7 +159,7 @@ public func createFirstSmallStruct(_ x: UInt32) -> FirstSmallStruct {
 // CHECK-NEXT:   return _impl::$s10Properties20LargeStructWithPropsV06storedbC0AA0bC0Vvs(_impl::_impl_LargeStruct::getOpaquePointer(value), _getOpaquePointer());
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK FirstSmallStruct LargeStructWithProps::getStoredSmallStruct() const {
-// CHECK-NEXT:   return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties20LargeStructWithPropsV011storedSmallC0AA05FirstgC0Vvg(_getOpaquePointer()));
 // CHECK-NEXT:   });
 // CHECK-NEXT:   }
@@ -190,7 +193,7 @@ public func createFirstSmallStruct(_ x: UInt32) -> FirstSmallStruct {
 // CHECK-NEXT:  return _impl::$s10Properties20SmallStructWithPropsV11computedIntSivs(newValue, _getOpaquePointer());
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK LargeStructWithProps SmallStructWithProps::getLargeStructWithProps() const {
-// CHECK-NEXT:  return _impl::_impl_LargeStructWithProps::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_LargeStructWithProps::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::$s10Properties20SmallStructWithPropsV05largecdE0AA05LargecdE0Vvg(result, _impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT:  });
 // CHECK-NEXT:  }

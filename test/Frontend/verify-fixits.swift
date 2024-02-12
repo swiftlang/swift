@@ -225,6 +225,26 @@ func test1Fixits() {
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-+1:18=aa}}
 }
 
+func unlabeledFunc(_ aa: Int) {}
+
+func testDefaultedLineNumbers() {
+  // Fix-it end line defaults to first line.
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  unlabeledFunc(aa: // expected-error {{extraneous argument label 'aa:' in call}} {{+0:17-+1:5=}}
+    1)
+  // CHECK: [[@LINE+1]]:83: error: expected fix-it not seen; actual fix-it seen: {{{{}}17-[[@LINE+2]]:5=}}
+  unlabeledFunc(aa: // expected-error {{extraneous argument label 'aa:' in call}} {{+0:17-5=}}
+    1)
+
+  // Fix-it start line defaults to diagnostic line.
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{+1:15-+1:18=bb}}
+              bbx: 1)
+  // CHECK: [[@LINE+1]]:113: error: expected fix-it not seen; actual fix-it seen: {{{{}}[[@LINE+2]]:15-18=bb}}
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{15-+1:18=bb}}
+              bbx: 1)
+}
+
 func test2Fixits() {
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}}
 

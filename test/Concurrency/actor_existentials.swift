@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 protocol P: Actor {
   func f()
@@ -44,7 +49,7 @@ func from_isolated_concrete(_ x: isolated A) async {
 actor Act {
     var i = 0 // expected-note {{mutation of this property is only permitted within the actor}}
 }
-let act = Act()
+nonisolated let act = Act()
 
 func bad() async {
     // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}

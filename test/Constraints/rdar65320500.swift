@@ -3,7 +3,7 @@
 struct Result {}
 
 @resultBuilder
-struct Builder {
+struct Builder { // expected-note 4 {{add 'buildOptional(_:)' to the result builder 'Builder' to add support for 'if' statements without an 'else'}}
   static func buildBlock() -> Result {
     Result()
   }
@@ -12,10 +12,12 @@ struct Builder {
 func test_builder<T>(@Builder _: () -> T) {}
 func test_builder(@Builder _: () -> Int) {}
 
-test_builder {
+test_builder { // expected-error {{no exact matches in call to global function 'test_builder'}}
   let _ = 0
 
-  if let x = does_not_exist { // expected-error {{cannot find 'does_not_exist' in scope}}
+  // expected-error@+2 {{cannot find 'does_not_exist' in scope}}
+  // expected-note@+1 2 {{closure containing control flow statement cannot be used with result builder 'Builder'}}
+  if let x = does_not_exist {
   }
 }
 
@@ -28,9 +30,10 @@ test_builder {
   test(totalseconds / 3600) // expected-error {{cannot find 'totalseconds' in scope; did you mean 'totalSeconds'?}}
 }
 
-test_builder {
+test_builder { // expected-error {{no exact matches in call to global function 'test_builder'}}
   test(doesntExist()) // expected-error {{cannot find 'doesntExist' in scope}}
 
+  // expected-note@+1 2 {{closure containing control flow statement cannot be used with result builder 'Builder'}}
   if let result = doesntExist() { // expected-error {{cannot find 'doesntExist' in scope}}
   }
 

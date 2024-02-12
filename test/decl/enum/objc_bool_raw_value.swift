@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 // REQUIRES: objc_interop
 
-extension Bool: ExpressibleByIntegerLiteral {
+extension Bool: @retroactive ExpressibleByIntegerLiteral {
 	public init(integerLiteral value: Int) {
 		self = value != 0
 	}

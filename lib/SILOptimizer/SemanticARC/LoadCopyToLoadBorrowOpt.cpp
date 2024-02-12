@@ -56,7 +56,7 @@ class StorageGuaranteesLoadVisitor
   // The current address being visited.
   SILValue currentAddress;
 
-  Optional<bool> isWritten;
+  llvm::Optional<bool> isWritten;
 
 public:
   StorageGuaranteesLoadVisitor(Context &context, LoadInst *load,
@@ -88,7 +88,7 @@ public:
     SmallVector<Operand *, 8> endScopeUses;
     transform(access->getEndAccesses(), std::back_inserter(endScopeUses),
               [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
-    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
     if (!checker.validateLifetime(access, endScopeUses,
                                   liveRange.getAllConsumingUses())) {
       // If we fail the linear lifetime check, then just recur:
@@ -124,7 +124,7 @@ public:
     // If we have an inout parameter that isn't ever actually written to, return
     // false.
     if (!arg->isIndirectResult() &&
-        arg->getKnownParameterInfo().isIndirectMutating()) {
+        arg->getArgumentConvention().isExclusiveIndirectParameter()) {
       auto wellBehavedWrites = ctx.addressToExhaustiveWriteListCache.get(arg);
       if (!wellBehavedWrites.has_value()) {
         return answer(true);
@@ -138,11 +138,17 @@ public:
       // Ok, we have some writes. See if any of them are within our live
       // range. If any are, we definitely can not promote to load_borrow.
       SmallVector<BeginAccessInst *, 16> foundBeginAccess;
-      LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+      LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
       SILValue introducerValue = liveRange.getIntroducer().value;
-      if (!checker.usesNotContainedWithinLifetime(introducerValue,
-                                                  liveRange.getDestroyingUses(),
-                                                  *wellBehavedWrites)) {
+      SmallVector<Operand *, 4> consumingUses;
+      for (auto *op : liveRange.getDestroyingUses()) {
+        consumingUses.push_back(op);
+      }
+      for (auto *op : liveRange.getUnknownConsumingUses()) {
+        consumingUses.push_back(op);
+      }
+      if (!checker.usesNotContainedWithinLifetime(
+              introducerValue, consumingUses, *wellBehavedWrites)) {
         return answer(true);
       }
 
@@ -244,7 +250,7 @@ public:
     value.visitLocalScopeEndingUses(
       [&](Operand *use) { endScopeInsts.push_back(use); return true; });
 
-    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
 
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
@@ -291,7 +297,7 @@ public:
 
     // Then make sure that all of our load [copy] uses are within the
     // destroy_addr.
-    LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+    LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
         stack, addrDestroyingOperands /*consuming users*/,
@@ -319,8 +325,6 @@ static bool isWrittenTo(Context &ctx, LoadInst *load,
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-// Convert a load [copy] from unique storage [read] that has all uses that can
-// accept a guaranteed parameter to a load_borrow.
 bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // This optimization can use more complex analysis. We should do some
   // experiments before enabling this by default as a guaranteed optimization.
@@ -334,29 +338,61 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
-  // Ok, we have our load [copy]. Make sure its value is truly a dead live range
-  // implying it is only ever consumed by destroy_value instructions. If it is
-  // consumed, we need to pass off a +1 value, so bail.
+  // Ok, we have our load [copy].  Try to optimize considering its live range.
+  if (performLoadCopyToLoadBorrowOptimization(li, li))
+    return true;
+  // Check whether the load [copy]'s only use is as an operand to a move_value.
+  auto *use = li->getSingleUse();
+  if (!use)
+    return false;
+  auto *mvi = dyn_cast<MoveValueInst>(use->getUser());
+  if (!mvi)
+    return false;
+  // Try to optimize considering the move_value's live range.
+  return performLoadCopyToLoadBorrowOptimization(li, mvi);
+}
+
+// Convert a load [copy] from unique storage [read] whose representative
+// (either the load [copy] itself or a move from it) has all uses that can
+// accept a guaranteed parameter to a load_borrow.
+bool SemanticARCOptVisitor::performLoadCopyToLoadBorrowOptimization(
+    LoadInst *li, SILValue original) {
+  assert(li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
+  assert(li == original || li->getSingleUse()->getUser() ==
+                               cast<SingleValueInstruction>(original));
+  // Make sure its value is truly a dead live range implying it is only ever
+  // consumed by destroy_value instructions. If it is consumed, we need to pass
+  // off a +1 value, so bail.
   //
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
-  OwnershipLiveRange lr(li);
+  OwnershipLiveRange lr(original);
   if (bool(lr.hasUnknownConsumingUse()))
     return false;
 
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  if (isWrittenTo(ctx, li, lr))
+  if (isWrittenTo(ctx, li, lr) ||
+      (li != original && isWrittenTo(ctx, li, OwnershipLiveRange(li))))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
   // load_borrow.
   auto *lbi =
       SILBuilderWithScope(li).createLoadBorrow(li->getLoc(), li->getOperand());
-
   lr.insertEndBorrowsAtDestroys(lbi, getDeadEndBlocks(), ctx.lifetimeFrontier);
-  std::move(lr).convertToGuaranteedAndRAUW(lbi, getCallbacks());
+  SILValue replacement = lbi;
+  if (original != li) {
+    getCallbacks().eraseAndRAUWSingleValueInst(li, lbi);
+    auto *bbi =
+        SILBuilderWithScope(cast<SingleValueInstruction>(original))
+            .createBeginBorrow(li->getLoc(), lbi, original->isLexical());
+    replacement = bbi;
+    lr.insertEndBorrowsAtDestroys(bbi, getDeadEndBlocks(),
+                                  ctx.lifetimeFrontier);
+  }
+  std::move(lr).convertToGuaranteedAndRAUW(replacement, getCallbacks());
   return true;
 }

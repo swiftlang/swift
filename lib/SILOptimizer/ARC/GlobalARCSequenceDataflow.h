@@ -64,7 +64,7 @@ private:
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
   llvm::BumpPtrAllocator Allocator;
-  ImmutablePointerSetFactory<SILInstruction> SetFactory;
+  ImmutablePointerSetFactory<SILInstruction *> SetFactory;
 
   /// Stashed BB information.
   std::unique_ptr<ARCBBStateInfo> BBStateInfo;

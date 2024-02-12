@@ -13,13 +13,16 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
-#include "swift/Basic/Mangler.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "llvm/ADT/Optional.h"
 
 namespace clang {
 class NamedDecl;
+class TypedefType;
 }
 
 namespace swift {
@@ -159,7 +162,6 @@ public:
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,
-    RuntimeDiscoverableAttributeRecord,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
@@ -250,12 +252,10 @@ public:
   ///
   /// - If `predefined` is true, this mangles the symbol name of the completion handler
   /// predefined in the Swift runtime for the given type signature.
-  std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
-                                                   CanType ResultType,
-                                                   CanGenericSignature Sig,
-                                                   Optional<bool> FlagParamIsZeroOnError,
-                                                   bool predefined);
-  
+  std::string mangleObjCAsyncCompletionHandlerImpl(
+      CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
+      llvm::Optional<bool> FlagParamIsZeroOnError, bool predefined);
+
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
   /// thunk, for the given:
   /// - Mangled original function declaration.
@@ -363,12 +363,7 @@ public:
 
   std::string mangleHasSymbolQuery(const ValueDecl *decl);
 
-  std::string
-  mangleRuntimeAttributeGeneratorEntity(const ValueDecl *decl, CustomAttr *attr,
-                                        SymbolKind SKind = SymbolKind::Default);
-
-  std::string mangleMacroExpansion(const MacroExpansionExpr *expansion);
-  std::string mangleMacroExpansion(const MacroExpansionDecl *expansion);
+  std::string mangleMacroExpansion(const FreestandingMacroExpansion *expansion);
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
 
@@ -380,12 +375,15 @@ public:
     ObjCContext,
     ClangImporterContext,
   };
-  
-  static Optional<SpecialContext>
+
+  static llvm::Optional<SpecialContext>
   getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
-  static const clang::NamedDecl *
-  getClangDeclForMangling(const ValueDecl *decl);
+  static bool isCXXCFOptionsDefinition(const ValueDecl *decl);
+  static const clang::TypedefType *
+  getTypeDefForCXXCFOptionsDefinition(const ValueDecl *decl);
+
+  static const clang::NamedDecl *getClangDeclForMangling(const ValueDecl *decl);
 
   void appendExistentialLayout(
       const ExistentialLayout &layout, GenericSignature sig,
@@ -398,7 +396,8 @@ protected:
   void appendType(Type type, GenericSignature sig,
                   const ValueDecl *forDecl = nullptr);
   
-  void appendDeclName(const ValueDecl *decl);
+  void appendDeclName(
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,
@@ -600,9 +599,6 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
-
-  void appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
-                                             CustomAttr *attr);
 };
 
 } // end namespace Mangle

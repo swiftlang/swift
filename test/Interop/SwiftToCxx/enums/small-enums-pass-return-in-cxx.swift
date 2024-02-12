@@ -117,25 +117,25 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Small makeSmall(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9makeSmallyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_[[Small]](result, _impl::$s5Enums9makeSmallyAA0C0OSiF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Tiny makeTiny(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums8makeTinyyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, _impl::$s5Enums8makeTinyyAA0C0OSiF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Small passThroughSmall(const Small& en) noexcept SWIFT_SYMBOL("s:5Enums16passThroughSmallyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_[[Small]](result, _impl::$s5Enums16passThroughSmallyAA0D0OADF(_impl::swift_interop_passDirect_Enums_[[Small]](_impl::_impl_Small::getOpaquePointer(en))));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Tiny passThroughTiny(const Tiny& en) noexcept SWIFT_SYMBOL("s:5Enums15passThroughTinyyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, _impl::$s5Enums15passThroughTinyyAA0D0OADF(_impl::swift_interop_passDirect_Enums_uint8_t_0_1(_impl::_impl_Tiny::getOpaquePointer(en))));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }

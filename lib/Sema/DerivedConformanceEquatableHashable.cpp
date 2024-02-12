@@ -70,7 +70,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal())->hasCases());
 
   SmallVector<ASTNode, 1> statements;
   SmallVector<ASTNode, 0> cases;
@@ -78,11 +78,11 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   // switch (a, b) { }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
                                   AccessSemantics::Ordinary,
-                                  aParam->getType());
+                                  aParam->getTypeInContext());
   auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
                                   AccessSemantics::Ordinary,
-                                  bParam->getType());
-  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
+                                  bParam->getTypeInContext());
+  TupleTypeElt abTupleElts[2] = { aParam->getTypeInContext(), bParam->getTypeInContext() };
   auto abExpr = TupleExpr::createImplicit(C, {aRef, bRef}, /*labels*/ {});
   abExpr->setType(TupleType::get(abTupleElts, C));
   auto switchStmt =
@@ -106,7 +106,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 6> statements;
@@ -132,7 +132,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto *callExpr = DotSyntaxCallExpr::create(
         C, ref, SourceLoc(), Argument::unlabeled(base), fnType);
     callExpr->setImplicit();
-    callExpr->setThrows(false);
+    callExpr->setThrows(nullptr);
     cmpFuncExpr = callExpr;
   } else {
     cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
@@ -144,8 +144,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
                          fnType->castTo<FunctionType>()->getResult());
-  cmpExpr->setThrows(false);
-  statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
+  cmpExpr->setThrows(nullptr);
+  statements.push_back(ReturnStmt::createImplicit(C, cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/true };
@@ -163,8 +163,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  Type enumType = aParam->getType();
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  Type enumType = aParam->getTypeInContext();
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
   SmallVector<ASTNode, 4> cases;
@@ -176,14 +176,21 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   for (auto elt : enumDecl->getAllElements()) {
     ++elementCount;
 
+    if (auto *unavailableElementCase =
+            DerivedConformance::unavailableEnumElementCaseStmt(
+                enumType, elt, eqDecl, /*subPatternCount=*/2)) {
+      cases.push_back(unavailableElementCase);
+      continue;
+    }
+
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat =
-        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, lhsSubpattern);
+    auto lhsElemPat = new (C)
+        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, lhsSubpattern, /*DC*/ eqDecl);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
@@ -191,13 +198,13 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat =
-        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, rhsSubpattern);
+    auto rhsElemPat = new (C)
+        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, rhsSubpattern, /*DC*/ eqDecl);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -242,7 +249,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // return true
     auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(),
                                                /*Implicit*/true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, trueExpr);
     statementsInCase.push_back(returnStmt);
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
@@ -261,13 +268,13 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      defaultItem, SourceLoc(), SourceLoc(),
                                      body,
-                                     /*case body var decls*/ None));
+                                     /*case body var decls*/ llvm::None));
   }
 
   // switch (a, b) { <case statements> }
@@ -292,7 +299,7 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto structDecl = cast<StructDecl>(aParam->getType()->getAnyNominal());
+  auto structDecl = cast<StructDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
 
@@ -326,7 +333,7 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   // return true
   auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(),
                                              /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, trueExpr);
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -377,7 +384,7 @@ deriveEquatable_eq(
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
+  auto selfIfaceTy = parentDC->getSelfInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(SourceLoc(),
@@ -410,23 +417,19 @@ deriveEquatable_eq(
   auto *const eqDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/false,
+      /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
     auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableTy = equatableProto->getDeclaredInterfaceType();
-    auto equatableTyExpr = TypeExpr::createImplicit(equatableTy, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
-    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                  SourceRange(),
-                                                  equatableTyExpr,
-                                                  equalsDeclName,
-                                                  DeclNameLoc()));
+    eqDecl->getAttrs().add(ImplementsAttr::create(parentDC,
+                                                  equatableProto,
+                                                  equalsDeclName));
   }
 
   if (!C.getEqualIntDecl()) {
@@ -551,7 +554,7 @@ deriveHashable_hashInto(
   auto *const hashDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/false,
+      /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
@@ -560,7 +563,8 @@ deriveHashable_hashInto(
   // The derived hash(into:) for an actor must be non-isolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
       derived.Nominal->isActor())
-    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
+    hashDecl->getAttrs().add(
+        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -685,7 +689,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
-  Type enumType = selfDecl->getType();
+  Type enumType = selfDecl->getTypeInContext();
 
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
@@ -696,15 +700,23 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   // For each enum element, generate a case statement that binds the associated
   // values so that they can be fed to the hasher.
   for (auto elt : enumDecl->getAllElements()) {
+    if (auto *unavailableElementCase =
+            DerivedConformance::unavailableEnumElementCaseStmt(enumType, elt,
+                                                               hashIntoDecl)) {
+      cases.push_back(unavailableElementCase);
+      continue;
+    }
+
     // case .<elt>(let a0, let a1, ...):
     SmallVector<VarDecl*, 3> payloadVars;
     SmallVector<ASTNode, 3> statements;
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
-        DeclNameRef(elt->getBaseIdentifier()), elt, payloadPattern);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(elt->getBaseIdentifier()),
+                           elt, payloadPattern, /*DC*/ hashIntoDecl);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -731,7 +743,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto hasBoundDecls = !payloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       auto copy = C.Allocate<VarDecl *>(payloadVars.size());
       for (unsigned i : indices(payloadVars)) {
@@ -817,7 +829,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // 'self'
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
-  Type selfType = selfDecl->getType();
+  Type selfType = selfDecl->getTypeInContext();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true,
                                      AccessSemantics::Ordinary,
@@ -848,9 +860,9 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
-  callExpr->setThrows(false);
+  callExpr->setThrows(nullptr);
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
@@ -889,6 +901,10 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     SourceLoc(), C.Id_hashValue, parentDC);
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setSynthesized();
+  hashValueDecl->setImplicit();
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
+                                      /*sourceIsParentContext*/ true);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -896,9 +912,9 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, hashValueDecl,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, intType, parentDC);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setSynthesized();
@@ -907,20 +923,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
-  hashValueDecl->setImplicit();
-  hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
-  hashValueDecl->copyFormalAccessFrom(derived.Nominal,
-                                      /*sourceIsParentContext*/ true);
 
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
       derived.Nominal->isActor())
-    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
+    hashValueDecl->getAttrs().add(
+        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
 
-  Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
-  hashValuePat->setType(intType);
+  Pattern *hashValuePat =
+      NamedPattern::createImplicit(C, hashValueDecl, intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);
 
@@ -960,8 +972,6 @@ getHashableConformance(const Decl *parentDecl) {
 }
 
 bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
-  if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
-    return false;
   // FIXME: This is not actually correct. We cannot promise to always
   // provide a witness here in all cases. Unfortunately, figuring out
   // whether this is actually possible requires a parent decl context.

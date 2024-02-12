@@ -29,6 +29,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -127,6 +128,10 @@ static bool isDestroyArray(SILInstruction *inst) {
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
+/// TODO: Most default destructors with non-trivial elements will have a
+/// destroy_addr of the non-trivial element in the destructor, this analysis
+/// will return as having side-effects in such cases, leading to conservative
+/// results. Check if we can do better here.
 static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
   SILFunction *Fn = getDestructor(ARI);
   // If we can't find a constructor then assume it has side effects.
@@ -173,13 +178,22 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
           assert(RefInst->getNumOperands() == 1 &&
                  "Make sure RefInst only has one argument.");
           LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
-                     "Self.\n");
+                                     "Self.\n");
           continue;
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
-                     "not on self.\n");
-          return DestructorEffects::Unknown;
         }
+        LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                                   "not on self.\n");
+        return DestructorEffects::Unknown;
+      }
+      if (auto *destroy = dyn_cast<DestroyValueInst>(&I)) {
+        if (stripCasts(destroy->getOperand()) == Self) {
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
+                                     "Self.\n");
+          continue;
+        }
+        LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                                   "not on self.\n");
+        return DestructorEffects::Unknown;
       }
 
       // dealloc_stack can be ignored.
@@ -242,7 +256,16 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
 /// alloc_ref alive.
 static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
                               bool onlyAcceptTrivialStores) {
-  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
+  if (isa<DestroyValueInst>(Inst)) {
+    return acceptRefCountInsts;
+  }
+  if (isa<CopyValueInst>(Inst) || isa<BeginBorrowInst>(Inst) ||
+      isa<MoveValueInst>(Inst)) {
+    return true;
+  }
+  if (isa<EndInitLetRefInst>(Inst) || isa<BeginDeallocRefInst>(Inst) ||
+      isa<FixLifetimeInst>(Inst) || isa<EndBorrowInst>(Inst) ||
+      isa<UpcastInst>(Inst) || isa<UncheckedRefCastInst>(Inst))
     return true;
 
   // It is ok to eliminate various retains/releases. We are either removing
@@ -267,17 +290,24 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // If we see a store here, we have already checked that we are storing into
-  // the pointer before we added it to the worklist, so we can skip it.
+  // We have already checked that we are storing into the pointer before we
+  // added it to the worklist. Here, in the case we are allowing non-trivial
+  // stores, check if the store's source is lexical, if so return false.
+  // Deleting a dead object with non-trivial stores, will need compensating
+  // destroys at the store for it's source, which will shorten the lifetime of
+  // the store's source.
   if (auto *store = dyn_cast<StoreInst>(Inst)) {
-    // TODO: when we have OSSA, we can also accept stores of non trivial values:
-    //       just replace the store with a destroy_value.
-    return !onlyAcceptTrivialStores ||
-           store->getSrc()->getType().isTrivial(*store->getFunction());
+    auto storeSrc = store->getSrc();
+    return storeSrc->getType().isTrivial(*store->getFunction()) ||
+           (!onlyAcceptTrivialStores &&
+            (!store->getFunction()->hasOwnership() || !storeSrc->isLexical()));
   }
 
   // Conceptually this instruction has no side-effects.
   if (isa<InitExistentialAddrInst>(Inst))
+    return true;
+
+  if (isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst))
     return true;
 
   // If Inst does not read or write to memory, have side effects, and is not a
@@ -298,7 +328,7 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
                                     AllocRefInstBase *allocRef) {
   // Get the number of destroyed elements.
   auto *literal = dyn_cast<IntegerLiteralInst>(destroyArray->getArguments()[2]);
-  if (!literal || literal->getValue().getMinSignedBits() > 32)
+  if (!literal || literal->getValue().getSignificantBits() > 32)
     return false;
   int numDestroyed = literal->getValue().getSExtValue();
   
@@ -307,6 +337,14 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 
   // Check if the destroyArray destroys the tail elements of allocRef.
   auto destroyPath = AccessPath::compute(destroyArray->getArguments()[1]);
+  AccessStorage storage = destroyPath.getStorage();
+  if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(storage.getRoot())) {
+    destroyPath = AccessPath(
+                   storage.transformReference(beginDealloc->getAllocation()),
+                   destroyPath.getPathNode(),
+                   destroyPath.getOffset());
+  }
+
   if (destroyPath != AccessPath::forTailStorage(allocRef))
     return false;
 
@@ -379,7 +417,7 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
 
   SmallVector<RefElementAddrInst *, 8> refElementAddrs;
-  bool deallocationMaybeInlined = false;
+
   BuiltinInst *destroyArray = nullptr;
   auto *allocRef = dyn_cast<AllocRefInstBase>(allocation);
 
@@ -393,14 +431,10 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
     if (Users && !Users->insert(I)) {
       LLVM_DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
-    }
-
-    if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
-      if (!rea->getType().isTrivial(*rea->getFunction()))
+    } else if (auto *rea = dyn_cast<RefElementAddrInst>(I)) {
+      if (rea != allocation && !rea->getType().isTrivial(*rea->getFunction()))
         refElementAddrs.push_back(rea);
-    } else if (isa<SetDeallocatingInst>(I)) {
-      deallocationMaybeInlined = true;
-    } else if (allocRef && Users && isDestroyArray(I)) {
+    } else if (allocRef && isDestroyArray(I)) {
       if (destroyArray)
         return true;
       destroyArray = cast<BuiltinInst>(I);
@@ -433,18 +467,14 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
     }
   }
 
-  // In OSSA, we don't have to do this check. We can always accept a
-  // destroyArray and insert the compensating destroys right at the store
-  // instructions.
-  if (destroyArray)
-    return !onlyStoresToTailObjects(destroyArray, *Users, allocRef);
-
-  if (deallocationMaybeInlined) {
-    // The alloc_ref is not destructed by a strong_release which is calling the
-    // deallocator (destroying all stored properties).
+  if (!allocation->getFunction()->hasOwnership()) {
+    // In non-ossa, if we found a destroy array builtin that destroys the tail
+    // elements, ensure all stores are to the taile elems.
+    if (destroyArray) {
+      return !onlyStoresToTailObjects(destroyArray, *Users, allocRef);
+    }
     // In non-OSSA we cannot reliably track the lifetime of non-trivial stored
     // properties. Removing the dead alloc_ref might leak a property value.
-    // TODO: in OSSA we can replace stores to properties with a destroy_value.
     for (RefElementAddrInst *rea : refElementAddrs) {
       // Re-run the check with not accepting non-trivial stores.
       if (hasUnremovableUsers(rea, nullptr, acceptRefCountInsts,
@@ -564,9 +594,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     auto User = Op->getUser();
 
     // Lifetime endpoints that don't allow the address to escape.
-    if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User)) {
+    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -585,6 +614,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       addStore(Store, StoreAddrNode);
 
       AllUsers.insert(User);
+      continue;
+    }
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
+      if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
       continue;
     }
     if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
@@ -701,10 +737,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
     // per block, and all release points occur after all stores. Therefore we
     // can simply ask SSAUpdater for the reaching store.
     SILValue RelVal = SSAUp.getValueAtEndOfBlock(RelPoint->getParent());
-    if (StVal->getType().isReferenceCounted(RelPoint->getModule()))
-      B.createStrongRelease(Loc, RelVal, B.getDefaultAtomicity());
-    else
-      B.createReleaseValue(Loc, RelVal, B.getDefaultAtomicity());
+    B.emitDestroyValueOperation(Loc, RelVal);
   }
 }
 
@@ -748,10 +781,11 @@ class DeadObjectElimination : public SILFunctionTransform {
     DeadEndBlocks DEBlocks(&Fn);
     DestructorAnalysisCache.clear();
 
+    LLVM_DEBUG(llvm::dbgs() << "Processing " << Fn.getName() << "\n");
+
     bool Changed = false;
 
     for (auto &BB : Fn) {
-
       for (SILInstruction &inst : BB.deletableInstructions()) {
         if (auto *A = dyn_cast<AllocRefInstBase>(&inst))
           Changed |= processAllocRef(A);
@@ -770,10 +804,6 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
-    // FIXME: We should support ownership eventually.
-    if (getFunction()->hasOwnership())
-      return;
-
     assert(!domInfo);
 
     if (processFunction(*getFunction())) {
@@ -826,21 +856,48 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
     return false;
   }
 
-  // Find the instruction which releases the object's tail elements.
-  SILInstruction *releaseOfTailElems = nullptr;
-  for (SILInstruction *user : UsersToRemove) {
-    if (isDestroyArray(user) ||
-       (destructorEffects == DestructorEffects::DestroysTailElems &&
-        isa<RefCountingInst>(user) && user->mayRelease())) {
-      // Bail if we find multiple such instructions.
-      if (releaseOfTailElems)
+  if (!ARI->getFunction()->hasOwnership()) {
+    // Find the instruction which releases the object's tail elements.
+    SILInstruction *releaseOfTailElems = nullptr;
+    for (SILInstruction *user : UsersToRemove) {
+      if (isDestroyArray(user) ||
+          (destructorEffects == DestructorEffects::DestroysTailElems &&
+           isa<RefCountingInst>(user) && user->mayRelease())) {
+        // Bail if we find multiple such instructions.
+        if (releaseOfTailElems)
+          return false;
+        releaseOfTailElems = user;
+      }
+    }
+    if (releaseOfTailElems) {
+      if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
         return false;
-      releaseOfTailElems = user;
+      }
     }
   }
-  if (releaseOfTailElems) {
-    if (!insertCompensatingReleases(releaseOfTailElems, UsersToRemove)) {
-      return false;
+
+  if (ARI->getFunction()->hasOwnership()) {
+    // In ossa, we are going to delete the dead element store and insert a
+    // destroy_value of the store's source. This is shortening the store's
+    // source lifetime. Check if there was a pointer escape of the store's
+    // source, if so bail out.
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
+      if (findPointerEscape(store->getSrc())) {
+        return false;
+      }
+    }
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial) {
+        continue;
+      }
+      SILBuilderWithScope(store).createDestroyValue(store->getLoc(),
+                                                    store->getSrc());
     }
   }
 
@@ -856,11 +913,39 @@ bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors.
   bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
+  // In non-ossa, only accept trivial stores if we have a non-trivial
+  // alloc_stack
+  bool onlyAcceptTrivialStores =
+      ASI->getFunction()->hasOwnership() ? false : !isTrivialType;
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/ true,
-      /*onlyAcceptTrivialStores*/!isTrivialType)) {
+  if (hasUnremovableUsers(ASI, &UsersToRemove, /*acceptRefCountInsts=*/true,
+                          onlyAcceptTrivialStores)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
+  }
+
+  if (ASI->getFunction()->hasOwnership()) {
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
+      // In ossa, we are going to delete the dead store and insert a
+      // destroy_value of the store's source. This is shortening the store's
+      // source lifetime. Check if there was a pointer escape of the store's
+      // source, if so bail out.
+      if (findPointerEscape(store->getSrc())) {
+        return false;
+      }
+    }
+    for (auto *user : UsersToRemove) {
+      auto *store = dyn_cast<StoreInst>(user);
+      if (!store ||
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial)
+        continue;
+      SILBuilderWithScope(store).createDestroyValue(store->getLoc(),
+                                                    store->getSrc());
+    }
   }
 
   // Remove the AllocRef and all of its users.
@@ -880,11 +965,38 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
     return false;
   }
 
-  // For simplicity just bail if the keypath has a non-trivial operands.
-  // TODO: don't bail but insert compensating destroys for such operands.
+  bool hasOwnership = KPI->getFunction()->hasOwnership();
   for (const Operand &Op : KPI->getPatternOperands()) {
-    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+    // In non-ossa, bail out if we have non-trivial pattern operands.
+    if (!hasOwnership) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+        return false;
+      continue;
+    }
+    // In ossa, bail out if we have non-trivial pattern operand values that are
+    // lexical.
+    if (Op.get()->isLexical()) {
       return false;
+    }
+  }
+
+  if (KPI->getFunction()->hasOwnership()) {
+    for (const Operand &Op : KPI->getPatternOperands()) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+        continue;
+      // In ossa, we are going to delete the dead keypath which was consuming
+      // the pattern operand and insert a destroy_value of the pattern operand
+      // value. This is shortening the pattern operand value's lifetime. Check
+      // if there was a pointer escape, if so bail out.
+      if (findPointerEscape(Op.get())) {
+        return false;
+      }
+    }
+    for (const Operand &Op : KPI->getPatternOperands()) {
+      if (Op.get()->getType().isTrivial(*KPI->getFunction()))
+        continue;
+      SILBuilderWithScope(KPI).createDestroyValue(KPI->getLoc(), Op.get());
+    }
   }
 
   // Remove the keypath and all of its users.
@@ -921,10 +1033,11 @@ bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(Arg0)) {
     if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
-          if (Op->getUser() == AI)
+          auto *user = Op->getUser();
+          if (user == AI)
             return true;
-          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
-            ToDestroy.emplace_back(SRI);
+          if (isa<StrongReleaseInst>(user) || isa<DestroyValueInst>(user)) {
+            ToDestroy.emplace_back(user);
             return true;
           }
           return false;
@@ -952,18 +1065,32 @@ bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
 // or we could also handle calls to array.init.
 bool DeadObjectElimination::removeAndReleaseArray(
     SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks) {
-  TupleExtractInst *ArrayDef = nullptr;
-  TupleExtractInst *StorageAddress = nullptr;
-  for (auto *Op : NewArrayValue->getUses()) {
-    auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
-    if (!TupleElt)
+  SILValue ArrayDef = nullptr;
+  SILValue StorageAddress = nullptr;
+
+  if (NewArrayValue->getFunction()->hasOwnership()) {
+    auto *destructureTuple =
+        NewArrayValue->getSingleConsumingUserOfType<DestructureTupleInst>();
+    if (!destructureTuple) {
       return false;
-    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
-      ArrayDef = TupleElt;
-    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
-      StorageAddress = TupleElt;
-    } else {
+    }
+    if (destructureTuple->getNumResults() != 2) {
       return false;
+    }
+    ArrayDef = destructureTuple->getResult(0);
+    StorageAddress = destructureTuple->getResult(1);
+  } else {
+    for (auto *Op : NewArrayValue->getUses()) {
+      auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
+      if (!TupleElt)
+        return false;
+      if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
+        ArrayDef = TupleElt;
+      } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
+        StorageAddress = TupleElt;
+      } else {
+        return false;
+      }
     }
   }
   if (!ArrayDef)
@@ -1043,9 +1170,15 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
+  auto *ARI = dyn_cast<AllocRefInst>(AI->getArgument(0));
+
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
+  }
+
+  if (ARI) {
+    deleter.forceDeleteWithUsers(ARI);
   }
 
   ++DeadAllocApplyEliminated;

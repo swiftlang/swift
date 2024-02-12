@@ -12,10 +12,9 @@ import ObjectiveC
 
 @objc protocol OP {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %TSo8ProtocolC* @protocol_conversion() {{.*}} {
-// CHECK:         %0 = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24objc_protocol_conversion2OP_", align 8
-// CHECK:         %1 = bitcast i8* %0 to %TSo8ProtocolC*
-// CHECK:         ret %TSo8ProtocolC* %1
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @protocol_conversion() {{.*}} {
+// CHECK:         %0 = load ptr, ptr @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24objc_protocol_conversion2OP_", align 8
+// CHECK:         ret ptr %0
 // CHECK:       }
 
 sil @protocol_conversion : $@convention(thin) () -> @owned Protocol {

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -strict-concurrency=complete -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -27,7 +27,7 @@ func invalidFile() async -> FileDescriptor {
   return FileDescriptor(id: -1)
 }
 
-func takeNotSendable(_ nsmo: __shared NotSendableMO) async {}
+func takeNotSendable(_ nsmo: borrowing NotSendableMO) async {}
 
 actor A {
   init(_ t: __owned FileDescriptor) {}
@@ -42,15 +42,15 @@ actor A {
 }
 
 @MainActor
-func processFiles(_ a: A, _ anotherFile: __shared FileDescriptor) async {
+func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   let file = await invalidFile()
   await a.takeFileDescriptor(file)
 
   await a.takeMaybeFile(.available(anotherFile))
   _ = A(.available(anotherFile))
 
-  let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by implicitly asynchronous call to actor-isolated instance method 'getRef()' cannot cross actor boundary}}
-  await takeNotSendable(ns) // expected-warning {{non-sendable type 'NotSendableMO' exiting main actor-isolated context in call to non-isolated global function 'takeNotSendable' cannot cross actor boundary}}
+  let ns = await a.getRef() // expected-warning {{non-sendable type 'NotSendableMO' returned by call to actor-isolated function cannot cross actor boundary}}
+  await takeNotSendable(ns) // expected-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
 
   switch (await a.giveFileDescriptor()) {
   case let .available(fd):
@@ -91,47 +91,47 @@ enum Wrong_NoncopyableOption<T> : Sendable { // expected-note {{consider making 
 }
 
 func takeAnySendable(_ s: any Sendable) {}
-func takeSomeSendable(_ s: some Sendable) {}
+func takeSomeSendable(_ s: some Sendable) {} // expected-note {{generic parameter 'some Sendable' has an implicit Copyable requirement}}
 
-// expected-error@+1 {{move-only type 'FileDescriptor' cannot be used with generics yet}}
+// expected-error@+1 {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 func mkSendable() -> Sendable { return FileDescriptor(id: 0) }
 
-func tryToCastIt(_ fd: __shared FileDescriptor) {
-  let _: any Sendable = fd // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
-  let _: Sendable = fd // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
+func tryToCastIt(_ fd: borrowing FileDescriptor) {
+  let _: any Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  let _: Sendable = fd // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 
-  takeAnySendable(fd) // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
-  takeSomeSendable(fd) // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
+  takeAnySendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
+  takeSomeSendable(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'some Sendable' in 'takeSomeSendable'}}
 
-  let _ = fd as Sendable // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
+  let _ = fd as Sendable // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
 
   let _ = fd as? Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
 
   let _ = fd as! Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
 
   let _ = fd is Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
 
   let sendy = mkSendable()
   let _ = sendy as FileDescriptor // expected-error {{cannot convert value of type 'any Sendable' to type 'FileDescriptor' in coercion}}
   let _ = sendy is FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
   let _ = sendy as! FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
   let _ = sendy as? FileDescriptor// expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
 }
 
 protocol GiveSendable<T> {
-  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+  associatedtype T: Sendable // expected-note {{protocol requires nested type 'T'; add nested type 'T' for conformance}}
   func give() -> T
 }
 
 // make sure witnessing associatedtypes is still prevented, even though we meet the explicit constraint.
 class Bad: GiveSendable { // expected-error {{type 'Bad' does not conform to protocol 'GiveSendable'}}
-  typealias T = FileDescriptor // expected-note {{possibly intended match 'Bad.T' (aka 'FileDescriptor') does not conform to '_Copyable'}}
+  typealias T = FileDescriptor // expected-note {{possibly intended match 'Bad.T' (aka 'FileDescriptor') does not conform to 'Copyable'}}
   func give() -> FileDescriptor { return FileDescriptor(id: -1) }
 }
 
@@ -145,21 +145,9 @@ class Container<T> where T:Sendable {
   init(_ t: T) { self.elm = t }
 }
 
-func createContainer(_ fd: __shared FileDescriptor) {
-  let _: Container<Sendable> = Container(fd) // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
+func createContainer(_ fd: borrowing FileDescriptor) {
+  let _: Container<Sendable> = Container(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
   let _: Container<Sendable> = Container(CopyableStruct())
-}
-
-func takeTwo<T: Sendable>(_ s1: T, _ s2: T) {}
-
-extension Sendable {
-  func doIllegalThings() {
-    return takeTwo(self, self)
-  }
-}
-
-func tryToDupe(_ fd: __shared FileDescriptor) {
-  fd.doIllegalThings() // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 }
 
 @_moveOnly

@@ -70,16 +70,18 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
 //                         Pass implementation
 //===--------------------------------------------------------------------===//
 
-
-private func runSimplification(on function: Function, _ context: FunctionPassContext,
-                               preserveDebugInfo: Bool,
-                               _ simplify: (Instruction, SimplifyContext) -> ()) {
+@discardableResult
+func runSimplification(on function: Function, _ context: FunctionPassContext,
+                       preserveDebugInfo: Bool,
+                       _ simplify: (Instruction, SimplifyContext) -> ()) -> Bool {
   var worklist = InstructionWorklist(context)
   defer { worklist.deinitialize() }
 
+  var changed = false
   let simplifyCtxt = context.createSimplifyContext(preserveDebugInfo: preserveDebugInfo,
                                                    notifyInstructionChanged: {
     worklist.pushIfNotVisited($0)
+    changed = true
   })
 
   // Push in reverse order so that popping from the tail of the worklist visits instruction in forward order again.
@@ -97,7 +99,7 @@ private func runSimplification(on function: Function, _ context: FunctionPassCon
         continue
       }
       if !context.continueWithNextSubpassRun(for: instruction) {
-        return
+        return changed
       }
       simplify(instruction, simplifyCtxt)
     }
@@ -110,6 +112,8 @@ private func runSimplification(on function: Function, _ context: FunctionPassCon
   if context.needFixStackNesting {
     function.fixStackNesting(context)
   }
+  
+  return changed
 }
 
 private func cleanupDeadInstructions(in function: Function,

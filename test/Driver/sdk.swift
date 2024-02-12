@@ -2,7 +2,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu    -g -sdk %S/../Inputs/clang-importer-sdk %s 2>&1 | %FileCheck %s --check-prefix LINUX
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-freebsd      -g -sdk %S/../Inputs/clang-importer-sdk %s 2>&1 | %FileCheck %s --check-prefix FREEBSD
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -g -sdk %S/../Inputs/clang-importer-sdk %s 2>&1 | %FileCheck %s --check-prefix WINDOWS
-// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi         -g -sdk %S/../Inputs/clang-importer-sdk %s 2>&1 | %FileCheck %s --check-prefix WASI
+// RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi         -g -sdk %S/../Inputs/clang-importer-sdk -resource-dir %S/Inputs/fake-resource-dir/lib/swift_static %s 2>&1 | %FileCheck %s --check-prefix WASI
 
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -target x86_64-apple-macosx10.9  -g -driver-print-jobs %s 2>&1 | %FileCheck %s --check-prefix OSX
 // RUN: env SDKROOT=%S/../Inputs/clang-importer-sdk %swiftc_driver_plain -target x86_64-unknown-linux-gnu -g -driver-print-jobs %s 2>&1 | %FileCheck %s --check-prefix LINUX
@@ -12,7 +12,7 @@
 // OSX: bin{{/|\\\\}}swift
 // OSX: Driver{{/|\\\\}}sdk.swift
 // OSX: -sdk {{.*}}/Inputs/clang-importer-sdk
-// OSX-NEXT: bin{{/|\\\\}}swift
+// OSX: bin{{/|\\\\}}swift
 // OSX: -sdk {{.*}}/Inputs/clang-importer-sdk
 // OSX: {{.*}}.o{{[ "]}}
 // OSX: {{-syslibroot|--sysroot}} {{[^ ]*}}/Inputs/clang-importer-sdk

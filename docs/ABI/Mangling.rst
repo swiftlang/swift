@@ -108,6 +108,10 @@ The following symbolic reference kinds are currently implemented:
      symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
    #endif
 
+   #if SWIFT_RUNTIME_VERSION >= 5.TBD
+    objective-c-protocol-relative-reference  ::=  `\x0C`  .{4} // Reference points directly to a objective-c protcol reference
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
@@ -150,7 +154,6 @@ Globals
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
   global ::= global 'HF'                 // accessible function runtime record
-  global ::= global 'Ha'                 // runtime discoverable attribute record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
@@ -301,6 +304,8 @@ are always non-polymorphic ``<impl-function-type>`` types.
   VALUE-WITNESS-KIND ::= 'ug'           // getEnumTag
   VALUE-WITNESS-KIND ::= 'up'           // destructiveProjectEnumData
   VALUE-WITNESS-KIND ::= 'ui'           // destructiveInjectEnumTag
+  VALUE-WITNESS-KIND ::= 'et'           // getEnumTagSinglePayload
+  VALUE-WITNESS-KIND ::= 'st'           // storeEnumTagSinglePayload
 
 ``<VALUE-WITNESS-KIND>`` differentiates the kinds of value
 witness functions for a type.
@@ -323,9 +328,16 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOs' // Outlined release
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
+  global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness
   global ::= generic-signature? type 'WOd' // Outlined assignWithTake
+  global ::= generic-signature? type 'WOD' // Outlined assignWithTake, not using value witness
   global ::= generic-signature? type 'WOf' // Outlined assignWithCopy
+  global ::= generic-signature? type 'WOF' // Outlined assignWithCopy, not using value witness
   global ::= generic-signature? type 'WOh' // Outlined destroy
+  global ::= generic-signature? type 'WOH' // Outlined destroy, not using value witness
+  global ::= generic-signature? type 'WOi` // Outlined store enum tag
+  global ::= generic-signature? type 'WOj` // Outlined enum destructive project
+  global ::= generic-signature? type 'WOg` // Outlined enum get tag
 
 Entities
 ~~~~~~~~
@@ -394,13 +406,18 @@ Entities
   RELATED-DISCRIMINATOR ::= [a-j]
   RELATED-DISCRIMINATOR ::= [A-J]
 
-  macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
+  macro-discriminator-list ::= macro-discriminator-list? file-discriminator? macro-expansion-operator INDEX
 
-  macro-expansion-operator ::= identifier 'a' // accessor attached macro
-  macro-expansion-operator ::= identifier 'A' // member-attribute attached macro
-  macro-expansion-operator ::= identifier 'f' // freestanding macro
-  macro-expansion-operator ::= identifier 'm' // member attached macro
-  macro-expansion-operator ::= identifier 'u' // uniquely-named entity
+  macro-expansion-operator ::= decl-name identifier 'fMa' // attached accessor macro
+  macro-expansion-operator ::= decl-name identifier 'fMr' // attached member-attribute macro
+  macro-expansion-operator ::= identifier 'fMf' // freestanding macro
+  macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
+  macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
+  macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMe' // attached extension macro
+  macro-expansion-operator ::= decl-name identifier 'fMq' // attached preamble macro
+  macro-expansion-operator ::= decl-name identifier 'fMb' // attached body macro
+  macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 
@@ -574,6 +591,9 @@ Types
     type ::= 'BD'                              // Builtin.DefaultActorStorage
     type ::= 'Be'                              // Builtin.Executor
   #endif
+  #if SWIFT_RUNTIME_VERSION >= 5.9
+    type ::= 'Bd'                              // Builtin.NonDefaultDistributedActorStorage
+  #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
@@ -623,7 +643,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -633,9 +653,13 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
-    global-actor :: = type 'Yc'                // Global actor on function type
+    function-isolation ::= type 'Yc'          // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.11
+    throws ::= type 'YK'                     // 'throws(type)' annotation on function types
+    function-isolation ::= type 'YA'         // @isolated(any) on function type
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
@@ -667,6 +691,8 @@ Types
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
   type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
+  
+  type ::= pack-type 'Qe' INDEX              // pack element type
   
   type ::= pattern-type count-type 'Qp'      // pack expansion type
   type ::= pack-element-list 'QP'            // pack type
@@ -929,6 +955,8 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
+  LAYOUT-CONSTRAINT ::= 'B' // BridgeObject
+  LAYOUT-CONSTRAINT ::= 'S' // TrivialStride
 
   LAYOUT-SIZE ::= INDEX // Size only
   LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment
@@ -1142,6 +1170,7 @@ Function Specializations
   specialization ::= type '_' type* 'Ts' SPEC-INFO     // Generic re-abstracted prespecialization
   specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.
+  specialization ::= type '_' type* 'Ta' SPEC-INFO     // Non-async specialization
 
 The types are the replacement types of the substitution list.
 
@@ -1164,7 +1193,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= MT-REMOVED? FRAGILE? PASSID
+  SPEC-INFO ::= MT-REMOVED? FRAGILE? ASYNC-REMOVED? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1172,10 +1201,14 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '3'                             // CapturePropagation,
   PASSID ::= '4'                             // FunctionSignatureOpts,
   PASSID ::= '5'                             // GenericSpecializer,
+  PASSID ::= '6'                             // MoveDiagnosticInOutToOut,
+  PASSID ::= '7'                             // AsyncDemotion,
 
   MT-REMOVED ::= 'm'                         // non-generic metatype arguments are removed in the specialized function
 
   FRAGILE ::= 'q'
+
+  ASYNC-REMOVED ::= 'a'                      // async effect removed
 
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order

@@ -1,12 +1,12 @@
 enum Foo {
   case first(associated: Int)
-  case secondary
+  case <base>second</base>
 }
 
 func test() {
   let _ = Foo.first(associated: 1)
   let _ = Foo.first
-  let _ = Foo.secondary
+  let _ = Foo.<base>second</base>
 }
 
 

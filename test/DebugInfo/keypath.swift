@@ -8,7 +8,7 @@ public struct Gen<Value> {
 
 // This used to assert.
 
-// CHECK: distinct !DISubprogram(linkageName: "keypath_set", {{.*}} flags: DIFlagArtificial
+// CHECK: distinct !DISubprogram(linkageName: "$sSly7ElementQz5IndexQzcipSMRzSHADRQlxxTK", {{.*}} flags: DIFlagArtificial
 extension Gen where Value : MutableCollection, Value.Index : Hashable {
     public var dontAssert: Int {
         var i = value.startIndex

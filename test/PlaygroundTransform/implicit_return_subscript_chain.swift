@@ -33,15 +33,19 @@ s[13]
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[newValue='Optional(33)']
+// CHECK-NEXT: {{.*}} __builtin_log[int='13']
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(Optional(33))']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[int='14']
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(14)']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(14)']
 
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[int='13']
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(33)']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(33)']

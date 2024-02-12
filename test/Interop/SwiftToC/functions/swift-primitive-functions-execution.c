@@ -22,7 +22,11 @@ int main() {
   // passThroughCChar
   VERIFY_PASSTHROUGH_VALUE($s9Functions16passThroughCCharys4Int8VADF, 'a');
   // passThroughCWideChar
+#if defined(_WIN32)
+  VERIFY_PASSTHROUGH_VALUE($s9Functions20passThroughCWideCharys6UInt16VADF, 'a');
+#else
   VERIFY_PASSTHROUGH_VALUE($s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF, 'a');
+#endif
   // passThroughCChar16
   VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCChar16ys6UInt16VADF, 0xFE1);
   // passThroughCChar32

@@ -5,6 +5,9 @@
 // RUN: %target-sil-nm -module-name main %t/out.sib | %FileCheck %s
 // RUN: %target-sil-nm -module-name main -demangle %t/out.sib | %FileCheck -check-prefix=DEMANGLE %s
 
+// Use this testfile to check if the `swift-frontend -sil-nm` option works.
+// RUN: %swift_frontend_plain -sil-nm %s | %FileCheck -check-prefix=SIL-NM -check-prefix=CHECK %s
+
 import Builtin
 
 public class C {

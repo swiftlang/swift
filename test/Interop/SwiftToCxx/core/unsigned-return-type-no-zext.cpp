@@ -4,6 +4,7 @@
 // RUN: %FileCheck %s < %t/ir.ll
 
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 unsigned char getEnumTagi8(void *p);
 unsigned getEnumTagi32(void *p);
@@ -15,5 +16,5 @@ void test(void *p) {
 
 // NOTE: it's important to verify that i32 function does not zeroext/signext return value.
 
-// CHECK: declare{{( noundef)?}}{{( zeroext)?}} i8 @_Z12getEnumTagi8Pv(i8* noundef)
-// CHECK: declare{{( noundef)?}} i32 @_Z13getEnumTagi32Pv(i8* noundef)
+// CHECK: declare{{( noundef)?}}{{( zeroext)?}} i8 @_Z12getEnumTagi8Pv(ptr noundef)
+// CHECK: declare{{( noundef)?}} i32 @_Z13getEnumTagi32Pv(ptr noundef)

@@ -47,12 +47,12 @@ enum IndirectionKind {
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
 /// Used to signal to emitDbgIntrinsic that we actually want to emit dbg.declare
-/// instead of dbg.addr. By default, we now emit llvm.dbg.addr instead of
-/// llvm.dbg.declare for normal variables. This is not true for metadata which
+/// instead of dbg.value + op_deref. By default, we now emit dbg.value instead of
+/// dbg.declare for normal variables. This is not true for metadata which
 /// truly are function wide and should be llvm.dbg.declare.
 enum class AddrDbgInstrKind : bool {
   DbgDeclare,
-  DbgAddr,
+  DbgValueDeref,
 };
 
 /// Helper object that keeps track of the current CompileUnit, File,
@@ -160,17 +160,17 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               Optional<SILLocation> VarLoc,
+                               llvm::Optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind Indirection = DirectValue,
                                ArtificialKind Artificial = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
-  /// Emit a dbg.addr or dbg.value intrinsic, depending on Storage. If \p
-  /// ForceDbgDeclare is set to Yes, then instead of emitting a dbg.addr, we
-  /// will insert a dbg.declare. Please only use that if you know that the given
-  /// value can never be moved and have its lifetime ended early (e.x.: type
-  /// metadata).
+  /// Emit a dbg.value or dbg.declare intrinsic, depending on Storage. If \p
+  /// AddrDbgInstrKind is set to DbgDeclare, then instead of emitting a
+  /// dbg.value, we will insert a dbg.declare. Please only use that if you know
+  /// that the given value can never be moved and have its lifetime ended early
+  /// (e.x.: type metadata).
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
@@ -182,7 +182,7 @@ public:
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
-                                     Optional<SILLocation> Loc);
+                                     llvm::Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
@@ -195,9 +195,6 @@ public:
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();
-
-  /// Decode (and cache) a SourceLoc.
-  SILLocation::FilenameAndLocation decodeSourceLoc(SourceLoc SL);
 };
 
 /// An RAII object that autorestores the debug location.

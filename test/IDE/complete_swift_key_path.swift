@@ -55,28 +55,26 @@ class Person {
 
 let _ = \Person#^TYPE_NODOT^#
 // PERSONTYPE-NODOT: Begin completions, 5 items
-// PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .name[#String#]; name=name
-// PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
-// PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
-// PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
-// PERSONTYPE-NODOT-NEXT: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Int#]; name=[:]
+// PERSONTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .name[#String#]; name=name
+// PERSONTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
+// PERSONTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
+// PERSONTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
+// PERSONTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Int#]; name=[:]
 
 let _ = \Person.#^TYPE_DOT^#
 // PERSONTYPE-DOT: Begin completions, 5 items
-// PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
-// PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
-// PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
-// PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
-// PERSONTYPE-DOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[:]
+// PERSONTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
+// PERSONTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
+// PERSONTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
+// PERSONTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
+// PERSONTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[:]
 
 let _ = \Person.friends#^ARRAY_NODOT^#
-// ARRAY-NODOT: Begin completions
 // ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   [{#(index): Int#}][#Person#]; name=[:]
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Person?#]; name=first
 
 let _ = \Person.friends.#^ARRAY_DOT^#
-// ARRAY-DOT: Begin completions
 // ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal/IsSystem:     [{#(index): Int#}][#Element#]; name=[]
 // ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:   count[#Int#]; name=count
 // ARRAY-DOT-DAG: Decl[InstanceVar]/Super/IsSystem:         first[#Person?#]; name=first
@@ -84,35 +82,33 @@ let _ = \Person.friends.#^ARRAY_DOT^#
 
 let _ = \Person.friends[0]#^OBJ_NODOT^#
 // OBJ-NODOT: Begin completions, 5 items
-// OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .name[#String#]; name=name
-// OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
-// OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
-// OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
-// OBJ-NODOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[:]
+// OBJ-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .name[#String#]; name=name
+// OBJ-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
+// OBJ-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
+// OBJ-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
+// OBJ-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[:]
 
 let _ = \Person.friends[0].#^OBJ_DOT^#
 // OBJ-DOT: Begin completions, 4 items
-// OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
-// OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
-// OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
-// OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
+// OBJ-DOT-DAG: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
+// OBJ-DOT-DAG: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
+// OBJ-DOT-DAG: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
+// OBJ-DOT-DAG: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
 
 let _ = \Person.bestFriend#^OPTIONAL_NODOT^#
-// OPTIONAL-NODOT: Begin completions
-// OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.name[#String#]; name=name
-// OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.friends[#[Person]#]; name=friends
-// OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.bestFriend[#Person?#]; name=bestFriend
-// OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.itself[#Person#]; name=itself
-// OPTIONAL-NODOT-NEXT: Decl[Subscript]/CurrNominal:        ?[{#(index): Int#}][#Int#]; name=[:]
-// OPTIONAL-NODOT: Decl[InstanceVar]/CurrNominal/IsSystem:  .unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
+// OPTIONAL-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      ?.name[#String#]; name=name
+// OPTIONAL-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      ?.friends[#[Person]#]; name=friends
+// OPTIONAL-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      ?.bestFriend[#Person?#]; name=bestFriend
+// OPTIONAL-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      ?.itself[#Person#]; name=itself
+// OPTIONAL-NODOT-DAG: Decl[Subscript]/CurrNominal:        ?[{#(index): Int#}][#Int#]; name=[:]
+// OPTIONAL-NODOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:  .unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend.#^OPTIONAL_DOT^#
-// OPTIONAL-DOT: Begin completions
-// OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.name[#String#]; name=name
-// OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
-// OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
-// OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.itself[#Person#]; name=itself
-// OPTIONAL-DOT: Decl[InstanceVar]/CurrNominal/IsSystem:      unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
+// OPTIONAL-DOT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.name[#String#]; name=name
+// OPTIONAL-DOT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
+// OPTIONAL-DOT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
+// OPTIONAL-DOT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.itself[#Person#]; name=itself
+// OPTIONAL-DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:      unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend?#^UNWRAPPED_NODOT^#
 // Same as OBJ_NODOT.
@@ -127,13 +123,11 @@ let _ = \Person.bestFriend?.itself.#^CHAIN_DOT^#
 // Same as OBJ_DOT.
 
 let _ = \[Person]#^ARRAYTYPE_NODOT^#
-// ARRAYTYPE-NODOT: Begin completions
 // ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   .[{#(index): Int#}][#Person#]; name=[:]
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Person?#]; name=first
 
 let _ = \[Person].#^ARRAYTYPE_DOT^#
-// ARRAYTYPE-DOT: Begin completions
 // ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal/IsSystem:   [{#(index): Int#}][#Person#]; name=[:]
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: count[#Int#]; name=count
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       first[#Person?#]; name=first

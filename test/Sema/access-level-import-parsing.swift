@@ -11,7 +11,7 @@
 
 /// Check that all access levels are accepted, except for 'open'.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -package-name package -verify
 
 //--- PublicLib.swift
 //--- PackageLib.swift
@@ -21,8 +21,8 @@
 //--- OpenLib.swift
 
 //--- Client.swift
-public import PublicLib
-package import PackageLib
+public import PublicLib // expected-warning {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
+package import PackageLib // expected-warning {{package import of 'PackageLib' was not used in package declarations}}
 internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib

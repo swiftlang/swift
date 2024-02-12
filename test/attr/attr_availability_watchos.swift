@@ -59,7 +59,7 @@ if #available(iOS 9.3, *) {
 }
 
 if #available(iOS 9.3, watchOS 2.1, *) {
-  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}} {{32-35=2.2}}
+  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}} {{-1:32-35=2.2}}
 }
 
 if #available(iOS 9.1, watchOS 2.2, *) {

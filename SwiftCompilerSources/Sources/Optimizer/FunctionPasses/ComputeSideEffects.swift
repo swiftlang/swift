@@ -24,7 +24,7 @@ import SIL
 /// ```
 /// are computed.
 ///
-let computeSideEffects = FunctionPass(name: "compute-side-effects", {
+let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   (function: Function, context: FunctionPassContext) in
 
   if function.isAvailableExternally {
@@ -56,7 +56,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
   // global effects to the argument, because we don't know to which "global" side-effect
   // instruction the argument might have escaped.
   for argument in function.arguments {
-    collectedEffects.addEffectsForEcapingArgument(argument: argument)
+    collectedEffects.addEffectsForEscapingArgument(argument: argument)
   }
 
   // Don't modify the effects if they didn't change. This avoids sending a change notification
@@ -71,7 +71,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
     effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
   }
-})
+}
 
 /// The collected argument and global side effects of the function.
 private struct CollectedEffects {
@@ -113,7 +113,7 @@ private struct CollectedEffects {
 
     case let store as StoreInst:
       addEffects(.write, to: store.destination)
-      if store.destinationOwnership == .assign {
+      if store.storeOwnership == .assign {
         addDestroyEffects(ofAddress: store.destination)
       }
 
@@ -141,6 +141,24 @@ private struct CollectedEffects {
         // we have to consider side-effects within the closure.
         handleApply(pa)
         checkedIfDeinitBarrier = true
+      }
+      // In addition to the effects of the apply, also consider the
+      // effects of the capture, which reads the captured value in
+      // order to move it into the context. This only applies to
+      // addressible values, because capturing does not dereference
+      // any class objects.
+      //
+      // Ignore captures for on-stack partial applies. They only
+      // bitwise-move or capture by address, so the call to
+      // handleApply above is sufficient. And, if they are not applied
+      // in this function, then they are never applied.
+      if !pa.isOnStack {
+        // callee is never an address.
+        for argument in pa.arguments {
+          if argument.type.isAddress {
+            addEffects(.read, to: argument)
+          }
+        }
       }
 
     case let fl as FixLifetimeInst:
@@ -196,7 +214,7 @@ private struct CollectedEffects {
     }
   }
   
-  mutating func addEffectsForEcapingArgument(argument: FunctionArgument) {
+  mutating func addEffectsForEscapingArgument(argument: FunctionArgument) {
     var escapeWalker = ArgumentEscapingWalker()
 
     if escapeWalker.hasUnknownUses(argument: argument) {
@@ -221,9 +239,9 @@ private struct CollectedEffects {
   
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
-    let args = apply.arguments.enumerated().lazy.map {
-      (calleeArgumentIndex: apply.calleeArgIndex(callerArgIndex: $0.0),
-       callerArgument: $0.1)
+    let args = apply.argumentOperands.lazy.map {
+      (calleeArgumentIndex: apply.calleeArgumentIndex(of: $0)!,
+       callerArgument: $0.value)
     }
     addEffects(ofFunctions: callees, withArguments: args)
   }
@@ -298,7 +316,7 @@ private struct CollectedEffects {
           if let calleePath = calleeEffect.copy    { addEffects(.copy,    to: argument, fromInitialPath: calleePath) }
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
-          let convention = callee.getArgumentConvention(for: calleeArgIdx)
+          let convention = callee.argumentConventions[calleeArgIdx]
           let wholeArgument = argument.at(defaultPath(for: argument))
           let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
                                                     atIndex: calleeArgIdx,
@@ -311,7 +329,7 @@ private struct CollectedEffects {
 
   /// Adds effects to a specific value.
   ///
-  /// If the value comes from an argument (or mutliple arguments), then the effects are added
+  /// If the value comes from an argument (or multiple arguments), then the effects are added
   /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
@@ -426,7 +444,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     case let apply as ApplySite:
-      if apply.isCalleeOperand(value) {
+      if apply.isCallee(operand: value) {
         // `CollectedEffects.handleApply` only handles argument operands of an apply, but not the callee operand.
         return .abortWalk
       }
@@ -454,7 +472,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     case let load as LoadInst:
       if !address.value.hasTrivialType &&
           // In non-ossa SIL we don't know if a load is taking.
-          (!function.hasOwnership || load.ownership == .take) {
+          (!function.hasOwnership || load.loadOwnership == .take) {
         foundTakingLoad = true
       }
       return .continueWalk

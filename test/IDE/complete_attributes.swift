@@ -22,7 +22,6 @@ struct MyValue {
 // MEMBER_MyValue-DAG: Keyword/CurrNominal:                Type[#MyValue.Type#];
 // MEMBER_MyValue-DAG: Decl[Constructor]/CurrNominal:      init()[#MyValue#];
 // MEMBER_MyValue-DAG: Decl[StaticVar]/CurrNominal:        val[#Int#];
-// MEMBER_MyValue: End completions
 
 class TestUnkownDanglingAttr1 {
   @UknownAttr(arg: MyValue.#^ATTRARG_MEMBER^#)

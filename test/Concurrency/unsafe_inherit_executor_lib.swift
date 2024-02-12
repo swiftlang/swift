@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
+// REQUIRES: asserts
 
 actor A {
   func g() { }

@@ -18,8 +18,12 @@ import OptimizerBridging
 /// It provides access to all functions, v-tables and witness tables of a module,
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
-struct ModulePassContext : Context {
+struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
+
+  public var description: String {
+    return String(taking: _bridged.getModuleDescription())
+  }
 
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
     private var currentFunction: Function?
@@ -28,22 +32,36 @@ struct ModulePassContext : Context {
 
     mutating func next() -> Function? {
       if let f = currentFunction {
-        currentFunction = PassContext_nextFunctionInModule(f.bridged).function
+        currentFunction = BridgedPassContext.getNextFunctionInModule(f.bridged).function
         return f
       }
       return nil
     }
   }
 
+  struct GlobalVariableList : CollectionLikeSequence, IteratorProtocol {
+    private var currentGlobal: GlobalVariable?
+
+    fileprivate init(first: GlobalVariable?) { currentGlobal = first }
+
+    mutating func next() -> GlobalVariable? {
+      if let g = currentGlobal {
+        currentGlobal = BridgedPassContext.getNextGlobalInModule(g.bridged).globalVar
+        return g
+      }
+      return nil
+    }
+  }
+
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedVTableArray
-    
+    fileprivate let bridged: BridgedPassContext.VTableArray
+
     var startIndex: Int { return 0 }
-    var endIndex: Int { return Int(bridged.count) }
-    
+    var endIndex: Int { return bridged.count }
+
     subscript(_ index: Int) -> VTable {
-      assert(index >= 0 && index < bridged.count)
-      return VTable(bridged: bridged.vTables![index])
+      assert(index >= startIndex && index < endIndex)
+      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
     }
   }
 
@@ -54,7 +72,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> WitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextWitnessTableInModule(t.bridged).table
+        currentTable = BridgedPassContext.getNextWitnessTableInModule(t.bridged).witnessTable
         return t
       }
       return nil
@@ -68,7 +86,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> DefaultWitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextDefaultWitnessTableInModule(t.bridged).table
+        currentTable = BridgedPassContext.getNextDefaultWitnessTableInModule(t.bridged).defaultWitnessTable
         return t
       }
       return nil
@@ -76,19 +94,23 @@ struct ModulePassContext : Context {
   }
 
   var functions: FunctionList {
-    FunctionList(first: PassContext_firstFunctionInModule(_bridged).function)
+    FunctionList(first: _bridged.getFirstFunctionInModule().function)
   }
   
+  var globalVariables: GlobalVariableList {
+    GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
+  }
+
   var vTables: VTableArray {
-    VTableArray(bridged: PassContext_getVTables(_bridged))
+    VTableArray(bridged: _bridged.getVTables())
   }
   
   var witnessTables: WitnessTableList {
-    WitnessTableList(first: PassContext_firstWitnessTableInModule(_bridged).table)
+    WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
   }
 
   var defaultWitnessTables: DefaultWitnessTableList {
-    DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
+    DefaultWitnessTableList(first: _bridged.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
   }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
@@ -96,8 +118,56 @@ struct ModulePassContext : Context {
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
   func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
-    PassContext_beginTransformFunction(function.bridged, _bridged)
+    _bridged.beginTransformFunction(function.bridged)
     runOnFunction(FunctionPassContext(_bridged: _bridged))
-    PassContext_endTransformFunction(_bridged);
+    _bridged.endTransformFunction();
+  }
+
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
+  }
+
+  func createEmptyFunction(
+    name: String,
+    parameters: [ParameterInfo],
+    hasSelfParameter: Bool,
+    fromOriginal originalFunction: Function
+  ) -> Function {
+    return name._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = parameters.map { $0._bridged }
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        _bridged.createEmptyFunction(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                     hasSelfParameter, originalFunction.bridged).function
+      }
+    }
+  }
+
+  func moveFunctionBody(from sourceFunc: Function, to destFunc: Function) {
+    precondition(!destFunc.isDefinition, "cannot move body to non-empty function")
+    _bridged.moveFunctionBody(sourceFunc.bridged, destFunc.bridged)
+  }
+
+  func mangleAsyncRemoved(from function: Function) -> String {
+    return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
+  }
+
+  func mangle(withDeadArguments: [Int], from function: Function) -> String {
+    withDeadArguments.withUnsafeBufferPointer { bufPtr in
+      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
+        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
+                                                   withDeadArguments.count,
+                                                   function.bridged))
+      }
+    }
+  }
+}
+
+extension GlobalVariable {
+  func setIsLet(to value: Bool, _ context: ModulePassContext) {
+    bridged.setLet(value)
   }
 }

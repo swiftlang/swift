@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,7 +54,7 @@ fileprivate struct _CapacityAndFlags {
   // in the bottom 48 bits, and flags in the top 16.
   fileprivate var _storage: UInt64
 
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_32)
   fileprivate init(realCapacity: Int, flags: UInt16) {
     let realCapUInt = UInt64(UInt(bitPattern: realCapacity))
     _internalInvariant(realCapUInt == realCapUInt & _CountAndFlags.countMask)
@@ -181,14 +181,12 @@ fileprivate func _allocate<T: AnyObject>(
 ) -> (T, realNumTailBytes: Int) {
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
-  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
-
   let numBytes = numHeaderBytes + numTailBytes
 
   let linearBucketThreshold = 128
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16
-    let realNumBytes = roundUp(numBytes)
+    let realNumBytes = _mallocGoodSize(for: numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
     let object = tailAllocator(realNumTailBytes)
@@ -202,21 +200,10 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let total = roundUp(numHeaderBytes + growTailBytes)
+  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
   let totalTailBytes = total - numHeaderBytes
 
-  let object = tailAllocator(totalTailBytes)
-  if let allocSize = _mallocSize(ofAllocation:
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(object))) {
-    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
-
-    let realNumTailBytes = allocSize - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-
-    return (object, realNumTailBytes)
-  } else {
-    return (object, totalTailBytes)
-  }
+  return (tailAllocator(totalTailBytes), totalTailBytes)
 }
 
 fileprivate func _allocateStringStorage(
@@ -249,7 +236,13 @@ fileprivate func _allocateStringStorage(
 // renamed. The old name must not be used in the new runtime.
 final internal class __StringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_64)
+  fileprivate var _capacityAndFlags: _CapacityAndFlags
+  internal var _countAndFlags: _StringObject.CountAndFlags
+
+  @inline(__always)
+  internal var count: Int { _countAndFlags.count }
+#elseif _pointerBitWidth(_32)
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
   private var _realCapacity: Int
@@ -270,11 +263,7 @@ final internal class __StringStorage
     _CapacityAndFlags(realCapacity: _realCapacity, flags: _capacityFlags)
   }
 #else
-  fileprivate var _capacityAndFlags: _CapacityAndFlags
-  internal var _countAndFlags: _StringObject.CountAndFlags
-
-  @inline(__always)
-  internal var count: Int { _countAndFlags.count }
+#error("Unknown platform")
 #endif
 
   @inline(__always)
@@ -312,14 +301,16 @@ extension __StringStorage {
 
     _internalInvariant(capAndFlags.capacity >= capacity)
 
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_64)
+    storage._capacityAndFlags = capAndFlags
+    storage._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
     storage._realCapacity = capAndFlags._realCapacity
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
     storage._capacityFlags = capAndFlags.flags
 #else
-    storage._capacityAndFlags = capAndFlags
-    storage._countAndFlags = countAndFlags
+#error("Unknown platform")
 #endif
 
     _internalInvariant(
@@ -358,11 +349,13 @@ extension __StringStorage {
     let count = try initializer(buffer)
 
     let countAndFlags = _CountAndFlags(mortalCount: count, isASCII: false)
-    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    #if _pointerBitWidth(_64)
+    storage._countAndFlags = countAndFlags
+    #elseif _pointerBitWidth(_32)
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
     #else
-    storage._countAndFlags = countAndFlags
+    #error("Unknown platform")
     #endif
 
     storage.terminator.pointee = 0 // nul-terminated
@@ -511,11 +504,13 @@ extension __StringStorage {
   internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = _CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_64)
+    self._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else
-    self._countAndFlags = countAndFlags
+#error("Unknown platform")
 #endif
     self.terminator.pointee = 0
 
@@ -657,7 +652,9 @@ final internal class __SharedStringStorage
   internal var _owner: AnyObject?
   internal var start: UnsafePointer<UInt8>
 
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_64)
+  internal var _countAndFlags: _StringObject.CountAndFlags
+#elseif _pointerBitWidth(_32)
   internal var _count: Int
   internal var _countFlags: UInt16
 
@@ -666,10 +663,12 @@ final internal class __SharedStringStorage
     _CountAndFlags(count: _count, flags: _countFlags)
   }
 #else
-  internal var _countAndFlags: _StringObject.CountAndFlags
+#error("Unknown platform")
 #endif
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
+
+  internal var immortal = false
 
   internal var count: Int { _countAndFlags.count }
 
@@ -679,11 +678,14 @@ final internal class __SharedStringStorage
   ) {
     self._owner = nil
     self.start = ptr
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    self.immortal = true
+#if _pointerBitWidth(_64)
+    self._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else
-    self._countAndFlags = countAndFlags
+#error("Unknown platform")
 #endif
     super.init()
     self._invariantCheck()
@@ -695,6 +697,32 @@ final internal class __SharedStringStorage
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
       return String(_StringGuts(self))
+    }
+  }
+
+  internal init(
+    _mortal ptr: UnsafePointer<UInt8>,
+    countAndFlags: _StringObject.CountAndFlags
+  ) {
+    // ptr *must* be the start of an allocation
+    self._owner = nil
+    self.start = ptr
+    self.immortal = false
+#if _pointerBitWidth(_64)
+    self._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
+    self._count = countAndFlags.count
+    self._countFlags = countAndFlags.flags
+#else
+#error("Unknown platform")
+#endif
+    super.init()
+    self._invariantCheck()
+  }
+
+  deinit {
+    if (_owner == nil) && !immortal {
+      start.deallocate()
     }
   }
 }

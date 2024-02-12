@@ -137,10 +137,14 @@ bb0(%0 : @owned $Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed
 // CHECK-NEXT:     (result
 // CHECK-NEXT:       (generic_type_parameter depth=0 index=1)))
 // CHECK-NEXT: (closure_binding index=0)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=1)
+// CHECK-NEXT:   (function
+// CHECK-NEXT:     (parameters
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT:     (result
+// CHECK-NEXT:       (struct Swift.Int)))
 // CHECK-NEXT: (closure_binding index=1)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
-// CHECK-NEXT: (closure_binding index=2)
 
 
 // Generic caller and generic callee -- and one of the type parameters is
@@ -208,10 +212,10 @@ sil_vtable GenericClass {}
 // CHECK-NEXT:     (generic_type_parameter depth=0 index=1)
 // CHECK-NEXT:     (generic_type_parameter depth=0 index=2)))
 // CHECK-NEXT: - Metadata sources:
-// CHECK-NEXT: (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=2)
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=0))
 // CHECK-NEXT: (closure_binding index=0)
-// CHECK-NEXT: (generic_type_parameter depth=0 index=0)
-// CHECK-NEXT: (closure_binding index=1)
 // CHECK-NEXT: (tuple
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=0)
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=1))

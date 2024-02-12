@@ -68,6 +68,9 @@ public:
   /// Retrieve a reference to the declaration this one overrides.
   ConcreteDeclRef getOverriddenDecl() const;
 
+  /// Retrieve a reference to the given declaration that this one overrides.
+  ConcreteDeclRef getOverriddenDecl(ValueDecl *overriddenDecl) const;
+
   /// Determine whether this reference specializes the declaration to which
   /// it refers.
   bool isSpecialized() const { return !substitutions.empty(); }

@@ -106,8 +106,8 @@ class OuterGenericClass<T> {
   }
 
   class Middle {
-    class Inner1<T> {}
-    class Inner2<T> : Middle where T: Inner1<Int> {}
+    class Inner1<U> {}
+    class Inner2<U> : Middle where U: Inner1<Int> {}
   }
 }
 

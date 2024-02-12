@@ -21,10 +21,8 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -166,6 +164,7 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                          bool removeCondFails, bool enableCopyPropagation) :
   parentTransform(trans),
   AA(trans->getPassManager()->getAnalysis<AliasAnalysis>(trans->getFunction())),
+  CA(trans->getPassManager()->getAnalysis<BasicCalleeAnalysis>()),
   DA(trans->getPassManager()->getAnalysis<DominanceAnalysis>()),
   PCA(trans->getPassManager()->getAnalysis<ProtocolConformanceAnalysis>()),
   CHA(trans->getPassManager()->getAnalysis<ClassHierarchyAnalysis>()),
@@ -298,7 +297,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
-  SmallSetVector<SILValue, 16> defsToCanonicalize;
+  llvm::SmallSetVector<SILValue, 16> defsToCanonicalize;
 
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
   // produced by the visitor. Find the canonical def.
@@ -353,8 +352,9 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   CanonicalizeOSSALifetime canonicalizer(
       false /*prune debug*/,
       !parentTransform->getFunction()->shouldOptimize() /*maximize lifetime*/,
-      NLABA, domTree, deleter);
-  CanonicalizeBorrowScope borrowCanonicalizer(deleter);
+      parentTransform->getFunction(), NLABA, domTree, CA, deleter);
+  CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
+                                              deleter);
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();
@@ -420,6 +420,12 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       MadeChange = true;
       continue;
     }
+#ifndef NDEBUG
+    std::string OrigIStr;
+#endif
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
+               OrigIStr = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     // Canonicalize the instruction.
     if (scCanonicalize.tryCanonicalize(I)) {
@@ -439,14 +445,15 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       // owned parameters since chains of these values will be in the same
       // block.
       if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
-        if ((isa<FirstArgOwnershipForwardingSingleValueInst>(svi) ||
-             isa<OwnershipForwardingConversionInst>(svi)) &&
-            SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
-          // Try to sink the value. If we sank the value and deleted it,
-          // continue. If we didn't optimize or sank but we are still able to
-          // optimize further, we fall through to SILCombine below.
-          if (trySinkOwnedForwardingInst(svi)) {
-            continue;
+        if (auto fwdOp = ForwardingOperation(svi)) {
+          if (fwdOp.getSingleForwardingOperand() &&
+              SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
+            // Try to sink the value. If we sank the value and deleted it,
+            // continue. If we didn't optimize or sank but we are still able to
+            // optimize further, we fall through to SILCombine below.
+            if (trySinkOwnedForwardingInst(svi)) {
+              continue;
+            }
           }
         }
       }
@@ -454,13 +461,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // Then begin... SILCombine.
     Builder.setInsertionPoint(I);
-
-#ifndef NDEBUG
-    std::string OrigIStr;
-#endif
-    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
-               OrigIStr = SS.str(););
-    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     SILInstruction *currentInst = I;
     if (SILInstruction *Result = visit(I)) {
@@ -538,9 +538,9 @@ static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
-void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
+void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[instClassName] = runFn;
+  swiftInstPasses[instClassName.unbridged()] = runFn;
   passesRegistered = true;
 }
 
@@ -615,6 +615,10 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {
-    inst->eraseFromParent();
+    if (inst->isStaticInitializerInst()) {
+      inst->getParent()->erase(inst, *getPassManager()->getModule());
+    } else {
+      inst->eraseFromParent();
+    }
   }
 }

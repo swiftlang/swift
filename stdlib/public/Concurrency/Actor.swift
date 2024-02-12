@@ -58,6 +58,10 @@ public protocol Actor: AnyActor {
 @_silgen_name("swift_defaultActor_initialize")
 public func _defaultActorInitialize(_ actor: AnyObject)
 
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_nonDefaultDistributedActor_initialize")
+public func _nonDefaultDistributedActorInitialize(_ actor: AnyObject)
+
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
 @available(SwiftStdlib 5.1, *)
@@ -68,3 +72,12 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
+
+#if $Macros
+/// Produce a reference to the actor to which the enclosing code is
+/// isolated, or `nil` if the code is nonisolated.
+@available(SwiftStdlib 5.1, *)
+@freestanding(expression)
+public macro isolation() -> (any Actor)? = Builtin.IsolationMacro
+#endif
+

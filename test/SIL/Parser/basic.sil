@@ -36,6 +36,25 @@ sil_global @static_array : $TestArrayStorage = {
   %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
 }
 
+// CHECK-LABEL: sil_global @static_global_vector : $Int32 = {
+// CHECK:         %initval = vector (%1 : $Int32, %3 : $Int32)
+// CHECK-NEXT:  }       
+sil_global @static_global_vector : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %initval = vector (%1 : $Int32, %3 : $Int32)
+}
+
+// CHECK-LABEL: sil_global @static_global_uninitialized_vector : $Int = {
+// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
+// CHECK-NEXT:  }       
+sil_global @static_global_uninitialized_vector : $Int = {
+  %0 = integer_literal $Builtin.Word, 10
+  %initval = alloc_vector $Int, %0 : $Builtin.Word
+}
+
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -47,6 +66,12 @@ class Class2 {
   var b : Class1
   init()
 }
+
+@_moveOnly struct MoveOnlyStruct {
+  @_hasStorage var i: Int
+  deinit
+}
+
 
 sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@convention(thin) (Class1, Int)
 
@@ -510,7 +535,7 @@ bb0(%0 : $B):
   store %0 to %1a : $*B
   %3 = load %1a : $*B                        // CHECK: load
   strong_retain %3 : $B
-  checked_cast_br %3 : $B to E, yes, no     // CHECK: checked_cast_br
+  checked_cast_br B in %3 : $B to E, yes, no     // CHECK: checked_cast_br
 yes(%5 : $E):
   %y = integer_literal $Builtin.Int1, 1
   br isa(%y : $Builtin.Int1)
@@ -554,6 +579,17 @@ bb0:
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
+}
+
+// CHECK-LABEL: sil @alloc_vector :
+sil @alloc_vector : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 42
+  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
+  %1 = alloc_vector $Int, %0 : $Builtin.Word
+  dealloc_stack %1 : $*Int
+  %3 = tuple ()
+  return %3 : $()
 }
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
@@ -748,6 +784,17 @@ bb0:
   %0 = alloc_ref [stack] $Class1
   // CHECK: dealloc_stack_ref %0 : $Class1
   dealloc_stack_ref  %0 : $Class1
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @test_bare_flags
+sil @test_bare_flags : $@convention(thin) () -> () {
+bb0:
+  // CHECK: alloc_ref [bare] $Class1
+  %0 = alloc_ref [bare] $Class1
+  // CHECK: global_value [bare] @static_array : $TestArrayStorage
+  %1 = global_value [bare] @static_array : $TestArrayStorage
   %2 = tuple ()
   return %2 : $()
 }
@@ -971,57 +1018,6 @@ bb6:
   return %18 : $()
 }
 
-// CHECK-LABEL: sil @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word
-sil @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word {
-bb0(%0 : $Builtin.Word):
-
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = integer_literal $Builtin.Word, 2
-  %3 = integer_literal $Builtin.Word, 3
-  %4 = integer_literal $Builtin.Word, 4
-  %5 = integer_literal $Builtin.Word, 5
-  %6 = integer_literal $Builtin.Word, 6
-  %11 = integer_literal $Builtin.Word, 11
-  %22 = integer_literal $Builtin.Word, 22
-  %33 = integer_literal $Builtin.Word, 33
-  %44 = integer_literal $Builtin.Word, 44
-  %55 = integer_literal $Builtin.Word, 55
-  %66 = integer_literal $Builtin.Word, 66
-
-  // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Builtin.Word
-  %10 = select_value %0: $Builtin.Word, case %1: %11, case %2: %22, case %4: %44, case %5: %55, case %6: %66, default %33 : $Builtin.Word
-
-  // CHECK: return
-  return %10 : $Builtin.Word
-}
-
-enum IntEnum : Int {
-  case E0
-  case E1
-  case E2
-}
-
-// CHECK-LABEL: sil @test_select_value_with_enum : $@convention(thin) (Builtin.Word) -> Optional<IntEnum>
-sil @test_select_value_with_enum : $@convention(thin) (Builtin.Word) -> Optional<IntEnum> {
-bb0(%0 : $Builtin.Word):
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = integer_literal $Builtin.Word, 1
-  %3 = enum $IntEnum, #IntEnum.E1!enumelt
-  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt, %3 : $IntEnum
-  %5 = integer_literal $Builtin.Word, 2
-  %6 = enum $IntEnum, #IntEnum.E2!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt, %6 : $IntEnum
-  %8 = enum $IntEnum, #IntEnum.E0!enumelt
-  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt, %8 : $IntEnum
-  %10 = enum $Optional<IntEnum>, #Optional.none!enumelt
-
-  // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Optional<IntEnum>
-  %11 = select_value %0 : $Builtin.Word, case %2: %4, case %5: %7, case %1: %9, default %10 : $Optional<IntEnum>
-
-  // CHECK: return
-  return %11 : $Optional<IntEnum>
-}
-
 class ConcreteClass : ClassP {
 }
 struct Spoon : Bendable {
@@ -1159,13 +1155,23 @@ bb0(%0 : $X):
 // CHECK-NEXT: return [[T0]] : $X
 }
 
-// CHECK-LABEL: sil @test_set_deallocating
-sil @test_set_deallocating : $(X) -> X {
+// CHECK-LABEL: sil @test_begin_dealloc_ref
+sil @test_begin_dealloc_ref : $() -> X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = begin_dealloc_ref %0 : $X of %0 : $X
+  return %1 : $X
+// CHECK:      %1 = begin_dealloc_ref %0 : $X of %0 : $X
+// CHECK-NEXT: return %1 : $X
+}
+
+// CHECK-LABEL: sil @test_end_init_let_ref
+sil @test_end_init_let_ref : $(X) -> X {
 bb0(%0 : $X):
-  set_deallocating %0 : $X
-  return %0 : $X
-// CHECK:      set_deallocating [[T0]] : $X
-// CHECK-NEXT: return [[T0]] : $X
+  %1 = end_init_let_ref %0 : $X
+  return %1 : $X
+// CHECK:      %1 = end_init_let_ref %0 : $X
+// CHECK-NEXT: return %1 : $X
 }
 
 struct GenericStruct<T> {
@@ -1288,9 +1294,10 @@ bb0:
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @staticProp : $*Int
+  // CHECK: [[O:%.*]] = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $Builtin.SILToken
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $Builtin.SILToken
+  // CHECK: global_addr @staticProp : $*Int depends_on [[O]]
+  %6 = global_addr @staticProp : $*Int depends_on %5
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -1657,6 +1664,16 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
   end_lifetime %1 : $Builtin.NativeObject
   return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_drop_deinit :
+sil [ossa] @test_drop_deinit : $@convention(thin) (@owned MoveOnlyStruct) -> () {
+bb0(%0 : @owned $MoveOnlyStruct):
+  // CHECK: drop_deinit %0 : $MoveOnlyStruct
+  %1 = drop_deinit %0 : $MoveOnlyStruct
+  destroy_value %1 : $MoveOnlyStruct
+  %3 = tuple ()
+  return %3 : $()
 }
 
 sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {

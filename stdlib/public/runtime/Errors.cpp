@@ -70,6 +70,8 @@
 #include "swift/Runtime/Atomic.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
+#include "BacktracePrivate.h"
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0
@@ -311,7 +313,10 @@ reportNow(uint32_t flags, const char *message)
   fflush(stderr);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
@@ -353,7 +358,13 @@ void swift::swift_reportError(uint32_t flags,
                               const char *message) {
 #if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
+#elif SWIFT_ENABLE_BACKTRACING
+  // Disable fatalError backtraces if the backtracer is enabled
+  if (runtime::backtrace::_swift_backtrace_isEnabled()) {
+    flags &= ~FatalErrorFlags::ReportBacktrace;
+  }
 #endif
+
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
@@ -388,9 +399,9 @@ swift::warningv(uint32_t flags, const char *format, va_list args)
 #pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
 #pragma GCC diagnostic pop
-  
+
   reportNow(flags, log);
-  
+
   free(log);
 }
 
@@ -402,6 +413,12 @@ swift::warning(uint32_t flags, const char *format, ...)
   va_start(args, format);
 
   warningv(flags, format, args);
+}
+
+/// Report a warning to the system console and stderr.  This is exported,
+/// unlike the swift::warning() function above.
+void swift::swift_reportWarning(uint32_t flags, const char *message) {
+  warning(flags, "%s", message);
 }
 
 // Crash when a deleted method is called by accident.
@@ -465,3 +482,18 @@ void swift::swift_abortDisabledUnicodeSupport() {
                     "Unicode normalization data is disabled on this platform");
 
 }
+
+#if defined(_WIN32)
+// On Windows, exceptions may be swallowed in some cases and the
+// process may not terminate as expected on crashes. For example,
+// illegal instructions used by llvm.trap. Disable the exception
+// swallowing so that the error handling works as expected.
+__attribute__((__constructor__))
+static void ConfigureExceptionPolicy() {
+  BOOL Suppress = FALSE;
+  SetUserObjectInformationA(GetCurrentProcess(),
+                            UOI_TIMERPROC_EXCEPTION_SUPPRESSION,
+                            &Suppress, sizeof(Suppress));
+}
+
+#endif

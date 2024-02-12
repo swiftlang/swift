@@ -41,8 +41,8 @@ deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  assert(!cast<EnumDecl>(aParam->getType()->getAnyNominal())->hasCases());
-  assert(!cast<EnumDecl>(bParam->getType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal())->hasCases());
+  assert(!cast<EnumDecl>(bParam->getInterfaceType()->getAnyNominal())->hasCases());
 
   SmallVector<ASTNode, 0> statements;
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -62,7 +62,7 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   // Generate the conversion from the enums to integer indices.
   SmallVector<ASTNode, 8> statements;
@@ -81,7 +81,7 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
 
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true);
-  statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
+  statements.push_back(ReturnStmt::createImplicit(C, cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -98,8 +98,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  Type enumType = aParam->getType();
-  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  Type enumType = aParam->getTypeInContext();
+  auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 8> statements;
   SmallVector<ASTNode, 4> cases;
@@ -116,9 +116,9 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
     auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat =
-        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, lhsSubpattern);
+    auto lhsElemPat = new (C)
+        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, lhsSubpattern, /*DC*/ ltDecl);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
@@ -126,13 +126,13 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
     auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat =
-        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, rhsSubpattern);
+    auto rhsElemPat = new (C)
+        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, rhsSubpattern, /*DC*/ ltDecl);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
     if (hasBoundDecls) {
       // We allocated a direct copy of our lhs var decls for the case
       // body.
@@ -176,7 +176,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // return false 
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                /*Implicit*/true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     statementsInCase.push_back(returnStmt);
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
@@ -197,7 +197,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      defaultItem, SourceLoc(), SourceLoc(),
                                      body,
-                                     /*case body var decls*/ None));
+                                     /*case body var decls*/ llvm::None));
   }
 
   // switch (a, b) { <case statements> }
@@ -253,22 +253,19 @@ deriveComparable_lt(
       C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   comparableDecl->setUserAccessible(false);
 
   // Add the @_implements(Comparable, < (_:_:)) attribute
   if (generatedIdentifier != C.Id_LessThanOperator) {
     auto comparable = C.getProtocol(KnownProtocolKind::Comparable);
-    auto comparableType = comparable->getDeclaredInterfaceType();
-    auto comparableTypeExpr = TypeExpr::createImplicit(comparableType, C);
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
                                    argumentLabels);
-    comparableDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                          SourceRange(),
-                                                          comparableTypeExpr,
-                                                          comparableDeclName,
-                                                          DeclNameLoc()));
+    comparableDecl->getAttrs().add(ImplementsAttr::create(parentDC,
+                                                          comparable,
+                                                          comparableDeclName));
   }
 
   if (!C.getLessThanIntDecl()) {
@@ -340,11 +337,13 @@ void DerivedConformance::tryDiagnoseFailedComparableDerivation(
   if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
     if (enumDecl->hasRawType() && !enumDecl->getRawType()->is<ErrorType>()) {
       auto rawType = enumDecl->getRawType();
-      auto rawTypeLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+      auto rawTypeLoc = enumDecl->getInherited().getStartLoc();
       ctx.Diags.diagnose(rawTypeLoc,
                          diag::comparable_synthesis_raw_value_not_allowed,
                          rawType, nominal->getDeclaredInterfaceType(),
                          comparableProto->getDeclaredInterfaceType());
     }
+    // FIXME: Diagnose potentially unavailable enum elements that are preventing
+    // Comparable synthesis.
   }
 }

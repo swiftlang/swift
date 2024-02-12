@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/AST/Decl.h"
@@ -56,14 +55,4 @@ void DeadEndBlocksAnalysis::verify(DeadEndBlocks *deBlocks) const {
 
 SILAnalysis *swift::createDeadEndBlocksAnalysis(SILModule *) {
   return new DeadEndBlocksAnalysis();
-}
-
-//===----------------------------------------------------------------------===//
-//                            Swift Bridging
-//===----------------------------------------------------------------------===//
-
-SwiftInt DeadEndBlocksAnalysis_isDeadEnd(BridgedDeadEndBlocksAnalysis debAnalysis,
-                                         BridgedBasicBlock block) {
-  auto *dea = static_cast<DeadEndBlocks *>(debAnalysis.dea);
-  return dea->isDeadEnd(castToBasicBlock(block));
 }

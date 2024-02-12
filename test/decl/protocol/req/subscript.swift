@@ -38,7 +38,7 @@ struct S1Error : P1 { // expected-error{{type 'S1Error' does not conform to prot
 
 
 protocol SubscriptGet {
-  subscript(a : Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; do you want to add a stub?}}
+  subscript(a : Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; add a stub for conformance}}
 }
 
 class SubscriptGet_Get : SubscriptGet {
@@ -78,7 +78,7 @@ protocol Initable {
 
 protocol GenericSubscriptProtocol {
   subscript<T : Initable>(t: T.Type) -> T { get set }
-  // expected-note@-1 {{protocol requires subscript with type '<T> (T.Type) -> T'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires subscript with type '<T> (T.Type) -> T'; add a stub for conformance}}
 }
 
 struct GenericSubscriptWitness : GenericSubscriptProtocol {
@@ -99,7 +99,7 @@ struct GenericSubscriptNoWitness : GenericSubscriptProtocol {}
 //===----------------------------------------------------------------------===//
 
 protocol StaticSubscriptGet {
-  static subscript(a : Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; do you want to add a stub?}}
+  static subscript(a : Int) -> Int { get } // expected-note {{protocol requires subscript with type '(Int) -> Int'; add a stub for conformance}}
 }
 
 class StaticSubscriptGet_Get : StaticSubscriptGet {

@@ -300,8 +300,8 @@ struct UseState {
   SILValue address;
   SmallVector<MarkUnresolvedMoveAddrInst *, 1> markMoves;
   SmallPtrSet<SILInstruction *, 1> seenMarkMoves;
-  SmallSetVector<SILInstruction *, 2> inits;
-  SmallSetVector<SILInstruction *, 4> livenessUses;
+  llvm::SmallSetVector<SILInstruction *, 2> inits;
+  llvm::SmallSetVector<SILInstruction *, 4> livenessUses;
   SmallBlotSetVector<DestroyAddrInst *, 4> destroys;
   llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
   SmallBlotSetVector<SILInstruction *, 4> reinits;
@@ -1332,7 +1332,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
       return false;
     }
 
-    if (fas.getArgumentOperandConvention(*op) ==
+    if (fas.getCaptureConvention(*op) ==
         SILArgumentConvention::Indirect_InoutAliasable) {
       // If we don't find the function, we can't handle this, so bail.
       auto *func = fas.getCalleeFunction();
@@ -1655,18 +1655,18 @@ bool DataflowState::process(
         auto &astContext = fn->getASTContext();
         {
           auto diag =
-              diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+              diag::sil_movechecking_value_used_after_consume;
           StringRef name = getDebugVarName(address);
           diagnose(astContext, getSourceLocFromValue(address), diag, name);
         }
 
         {
-          auto diag = diag::sil_movekillscopyablevalue_move_here;
+          auto diag = diag::sil_movechecking_consuming_use_here;
           diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
         }
 
         {
-          auto diag = diag::sil_movekillscopyablevalue_use_here;
+          auto diag = diag::sil_movechecking_nonconsuming_use_here;
           diagnose(astContext, iter->second->getLoc().getSourceLoc(), diag);
         }
 
@@ -1685,18 +1685,18 @@ bool DataflowState::process(
           auto &astContext = fn->getASTContext();
           {
             auto diag =
-                diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+                diag::sil_movechecking_value_used_after_consume;
             StringRef name = getDebugVarName(address);
             diagnose(astContext, getSourceLocFromValue(address), diag, name);
           }
 
           {
-            auto diag = diag::sil_movekillscopyablevalue_move_here;
+            auto diag = diag::sil_movechecking_consuming_use_here;
             diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
           }
 
           {
-            auto diag = diag::sil_movekillscopyablevalue_use_here;
+            auto diag = diag::sil_movechecking_nonconsuming_use_here;
             for (auto *user : iter->second->pairedUseInsts) {
               diagnose(astContext, user->getLoc().getSourceLoc(), diag);
             }
@@ -2114,16 +2114,16 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     auto &astCtx = mvi->getFunction()->getASTContext();
     {
       auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+          diag::sil_movechecking_value_used_after_consume;
       StringRef name = getDebugVarName(address);
       diagnose(astCtx, getSourceLocFromValue(address), diag, name);
     }
 
-    auto diag = diag::sil_movekillscopyablevalue_move_here;
+    auto diag = diag::sil_movechecking_consuming_use_here;
     diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      auto diag = diag::sil_movechecking_nonconsuming_use_here;
       for (auto *user : interestingClosureUsers) {
         diagnose(astCtx, user->getLoc().getSourceLoc(), diag);
       }
@@ -2155,18 +2155,18 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     auto &astCtx = mvi->getFunction()->getASTContext();
     {
       auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+          diag::sil_movechecking_value_used_after_consume;
       StringRef name = getDebugVarName(address);
       diagnose(astCtx, getSourceLocFromValue(address), diag, name);
     }
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_move_here;
+      auto diag = diag::sil_movechecking_consuming_use_here;
       diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
     }
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      auto diag = diag::sil_movechecking_nonconsuming_use_here;
       diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
     }
 
@@ -2388,6 +2388,70 @@ bool ConsumeOperatorCopyableAddressesChecker::check(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
+//                     MARK: Unsupported Use Case Errors
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct UnsupportedUseCaseDiagnosticEmitter {
+  MarkUnresolvedMoveAddrInst *mai;
+
+  ~UnsupportedUseCaseDiagnosticEmitter() {
+    assert(!mai && "Didn't call cleanup!\n");
+  }
+
+  bool cleanup() && {
+    // Now that we have emitted the error, replace the move_addr with a
+    // copy_addr so that future passes never see it. We mark it as a
+    // copy_addr [init].
+    SILBuilderWithScope builder(mai);
+    builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
+                           IsNotTake, IsInitialization);
+    mai->eraseFromParent();
+    mai = nullptr;
+    return true;
+  }
+
+  ASTContext &getASTContext() const { return mai->getModule().getASTContext(); }
+
+  void emitUnsupportedUseCaseError() const {
+    auto diag =
+        diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+    diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag);
+  }
+
+  /// Try to pattern match if we were trying to move a global. In such a case,
+  /// emit a better error.
+  bool tryEmitCannotConsumeNonLocalMemoryError() const {
+    auto src = stripAccessMarkers(mai->getSrc());
+
+    if (auto *gai = dyn_cast<GlobalAddrInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 0);
+      return true;
+    }
+
+    // If we have a project_box, then we must have an escaping capture. It is
+    // the only case that allocbox to stack doesn't handle today.
+    if (isa<ProjectBoxInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 1);
+      return true;
+    }
+
+    return false;
+  }
+
+  void emit() const {
+    if (tryEmitCannotConsumeNonLocalMemoryError())
+      return;
+    emitUnsupportedUseCaseError();
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -2399,10 +2463,6 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
 
-    // Only run this pass if the move only language feature is enabled.
-    if (!astContext.LangOpts.Features.contains(Feature::MoveOnly))
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
@@ -2410,7 +2470,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    SmallSetVector<SILValue, 32> addressesToCheck;
+    llvm::SmallSetVector<SILValue, 32> addressesToCheck;
 
     for (auto *arg : fn->front().getSILFunctionArguments()) {
       if (arg->getType().isAddress() &&
@@ -2490,17 +2550,9 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *mai = dyn_cast<MarkUnresolvedMoveAddrInst>(inst)) {
-          auto diag =
-              diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-          diagnose(astContext, mai->getLoc().getSourceLoc(), diag);
-
-          // Now that we have emitted the error, replace the move_addr with a
-          // copy_addr so that future passes never see it. We mark it as a
-          // copy_addr [init].
-          SILBuilderWithScope builder(mai);
-          builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
-                                 IsNotTake, IsInitialization);
-          mai->eraseFromParent();
+          UnsupportedUseCaseDiagnosticEmitter emitter{mai};
+          emitter.emit();
+          std::move(emitter).cleanup();
           lateMadeChange = true;
         }
       }

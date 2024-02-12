@@ -163,10 +163,6 @@ struct SILDeclRef {
 
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
-
-    /// This constant references the generator function used to instantiate
-    /// attribute value associated with a particular declaration.
-    RuntimeAttributeGenerator,
   };
 
   /// Represents the variants of a back deployable function.
@@ -282,9 +278,6 @@ struct SILDeclRef {
   /// Produces a SILDeclRef for the entry-point of an async main FileUnit.
   static SILDeclRef getAsyncMainFileEntryPoint(FileUnit *file);
 
-  static SILDeclRef getRuntimeAttributeGenerator(CustomAttr *attr,
-                                                 ValueDecl *decl);
-
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
 
@@ -294,7 +287,7 @@ struct SILDeclRef {
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
 
-  ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
+  ValueDecl *getDecl() const { return loc.dyn_cast<ValueDecl *>(); }
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return loc.dyn_cast<AbstractClosureExpr *>();
   }
@@ -381,6 +374,9 @@ struct SILDeclRef {
   bool isInitializerOrDestroyer() const {
     return kind == Kind::Initializer || kind == Kind::Destroyer;
   }
+
+  /// True if the SILDeclRef references an init accessor declaration.
+  bool isInitAccessor() const;
 
   /// True if the function should be treated as transparent.
   bool isTransparent() const;
@@ -525,10 +521,6 @@ struct SILDeclRef {
   /// fallback for an original function which may be unavailable at runtime.
   bool isBackDeploymentFallback() const;
 
-  /// True if the decl ref references a function that could be looked up
-  /// at runtime using special API.
-  bool isRuntimeAccessibleFunction() const;
-
   /// True if the decl ref references a method which introduces a new vtable
   /// entry.
   bool requiresNewVTableEntry() const;
@@ -561,7 +553,7 @@ struct SILDeclRef {
                                                     AbstractFunctionDecl *func);
 
   /// Returns the availability of the decl for computing linkage.
-  Optional<AvailabilityContext> getAvailabilityForLinkage() const;
+  llvm::Optional<AvailabilityContext> getAvailabilityForLinkage() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

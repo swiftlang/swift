@@ -119,11 +119,24 @@ public func _withUnprotectedUnsafeMutablePointer<T, Result>(
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
+@_alwaysEmitIntoClient
 @inlinable
-public func withUnsafePointer<T, Result>(
+public func withUnsafePointer<T, E, Result>(
+  to value: T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result
+{
+  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+}
+
+/// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
+/// which is ABI-compatible with "rethrows".
+@_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
+@usableFromInline
+func __abi_withUnsafePointer<T, Result>(
   to value: T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
+) throws -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
@@ -178,6 +191,7 @@ public func _withUnprotectedUnsafePointer<T, Result>(
 #endif
 }
 
+#if !$Embedded
 extension String {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
@@ -199,6 +213,7 @@ extension String {
     return try _guts.withCString(body)
   }
 }
+#endif
 
 /// Takes in a value at +0 and performs a Builtin.copy upon it.
 ///

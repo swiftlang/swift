@@ -61,6 +61,8 @@ bb0(%0: @guaranteed $ArrayInt):
     unreachable
 }
 
+sil [ossa] @nonconst : $@convention(thin) () -> Builtin.Int32
+
 sil [ossa] @unknown_func : $@convention(thin) () -> () {
 bb0:
   unreachable
@@ -1289,3 +1291,41 @@ bb6(%32 : $Builtin.Int32):
   return %33 : $Int32
 }
 
+// CHECK-LABEL: sil [ossa] @non_const_post_increment :
+// CHECK-NOT:     apply
+// CHECK:       bb1({{.*}}):
+// CHECK:         function_ref @nonconst
+// CHECK:         apply
+// CHECK:         function_ref @checkbounds2
+// CHECK:         apply
+// CHECK:       bb2:
+// CHECK:       } // end sil function 'non_const_post_increment'
+sil [ossa] @non_const_post_increment : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : @guaranteed $Array<Int>):
+  %t = integer_literal $Builtin.Int1, -1
+  %ts = struct $Bool (%t : $Builtin.Int1)
+  %zero = integer_literal $Builtin.Int32, 0
+  %one = integer_literal $Builtin.Int32, 1
+  %ten = integer_literal $Builtin.Int32, 10
+  br bb1(%zero : $Builtin.Int32)
+
+bb1(%i : $Builtin.Int32):
+  %a1 = builtin "sadd_with_overflow_Int32"(%i : $Builtin.Int32, %one : $Builtin.Int32, %t : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %i1 = tuple_extract %a1 : $(Builtin.Int32, Builtin.Int1), 0
+  %nf = function_ref @nonconst : $@convention(thin) () -> Builtin.Int32
+  %nc = apply %nf() : $@convention(thin) () -> Builtin.Int32
+  %a2 = builtin "sadd_with_overflow_Int32"(%i : $Builtin.Int32, %nc : $Builtin.Int32, %t : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %idx = tuple_extract %a2 : $(Builtin.Int32, Builtin.Int1), 0
+  %idxs = struct $Int32 (%idx : $Builtin.Int32)
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  apply %f2(%idxs, %ts, %0) : $@convention(method) (Int32, Bool, @guaranteed Array<Int>) -> _DependenceToken
+  %c = builtin "cmp_eq_Int32"(%i1 : $Builtin.Int32, %ten : $Builtin.Int32) : $Builtin.Int1
+  cond_br %c, bb3, bb2
+
+bb2:
+  br bb1(%i1 : $Builtin.Int32)
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}

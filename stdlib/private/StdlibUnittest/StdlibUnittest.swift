@@ -22,6 +22,10 @@ import Foundation
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif os(WASI)
+import WASILibc
 #elseif os(Windows)
 import CRT
 import WinSDK
@@ -33,6 +37,12 @@ import ObjectiveC
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 import _Concurrency
+#endif
+
+#if os(WASI)
+let platformSupportsChildProcesses = false
+#else
+let platformSupportsChildProcesses = true
 #endif
 
 extension String {
@@ -840,7 +850,7 @@ func _printDebuggingAdvice(_ fullTestName: String) {
 #else
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
-    if let interpreterCmd = String(validatingUTF8: interpreter!) {
+    if let interpreterCmd = String(validatingCString: interpreter!) {
         invocation.insert(interpreterCmd, at: 0)
     }
   }
@@ -1724,7 +1734,7 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
     var args = [String]()
     var i = 0
@@ -1794,7 +1804,7 @@ public func runAllTestsAsync() async {
   if _isChildProcess {
     await _childProcessAsync()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
     var args = [String]()
     var i = 0
@@ -3479,11 +3489,11 @@ struct Pair<T : Comparable> : Comparable {
   var first: T
   var second: T
 
-  static func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  static func ==(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
     return lhs.first == rhs.first && lhs.second == rhs.second
   }
 
-  static func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  static func <(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
     return [lhs.first, lhs.second].lexicographicallyPrecedes(
       [rhs.first, rhs.second])
   }

@@ -274,7 +274,7 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
                        NecessaryBindings &&bindings, unsigned bindingsIndex)
-    : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
+    : StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::HeapObject, strategy,
                    fieldTypeInfos, typeToFill),
       ElementTypes(fieldTypes.begin(), fieldTypes.end()),
       Bindings(std::move(bindings)), BindingsIndex(bindingsIndex) {
@@ -444,7 +444,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
     auto bindingsAddr = layout.getElement(layout.getBindingsIndex())
-                            .project(IGF, structAddr, None);
+                            .project(IGF, structAddr, llvm::None);
     layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
@@ -499,6 +499,22 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
   ConstantInitBuilder builder(IGM);
+
+  // In embedded Swift, heap objects have a different, simple(r) layout:
+  // superclass pointer + destructor.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    auto fields = builder.beginStruct();
+    fields.addNullPointer(IGM.Int8PtrTy);
+    fields.addSignedPointer(dtorFn,
+                            IGM.getOptions().PointerAuth.HeapDestructors,
+                            PointerAuthEntity::Special::HeapDestructor);
+
+    llvm::GlobalVariable *var = fields.finishAndCreateGlobal(
+        "metadata", IGM.getPointerAlignment(), /*constant*/ true,
+        llvm::GlobalVariable::PrivateLinkage);
+    return var;
+  }
+
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
   fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
@@ -697,7 +713,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Error:
     llvm_unreachable("Unsupported reference-counting style");
   }
-  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+  return APInt::getAllOnes(getPointerSize().getValueInBits());
 }
 
 llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
@@ -1553,11 +1569,14 @@ public:
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       auto astType = boxedInterfaceType.getASTType();
-      astType = astType.transformRec([](Type t) -> Optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
-        return None;
-      })->getCanonicalType();
+      astType =
+          astType
+              .transformRec([](Type t) -> llvm::Optional<Type> {
+                if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+                  return openedExistential->getInterfaceType();
+                return llvm::None;
+              })
+              ->getCanonicalType();
       boxedInterfaceType = SILType::getPrimitiveType(
           astType, boxedInterfaceType.getCategory());
     }
@@ -1585,7 +1604,7 @@ public:
   project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
   const override {
     Address rawAddr = layout.emitCastTo(IGF, box);
-    rawAddr = layout.getElement(0).project(IGF, rawAddr, None);
+    rawAddr = layout.getElement(0).project(IGF, rawAddr, llvm::None);
     auto &ti = IGF.getTypeInfo(boxedType);
     return IGF.Builder.CreateElementBitCast(rawAddr, ti.getStorageType());
   }
@@ -1978,9 +1997,9 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
   auto metadata = IGF.Builder.CreateCall(
       IGF.IGM.getGetObjectClassFunctionPointer(), object);
   metadata->setName(object->getName() + ".Type");
-  metadata->setCallingConv(llvm::CallingConv::C);
+  metadata->setCallingConv(IGF.IGM.getOptions().PlatformCCallingConvention);
   metadata->setDoesNotThrow();
-  metadata->addFnAttr(llvm::Attribute::ReadOnly);
+  metadata->setOnlyReadsMemory();
   return metadata;
 }
 

@@ -46,7 +46,6 @@ import SomeModule
 
 func test(value: SomeValue) {
   let _ = #^GLOBAL^#
-// GLOBAL: Begin completions
 // GLOBAL-NOT: _secretFunc
 // GLOBAL-NOT: internalFunc
 // GLOBAL-NOT: _SecretClass
@@ -54,25 +53,20 @@ func test(value: SomeValue) {
 // GLOBAL-DAG: Decl[Struct]/OtherModule[SomeModule]/IsSystem: SomeValue[#SomeValue#];
 // GLOBAL-DAG: Decl[FreeFunction]/OtherModule[SomeModule]/IsSystem: publicFunc()[#Void#];
 // GLOBAL-DAG: Decl[Class]/OtherModule[SomeModule]/IsSystem: PublicClass[#PublicClass#]; name=PublicClass
-// GLOBAL: End completions
 
   let _: #^GLOBAL_TYPE^#
-// GLOBAL_TYPE: Begin completions
 // GLOBAL_TYPE-NOT: InternalClass
 // GLOBAL_TYPE-NOT: _SecretClass
 // GLOBAL-TYPE-DAG: Decl[Struct]/OtherModule[SomeModule]: SomeValue[#SomeValue#];
 // GLOBAL-TYPE-DAG: Decl[Class]/OtherModule[SomeModule]: PublicClass[#PublicClass#];
-// GLOBAL_TYPE: End completions
 
   let _ = value.#^INSTANCE^#
 // INSTANCE: Begin completions, 3 items
 // INSTANCE-DAG: Keyword[self]/CurrNominal:          self[#SomeValue#];
 // INSTANCE-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: publicValue[#Int#];
 // INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: publicMethod()[#Int#];
-// INSTANCE: End completions
 
   let _ = SomeValue(#^INITIALIZER^#
 // INITIALIZER: Begin completions, 1 items
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#public: Int#}[')'][#SomeValue#];
-// INITIALIZER: End completions
 }

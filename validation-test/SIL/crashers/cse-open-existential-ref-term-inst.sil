@@ -1,0 +1,27 @@
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s -cse
+
+// Move this test case to 'test/SILOptimizer/cse_open_existential_ref.sil' once
+// it is fixed.
+
+import Builtin
+import Swift
+
+protocol P {}
+
+sil @test_br_use : $@convention(thin) (@guaranteed any P) -> () {
+bb0(%p : $any P):
+  %blackhole = function_ref @blackhole : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened1 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000009", any P) Self
+  // Don't let the first opened existential get optimized away.
+  %void1 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000009", any P) Self>(%opened1) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened2 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000010", any P) Self
+  br bb1(%opened2 : $@opened("00000000-0000-0000-0000-000000000010", any P) Self)
+
+bb1(%arg : $@opened("00000000-0000-0000-0000-000000000010", any P) Self):
+  %optional = enum $Optional<@opened("00000000-0000-0000-0000-000000000010", any P) Self>, #Optional.some!enumelt, %arg : $@opened("00000000-0000-0000-0000-000000000010", any P) Self
+  %void2 = apply %blackhole<Optional<@opened("00000000-0000-0000-0000-000000000010", any P) Self>>(%optional) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  %result = tuple ()
+  return %result : $()
+}

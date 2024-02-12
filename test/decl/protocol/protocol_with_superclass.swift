@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // Protocols with superclass-constrained Self.
 
@@ -18,7 +18,7 @@ protocol BaseProto {}
 
 protocol ProtoRefinesClass : Generic<Int>, BaseProto {
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias)
-  // expected-note@-1 {{protocol requires function 'requirementUsesClassTypes' with type '(Generic<Int>.ConcreteAlias, Generic<Int>.GenericAlias) -> ()' (aka '(String, (Int, Int)) -> ()'); do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'requirementUsesClassTypes' with type '(Generic<Int>.ConcreteAlias, Generic<Int>.GenericAlias) -> ()' (aka '(String, (Int, Int)) -> ()'); add a stub for conformance}}
 }
 
 func duplicateOverload<T : ProtoRefinesClass>(_: T) {}
@@ -26,7 +26,6 @@ func duplicateOverload<T : ProtoRefinesClass>(_: T) {}
 
 func duplicateOverload<T : ProtoRefinesClass & Generic<Int>>(_: T) {}
 // expected-error@-1 {{invalid redeclaration of 'duplicateOverload'}}
-// expected-warning@-2 {{redundant superclass constraint 'T' : 'Generic<Int>'}}
 
 extension ProtoRefinesClass {
   func extensionMethodUsesClassTypes(_ x: ConcreteAlias, _ y: GenericAlias) {
@@ -321,10 +320,8 @@ class FirstConformer : FirstClass, SecondProtocol {}
 class SecondConformer : SecondClass, SecondProtocol {}
 
 // Duplicate superclass
-// FIXME: Duplicate diagnostics
 protocol DuplicateSuper : Concrete, Concrete {}
-// expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
-// expected-error@-2 {{duplicate inheritance from 'Concrete'}}
+// expected-error@-1 {{duplicate inheritance from 'Concrete'}}
 
 // Ambiguous name lookup situation
 protocol Amb : Concrete {}

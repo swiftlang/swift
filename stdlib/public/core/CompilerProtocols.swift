@@ -765,6 +765,7 @@ public protocol ExpressibleByDictionaryLiteral {
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral {
   
+#if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
   ///
@@ -773,6 +774,10 @@ public protocol ExpressibleByStringInterpolation
   associatedtype StringInterpolation: StringInterpolationProtocol
     = DefaultStringInterpolation
     where StringInterpolation.StringLiteralType == StringLiteralType
+#else
+  associatedtype StringInterpolation: StringInterpolationProtocol
+    where StringInterpolation.StringLiteralType == StringLiteralType
+#endif
 
   /// Creates an instance from a string interpolation.
   /// 
@@ -787,6 +792,7 @@ public protocol ExpressibleByStringInterpolation
   init(stringInterpolation: StringInterpolation)
 }
 
+#if !$Embedded
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
   
@@ -809,6 +815,7 @@ extension ExpressibleByStringInterpolation
     self.init(stringLiteral: stringInterpolation.make())
   }
 }
+#endif
 
 /// Represents the contents of a string literal with interpolations while it's
 /// being built up.
@@ -940,6 +947,7 @@ public protocol _ExpressibleByColorLiteral {
 
 /// A type that can be initialized using an image literal (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
+@_unavailableInEmbedded
 public protocol _ExpressibleByImageLiteral {
   /// Creates an instance initialized with the given resource name.
   ///
@@ -950,6 +958,7 @@ public protocol _ExpressibleByImageLiteral {
 
 /// A type that can be initialized using a file reference literal (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
+@_unavailableInEmbedded
 public protocol _ExpressibleByFileReferenceLiteral {
   /// Creates an instance initialized with the given resource name.
   ///

@@ -39,14 +39,16 @@
 using namespace swift;
 using namespace Lowering;
 
-
-Optional<SILVTable::Entry>
-SILGenModule::emitVTableMethod(ClassDecl *theClass,
-                               SILDeclRef derived, SILDeclRef base) {
+llvm::Optional<SILVTable::Entry>
+SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
+                               SILDeclRef base) {
   assert(base.kind == derived.kind);
 
   auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
+
+  if (shouldSkipDecl(baseDecl))
+    return llvm::None;
 
   // Note: We intentionally don't support extension members here.
   //
@@ -73,7 +75,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     // domain, don't emit the vtable entry.
     if (derivedClass->isResilient(M.getSwiftModule(),
                                   ResilienceExpansion::Maximal)) {
-      return None;
+      return llvm::None;
     }
   }
 
@@ -547,7 +549,7 @@ public:
         wt->convertToDefinition(Entries, ConditionalConformances, Serialized);
 
         // Since we had a declaration before, its linkage should be external,
-        // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
+        // ensure that we have a compatible linkage for soundness. *NOTE* we are ok
         // with both being shared since we do not have a shared_external
         // linkage.
         assert(stripExternalFromLinkage(wt->getLinkage()) == Linkage &&
@@ -756,7 +758,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
     CanAnyFunctionType::get(genericSig,
                             reqtSubstTy->getParams(),
                             reqtSubstTy.getResult(),
-                            reqtOrigTy->getExtInfo());
+                            reqtSubstTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
   // in order to recreate the appropriate yield types for the accessor
@@ -764,7 +766,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // But this is expensive, so we only do it for coroutine lowering.
   // When they're part of the AST function type, we can remove this
   // parameter completely.
-  Optional<SubstitutionMap> witnessSubsForTypeLowering;
+  llvm::Optional<SubstitutionMap> witnessSubsForTypeLowering;
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
@@ -832,9 +834,21 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
+  // If the conformance is marked as `@preconcurrency` instead of
+  // emitting a hop to the executor (when needed) emit a dynamic check
+  // to make sure that witness has been unsed in the expected context.
+  bool isPreconcurrency = false;
+  if (conformance.isConcrete()) {
+    if (auto *C =
+            dyn_cast<NormalProtocolConformance>(conformance.getConcrete()))
+      isPreconcurrency = C->isPreconcurrency();
+  }
+
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witnessSubs, isFree,
+                          /*isSelfConformance*/ false,
+                          isPreconcurrency,
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
@@ -907,9 +921,9 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                       requirement.getDecl());
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, reqtSubs, requirement,
-                          witnessSubs, isFree, /*isSelfConformance*/ true,
-                          None);
+                          requirement, reqtSubs, requirement, witnessSubs,
+                          isFree, /*isSelfConformance*/ true,
+                          /*isPreconcurrency*/ false, llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 
@@ -1069,6 +1083,21 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 
+void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
+  auto *dd = nom->getValueTypeDestructor();
+  if (!dd)
+    return;
+
+  SILDeclRef constant(dd, SILDeclRef::Kind::Deallocator);
+  SILFunction *f = getFunction(constant, NotForDefinition);
+  auto serialized = IsSerialized_t::IsNotSerialized;
+  bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
+  // We only serialize the deinit if the type is public and not resilient.
+  if (nomIsPublic && !nom->isResilient())
+    serialized = IsSerialized;
+  SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
+}
+
 namespace {
 
 /// An ASTVisitor for generating SIL from method declarations
@@ -1085,13 +1114,21 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
-    for (Decl *member : theType->getABIMembers())
+    for (Decl *member : theType->getABIMembers()) {
       visit(member);
+    }
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
+    }
+
+    // If this is a nominal type that is move only, emit a deinit table for it.
+    if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
+      if (!nom->canBeCopyable()) {
+        SGM.emitNonCopyableTypeDeinitTable(nom);
+      }
     }
 
     // Build a default witness table if this is a protocol that needs one.
@@ -1111,7 +1148,6 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
-      assert(conformance->isComplete());
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(normal);
     }
@@ -1120,6 +1156,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visit(Decl *D) {
+    if (SGM.shouldSkipDecl(D))
+      return;
+
+    TypeMemberVisitor::visit(D);
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *otd) {}
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
@@ -1148,7 +1191,7 @@ public:
     if (auto *cd = dyn_cast<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isMoveOnly()) {
+      if (!nom->canBeCopyable()) {
         return SGM.emitMoveOnlyDestructor(nom, dd);
       }
     }
@@ -1193,12 +1236,7 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1217,7 +1255,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }
@@ -1252,9 +1290,10 @@ public:
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
 
-    for (Decl *member : e->getABIMembers())
+    for (Decl *member : e->getABIMembers()) {
       visit(member);
-    
+    }
+
     // If this is a main-interface @_objcImplementation extension and the class
     // has a synthesized destructor, emit it now.
     if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
@@ -1268,7 +1307,6 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
-        assert(conformance->isComplete());
         if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);
       }
@@ -1278,6 +1316,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visit(Decl *D) {
+    if (SGM.shouldSkipDecl(D))
+      return;
+
+    TypeMemberVisitor::visit(D);
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *tad) {}
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
@@ -1332,8 +1377,13 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
-      if (pd->getExecutableInit(i) && pd->isStatic()) {
-        SGM.emitGlobalInitialization(pd, i);
+      if (pd->getExecutableInit(i)) {
+        if (pd->isStatic())
+          SGM.emitGlobalInitialization(pd, i);
+        else if (isa<ExtensionDecl>(pd->getDeclContext()) &&
+                 cast<ExtensionDecl>(pd->getDeclContext())
+                     ->isObjCImplementation())
+          SGM.emitStoredPropertyInitialization(pd, i);
       }
     }
   }
@@ -1362,12 +1412,7 @@ public:
       }
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1390,7 +1435,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }

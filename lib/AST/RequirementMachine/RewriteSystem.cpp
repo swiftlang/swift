@@ -73,17 +73,14 @@ RewriteSystem::~RewriteSystem() {
 /// complete rewrite system.
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
-    std::vector<StructuralRequirement> &&writtenRequirements,
     std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>>
-        &&requirementRules) {
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
   Protos = protos;
-  WrittenRequirements = std::move(writtenRequirements);
 
   addRules(std::move(importedRules),
            std::move(permanentRules),
@@ -209,7 +206,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  Optional<int> result = lhs.compare(rhs, Context);
+  llvm::Optional<int> result = lhs.compare(rhs, Context);
   if (*result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
@@ -288,13 +285,10 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Add a new rule, marking it explicit.
-bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
-                                    Optional<unsigned> requirementID) {
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
   bool added = addRule(std::move(lhs), std::move(rhs));
-  if (added) {
+  if (added)
     Rules.back().markExplicit();
-    Rules.back().setRequirementID(requirementID);
-  }
 
   return added;
 }
@@ -308,7 +302,7 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs,
 void RewriteSystem::addRules(
     std::vector<Rule> &&importedRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-    std::vector<std::tuple<MutableTerm, MutableTerm, Optional<unsigned>>> &&requirementRules) {
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   unsigned ruleCount = Rules.size();
 
   if (ruleCount == 0) {
@@ -355,17 +349,8 @@ void RewriteSystem::addRules(
   for (const auto &rule : permanentRules)
     addPermanentRule(rule.first, rule.second);
 
-  for (const auto &rule : requirementRules) {
-    auto lhs = std::get<0>(rule);
-    auto rhs = std::get<1>(rule);
-    auto requirementID = std::get<2>(rule);
-
-    // When this is called while adding conditional requirements, there
-    // shouldn't be any new structural requirement IDs.
-    assert(ruleCount == 0 || !requirementID.has_value());
-
-    addExplicitRule(lhs, rhs, requirementID);
-  }
+  for (const auto &rule : requirementRules)
+    addExplicitRule(rule.first, rule.second);
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules.
@@ -503,8 +488,16 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
     return;
 
   // Ignore the rewrite loop if it is not part of our minimization domain.
-  if (!isInMinimizationDomain(basepoint.getRootProtocol()))
+  //
+  // Completion might record a rewrite loop where the basepoint is just
+  // the term [shape]. In this case though, we know it's in our domain,
+  // since completion only checks local rules for overlap. Other callers
+  // of recordRewriteLoop() always pass in a valid basepoint, so we
+  // check.
+  if (basepoint[0].getKind() != Symbol::Kind::Shape &&
+      !isInMinimizationDomain(basepoint.getRootProtocol())) {
     return;
+  }
 
   Loops.push_back(loop);
 }
@@ -554,11 +547,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Shape);
       }
 
-      // A shape symbol must follow a generic param symbol
-      if (symbol.getKind() == Symbol::Kind::Shape) {
-        ASSERT_RULE(index > 0 && lhs[index - 1].getKind() == Symbol::Kind::GenericParam);
-      }
-
       if (!rule.isLHSSimplified() &&
           index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteConformance);
@@ -601,13 +589,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
 
-      if (index != lhs.size() - 1) {
+      if (index != rhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Shape);
-      }
-
-      // A shape symbol must follow a generic param symbol
-      if (symbol.getKind() == Symbol::Kind::Shape) {
-        ASSERT_RULE(index > 0 && rhs[index - 1].getKind() == Symbol::Kind::GenericParam);
       }
 
       // Completion can introduce a rule of the form
@@ -634,10 +617,15 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       }
     }
 
-    auto lhsDomain = lhs.getRootProtocol();
-    auto rhsDomain = rhs.getRootProtocol();
-
-    ASSERT_RULE(lhsDomain == rhsDomain);
+    if (rhs.size() == 1 && rhs[0].getKind() == Symbol::Kind::Shape) {
+      // We can have a rule like T.[shape] => [shape].
+      ASSERT_RULE(lhs.back().getKind() == Symbol::Kind::Shape);
+    } else {
+      // Otherwise, LHS and RHS must have the same domain.
+      auto lhsDomain = lhs.getRootProtocol();
+      auto rhsDomain = rhs.getRootProtocol();
+      ASSERT_RULE(lhsDomain == rhsDomain);
+    }
   }
 
 #undef ASSERT_RULE
@@ -655,7 +643,6 @@ void RewriteSystem::freeze() {
     getRule(ruleID).freeze();
   }
 
-  WrittenRequirements.clear();
   CheckedOverlaps.clear();
   RelationMap.clear();
   Relations.clear();
@@ -670,16 +657,7 @@ void RewriteSystem::freeze() {
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
-    out << "- " << rule;
-    if (auto ID = rule.getRequirementID()) {
-      auto requirement = WrittenRequirements[*ID];
-      out << " [ID: " << *ID << " - ";
-      requirement.req.dump(out);
-      out << " at ";
-      requirement.loc.print(out, Context.getASTContext().SourceMgr);
-      out << "]";
-    }
-    out << "\n";
+    out << "- " << rule << "\n";
   }
   out << "}\n";
   if (!Relations.empty()) {
@@ -708,18 +686,6 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
       loop.dump(out, *this);
       out << "\n";
     }
+    out << "}\n";
   }
-  if (!WrittenRequirements.empty()) {
-    out << "Written requirements: {\n";
-
-    for (unsigned reqID : indices(WrittenRequirements)) {
-      out << " - ID: " << reqID << " - ";
-      const auto &requirement = WrittenRequirements[reqID];
-      requirement.req.dump(out);
-      out << " at ";
-      requirement.loc.print(out, Context.getASTContext().SourceMgr);
-      out << "\n";
-    }
-  }
-  out << "}\n";
 }

@@ -749,7 +749,6 @@ func invalidDictionaryLiteral() {
 
 [4].joined(separator: [1])
 // expected-error@-1 {{no exact matches in call to instance method 'joined'}}
-// expected-note@-2 {{found candidate with type '(String) -> String'}}
 // There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
 
 [4].joined(separator: [[[1]]])
@@ -802,7 +801,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // <rdar://problem/27457457> [Type checker] Diagnose unsavory optional injections
   // Accidental optional injection for ??.
   let i = 42
-  _ = i ?? 17 // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int', so the right side is never used}} {{9-15=}}
+  _ = i ?? 17 // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int', so the right side is never used}} {{8-14=}}
 }
 
 // <rdar://problem/19772570> Parsing of as and ?? regressed
@@ -952,3 +951,7 @@ let _ = "foo \(42 /*
 // expected-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-3 {{unterminated string literal}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}
+
+// https://github.com/apple/swift/issues/66192
+func I66192(_: Int) {}
+I66192(true ? "yes" : "no") // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}

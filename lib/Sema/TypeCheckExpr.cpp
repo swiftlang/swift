@@ -585,7 +585,7 @@ Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
   auto type = constraints::ConstraintSystem::getUnopenedTypeOfReference(
       value, Type(), UseDC,
-      [&](VarDecl *var) -> Type { return value->getType(); });
+      [&](VarDecl *var) -> Type { return value->getTypeInContext(); });
   auto semantics = value->getAccessSemanticsFromContext(UseDC,
                                                        /*isAccessOnSelf*/false);
   return new (value->getASTContext())
@@ -615,9 +615,11 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
   DeclNameRef nameRef(ctx.getIdentifier(name));
-  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               nameRef, SourceLoc(),
-                                               defaultUnqualifiedLookupOptions);
+  auto lookup = TypeChecker::lookupUnqualified(
+      dc->getModuleScopeContext(),
+      nameRef, SourceLoc(),
+      defaultUnqualifiedLookupOptions | NameLookupFlags::ExcludeMacroExpansions
+  );
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -630,26 +632,27 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
-static Optional<KnownProtocolKind>
-getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
-  if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
-                                           SourceLoc(),                        \
-                                           KnownProtocolKind::Id))             \
-    return KnownProtocolKind::Id;
+Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
+  auto knownKind = protocol->getKnownProtocolKind();
+  if (!knownKind)
+    return Type();
+
+  switch (knownKind.value()) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___) \
+  case KnownProtocolKind::Id: \
+    break;
+#define PROTOCOL_WITH_NAME(Id, _) \
+  case KnownProtocolKind::Id: \
+    return Type();
+
 #include "swift/AST/KnownProtocols.def"
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-
-  return None;
-}
-
-Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
-  if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
-    return evaluateOrDefault(
-        protocol->getASTContext().evaluator,
-        DefaultTypeRequest{knownProtocolKindIfAny.value(), dc}, nullptr);
+#undef PROTOCOL_WITH_NAME
   }
-  return Type();
+
+  return evaluateOrDefault(
+      protocol->getASTContext().evaluator,
+      DefaultTypeRequest{knownKind.value(), dc}, nullptr);
 }
 
 static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
@@ -770,28 +773,29 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   return initExpr;
 }
 
-bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
-                                               ClosureExpr *closure) const {
+bool ClosureHasResultExprRequest::evaluate(Evaluator &evaluator,
+                                           ClosureExpr *closure) const {
   // A walker that looks for 'return' statements that aren't
   // nested within closures or nested declarations.
   class FindReturns : public ASTWalker {
     bool FoundResultReturn = false;
     bool FoundNoResultReturn = false;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      return Action::SkipChildren(expr);
+      return Action::SkipNode(expr);
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Record return statements.
       if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
-        if (ret->isImplicit())
-          return Action::Continue(stmt);
-
         // If it has a result, remember that we saw one, but keep
         // traversing in case there's a no-result return somewhere.
         if (ret->hasResult()) {

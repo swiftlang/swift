@@ -15,8 +15,6 @@ public extension Sequence {
     }
 }
 
-// CHECK: Begin completions,
 // CHECK-DAG: Pattern/CurrNominal:                key[#Int#];
 // CHECK-DAG: Pattern/CurrNominal:                value[#[Int]#];
-// CHECK: End completions
 

@@ -51,7 +51,7 @@ struct CallerAnalysis::ApplySiteFinderVisitor
 
 #ifndef NDEBUG
   SmallPtrSet<SILInstruction *, 8> visitedCallSites;
-  SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
+  llvm::SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
 #endif
 
   ApplySiteFinderVisitor(CallerAnalysis *analysis, SILFunction *callerFn)

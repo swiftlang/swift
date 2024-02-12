@@ -46,12 +46,15 @@ class FilteringDiagnosticConsumer: public DiagnosticConsumer {
   bool HasError = false;
   std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers;
   std::unique_ptr<llvm::StringSet<>> allowedBreakages;
+  bool DowngradeToWarning;
   bool shouldProceed(const DiagnosticInfo &Info);
 public:
   FilteringDiagnosticConsumer(std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers,
-                              std::unique_ptr<llvm::StringSet<>> allowedBreakages):
+                              std::unique_ptr<llvm::StringSet<>> allowedBreakages,
+                              bool DowngradeToWarning):
     subConsumers(std::move(subConsumers)),
-    allowedBreakages(std::move(allowedBreakages)) {}
+    allowedBreakages(std::move(allowedBreakages)),
+    DowngradeToWarning(DowngradeToWarning) {}
   ~FilteringDiagnosticConsumer() = default;
 
   void flush() override;

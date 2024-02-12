@@ -440,9 +440,7 @@ bb0:
 //
 // CHECK-LABEL: sil [ossa] @testCopyBorrow : $@convention(thin) <T> (@in T) -> () {
 // CHECK:       bb0(%0 : @owned $T):
-// CHECK:       [[COPY:%[^,]+]] = copy_value %0
 // CHECK:       destroy_value %0 : $T
-// CHECK:       destroy_value [[COPY]]
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
 // CHECK-LABEL: } // end sil function 'testCopyBorrow'

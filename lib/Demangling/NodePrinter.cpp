@@ -295,6 +295,7 @@ private:
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
+    case Node::Kind::BuiltinTupleType:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
     case Node::Kind::DependentMemberType:
@@ -310,7 +311,6 @@ private:
     case Node::Kind::Pack:
     case Node::Kind::SILPackDirect:
     case Node::Kind::SILPackIndirect:
-    case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
     case Node::Kind::Protocol:
@@ -340,6 +340,9 @@ private:
     case Node::Kind::ProtocolListWithAnyObject:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
+    case Node::Kind::ConstrainedExistential:
+    case Node::Kind::PackElement:
+    case Node::Kind::PackElementLevel:
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorAttachedMacroExpansion:
@@ -350,9 +353,11 @@ private:
     case Node::Kind::AssociatedTypeDescriptor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::AsyncRemoved:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::BodyAttachedMacroExpansion:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
@@ -385,6 +390,7 @@ private:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
+    case Node::Kind::ExtensionAttachedMacroExpansion:
     case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
     case Node::Kind::FreestandingMacroExpansion:
@@ -413,6 +419,7 @@ private:
     case Node::Kind::GlobalGetter:
     case Node::Kind::Identifier:
     case Node::Kind::Index:
+    case Node::Kind::InitAccessor:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
     case Node::Kind::ImplDifferentiabilityKind:
@@ -480,6 +487,7 @@ private:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
+    case Node::Kind::PreambleAttachedMacroExpansion:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
@@ -549,8 +557,10 @@ private:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
+    case Node::Kind::IsolatedAnyFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::TypedThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
@@ -564,6 +574,13 @@ private:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedDestroy:
+    case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
+    case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
+    case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
+    case Node::Kind::OutlinedDestroyNoValueWitness:
+    case Node::Kind::OutlinedEnumTagStore:
+    case Node::Kind::OutlinedEnumGetTag:
+    case Node::Kind::OutlinedEnumProjectDataForLoad:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::OutlinedReadOnlyObject:
     case Node::Kind::AssocTypePath:
@@ -620,8 +637,7 @@ private:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
-    case Node::Kind::RuntimeDiscoverableAttributeRecord:
-    case Node::Kind::RuntimeAttributeGenerator:
+    case Node::Kind::ObjectiveCProtocolSymbolicReference:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -858,10 +874,15 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind()
+            == Node::Kind::IsolatedAnyFunctionType) {
+      Printer << "@isolated(any) ";
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() ==
@@ -875,10 +896,15 @@ private:
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
       ++startIndex;
     }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+
+    Node *thrownErrorNode = nullptr;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
+        node->getChild(startIndex)->getKind()
+          == Node::Kind::TypedThrowsAnnotation) {
+      thrownErrorNode = node->getChild(startIndex);
       ++startIndex;
-      isThrows = true;
     }
+
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
@@ -918,8 +944,9 @@ private:
     if (isAsync)
       Printer << " async";
 
-    if (isThrows)
-      Printer << " throws";
+    if (thrownErrorNode) {
+      print(thrownErrorNode, depth + 1);
+    }
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1304,6 +1331,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "static ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::AsyncRemoved:
+    Printer << "async demotion of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
     print(Node->getChild(0), depth + 1);
@@ -1360,19 +1391,35 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedInitializeWithCopy:
+  case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
     Printer << "outlined init with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithTake:
+  case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
     Printer << "outlined assign with take of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithCopy:
+  case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
     Printer << "outlined assign with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedDestroy:
+  case Node::Kind::OutlinedDestroyNoValueWitness:
     Printer << "outlined destroy of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumProjectDataForLoad:
+    Printer << "outlined enum project data for load of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumTagStore:
+    Printer << "outlined enum tag store of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumGetTag:
+    Printer << "outlined enum get tag of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedVariable:
@@ -1432,29 +1479,18 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
-  case Node::Kind::AccessorAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "accessor macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)                \
+  case Node::Kind::Name##AttachedMacroExpansion:                           \
+    return printEntity(Node, depth, asPrefixContext,                       \
+                       TypePrinting::NoType, /*hasName*/true,              \
+                       (Description " macro @" +                           \
+                        nodeToString(Node->getChild(2)) + " expansion #"), \
+                       (int)Node->getChild(3)->getIndex() + 1);
+#include "swift/Basic/MacroRoles.def"
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::MemberAttributeAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "member attribute macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::MemberAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "member macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::PeerAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "peer macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::ConformanceAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "conformance macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
@@ -1618,6 +1654,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   }
+  case Node::Kind::PackElement: {
+    Printer << "/* level: " << Node->getChild(1)->getIndex() << " */ ";
+    Printer << "each ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::PackElementLevel:
+    printer_unreachable("should be handled in Node::Kind::PackElement");
+
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
       Printer << " -> " << Node->getText();
@@ -1818,6 +1863,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::BuiltinTypeName:
     Printer << Node->getText();
+    return nullptr;
+  case Node::Kind::BuiltinTupleType:
+    Printer << "Builtin.TheTupleType";
     return nullptr;
   case Node::Kind::Number:
     Printer << Node->getIndex();
@@ -2211,11 +2259,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "accessible function runtime record for ";
     }
     return nullptr;
-  case Node::Kind::RuntimeDiscoverableAttributeRecord:
-    if (!Options.ShortenThunk) {
-      Printer << "runtime discoverable attribute record for ";
-    }
-    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2576,6 +2619,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
+  case Node::Kind::InitAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "init");
   case Node::Kind::Allocator:
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,
@@ -2873,11 +2919,20 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
+  case Node::Kind::IsolatedAnyFunctionType:
+    Printer << "@isolated(any) ";
+    return nullptr;
   case Node::Kind::AsyncAnnotation:
-    Printer << " async ";
+    Printer << " async";
     return nullptr;
   case Node::Kind::ThrowsAnnotation:
-    Printer << " throws ";
+    Printer << " throws";
+    return nullptr;
+  case Node::Kind::TypedThrowsAnnotation:
+    Printer << " throws(";
+    if (Node->getNumChildren() == 1)
+      print(Node->getChild(0), depth + 1);
+    Printer << ")";
     return nullptr;
   case Node::Kind::EmptyList:
     Printer << " empty-list ";
@@ -3159,6 +3214,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "non-unique existential shape symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    Printer << "objective-c protocol symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
   case Node::Kind::SymbolicExtendedExistentialType: {
     auto shape = Node->getChild(0);
     bool isUnique =
@@ -3180,16 +3239,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::HasSymbolQuery:
     Printer << "#_hasSymbol query for ";
-    return nullptr;
-  case Node::Kind::RuntimeAttributeGenerator:
-    Printer << "runtime attribute generator of ";
-
-    print(Node->getChild(1), depth);
-
-    printEntity(Node, depth, asPrefixContext,
-                TypePrinting::NoType, /*hasName*/ false,
-                " for attribute");
-
     return nullptr;
   case Node::Kind::OpaqueReturnTypeIndex:
   case Node::Kind::OpaqueReturnTypeParent:
@@ -3327,8 +3376,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||
         Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer ||
-        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue ||
-        Entity->getKind() == Node::Kind::RuntimeAttributeGenerator) {
+        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue) {
       Printer << " of ";
     } else {
       Printer << " in ";
@@ -3407,6 +3455,11 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
         std::vector<std::string> argumentTypeNames;
+        auto getArgumentTypeName = [&argumentTypeNames](size_t i) {
+          if (i < argumentTypeNames.size())
+            return argumentTypeNames[i];
+          return std::string("<unknown>");
+        };
         // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
@@ -3454,27 +3507,27 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           if (child->getKind() == Node::Kind::LabelList) {
             size_t numChildren = child->getNumChildren();
             if (numChildren == 0) {
-              subscriptText += unlabelledArg + argumentTypeNames[0];
+              subscriptText += unlabelledArg + getArgumentTypeName(0);
             } else {
               while (idx < numChildren) {
                 Node *argChild = child->getChild(idx);
                 idx += 1;
                 if (argChild->getKind() == Node::Kind::Identifier) {
                   subscriptText += std::string(argChild->getText()) + ": " +
-                                   argumentTypeNames[idx - 1];
+                                   getArgumentTypeName(idx - 1);
                   if (idx != numChildren) {
                     subscriptText += ", ";
                   }
                 } else if (argChild->getKind() ==
                                Node::Kind::FirstElementMarker ||
                            argChild->getKind() == Node::Kind::VariadicMarker) {
-                  subscriptText += unlabelledArg + argumentTypeNames[idx - 1];
+                  subscriptText += unlabelledArg + getArgumentTypeName(idx - 1);
                 }
               }
             }
           }
         } else {
-          subscriptText += unlabelledArg + argumentTypeNames[0];
+          subscriptText += unlabelledArg + getArgumentTypeName(0);
         }
         return subscriptText + ")";
       }

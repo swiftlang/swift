@@ -55,7 +55,7 @@ let _ = "Some text \(/*param-label:call*/aFunc(a:1)) around"
 class SomeClass {
     init() {}
     /*init:def*/init(a: Int, b:Int, c:Int) {}
-    /*sub:def*/subscript(x x: Int, j j: Int) -> Int {
+    /*sub:def*/<keywordBase>subscript</keywordBase>(<arglabel index=0></arglabel><noncollapsibleparam index=0>x</noncollapsibleparam>: Int, <arglabel index=1>y</arglabel> <noncollapsibleparam index=1>j</noncollapsibleparam>: Int) -> Int {
         get { return 1 }
         set {}
     }
@@ -64,8 +64,8 @@ class SomeClass {
 let someClass = SomeClass();
 let _ = /*init:call*/SomeClass(a:1, b:1, c:1)
 let _ = SomeClass . /*init*/init(a:b:c:)
-_ = someClass/*sub:ref*/[x: 1, j: 2]
-someClass/*sub:ref*/[x: 1, j: 2] = 2
+_ = someClass/*sub:ref*/[<callcombo index=0></callcombo>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2]
+someClass/*sub:ref*/[<callcombo index=0></callcombo>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2] = 2
 
 class AnotherClass {
     let bar = AnotherClass()

@@ -17,14 +17,36 @@ struct Options {
   let _bridged: BridgedPassContext
 
   var enableStackProtection: Bool {
-    SILOptions_enableStackProtection(_bridged) != 0
+    _bridged.enableStackProtection()
   }
 
   var enableMoveInoutStackProtection: Bool {
-    SILOptions_enableMoveInoutStackProtection(_bridged) != 0
+    _bridged.enableMoveInoutStackProtection()
   }
 
   func enableSimplification(for inst: Instruction) -> Bool {
-    SILOptions_enableSimplificationFor(inst.bridged)
+    _bridged.enableSimplificationFor(inst.bridged)
+  }
+
+  var enableEmbeddedSwift: Bool {
+    _bridged.hasFeature(.Embedded)
+  }
+
+  func hasFeature(_ feature: BridgedFeature) -> Bool {
+    _bridged.hasFeature(feature)
+  }
+
+  enum AssertConfiguration {
+    case enabled
+    case disabled
+    case unknown
+  }
+
+  var assertConfiguration: AssertConfiguration {
+    switch _bridged.getAssertConfiguration() {
+      case .Debug:               return .enabled
+      case .Release, .Unchecked: return .disabled
+      default:                   return .unknown
+    }
   }
 }

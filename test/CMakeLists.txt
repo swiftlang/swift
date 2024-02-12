@@ -52,17 +52,10 @@ function(get_test_dependencies SDK result_var_name)
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
       lldb-moduleimport-test
-      sil-func-extractor
-      sil-llvm-gen
-      sil-nm
-      sil-opt
-      sil-passpipeline-dumper
       swift-frontend
       swift-demangle
       swift-demangle-yamldump
-      swift-dependency-tool
       swift-ide-test
-      swift-llvm-opt
       swift-refactor
       swift-reflection-dump
       swift-remoteast-test)
@@ -77,7 +70,9 @@ function(get_test_dependencies SDK result_var_name)
       arcmt-test
       c-arcmt-test
       c-index-test
+      CASPluginTest
       clang
+      clang-cas-test
       count
       dsymutil
       FileCheck
@@ -85,6 +80,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-ar
       llvm-as
       llvm-bcanalyzer
+      llvm-cas
       llvm-cov
       llvm-dis
       llvm-dwarfdump
@@ -96,6 +92,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-readobj
       llvm-size
       llvm-strings
+      llvm-readtapi
       not
       split-file)
   endif()
@@ -114,7 +111,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
-     ("${SDK}" STREQUAL "HAIKU"))
+     ("${SDK}" STREQUAL "HAIKU") OR
+     ("${SDK}" STREQUAL "WASI"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -154,8 +152,14 @@ if(NOT SWIFT_INCLUDE_TOOLS)
       )
   endif()
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_LIT_ARGS
-         "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    # If building only static stdlib, use `swift_static` resources directory.
+    if(NOT SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTSTATICLIB_DIR}")
+    else()
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    endif()
   endif()
 endif()
 
@@ -186,10 +190,10 @@ normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -204,7 +208,13 @@ normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
+normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
+normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
+
+# Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
+set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
@@ -223,7 +233,6 @@ set(TEST_SUBSETS
     only_validation
     only_long
     only_stress
-    only_early_swiftdriver
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -303,6 +312,10 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
       endif()
 
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-stdlib")
+        list(APPEND test_dependencies "embedded-stdlib")
+      endif()
+
       if(NOT "${COVERAGE_DB}" STREQUAL "")
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
@@ -377,23 +390,38 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "concurrency")
         endif()
 
-        if(SWIFT_BACK_DEPLOY_CONCURRENCY)
-          list(APPEND LIT_ARGS "--param" "back_deploy_concurrency")
-        endif()
-
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+          list(APPEND LIT_ARGS "--param" "noncopyable_generics")
         endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
-        if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-          list(APPEND LIT_ARGS "--param" "reflection")
+        if(SWIFT_ENABLE_BACKTRACING)
+          list(APPEND LIT_ARGS "--param" "backtracing")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+          list(APPEND LIT_ARGS "--param" "observation")
+        endif()
+
+        if(SWIFT_ENABLE_SYNCHRONIZATION)
+          list(APPEND LIT_ARGS "--param" "synchronization")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+
+        # Enable on-crash backtracing if supported
+        if(("${SDK}" STREQUAL "OSX" OR "${SDK}" STREQUAL "LINUX")
+            AND NOT SWIFT_ASAN_BUILD)
+          list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
+        endif()
+
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
@@ -402,7 +430,6 @@ foreach(SDK ${SWIFT_SDKS})
              (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "only_stress") OR
-             (test_subset STREQUAL "only_early_swiftdriver") OR
              (test_subset STREQUAL "all"))
             list(APPEND directories "${test_bin_dir}")
           endif()

@@ -28,7 +28,9 @@
 #include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 
 namespace swift {
 namespace irgen {
@@ -42,8 +44,8 @@ template <class FieldImpl> class RecordField {
   template <class, class, class> friend class RecordTypeBuilder;
 
   /// Begin/End - the range of explosion indexes for this element
-  unsigned Begin : 16;
-  unsigned End : 16;
+  unsigned Begin;
+  unsigned End;
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
@@ -122,8 +124,8 @@ private:
   const unsigned NumFields;
   const unsigned AreFieldsABIAccessible : 1;
 
-  mutable Optional<const FieldImpl *> ExtraInhabitantProvidingField;
-  mutable Optional<bool> MayHaveExtraInhabitants;
+  mutable llvm::Optional<const FieldImpl *> ExtraInhabitantProvidingField;
+  mutable llvm::Optional<bool> MayHaveExtraInhabitants;
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
@@ -170,7 +172,7 @@ public:
       return emitAssignWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -193,7 +195,7 @@ public:
       return emitAssignWithTakeCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -223,7 +225,7 @@ public:
       return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -255,7 +257,7 @@ public:
       return emitInitializeWithTakeCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -278,7 +280,7 @@ public:
       return emitDestroyCall(IGF, T, addr);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isTriviallyDestroyable())
@@ -542,7 +544,6 @@ public:
   }
 
 private:
-  /// Scan the given field info
   static unsigned findUniqueNonEmptyField(ArrayRef<FieldImpl> fields) {
     unsigned result = 0;
     for (auto &field : fields) {
@@ -784,10 +785,10 @@ public:
     return ExplosionSize;
   }
 
-  void reexplode(IRGenFunction &IGF, Explosion &src,
+  void reexplode(Explosion &src,
                  Explosion &dest) const override {
     for (auto &field : getFields())
-      cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(IGF, src, dest);
+      cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(src, dest);
   }
 
   void copy(IRGenFunction &IGF, Explosion &src,
@@ -810,7 +811,8 @@ public:
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
   }
   
-  void packIntoEnumPayload(IRGenFunction &IGF,
+  void packIntoEnumPayload(IRGenModule &IGM,
+                           IRBuilder &builder,
                            EnumPayload &payload,
                            Explosion &src,
                            unsigned startOffset) const override {
@@ -819,7 +821,7 @@ public:
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())
-          .packIntoEnumPayload(IGF, payload, src, offset);
+          .packIntoEnumPayload(IGM, builder, payload, src, offset);
       }
     }
   }
@@ -861,7 +863,6 @@ public:
     fields.reserve(astFields.size());
     fieldTypesForLayout.reserve(astFields.size());
 
-    bool loadable = true;
     auto fieldsABIAccessible = FieldsAreABIAccessible;
 
     unsigned explosionSize = 0;
@@ -878,13 +879,17 @@ public:
 
       auto loadableFieldTI = dyn_cast<LoadableTypeInfo>(&fieldTI);
       if (!loadableFieldTI) {
-        loadable = false;
         continue;
       }
 
       auto &fieldInfo = fields.back();
       fieldInfo.Begin = explosionSize;
-      explosionSize += loadableFieldTI->getExplosionSize();
+      bool overflow = false;
+      explosionSize = llvm::SaturatingAdd(explosionSize, loadableFieldTI->getExplosionSize(), &overflow);
+      if (overflow) {
+        IGM.Context.Diags.diagnose(SourceLoc(), diag::explosion_size_oveflow);
+      }
+
       fieldInfo.End = explosionSize;
     }
 
@@ -895,7 +900,7 @@ public:
     }
 
     // Create the type info.
-    if (loadable) {
+    if (layout.isLoadable()) {
       assert(layout.isFixedLayout());
       assert(fieldsABIAccessible);
       return asImpl()->createLoadable(fields, std::move(layout), explosionSize);

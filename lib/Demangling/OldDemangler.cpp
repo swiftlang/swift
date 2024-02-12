@@ -18,13 +18,14 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Strings.h"
 #include "swift/Demangling/Punycode.h"
+#include "swift/Strings.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
-#include <functional>
-#include <vector>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -1632,6 +1633,9 @@ private:
       } else if (Mangled.nextIf('T')) {
         kind = Node::Kind::Identifier;
         name = "T";
+      } else if (Mangled.nextIf('B')) {
+        kind = Node::Kind::Identifier;
+        name = "B";
       } else if (Mangled.nextIf('E')) {
         kind = Node::Kind::Identifier;
         if (!demangleNatural(size, depth + 1))
@@ -1660,6 +1664,11 @@ private:
         if (!demangleNatural(size, depth + 1))
           return nullptr;
         name = "m";
+      } else if (Mangled.nextIf('S')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size, depth + 1))
+          return nullptr;
+        name = "S";
       } else {
         return nullptr;
       }
@@ -1851,6 +1860,7 @@ private:
       globalActorNode->addChild(globalActorType, Factory);
       block->addChild(globalActorNode, Factory);
     }
+    // Is there any need to handle isolated(any) function types here?
 
     NodePointer in_node = Factory.createNode(Node::Kind::ArgumentTuple);
     block->addChild(in_node, Factory);

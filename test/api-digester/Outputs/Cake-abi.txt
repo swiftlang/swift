@@ -61,6 +61,8 @@ cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available at
 cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
+cake: AssociatedType RequirementChanges.addedTypeWithDefault is a new API without @available attribute
+cake: AssociatedType RequirementChanges.addedTypeWithoutDefault is a new API without @available attribute
 cake: Class C0 is a new API without @available attribute
 cake: Class C8 is a new API without @available attribute
 cake: Constructor AddingNewDesignatedInit.init(_:) is a new API without @available attribute
@@ -120,7 +122,7 @@ cake: Func RequirementChanges.addedFunc() has been added as a protocol requireme
 cake: Var RequirementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
-cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
+cake: Class SubGenericClass has changed its super class from cake.GenericClass<any cake.P1> to cake.GenericClass<any cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
 cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class
 cake: Constructor ClassWithMissingDesignatedInits.init() has been added as a designated initializer to an open class

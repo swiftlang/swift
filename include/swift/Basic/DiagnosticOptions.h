@@ -32,7 +32,7 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
-  enum FormattingStyle { LLVM, Swift, SwiftSyntax };
+  enum FormattingStyle { LLVM, Swift };
 
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
@@ -82,6 +82,14 @@ public:
 
   /// Path to a directory of diagnostic localization tables.
   std::string LocalizationPath = "";
+
+  /// A list of prefixes that are appended to expected- that the diagnostic
+  /// verifier should check for diagnostics.
+  ///
+  /// For example, if one placed the phrase "NAME", the verifier will check for:
+  /// expected-$NAME{error,note,warning,remark} as well as the normal expected-
+  /// prefixes.
+  std::vector<std::string> AdditionalDiagnosticVerifierPrefixes;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

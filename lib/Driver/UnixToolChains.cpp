@@ -12,7 +12,6 @@
 
 #include "ToolChains.h"
 
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -21,6 +20,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "clang/Basic/Version.h"
@@ -45,6 +45,31 @@ toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
           this->getTriple().getArchName() +
           (this->getTriple().isAndroid() ? "-android" : "") + ".a")
       .str();
+}
+
+void
+toolchains::GenericUnix::addPluginArguments(const ArgList &Args,
+                                            ArgStringList &Arguments) const {
+  SmallString<64> pluginPath;
+  auto programPath = getDriver().getSwiftProgramPath();
+  CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+      programPath, /*shared=*/true, pluginPath);
+
+  auto defaultPluginPath = pluginPath;
+  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
+
+  // Default plugin path.
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
+
+  // Local plugin path.
+  llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
+  llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
+  llvm::sys::path::append(pluginPath, "local", "lib");
+  llvm::sys::path::append(pluginPath, "swift");
+  llvm::sys::path::append(pluginPath, "host", "plugins");
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(pluginPath));
 }
 
 ToolChain::InvocationInfo
@@ -133,10 +158,15 @@ bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
 
   // Honour the user's request to add a rpath to the binary.  This defaults to
   // `true` on non-android and `false` on android since the library must be
-  // copied into the bundle.
+  // copied into the bundle. An exception is made for the Termux app as it
+  // builds and runs natively like a Unix environment on Android.
+#if defined(__TERMUX__)
+  bool apply_rpath = true;
+#else
+  bool apply_rpath = !T.isAndroid();
+#endif
   return Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
-                      options::OPT_no_toolchain_stdlib_rpath,
-                      !T.isAndroid());
+                      options::OPT_no_toolchain_stdlib_rpath, apply_rpath);
 }
 
 ToolChain::InvocationInfo

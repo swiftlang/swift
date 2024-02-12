@@ -82,6 +82,8 @@ public:
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                              const llvm::Twine &name) const override;
+  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
+                              llvm::Value *capacity, const Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;
@@ -151,7 +153,7 @@ public:
 
   /// Get the bit mask that must be applied before testing an extra inhabitant.
   virtual APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-    return APInt::getAllOnesValue(getFixedSize().getValueInBits());
+    return APInt::getAllOnes(getFixedSize().getValueInBits());
   }
 
   /// Create a constant of the given bit width holding one of the extra

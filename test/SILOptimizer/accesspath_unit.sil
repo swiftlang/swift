@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 sil_stage raw
 
@@ -41,13 +41,13 @@ sil_global hidden @globalStruct : $S2
 // CHECK: end running test 2 of 2 on testRefElement: accesspath-base with: @trace[1]
 sil hidden [ossa] @testRefElement : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  test_specification "accesspath-base @trace[0]"
+  specify_test "accesspath-base @trace[0]"
   %p1 = ref_element_addr %0 : $Klass, #Klass.f
   debug_value [trace] %p1 : $*S
   %a1 = begin_access [read] [dynamic] %p1 : $*S
   %l1 = load [trivial] %a1 : $*S
   end_access %a1 : $*S
-  test_specification "accesspath-base @trace[1]"
+  specify_test "accesspath-base @trace[1]"
   %p2 = ref_element_addr %0 : $Klass, #Klass.f
   debug_value [trace] %p2 : $*S
   %a2 = begin_access [read] [dynamic] %p2 : $*S
@@ -78,7 +78,7 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK: end running test 2 of 2 on testGlobalAddrKlass: accesspath-base with: @trace[1]
 sil [ossa] @testGlobalAddrKlass : $@convention(thin) () -> () {
 bb0:
-  test_specification "accesspath-base @trace[0]"
+  specify_test "accesspath-base @trace[0]"
   %p1 = global_addr @globalKlass : $*Klass
   debug_value [trace] %p1 : $*Klass
   %a1 = begin_access [read] [dynamic] %p1 : $*Klass
@@ -86,7 +86,7 @@ bb0:
   end_borrow %l1 : $Klass
   end_access %a1 : $*Klass
 
-  test_specification "accesspath-base @trace[1]"
+  specify_test "accesspath-base @trace[1]"
   %p2 = global_addr @globalKlass : $*Klass
   debug_value [trace] %p2 : $*Klass
   %a2 = begin_access [read] [dynamic] %p2 : $*Klass
@@ -141,7 +141,7 @@ bb0:
 // CHECK: end running test 3 of 3 on testGlobalAddrStruct: accesspath-base with: @trace[2]
 sil [ossa] @testGlobalAddrStruct : $@convention(thin) () -> () {
 bb0:
-  test_specification "accesspath-base @trace[0]"
+  specify_test "accesspath-base @trace[0]"
   %p3 = global_addr @globalStruct : $*S2
   debug_value [trace] %p3 : $*S2
   %a3 = begin_access [read] [dynamic] %p3 : $*S2
@@ -149,7 +149,7 @@ bb0:
   end_borrow %l3 : $S2
   end_access %a3 : $*S2
 
-  test_specification "accesspath-base @trace[1]"
+  specify_test "accesspath-base @trace[1]"
   %p4 = global_addr @globalStruct : $*S2
   debug_value [trace] %p4 : $*S2
   %a4 = begin_access [read] [dynamic] %p4 : $*S2
@@ -158,7 +158,7 @@ bb0:
   end_borrow %l4 : $Klass
   end_access %a4 : $*S2
 
-  test_specification "accesspath-base @trace[2]"
+  specify_test "accesspath-base @trace[2]"
   %p5 = global_addr @globalStruct : $*S2
   debug_value [trace] %p5 : $*S2
   %a5 = begin_access [read] [dynamic] %p5 : $*S2

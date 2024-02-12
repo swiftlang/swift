@@ -28,7 +28,7 @@ public typealias ClazzAlias = Clazz
 
 //--- UsesAliasesNoImport.swift
 
-import Aliases
+public import Aliases
 
 // expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file}}
 public class InheritsFromClazzAlias: ClazzAlias {}

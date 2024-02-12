@@ -65,12 +65,12 @@ actor A: P2 {
 actor AnActor {
   func isolatedMethod(_ i: Int) {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@guaranteed AnActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@sil_isolated @guaranteed AnActor) -> () {
   func caller() async {
     // CHECK: hop_to_executor {{..*}} : $AnActor
     //  [[F:%.*]] = function_ref @$s4test7AnActorC6calleryyYaFySicACYicfu_ : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()
     //  [[APPLIED_F:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()
-    //  [[BORROWED_F:%.*]] = begin_borrow [lexical] [[APPLIED_F]] : $@callee_guaranteed (Int) -> ()
+    //  [[BORROWED_F:%.*]] = begin_borrow [lexical] [var_decl] [[APPLIED_F]] : $@callee_guaranteed (Int) -> ()
     //  [[COPIED_F:%.*]] = copy_value [[BORROWED_F]] : $@callee_guaranteed (Int) -> ()
     //  [[THUNK:%.*]] = function_ref @$sSiIegy_SiIegHy_TR : $@convention(thin) @async (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
     //  = partial_apply [callee_guaranteed] [[THUNK]]([[COPIED_F]]) : $@convention(thin) @async (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()

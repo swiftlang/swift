@@ -6,10 +6,10 @@ add_swift_host_library(swiftLLVMPasses STATIC
   LLVMARCContract.cpp
   LLVMInlineTree.cpp
   LLVMMergeFunctions.cpp
-  DbgAddrBlockSplitter.cpp
 
   LLVM_LINK_COMPONENTS
   analysis
+  targetparser
   )
 target_link_libraries(swiftLLVMPasses PRIVATE
   swiftDemangling)

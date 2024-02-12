@@ -127,7 +127,7 @@ public:
       v = v.zext(v.getBitWidth() + numBits);
       return;
     }
-    Bits = APInt::getNullValue(numBits);
+    Bits = APInt::getZero(numBits);
   }
 
   /// Extend the vector out to the given length with clear bits.
@@ -148,7 +148,7 @@ public:
       v.setBitsFrom(w);
       return;
     }
-    Bits = APInt::getAllOnesValue(numBits);
+    Bits = APInt::getAllOnes(numBits);
     return;
   }
 
@@ -216,7 +216,7 @@ public:
 
   /// Count the number of set bits in this vector.
   size_t count() const {
-    return Bits ? Bits.value().countPopulation() : 0;
+    return Bits ? Bits.value().popcount() : 0;
   }
 
   /// Determine if there are any bits set in this vector.
@@ -268,7 +268,7 @@ public:
     if (numBits == 0) {
       return ClusteredBitVector();
     }
-    auto vec = APInt::getNullValue(numBits);
+    auto vec = APInt::getZero(numBits);
     if (value) {
       vec.flipAllBits();
     }

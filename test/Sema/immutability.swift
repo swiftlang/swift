@@ -168,7 +168,7 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-16=mutating}}
+    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{-1:5-16=mutating}}
       iv = newValue // expected-error {{cannot assign to property: 'self' is immutable}}
     }
   }
@@ -646,8 +646,8 @@ func f(a : FooClass, b : LetStructMembers) {
 class MutableSubscripts {
   var x : Int = 0
 
-  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' must not be used on subscript parameters}}
-  subscript<T>(x: inout T) -> () { // expected-error {{'inout' must not be used on subscript parameters}}
+  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' may only be used on function or initializer parameters}}
+  subscript<T>(x: inout T) -> () { // expected-error {{'inout' may only be used on function or initializer parameters}}
     fatalError()
   }
 

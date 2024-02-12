@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
@@ -38,20 +39,23 @@ class NamedDecl;
 }
 
 namespace swift {
+  class ConstructorDecl;
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
+  class FuncDecl;
   class GeneratedSourceInfo;
   class SourceManager;
+  class TypeAliasDecl;
   class ValueDecl;
   class SourceFile;
 
-  enum class PatternKind : uint8_t;
+  enum class DescriptivePatternKind : uint8_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
-  enum DeclAttrKind : unsigned;
+  enum class DeclAttrKind : unsigned;
   enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.
@@ -101,6 +105,14 @@ namespace swift {
     Type getType() const { return t; }
   };
 
+  struct WitnessType {
+    Type t;
+
+    WitnessType(Type t) : t(t) {}
+
+    Type getType() { return t; }
+  };
+
   /// Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -109,11 +121,12 @@ namespace swift {
     Unsigned,
     Identifier,
     ObjCSelector,
-    ValueDecl,
+    Decl,
     Type,
     TypeRepr,
     FullyQualifiedType,
-    PatternKind,
+    WitnessType,
+    DescriptivePatternKind,
     SelfAccessKind,
     ReferenceOwnership,
     StaticSpellingKind,
@@ -143,11 +156,12 @@ namespace swift {
       StringRef StringVal;
       DeclNameRef IdentifierVal;
       ObjCSelector ObjCSelectorVal;
-      ValueDecl *TheValueDecl;
+      const Decl *TheDecl;
       Type TypeVal;
       TypeRepr *TyR;
       FullyQualified<Type> FullyQualifiedTypeVal;
-      PatternKind PatternKindVal;
+      WitnessType WitnessTypeVal;
+      DescriptivePatternKind DescriptivePatternKindVal;
       SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
       StaticSpellingKind StaticSpellingKindVal;
@@ -194,8 +208,8 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
     }
 
-    DiagnosticArgument(ValueDecl *VD)
-      : Kind(DiagnosticArgumentKind::ValueDecl), TheValueDecl(VD) {
+    DiagnosticArgument(const Decl *VD)
+      : Kind(DiagnosticArgumentKind::Decl), TheDecl(VD) {
     }
 
     DiagnosticArgument(Type T)
@@ -210,6 +224,10 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::FullyQualifiedType),
           FullyQualifiedTypeVal(FQT) {}
 
+    DiagnosticArgument(WitnessType WT)
+        : Kind(DiagnosticArgumentKind::WitnessType),
+          WitnessTypeVal(WT) {}
+
     DiagnosticArgument(const TypeLoc &TL) {
       if (TypeRepr *tyR = TL.getTypeRepr()) {
         Kind = DiagnosticArgumentKind::TypeRepr;
@@ -220,8 +238,9 @@ namespace swift {
       }
     }
 
-    DiagnosticArgument(PatternKind K)
-        : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {}
+    DiagnosticArgument(DescriptivePatternKind DPK)
+        : Kind(DiagnosticArgumentKind::DescriptivePatternKind),
+          DescriptivePatternKindVal(DPK) {}
 
     DiagnosticArgument(ReferenceOwnership RO)
         : Kind(DiagnosticArgumentKind::ReferenceOwnership),
@@ -304,9 +323,9 @@ namespace swift {
       return ObjCSelectorVal;
     }
 
-    ValueDecl *getAsValueDecl() const {
-      assert(Kind == DiagnosticArgumentKind::ValueDecl);
-      return TheValueDecl;
+    const Decl *getAsDecl() const {
+      assert(Kind == DiagnosticArgumentKind::Decl);
+      return TheDecl;
     }
 
     Type getAsType() const {
@@ -324,9 +343,14 @@ namespace swift {
       return FullyQualifiedTypeVal;
     }
 
-    PatternKind getAsPatternKind() const {
-      assert(Kind == DiagnosticArgumentKind::PatternKind);
-      return PatternKindVal;
+    WitnessType getAsWitnessType() const {
+      assert(Kind == DiagnosticArgumentKind::WitnessType);
+      return WitnessTypeVal;
+    }
+
+    DescriptivePatternKind getAsDescriptivePatternKind() const {
+      assert(Kind == DiagnosticArgumentKind::DescriptivePatternKind);
+      return DescriptivePatternKindVal;
     }
 
     ReferenceOwnership getAsReferenceOwnership() const {
@@ -505,6 +529,9 @@ namespace swift {
     void addChildNote(Diagnostic &&D);
     void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
   };
+
+  /// A diagnostic that has no input arguments, so it is trivially-destructable.
+  using ZeroArgDiagnostic = Diag<>;
   
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
@@ -557,11 +584,49 @@ namespace swift {
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
+    /// Conditionally prevent the diagnostic from behaving more severely than \p
+    /// limit. If the condition is false, no limit is imposed.
+    InFlightDiagnostic &limitBehaviorIf(bool shouldLimit,
+                                        DiagnosticBehavior limit) {
+      if (!shouldLimit) {
+        return *this;
+      }
+      return limitBehavior(limit);
+    }
+
+    /// Conditionally limit the diagnostic behavior if the given \c limit
+    /// is not \c None.
+    InFlightDiagnostic &limitBehaviorIf(
+        llvm::Optional<DiagnosticBehavior> limit) {
+      if (!limit) {
+        return *this;
+      }
+
+      return limitBehavior(*limit);
+    }
+
+    /// Limit the diagnostic behavior to \c limit until the specified
+    /// version.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
+        DiagnosticBehavior limit, unsigned majorVersion);
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
     InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+
+    /// Limit the diagnostic behavior to warning if the context is a
+    /// swiftinterface.
+    ///
+    /// This is useful for diagnostics for restrictions that may be lifted by a
+    /// future version of the compiler. In such cases, it may be helpful to
+    /// avoid failing to build a module from its interface if the interface was
+    /// emitted using a compiler that no longer has the restriction.
+    InFlightDiagnostic &warnInSwiftInterface(const DeclContext *context);
 
     /// Conditionally limit the diagnostic behavior to warning until
     /// the specified version.  If the condition is false, no limit is
@@ -803,7 +868,7 @@ namespace swift {
 
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
-  class SWIFT_IMPORT_REFERENCE DiagnosticEngine {
+  class DiagnosticEngine {
   public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
@@ -818,7 +883,7 @@ namespace swift {
     DiagnosticState state;
 
     /// The currently active diagnostic, if there is one.
-    Optional<Diagnostic> ActiveDiagnostic;
+    llvm::Optional<Diagnostic> ActiveDiagnostic;
 
     /// Diagnostics wrapped by ActiveDiagnostic, if any.
     SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
@@ -861,6 +926,10 @@ namespace swift {
     /// The Swift language version. This is used to limit diagnostic behavior
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
+
+    /// The stats reporter used to keep track of Swift 6 errors
+    /// diagnosed via \c warnUntilSwiftVersion(6).
+    UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of
     /// diagnostics.
@@ -932,6 +1001,10 @@ namespace swift {
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
 
     void setLanguageVersion(version::Version v) { languageVersion = v; }
+
+    void setStatsReporter(UnifiedStatsReporter *stats) {
+      statsReporter = stats;
+    }
 
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());
@@ -1160,7 +1233,7 @@ namespace swift {
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
-    Optional<DiagnosticInfo>
+    llvm::Optional<DiagnosticInfo>
     diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
 
     /// Send \c diag to all diagnostic consumers.
@@ -1168,8 +1241,7 @@ namespace swift {
 
     /// Retrieve the set of child notes that describe how the generated
     /// source buffer was derived, e.g., a macro expansion backtrace.
-    std::vector<Diagnostic> getGeneratedSourceBufferNotes(
-        SourceLoc loc, Optional<unsigned> &lastBufferID);
+    std::vector<Diagnostic> getGeneratedSourceBufferNotes(SourceLoc loc);
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.
@@ -1449,6 +1521,22 @@ namespace swift {
     }
   };
 
+  /// A RAII object that adds and removes a diagnostic consumer from an engine.
+  class DiagnosticConsumerRAII final {
+    DiagnosticEngine &Diags;
+    DiagnosticConsumer &Consumer;
+
+  public:
+    DiagnosticConsumerRAII(DiagnosticEngine &diags,
+                           DiagnosticConsumer &consumer)
+        : Diags(diags), Consumer(consumer) {
+      Diags.addConsumer(Consumer);
+    }
+    ~DiagnosticConsumerRAII() {
+      Diags.removeConsumer(Consumer);
+    }
+  };
+
   inline void
   DiagnosticEngine::diagnoseWithNotes(InFlightDiagnostic parentDiag,
                                       llvm::function_ref<void(void)> builder) {
@@ -1471,13 +1559,6 @@ namespace swift {
     /// The unescaped message to display to the user.
     const StringRef Message;
   };
-
-/// Returns a value that can be used to select between accessor kinds in
-/// diagnostics.
-///
-/// This is correlated with diag::availability_deprecated and others.
-std::pair<unsigned, DeclName>
-getAccessorKindAndNameForDiagnostics(const ValueDecl *D);
 
 /// Retrieve the macro name for a generated source info that represents
 /// a macro expansion.

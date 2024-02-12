@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Type-check function definitions
@@ -123,7 +123,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set } // expected-note {{found this candidate}}
+  subscript (index : Index) -> Value { get set } // expected-note {{candidate expects value of type 'T.Index' for parameter #1 (got 'T.Value')}}
 }
 
 protocol IntSubscriptable {
@@ -131,7 +131,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  } // expected-note {{found this candidate}}
+  subscript (index : Int) -> ElementType { get  } // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T.Value')}}
 }
 
 func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
@@ -278,7 +278,6 @@ func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constr
 func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{cannot find type 'Wibble' in scope}}
 func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{cannot find type 'Wibble' in scope}}
 func sameTypeEq<T>(_: T) where T = T {} // expected-error{{use '==' for same-type requirements rather than '='}} {{34-35===}}
-// expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
 
 func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
 
@@ -293,8 +292,8 @@ func badTypeConformance4<T>(_: T) where @escaping (inout T) throws -> () : Equal
 func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
 // expected-error@-1 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
 
+// This is not bad! Array<T> conforms to Collection.
 func badTypeConformance6<T>(_: T) where [T] : Collection { }
-// expected-warning@-1{{redundant conformance constraint '[T]' : 'Collection'}}
 
 func badTypeConformance7<T, U>(_: T, _: U) where T? : U { }
 // expected-error@-1{{type 'T?' constrained to non-protocol, non-class type 'U'}}

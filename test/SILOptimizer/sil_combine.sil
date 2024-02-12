@@ -1194,19 +1194,6 @@ bb0(%0 : $E):
   return %3 : $E
 }
 
-// (load (upcast-addr %x)) -> (upcast-ref (load %x))
-// CHECK-LABEL: sil @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> B {
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: upcast
-// CHECK-NEXT: return
-sil @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> B {
-bb0(%0 : $*E):
-  %1 = upcast %0 : $*E to $*B
-  %2 = load %1 : $*B
-  return %2 : $B
-}
-
 // CHECK-LABEL: sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal
@@ -1440,6 +1427,28 @@ entry(%a : $AnotherClass):
   %r = load %b : $*MyNSObj
   dealloc_stack %b : $*MyNSObj
   return %r : $MyNSObj
+}
+
+sil @createMyInt : $@convention(thin) (Builtin.Int32) -> @out MyInt
+
+// CHECK-LABEL: sil @convert_function_of_closure :
+// CHECK:         [[F:%.*]] = function_ref @createMyInt 
+// CHECK:         [[S:%.*]] = alloc_stack $MyInt
+// CHECK:         apply [[F]]([[S]], %0)
+// CHECK-NOT:     strong_release
+// CHECK:       } // end sil function 'convert_function_of_closure'
+sil @convert_function_of_closure : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @createMyInt : $@convention(thin) (Builtin.Int32) -> @out MyInt
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Builtin.Int32) -> @out MyInt
+  %3 = convert_function %2 : $@callee_guaranteed () -> @out MyInt to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <MyInt>
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <MyInt> to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <MyInt>
+  %5 = alloc_stack $MyInt
+  %6 = apply %4(%5) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <MyInt>
+  dealloc_stack %5 : $*MyInt
+  strong_release %2 : $@callee_guaranteed () -> @out MyInt
+  %9 = tuple ()
+  return %9 : $()
 }
 
 // CHECK-LABEL: sil @upcast_formation : $@convention(thin) (@inout E, E, @inout B) -> B {
@@ -2553,7 +2562,7 @@ sil @alloc_ref_dynamic_with_upcast_metatype : $() -> B {
 // CHECK: alloc_ref $B
 sil @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to B.Type, bb1, bb2
+  checked_cast_br [exact] @thick B.Type in %1 : $@thick B.Type to B.Type, bb1, bb2
 
 bb1(%2 : $@thick B.Type):
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -2577,7 +2586,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK-NEXT: strong_release [[R]]
 sil @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
+  checked_cast_br [exact] @thick B.Type in %1 : $@thick B.Type to E.Type, bb1, bb2
 
 bb1(%2 : $@thick E.Type):
   %3 = upcast %2 : $@thick E.Type to $@thick B.Type
@@ -2604,20 +2613,6 @@ bb0(%0 : $*B):
   copy_addr %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
-  %2 = tuple()
-  return %2 : $()
-}
-
-// CHECK-LABEL: sil @delete_dead_alloc_ref
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @delete_dead_alloc_ref : $() -> () {
-bb0:
-  %1 = alloc_ref $B
-  set_deallocating %1 : $B
-  fix_lifetime %1 : $B
-  dealloc_ref %1 : $B
   %2 = tuple()
   return %2 : $()
 }
@@ -3512,31 +3507,6 @@ bb0:
 }
 
 
-// CHECK-LABEL: sil @remove_unused_alloc_ref
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref $B
-  dealloc_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref_stack
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $B
-  set_deallocating %1 : $B
-  dealloc_stack_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
-
 // Int1_const == x -> x == Int1_const
 // CHECK-LABEL: sil @canonicalize_bool_eq_checks
 sil @canonicalize_bool_eq_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
@@ -4305,8 +4275,8 @@ class Kp2 {
   init()
 }
 
-sil @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String
-sil @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> ()
+sil @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed Kp2) -> @out String
+sil @kpsetter : $@convention(keypath_accessor_setter) (@in_guaranteed String, @in_guaranteed Kp2) -> ()
 sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
 
 // Test keypath optimization for optional chaining with accesses scopes.
@@ -4324,7 +4294,7 @@ sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ
 // CHECK:     } // end sil function 'test_optional_chaining_keypath'
 sil @test_optional_chaining_keypath : $@convention(thin) (@in_guaranteed Kp1) -> @out Optional<String> {
 bb0(%0 : $*Optional<String>, %1 : $*Kp1):
-  %kp = keypath $KeyPath<Kp1, Optional<String>>, (root $Kp1; stored_property #Kp1.b : $Optional<Kp2>; optional_chain : $Kp2; settable_property $String,  id #Kp2.s!getter : (Kp2) -> () -> String, getter @kpgetter : $@convention(thin) (@in_guaranteed Kp2) -> @out String, setter @kpsetter : $@convention(thin) (@in_guaranteed String, @in_guaranteed Kp2) -> (); optional_wrap : $Optional<String>)
+  %kp = keypath $KeyPath<Kp1, Optional<String>>, (root $Kp1; stored_property #Kp1.b : $Optional<Kp2>; optional_chain : $Kp2; settable_property $String,  id #Kp2.s!getter : (Kp2) -> () -> String, getter @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed Kp2) -> @out String, setter @kpsetter : $@convention(keypath_accessor_setter) (@in_guaranteed String, @in_guaranteed Kp2) -> (); optional_wrap : $Optional<String>)
   %f = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
   %a = apply %f<Kp1, Optional<String>>(%0, %1, %kp) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
   strong_release %kp : $KeyPath<Kp1, Optional<String>>

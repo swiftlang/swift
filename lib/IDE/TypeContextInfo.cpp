@@ -26,7 +26,8 @@
 using namespace swift;
 using namespace ide;
 
-class ContextInfoCallbacks : public IDEInspectionCallbacks {
+class ContextInfoCallbacks : public CodeCompletionCallbacks,
+                             public DoneParsingCallback {
   TypeContextInfoConsumer &Consumer;
   SourceLoc Loc;
   Expr *ParsedExpr = nullptr;
@@ -36,16 +37,17 @@ class ContextInfoCallbacks : public IDEInspectionCallbacks {
 
 public:
   ContextInfoCallbacks(Parser &P, TypeContextInfoConsumer &Consumer)
-      : IDEInspectionCallbacks(P), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), DoneParsingCallback(), Consumer(Consumer) {}
 
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
 
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
-                         Optional<unsigned> yieldIndex) override;
+                         llvm::Optional<unsigned> yieldIndex) override;
 
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
@@ -63,8 +65,7 @@ void ContextInfoCallbacks::completeForEachSequenceBeginning(
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
-                                           bool isFirst) {
+void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -72,8 +73,12 @@ void ContextInfoCallbacks::completeReturnStmt(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeYieldStmt(CodeCompletionExpr *E,
-                                             Optional<unsigned> yieldIndex) {
+void ContextInfoCallbacks::completeThenStmt(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  ParsedExpr = E;
+}
+void ContextInfoCallbacks::completeYieldStmt(
+    CodeCompletionExpr *E, llvm::Optional<unsigned> yieldIndex) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -127,21 +132,19 @@ void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
       continue;
 
     T = T->getRValueType();
-    if (T->hasArchetype())
-      T = T->mapTypeOutOfContext();
+
+    auto interfaceTy = T;
+    if (interfaceTy->hasArchetype())
+      interfaceTy = interfaceTy->mapTypeOutOfContext();
 
     // TODO: Do we need '.none' for Optionals?
-    auto objT = T->lookThroughAllOptionalTypes();
-
-    if (auto env = CurDeclContext->getGenericEnvironmentOfContext())
-      objT = env->mapTypeIntoContext(T);
-
-    if (!seenTypes.insert(objT->getCanonicalType()).second)
+    auto objTy = T->lookThroughAllOptionalTypes();
+    if (!seenTypes.insert(objTy->getCanonicalType()).second)
       continue;
 
-    results.emplace_back(T);
+    results.emplace_back(interfaceTy);
     auto &item = results.back();
-    getImplicitMembers(objT, item.ImplicitMembers);
+    getImplicitMembers(objTy, item.ImplicitMembers);
   }
 
   Consumer.handleResults(results);
@@ -193,7 +196,8 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   } LocalConsumer(CurDeclContext, T, Result);
 
-  lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
+  lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T),
+                           Loc, CurDeclContext,
                            /*includeInstanceMembers=*/false,
                            /*includeDerivedRequirements*/false,
                            /*includeProtocolExtensionMembers*/true);
@@ -211,8 +215,9 @@ IDEInspectionCallbacksFactory *swift::ide::makeTypeContextInfoCallbacksFactory(
     ContextInfoCallbacksFactoryImpl(TypeContextInfoConsumer &Consumer)
         : Consumer(Consumer) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new ContextInfoCallbacks(P, Consumer);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callbacks = std::make_shared<ContextInfoCallbacks>(P, Consumer);
+      return {Callbacks, Callbacks};
     }
   };
 

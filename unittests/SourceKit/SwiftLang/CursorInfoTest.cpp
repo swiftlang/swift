@@ -86,9 +86,8 @@ class NullEditorConsumer : public EditorConsumer {
 
   bool diagnosticsEnabled() override { return false; }
 
-  void setDiagnosticStage(UIdent DiagStage) override {}
-  void handleDiagnostic(const DiagnosticEntryInfo &Info,
-                        UIdent DiagStage) override {}
+  void handleDiagnostics(ArrayRef<DiagnosticEntryInfo> DiagInfos,
+                         UIdent DiagStage) override {}
   void recordFormattedText(StringRef Text) override {}
 
   void handleSourceText(StringRef Text) override {}
@@ -163,7 +162,7 @@ public:
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(
-        DocName, Offset, /*Length=*/0, /*Actionables=*/false,
+        DocName, DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
         /*vfsOptions=*/None, CancellationToken,
         [&](const RequestResult<CursorInfoData> &Result) {
@@ -448,7 +447,7 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   // cancelled as the next cursor info (which is faster) gets requested.
   Semaphore FirstCursorInfoSema(0);
   getLang().getCursorInfo(
-      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
       /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
       [&](const RequestResult<CursorInfoData> &Result) {
@@ -491,7 +490,7 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
   // cancelled as the next cursor info (which is faster) gets requested.
   Semaphore CursorInfoSema(0);
   getLang().getCursorInfo(
-      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
       /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
       [&](const RequestResult<CursorInfoData> &Result) {

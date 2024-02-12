@@ -17,6 +17,8 @@
 #ifndef SWIFT_TBDGEN_REQUESTS_H
 #define SWIFT_TBDGEN_REQUESTS_H
 
+#include "llvm/ExecutionEngine/JITSymbol.h"
+
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/IRGen/Linking.h"
@@ -148,6 +150,10 @@ public:
     /// A symbol introduced when emitting a SIL decl.
     SIL,
 
+    /// A symbol introduced when emitting a SIL global variable.
+    /// Only used in piecewise compilation for Immediate mode.
+    Global,
+
     /// A symbol introduced when emitting LLVM IR.
     IR,
 
@@ -162,6 +168,7 @@ public:
 
 private:
   union {
+    VarDecl *Global;
     SILDeclRef silDeclRef;
     irgen::LinkEntity irEntity;
   };
@@ -169,6 +176,9 @@ private:
   explicit SymbolSource(SILDeclRef ref) : kind(Kind::SIL) {
     silDeclRef = ref;
   }
+
+  SymbolSource(VarDecl *Global) : kind(Kind::Global), Global(Global) {}
+
   explicit SymbolSource(irgen::LinkEntity entity) : kind(Kind::IR) {
     irEntity = entity;
   }
@@ -180,6 +190,9 @@ public:
   static SymbolSource forSILDeclRef(SILDeclRef ref) {
     return SymbolSource{ref};
   }
+
+  static SymbolSource forGlobal(VarDecl *Global) { return Global; }
+
   static SymbolSource forIRLinkEntity(irgen::LinkEntity entity) {
     return SymbolSource{entity};
   }
@@ -198,49 +211,93 @@ public:
     assert(kind == Kind::SIL);
     return silDeclRef;
   }
+
+  VarDecl *getGlobal() const {
+    assert(kind == Kind::Global);
+    return Global;
+  }
+
   irgen::LinkEntity getIRLinkEntity() const {
     assert(kind == Kind::IR);
     return irEntity;
   }
+
+  /// Typecheck the entity wrapped by this `SymbolSource`
+  void typecheck() const {
+    switch (kind) {
+    case Kind::SIL: {
+      if (auto *AFD = silDeclRef.getAbstractFunctionDecl())
+        // If this entity is a `SILFunction`, check its body
+        AFD->getTypecheckedBody();
+      break;
+    }
+    case Kind::Global:
+    case Kind::IR:
+    case Kind::LinkerDirective:
+    case Kind::Unknown:
+      // Nothing to do
+      break;
+    }
+  }
+
+  friend llvm::hash_code hash_value(const SymbolSource &S) {
+    auto Kind = S.kind;
+    switch (Kind) {
+    case Kind::SIL:
+      return llvm::hash_combine(Kind, S.silDeclRef);
+    case Kind::Global:
+      return llvm::hash_combine(Kind, S.Global);
+    case Kind::IR:
+      return llvm::hash_combine(Kind, S.irEntity);
+    case Kind::LinkerDirective:
+    case Kind::Unknown:
+      return llvm::hash_value(Kind);
+    }
+  }
+
+  friend bool operator==(const SymbolSource &LHS, const SymbolSource &RHS) {
+    if (LHS.kind != RHS.kind)
+      return false;
+    switch (LHS.kind) {
+    case Kind::SIL:
+      return LHS.silDeclRef == RHS.silDeclRef;
+    case Kind::Global:
+      return LHS.Global == RHS.Global;
+    case Kind::IR:
+      return LHS.irEntity == RHS.irEntity;
+    case Kind::LinkerDirective:
+    case Kind::Unknown:
+      return true;
+    }
+  }
+
+  friend bool operator!=(const SymbolSource &LHS, const SymbolSource &RHS) {
+    return !(LHS == RHS);
+  }
+
+  llvm::JITSymbolFlags getJITSymbolFlags() const {
+    switch (kind) {
+    case Kind::SIL:
+      return llvm::JITSymbolFlags::Callable | llvm::JITSymbolFlags::Exported;
+    case Kind::Global:
+      return llvm::JITSymbolFlags::Exported;
+    case Kind::IR:
+      llvm_unreachable("Unimplemented: Symbol flags for LinkEntities");
+    case Kind::LinkerDirective:
+      llvm_unreachable("Unsupported: Symbol flags for linker directives");
+    case Kind::Unknown:
+      llvm_unreachable("Unsupported: Symbol flags for unknown source");
+    }
+  }
 };
 
 /// Maps a symbol back to its source for lazy compilation.
-class SymbolSourceMap {
-  friend class SymbolSourceMapRequest;
-
-  using Storage = llvm::StringMap<SymbolSource>;
-  const Storage *storage;
-
-  explicit SymbolSourceMap(const Storage *storage) : storage(storage) {
-    assert(storage);
-  }
-
-public:
-  Optional<SymbolSource> find(StringRef symbol) const {
-    auto result = storage->find(symbol);
-    if (result == storage->end())
-      return None;
-    return result->second;
-  }
-
-  friend bool operator==(const SymbolSourceMap &lhs,
-                         const SymbolSourceMap &rhs) {
-    return lhs.storage == rhs.storage;
-  }
-  friend bool operator!=(const SymbolSourceMap &lhs,
-                         const SymbolSourceMap &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend void simple_display(llvm::raw_ostream &out, const SymbolSourceMap &) {
-    out << "(symbol storage map)";
-  }
-};
+using SymbolSourceMap = llvm::StringMap<SymbolSource>;
 
 /// Computes a map of symbols to their SymbolSource for a file or module.
 class SymbolSourceMapRequest
     : public SimpleRequest<SymbolSourceMapRequest,
-                           SymbolSourceMap(TBDGenDescriptor),
+                           const SymbolSourceMap *(TBDGenDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -249,7 +306,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SymbolSourceMap evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+  const SymbolSourceMap *evaluate(Evaluator &evaluator,
+                                  TBDGenDescriptor desc) const;
 
 public:
   // Cached.

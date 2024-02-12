@@ -20,6 +20,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   public typealias ProcessHandle = task_t
 
   private var task: task_t
+  internal var processIdentifier: ProcessIdentifier
+  internal lazy var processName = getProcessName(processId: processIdentifier) ?? "<unknown process>"
 
   public var process: ProcessHandle { task }
   public private(set) var context: SwiftReflectionContextRef!
@@ -114,20 +116,32 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   }
 
   init?(processId: ProcessIdentifier, forkCorpse: Bool) {
+    processIdentifier = processId
     var task: task_t = task_t()
     let taskResult = task_for_pid(mach_task_self_, processId, &task)
     guard taskResult == KERN_SUCCESS else {
-      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)")
+      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)",
+        to: &Std.err)
       return nil
     }
 
     if forkCorpse {
       var corpse = task_t()
-      let corpseResult = task_generate_corpse(task, &corpse)
-      if corpseResult == KERN_SUCCESS {
-        task = corpse
-      } else {
-        print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)")
+      let maxRetry = 6
+      for retry in 0..<maxRetry {
+        let corpseResult = task_generate_corpse(task, &corpse)
+        if corpseResult == KERN_SUCCESS {
+          task_stop_peeking(task)
+          mach_port_deallocate(mach_task_self_, task)
+          task = corpse
+          break
+        }
+        if corpseResult != KERN_RESOURCE_SHORTAGE || retry == maxRetry {
+          print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)",
+            to: &Std.err)
+          return nil
+        }
+        sleep(UInt32(1 << retry))
       }
     }
 
@@ -160,6 +174,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
   deinit {
     task_stop_peeking(self.task)
+    CSRelease(self.symbolicator)
     mach_port_deallocate(mach_task_self_, self.task)
   }
 

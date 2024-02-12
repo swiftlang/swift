@@ -85,7 +85,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILNode.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -225,7 +227,8 @@ private:
   /// other scope ending instructions.
   /// If a Match WITH an apply is returned, we might be able to transform this
   /// instruction, so more expensive checks are in order.
-  Optional<Match> definesMatchingInstructionSequence(SILInstruction *) const;
+  llvm::Optional<Match>
+  definesMatchingInstructionSequence(SILInstruction *) const;
 
   /// Whether the specified instruction is or might be the beginning of a
   /// sequence of "inconsequential" instructions the last of which destroys
@@ -660,7 +663,7 @@ bool borroweeHasUsesWithinBorrowScope(Context const &context,
 //                             MARK: Predicates
 //===----------------------------------------------------------------------===//
 
-Optional<Match>
+llvm::Optional<Match>
 FindCandidates::definesMatchingInstructionSequence(SILInstruction *inst) const {
   // Look specifically for
   //
@@ -670,10 +673,10 @@ FindCandidates::definesMatchingInstructionSequence(SILInstruction *inst) const {
   //   destroy_value %borrowee
   auto *ebi = dyn_cast<EndBorrowInst>(inst);
   if (!ebi)
-    return None;
+    return llvm::None;
   auto *dvi = findNextBorroweeDestroy(ebi->getNextInstruction());
   if (!dvi)
-    return None;
+    return llvm::None;
   auto *ai = dyn_cast_or_null<ApplyInst>(ebi->getPreviousInstruction());
   if (!ai)
     return {{nullptr, ebi, dvi}};
@@ -797,3 +800,20 @@ swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
   auto context = LexicalDestroyFolding::Context(bbi, dominanceTree, deleter);
   return LexicalDestroyFolding::run(context);
 }
+
+namespace swift::test {
+// Arguments:
+// - the lexical borrow to fold
+// Dumps:
+// - the function
+static FunctionTest LexicalDestroyFoldingTest(
+    "lexical-destroy-folding", [](auto &function, auto &arguments, auto &test) {
+      auto *dominanceAnalysis = test.template getAnalysis<DominanceAnalysis>();
+      DominanceInfo *domTree = dominanceAnalysis->get(&function);
+      auto value = arguments.takeValue();
+      auto *bbi = cast<BeginBorrowInst>(value);
+      InstructionDeleter deleter;
+      foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
+      function.print(llvm::outs());
+    });
+} // end namespace swift::test

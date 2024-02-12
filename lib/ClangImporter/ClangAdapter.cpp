@@ -63,7 +63,7 @@ importer::getNonNullArgs(const clang::Decl *decl,
   return result;
 }
 
-Optional<const clang::Decl *>
+llvm::Optional<const clang::Decl *>
 importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
     return OID->getDefinition();
@@ -74,7 +74,7 @@ importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
     return OPD->getDefinition();
 
-  return None;
+  return llvm::None;
 }
 
 static bool isInLocalScope(const clang::Decl *D) {
@@ -103,7 +103,7 @@ importer::getFirstNonLocalDecl(const clang::Decl *D) {
   return *iter;
 }
 
-Optional<clang::Module *>
+llvm::Optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
   const clang::Decl *actual = nullptr;
@@ -113,7 +113,7 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
     actual = maybeDefinition.value();
     if (!actual && !allowForwardDeclaration)
-      return None;
+      return llvm::None;
   }
 
   if (!actual)
@@ -204,7 +204,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       if (isCollectionName(name)) {
         if (auto ptrType = type->getAs<clang::PointerType>()) {
           return OmissionTypeName(
-              name, None,
+              name, llvm::None,
               getClangTypeNameForOmission(ctx, ptrType->getPointeeType()).Name);
         }
       }
@@ -218,7 +218,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // For array types, convert the element type and treat this an as array.
     if (auto arrayType = dyn_cast<clang::ArrayType>(typePtr)) {
       return OmissionTypeName(
-          "Array", None,
+          "Array", llvm::None,
           getClangTypeNameForOmission(ctx, arrayType->getElementType()).Name);
     }
 
@@ -264,17 +264,18 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
         unsigned lastWordSize = camel_case::getLastWord(className).size();
         StringRef elementName =
             className.substr(0, className.size() - lastWordSize);
-        return OmissionTypeName(className, None, elementName);
+        return OmissionTypeName(className, llvm::None, elementName);
       }
 
       // If we don't have type arguments, the collection element type
       // is "Object".
       auto typeArgs = objcObjectPtr->getTypeArgs();
       if (typeArgs.empty())
-        return OmissionTypeName(className, None, "Object");
+        return OmissionTypeName(className, llvm::None, "Object");
 
       return OmissionTypeName(
-          className, None, getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
+          className, llvm::None,
+          getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
     }
 
     // Objective-C "id" type.
@@ -456,10 +457,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
     case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
     case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
       return OmissionTypeName();
 
     // OpenMP types that don't have Swift equivalents.
@@ -481,6 +482,11 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // RISC-V V builtin types that don't have Swift equivalents.
 #define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
+      return OmissionTypeName();
+
+    // WAM builtin types that don't have Swift equivalents.
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
       return OmissionTypeName();
     }
   }
@@ -554,7 +560,9 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     clang::LookupResult lookupResult(clangSema, notificationName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
-    if (!clangSema.LookupName(lookupResult, nullptr))
+    if (!clangSema.LookupQualifiedName(
+            lookupResult,
+            /*LookupCtx*/ clangSema.getASTContext().getTranslationUnitDecl()))
       return nullptr;
     auto nsDecl = lookupResult.getAsSingle<clang::TypedefNameDecl>();
     if (!nsDecl)
@@ -580,6 +588,13 @@ bool importer::isNSString(const clang::Type *type) {
 
 bool importer::isNSString(clang::QualType qt) {
   return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
+}
+
+bool importer::isNSNotificationName(clang::QualType type) {
+  if (auto *typealias = type->getAs<clang::TypedefType>()) {
+    return typealias->getDecl()->getName() == "NSNotificationName";
+  }
+  return false;
 }
 
 bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
@@ -748,11 +763,9 @@ bool importer::isUnavailableInSwift(
 
 OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
-  auto &clangCtx = param->getASTContext();
-
   // If nullability is available on the type, use it.
   clang::QualType paramTy = param->getType();
-  if (auto nullability = paramTy->getNullability(clangCtx)) {
+  if (auto nullability = paramTy->getNullability()) {
     return translateNullability(*nullability);
   }
 

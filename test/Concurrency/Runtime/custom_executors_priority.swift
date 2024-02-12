@@ -1,20 +1,18 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
 final class InlineExecutor: SerialExecutor {
-  public func enqueue(_ job: UnownedJob) {
+  public func enqueue(_ job: consuming ExecutorJob) {
     print("\(self): enqueue (priority: \(TaskPriority(job.priority)!))")
-    job._runSynchronously(on: self.asUnownedSerialExecutor())
-  }
-
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 }
 
@@ -35,7 +33,6 @@ actor Custom {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     print("begin")

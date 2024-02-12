@@ -18,12 +18,10 @@ target_sources(swiftSILOptimizer PRIVATE
   FunctionOrderPrinter.cpp
   IVInfoPrinter.cpp
   InstCount.cpp
-  LSLocationPrinter.cpp
   Link.cpp
   LoopCanonicalizer.cpp
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
-  MemBehaviorDumper.cpp
   ModulePrinter.cpp
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
@@ -31,8 +29,7 @@ target_sources(swiftSILOptimizer PRIVATE
   SILSkippingChecker.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
-  UnitTestRunner.cpp
+  TestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp
-  ParseTestSpecification.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp)
   

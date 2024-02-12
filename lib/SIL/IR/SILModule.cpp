@@ -75,12 +75,19 @@ class SILModule::SerializationCallback final
       // translation units in the same Swift module.
       decl->setLinkage(SILLinkage::Shared);
       return;
+    case SILLinkage::Package:
+      decl->setLinkage(SILLinkage::PackageExternal);
+      return;
+    case SILLinkage::PackageNonABI: // Same as PublicNonABI
+      decl->setLinkage(SILLinkage::Shared);
+      return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::Shared:
       return;
@@ -100,6 +107,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
+      hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
       Types(TC) {
   assert(!context.isNull());
@@ -412,9 +420,8 @@ bool SILModule::loadFunction(SILFunction *F, LinkingMode LinkMode) {
   return true;
 }
 
-SILFunction *SILModule::loadFunction(StringRef name,
-                                     LinkingMode LinkMode,
-                                     Optional<SILLinkage> linkage) {
+SILFunction *SILModule::loadFunction(StringRef name, LinkingMode LinkMode,
+                                     llvm::Optional<SILLinkage> linkage) {
   SILFunction *func = lookUpFunction(name);
   if (!func)
     func = getSILLoader()->lookupSILFunction(name, linkage);
@@ -519,6 +526,20 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
   if (!Vtbl)
     return nullptr;
 
+  if (C->walkSuperclasses([&](ClassDecl *S) {
+    auto R = VTableMap.find(S);
+    if (R != VTableMap.end())
+      return TypeWalker::Action::Continue;
+    SILVTable *Vtbl = getSILLoader()->lookupVTable(S);
+    if (!Vtbl) {
+      return TypeWalker::Action::Stop;
+    }
+    VTableMap[S] = Vtbl;
+    return TypeWalker::Action::Continue;
+  })) {
+    return nullptr;
+  }
+
   // If we succeeded, map C -> VTbl in the table and return VTbl.
   VTableMap[C] = Vtbl;
   return Vtbl;
@@ -545,6 +566,15 @@ SILMoveOnlyDeinit *SILModule::lookUpMoveOnlyDeinit(const NominalTypeDecl *C,
   // If we succeeded, map C -> VTbl in the table and return VTbl.
   MoveOnlyDeinitMap[C] = tbl;
   return tbl;
+}
+
+SILVTable *SILModule::lookUpSpecializedVTable(SILType classTy) {
+  // First try to look up R from the lookup table.
+  auto R = SpecializedVTableMap.find(classTy);
+  if (R != SpecializedVTableMap.end())
+    return R->second;
+
+  return nullptr;
 }
 
 SerializedSILLoader *SILModule::getSILLoader() {
@@ -657,7 +687,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 SILFunction *
 SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
-  assert(nomDecl->isMoveOnly());
+  assert(!nomDecl->canBeCopyable());
 
   auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
 
@@ -865,12 +895,42 @@ void SILModule::installSILRemarkStreamer() {
   silRemarkStreamer = SILRemarkStreamer::create(*this);
 }
 
+void SILModule::promoteLinkages() {
+  for (auto &Fn : functions) {
+    // Ignore functions with shared linkage
+    if (Fn.getLinkage() == SILLinkage::Shared)
+      continue;
+
+    if (Fn.isDefinition())
+      Fn.setLinkage(SILLinkage::Public);
+    else
+      Fn.setLinkage(SILLinkage::PublicExternal);
+  }
+
+  for (auto &Global : silGlobals) {
+    // Ignore globals with shared linkage
+    if (Global.getLinkage() == SILLinkage::Shared)
+      continue;
+
+    if (Global.isDefinition())
+      Global.setLinkage(SILLinkage::Public);
+    else
+      Global.setLinkage(SILLinkage::PublicExternal);
+  }
+
+  // TODO: Promote linkage of other SIL entities
+}
+
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
 }
 void SILModule::performOnceForPrespecializedImportedExtensions(
     llvm::function_ref<void(AbstractFunctionDecl *)> action) {
   if (prespecializedFunctionDeclsImported)
+    return;
+
+  // No prespecitalizations in embedded Swift
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return;
 
   SmallVector<ModuleDecl *, 8> importedModules;
@@ -905,10 +965,9 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   prespecializedFunctionDeclsImported = true;
 }
 
-SILProperty *SILProperty::create(SILModule &M,
-                                 bool Serialized,
-                                 AbstractStorageDecl *Decl,
-                                 Optional<KeyPathPatternComponent> Component) {
+SILProperty *
+SILProperty::create(SILModule &M, bool Serialized, AbstractStorageDecl *Decl,
+                    llvm::Optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;
@@ -927,6 +986,8 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     linkage = SILLinkage::Hidden;
     break;
   case AccessLevel::Package:
+    linkage = SILLinkage::Package;
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     linkage = SILLinkage::Public;

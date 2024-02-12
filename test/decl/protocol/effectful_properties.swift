@@ -5,21 +5,21 @@
 
 protocol None {
   associatedtype V
-  // expected-note@+2 {{protocol requires property 'someProp' with type 'CA_N.V' (aka 'Int'); do you want to add a stub?}}
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+2 {{protocol requires property 'someProp' with type 'CA_N.V' (aka 'Int'); add a stub for conformance}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; add a stub for conformance}}
   var someProp : V { get }
 }
 
 protocol T {
   associatedtype V
-  // expected-note@+2 {{protocol requires property 'someProp' with type 'CAT_T.V' (aka 'Int'); do you want to add a stub?}}
-  // expected-note@+1 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+2 {{protocol requires property 'someProp' with type 'CAT_T.V' (aka 'Int'); add a stub for conformance}}
+  // expected-note@+1 {{protocol requires property 'someProp' with type 'Self.V'; add a stub for conformance}}
   var someProp : V { get throws }
 }
 
 protocol A {
   associatedtype V
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; add a stub for conformance}}
   var someProp : V { get async }
 }
 
@@ -239,17 +239,17 @@ func composed4<U : T & None >(u : U) {
 // redefining the protocols to make sure the fix-its are matched
 
 protocol NoEffects {
-// expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+// expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; add a stub for conformance}}
   var someProp : Int { get }
 }
 
 protocol Throws {
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; add a stub for conformance}}
   var someProp : Int { get throws }
 }
 
 protocol Async {
-  // expected-note@+1 3 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+  // expected-note@+1 3 {{protocol requires property 'someProp' with type 'Int'; add a stub for conformance}}
   var someProp : Int { get async }
 }
 

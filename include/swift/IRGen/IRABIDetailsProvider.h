@@ -96,13 +96,16 @@ public:
 
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
     DirectParameter(IRABIDetailsProviderImpl &owner,
                     const irgen::TypeInfo &typeDetails,
-                    const ParamDecl &paramDecl);
+                    const ParamDecl &paramDecl, ParameterConvention convention);
     IRABIDetailsProviderImpl &owner;
     const irgen::TypeInfo &typeDetails;
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 
@@ -111,13 +114,17 @@ public:
   public:
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
-    IndirectParameter(const ParamDecl &paramDecl);
+    IndirectParameter(const ParamDecl &paramDecl,
+                      ParameterConvention convention);
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 
-  /// Represents a generic requirement paremeter that must be passed to the
+  /// Represents a generic requirement parameter that must be passed to the
   /// function.
   class GenericRequirementParameter {
   public:
@@ -271,14 +278,14 @@ public:
     }
 
     static MethodDispatchInfo indirectVTableStaticOffset(
-        size_t offset, Optional<PointerAuthDiscriminator> discriminator) {
+        size_t offset, llvm::Optional<PointerAuthDiscriminator> discriminator) {
       return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, offset, "",
                                 discriminator);
     }
 
     static MethodDispatchInfo indirectVTableRelativeOffset(
         size_t offset, std::string symbolName,
-        Optional<PointerAuthDiscriminator> discriminator) {
+        llvm::Optional<PointerAuthDiscriminator> discriminator) {
       return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, offset,
                                 symbolName, discriminator);
     }
@@ -295,7 +302,8 @@ public:
       assert(kind == Kind::IndirectVTableStaticOffset);
       return offset;
     }
-    Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
+    llvm::Optional<PointerAuthDiscriminator>
+    getPointerAuthDiscriminator() const {
       assert(kind == Kind::IndirectVTableStaticOffset ||
              kind == Kind::IndirectVTableRelativeOffset);
       return discriminator;
@@ -320,18 +328,19 @@ public:
     }
 
   private:
-    MethodDispatchInfo(Kind kind, size_t offset, std::string symbolName = "",
-                       Optional<PointerAuthDiscriminator> discriminator = None)
+    MethodDispatchInfo(
+        Kind kind, size_t offset, std::string symbolName = "",
+        llvm::Optional<PointerAuthDiscriminator> discriminator = llvm::None)
         : kind(kind), offset(offset), symbolName(symbolName),
           discriminator(discriminator) {}
 
     Kind kind;
     size_t offset;
     std::string symbolName;
-    Optional<PointerAuthDiscriminator> discriminator;
+    llvm::Optional<PointerAuthDiscriminator> discriminator;
   };
 
-  Optional<MethodDispatchInfo>
+  llvm::Optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl);
 
   /// Returns the type of the base offset value located at the specific class

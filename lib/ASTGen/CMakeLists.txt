@@ -1,163 +1,123 @@
-if (SWIFT_SWIFT_PARSER)
-  # Ensure that we do not link the _StringProcessing module. But we can
-  # only pass this flag for new-enough compilers that support it.
-  file(WRITE "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift" "")
-  execute_process(
-    COMMAND
-      "${CMAKE_Swift_COMPILER}"
-      -Xfrontend -disable-implicit-string-processing-module-import
-      -c - -o /dev/null
-    INPUT_FILE
-      "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift"
-    OUTPUT_QUIET ERROR_QUIET
-    RESULT_VARIABLE
-      SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
-  if (NOT SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
-    add_compile_options(
-      $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
-      $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
-  endif()
+add_pure_swift_host_library(swiftLLVMJSON STATIC EMIT_MODULE
+  Sources/LLVMJSON/LLVMJSON.swift
 
-  add_library(swiftASTGen STATIC
-    Sources/ASTGen/ASTGen.swift
-    Sources/ASTGen/Decls.swift
-    Sources/ASTGen/Diagnostics.swift
-    Sources/ASTGen/Exprs.swift
-    Sources/ASTGen/Generics.swift
-    Sources/ASTGen/Literals.swift
-    Sources/ASTGen/LLVMJSON.swift
-    Sources/ASTGen/Macros.swift
-    Sources/ASTGen/Misc.swift
-    Sources/ASTGen/PluginHost.swift
-    Sources/ASTGen/PluginMessages.swift
-    Sources/ASTGen/SourceFile.swift
-    Sources/ASTGen/SourceManager.swift
-    Sources/ASTGen/SourceManager+MacroExpansionContext.swift
-    Sources/ASTGen/Stmts.swift
-    Sources/ASTGen/Types.swift
+  DEPENDENCIES
+    swiftBasic
+)
+
+set(ASTGen_Swift_dependencies)
+
+# If requested, build the regular expression parser into the compiler itself.
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
+  file(GLOB_RECURSE _COMPILER_REGEX_PARSER_SOURCES
+    "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_RegexParser/*.swift")
+  set(COMPILER_REGEX_PARSER_SOURCES)
+  foreach(source ${_COMPILER_REGEX_PARSER_SOURCES})
+    file(TO_CMAKE_PATH "${source}" source)
+    list(APPEND COMPILER_REGEX_PARSER_SOURCES ${source})
+  endforeach()
+  message(STATUS "Using Experimental String Processing library for _CompilerRegexParser (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
+
+  add_pure_swift_host_library(_CompilerRegexParser STATIC EMIT_MODULE
+    "${COMPILER_REGEX_PARSER_SOURCES}"
   )
 
-  # The compat56 library is not available in current toolchains. The stage-0
-  # compiler will build fine since the builder compiler is not aware of the 56
-  # compat library, but the stage-1 and subsequent stage compilers will fail as
-  # the stage-0 compiler is aware and will attempt to include the appropriate
-  # compatibility library. We should turn this back on once we are building the
-  # compiler correctly.
-  # Note: This is safe at the moment because the 5.6 compat library only
-  #       contains concurrency runtime fixes, and the compiler frontend does not
-  #       use concurrency at the moment.
-  target_compile_options(swiftASTGen PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
-    $<$<COMPILE_LANGUAGE:Swift>:none>)
+  list(APPEND ASTGen_Swift_dependencies _CompilerRegexParser)
+endif()
 
-  # Set the appropriate target triple.
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-  endif()
+add_pure_swift_host_library(swiftASTGen STATIC
+  Sources/ASTGen/ASTGen.swift
+  Sources/ASTGen/Bridge.swift
+  Sources/ASTGen/DeclAttrs.swift
+  Sources/ASTGen/Decls.swift
+  Sources/ASTGen/Diagnostics.swift
+  Sources/ASTGen/DiagnosticsBridge.swift
+  Sources/ASTGen/Exprs.swift
+  Sources/ASTGen/Generics.swift
+  Sources/ASTGen/LegacyParse.swift
+  Sources/ASTGen/Literals.swift
+  Sources/ASTGen/Macros.swift
+  Sources/ASTGen/ParameterClause.swift
+  Sources/ASTGen/Patterns.swift
+  Sources/ASTGen/PluginHost.swift
+  Sources/ASTGen/Regex.swift
+  Sources/ASTGen/SourceFile.swift
+  Sources/ASTGen/SourceManager.swift
+  Sources/ASTGen/SourceManager+MacroExpansionContext.swift
+  Sources/ASTGen/Stmts.swift
+  Sources/ASTGen/TypeAttrs.swift
+  Sources/ASTGen/Types.swift
 
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
-    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
-  endif()
-
-  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-    MACCATALYST_BUILD_FLAVOR ""
-    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-
-    target_compile_options(swiftASTGen PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
-
-  # Workaround a cmake bug, see the corresponding function in swift-syntax
-  function(force_target_link_libraries TARGET)
-    cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
-
-    foreach(DEPENDENCY ${ARGS_PUBLIC})
-      target_link_libraries(${TARGET} PRIVATE
-        ${DEPENDENCY}
-      )
-      add_dependencies(${TARGET} ${DEPENDENCY})
-
-      add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
-        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
-        DEPENDS ${DEPENDENCY}
-        )
-      target_sources(${TARGET} PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
-      )
-    endforeach()
-  endfunction()
-
-  # Workaround to touch the library and its objects so that we don't continually rebuild (again, see
-  # corresponding change in swift-syntax).
-  add_custom_command(
-      TARGET swiftASTGen
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:swiftASTGen> $<TARGET_OBJECTS:swiftASTGen>
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of library outputs workaround")
-
-  set(SWIFT_SYNTAX_MODULES
+  DEPENDENCIES
+    swiftAST
+  SWIFT_DEPENDENCIES
     SwiftBasicFormat
+    SwiftCompilerPluginMessageHandling
+    SwiftDiagnostics
+    SwiftOperators
     SwiftParser
     SwiftParserDiagnostics
-    SwiftDiagnostics
     SwiftSyntax
-    SwiftOperators
     SwiftSyntaxBuilder
     SwiftSyntaxMacros
-  )
+    SwiftSyntaxMacroExpansion
+    swiftLLVMJSON
+    ${ASTGen_Swift_dependencies}
+)
 
-  # Compute the list of SwiftSyntax targets
-  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND "SwiftSyntax::"
-       OUTPUT_VARIABLE SWIFT_SYNTAX_TARGETS)
-
-  # TODO: Change to target_link_libraries when cmake is fixed
-  force_target_link_libraries(swiftASTGen PUBLIC
-    ${SWIFT_SYNTAX_TARGETS}
-  )
-  target_link_libraries(swiftASTGen PUBLIC
+add_pure_swift_host_library(swiftIDEUtilsBridging
+  Sources/SwiftIDEUtilsBridging/NameMatcherBridging.swift
+  
+  DEPENDENCIES
     swiftAST
-  )
+    swiftASTGen
 
-  set(SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR
-      "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-  set(SWIFT_SYNTAX_LIBRARIES_DEST_DIR
-      "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
+  SWIFT_DEPENDENCIES
+    SwiftIDEUtils
+    SwiftSyntax
+)
 
-  # Determine the SwiftSyntax shared library files that were built as
-  # part of earlyswiftsyntax.
-  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND ${CMAKE_SHARED_LIBRARY_PREFIX}
-       OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
-  list(TRANSFORM SWIFT_SYNTAX_SHARED_LIBRARIES APPEND
-       ${CMAKE_SHARED_LIBRARY_SUFFIX}
-       OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
 
-  # Copy over all of the shared libraries from earlyswiftsyntax so they can
-  # be found via RPATH.
-  foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
-    add_custom_command(
-      TARGET swiftASTGen PRE_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib} ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${sharedlib}
-      COMMENT "Copying ${sharedlib}"
-    )
+set(c_include_paths
+  # LLVM modules and headers.
+  "${LLVM_MAIN_INCLUDE_DIR}"
+  # Generated LLVM headers.
+  "${LLVM_INCLUDE_DIR}"
+  # Clang modules and headers.
+  ${CLANG_INCLUDE_DIRS}
+  # Bridging modules and headers.
+  "${SWIFT_MAIN_INCLUDE_DIR}"
+  # Generated C headers.
+  "${CMAKE_CURRENT_BINARY_DIR}/../../include")
+set(c_include_paths_args)
+foreach(c_include_path ${c_include_paths})
+  list(APPEND c_include_paths_args "SHELL: -Xcc -I -Xcc ${c_include_path}")
+endforeach()
+
+# Prior to 5.9, we have to use the experimental flag for C++ interop.
+if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+  set(cxx_interop_flag "-enable-experimental-cxx-interop")
+else()
+  set(cxx_interop_flag "-cxx-interoperability-mode=default")
+endif()
+
+set(compile_options
+  ${c_include_paths_args}
+  "SHELL: -DRESILIENT_SWIFT_SYNTAX"
+  "SHELL: ${cxx_interop_flag}"
+  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT -Xcc -DSWIFT_TARGET"
+
+  # FIXME: Needed to work around an availability issue with CxxStdlib
+  "SHELL: -Xfrontend -disable-target-os-checking"
+
+  # Necessary to avoid treating IBOutlet and IBAction as keywords
+  "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+
+  "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
+)
+
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  foreach(target swiftASTGen swiftLLVMJSON swiftIDEUtilsBridging)
+    target_compile_options(${target} PRIVATE ${compile_options})
   endforeach()
-
-  # Copy all of the Swift modules from earlyswiftsyntax so they can be found
-  # in the same relative place within the build directory as in the final
-  # toolchain.
-  list(TRANSFORM SWIFT_SYNTAX_MODULES APPEND ".swiftmodule"
-       OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
-  foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
-    file(GLOB module_files
-         "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swiftinterface")
-    add_custom_command(
-      TARGET swiftASTGen PRE_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${module_files} ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR}/${module_dir}/
-      COMMENT "Copying ${module_dir}"
-    )
-  endforeach()
-
-  target_include_directories(swiftASTGen PUBLIC
-    ${SWIFT_SYNTAX_LIBRARIES_DEST_DIR})
-
-  set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()

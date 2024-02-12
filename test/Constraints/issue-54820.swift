@@ -5,7 +5,7 @@
 protocol Protocol {
   associatedtype Index: Comparable
   subscript(bounds: Range<Index>) -> Int { get }
-  // expected-note@+1 {{protocol requires subscript with type '(Wrapper<Base>.Index) -> Int' (aka '(Base.Index) -> Int'); do you want to add a stub?}}
+  // expected-note@+1 {{protocol requires subscript with type '(Wrapper<Base>.Index) -> Int' (aka '(Base.Index) -> Int'); add a stub for conformance}}
   subscript(position: Index) -> Int { get } 
 }
 

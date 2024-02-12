@@ -32,8 +32,6 @@ using namespace swift;
 SILFunction *GenericCloner::createDeclaration(
     SILOptFunctionBuilder &FunctionBuilder, SILFunction *Orig,
     const ReabstractionInfo &ReInfo, StringRef NewName) {
-  assert((!ReInfo.isSerialized() || Orig->isSerialized())
-         && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
@@ -62,6 +60,7 @@ SILFunction *GenericCloner::createDeclaration(
 void GenericCloner::populateCloned() {
   assert(AllocStacks.empty() && "Stale cloner state.");
   assert(!ReturnValueAddr && "Stale cloner state.");
+  assert(!ErrorValueAddr && "Stale cloner state.");
 
   SILFunction *Cloned = getCloned();
   // Create arguments for the entry block.
@@ -95,17 +94,33 @@ void GenericCloner::populateCloned() {
         return false;
 
       if (ArgIdx < origConv.getSILArgIndexOfFirstParam()) {
-        // Handle result arguments.
-        unsigned formalIdx =
-            origConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
-        if (ReInfo.isFormalResultConverted(formalIdx)) {
-          // This result is converted from indirect to direct. The return inst
-          // needs to load the value from the alloc_stack. See below.
-          createAllocStack();
-          assert(!ReturnValueAddr);
-          ReturnValueAddr = ASI;
-          entryArgs.push_back(ASI);
-          return true;
+        if (ArgIdx < origConv.getNumIndirectSILResults()) {
+          // Handle result arguments.
+          unsigned formalIdx =
+              origConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+          if (ReInfo.isFormalResultConverted(formalIdx)) {
+            // This result is converted from indirect to direct. The return inst
+            // needs to load the value from the alloc_stack. See below.
+            createAllocStack();
+            assert(!ReturnValueAddr);
+            ReturnValueAddr = ASI;
+            entryArgs.push_back(ASI);
+            return true;
+          }
+        } else {
+          assert(origConv.getNumIndirectSILErrorResults() == 1 &&
+                 "only a single indirect error result is supported");
+          assert(ArgIdx == origConv.getNumIndirectSILResults());
+
+          if (ReInfo.isErrorResultConverted()) {
+            // This error result is converted from indirect to direct. The throw
+            // instruction needs to load the value from the alloc_stack. See below.
+            createAllocStack();
+            assert(!ErrorValueAddr);
+            ErrorValueAddr = ASI;
+            entryArgs.push_back(ASI);
+            return true;
+          }
         }
       } else if (ReInfo.isDroppedMetatypeArg(ArgIdx)) {
         // Replace the metatype argument with an `metatype` instruction in the
@@ -192,10 +207,20 @@ void GenericCloner::visitTerminator(SILBasicBlock *BB) {
       getBuilder().createDeallocStack(ASI->getLoc(), ASI);
     }
     if (ReturnValue) {
-      auto *NewReturn = getBuilder().createReturn(RI->getLoc(), ReturnValue);
-      FunctionExits.push_back(NewReturn);
+      getBuilder().createReturn(RI->getLoc(), ReturnValue);
       return;
     }
+  } else if (isa<ThrowAddrInst>(OrigTermInst) && ErrorValueAddr) {
+      // The result is converted from indirect to direct. We have to load the
+      // returned value from the alloc_stack.
+      SILValue errorValue = getBuilder().emitLoadValueOperation(
+            ErrorValueAddr->getLoc(), ErrorValueAddr,
+            LoadOwnershipQualifier::Take);
+      for (AllocStackInst *ASI : reverse(AllocStacks)) {
+        getBuilder().createDeallocStack(ASI->getLoc(), ASI);
+      }
+      getBuilder().createThrow(OrigTermInst->getLoc(), errorValue);
+      return;
   } else if (OrigTermInst->isFunctionExiting()) {
     for (AllocStackInst *ASI : reverse(AllocStacks)) {
       getBuilder().createDeallocStack(ASI->getLoc(), ASI);
@@ -248,7 +273,7 @@ void GenericCloner::postFixUp(SILFunction *f) {
     // FIXME: Call OSSA lifetime fixup on all values used within the unreachable
     // code. This will recursively fixup nested scopes from the inside out so
     // that transitive liveness is not required.
-    SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+    SSAPrunedLiveness storeBorrowLiveness(getCloned(), &discoveredBlocks);
     AddressUseKind useKind =
         scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
     if (useKind == AddressUseKind::NonEscaping) {

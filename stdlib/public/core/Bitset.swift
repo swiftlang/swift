@@ -309,6 +309,12 @@ extension _UnsafeBitset.Word {
 // problems in normal use, because `next()` is usually called on a separate
 // iterator, not the original word.
 extension _UnsafeBitset.Word: Sequence, IteratorProtocol {
+
+#if $NoncopyableGenerics
+  @usableFromInline
+  typealias Element = Int
+#endif
+
   @inlinable
   internal var count: Int {
     return value.nonzeroBitCount

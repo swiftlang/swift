@@ -52,25 +52,17 @@ func returnsImplicitlyUnwrappedOptional() -> FooStruct! {
   return FooStruct()
 }
 
-// OPT_NO_DOT_FOOSTRUCT: Begin completions
 // OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
 // OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{; name=.+$}}
-// OPT_NO_DOT_FOOSTRUCT: End completions
 
-// OPT_DOT_FOOSTRUCT: Begin completions
 // OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]:    ?.instanceVar[#Int#]{{; name=.+$}}
 // OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{; name=.+$}}
-// OPT_DOT_FOOSTRUCT: End completions
 
-// OPT_DOT_FOOSTRUCT_SPACES: Begin completions
 // OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceVar]/CurrNominal/Erase[3]:    ?.instanceVar[#Int#]{{; name=.+$}}
 // OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceMethod]/CurrNominal/Erase[3]: ?.instanceFunc()[#Void#]{{; name=.+$}}
-// OPT_DOT_FOOSTRUCT_SPACES: End completions
 
-// UN_OPT_DOT_FOOSTRUCT: Begin completions
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
-// UN_OPT_DOT_FOOSTRUCT: End completions
 
 
 //===---
@@ -143,8 +135,6 @@ func testOptionalTuple5(a: (x: Int, y: String)?) {
 // OPT_TUPLE_5: Pattern/CurrNominal/Erase[1]:       ?.x[#Int#]
 // OPT_TUPLE_5: Pattern/CurrNominal/Erase[1]:       ?.y[#String#]
 
-// UN_OPT_NO_DOT_FOOSTRUCT: Begin completions
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
-// UN_OPT_NO_DOT_FOOSTRUCT: End completions
 

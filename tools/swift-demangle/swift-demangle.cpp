@@ -138,8 +138,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
-    llvm::outs() << "Demangling for " << name << '\n';
-    llvm::outs() << getNodeTreeAsString(pointer);
+    os << "Demangling for " << name << '\n';
+    os << getNodeTreeAsString(pointer);
   }
   if (RemangleMode) {
     std::string remangled;
@@ -175,8 +175,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
     }
-    if (hadLeadingUnderscore) llvm::outs() << '_';
-    llvm::outs() << remangled;
+    if (hadLeadingUnderscore) os << '_';
+    os << remangled;
     return;
   } else if (RemangleRtMode) {
     std::string remangled = name.str();
@@ -190,7 +190,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       }
       remangled = mangling.result();
     }
-    llvm::outs() << remangled;
+    os << remangled;
     return;
   }
   if (!TreeOnly) {
@@ -207,7 +207,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
       std::string remangled = mangling.result();
-      llvm::outs() << remangled;
+      os << remangled;
       return;
     }
     if (StripSpecialization) {
@@ -220,12 +220,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
       std::string remangled = mangling.result();
-      llvm::outs() << remangled;
+      os << remangled;
       return;
     }
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
-      llvm::outs() << name << " ---> ";
+      os << name << " ---> ";
 
     if (Classify) {
       std::string Classifications;
@@ -245,9 +245,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         Classifications += 'C';
       }
       if (!Classifications.empty())
-        llvm::outs() << '{' << Classifications << "} ";
+        os << '{' << Classifications << "} ";
     }
-    llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
+    os << (string.empty() ? name : llvm::StringRef(string));
   }
   DCtx.clear();
 }
@@ -271,7 +271,7 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
   } state = Start;
   const char *matchStart = nullptr;
 
-  // Find _T, $S, $s, _$S, _$s, @__swift_ followed by a valid mangled string
+  // Find _T, $S, $s, _$S, _$s, @__swiftmacro_ followed by a valid mangled string
   while (ptr < end) {
     switch (state) {
     case Start:
@@ -289,7 +289,7 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
         } else if (ch == '@' &&
                    llvm::StringRef(ptr, end - ptr).startswith("__swiftmacro_")){
           matchStart = ptr - 1;
-          ptr = ptr + strlen("__swift_");
+          ptr = ptr + strlen("__swiftmacro_");
           state = FoundPrefix;
           break;
         }
@@ -399,6 +399,12 @@ int main(int argc, char **argv) {
     for (llvm::StringRef name : InputNames) {
       if (name == "_") {
         llvm::errs() << "warning: input symbol '_' is likely the result of "
+                        "variable expansion by the shell. Ensure the argument "
+                        "is quoted or escaped.\n";
+        continue;
+      }
+      if (name == "") {
+        llvm::errs() << "warning: empty input symbol is likely the result of "
                         "variable expansion by the shell. Ensure the argument "
                         "is quoted or escaped.\n";
         continue;

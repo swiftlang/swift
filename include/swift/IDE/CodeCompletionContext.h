@@ -20,6 +20,7 @@ namespace swift {
 namespace ide {
 
 class CodeCompletionCache;
+struct RequestedCachedModule;
 
 class CodeCompletionContext {
   friend class CodeCompletionResultBuilder;
@@ -38,10 +39,10 @@ public:
     /// There is no known contextual type. All types are equally good.
     None,
 
-    /// There is a contextual type from a single-expression closure/function
-    /// body. The context is a hint, and enables unresolved member completion,
-    /// but should not hide any results.
-    SingleExpressionBody,
+    /// There is a contextual type from e.g a single-expression closure/function
+    /// body, where the return is implied. The context is a hint, and enables
+    /// unresolved member completion, but should not hide any results.
+    Implied,
 
     /// There are known contextual types, or there aren't but a nonvoid type is
     /// expected.
@@ -78,13 +79,6 @@ public:
     return CurrentResults.addInitsToTopLevel;
   }
 
-  void setCallPatternHeuristics(bool flag) {
-    CurrentResults.enableCallPatternHeuristics = flag;
-  }
-  bool getCallPatternHeuristics() const {
-    return CurrentResults.enableCallPatternHeuristics;
-  }
-
   void setAddCallWithNoDefaultArgs(bool flag) {
     CurrentResults.addCallWithNoDefaultArgs = flag;
   }
@@ -103,6 +97,13 @@ public:
   sortCompletionResults(ArrayRef<CodeCompletionResult *> Results);
 
   CodeCompletionResultSink &getResultSink() { return CurrentResults; }
+
+  /// Add code completion results from the given requested modules to this
+  /// context.
+  void addResultsFromModules(ArrayRef<RequestedCachedModule> RequestedModules,
+                             const ExpectedTypeContext &TypeContext,
+                             const DeclContext *DC,
+                             bool CanCurrDeclContextHandleAsync);
 };
 
 } // end namespace ide

@@ -64,7 +64,7 @@ internal func getAddressInfoForImage(atIndex i: UInt32) ->
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let header = unsafeBitCast(_dyld_get_image_header(i),
           to: UnsafePointer<MachHeader>.self)
-  let name = String(validatingUTF8: _dyld_get_image_name(i)!)!
+  let name = String(validatingCString: _dyld_get_image_name(i)!)!
   var size: UInt = 0
   let address = getsegmentdata(header, "__TEXT", &size)
   return (name, address, size)
@@ -111,7 +111,7 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   let capture = getSectionInfo("__swift5_capture", header)
   let typeref = getSectionInfo("__swift5_typeref", header)
   let reflstr = getSectionInfo("__swift5_reflstr", header)
-  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
+  return ReflectionInfo(imageName: String(validatingCString: imageName)!,
                         fieldmd: fieldmd,
                         assocty: assocty,
                         builtin: builtin,
@@ -127,7 +127,11 @@ internal func getImageCount() -> UInt32 {
 let rtldDefault = UnsafeMutableRawPointer(bitPattern: Int(-2))
 #elseif !os(Windows)
 import SwiftShims
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 let rtldDefault: UnsafeMutableRawPointer? = nil
 
@@ -156,7 +160,7 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   return _getMetadataSection(UInt(i)).map { rawPointer in
     let name = _getMetadataSectionName(rawPointer)
     let metadataSection = rawPointer.bindMemory(to: MetadataSections.self, capacity: 1).pointee
-    return ReflectionInfo(imageName: String(validatingUTF8: name)!,
+    return ReflectionInfo(imageName: String(validatingCString: name)!,
             fieldmd: Section(range: metadataSection.swift5_fieldmd),
             assocty: Section(range: metadataSection.swift5_assocty),
             builtin: Section(range: metadataSection.swift5_builtin),
@@ -298,7 +302,7 @@ internal func sendReflectionInfos() {
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let errorCString = strerror(errno)!
-  let message = String(validatingUTF8: errorCString)! + "\n"
+  let message = String(validatingCString: errorCString)! + "\n"
   let bytes = Array(message.utf8)
   fwrite(bytes, 1, bytes.count, stderr)
   fflush(stderr)
@@ -504,6 +508,7 @@ public func reflect<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+  withExtendedLifetime(error) {}
 }
 
 // Like reflect<T: Error>(error: T), but calls projectExistentialAndUnwrapClass 
@@ -519,6 +524,7 @@ public func reflectUnwrappingClassExistential<T: Error>(error: T) {
           kind: .ErrorExistential, 
           shouldUnwrapClassExistential: true)
   anyPointer.deallocate()
+  withExtendedLifetime(error) {}
 }
 
 // Reflect an `Enum`

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1203,11 +1203,12 @@ extension Unicode.Scalar.Properties {
     case (0x3400 ... 0x4DBF),
          (0x4E00 ... 0x9FFF),
          (0x20000 ... 0x2A6DF),
-         (0x2A700 ... 0x2B738),
+         (0x2A700 ... 0x2B739),
          (0x2B740 ... 0x2B81D),
          (0x2B820 ... 0x2CEA1),
          (0x2CEB0 ... 0x2EBE0),
-         (0x30000 ... 0x3134A):
+         (0x30000 ... 0x3134A),
+         (0x31350 ... 0x323AF):
       return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
 
     case (0xF900 ... 0xFA6D),

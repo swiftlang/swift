@@ -40,11 +40,13 @@ int serializeSymbolGraph(SymbolGraph &SG,
   SmallString<1024> OutputPath(Options.OutputDir);
   llvm::sys::path::append(OutputPath, FileName);
 
-  return withOutputFile(SG.M.getASTContext().Diags, OutputPath, [&](raw_ostream &OS) {
-    llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-    SG.serialize(J);
-    return false;
-  });
+  return withOutputPath(
+      SG.M.getASTContext().Diags, SG.M.getASTContext().getOutputBackend(),
+      OutputPath, [&](raw_ostream &OS) {
+        llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
+        SG.serialize(J);
+        return false;
+      });
 }
 
 } // end anonymous namespace
@@ -110,7 +112,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
   llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
   SymbolGraphASTWalker Walker(*MD, {}, QualifiedImports, Options);
   markup::MarkupContext MarkupCtx;
-  SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
+  SymbolGraph Graph(Walker, *MD, llvm::None, MarkupCtx, llvm::None,
                     /*IsForSingleNode=*/true);
   NominalTypeDecl *NTD = InSynthesizedExtension
       ? BaseTy->getAnyNominal()

@@ -15,9 +15,8 @@ public protocol SIMDScalarStub {
 
 // CHECK: define {{.*}}swiftcc void @"$s22witness_method_default7callAbs1sxx_tAA14SIMDScalarStubRzlF
 public func callAbs<T: SIMDScalarStub>(s: T) -> T {
-  // CHECK: [[ABS_PTR:%[0-9]+]] = getelementptr inbounds i8*, i8** %T.SIMDScalarStub, i32 3
-  // CHECK-NEXT: [[ABS_VALUE:%[0-9]+]] = load i8*, i8** [[ABS_PTR]]
-  // CHECK-NEXT: [[ABS:%[0-9]+]] = bitcast i8* [[ABS_VALUE]]
+  // CHECK: [[ABS_PTR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.SIMDScalarStub, i32 3
+  // CHECK-NEXT: [[ABS:%[0-9]+]] = load ptr, ptr [[ABS_PTR]]
   // CHECK: call swiftcc void [[ABS]]
  return s.abs()
 }

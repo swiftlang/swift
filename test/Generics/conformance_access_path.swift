@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P0 { }
 protocol Q0: P0 { }
@@ -48,9 +49,10 @@ func testPaths3<V: P5>(_ v: V) {
 	acceptQ0(v.getAssocP3())
 }
 
+// CHECK-LABEL: .P6Unordered@
+// CHECK-NEXT: Requirement signature: <Self where Self : P5Unordered>
 protocol P6Unordered: P5Unordered {
-	associatedtype A: P0 // expected-warning{{redundant conformance constraint 'Self.A' : 'P0'}}
-                       // expected-warning@-1{{redeclaration of associated type 'A'}}
+	associatedtype A: P0 // expected-warning{{redeclaration of associated type 'A'}}
 }
 
 protocol P5Unordered {

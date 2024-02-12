@@ -1,152 +1,60 @@
-set(libstdcxx_modulemap_target_list)
-foreach(sdk ${SWIFT_SDKS})
-  if(NOT ${sdk} IN_LIST SWIFT_LIBSTDCXX_PLATFORMS)
-    continue()
-  endif()
+#
+# API Notes for the C++ Standard Library
+#
+set(output_dir "${SWIFTLIB_DIR}/apinotes")
+add_custom_command_target(unused_var
+    CUSTOM_TARGET_NAME CxxStdlib-apinotes
+    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
+    COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
+    OUTPUT "${output_dir}/std.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes")
 
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+swift_install_in_component(FILES std.apinotes
+    DESTINATION "lib/swift/apinotes"
+    COMPONENT compiler)
 
-    set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
-    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+set_property(TARGET CxxStdlib-apinotes PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay CxxStdlib-apinotes)
+add_dependencies(compiler CxxStdlib-apinotes)
 
-    set(libstdcxx_header "libstdcxx.h")
-    set(libstdcxx_header_out "${module_dir}/libstdcxx.h")
-    set(libstdcxx_header_out_static "${module_dir_static}/libstdcxx.h")
-    set(libstdcxx_modulemap "libstdcxx.modulemap")
-    set(libstdcxx_modulemap_out "${module_dir}/libstdcxx.modulemap")
-    set(libstdcxx_modulemap_out_static "${module_dir_static}/libstdcxx.modulemap")
 
-    add_custom_command_target(
-        copy_libstdcxx_modulemap
-        COMMAND
-        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
-        COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out}"
-        OUTPUT ${libstdcxx_modulemap_out}
-        DEPENDS ${libstdcxx_modulemap}
-        COMMENT "Copying libstdcxx modulemap to resources")
-    list(APPEND libstdcxx_modulemap_target_list ${copy_libstdcxx_modulemap})
-    add_dependencies(swift-stdlib-${arch_suffix} ${copy_libstdcxx_modulemap})
-
-    add_custom_command_target(
-        copy_libstdcxx_header
-        COMMAND
-        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
-        COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out}"
-        OUTPUT ${libstdcxx_header_out}
-        DEPENDS ${libstdcxx_header}
-        COMMENT "Copying libstdcxx header to resources")
-    list(APPEND libstdcxx_modulemap_target_list ${copy_libstdcxx_header})
-    add_dependencies(swift-stdlib-${arch_suffix} ${copy_libstdcxx_header})
-
-    if(SWIFT_BUILD_STATIC_STDLIB)
-      add_custom_command_target(
-          copy_libstdcxx_modulemap_static
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy_if_different"
-          "${libstdcxx_modulemap_out}" "${libstdcxx_modulemap_out_static}"
-          OUTPUT ${libstdcxx_modulemap_out_static}
-          DEPENDS ${copy_libstdcxx_modulemap}
-          COMMENT "Copying libstdcxx modulemap to static resources")
-      list(APPEND libstdcxx_modulemap_target_list ${copy_libstdcxx_modulemap_static})
-      add_dependencies(swift-stdlib-${arch_suffix} ${copy_libstdcxx_modulemap_static})
-
-      add_custom_command_target(
-          copy_libstdcxx_header_static
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
-          COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy_if_different"
-          "${libstdcxx_header_out}" "${libstdcxx_header_out_static}"
-          OUTPUT ${libstdcxx_header_out_static}
-          DEPENDS ${copy_libstdcxx_header}
-          COMMENT "Copying libstdcxx header to static resources")
-      list(APPEND libstdcxx_modulemap_target_list ${copy_libstdcxx_header_static})
-      add_dependencies(swift-stdlib-${arch_suffix} ${copy_libstdcxx_header_static})
-    endif()
-
-    swift_install_in_component(FILES "${libstdcxx_modulemap_out}"
-        DESTINATION "lib/swift/${arch_subdir}"
-        COMPONENT sdk-overlay)
-    swift_install_in_component(FILES "${libstdcxx_header_out}"
-        DESTINATION "lib/swift/${arch_subdir}"
-        COMPONENT sdk-overlay)
-
-    if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES "${libstdcxx_modulemap_out_static}"
-          DESTINATION "lib/swift_static/${arch_subdir}"
-          COMPONENT sdk-overlay)
-      swift_install_in_component(FILES "${libstdcxx_header_out_static}"
-          DESTINATION "lib/swift_static/${arch_subdir}"
-          COMPONENT sdk-overlay)
-    endif()
-
-    if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
-      foreach(bootstrapping "0" "1")
-        get_bootstrapping_path(bootstrapping_dir ${module_dir} ${bootstrapping})
-        set(libstdcxx_modulemap_out_bootstrapping "${bootstrapping_dir}/libstdcxx.modulemap")
-        set(libstdcxx_header_out_bootstrapping "${bootstrapping_dir}/libstdcxx.h")
-
-        add_custom_command_target(unused_var
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy_if_different"
-            "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_modulemap}" "${libstdcxx_modulemap_out_bootstrapping}"
-
-            CUSTOM_TARGET_NAME "copy-libstdcxx-modulemap-bootstrapping${bootstrapping}"
-            OUTPUT "${libstdcxx_modulemap_out_bootstrapping}"
-            DEPENDS ${libstdcxx_modulemap}
-            COMMENT "Copying libstdcxx modulemap to resources for bootstrapping${bootstrapping}")
-
-        add_custom_command_target(unused_var
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "make_directory" "${bootstrapping_dir}"
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy_if_different"
-            "${CMAKE_CURRENT_SOURCE_DIR}/${libstdcxx_header}" "${libstdcxx_header_out_bootstrapping}"
-
-            CUSTOM_TARGET_NAME "copy-libstdcxx-header-bootstrapping${bootstrapping}"
-            OUTPUT "${libstdcxx_header_out_bootstrapping}"
-            DEPENDS ${libstdcxx_header}
-            COMMENT "Copying libstdcxx header to resources for bootstrapping${bootstrapping}")
-      endforeach()
-    endif()
-  endforeach()
-endforeach()
-add_custom_target(libstdcxx-modulemap DEPENDS ${libstdcxx_modulemap_target_list})
-set_property(TARGET libstdcxx-modulemap PROPERTY FOLDER "Miscellaneous")
-add_dependencies(sdk-overlay libstdcxx-modulemap)
-
+# Swift compiler currently assumes that the Darwin overlay is a dependency of
+# CxxStdlib, and fails to build CxxStdlib if Darwin.swiftmodule in build dir
+# is built with a different (older) version of the compiler. To workaround this,
+# declare the Darwin overlay as a dependency of CxxStdlib.
+set(swift_cxxstdlib_darwin_dependencies)
+if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  set(swift_cxxstdlib_darwin_dependencies Darwin)
+endif()
 
 #
 # C++ Standard Library Overlay.
 #
-add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB
+# The overlay is fragile (i.e. it does not use library evolution)
+# as it's not ABI stable.
+add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
     std.swift
     String.swift
 
     SWIFT_MODULE_DEPENDS Cxx
-    SWIFT_MODULE_DEPENDS_OSX Darwin
-    SWIFT_MODULE_DEPENDS_IOS Darwin
-    SWIFT_MODULE_DEPENDS_TVOS Darwin
-    SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-    SWIFT_MODULE_DEPENDS_LINUX Glibc
+    SWIFT_MODULE_DEPENDS_IOS ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_OSX ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_WATCHOS ${swift_cxxstdlib_darwin_dependencies}
+    SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -Xfrontend -enable-experimental-cxx-interop
+    -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
 
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
+    DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
+
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX
+    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED
-    DEPENDS libstdcxx-modulemap)
+    DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes)

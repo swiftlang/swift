@@ -6,18 +6,16 @@
 
 // Make sure that the key at the definition of the global matches call sites.
 
-// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZ" = global %swift.function { {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth"
-// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth" = {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_" {{.*}} i64 58141 }, section "llvm.ptrauth"
+// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZ" = constant %swift.function { {{.*}} @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth"
+// CHECK-DAG: @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_.ptrauth" = {{.*}}@"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvpZfiAGycAJcycfU_"{{.*}} i64 58141 }, section "llvm.ptrauth"
 
 
 
 // CHECK2: define {{.*}}swiftcc void @"$s1A4testyyF"()
-// CHECK2:  [[T:%.*]] = call swiftcc i8* @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvau"()
-// CHECK2:  [[T2:%.*]] = bitcast i8* [[T]] to %swift.function*
-// CHECK2:  [[T3:%.*]] = getelementptr inbounds %swift.function, %swift.function* [[T2]], i32 0, i32 0
-// CHECK2:  [[T4:%.*]] = load i8*, i8** [[T3]]
-// CHECK2:  [[T5:%.*]] = bitcast i8* [[T4]] to { i8*, %swift.refcounted* } (%swift.refcounted*)*
-// CHECK2:  call swiftcc { i8*, %swift.refcounted* } [[T5]]({{.*}}) [ "ptrauth"(i32 0, i64 58141) ]
+// CHECK2:  [[T:%.*]] = call swiftcc ptr @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvau"()
+// CHECK2:  [[T1:%.*]] = getelementptr inbounds %swift.function, ptr [[T]], i32 0, i32 0
+// CHECK2:  [[T4:%.*]] = load ptr, ptr [[T1]]
+// CHECK2:  call swiftcc { ptr, ptr } [[T4]]({{.*}}) [ "ptrauth"(i32 0, i64 58141) ]
 
 public struct G<T> {
     init(_ t: T) {}

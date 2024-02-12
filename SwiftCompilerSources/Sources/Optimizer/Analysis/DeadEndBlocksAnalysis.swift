@@ -17,6 +17,6 @@ public struct DeadEndBlocksAnalysis {
   let bridged: BridgedDeadEndBlocksAnalysis
 
   public func isDeadEnd(_ block: BasicBlock) -> Bool {
-    return DeadEndBlocksAnalysis_isDeadEnd(bridged, block.bridged) != 0
+    return bridged.isDeadEnd(block.bridged)
   }
 }

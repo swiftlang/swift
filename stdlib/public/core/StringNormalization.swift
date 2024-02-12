@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
-
 extension Unicode.Scalar {
   // Normalization boundary - a place in a string where everything left of the
   // boundary can be normalized independently from everything right of the
@@ -27,17 +25,8 @@ extension Unicode.Scalar {
   internal var _isNFCStarter: Bool {
     // Fast path: All scalars up to U+300 are NFC_QC and have boundaries
     // before them.
-    if value < 0x300 {
-      return true
-    }
-
-    // Any scalar who has CCC of 0 has a normalization boundary before it AND
-    // any scalar who is also NFC_QC is considered an NFC starter.
-    let normData = _swift_stdlib_getNormData(value)
-    let ccc = normData >> 3
-    let isNFCQC = normData & 0x6 == 0
-
-    return ccc == 0 && isNFCQC
+    let normData = Unicode._NormData(self, fastUpperbound: 0x300)
+    return normData.ccc == 0 && normData.isNFCQC
   }
 }
 

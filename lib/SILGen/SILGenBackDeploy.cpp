@@ -143,9 +143,9 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit error block.
     SGF.B.emitBlock(errorBB);
-    SILValue error = errorBB->createPhiArgument(
-        SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
-        OwnershipKind::Owned);
+    ManagedValue error =
+        SGF.B.createPhi(SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
+                        OwnershipKind::Owned);
     SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
     // Emit normal block.
@@ -166,6 +166,36 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   extractAllElements(apply, loc, SGF.B, directResults);
 
   SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+}
+
+bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
+                                               ResilienceExpansion expansion) {
+  auto &ctx = getASTContext();
+  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
+  if (!backDeployBeforeVersion)
+    return false;
+
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    // In a minimal resilience expansion we must always call the back deployment
+    // thunk since we can't predict the deployment targets of the modules that
+    // might inline the call.
+    return true;
+  case ResilienceExpansion::Maximal:
+    // FIXME: We can skip thunking if we're in the same module.
+    break;
+  }
+
+  // Use of a back deployment thunk is unnecessary if the deployment target is
+  // high enough that the ABI implementation of the back deployed declaration is
+  // guaranteed to be available.
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  auto declAvailability =
+      AvailabilityContext(VersionRange::allGTE(*backDeployBeforeVersion));
+  if (deploymentAvailability.isContainedIn(declAvailability))
+    return false;
+
+  return true;
 }
 
 void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
@@ -190,14 +220,18 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
 
   // Generate the thunk prolog by collecting parameters.
   SmallVector<ManagedValue, 4> params;
-  SmallVector<SILArgument *, 4> indirectParams;
-  collectThunkParams(loc, params, &indirectParams);
+  SmallVector<ManagedValue, 4> indirectParams;
+  SmallVector<ManagedValue, 4> indirectErrorResults;
+  collectThunkParams(loc, params, &indirectParams, &indirectErrorResults);
 
   // Build up the list of arguments that we're going to invoke the the real
   // function with.
   SmallVector<SILValue, 8> paramsForForwarding;
   for (auto indirectParam : indirectParams) {
-    paramsForForwarding.emplace_back(indirectParam);
+    paramsForForwarding.emplace_back(indirectParam.getLValueAddress());
+  }
+  for (auto indirectErrorResult : indirectErrorResults) {
+    paramsForForwarding.emplace_back(indirectErrorResult.getLValueAddress());
   }
 
   for (auto param : params) {
@@ -207,7 +241,9 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
     paramsForForwarding.emplace_back(param.forward(*this));
   }
 
-  prepareEpilog(getResultInterfaceType(AFD), AFD->hasThrows(),
+  prepareEpilog(AFD,
+                getResultInterfaceType(AFD),
+                AFD->getEffectiveThrownErrorType(),
                 CleanupLocation(AFD));
 
   SILBasicBlock *availableBB = createBasicBlock("availableBB");

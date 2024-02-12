@@ -107,6 +107,16 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
     elseif("${bootstrapping}" STREQUAL "")
       get_bootstrapping_path(bs_lib_dir ${lib_dir} "1")
     endif()
+  elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+      # Compiler's INSTALL_RPATH is set to libs in the build directory
+      # For building stdlib, use stdlib in the builder's resource directory
+      # because the runtime may not be built yet.
+      # FIXME: This assumes the ABI hasn't changed since the builder.
+      get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      set(bs_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
   endif()
   set(bs_lib_dir ${bs_lib_dir} PARENT_SCOPE)
 endfunction()

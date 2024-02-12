@@ -28,8 +28,8 @@ protocol P {
 // CHECK: exiting call_f
 
 // CHECK-LL: @"$s4main1PPAAE1fyyYaFTu" = hidden global %swift.async_func_pointer
-// CHECK-LL: @"$s4main6call_fyyxYaAA1PRzlFTu" = hidden global %swift.async_func_pointer
 // CHECK-LL: @"$s4main1XCAA1PA2aDP1fyyYaFTWTu" = internal global %swift.async_func_pointer
+// CHECK-LL: @"$s4main6call_fyyxYaAA1PRzlFTu" = hidden global %swift.async_func_pointer
 
 extension P {
   // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1PPAAE1fyyYaF"(

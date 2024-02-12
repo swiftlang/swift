@@ -1,4 +1,0 @@
-struct A {
-}
-struct B {
-}

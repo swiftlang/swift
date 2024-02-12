@@ -111,8 +111,16 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLTraits.h"
+
+namespace llvm {
+namespace cas {
+class ObjectStore;
+class ActionCache;
+} // namespace cas
+} // namespace llvm
 
 namespace clang {
 class CompilerInstance;
@@ -142,8 +150,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool &isFramework,
-                  bool &isSystemModule) override;
+                  bool skipBuildingInterface, bool isTestableDependencyLookup,
+                  bool &isFramework, bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -152,10 +160,12 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool canImportModule(ImportPath::Module named,
-                       ModuleVersionInfo *versionInfo) override;
+                       ModuleVersionInfo *versionInfo,
+                       bool isTestableDependencyLookup = false) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -176,41 +186,93 @@ public:
   ~ExplicitSwiftModuleLoader();
 };
 
+class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
+  explicit ExplicitCASModuleLoader(ASTContext &ctx, llvm::cas::ObjectStore &CAS,
+                                   llvm::cas::ActionCache &cache,
+                                   DependencyTracker *tracker,
+                                   ModuleLoadingMode loadMode,
+                                   bool IgnoreSwiftSourceInfoFile);
+
+  bool findModule(ImportPath::Element moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
+                  SmallVectorImpl<char> *moduleInterfaceSourcePath,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+                  bool skipBuildingInterface, bool isTestableDependencyLookup,
+                  bool &isFramework, bool &isSystemModule) override;
+
+  std::error_code findModuleFilesInDirectory(
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
+
+  bool canImportModule(ImportPath::Module named,
+                       ModuleVersionInfo *versionInfo,
+                       bool isTestableDependencyLookup = false) override;
+
+  struct Implementation;
+  Implementation &Impl;
+
+public:
+  static std::unique_ptr<ExplicitCASModuleLoader>
+  create(ASTContext &ctx, llvm::cas::ObjectStore &CAS,
+         llvm::cas::ActionCache &cache, DependencyTracker *tracker,
+         ModuleLoadingMode loadMode, StringRef ExplicitSwiftModuleMap,
+         const std::vector<std::pair<std::string, std::string>>
+             &ExplicitSwiftModuleInputs,
+         bool IgnoreSwiftSourceInfoFile);
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
+  ~ExplicitCASModuleLoader();
+};
 
 // Explicitly-specified Swift module inputs
 struct ExplicitSwiftModuleInputInfo {
-  ExplicitSwiftModuleInputInfo(std::string modulePath,
-                               llvm::Optional<std::string> moduleDocPath,
-                               llvm::Optional<std::string> moduleSourceInfoPath,
-                               bool isFramework = false,
-                               bool isSystem = false)
-    : modulePath(modulePath),
-      moduleDocPath(moduleDocPath),
-      moduleSourceInfoPath(moduleSourceInfoPath),
-      isFramework(isFramework),
-      isSystem(isSystem) {}
+  ExplicitSwiftModuleInputInfo(
+      std::string modulePath, llvm::Optional<std::string> moduleDocPath,
+      llvm::Optional<std::string> moduleSourceInfoPath,
+      llvm::Optional<std::vector<std::string>> headerDependencyPaths,
+      bool isFramework = false, bool isSystem = false,
+      llvm::Optional<std::string> moduleCacheKey = llvm::None)
+      : modulePath(modulePath), moduleDocPath(moduleDocPath),
+        moduleSourceInfoPath(moduleSourceInfoPath),
+        headerDependencyPaths(headerDependencyPaths), isFramework(isFramework),
+        isSystem(isSystem), moduleCacheKey(moduleCacheKey) {}
   // Path of the .swiftmodule file.
   std::string modulePath;
   // Path of the .swiftmoduledoc file.
   llvm::Optional<std::string> moduleDocPath;
   // Path of the .swiftsourceinfo file.
   llvm::Optional<std::string> moduleSourceInfoPath;
+  // Paths of the precompiled header dependencies of this module.
+  llvm::Optional<std::vector<std::string>> headerDependencyPaths;
   // A flag that indicates whether this module is a framework
   bool isFramework = false;
   // A flag that indicates whether this module is a system module
   bool isSystem = false;
+  // The cache key for clang module.
+  llvm::Optional<std::string> moduleCacheKey;
 };
 
 // Explicitly-specified Clang module inputs
 struct ExplicitClangModuleInputInfo {
-  ExplicitClangModuleInputInfo(std::string moduleMapPath,
-                               std::string modulePath,
-                               bool isFramework = false,
-                               bool isSystem = false)
-    : moduleMapPath(moduleMapPath),
-      modulePath(modulePath),
-      isFramework(isFramework),
-      isSystem(isSystem) {}
+  ExplicitClangModuleInputInfo(
+      std::string moduleMapPath, std::string modulePath,
+      bool isFramework = false, bool isSystem = false,
+      llvm::Optional<std::string> moduleCacheKey = llvm::None)
+      : moduleMapPath(moduleMapPath), modulePath(modulePath),
+        isFramework(isFramework), isSystem(isSystem),
+        moduleCacheKey(moduleCacheKey) {}
   // Path of the Clang module map file.
   std::string moduleMapPath;
   // Path of a compiled Clang explicit module file (pcm).
@@ -219,6 +281,8 @@ struct ExplicitClangModuleInputInfo {
   bool isFramework = false;
   // A flag that indicates whether this module is a system module
   bool isSystem = false;
+  // The cache key for clang module.
+  llvm::Optional<std::string> moduleCacheKey;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -231,6 +295,8 @@ struct ExplicitClangModuleInputInfo {
 //      "isFramework": false,
 //      "clangModuleMapPath": "A/module.modulemap",
 //      "clangModulePath": "A.pcm",
+//      "moduleCacheKey": "llvmcas://<hash>",
+//      "clangModuleCacheKey": "llvmcas://<hash>",
 //    },
 //    {
 //      "moduleName": "B",
@@ -240,6 +306,8 @@ struct ExplicitClangModuleInputInfo {
 //      "isFramework": false,
 //      "clangModuleMapPath": "B/module.modulemap",
 //      "clangModulePath": "B.pcm",
+//      "moduleCacheKey": "llvmcas://<hash>",
+//      "clangModuleCacheKey": "llvmcas://<hash>",
 //    }
 //  ]
 class ExplicitModuleMapParser {
@@ -247,21 +315,14 @@ public:
   ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
 
   std::error_code
-  parseSwiftExplicitModuleMap(llvm::StringRef fileName,
+  parseSwiftExplicitModuleMap(llvm::MemoryBufferRef BufferRef,
                               llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
                               llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
     using namespace llvm::yaml;
-    // Load the input file.
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
-        llvm::MemoryBuffer::getFile(fileName);
-    if (!fileBufOrErr) {
-      return std::make_error_code(std::errc::no_such_file_or_directory);
-    }
-    StringRef Buffer = fileBufOrErr->get()->getBuffer();
     // Use a new source manager instead of the one from ASTContext because we
     // don't want the JSON file to be persistent.
     llvm::SourceMgr SM;
-    Stream Stream(llvm::MemoryBufferRef(Buffer, fileName), SM);
+    Stream Stream(BufferRef, SM);
     for (auto DI = Stream.begin(); DI != Stream.end(); ++DI) {
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
@@ -303,31 +364,41 @@ private:
       return true;
     StringRef moduleName;
     llvm::Optional<std::string> swiftModulePath, swiftModuleDocPath,
-                                swiftModuleSourceInfoPath;
+                                swiftModuleSourceInfoPath, swiftModuleCacheKey,
+                                clangModuleCacheKey;
+    llvm::Optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false;
     for (auto &entry : *mapNode) {
       auto key = getScalaNodeText(entry.getKey());
-      auto val = getScalaNodeText(entry.getValue());
-      if (key == "moduleName") {
-        moduleName = val;
-      } else if (key == "modulePath") {
-        swiftModulePath = val.str();
-      } else if (key == "docPath") {
-        swiftModuleDocPath = val.str();
-      } else if (key == "sourceInfoPath") {
-        swiftModuleSourceInfoPath = val.str();
-      } else if (key == "isFramework") {
-        isFramework = parseBoolValue(val);
-      } else if (key == "isSystem") {
-        isSystem = parseBoolValue(val);
-      } else if (key == "clangModuleMapPath") {
-        clangModuleMapPath = val.str();
-      } else if (key == "clangModulePath") {
-        clangModulePath = val.str();
-      } else {
-        // Being forgiving for future fields.
+      if (key == "prebuiltHeaderDependencyPaths") {
         continue;
+      } else {
+        auto val = getScalaNodeText(entry.getValue());
+        if (key == "moduleName") {
+          moduleName = val;
+        } else if (key == "modulePath") {
+          swiftModulePath = val.str();
+        } else if (key == "docPath") {
+          swiftModuleDocPath = val.str();
+        } else if (key == "sourceInfoPath") {
+          swiftModuleSourceInfoPath = val.str();
+        } else if (key == "isFramework") {
+          isFramework = parseBoolValue(val);
+        } else if (key == "isSystem") {
+          isSystem = parseBoolValue(val);
+        } else if (key == "clangModuleMapPath") {
+          clangModuleMapPath = val.str();
+        } else if (key == "clangModulePath") {
+          clangModulePath = val.str();
+        } else if (key == "moduleCacheKey") {
+          swiftModuleCacheKey = val.str();
+        } else if (key == "clangModuleCacheKey") {
+          clangModuleCacheKey = val.str();
+        } else {
+          // Being forgiving for future fields.
+          continue;
+        }
       }
     }
     if (moduleName.empty())
@@ -340,8 +411,10 @@ private:
       ExplicitSwiftModuleInputInfo entry(swiftModulePath.value(),
                                          swiftModuleDocPath,
                                          swiftModuleSourceInfoPath,
+                                         headerDependencyPaths,
                                          isFramework,
-                                         isSystem);
+                                         isSystem,
+                                         swiftModuleCacheKey);
       swiftModuleMap.try_emplace(moduleName, std::move(entry));
     } else {
       assert((!clangModuleMapPath.empty() ||
@@ -350,7 +423,8 @@ private:
       ExplicitClangModuleInputInfo entry(clangModuleMapPath,
                                          clangModulePath,
                                          isFramework,
-                                         isSystem);
+                                         isSystem,
+                                         clangModuleCacheKey);
       clangModuleMap.try_emplace(moduleName, std::move(entry));
     }
 
@@ -413,6 +487,19 @@ struct RequireOSSAModules_t {
   explicit operator bool() const { return bool(value); }
 };
 
+/// Help prevent confusion between different bools being passed around.
+struct RequireNoncopyableGenerics_t {
+private:
+  bool value;
+public:
+  RequireNoncopyableGenerics_t(const ASTContext &ctx)
+    : RequireNoncopyableGenerics_t(ctx.LangOpts) {}
+  RequireNoncopyableGenerics_t(const LangOptions &opts)
+      : value(opts.hasFeature(Feature::NoncopyableGenerics)) {}
+
+  explicit operator bool() const { return value; }
+};
+
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
@@ -421,22 +508,26 @@ class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t RequiresOSSAModules;
+  RequireNoncopyableGenerics_t RequireNCGenerics;
 
 public:
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      StringRef BackupInterfaceDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules)
+                                StringRef prebuiltCacheDir,
+                                StringRef BackupInterfaceDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics)
       : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
         BackupInterfaceDir(BackupInterfaceDir),
-        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
+        Opts(opts), RequiresOSSAModules(requiresOSSAModules),
+        RequireNCGenerics(requireNCGenerics) {}
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules):
+                                StringRef prebuiltCacheDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
-                               opts, requiresOSSAModules) {}
+                               opts, requiresOSSAModules, requireNCGenerics) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -447,6 +538,7 @@ public:
   bool tryEmitForwardingModule(StringRef moduleName,
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
+                               llvm::vfs::OutputBackend &backend,
                                StringRef outPath) override;
   bool isCached(StringRef DepPath);
 };
@@ -476,7 +568,8 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool isCached(StringRef DepPath) override;
 public:
@@ -510,6 +603,7 @@ public:
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
+      RequireNoncopyableGenerics_t RequireNCGenerics,
       bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -526,6 +620,18 @@ public:
       StringRef outputPath, bool ShouldSerializeDeps,
       ArrayRef<std::string> CompiledCandidates,
       DependencyTracker *tracker = nullptr);
+};
+
+struct SwiftInterfaceInfo {
+  /// The compiler arguments that were encoded in the swiftinterface.
+  SmallVector<const char *, 64> Arguments;
+
+  /// The string following `swift-compiler-version:` in the swiftinterface.
+  std::string CompilerVersion;
+
+  /// The tools version of the compiler (e.g. 5.8) that emitted the
+  /// swiftinterface. This is extracted from the `CompilerVersion` string.
+  llvm::Optional<version::Version> CompilerToolsVersion;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -550,11 +656,12 @@ private:
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     const ClangImporterOptions &clangImporterOpts,
                                      bool suppressRemarks,
-                                     RequireOSSAModules_t requireOSSAModules);
+                                     RequireOSSAModules_t requireOSSAModules,
+                                     RequireNoncopyableGenerics_t requireNCGenerics);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
-                                           SmallVectorImpl<const char *> &SubArgs,
-                                           std::string &CompilerVersion,
+                                           SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
 public:
@@ -566,7 +673,8 @@ public:
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
-      RequireOSSAModules_t requireOSSAModules);
+      RequireOSSAModules_t requireOSSAModules,
+      RequireNoncopyableGenerics_t requireNCGenerics);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,

@@ -4,6 +4,8 @@
 // FIXME: check copy-propagation output instead once it is the default mode
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
+// REQUIRES: swift_in_compiler
+
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
 // required to allow address-type block args in canonical SIL.
@@ -87,10 +89,16 @@ sil [ossa] @get_owned_klass : $@convention(thin) () -> (@owned Klass)
 sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
+sil [ossa] @get_myint : $@convention(thin) () -> (MyInt)
 
 enum KlassNativeObjEither {
 case lhs(Klass)
 case rhs(Builtin.NativeObject)
+}
+
+@_moveOnly
+struct MoveOnlyStruct {
+  var value: MyInt
 }
 
 //////////////////////
@@ -505,18 +513,43 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   return %7 : $(Builtin.Word, Builtin.RawPointer)
 }
 
-// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer
+// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1
 // CHECK: bb0
 // CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer'
-sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer1'
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
   %4 = load [trivial] %3 : $*Int32
   return %4 : $Int32
+}
+
+sil @useInt : $@convention(thin) (Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer2
+// CHECK: unchecked_addr_cast
+// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer2'
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer2 : $@convention(thin) (@owned ContiguousArray<UInt16>) -> () {
+bb0(%0 : @owned $ContiguousArray<UInt16>):
+  %1 = begin_borrow %0 : $ContiguousArray<UInt16>
+  %2 = struct_extract %1 : $ContiguousArray<UInt16>, #ContiguousArray._buffer
+  %3 = struct_extract %2 : $_ContiguousArrayBuffer<UInt16>, #_ContiguousArrayBuffer._storage
+  %4 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $UInt16
+  %5 = address_to_pointer %4 : $*UInt16 to $Builtin.RawPointer
+  br bb1
+
+bb1:
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*Int32
+  %7 = load [trivial] %6 : $*Int32
+  %8 = function_ref @useInt : $@convention(thin) (Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (Int32) -> ()
+  end_borrow %1 : $ContiguousArray<UInt16>
+  destroy_value %0 : $ContiguousArray<UInt16>
+  %12 = tuple ()
+  return %12 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @sil_extract_of_string
@@ -1034,6 +1067,30 @@ bb0(%0 : @owned $C1):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @end_cow_mutation_of_cast :
+// CHECK:         %1 = end_cow_mutation %0
+// CHECK-NEXT:    %2 = upcast %1
+// CHECK-NEXT:    return %2
+// CHECK: } // end sil function 'end_cow_mutation_of_cast'
+sil [ossa] @end_cow_mutation_of_cast : $@convention(thin) (@owned C2) -> @owned C1 {
+bb0(%0 : @owned $C2):
+  %1 = upcast %0 : $C2 to $C1
+  %2 = end_cow_mutation %1 : $C1
+  return %2 : $C1
+}
+
+// CHECK-LABEL: sil [ossa] @end_cow_mutation_of_cast2 :
+// CHECK:         %1 = end_cow_mutation [keep_unique] %0
+// CHECK-NEXT:    %2 = upcast %1
+// CHECK-NEXT:    return %2
+// CHECK: } // end sil function 'end_cow_mutation_of_cast2'
+sil [ossa] @end_cow_mutation_of_cast2 : $@convention(thin) (@owned C2) -> @owned C1 {
+bb0(%0 : @owned $C2):
+  %1 = upcast %0 : $C2 to $C1
+  %2 = end_cow_mutation [keep_unique] %1 : $C1
+  return %2 : $C1
+}
+
 struct XS {
   var m: Int
   var k: Float
@@ -1457,38 +1514,6 @@ bb0(%0 : @owned $E):
   return %res : $()
 }
 
-// (load (upcast-addr %x)) -> (upcast-ref (load %x))
-//
-// CHECK-LABEL: sil [ossa] @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: upcast
-// CHECK-NEXT: return
-sil [ossa] @load_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
-bb0(%0 : $*E):
-  %1 = upcast %0 : $*E to $*B
-  %2 = load [copy] %1 : $*B
-  return %2 : $B
-}
-
-// (load (upcast-addr %x)) -> (upcast-ref (load %x))
-//
-// CHECK-LABEL: sil [ossa] @loadborrow_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
-// CHECK: bb0
-// CHECK-NEXT: load_borrow
-// CHECK-NEXT: upcast
-// CHECK-NEXT: copy_value
-// CHECK-NEXT: end_borrow
-// CHECK-NEXT: return
-sil [ossa] @loadborrow_upcast_addr_to_upcast_ref_load_canonicalization : $@convention(thin) (@inout E) -> @owned B {
-bb0(%0 : $*E):
-  %1 = upcast %0 : $*E to $*B
-  %2 = load_borrow %1 : $*B
-  %3 = copy_value %2 : $B
-  end_borrow %2 : $B
-  return %3 : $B
-}
-
 // CHECK-LABEL: sil [ossa] @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal
@@ -1547,11 +1572,8 @@ bb0(%0 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_owned'
 sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 bb0(%0 : @owned $B):
@@ -1564,11 +1586,8 @@ bb0(%0 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] : @guaranteed $B):
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_guaranteed'
 sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
 bb0(%0 : @guaranteed $B):
@@ -1580,11 +1599,8 @@ bb0(%0 : @guaranteed $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] :
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_unowned'
 sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
 bb0(%0 : @unowned $B):
@@ -3082,7 +3098,7 @@ sil [ossa] @alloc_ref_dynamic_with_upcast_metatype : $@convention(thin) () -> @o
 // CHECK: } // end sil function 'alloc_ref_dynamic_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to B.Type, bb1, bb2
+  checked_cast_br [exact] @thick B.Type in %1 : $@thick B.Type to B.Type, bb1, bb2
 
 bb1(%2 : $@thick B.Type):
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -3107,7 +3123,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: } // end sil function 'alloc_ref_dynamic_upcast_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
+  checked_cast_br [exact] @thick B.Type in %1 : $@thick B.Type to E.Type, bb1, bb2
 
 bb1(%2 : $@thick E.Type):
   %3 = upcast %2 : $@thick E.Type to $@thick B.Type
@@ -3124,6 +3140,61 @@ bb3 (%10: $Builtin.Int32):
   return %10 : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_stack_with_metatype :
+// CHECK:       bb0:
+// CHECK-NOT:     alloc_ref_dynamic
+// CHECK-NEXT:    alloc_ref [stack] $B
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    dealloc_stack_ref
+// CHECK: return
+// CHECK: } // end sil function 'alloc_ref_dynamic_stack_with_metatype'
+sil [ossa] @alloc_ref_dynamic_stack_with_metatype : $() -> () {
+  %1 = metatype $@thick B.Type
+  %2 = alloc_ref_dynamic [stack] %1 : $@thick B.Type, $B
+  destroy_value %2 : $B
+  dealloc_stack_ref %2 : $B
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_stack_with_upcast_metatype :
+// CHECK:         alloc_ref_dynamic [stack]
+// CHECK:       } // end sil function 'alloc_ref_dynamic_stack_with_upcast_metatype'
+sil [ossa] @alloc_ref_dynamic_stack_with_upcast_metatype : $() -> () {
+  %1 = metatype $@thick E.Type
+  %2 = upcast %1 : $@thick E.Type to $@thick B.Type
+  %3 = alloc_ref_dynamic [stack] %2 : $@thick B.Type, $B
+  destroy_value %3 : $B
+  dealloc_stack_ref %3 : $B
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @alloc_ref_dynamic_stack_after_successful_checked_cast_br :
+// CHECK:         checked_cast_br
+// CHECK:       bb1
+// CHECK-NOT:     alloc_ref_dynamic
+// CHECK:         alloc_ref [stack] $B
+// CHECK:       } // end sil function 'alloc_ref_dynamic_stack_after_successful_checked_cast_br'
+sil [ossa] @alloc_ref_dynamic_stack_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
+bb0(%1 : $@thick B.Type):
+  checked_cast_br [exact] @thick B.Type in %1 : $@thick B.Type to B.Type, bb1, bb2
+
+bb1(%2 : $@thick B.Type):
+  %3 = alloc_ref_dynamic [stack] %2 : $@thick B.Type, $B
+  destroy_value %3 : $B
+  dealloc_stack_ref %3 : $B
+  %4 = integer_literal $Builtin.Int32, 1
+  br bb3 (%4 : $Builtin.Int32)
+
+bb2(%2a : $@thick B.Type):
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3 (%10: $Builtin.Int32):
+  return %10 : $Builtin.Int32
+}
+
 // CHECK-LABEL: sil [ossa] @delete_dead_alloc_stack
 // XHECK: bb0
 // XHECK-NEXT: tuple
@@ -3134,21 +3205,6 @@ bb0(%0 : $*B):
   copy_addr %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
-  %2 = tuple()
-  return %2 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @delete_dead_alloc_ref :
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'delete_dead_alloc_ref'
-sil [ossa] @delete_dead_alloc_ref : $() -> () {
-bb0:
-  %1 = alloc_ref $B
-  set_deallocating %1 : $B
-  fix_lifetime %1 : $B
-  dealloc_ref %1 : $B
   %2 = tuple()
   return %2 : $()
 }
@@ -3988,33 +4044,6 @@ bb0:
   return %9 : $AnyObject
 }
 
-
-// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil [ossa] @remove_unused_alloc_ref : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref $B
-  dealloc_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_stack
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil [ossa] @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $B
-  set_deallocating %1 : $B
-  dealloc_ref %1 : $B
-  dealloc_stack_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
-
 // Int1_const == x -> x == Int1_const
 // CHECK-LABEL: sil [ossa] @canonicalize_bool_eq_checks :
 // CHECK: builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %1 :
@@ -4247,14 +4276,13 @@ bb2(%5 : @owned $MyErrorType):
   throw %5 : $MyErrorType
 }
 
-// CHECK-LABEL: sil [ossa] @mark_dependence_base :
-// CHECK: bb0(
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK: mark_dependence %0 : $*Builtin.Int64 on {{%.*}} : $B
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK: } // end sil function 'mark_dependence_base'
+// CHECK-LABEL: sil [ossa] @mark_dependence_base
+// XHECK: bb0(
+// XHECK-NOT: init_existential_ref
+// XHECK-NOT: enum
+// XHECK-NEXT: mark_dependence
+// XHECK-NEXT: load
+// XHECK: return
 sil [ossa] @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
@@ -4266,10 +4294,10 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @mark_dependence_trivial_object_base :
-// CHECK: bb0(
-// CHECK-NEXT: copy_value
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+// XHECK: bb0(
+// XHECK-NEXT: copy_value
+// XHECK-NEXT: return
+// XHECK: } // end sil function 'mark_dependence_trivial_object_base'
 sil [ossa] @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
 bb0(%0 : @guaranteed $B):
   %0a = copy_value %0 : $B
@@ -4301,14 +4329,13 @@ bb0(%addr : $*Builtin.Int64, %instance : @owned $B):
 
 protocol _NSArrayCore {}
 
-// CHECK-LABEL: sil [ossa] @mark_dependence_base2 :
-// CHECK: bb0(
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK: mark_dependence %0 : $*Builtin.Int64 on {{%.*}} : $B
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK: } // end sil function 'mark_dependence_base2'
+// CHECK-LABEL: sil [ossa] @mark_dependence_base2
+// XHECK: bb0(
+// XHECK-NOT: open_existential_ref
+// XHECK-NOT: enum
+// XHECK-NEXT: mark_dependence
+// XHECK-NEXT: load
+// XHECK: return
 sil [ossa] @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   %2 = init_existential_ref %1 : $B : $B, $AnyObject
@@ -5345,4 +5372,65 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
   return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_moveonly_singlestoreopt :
+// CHECK: struct_element_addr 
+// CHECK-LABEL: } // end sil function 'test_moveonly_singlestoreopt'
+sil [ossa] @test_moveonly_singlestoreopt : $@convention(method) (@inout MoveOnlyStruct) -> () {
+bb0(%0 : $*MoveOnlyStruct):
+  %1 = struct_element_addr %0 : $*MoveOnlyStruct, #MoveOnlyStruct.value
+  %2 = function_ref @get_myint : $@convention(thin) () -> MyInt
+  %3 = apply %2() : $@convention(thin) () -> MyInt
+  store %3 to [trivial] %1 : $*MyInt
+  %16 = tuple ()
+  return %16 : $()
+}
+
+sil @originalClosure : $@convention(thin) (@owned Klass) -> ()
+sil @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_ossa_silcombine1 :
+// [[ENUM:%.*]] = enum
+// [[MDI:%.*]] = mark_dependence {{.*}} on [[ENUM]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_ossa_silcombine1'
+sil [ossa] @test_mark_dependence_ossa_silcombine1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = function_ref @originalClosure : $@convention(thin) (@owned Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@owned Klass) -> ()
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %2 : $@callee_guaranteed () -> ()
+  %5 = begin_borrow %4 : $Optional<@callee_guaranteed () -> ()>
+  %6 = mark_dependence %3 : $@noescape @callee_guaranteed () -> () on %5 : $Optional<@callee_guaranteed () -> ()>
+  %7 = function_ref @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %6 : $@noescape @callee_guaranteed () -> ()
+  end_borrow %5 : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %4 : $Optional<@callee_guaranteed () -> ()>
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_ossa_silcombine2 :
+// [[ENUM:%.*]] = enum
+// [[MDI:%.*]] = mark_dependence {{.*}} on [[ENUM]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_ossa_silcombine2'
+sil [ossa] @test_mark_dependence_ossa_silcombine2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = function_ref @originalClosure : $@convention(thin) (@owned Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@owned Klass) -> ()
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %2 : $@callee_guaranteed () -> ()
+  %5 = begin_borrow %4 : $Optional<@callee_guaranteed () -> ()>
+  %6 = mark_dependence %3 : $@noescape @callee_guaranteed () -> () on %5 : $Optional<@callee_guaranteed () -> ()>
+  %7 = function_ref @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %6 : $@noescape @callee_guaranteed () -> ()
+  br bb1(%4 : $Optional<@callee_guaranteed () -> ()>, %5 : $Optional<@callee_guaranteed () -> ()>)
+
+bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Optional<@callee_guaranteed () -> ()>):
+  end_borrow %11 : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %10 : $Optional<@callee_guaranteed () -> ()>
+  %12 = tuple ()
+  return %12 : $()
 }

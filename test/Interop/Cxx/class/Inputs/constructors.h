@@ -10,6 +10,11 @@ struct ImplicitDefaultConstructor {
   int x = 42;
 };
 
+struct DefaultedDefaultConstructor {
+  int x = 42;
+  DefaultedDefaultConstructor() = default;
+};
+
 struct MemberOfClassType {
   ImplicitDefaultConstructor member;
 };
@@ -73,12 +78,6 @@ HasUserProvidedCopyConstructor {
 
 struct DeletedCopyConstructor {
   DeletedCopyConstructor(const DeletedCopyConstructor &) = delete;
-};
-
-// TODO: we should be able to import this constructor correctly. Until we can,
-// make sure not to crash.
-struct UsingBaseConstructor : ConstructorWithParam {
-  using ConstructorWithParam::ConstructorWithParam;
 };
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H

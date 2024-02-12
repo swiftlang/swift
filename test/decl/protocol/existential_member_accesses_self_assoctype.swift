@@ -6,7 +6,7 @@
 
 struct Struct<T> {
   class Inner {}
-  struct InnerGeneric<T> {}
+  struct InnerGeneric<U> {}
 }
 class Class<T> {}
 
@@ -694,7 +694,7 @@ protocol MiscTestsProto {
 do {
   func miscTests(_ arg: any MiscTestsProto) {
     var r: any Sequence & IteratorProtocol = arg.getR()
-    r.makeIterator() // expected-error {{inferred result type 'any IteratorProtocol' requires explicit coercion due to loss of generic requirements}} {{19-19=as any IteratorProtocol}}
+    r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
     r.next() // expected-warning {{result of call to 'next()' is unused}}
     r.nonexistent() // expected-error {{value of type 'any IteratorProtocol & Sequence' has no member 'nonexistent'}}
 
@@ -855,7 +855,7 @@ do {
 class BadConformanceClass: CompositionBrokenClassConformance_a {}
 // expected-error@-1 {{type 'BadConformanceClass' does not conform to protocol 'CompositionBrokenClassConformance_a'}}
 protocol CompositionBrokenClassConformance_a {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 protocol CompositionBrokenClassConformance_b: CompositionBrokenClassConformance_a {
   func method(_: A)
@@ -864,7 +864,7 @@ do {
   // FIXME: Should GenericSignature::getConcreteType return the null type instead
   // of the error type here for Self.A, despite the broken conformance?
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
-  exist.method(false) // expected-error {{type of expression is ambiguous without more context}}
+  exist.method(false) // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 /// Covariant Associated Type Erasure
@@ -918,12 +918,24 @@ do {
   let _: Class2Base = exist.method5()
   let _: any Class2Base & CovariantAssocTypeErasure = exist.method6()
   let _: any Class2Base & CovariantAssocTypeErasure = exist.method7()
-
   let _: Any? = exist.method8()
   let _: (AnyObject, Bool) = exist.method9()
   let _: any CovariantAssocTypeErasure.Type = exist.method10()
   let _: Array<Class2Base> = exist.method11()
   let _: Dictionary<String, Class2Base> = exist.method12()
+
+  let _ = exist.method1()
+  let _ = exist.method2()
+  let _ = exist.method3()
+  let _ = exist.method4()
+  let _ = exist.method5()
+  let _ = exist.method6()
+  let _ = exist.method7()
+  let _ = exist.method8()
+  let _ = exist.method9()
+  let _ = exist.method10()
+  let _ = exist.method11()
+  let _ = exist.method12()
 }
 do {
   let exist: any CovariantAssocTypeErasureDerived

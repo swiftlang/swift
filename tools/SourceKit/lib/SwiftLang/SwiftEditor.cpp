@@ -64,13 +64,71 @@ void EditorDiagConsumer::getAllDiagnostics(
 
   Result.append(InvalidLocDiagnostics.begin(), InvalidLocDiagnostics.end());
 
-  // Note: we cannot reuse InputBufIds because there may be diagnostics outside
-  // the inputs.  Instead, sort the extant buffers.
+  // Note: We cannot use the input buffer IDs because there may be diagnostics
+  // outside the inputs. Instead, sort the extant buffers.
   auto bufferIDs = getSortedBufferIDs(BufferDiagnostics);
   for (unsigned bufferID : bufferIDs) {
     const auto &diags = BufferDiagnostics[bufferID];
     Result.append(diags.begin(), diags.end());
   }
+}
+
+/// Retrieve the raw range from a range, if it exists in the provided buffer.
+/// Otherwise returns \c None.
+static llvm::Optional<RawCharSourceRange>
+getRawRangeInBuffer(CharSourceRange range, unsigned bufferID,
+                    SourceManager &SM) {
+  if (!range.isValid() ||
+      SM.findBufferContainingLoc(range.getStart()) != bufferID) {
+    return llvm::None;
+  }
+  unsigned offset = SM.getLocOffsetInBuffer(range.getStart(), bufferID);
+  unsigned length = range.getByteLength();
+  return {{offset, length}};
+}
+
+BufferInfoSharedPtr
+EditorDiagConsumer::getBufferInfo(StringRef FileName,
+                                  llvm::Optional<unsigned> BufferID,
+                                  swift::SourceManager &SM) {
+  auto Result = BufferInfos.find(FileName);
+  if (Result != BufferInfos.end())
+    return Result->second;
+
+  llvm::Optional<std::string> GeneratedFileText;
+  llvm::Optional<BufferInfo::OriginalLocation> OriginalLocInfo;
+
+  // If we have a generated buffer, we need to include the source text, as
+  // clients otherwise won't be able to access to it.
+  if (BufferID) {
+    if (auto Info = SM.getGeneratedSourceInfo(*BufferID)) {
+      // Don't include this information for replaced function body buffers, as
+      // they'll just be referencing the original file.
+      // FIXME: Does this mean that the location information we'll be giving
+      // will be wrong? Seems like we may need to adjust it to correspond to the
+      // original file.
+      if (Info->kind != GeneratedSourceInfo::ReplacedFunctionBody) {
+        GeneratedFileText.emplace(SM.getEntireTextForBuffer(*BufferID));
+
+        auto OrigRange = Info->originalSourceRange;
+        if (OrigRange.isValid()) {
+          auto OrigLoc = OrigRange.getStart();
+          auto OrigBuffer = SM.findBufferContainingLoc(OrigLoc);
+
+          auto OrigRawRange = getRawRangeInBuffer(OrigRange, OrigBuffer, SM);
+          assert(OrigRawRange);
+
+          auto OrigFileName = SM.getDisplayNameForLoc(OrigLoc);
+          auto OrigInfo = getBufferInfo(OrigFileName, OrigBuffer, SM);
+          OriginalLocInfo.emplace(OrigInfo, OrigBuffer, *OrigRawRange);
+        }
+      }
+    }
+  }
+  auto Info = std::make_shared<BufferInfo>(FileName.str(), GeneratedFileText,
+                                           OriginalLocInfo);
+  BufferInfos.insert({FileName, Info});
+  return Info;
 }
 
 void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
@@ -119,70 +177,59 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
   }
-  SKInfo.Description = std::string(Text.str());
+  SKInfo.Description = Text.str();
 
   for (auto notePath : Info.EducationalNotePaths)
     SKInfo.EducationalNotePaths.push_back(notePath);
 
-  Optional<unsigned> BufferIDOpt;
+  llvm::Optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
     BufferIDOpt = SM.findBufferContainingLoc(Info.Loc);
-  }
-
-  if (BufferIDOpt && !isInputBufferID(*BufferIDOpt)) {
-    if (Info.ID == diag::error_from_clang.ID ||
-        Info.ID == diag::warning_from_clang.ID ||
-        Info.ID == diag::note_from_clang.ID ||
-        !IsNote) {
-      // Handle it as other diagnostics.
-    } else {
-      // FIXME: This is a note pointing to a synthesized declaration buffer for
-      // a declaration coming from a module.
-      // We should include the Decl* in the DiagnosticInfo and have a way for
-      // Xcode to handle this "points-at-a-decl-from-module" location.
-      //
-      // For now instead of ignoring it, pick up the declaration name from the
-      // buffer identifier and append it to the diagnostic message.
-      auto &LastDiag = getLastDiag();
-      SKInfo.Description += " (";
-      SKInfo.Description += SM.getIdentifierForBuffer(*BufferIDOpt);
-      SKInfo.Description += ")";
-      SKInfo.Offset = LastDiag.Offset;
-      SKInfo.Line = LastDiag.Line;
-      SKInfo.Column = LastDiag.Column;
-      SKInfo.Filename = LastDiag.Filename;
-      LastDiag.Notes.push_back(std::move(SKInfo));
-      return;
-    }
   }
 
   if (BufferIDOpt.has_value()) {
     unsigned BufferID = *BufferIDOpt;
 
+    if (auto info = SM.getGeneratedSourceInfo(BufferID)) {
+      if (IsNote && info->kind == GeneratedSourceInfo::PrettyPrinted) {
+        // FIXME: This is a note pointing to a synthesized declaration buffer
+        // for a declaration coming from a module. We should be able to remove
+        // this check once clients have been updated to deal with the buffer contents
+        // that we'll include in the response once this check is removed.
+        //
+        // For now instead of ignoring it, pick up the declaration name from the
+        // buffer identifier and append it to the diagnostic message.
+        auto &LastDiag = getLastDiag();
+        SKInfo.Description += " (";
+        SKInfo.Description += SM.getIdentifierForBuffer(*BufferIDOpt);
+        SKInfo.Description += ")";
+        SKInfo.Offset = LastDiag.Offset;
+        SKInfo.Line = LastDiag.Line;
+        SKInfo.Column = LastDiag.Column;
+        SKInfo.FileInfo = LastDiag.FileInfo;
+        LastDiag.Notes.push_back(std::move(SKInfo));
+        return;
+      }
+    }
+
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
     std::tie(SKInfo.Line, SKInfo.Column) =
         SM.getPresumedLineAndColumnForLoc(Info.Loc, BufferID);
-    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc).str();
+
+    auto Filename = SM.getDisplayNameForLoc(Info.Loc);
+    SKInfo.FileInfo = getBufferInfo(Filename, BufferID, SM);
 
     for (auto R : Info.Ranges) {
-      if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
-        continue;
-      unsigned Offset = SM.getLocOffsetInBuffer(R.getStart(), BufferID);
-      unsigned Length = R.getByteLength();
-      SKInfo.Ranges.push_back({Offset, Length});
+      if (auto Raw = getRawRangeInBuffer(R, BufferID, SM))
+        SKInfo.Ranges.push_back(*Raw);
     }
 
     for (auto F : Info.FixIts) {
-      if (F.getRange().isInvalid() ||
-          SM.findBufferContainingLoc(F.getRange().getStart()) != BufferID)
-        continue;
-      unsigned Offset =
-          SM.getLocOffsetInBuffer(F.getRange().getStart(), BufferID);
-      unsigned Length = F.getRange().getByteLength();
-      SKInfo.Fixits.push_back({Offset, Length, F.getText().str()});
+      if (auto Range = getRawRangeInBuffer(F.getRange(), BufferID, SM))
+        SKInfo.Fixits.emplace_back(*Range, F.getText().str());
     }
   } else {
-    SKInfo.Filename = "<unknown>";
+    SKInfo.FileInfo = getBufferInfo("<unknown>", /*BufferID*/ llvm::None, SM);
   }
 
   if (IsNote) {
@@ -208,12 +255,22 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     return;
   }
 
-  unsigned BufferID = *BufferIDOpt;
-  DiagnosticsTy &Diagnostics = BufferDiagnostics[BufferID];
+  // Look through to the original buffer, so we produce diagnostics that are
+  // present in generated buffers that originated there.
+  unsigned OrigBufferID = *BufferIDOpt;
+  {
+    auto BufferInfo = SKInfo.FileInfo;
+    while (auto &OrigLocation = BufferInfo->OrigLocation) {
+      OrigBufferID = OrigLocation->OrigBufferID;
+      BufferInfo = OrigLocation->OrigBufferInfo;
+    }
+  }
+
+  DiagnosticsTy &Diagnostics = BufferDiagnostics[OrigBufferID];
 
   if (Diagnostics.empty() || Diagnostics.back().Offset <= SKInfo.Offset) {
     Diagnostics.push_back(std::move(SKInfo));
-    LastDiagBufferID = BufferID;
+    LastDiagBufferID = OrigBufferID;
     LastDiagIndex = Diagnostics.size() - 1;
     return;
   }
@@ -223,7 +280,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     [&](const DiagnosticEntryInfo &LHS, unsigned Offset) -> bool {
       return LHS.Offset < Offset;
     });
-  LastDiagBufferID = BufferID;
+  LastDiagBufferID = OrigBufferID;
   LastDiagIndex = Pos - Diagnostics.begin();
   Diagnostics.insert(Pos, std::move(SKInfo));
 }
@@ -508,7 +565,7 @@ struct SwiftSyntaxMap {
     // If the replaced range didn't intersect with any existing tokens, there's
     // no need to report an affected range
     if (!TokenIntersected)
-      return None;
+      return llvm::None;
 
     // Update the end of the affected range to account for NewLen
     if (NewLen >= Len) {
@@ -586,36 +643,6 @@ struct EditorConsumerSyntaxMapEntry {
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
 
-struct SwiftSemanticToken {
-  unsigned ByteOffset;
-  unsigned Length : 24;
-  // The code-completion kinds are a good match for the semantic kinds we want.
-  // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
-  CodeCompletionDeclKind Kind : 6;
-  unsigned IsRef : 1;
-  unsigned IsSystem : 1;
-
-  SwiftSemanticToken(CodeCompletionDeclKind Kind,
-                     unsigned ByteOffset, unsigned Length,
-                     bool IsRef, bool IsSystem)
-    : ByteOffset(ByteOffset), Length(Length), Kind(Kind),
-      IsRef(IsRef), IsSystem(IsSystem) { }
-
-  bool getIsRef() const { return static_cast<bool>(IsRef); }
-
-  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
-
-  UIdent getUIdentForKind() const {
-    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
-  }
-};
-#if !defined(_MSC_VER)
-static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
-// FIXME: MSVC doesn't pack bitfields with different underlying types.
-// Giving up to check this in MSVC for now, because static_assert is only for
-// keeping low memory usage.
-#endif
-
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
 
@@ -662,7 +689,7 @@ public:
 
   void readSemanticInfo(ImmutableTextSnapshotRef NewSnapshot,
                         std::vector<SwiftSemanticToken> &Tokens,
-                        Optional<std::vector<DiagnosticEntryInfo>> &Diags,
+                        llvm::Optional<std::vector<DiagnosticEntryInfo>> &Diags,
                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 
   void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer,
@@ -684,9 +711,9 @@ private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
-  Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
-      ImmutableTextSnapshotRef NewSnapshot,
-      ArrayRef<DiagnosticEntryInfo> ParserDiags);
+  llvm::Optional<std::vector<DiagnosticEntryInfo>>
+  getSemanticDiagnostics(ImmutableTextSnapshotRef NewSnapshot,
+                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 };
 
 class SwiftDocumentSyntaxInfo {
@@ -710,14 +737,12 @@ public:
         Snapshot->getBuffer()->getText(), FilePath);
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
-    DiagConsumer.setInputBufferIDs(BufferID);
 
     Parser.reset(new ParserUnit(
         SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
         CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
         CompInv.getModuleName()));
 
-    registerParseRequestFunctions(Parser->getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
     registerClangImporterRequestFunctions(Parser->getParser().Context.evaluator);
@@ -773,7 +798,7 @@ uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
 void SwiftDocumentSemanticInfo::readSemanticInfo(
     ImmutableTextSnapshotRef NewSnapshot,
     std::vector<SwiftSemanticToken> &Tokens,
-    Optional<std::vector<DiagnosticEntryInfo>> &Diags,
+    llvm::Optional<std::vector<DiagnosticEntryInfo>> &Diags,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -830,7 +855,7 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
   return std::move(SemaToks);
 }
 
-Optional<std::vector<DiagnosticEntryInfo>>
+llvm::Optional<std::vector<DiagnosticEntryInfo>>
 SwiftDocumentSemanticInfo::getSemanticDiagnostics(
     ImmutableTextSnapshotRef NewSnapshot,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
@@ -858,8 +883,8 @@ SwiftDocumentSemanticInfo::getSemanticDiagnostics(
 
   auto orderDiagnosticEntryInfos = [](const DiagnosticEntryInfo &LHS,
                                       const DiagnosticEntryInfo &RHS) -> bool {
-    if (LHS.Filename != RHS.Filename)
-      return LHS.Filename < RHS.Filename;
+    if (LHS.FileInfo->BufferName != RHS.FileInfo->BufferName)
+      return LHS.FileInfo->BufferName < RHS.FileInfo->BufferName;
     if (LHS.Offset != RHS.Offset)
       return LHS.Offset < RHS.Offset;
     return LHS.Description < RHS.Description;
@@ -927,9 +952,34 @@ class SemanticAnnotator : public SourceEntityWalker {
 public:
 
   std::vector<SwiftSemanticToken> SemaToks;
+  bool IsWalkingMacroExpansionBuffer = false;
 
   SemanticAnnotator(SourceManager &SM, unsigned BufferID)
-    : SM(SM), BufferID(BufferID) {}
+      : SM(SM), BufferID(BufferID) {
+    if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(BufferID)) {
+      switch (GeneratedSourceInfo->kind) {
+#define MACRO_ROLE(Name, Description)                 \
+      case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+        IsWalkingMacroExpansionBuffer = true;
+        break;
+      case GeneratedSourceInfo::ReplacedFunctionBody:
+      case GeneratedSourceInfo::PrettyPrinted:
+        break;
+      }
+    }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    if (IsWalkingMacroExpansionBuffer) {
+      // When we are walking a macro expansion buffer, we need to set the macro
+      // walking behavior to walk the expansion, otherwise we skip over all the
+      // declarations in the buffer.
+      return MacroWalking::ArgumentsAndExpansion;
+    } else {
+      return SourceEntityWalker::getMacroWalkingBehavior();
+    }
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
@@ -971,10 +1021,16 @@ public:
     if (!Range.isValid())
       return;
 
+    // If we are walking into macro expansions, make sure we only report ranges
+    // from the requested buffer, not any buffers of child macro expansions.
+    if (IsWalkingMacroExpansionBuffer &&
+        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+      return;
+    }
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
-    bool IsSystem = D->getModuleContext()->isSystemModule();
+    bool IsSystem = D->getModuleContext()->isNonUserModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }
 };
@@ -1157,19 +1213,20 @@ static UIdent getAccessLevelUID(AccessLevel Access) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-static Optional<AccessLevel>
+static llvm::Optional<AccessLevel>
 inferDefaultAccessSyntactically(const ExtensionDecl *ED) {
   // Check if the extension has an explicit access control attribute.
   if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     return std::min(std::max(AA->getAccess(), AccessLevel::FilePrivate),
                     AccessLevel::Public);
-  return None;
+  return llvm::None;
 }
 
 /// Document structure is a purely syntactic request that shouldn't require name lookup
 /// or type-checking, so this is a best-effort computation, particularly where extensions
 /// are concerned.
-static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
+static llvm::Optional<AccessLevel>
+inferAccessSyntactically(const ValueDecl *D) {
   assert(D);
 
   // Check if the decl has an explicit access control attribute.
@@ -1183,21 +1240,24 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
     if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
       if (auto containerAccess = inferAccessSyntactically(container))
         return std::max(containerAccess.value(), AccessLevel::Internal);
-      return None;
+      return llvm::None;
     }
     return AccessLevel::Private;
   }
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     return AccessLevel::FilePrivate;
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
     return AccessLevel::Private;
+  case DeclContextKind::Package:
+    return AccessLevel::Package;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:
@@ -1234,10 +1294,10 @@ static bool inferIsSettableSyntactically(const AbstractStorageDecl *D) {
   }
 }
 
-static Optional<AccessLevel>
+static llvm::Optional<AccessLevel>
 inferSetterAccessSyntactically(const AbstractStorageDecl *D) {
   if (!inferIsSettableSyntactically(D))
-    return None;
+    return llvm::None;
   if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   return inferAccessSyntactically(D);
@@ -1525,6 +1585,10 @@ private:
     : PlaceholderLoc(PlaceholderLoc), Found(Found) {
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
@@ -1544,7 +1608,7 @@ private:
             Elem.walk(*this);
           }
         }
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       return Action::Continue();
     }
@@ -1557,6 +1621,10 @@ private:
     bool FoundFunctionTypeRepr = false;
     explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
       Info(Info) { }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
@@ -1648,7 +1716,14 @@ private:
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !checkCallExpr(E) && !EnclosingCallAndArg.first) {
-          OuterExpr = E;
+          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) &&
+              !isa<PrefixUnaryExpr>(E)) {
+            // We don't want to expand to trailing closures if the call is
+            // nested inside another expression that has closing characters,
+            // like a `)` for a function call. This is not the case for
+            // `try`, `await` and prefix operator applications.
+            OuterExpr = E;
+          }
         }
         return true;
       }
@@ -1666,9 +1741,19 @@ private:
           return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
 
         if (auto BS = dyn_cast<BraceStmt>(S)) {
-          if (BS->getNumElements() == 1) {
-            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
-              return isImplicitReturnBody(innerS);
+          if (BS->getNumElements() != 1)
+            return false;
+
+          if (auto *innerS = BS->getSingleActiveStatement())
+            return isImplicitReturnBody(innerS);
+
+          // Before pre-checking, the implicit return will not have been
+          // inserted. Look for a single expression body in a closure.
+          if (auto *ParentE = getWalker().Parent.getAsExpr()) {
+            if (isa<ClosureExpr>(ParentE)) {
+              if (auto *innerE = BS->getSingleActiveExpression())
+                return innerE->getStartLoc() == TargetLoc;
+            }
           }
         }
 
@@ -1728,14 +1813,14 @@ private:
   }
 
   struct ParamClosureInfo {
-    Optional<ClosureInfo> placeholderClosure;
+    llvm::Optional<ClosureInfo> placeholderClosure;
     bool isNonPlaceholderClosure = false;
     bool isWrappedWithBraces = false;
   };
 
   /// Scan the given ArgumentList collecting argument closure information and
   /// returning the index of the given target placeholder (if found).
-  Optional<unsigned>
+  llvm::Optional<unsigned>
   scanArgumentList(ArgumentList *Args, SourceLoc targetPlaceholderLoc,
                    std::vector<ParamClosureInfo> &outParams) {
     if (Args->empty())
@@ -1744,7 +1829,7 @@ private:
     outParams.clear();
     outParams.reserve(Args->size());
 
-    Optional<unsigned> targetPlaceholderIndex;
+    llvm::Optional<unsigned> targetPlaceholderIndex;
 
     for (auto Arg : *Args) {
       auto *E = Arg.getExpr();
@@ -1752,17 +1837,16 @@ private:
       auto &outParam = outParams.back();
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if (CE->hasSingleExpressionBody() &&
-            CE->getSingleExpressionBody()->getStartLoc() ==
-                targetPlaceholderLoc) {
-          targetPlaceholderIndex = outParams.size() - 1;
-          if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
-                  CE->getSingleExpressionBody())) {
-            outParam.isWrappedWithBraces = true;
-            ClosureInfo info;
-            if (scanClosureType(PHE, info))
-              outParam.placeholderClosure = info;
-            continue;
+        if (auto *E = CE->getSingleExpressionBody()) {
+          if (E->getStartLoc() == targetPlaceholderLoc) {
+            targetPlaceholderIndex = outParams.size() - 1;
+            if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(E)) {
+              outParam.isWrappedWithBraces = true;
+              ClosureInfo info;
+              if (scanClosureType(PHE, info))
+                outParam.placeholderClosure = info;
+              continue;
+            }
           }
         }
         // else...
@@ -1818,7 +1902,7 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     std::vector<ParamClosureInfo> params;
-    Optional<unsigned> targetPlaceholderIndex;
+    llvm::Optional<unsigned> targetPlaceholderIndex;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     ArgumentList *Args = ECE.first;
     if (Args && ECE.second) {
@@ -2025,9 +2109,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
   if (ReportDiags) {
-    Consumer.setDiagnosticStage(ParseDiagStage);
-    for (auto &Diag : Impl.ParserDiagnostics)
-      Consumer.handleDiagnostic(Diag, ParseDiagStage);
+    Consumer.handleDiagnostics(Impl.ParserDiagnostics, ParseDiagStage);
   }
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
@@ -2055,7 +2137,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
     Impl.SyntaxMap = std::move(NewMap);
 
     // Recording an affected length of 0 still results in the client updating
-    // its copy of the syntax map (by clearning all tokens on the line of the
+    // its copy of the syntax map (by clearing all tokens on the line of the
     // affected offset). We need to not record it at all to signal a no-op.
     if (SawChanges)
       Consumer.recordAffectedRange(Impl.AffectedRange->Offset,
@@ -2067,7 +2149,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
   std::vector<SwiftSemanticToken> SemaToks;
-  Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
+  llvm::Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,
                                       Impl.ParserDiagnostics);
 
@@ -2082,14 +2164,10 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
 
   // If there's no value returned for diagnostics it means they are out-of-date
   // (based on a different snapshot).
-  if (SemaDiags.has_value()) {
-    Consumer.setDiagnosticStage(SemaDiagStage);
-    for (auto &Diag : SemaDiags.value())
-      Consumer.handleDiagnostic(Diag, SemaDiagStage);
+  if (SemaDiags) {
+    Consumer.handleDiagnostics(*SemaDiags, SemaDiagStage);
   } else {
-    Consumer.setDiagnosticStage(ParseDiagStage);
-    for (auto &Diag : Impl.ParserDiagnostics)
-      Consumer.handleDiagnostic(Diag, ParseDiagStage);
+    Consumer.handleDiagnostics(Impl.ParserDiagnostics, ParseDiagStage);
   }
 }
 
@@ -2304,14 +2382,16 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 // EditorOpen
 //===----------------------------------------------------------------------===//
-void SwiftLangSupport::editorOpen(
-    StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                                  EditorConsumer &Consumer,
+                                  ArrayRef<const char *> Args,
+                                  llvm::Optional<VFSOptions> vfsOptions) {
 
   std::string error;
   // Do not provide primaryFile so that opening an existing document will
   // reinitialize the filesystem instead of keeping the old one.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
   if (!fileSystem)
     return Consumer.handleRequestError(error.c_str());
 
@@ -2396,9 +2476,9 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       return;
     }
 
-    // If client doesn't need any information, we doesn't need to parse it.
     EditorDoc->resetSyntaxInfo(Snapshot, *this);
 
+    // If client doesn't need any information, we doesn't need to parse it.
     if (!Consumer.documentStructureEnabled() &&
         !Consumer.syntaxMapEnabled() &&
         !Consumer.diagnosticsEnabled()) {
@@ -2465,4 +2545,69 @@ void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
     return;
   }
   EditorDoc->expandPlaceholder(Offset, Length, Consumer);
+}
+
+//===----------------------------------------------------------------------===//
+// Semantic Tokens
+//===----------------------------------------------------------------------===//
+
+void SwiftLangSupport::getSemanticTokens(
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<SemanticTokensResult>::fromError(FileSystemError));
+    return;
+  }
+
+  std::string InvocationError;
+  SwiftInvocationRef Invok = ASTMgr->getTypecheckInvocation(
+      Args, PrimaryFilePath, FileSystem, InvocationError);
+  if (!InvocationError.empty()) {
+    LOG_WARN_FUNC("error creating ASTInvocation: " << InvocationError);
+  }
+  if (!Invok) {
+    Receiver(RequestResult<SemanticTokensResult>::fromError(InvocationError));
+    return;
+  }
+
+  class SemanticTokensConsumer : public SwiftASTConsumer {
+    StringRef InputBufferName;
+    std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver;
+
+  public:
+    SemanticTokensConsumer(
+        StringRef InputBufferName,
+        std::function<void(const RequestResult<SemanticTokensResult> &)>
+            Receiver)
+        : InputBufferName(InputBufferName), Receiver(Receiver) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<SemanticTokensResult>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+      SemanticAnnotator Annotator(CompIns.getSourceMgr(), *SF->getBufferID());
+      Annotator.walk(SF);
+      Receiver(
+          RequestResult<SemanticTokensResult>::fromResult(Annotator.SemaToks));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<SemanticTokensResult>::cancelled());
+    }
+  };
+
+  auto Consumer = std::make_shared<SemanticTokensConsumer>(InputBufferName,
+                                                           std::move(Receiver));
+
+  getASTManager()->processASTAsync(Invok, std::move(Consumer),
+                                   /*OncePerASTToken=*/nullptr,
+                                   CancellationToken, FileSystem);
 }

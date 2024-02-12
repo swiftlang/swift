@@ -3,13 +3,13 @@
 // CHECK: struct HasTypeWithSelfAsParam<T> {
 // CHECK: }
 
-// CHECK: struct HasTypeWithSelfAsParam<Int32> {
+// CHECK: struct HasTypeWithSelfAsParam<CInt> {
 // CHECK:   init()
-// CHECK:   typealias TT = HasTypeWithSelfAsParam<HasTypeWithSelfAsParam<Int32>>
+// CHECK:   typealias TT = HasTypeWithSelfAsParam<HasTypeWithSelfAsParam<CInt>>
 // CHECK: }
 
-// CHECK: typealias WillBeInfinite = HasTypeWithSelfAsParam<Int32>
+// CHECK: typealias WillBeInfinite = HasTypeWithSelfAsParam<CInt>
 
 // TODO: we should not be importing functions that use this type in their
 // signature (such as the function below).
-// CHECK: mutating func test1() -> RegressionTest.ValExpr<SliceExpr<SliceExpr<Array<Int32>, _>, _>>
+// CHECK: mutating func test1() -> RegressionTest.ValExpr<SliceExpr<SliceExpr<Array<CInt>, _CInt_1>, _CInt_1>>

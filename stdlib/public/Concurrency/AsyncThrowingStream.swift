@@ -254,9 +254,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 
   final class _Context {
     let storage: _Storage?
-    let produce: () async throws -> Element?
+    let produce: () async throws(Failure) -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async throws -> Element?) {
+    init(storage: _Storage? = nil, produce: @escaping () async throws(Failure) -> Element?) {
       self.storage = storage
       self.produce = produce
     }
@@ -415,6 +415,24 @@ extension AsyncThrowingStream: AsyncSequence {
     public mutating func next() async throws -> Element? {
       return try await context.produce()
     }
+
+    /// The next value from the asynchronous stream.
+    ///
+    /// When `next()` returns `nil`, this signifies the end of the
+    /// `AsyncThrowingStream`.
+    ///
+    /// It is a programmer error to invoke `next()` from a concurrent
+    /// context that contends with another such call, which results in a call to
+    /// `fatalError()`.
+    ///
+    /// If you cancel the task this iterator is running in while `next()`
+    /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
+    /// `next()` may return `nil` immediately, or else return `nil` on
+    /// subsequent calls.
+    @available(SwiftStdlib 5.11, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
+      return try await context.produce()
+    }
   }
 
   /// Creates the asynchronous iterator that produces elements of this
@@ -470,6 +488,29 @@ extension AsyncThrowingStream.Continuation {
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
     storage.yield(())
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncThrowingStream {
+  /// Initializes a new ``AsyncThrowingStream`` and an ``AsyncThrowingStream/Continuation``.
+  ///
+  /// - Parameters:
+  ///   - elementType: The element type of the stream.
+  ///   - failureType: The failure type of the stream.
+  ///   - limit: The buffering policy that the stream should use.
+  /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
+  /// producer while the stream should be passed to the consumer.
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
+  public static func makeStream(
+      of elementType: Element.Type = Element.self,
+      throwing failureType: Failure.Type = Failure.self,
+      bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+  ) -> (stream: AsyncThrowingStream<Element, Failure>, continuation: AsyncThrowingStream<Element, Failure>.Continuation) where Failure == Error {
+    var continuation: AsyncThrowingStream<Element, Failure>.Continuation!
+    let stream = AsyncThrowingStream<Element, Failure>(bufferingPolicy: limit) { continuation = $0 }
+    return (stream: stream, continuation: continuation!)
   }
 }
 

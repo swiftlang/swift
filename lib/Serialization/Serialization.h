@@ -18,6 +18,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
 #include "ModuleFormat.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
@@ -82,6 +83,8 @@ class Serializer : public SerializerBase {
   friend class DeclSerializer;
   class TypeSerializer;
   friend class TypeSerializer;
+
+  const SerializationOptions &Options;
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -170,9 +173,9 @@ class Serializer : public SerializerBase {
     /// Returns the next entity to be written.
     ///
     /// If there is nothing left to serialize, returns None.
-    Optional<T> peekNext() const {
+    llvm::Optional<T> peekNext() const {
       if (!hasMoreToSerialize())
-        return None;
+        return llvm::None;
       return EntitiesToWrite.front();
     }
 
@@ -180,9 +183,9 @@ class Serializer : public SerializerBase {
     /// it so it can be written.
     ///
     /// If there is nothing left to serialize, returns None.
-    Optional<T> popNext(BitOffset offset) {
+    llvm::Optional<T> popNext(BitOffset offset) {
       if (!hasMoreToSerialize())
-        return None;
+        return llvm::None;
       T result = EntitiesToWrite.front();
       EntitiesToWrite.pop();
       Offsets.push_back(offset);
@@ -230,6 +233,10 @@ class Serializer : public SerializerBase {
   ASTBlockRecordKeeper<ProtocolConformance *, ProtocolConformanceID,
                        index_block::PROTOCOL_CONFORMANCE_OFFSETS>
   ConformancesToSerialize;
+
+  ASTBlockRecordKeeper<PackConformance *, ProtocolConformanceID,
+                       index_block::PACK_CONFORMANCE_OFFSETS>
+  PackConformancesToSerialize;
 
   ASTBlockRecordKeeper<const SILLayout *, SILLayoutID,
                        index_block::SIL_LAYOUT_OFFSETS>
@@ -283,7 +290,7 @@ public:
   // constructed, and then converted to a `DerivativeFunctionConfigTableData`.
   using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
       Identifier,
-      llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+      swift::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of the fingerprint associated with a serialized
@@ -317,14 +324,17 @@ private:
 
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
-  void writeHeader(const SerializationOptions &options = {});
+  void writeHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputBlock(const SerializationOptions &options);
+  void writeInputBlock();
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
+
+  /// Check if a decl should be skipped during serialization.
+  bool shouldSkipDecl(const Decl *D) const;
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const DeclContext *DC, uint32_t pathLen = 1);
@@ -365,7 +375,11 @@ private:
 
   /// Writes a protocol conformance.
   void writeASTBlockEntity(ProtocolConformance *conformance);
+
   void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
+
+  /// Writes a pack conformance.
+  void writeASTBlockEntity(PackConformance *conformance);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -416,6 +430,10 @@ private:
   using SerializerBase::writeToStream;
 
 public:
+  Serializer(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC,
+             const SerializationOptions &options)
+      : SerializerBase(signature, DC), Options(options) {}
+
   /// Serialize a module to the given stream.
   static void
   writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
@@ -503,16 +521,10 @@ public:
   /// The protocol conformance will be scheduled for serialization
   /// if necessary.
   ///
-  /// \param genericEnv When provided, the generic environment that describes
-  /// the archetypes within the substitutions. The replacement types within
-  /// the substitution will be mapped out of the generic environment before
-  /// being written.
-  ///
   /// \returns The ID for the given conformance in this module.
-  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
-  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
+  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance);
+  ProtocolConformanceID addConformanceRef(PackConformance *conformance);
+  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance);
 
   SmallVector<ProtocolConformanceID, 4>
   addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances);

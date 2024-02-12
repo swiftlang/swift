@@ -27,5 +27,11 @@ public protocol second_decl_protocol_1 {
 
 public var (decl_var_2, decl_var_3): (Int, Float) = (1, 1.0)
 
+/// Comment on package function
+package func second_package_function() {}
+
+/// Comment on SPI function
+@_spi(DocSPI) public func second_spi_function() {}
+
 #sourceLocation(file:"NonExistingSource.swift", line:100000)
 public func functionAfterPoundSourceLoc() {}

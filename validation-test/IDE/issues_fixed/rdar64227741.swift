@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 struct Earthquake {
   var magnitude: Float
@@ -35,4 +34,3 @@ func test() {
 
 // CHECK: Begin completions, 1 items
 // CHECK: Decl[InstanceVar]/CurrNominal:      magnitude[#Float#]; name=magnitude
-// CHECK: End completions

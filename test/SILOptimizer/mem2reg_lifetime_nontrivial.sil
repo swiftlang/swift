@@ -1061,8 +1061,7 @@ enum KlassOptional {
 sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
 
 // CHECK-LABEL: sil [ossa] @test_deadphi4 :
-// mem2reg cannot optimize an enum location which spans over multiple blocks.
-// CHECK:         alloc_stack
+// CHECK-NOT:         alloc_stack
 // CHECK-LABEL: } // end sil function 'test_deadphi4'
 sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
 bb0(%0 : @owned $KlassOptional):

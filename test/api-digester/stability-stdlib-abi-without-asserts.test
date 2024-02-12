@@ -49,30 +49,65 @@
 
 Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
+Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
 
-Func Collection.removingSubranges(_:) has been removed
-Func Collection.subranges(of:) has been removed
-Func Collection.subranges(where:) has been removed
-Func MutableCollection.moveSubranges(_:to:) has been removed
-Func MutableCollection.removeSubranges(_:) has been removed
-Func RangeReplaceableCollection.removeSubranges(_:) has been removed
+// These functions are not actually added to the ABI, but they had been a part of
+// the ABI exposed by the runtime library, so this is not breakage.
+// They are now referenced by @_extern(c) declarations in the standard library, but
+// api-digester cannot match them with the baseline symbols in the baseline runtime
+// library, which were not exposed by the baseline stdlib module.
+Func _swift_retainCount(_:) is a new API without @available attribute
+Func _swift_unownedRetainCount(_:) is a new API without @available attribute
+Func _swift_weakRetainCount(_:) is a new API without @available attribute
+
 Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
 Class AnyKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class KeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class PartialKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class ReferenceWritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class WritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
-Struct DiscontiguousSlice has been removed
-Struct RangeSet has been removed
-Subscript Collection.subscript(_:) has been removed
-Subscript MutableCollection.subscript(_:) has been removed
 Protocol CodingKey has added inherited protocol Sendable
 Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
 Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
 Constructor _SmallString.init(taggedCocoa:) has mangled name changing from 'Swift._SmallString.init(taggedCocoa: Swift.AnyObject) -> Swift._SmallString' to 'Swift._SmallString.init(taggedCocoa: Swift.AnyObject) -> Swift.Optional<Swift._SmallString>'
 Constructor _SmallString.init(taggedCocoa:) has return type change from Swift._SmallString to Swift._SmallString?
+Enum Never has added a conformance to an existing protocol Decodable
+Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
+
+// These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
+Func AnyBidirectionalCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyBidirectionalCollection.map(_:) has mangled name changing from 'Swift.AnyBidirectionalCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyBidirectionalCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyBidirectionalCollection.map(_:) is now without @rethrows
+Func AnyCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyCollection.map(_:) has mangled name changing from 'Swift.AnyCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyCollection.map(_:) is now without @rethrows
+Func AnyRandomAccessCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyRandomAccessCollection.map(_:) has mangled name changing from 'Swift.AnyRandomAccessCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyRandomAccessCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyRandomAccessCollection.map(_:) is now without @rethrows
+Func AnySequence.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnySequence.map(_:) has mangled name changing from 'Swift.AnySequence.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnySequence.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnySequence.map(_:) is now without @rethrows
+Func Sequence.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Sequence.map(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Sequence.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Sequence.map(_:) is now without @rethrows
+Func Collection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Collection.map(_:) has mangled name changing from '(extension in Swift):Swift.Collection.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Collection.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Collection.map(_:) is now without @rethrows
+Constructor Result.init(__abi_catching:) is a new API without @available attribute
+Constructor Result.init(catching:) has been removed
+Func Result.get() has been renamed to Func __abi_get()
+Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A' to 'Swift.Result.__abi_get() throws -> A'
+Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
+Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
+Func withUnsafePointer(to:_:) is now without @rethrows
+Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
+Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
+Func withoutActuallyEscaping(_:do:) is now without @rethrows
+Func _openExistential(_:do:) has been renamed to Func __abi_openExistential(_:do:)
+Func _openExistential(_:do:) has mangled name changing from 'Swift._openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C' to 'Swift.__abi_openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C'
+Func _openExistential(_:do:) is now without @rethrows
 
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
@@ -87,8 +122,6 @@ Protocol Collection has generic signature change from <Self : Swift.Sequence, Se
 
 Protocol StringProtocol has generic signature change from <Self : Swift.BidirectionalCollection, Self : Swift.Comparable, Self : Swift.ExpressibleByStringInterpolation, Self : Swift.Hashable, Self : Swift.LosslessStringConvertible, Self : Swift.TextOutputStream, Self : Swift.TextOutputStreamable, Self.Element == Swift.Character, Self.Index == Swift.String.Index, Self.StringInterpolation == Swift.DefaultStringInterpolation, Self.SubSequence : Swift.StringProtocol, Self.UTF16View : Swift.BidirectionalCollection, Self.UTF8View : Swift.Collection, Self.UnicodeScalarView : Swift.BidirectionalCollection, Self.UTF16View.Element == Swift.UInt16, Self.UTF16View.Index == Swift.String.Index, Self.UTF8View.Element == Swift.UInt8, Self.UTF8View.Index == Swift.String.Index, Self.UnicodeScalarView.Element == Swift.Unicode.Scalar, Self.UnicodeScalarView.Index == Swift.String.Index, Self.SubSequence.UTF16View.Index == Swift.String.Index, Self.SubSequence.UTF8View.Index == Swift.String.Index, Self.SubSequence.UnicodeScalarView.Index == Swift.String.Index> to <Self : Swift.BidirectionalCollection, Self : Swift.Comparable, Self : Swift.ExpressibleByStringInterpolation, Self : Swift.Hashable, Self : Swift.LosslessStringConvertible, Self : Swift.TextOutputStream, Self : Swift.TextOutputStreamable, Self.Element == Swift.Character, Self.Index == Swift.String.Index, Self.StringInterpolation == Swift.DefaultStringInterpolation, Self.SubSequence : Swift.StringProtocol, Self.UTF16View : Swift.BidirectionalCollection, Self.UTF8View : Swift.Collection, Self.UnicodeScalarView : Swift.BidirectionalCollection, Self.UTF16View.Element == Swift.UInt16, Self.UTF16View.Index == Swift.String.Index, Self.UTF8View.Element == Swift.UInt8, Self.UTF8View.Index == Swift.String.Index, Self.UnicodeScalarView.Element == Swift.Unicode.Scalar, Self.UnicodeScalarView.Index == Swift.String.Index>
 
-Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
-
 // These haven't actually been removed; they were replaced with @_alwaysEmitIntoClient
 // alternatives. The old silgen-name entry point was preserved under an alternative
 // source-level name. This causes a false positive with the ABI checker.
@@ -98,6 +131,11 @@ Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
+Func _AnySequenceBox._map(_:) is now without @rethrows
+Func _BidirectionalCollectionBox._map(_:) is now without @rethrows
+Func _CollectionBox._map(_:) is now without @rethrows
+Func _RandomAccessCollectionBox._map(_:) is now without @rethrows
+Func _SequenceBox._map(_:) is now without @rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
@@ -114,11 +152,41 @@ Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without @availabl
 Func UnsafeMutableBufferPointer.initialize(from:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (A1.Iterator, Swift.Int)' to 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (unwritten: A1.Iterator, index: Swift.Int)'
 Func UnsafeMutableBufferPointer.initialize(from:) has return type change from (τ_1_0.Iterator, Swift.Int) to (unwritten: τ_1_0.Iterator, index: Swift.Int)
 
+// This hasn't actually been removed; it was renamed at the source level while
+// retaining its old mangled/silgen name. The old source-level name is preserved
+// as an @_alwaysEmitIntoClient function. The source break was accepted as part of se-0405.
+Constructor String.init(validatingCString:) is a new API without @available attribute
+Constructor String.init(validatingUTF8:) has been removed
+
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
 // break because the symbols are still present.
 Var _StringGuts._isContiguousUTF16 has been removed
 Var _StringGuts.startUTF16 has been removed
 Func _persistCString(_:) has been removed
+
+// These functions have not been renamed, they are pre-specialized versions and purely additive.
+// These seem to be false positives in the ABI checker. The original symbols are still present.
+Func Array._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:) has been renamed to Func __specialize_class__createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:)
+Func Array._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:) has mangled name changing from 'Swift.Array._createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.Array.__specialize_class__createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
+Func ContiguousArray._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:) has been renamed to Func __specialize_class__createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:)
+Func ContiguousArray._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:) has mangled name changing from 'Swift.ContiguousArray._createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.ContiguousArray.__specialize_class__createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
+Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has been renamed to Func __specialize_class__reserveCapacityImpl(minimumCapacity:growForAppend:)
+Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has mangled name changing from 'Swift.ContiguousArray._reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.ContiguousArray.__specialize_class__reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
+
+// This hasn't actually been changed, but it seems the ABI checker gives a false positive here and detects
+// it as a removal with the addition of the RangeSet subscripts
+Subscript MutableCollection.subscript(_:) has been removed
+
+Protocol SIMD has added inherited protocol _BitwiseCopyable
+Protocol SIMDScalar has added inherited protocol _BitwiseCopyable
+Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift._BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
+Protocol SIMDStorage has added inherited protocol _BitwiseCopyable
+Protocol SIMDStorage has generic signature change from <Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable> to <Self : Swift._BitwiseCopyable, Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable>
+Protocol _Pointer has added inherited protocol _BitwiseCopyable
+Protocol _Pointer has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable, Self : Swift._BitwiseCopyable>
+Protocol FixedWidthInteger has added inherited protocol _BitwiseCopyable
+Protocol FixedWidthInteger has generic signature change from <Self : Swift.BinaryInteger, Self : Swift.LosslessStringConvertible, Self.Magnitude : Swift.FixedWidthInteger, Self.Magnitude : Swift.UnsignedInteger, Self.Stride : Swift.FixedWidthInteger, Self.Stride : Swift.SignedInteger> to <Self : Swift.BinaryInteger, Self : Swift.LosslessStringConvertible, Self : Swift._BitwiseCopyable, Self.Magnitude : Swift.FixedWidthInteger, Self.Magnitude : Swift.UnsignedInteger, Self.Stride : Swift.FixedWidthInteger, Self.Stride : Swift.SignedInteger>
+
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

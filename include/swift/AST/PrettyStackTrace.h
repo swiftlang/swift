@@ -18,11 +18,14 @@
 #ifndef SWIFT_PRETTYSTACKTRACE_H
 #define SWIFT_PRETTYSTACKTRACE_H
 
-#include "llvm/Support/PrettyStackTrace.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 namespace clang {
   class Type;
@@ -56,7 +59,7 @@ public:
 };
 
 void printDeclDescription(llvm::raw_ostream &out, const Decl *D,
-                          const ASTContext &Context, bool addNewline = true);
+                          bool addNewline = true);
 
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.
@@ -93,7 +96,21 @@ public:
   virtual void print(llvm::raw_ostream &OS) const override;
 };
 
-void printExprDescription(llvm::raw_ostream &out, Expr *E,
+/// PrettyStackTraceFreestandingMacroExpansion -  Observe that we are
+/// processing a specific freestanding macro expansion.
+class PrettyStackTraceFreestandingMacroExpansion
+    : public llvm::PrettyStackTraceEntry {
+  const FreestandingMacroExpansion *Expansion;
+  const char *Action;
+
+public:
+  PrettyStackTraceFreestandingMacroExpansion(
+      const char *action, const FreestandingMacroExpansion *expansion)
+      : Expansion(expansion), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const override;
+};
+
+void printExprDescription(llvm::raw_ostream &out, const Expr *E,
                           const ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceExpr - Observe that we are processing a specific
@@ -197,15 +214,15 @@ void printConformanceDescription(llvm::raw_ostream &out,
 class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
   const char *Action;
   GenericSignature GenericSig;
-  Optional<unsigned> Requirement;
+  llvm::Optional<unsigned> Requirement;
 
 public:
-  PrettyStackTraceGenericSignature(const char *action,
-                                   GenericSignature genericSig,
-                                   Optional<unsigned> requirement = None)
-    : Action(action), GenericSig(genericSig), Requirement(requirement) { }
+  PrettyStackTraceGenericSignature(
+      const char *action, GenericSignature genericSig,
+      llvm::Optional<unsigned> requirement = llvm::None)
+      : Action(action), GenericSig(genericSig), Requirement(requirement) {}
 
-  void setRequirement(Optional<unsigned> requirement) {
+  void setRequirement(llvm::Optional<unsigned> requirement) {
     Requirement = requirement;
   }
 

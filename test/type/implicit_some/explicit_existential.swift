@@ -1,11 +1,13 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-feature ImplicitSome
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ImplicitSome
+
+// REQUIRES: asserts
 
 protocol Foo { }
 
 var x: any Foo
 
 protocol SelfAsType {
-  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'; do you want to add a stub?}}
+  var x: Self { get } // expected-note{{protocol requires property 'x' with type 'U'; add a stub for conformance}}
 }
 
 struct U : SelfAsType { // expected-error{{type 'U' does not conform to protocol 'SelfAsType'}}
@@ -290,5 +292,3 @@ protocol PP {}
 struct A : PP {}
 let _: any PP = A() // Ok
 let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any (any PP)'}} {{8-12=}}
-
-

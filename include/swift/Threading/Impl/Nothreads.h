@@ -50,7 +50,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {}
 
 using lazy_mutex_handle = unsigned;
 
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() { return 0; }
+#define SWIFT_LAZY_MUTEX_INITIALIZER 0
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {}

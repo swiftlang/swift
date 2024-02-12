@@ -48,20 +48,46 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   private var insertedInsts: InstructionSet
 
+  // For efficiency, this set does not include instructions in blocks which are not the begin or any end block.
+  private var inExclusiveRange: InstructionSet
+
   init(begin beginInst: Instruction, _ context: some Context) {
     self.begin = beginInst
     self.blockRange = BasicBlockRange(begin: beginInst.parentBlock, context)
     self.insertedInsts = InstructionSet(context)
+    self.inExclusiveRange = InstructionSet(context)
+    self.inExclusiveRange.insert(beginInst)
+  }
+
+  init(for value: Value, _ context: some Context) {
+    var begin: Instruction
+    if let def = value.definingInstruction {
+      begin = def
+    } else if let result = TerminatorResult(value) {
+      begin = result.terminator
+    } else {
+      assert(Phi(value) != nil || value is FunctionArgument)
+      begin = value.parentBlock.instructions.first!
+    }
+    self = InstructionRange(begin: begin, context)
   }
 
   /// Insert a potential end instruction.
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
+    insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
     blockRange.insert(inst.parentBlock)
+    if inst.parentBlock != begin.parentBlock {
+      // The first time an instruction is inserted in another block than the begin-block we need to insert
+      // instructions from the begin instruction to the end of the begin block.
+      // For subsequent insertions this is a no-op: `insertIntoRange` will return immediately because those
+      // instruction are already inserted.
+      insertIntoRange(instructions: begin.parentBlock.instructions.reversed())
+    }
   }
 
   /// Insert a sequence of potential end instructions.
-  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == Instruction {
+  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element: Instruction {
     for inst in other {
       insert(inst)
     }
@@ -69,19 +95,11 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the exclusive range contains `inst`.
   func contains(_ inst: Instruction) -> Bool {
+    if inExclusiveRange.contains(inst) {
+      return true
+    }
     let block = inst.parentBlock
-    if !blockRange.inclusiveRangeContains(block) { return false }
-    var inRange = false
-    if blockRange.contains(block) {
-      if block != blockRange.begin { return true }
-      inRange = true
-    }
-    for i in block.instructions.reversed() {
-      if i == inst { return inRange }
-      if insertedInsts.contains(i) { inRange = true }
-      if i == begin { return false }
-    }
-    fatalError("didn't find instruction in its block")
+    return block != begin.parentBlock && blockRange.contains(block)
   }
 
   /// Returns true if the inclusive range contains `inst`.
@@ -98,10 +116,19 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns the end instructions.
+  ///
+  /// Warning: this returns `begin` if no instructions were inserted.
   var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
       $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
     }
+  }
+
+  // Returns the exit blocks.
+  var exitBlocks: LazySequence<FlattenSequence<
+                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
+                                    LazyFilterSequence<SuccessorArray>>>> {
+    blockRange.exits
   }
 
   /// Returns the exit instructions.
@@ -129,6 +156,14 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  private mutating func insertIntoRange(instructions: ReverseInstructionList) {
+    for inst in instructions {
+      if !inExclusiveRange.insert(inst) {
+        return
+      }
+    }
+  }
+
   var description: String {
     return (isValid ? "" : "<invalid>\n") +
       """
@@ -141,6 +176,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
+    inExclusiveRange.deinitialize()
     insertedInsts.deinitialize()
     blockRange.deinitialize()
   }

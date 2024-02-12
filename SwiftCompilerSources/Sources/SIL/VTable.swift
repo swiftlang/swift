@@ -20,32 +20,32 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedVTableEntry
     
-    public var function: Function { SILVTableEntry_getFunction(bridged).function }
+    public var function: Function { bridged.getImplementation().function }
 
     public var description: String {
-      let stdString = SILVTableEntry_debugDescription(bridged)
-      return String(_cxxString: stdString)
+      return String(taking: bridged.getDebugDescription())
     }
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let bridgedArray: BridgedArrayRef
+    fileprivate let base: BridgedVTableEntry
+    public let count: Int
     
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { return Int(bridgedArray.numElements) }
+    public var endIndex: Int { return count }
     
     public subscript(_ index: Int) -> Entry {
-      assert(index >= 0 && index < endIndex)
-      return Entry(bridged: BridgedVTableEntry(ptr: bridgedArray.data! + index &* BridgedVTableEntrySize))
+      assert(index >= startIndex && index < endIndex)
+      return Entry(bridged: base.advanceBy(index))
     }
   }
 
   public var entries: EntryArray {
-    EntryArray(bridgedArray: SILVTable_getEntries(bridged))
+    let entries = bridged.getEntries()
+    return EntryArray(base: entries.base, count: entries.count)
   }
 
   public var description: String {
-    let stdString = SILVTable_debugDescription(bridged)
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }

@@ -41,7 +41,7 @@ namespace llvm {
   /// This is intended to be trivially copyable, so it should be passed by
   /// value.
   template<typename T>
-  class LLVM_GSL_POINTER LLVM_NODISCARD ArrayRef {
+  class LLVM_GSL_POINTER [[nodiscard]] ArrayRef {
   public:
     using value_type = T;
     using pointer = value_type *;
@@ -305,7 +305,7 @@ namespace llvm {
   /// This is intended to be trivially copyable, so it should be passed by
   /// value.
   template<typename T>
-  class LLVM_NODISCARD MutableArrayRef : public ArrayRef<T> {
+  class [[nodiscard]] MutableArrayRef : public ArrayRef<T> {
   public:
     using value_type = T;
     using pointer = value_type *;
@@ -468,6 +468,28 @@ namespace llvm {
 
     ~OwningArrayRef() { delete[] this->data(); }
   };
+
+  /// C++17 ArrayRef deduction guides
+  template <typename T>
+  ArrayRef(const T &) -> ArrayRef<T>;
+  template <typename T>
+  ArrayRef(const T *, size_t) -> ArrayRef<T>;
+  template <typename T>
+  ArrayRef(const T *, const T *) -> ArrayRef<T>;
+  template <typename T>
+  ArrayRef(const SmallVectorImpl<T> &Vec) -> ArrayRef<T>;
+  template <typename T, unsigned N>
+  ArrayRef(const SmallVector<T, N> &Vec) -> ArrayRef<T>;
+  template <typename T, typename A>
+  ArrayRef(const std::vector<T, A> &) -> ArrayRef<T>;
+  template <typename T, std::size_t N>
+  ArrayRef(const std::array<T, N> &Vec) -> ArrayRef<T>;
+  template <typename T>
+  ArrayRef(const ArrayRef<T> &Vec) -> ArrayRef<T>;
+  template <typename T>
+  ArrayRef(ArrayRef<T> &Vec) -> ArrayRef<T>;
+  template <typename T, size_t N>
+  ArrayRef(const T (&Arr)[N]) -> ArrayRef<T>;
 
   /// @name ArrayRef Convenience constructors
   /// @{

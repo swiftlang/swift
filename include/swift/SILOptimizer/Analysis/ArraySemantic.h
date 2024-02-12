@@ -37,6 +37,7 @@ enum class ArrayCallKind {
   kWithUnsafeMutableBufferPointer,
   kAppendContentsOf,
   kAppendElement,
+  kCopyIntoVector,
   // The following two semantic function kinds return the result @owned
   // instead of operating on self passed as parameter. If you are adding
   // a function, and it has a self parameter, make sure that it is defined
@@ -45,7 +46,7 @@ enum class ArrayCallKind {
   kArrayInitEmpty,
   kArrayUninitialized,
   kArrayUninitializedIntrinsic,
-  kArrayFinalizeIntrinsic
+  kArrayFinalizeIntrinsic,
 };
 
 /// Return true is the given function is an array semantics call.
@@ -125,7 +126,7 @@ public:
   SILValue getIndex() const;
 
   /// Get the index as a constant if possible.
-  Optional<int64_t> getConstantIndex() const;
+  llvm::Optional<int64_t> getConstantIndex() const;
 
   /// Get the array.props.isNativeTypeChecked argument.
   SILValue getArrayPropertyIsNativeTypeChecked() const;

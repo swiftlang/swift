@@ -48,6 +48,17 @@ bb0(%0 : @owned $Buffer):
   return %t : $(Builtin.Int1, Buffer)
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair3
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair3'
+sil [ossa] @dont_remove_end_begin_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation [keep_unique] %0 : $Buffer
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  return %b : $Buffer
+}
+
 // CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair
 // CHECK-NOT: end_cow_mutation
 // CHECK-NOT: begin_cow_mutation
@@ -87,6 +98,16 @@ bb0(%0 : @owned $Buffer):
   return %t : $(Builtin.Int1, Buffer)
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair3
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair3'
+sil [ossa] @dont_remove_begin_end_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0 : $Buffer
+  %e = end_cow_mutation [keep_unique] %b : $Buffer
+  return %e : $Buffer
+}
 // CHECK-LABEL: sil @optimize_empty_cow_singleton
 // CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 // CHECK:   begin_cow_mutation

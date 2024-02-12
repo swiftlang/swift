@@ -3,7 +3,7 @@
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 
-// RUN: %target-sil-opt -I %t -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-sil-opt -I %t -opt-mode=speed -enable-sil-verify-all %s -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK
 
 import resilient_struct
 

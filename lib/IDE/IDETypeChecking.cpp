@@ -40,11 +40,22 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
   auto startingSize = Results.size();
   M->getDisplayDecls(Results, Recursive);
 
-  // Force Sendable on all types, which might synthesize some extensions.
+  // Force Sendable on all public types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
   for (auto result : Results) {
-    if (auto NTD = dyn_cast<NominalTypeDecl>(result))
-      (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+    if (auto NTD = dyn_cast<NominalTypeDecl>(result)) {
+
+      // Restrict this logic to public and package types. Non-public types
+      // may refer to implementation details and fail at deserialization.
+      auto accessScope = NTD->getFormalAccessScope();
+      if (!M->isMainModule() &&
+          !accessScope.isPublic() && !accessScope.isPackage())
+        continue;
+
+      auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+      if (proto)
+        (void) M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+    }
   }
 
   // Remove what we fetched and fetch again, possibly now with additional
@@ -103,7 +114,7 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::printModuleInterface(/*printFullConvention*/ false);
   result.PrintAccess = false;
   result.SkipUnavailable = false;
-  result.ExcludeAttrList.push_back(DAK_Available);
+  result.ExcludeAttrList.push_back(DeclAttrKind::Available);
   result.ArgAndParamPrinting =
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;
@@ -285,8 +296,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                ExtensionDecl *EnablingExt, NormalProtocolConformance *Conf) {
     SynthesizedExtensionInfo Result(IsSynthesized, EnablingExt);
     ExtensionMergeInfo MergeInfo;
-    MergeInfo.Unmergable = !Ext->getRawComment(/*SerializedOK=*/false).isEmpty() || // With comments
-                           Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
+    MergeInfo.Unmergable =
+        !Ext->getRawComment().isEmpty() ||             // With comments
+        Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
     MergeInfo.InheritsCount = countInherits(Ext);
 
     // There's (up to) two extensions here: the extension with the items that we
@@ -344,16 +356,30 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             return type;
           },
           LookUpConformanceInModule(M));
-        if (SubstReq.hasError())
+
+        SmallVector<Requirement, 2> subReqs;
+        switch (SubstReq.checkRequirement(subReqs)) {
+        case CheckRequirementResult::Success:
+          break;
+
+        case CheckRequirementResult::ConditionalConformance:
+          // FIXME: Need to handle conditional requirements here!
+          break;
+
+        case CheckRequirementResult::PackRequirement:
+          // FIXME
+          assert(false && "Refactor this");
           return true;
 
-        // FIXME: Need to handle conditional requirements here!
-        ArrayRef<Requirement> conditionalRequirements;
-        if (!SubstReq.isSatisfied(conditionalRequirements)) {
+        case CheckRequirementResult::SubstitutionFailure:
+          return true;
+
+        case CheckRequirementResult::RequirementFailure:
           if (!SubstReq.canBeSatisfied())
             return true;
 
           MergeInfo.addRequirement(Req);
+          break;
         }
       }
       return false;
@@ -643,6 +669,15 @@ class ExpressionTypeCollector: public SourceEntityWalker {
     if (E->getType().isNull())
       return false;
 
+    // We should not report a type for implicit expressions, except for
+    // - `OptionalEvaluationExpr` to show the correct type when there is optional chaining
+    // - `DotSyntaxCallExpr` to report the method type without the metatype
+    if (E->isImplicit() &&
+        !isa<OptionalEvaluationExpr>(E) &&
+        !isa<DotSyntaxCallExpr>(E)) {
+      return false;
+    }
+
     // If we have already reported types for this source range, we shouldn't
     // report again. This makes sure we always report the outtermost type of
     // several overlapping expressions.
@@ -656,7 +691,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.conformsToProtocol(E->getType(), Proto.first)) {
+      if (Module.checkConformance(E->getType(), Proto.first)) {
         Conformances.push_back(Proto.second);
       }
     }
@@ -822,7 +857,7 @@ public:
         PrintOptions Options;
         Options.SynthesizeSugarOnTypes = true;
         Options.FullyQualifiedTypes = FullyQualified;
-        auto Ty = VD->getType();
+        auto Ty = VD->getInterfaceType();
         // Skip this declaration and its children if the type is an error type.
         if (Ty->is<ErrorType>()) {
           return false;

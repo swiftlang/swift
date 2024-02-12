@@ -14,7 +14,8 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -placeholder-dependency-module-map-file %t/inputs/map.json -o %t/deps.json
 
 // Check the contents of the JSON output
-// RUN: %FileCheck %s < %t/deps.json
+// RUN: %validate-json %t/deps.json > %t/validated_deps.json
+// RUN: %FileCheck %s < %t/validated_deps.json
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -24,8 +25,7 @@ import Metal
 // Ensure the dependency on Darwin is captured even though it is a placeholder
 
 // CHECK:   "modulePath": "{{.*}}{{/|\\}}Metal-{{.*}}.swiftmodule",
-// CHECK-NEXT:   "sourceFiles": [
-// CHECK-NEXT:   ],
+// CHECK:   "directDependencies": [
 // CHECK:     {
 // CHECK:       "swiftPlaceholder": "Darwin"
 // CHECK:     },

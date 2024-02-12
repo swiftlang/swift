@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
 
@@ -16,6 +16,6 @@ class C {}
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on f: function-get-self-argument-index
 sil [ossa] @f : $@convention(method) <T> (@guaranteed C) -> @out T {
 entry(%instance : @guaranteed $C):
-    test_specification "function-get-self-argument-index"
+    specify_test "function-get-self-argument-index"
     unreachable
 }

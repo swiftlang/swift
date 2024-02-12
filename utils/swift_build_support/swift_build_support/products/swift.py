@@ -52,11 +52,24 @@ class Swift(product.Product):
         # Add experimental concurrency flag.
         self.cmake_options.extend(self._enable_experimental_concurrency)
 
+        # Add experimental cxx interop flags.
+        self.cmake_options.extend(self._enable_experimental_cxx_interop)
+        self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
+
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
-        # Add experimental reflection flag.
-        self.cmake_options.extend(self._enable_experimental_reflection)
+        # Add experimental NoncopyableGenerics flag.
+        self.cmake_options.extend(self._enable_experimental_noncopyable_generics)
+
+        # Add backtracing flag.
+        self.cmake_options.extend(self._enable_backtracing)
+
+        # Add experimental observation flag.
+        self.cmake_options.extend(self._enable_experimental_observation)
+
+        # Add synchronization flag.
+        self.cmake_options.extend(self._enable_synchronization)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -166,14 +179,39 @@ updated without updating swift.py?")
                  self.args.enable_experimental_concurrency)]
 
     @property
+    def _enable_experimental_cxx_interop(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL',
+                 self.args.enable_experimental_cxx_interop)]
+
+    @property
+    def _enable_cxx_interop_swift_bridging_header(self):
+        return [('SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL',
+                 self.args.enable_cxx_interop_swift_bridging_header)]
+
+    @property
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
 
     @property
-    def _enable_experimental_reflection(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL',
-                 self.args.enable_experimental_reflection)]
+    def _enable_experimental_noncopyable_generics(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS:BOOL',
+                 self.args.enable_experimental_noncopyable_generics)]
+
+    @property
+    def _enable_backtracing(self):
+        return [('SWIFT_ENABLE_BACKTRACING:BOOL',
+                 self.args.swift_enable_backtracing)]
+
+    @property
+    def _enable_experimental_observation(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL',
+                 self.args.enable_experimental_observation)]
+
+    @property
+    def _enable_synchronization(self):
+        return [('SWIFT_ENABLE_SYNCHRONIZATION:BOOL',
+                 self.args.enable_synchronization)]
 
     @property
     def _enable_stdlib_static_vprintf(self):

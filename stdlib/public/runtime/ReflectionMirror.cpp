@@ -379,7 +379,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto result = swift_getTypeByMangledName(
       MetadataState::Complete, typeName, substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index);
+        return substitutions.getMetadata(depth, index).Ptr;
       },
       [&substitutions](const Metadata *type, unsigned index) {
         return substitutions.getWitnessTable(type, index);

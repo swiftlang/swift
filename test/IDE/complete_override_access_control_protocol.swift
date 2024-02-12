@@ -119,7 +119,6 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRW: TagPC
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRO: TagPC
-// TEST_PRIVATE_ABC: End completions
 
 // TEST_INTERNAL_ABC: Begin completions, 18 items
 // TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: TagPA) {|}{{; name=.+$}}
@@ -140,7 +139,6 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRW: TagPC
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRO: TagPC
-// TEST_INTERNAL_ABC: End completions
 
 // TEST_PUBLIC_ABC: Begin completions, 18 items
 // TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: TagPA) {|}{{; name=.+$}}
@@ -161,7 +159,6 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    public var protoCVarRW: TagPC
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    public var protoCVarRO: TagPC
-// TEST_PUBLIC_ABC: End completions
 
 private class TestPrivateDE : ProtocolDPrivate, ProtocolEPublic {
   #^TEST_PRIVATE_DE^#

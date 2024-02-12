@@ -25,7 +25,7 @@ class Sub: Super {
 
 // Witness checking
 protocol P1 {
-  func g() // expected-note{{protocol requires function 'g()' with type '() -> ()'; do you want to add a stub?}}
+  func g() // expected-note{{protocol requires function 'g()' with type '() -> ()'; add a stub for conformance}}
 }
 
 struct ConformsToP1: P1 { // expected-error{{type 'ConformsToP1' does not conform to protocol 'P1'}}

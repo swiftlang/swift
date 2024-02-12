@@ -10,3 +10,4 @@ class C {
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=5:1 -end-pos=6:15 >> %t.result/L5-6.swift
 // RUN: diff -u %S/Outputs/extract_init/L5-6.swift.expected %t.result/L5-6.swift
+// REQUIRES: swift_swift_parser

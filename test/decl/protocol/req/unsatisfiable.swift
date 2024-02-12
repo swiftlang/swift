@@ -5,7 +5,7 @@ protocol P {
   associatedtype B
 
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A == Self.B' on 'Self'}}
-  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'; add a stub for conformance}}
 }
 
 extension P {
@@ -65,7 +65,7 @@ protocol P6 {
 
   func foo() where T == U
   // expected-error@-1 {{instance method requirement 'foo()' cannot add constraint 'Self.T == Self.U' on 'Self'}}
-  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'; add a stub for conformance}}
 }
 
 struct S2 : P6 {

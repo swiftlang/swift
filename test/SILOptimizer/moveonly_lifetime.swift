@@ -1,7 +1,8 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
-@_moveOnly
-class C {}
+struct C : ~Copyable {
+    deinit {}
+}
 
 @_silgen_name("getC")
 func getC() -> C
@@ -10,7 +11,7 @@ func getC() -> C
 func takeC(_ c: __owned C)
 
 @_silgen_name("borrowC")
-func borrowC(_ c: __shared C)
+func borrowC(_ c: borrowing C)
 
 @_silgen_name("something")
 func something()
@@ -30,19 +31,16 @@ func something()
 // CHECK:         [[INSTANCE:%.*]] = load [take] [[STACK]]
 // CHECK:         [[TAKE_C:%[^,]+]] = function_ref @takeC
 // CHECK:         apply [[TAKE_C]]([[INSTANCE]])
+// CHECK:         br [[BOTTOM:bb[0-9]+]]
 //
 // CHECK:       [[LEFT]]:
 // CHECK:         [[INSTANCE:%.*]] = load_borrow [[STACK]]
 // CHECK:         [[BORROW_C:%[^,]+]] = function_ref @borrowC
 // CHECK:         apply [[BORROW_C]]([[INSTANCE]])
-//
-// TODO: Once we maximize lifetimes this should be below something.
-// CHECK:         [[DESTROY_C:%[^,]+]] = function_ref @$s17moveonly_lifetime1CCfD
-// CHECK:         [[INSTANCE:%.*]] = load [take] [[STACK]]
-// CHECK:         apply [[DESTROY_C]]([[INSTANCE]])
-//
 // CHECK:         [[SOMETHING:%[^,]+]] = function_ref @something
 // CHECK:         apply [[SOMETHING]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         br [[BOTTOM]]
 // CHECK-LABEL: } // end sil function 'test_diamond__consume_r__use_l'
 @_silgen_name("test_diamond__consume_r__use_l")
 func test_diamond(_ condition: Bool) {

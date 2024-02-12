@@ -23,11 +23,11 @@ public func getUncheckedVar() -> Int {
   return globalUncheckedVar
 }
 
-public class ExclusivityAttrStruct {
+public struct ExclusivityAttrStruct {
 
-// CHECK-LABEL: sil {{.*}}@$s4test21ExclusivityAttrStructC9staticVarSivsZ
+// CHECK-LABEL: sil {{.*}}@$s4test21ExclusivityAttrStructV9staticVarSivsZ
 // CHECK-ON:      begin_access [modify] [unsafe]
-// CHECK:       } // end sil function '$s4test21ExclusivityAttrStructC9staticVarSivsZ'
+// CHECK:       } // end sil function '$s4test21ExclusivityAttrStructV9staticVarSivsZ'
   @exclusivity(unchecked)
   public static var staticVar: Int = 27
 }

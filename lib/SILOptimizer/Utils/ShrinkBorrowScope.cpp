@@ -20,9 +20,11 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -167,7 +169,8 @@ public:
   Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
       : context(context), uses(uses), barriers(barriers),
         result(&context.function),
-        reachability(&context.function, context.defBlock, *this, result) {}
+        reachability(Reachability::untilInitialBlock(
+            &context.function, context.defBlock, *this, result)) {}
   Dataflow(Dataflow const &) = delete;
   Dataflow &operator=(Dataflow const &) = delete;
 
@@ -208,6 +211,10 @@ private:
   void visitBarrierPhi(SILBasicBlock *block) { barriers.phis.push_back(block); }
 
   void visitBarrierBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
+
+  void visitInitialBlock(SILBasicBlock *block) {
     barriers.blocks.push_back(block);
   }
 };
@@ -489,3 +496,39 @@ bool swift::shrinkBorrowScope(
                                      calleeAnalysis);
   return ShrinkBorrowScope::run(context);
 }
+
+namespace swift::test {
+// Arguments:
+// - BeginBorrowInst - the introducer for the scope to shrink
+// - bool - the expected return value of shrinkBorrowScope
+// - variadic list of values consisting of the copies expected to be rewritten
+// Dumps:
+// - DELETED:  <<instruction deleted>>
+static FunctionTest ShrinkBorrowScopeTest(
+    "shrink-borrow-scope", [](auto &function, auto &arguments, auto &test) {
+      auto instruction = arguments.takeValue();
+      auto expected = arguments.takeBool();
+      auto *bbi = cast<BeginBorrowInst>(instruction);
+      auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
+      SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      InstructionDeleter deleter(
+          InstModCallbacks().onDelete([&](auto *instruction) {
+            llvm::outs() << "DELETED:\n";
+            instruction->print(llvm::outs());
+          }));
+      auto shrunk =
+          shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
+      unsigned index = 0;
+      for (auto *cvi : modifiedCopyValueInsts) {
+        auto expectedCopy = arguments.takeValue();
+        llvm::outs() << "rewritten copy " << index << ":\n";
+        llvm::outs() << "expected:\n";
+        expectedCopy->print(llvm::outs());
+        llvm::outs() << "got:\n";
+        cvi->print(llvm::outs());
+        assert(cvi == expectedCopy);
+        ++index;
+      }
+      assert(expected == shrunk && "didn't shrink expectedly!?");
+    });
+} // namespace swift::test

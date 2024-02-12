@@ -223,6 +223,20 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
   }
 }
 
+// Reduced from some code in Doggie.  rdar://107642925
+struct LocalGenericFunc<Element> {
+  var address: UnsafeMutablePointer<Element>
+  init(address: UnsafeMutablePointer<Element>) {
+    self.address = address
+  }
+
+  mutating func foo() {
+    func helper<S: Sequence>(_ newElements: S) where S.Element == Element {
+      let buffer = address
+    }
+  }
+}
+
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15nested_generics9OuterRingC05InnerD0Cyx_qd__GAA30ProtocolWithGenericRequirementA2aGP6method1t1u1v1TQz_1UQzqd__tAN_APqd__tlFTW : $@convention(witness_method: ProtocolWithGenericRequirement) <τ_0_0><τ_1_0><τ_2_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0, @in_guaranteed τ_2_0, @in_guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0) {
 // CHECK: bb0([[T:%[0-9]+]] : $*τ_0_0, [[U:%[0-9]+]] : $*τ_1_0, [[V:%[0-9]+]] : $*τ_2_0, [[TOut:%[0-9]+]] : $*τ_0_0, [[UOut:%[0-9]+]] : $*τ_1_0, [[VOut:%[0-9]+]] : $*τ_2_0, [[SELF:%[0-9]+]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
 // CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load_borrow [[SELF]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>

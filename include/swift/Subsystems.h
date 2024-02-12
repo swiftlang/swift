@@ -17,10 +17,13 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+#include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Version.h"
+#include "swift/Frontend/Frontend.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -35,6 +38,9 @@ namespace llvm {
   class Module;
   class TargetOptions;
   class TargetMachine;
+  namespace vfs {
+    class OutputBackend;
+  }
 }
 
 namespace swift {
@@ -125,13 +131,26 @@ namespace swift {
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once type checking is complete, this optionally transforms the ASTs to add
-  /// calls to external logging functions.
+  /// Once type checking is complete, this optionally transforms the ASTs to
+  /// insert calls to external logging functions.
+  ///
+  /// \param Opts The specific set of transforms that should be applied.
+  void performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts);
+
+  /// Once type checking is complete, this optionally transforms the ASTs to
+  /// insert calls to external logging functions. This function is provided
+  /// for backward compatibility with existing code; for new code, the variant
+  /// that takes an `PlaygroundOptionSet` parameter should be used.
   ///
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
+  ///
+  /// This function is provided for backward compatibility with older code, and
+  /// is a convenience for calling `performPlaygroundTransform()` with the set
+  /// of options that are enabled in high-performance mode. New uses should call
+  /// the newer form of this function that takes a `PlaygroundOptionSet`.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
-  
+
   /// Once type checking is complete this optionally walks the ASTs to add calls
   /// to externally provided functions that simulate "program counter"-like
   /// debugging events. See the comment at the top of lib/Sema/PCMacro.cpp for a
@@ -171,7 +190,8 @@ namespace swift {
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   GenericSignature handleSILGenericParams(GenericParamList *genericParams,
-                                          DeclContext *DC);
+                                          DeclContext *DC,
+                                          bool allowInverses=true);
 
   /// Turn the given module into SIL IR.
   ///
@@ -181,6 +201,14 @@ namespace swift {
   performASTLowering(ModuleDecl *M, Lowering::TypeConverter &TC,
                      const SILOptions &options,
                      const IRGenOptions *irgenOptions = nullptr);
+
+  /// Turn the given module into SIL IR.
+  ///
+  /// The module must contain source files. The optimizer will assume that the
+  /// SIL of all files in the module is present in the SILModule.
+  std::unique_ptr<SILModule>
+  performASTLowering(CompilerInstance &CI,
+                     llvm::SmallVector<SymbolSource, 1> Sources);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
@@ -236,10 +264,11 @@ namespace swift {
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
-  /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed, only to be optimized.
+  /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
+  /// if requested (\out is not null).
   void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
-                                llvm::TargetMachine *TargetMachine);
+                                llvm::TargetMachine *TargetMachine,
+                                llvm::raw_pwrite_stream *out);
 
   /// Compiles and writes the given LLVM module into an output stream in the
   /// format specified in the \c IRGenOptions.
@@ -248,7 +277,8 @@ namespace swift {
                            const IRGenOptions &opts,
                            UnifiedStatsReporter *stats, DiagnosticEngine &diags,
                            llvm::raw_pwrite_stream &out,
-                           llvm::sys::Mutex *diagMutex = nullptr);
+                           llvm::sys::Mutex *diagMutex = nullptr,
+                           llvm::raw_pwrite_stream *casid = nullptr);
 
   /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
@@ -275,6 +305,7 @@ namespace swift {
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
   /// \param OutputFilename Filename for output.
+  /// \param Backend OutputBackend for writing output.
   bool performLLVM(const IRGenOptions &Opts,
                    DiagnosticEngine &Diags,
                    llvm::sys::Mutex *DiagMutex,
@@ -282,6 +313,7 @@ namespace swift {
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
                    StringRef OutputFilename,
+                   llvm::vfs::OutputBackend &Backend,
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.

@@ -41,14 +41,14 @@ TEST_F(VersionTest, VersionComparison) {
   EXPECT_GE(currentVersion, currentVersion);
   EXPECT_GE(currentVersion, V("1.0").value());
   EXPECT_GE(currentVersion, V("2").value());
-  EXPECT_FALSE(V("2.n").hasValue());
-  EXPECT_FALSE(V("").hasValue());
-  EXPECT_FALSE(V("\"2.0\"").hasValue());
-  EXPECT_FALSE(V("2..").hasValue());
-  EXPECT_FALSE(V(".").hasValue());
-  EXPECT_FALSE(V("..").hasValue());
-  EXPECT_TRUE(V("1.").hasValue());
-  EXPECT_FALSE(V(".1").hasValue());
+  EXPECT_FALSE(V("2.n").has_value());
+  EXPECT_FALSE(V("").has_value());
+  EXPECT_FALSE(V("\"2.0\"").has_value());
+  EXPECT_FALSE(V("2..").has_value());
+  EXPECT_FALSE(V(".").has_value());
+  EXPECT_FALSE(V("..").has_value());
+  EXPECT_TRUE(V("1.").has_value());
+  EXPECT_FALSE(V(".1").has_value());
 
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -22,7 +22,7 @@ struct ConcreteConforms2: Conforms { typealias T = Int }
 struct ConcreteConformsNonFoo2: Conforms { typealias T = Float }
 
 protocol NestedConforms {
-    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 
     func foo(_: U)
 }
@@ -62,7 +62,7 @@ func needsNestedConformsDefault<X: NestedConformsDefault>(_: X.Type) {
 }
 
 protocol NestedSameType {
-    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
 
     func foo(_: U)
 }
@@ -120,21 +120,20 @@ struct ConcreteInheritsDiffer: Inherits {
     typealias U = ConcreteConforms
     typealias X = ConcreteConforms2
 }
-/*
-FIXME: the sametype requirement gets dropped from the requirement signature
-(enumerateRequirements doesn't yield it), so this doesn't error as it should.
+
 struct BadConcreteInherits: Inherits {
+// expected-error@-1 {{type 'BadConcreteInherits' does not conform to protocol 'Inherits'}}
+// expected-error@-2 {{'Inherits' requires the types 'ConcreteConforms.T' (aka 'Int') and 'ConcreteConformsNonFoo2.T' (aka 'Float') be equivalent}}
+// expected-note@-3 {{requirement specified as 'Self.U.T' == 'Self.X.T' [with Self = BadConcreteInherits]}}
     typealias U = ConcreteConforms
     typealias X = ConcreteConformsNonFoo2
 }
-*/
 
 struct X { }
 
 protocol P {
 	associatedtype P1 where P1 == X
 	associatedtype P2 where P2 == P1, P2 == X
-	// expected-warning@-1{{redundant same-type constraint 'Self.P2' == 'X'}}
 }
 
 // Lookup of same-named associated types aren't ambiguous in this context.

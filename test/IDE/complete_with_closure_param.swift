@@ -24,4 +24,3 @@ FooStruct().#^COMPLETE^#
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod6({#(callback): FunctionTypealias?##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod7({#(callback): OptionalFunctionTypealias##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// CHECK: End completions

@@ -98,14 +98,14 @@
 public let globalVariable = [ 100, 101, 102 ]
 
 // CHECK-LABEL: sil [noinline] @$s4test11arrayLookupyS2iF
-// CHECK:   global_value @$s4test11arrayLookupyS2iFTv_
+// CHECK:   global_value [bare] @$s4test11arrayLookupyS2iFTv_
 // CHECK-NOT: retain
 // CHECK-NOT: release
 // CHECK:   } // end sil function '$s4test11arrayLookupyS2iF'
 
 // CHECK-LLVM-LABEL: define {{.*}} @"$s4test11arrayLookupyS2iF"
 // CHECK-LLVM-NOT:  call
-// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_"
+// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_{{r*}}"
 // CHECK-LLVM-NEXT: [[L:%[0-9]+]] = load {{.*}} [[E]]
 // CHECK-LLVM-NEXT: ret {{.*}} [[L]]
 // CHECK-LLVM:   }
@@ -165,6 +165,16 @@ func arrayWithEmptyElements() -> [Empty] {
   return [Empty()]
 }
 
+// CHECK-LABEL: sil hidden [noinline] @$s4test13arrayOfTuplesSaySi_SbtGyF :
+// CHECK:         global_value @$s4test13arrayOfTuplesSaySi_SbtGyFTv_ :
+// CHECK-NOT:     store
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function '$s4test13arrayOfTuplesSaySi_SbtGyF'
+@inline(never)
+func arrayOfTuples() -> [(Int, Bool)] {
+  return [(1, false), (2, true), (3, false)]
+}
+
 // CHECK-LABEL: sil {{.*}}returnDictionary{{.*}} : $@convention(thin) () -> @owned Dictionary<Int, Int> {
 // CHECK:   global_value @{{.*}}returnDictionary{{.*}}
 // CHECK:   return
@@ -192,38 +202,60 @@ func functionArray() -> [(Int) -> Int] {
   return [foo, bar, { $0 + 10 }]
 }
 
+var g1 = 1
+var g2 = 2
+
+// CHECK-LABEL: sil {{.*arrayOfGlobalPointers.*}} : $@convention(thin) () -> @owned Array<UnsafePointer<Int>> {
+// CHECK:         global_value @{{.*arrayOfGlobalPointers.*}}
+// CHECK:       } // end sil function '{{.*arrayOfGlobalPointers.*}}'
+@inline(never)
+public func arrayOfGlobalPointers() -> [UnsafePointer<Int>] {
+  return [UnsafePointer(&g1), UnsafePointer(&g2)]
+}
+
 public struct FStr {
   // Not an array, but also tested here.
   public static var globalFunc = foo
 }
 
-// CHECK-OUTPUT:      [100, 101, 102]
-print(globalVariable)
-// CHECK-OUTPUT-NEXT: 11
-print(arrayLookup(1))
-// CHECK-OUTPUT-NEXT: [20, 21]
-print(returnArray())
-// CHECK-OUTPUT-NEXT: ["a", "b"]
-print(returnStaticStringArray())
-passArray()
-// CHECK-OUTPUT-NEXT: [29]
-print(gg!)
-storeArray()
-// CHECK-OUTPUT-NEXT: [227, 228]
-print(gg!)
-// CHECK-OUTPUT-NEXT: 311
-print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
-// CHECK-OUTPUT-NEXT: 27
-print(FStr.globalFunc(27))
+@inline(never)
+func testit() {
+  // CHECK-OUTPUT:      [100, 101, 102]
+  print(globalVariable)
+  // CHECK-OUTPUT-NEXT: 11
+  print(arrayLookup(1))
+  // CHECK-OUTPUT-NEXT: [20, 21]
+  print(returnArray())
+  // CHECK-OUTPUT-NEXT: ["a", "b"]
+  print(returnStaticStringArray())
+  passArray()
+  // CHECK-OUTPUT-NEXT: [29]
+  print(gg!)
+  storeArray()
+  // CHECK-OUTPUT-NEXT: [227, 228]
+  print(gg!)
+  // CHECK-OUTPUT-NEXT: 311
+  print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
+  // CHECK-OUTPUT-NEXT: 27
+  print(FStr.globalFunc(27))
+  
+  let tuples = arrayOfTuples()
+  // CHECK-OUTPUT-NEXT: tuples [(1, false), (2, true), (3, false)]
+  print("tuples \(tuples)")
+  
+  let dict = returnDictionary()
+  // CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6
+  print("dict \(dict.count): \(dict[1]!), \(dict[3]!), \(dict[5]!)")
+  
+  let sdict = returnStringDictionary()
+  // CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
+  print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")
 
-let dict = returnDictionary()
-// CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6
-print("dict \(dict.count): \(dict[1]!), \(dict[3]!), \(dict[5]!)")
+  // CHECK-OUTPUT-NEXT: globalpointers: [1, 2]
+  print("globalpointers: \(arrayOfGlobalPointers().map { $0.pointee })")
+}
 
-let sdict = returnStringDictionary()
-// CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
-print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")
-
+testit()
 
 public class SwiftClass {}
 
@@ -235,17 +267,15 @@ func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
 // This should be a single basic block, and the array should end up being stack
 // allocated.
 //
-// CHECK-LABEL: sil @{{.*}}passArrayOfClasses
-// CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
-// CHECK-NOT: bb1(
-// CHECK: alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
-// CHECK-NOT: bb1(
-// CHECK:   return
+// CHECK-LABEL: sil [noinline] @{{.*passArrayOfClasses.*}} : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> () {
+// CHECK:       bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
+// CHECK-NOT:   bb1(
+// CHECK:         alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
+// CHECK-NOT:   bb1(
+// CHECK:       } // end sil function '{{.*passArrayOfClasses.*}}'
+@inline(never)
 public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
   let arr = [a, b, c]
   takeUnsafePointer(ptr: arr, len: arr.count)
 }
-
-
-
 

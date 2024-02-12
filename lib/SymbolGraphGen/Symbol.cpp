@@ -91,6 +91,7 @@ std::pair<StringRef, StringRef> Symbol::getKind(const Decl *D) {
       return {"swift.method", "Instance Method"};
     return {"swift.func", "Function"};
   }
+  case swift::DeclKind::Param: LLVM_FALLTHROUGH;
   case swift::DeclKind::Var: {
     const auto *VD = cast<ValueDecl>(D);
 
@@ -210,8 +211,8 @@ void Symbol::serializeRange(size_t InitialIndentation,
 
 const ValueDecl *Symbol::getDeclInheritingDocs() const {
   // get the decl that would provide docs for this symbol
-  const auto *DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
-      getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
+  const auto *DocCommentProvidingDecl =
+      dyn_cast_or_null<ValueDecl>(getDocCommentProvidingDecl(D));
 
   // if the decl is the same as the one for this symbol, we're not
   // inheriting docs, so return null. however, if this symbol is
@@ -356,13 +357,13 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 
   const auto *DocCommentProvidingDecl = D;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
-    DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
-        getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
+    DocCommentProvidingDecl =
+        dyn_cast_or_null<ValueDecl>(getDocCommentProvidingDecl(D));
     if (!DocCommentProvidingDecl) {
       DocCommentProvidingDecl = D;
     }
   }
-  auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
+  auto RC = DocCommentProvidingDecl->getRawComment();
   if (RC.isEmpty()) {
     return;
   }
@@ -406,39 +407,62 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
-  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
-    OS.attributeObject("functionSignature", [&](){
+  auto serializeParameterList = [&](const swift::ParameterList *ParamList) {
+    if (ParamList->size()) {
+      OS.attributeArray("parameters", [&]() {
+        for (const auto *Param : *ParamList) {
+          auto ExternalName = Param->getArgumentName().str();
+          auto InternalName = Param->getParameterName().str();
 
+          OS.object([&]() {
+            if (ExternalName.empty()) {
+              OS.attribute("name", InternalName);
+            } else {
+              OS.attribute("name", ExternalName);
+              if (ExternalName != InternalName && !InternalName.empty()) {
+                OS.attribute("internalName", InternalName);
+              }
+            }
+            Graph->serializeDeclarationFragments(
+                "declarationFragments",
+                Symbol(Graph, Param, getSynthesizedBaseTypeDecl(),
+                       getBaseType()),
+                OS);
+          }); // end parameter object
+        }
+      }); // end parameters:
+    }
+  };
+
+  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
       // Parameters
       if (const auto *ParamList = FD->getParameters()) {
-        if (ParamList->size()) {
-          OS.attributeArray("parameters", [&](){
-            for (const auto *Param : *ParamList) {
-              auto ExternalName = Param->getArgumentName().str();
-              auto InternalName = Param->getParameterName().str();
-
-              OS.object([&](){
-                if (ExternalName.empty()) {
-                  OS.attribute("name", InternalName);
-                } else {
-                  OS.attribute("name", ExternalName);
-                  if (ExternalName != InternalName &&
-                      !InternalName.empty()) {
-                    OS.attribute("internalName", InternalName);
-                  }
-                }
-                Graph->serializeDeclarationFragments("declarationFragments",
-                                                     Symbol(Graph, Param,
-                                                            getSynthesizedBaseTypeDecl(),
-                                                            getBaseType()), OS);
-              }); // end parameter object
-            }
-          }); // end parameters:
-        }
+        serializeParameterList(ParamList);
       }
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
+        Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
+                                             OS);
+      }
+    });
+  } else if (const auto *CD = dyn_cast_or_null<ConstructorDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = CD->getParameters()) {
+        serializeParameterList(ParamList);
+      }
+    });
+  } else if (const auto *SD = dyn_cast_or_null<SubscriptDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = SD->getIndices()) {
+        serializeParameterList(ParamList);
+      }
+
+      // Returns
+      if (const auto ReturnType = SD->getElementInterfaceType()) {
         Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
                                              OS);
       }
@@ -839,6 +863,7 @@ bool Symbol::supportsKind(DeclKind Kind) {
   case DeclKind::Destructor: LLVM_FALLTHROUGH;
   case DeclKind::Func: LLVM_FALLTHROUGH;
   case DeclKind::Var: LLVM_FALLTHROUGH;
+  case DeclKind::Param: LLVM_FALLTHROUGH;
   case DeclKind::Subscript: LLVM_FALLTHROUGH;
   case DeclKind::TypeAlias: LLVM_FALLTHROUGH;
   case DeclKind::AssociatedType: LLVM_FALLTHROUGH;
@@ -859,7 +884,7 @@ AccessLevel Symbol::getEffectiveAccessLevel(const ExtensionDecl *ED) {
   }
 
   AccessLevel maxInheritedAL = AccessLevel::Private;
-  for (auto Inherited : ED->getInherited()) {
+  for (auto Inherited : ED->getInherited().getEntries()) {
     if (const auto Type = Inherited.getType()) {
       if (const auto *Proto = dyn_cast_or_null<ProtocolDecl>(
               Type->getAnyNominal())) {

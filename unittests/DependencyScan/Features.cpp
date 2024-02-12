@@ -27,7 +27,7 @@ testHasOption(llvm::opt::OptTable &table, options::ID id,
               const std::unordered_set<std::string> &optionSet) {
   if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
     auto name = table.getOptionName(id);
-    if (strlen(name) > 0) {
+    if (!name.empty() && name[0] != '\0') {
       auto nameStr = std::string(name);
       bool setContainsOption = optionSet.find(nameStr) != optionSet.end();
       EXPECT_EQ(setContainsOption, true) << "Missing Option: " << nameStr;

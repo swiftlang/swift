@@ -1241,6 +1241,7 @@ bb0:
   %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   %2 = apply %1<String>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   (%3, %4) = destructure_tuple %2 : $(Array<String>, Builtin.RawPointer)
+  %5 = mark_dependence %4 : $Builtin.RawPointer on %3 : $Array<String>
   return %3 : $Array<String>
 } // CHECK: Returns Array<String>
   // CHECK: size: 0 contents []
@@ -1480,7 +1481,7 @@ bb0:
 
 sil [ossa] @testMetatypeCast : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
 bb0(%0 : $@thick T.Type):
-  checked_cast_br %0 : $@thick T.Type to Int64.Type, bb1, bb2
+  checked_cast_br T.Type in %0 : $@thick T.Type to Int64.Type, bb1, bb2
 
 bb1(%3 : $@thick Int64.Type):
   %4 = metatype $@thin Int64.Type

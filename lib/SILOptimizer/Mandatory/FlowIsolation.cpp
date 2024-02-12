@@ -20,6 +20,7 @@
 #include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
@@ -155,7 +156,8 @@ public:
   /// a normal return is reached, along with the block that returns normally.
   /// Only computed after calling solve(), where it remains None if the function
   /// doesn't return normally.
-  Optional<std::pair<SILBasicBlock*, State::Kind>> normalReturn = None;
+  llvm::Optional<std::pair<SILBasicBlock *, State::Kind>> normalReturn =
+      llvm::None;
 
   /// indicates whether the SILFunction is (or contained in) a deinit.
   bool forDeinit;
@@ -277,33 +279,12 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
   SILBasicBlock* firstBlk = startInst->getParent();
   assert(firstBlk->getParent() == getFunction());
 
-  // workList for breadth-first search to find one of the closest blocks.
-  std::deque<SILBasicBlock*> workList;
-  BasicBlockSet visited(getFunction());
-
-  // seed the search
-  workList.push_back(firstBlk);
-  SILBasicBlock::reverse_iterator cursor = startInst->getReverseIterator();
-
-  while (!workList.empty()) {
-    auto *block = workList.front();
-    workList.pop_front();
+  // searches the a block starting at the provided position in reverse
+  // order of instructions (i.e., from terminator to first instruction).
+  auto searchBlockForNonisolated =
+      [&](SILBasicBlock::reverse_iterator cursor) -> SILInstruction * {
+    SILBasicBlock *block = cursor->getParent();
     auto &state = flow[block];
-
-    // if this block doesn't have exiting nonisolation, then there's no
-    // way we'll find nonisolation in a predecessor.
-    assert(state.exitSet[State::Nonisolated] && "nonisolation is unreachable!");
-
-    // If this is the first time we're scanning the start block, then leave
-    // the cursor alone and do a partial scan. If the block is part of
-    // a cycle, we want to scan the block entirely on the second visit, so we
-    // do not count this as a visit.
-    if (startInst) {
-      startInst = nullptr; // make sure second visit scans entirely.
-    } else {
-      cursor = block->rbegin();
-      visited.insert(block);
-    }
 
     // does this block generate non-isolation?
     if (state.genSet[State::Nonisolated]) {
@@ -321,16 +302,36 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
       }
     }
 
+    return nullptr;
+  };
+
+  // whether we should visit a given predecessor block in the search.
+  auto shouldVisit = [&](SILBasicBlock *pred) {
+    // visit blocks that contribute nonisolation to successors.
+    return flow[pred].exitSet[State::Nonisolated];
+  };
+
+  // first check if the nonisolated use precedes the start instruction in
+  // this same block.
+  if (auto *inst = searchBlockForNonisolated(startInst->getReverseIterator()))
+    return inst;
+
+  // Seed a workQueue with the predecessors of this start block to
+  // begin a breadth-first search to find one of the closest predecessors.
+  BasicBlockWorkqueue workQueue(firstBlk->getFunction());
+  for (auto *pred : firstBlk->getPredecessorBlocks())
+    if (shouldVisit(pred))
+      workQueue.push(pred);
+
+  while (auto *block = workQueue.pop()) {
+    // do we have a nonisolated use here?
+    if (auto *inst = searchBlockForNonisolated(block->rbegin()))
+      return inst;
+
+    // otherwise keep looking
     for (auto *pred : block->getPredecessorBlocks()) {
-      // skip visited
-      if (visited.contains(pred))
-        continue;
-
-      // skip blocks that do not contribute nonisolation.
-      if (flow[pred].exitSet[State::Nonisolated] == false)
-        continue;
-
-      workList.push_back(pred);
+      if (shouldVisit(pred))
+        workQueue.pushIfNotVisited(pred);
     }
   }
 
@@ -496,9 +497,8 @@ static bool accessIsConcurrencySafe(ModuleDecl *module,
                                     RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
 
-  // must be accessible from nonisolated and Sendable
-  return isLetAccessibleAnywhere(module, var)
-      && isSendableType(module, var->getType());
+  // must be accessible from nonisolated.
+  return isLetAccessibleAnywhere(module, var);
 }
 
 /// \returns true iff the ref_element_addr instruction is only used
@@ -516,11 +516,10 @@ static bool onlyDeinitAccess(RefElementAddrInst *inst) {
 /// diagnostic if it is not Sendable. The diagnostic assumes that the access
 /// is happening in a deinit that uses flow-isolation.
 /// \returns true iff a diagnostic was emitted for this reference.
-static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
-                                          RefElementAddrInst *inst) {
+static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
-  Type ty = var->getType();
-  DeclContext* dc = inst->getFunction()->getDeclContext();
+  Type ty = var->getTypeInContext();
+  DeclContext *dc = inst->getFunction()->getDeclContext();
 
 // FIXME: we should emit diagnostics in other modes using:
 //
@@ -533,7 +532,7 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
       != StrictConcurrency::Complete)
       return false;
 
-  if (isSendableType(module, ty))
+  if (ty->isSendableType())
     return false;
 
   auto &diag = var->getASTContext().Diags;
@@ -545,6 +544,30 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
   return true;
 }
 
+class OperandWorklist {
+  SmallVector<Operand *, 32> worklist;
+  SmallPtrSet<Operand *, 16> visited;
+
+public:
+  Operand *pop() {
+    if (worklist.empty())
+      return nullptr;
+    return worklist.pop_back_val();
+  }
+
+  void pushIfNotVisited(Operand *op) {
+    if (visited.insert(op).second) {
+      worklist.push_back(op);
+    }
+  }
+
+  void pushUsesOfValueIfNotVisited(SILValue value) {
+    for (Operand *use : value->getUses()) {
+      pushIfNotVisited(use);
+    }
+  }
+};
+
 /// Analyzes a function for uses of `self` and records the kinds of isolation
 /// required.
 /// \param selfParam the parameter of \c getFunction() that should be
@@ -555,13 +578,12 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
   ModuleDecl *module = getFunction()->getModule().getSwiftModule();
 
   // Use a worklist to track the uses left to be searched.
-  SmallVector<Operand *, 32> worklist;
+  OperandWorklist worklist;
 
   // Seed with direct users of `self`
-  worklist.append(selfParam->use_begin(), selfParam->use_end());
+  worklist.pushUsesOfValueIfNotVisited(selfParam);
 
-  while (!worklist.empty()) {
-    Operand *operand = worklist.pop_back_val();
+  while (Operand *operand = worklist.pop()) {
     SILInstruction *user = operand->getUser();
 
     // First, check if this is an apply that involves `self`
@@ -633,7 +655,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
           continue;
 
         // emit a diagnostic and skip if it's non-sendable in a deinit
-        if (forDeinit && diagnoseNonSendableFromDeinit(module, refInst))
+        if (forDeinit && diagnoseNonSendableFromDeinit(refInst))
           continue;
 
         markPropertyUse(user);
@@ -650,11 +672,19 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
         break;
 
       case SILInstructionKind::BeginAccessInst:
-      case SILInstructionKind::BeginBorrowInst: {
+      case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::EndInitLetRefInst: {
         auto *svi = cast<SingleValueInstruction>(user);
-        worklist.append(svi->use_begin(), svi->use_end());
+        worklist.pushUsesOfValueIfNotVisited(svi);
         break;
       }
+
+      case SILInstructionKind::BranchInst: {
+        auto *arg = cast<BranchInst>(user)->getArgForOperand(operand);
+        worklist.pushUsesOfValueIfNotVisited(arg);
+        break;
+      }
+
 
       default:
         // don't follow this instruction.

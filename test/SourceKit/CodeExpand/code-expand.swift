@@ -10,6 +10,22 @@ foo(x: <#T##() -> Void#>, y: <#T##Int#>)
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }, y: Int)
 
+try foo(x: <#T##() -> Void#>)
+// CHECK:      try foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+await foo(x: <#T##() -> Void#>)
+// CHECK:      await foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+!foo(x: <#T##() -> Void#>)
+// CHECK:      !foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+
 anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
 // CHECK:      anArr.indexOfObjectPassingTest { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
 // CHECK-NEXT: <#code#>
@@ -129,6 +145,19 @@ braced2(x: {<#T##() -> Void#>}, y: Int)
 // CHECK:   braced2(x: {
 // CHECK-NEXT:  <#code#>
 // CHECK-NEXT:  }, y: Int)
+
+braced3({
+  #if true
+  <#T##() -> Int#>
+  #endif
+})
+// CHECK:      braced3({
+// CHECK-NEXT:   #if true
+// CHECK-NEXT:    {
+// CHECK-NEXT:      <#code#>
+// CHECK-NEXT:    }
+// CHECK-NEXT:    #endif
+// CHECK-NEXT:  })
 
 func returnTrailing() -> Int {
   return withtrail(<#T##() -> ()#>)

@@ -117,6 +117,30 @@ static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
   return SILValue();
 }
 
+SILValue swift::stripFunctionConversions(SILValue val) {
+  SILValue result = nullptr;
+
+  for (;;) {
+    if (auto ti = dyn_cast<ThinToThickFunctionInst>(val)) {
+      val = ti->getOperand();
+      result = val;
+      continue;
+    } else if (auto cfi = dyn_cast<ConvertFunctionInst>(val)) {
+      val = cfi->getOperand();
+      result = val;
+      continue;
+    } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val)) {
+      val = cvt->getOperand();
+      result = val;
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  return result;
+}
+
 SILInstruction *ConstantTracker::getDef(SILValue val,
                                         ProjectionPath &projStack) {
 
@@ -137,14 +161,8 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
-      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
-        val = ti->getOperand();
-        continue;
-      } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
-        val = cfi->getOperand();
-        continue;
-      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
-        val = cvt->getOperand();
+      } else if (auto base = stripFunctionConversions(inst)) {
+        val = base;
         continue;
       }
       return inst;
@@ -172,9 +190,9 @@ case BuiltinValueKind::id:
       IntConst lhs = getIntConst(Args[0], depth);
       IntConst rhs = getIntConst(Args[1], depth);
       if (lhs.isValid && rhs.isValid) {
-        return IntConst(constantFoldComparison(lhs.value, rhs.value,
-                                               Builtin.ID),
-                        lhs.isFromCaller || rhs.isFromCaller);
+        return IntConst(
+            constantFoldComparisonInt(lhs.value, rhs.value, Builtin.ID),
+            lhs.isFromCaller || rhs.isFromCaller);
       }
       break;
     }
@@ -613,6 +631,7 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // transient and should be inlined away immediately.
   case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kArrayFinalizeIntrinsic:
+  case ArrayCallKind::kCopyIntoVector:
     return SemanticFunctionLevel::Transient;
 
   } // end switch
@@ -753,7 +772,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline >= InlineSelection::NoSemanticsAndGlobalInit) {
+    if (WhatToInline >= InlineSelection::NoSemanticsAndEffects) {
       // TODO: for stable optimization of semantics, prevent inlining whenever
       // isOptimizableSemanticFunction(Callee) is true.
       if (getSemanticFunctionLevel(Callee) == SemanticFunctionLevel::Fundamental
@@ -775,11 +794,6 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
       if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
         return nullptr;
       }
-    }
-
-  } else if (Callee->isGlobalInit()) {
-    if (WhatToInline != InlineSelection::Everything) {
-      return nullptr;
     }
   }
 
@@ -883,7 +897,7 @@ static bool hasInterestingSideEffect(SILInstruction *I) {
     case swift::SILInstructionKind::DeallocRefInst:
       return false;
     default:
-      return I->getMemoryBehavior() != SILInstruction::MemoryBehavior::None;
+      return I->getMemoryBehavior() != MemoryBehavior::None;
   }
 }
 
@@ -937,7 +951,7 @@ bool swift::isPureCall(FullApplySite AI, BasicCalleeAnalysis *BCA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  if (BCA->getMemoryBehavior(AI, /*observeRetains*/ true) != SILInstruction::MemoryBehavior::None)
+  if (BCA->getMemoryBehavior(AI, /*observeRetains*/ true) != MemoryBehavior::None)
     return false;
   // Check if all parameters are constant.
   auto Args = AI.getArgumentOperands().slice(AI.getNumIndirectSILResults());

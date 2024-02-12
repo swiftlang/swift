@@ -15,6 +15,7 @@
 # ----------------------------------------------------------------------------
 
 
+import multiprocessing
 import os
 import platform
 import re
@@ -273,18 +274,20 @@ class CMake(object):
 
         cwd = os.getcwd()
         os.chdir(cmake_build_dir)
-        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui', '--',
-                                    '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
-        shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
+        build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
+        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui',
+                                     '--parallel=%s' % build_jobs, '--',
+                                     '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
+        shell.call_without_sleeping(['make', '-j%s' % build_jobs],
                                     echo=True)
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
 
-    # For Linux only, determine the version of the installed CMake compared to
-    # the source and build the source if necessary. Returns the path to the
-    # cmake binary.
+    # For Linux and FreeBSD only, determine the version of the installed
+    # CMake compared to the source and build the source if necessary.
+    # Returns the path to the cmake binary.
     def check_cmake_version(self, source_root, build_root):
-        if platform.system() != 'Linux':
+        if not platform.system() in ["Linux", "FreeBSD"]:
             return
 
         cmake_source_dir = os.path.join(source_root, 'cmake')

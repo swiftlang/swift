@@ -45,7 +45,7 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto choice = solution.argumentMatchingChoices.find(locator);
   ASSERT_TRUE(choice != solution.argumentMatchingChoices.end());
   MatchCallArgumentResult expected{
-      TrailingClosureMatching::Forward, {{0}, {1}}, None};
+      TrailingClosureMatching::Forward, {{0}, {1}}, llvm::None};
   ASSERT_EQ(choice->second, expected);
 }
 
@@ -79,6 +79,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
       /*capturedSelfDecl=*/nullptr, ParameterList::create(Context, {paramDecl}),
       /*asyncLoc=*/SourceLoc(),
       /*throwsLoc=*/SourceLoc(),
+      /*thrownType=*/nullptr,
       /*arrowLoc=*/SourceLoc(),
       /*inLoc=*/SourceLoc(),
       /*explicitResultType=*/nullptr,
@@ -88,8 +89,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   closure->setImplicit();
 
   closure->setBody(BraceStmt::create(Context, /*startLoc=*/SourceLoc(), {},
-                                     /*endLoc=*/SourceLoc()),
-                   /*isSingleExpression=*/false);
+                                     /*endLoc=*/SourceLoc()));
 
   auto *closureLoc = cs.getConstraintLocator(closure);
 
@@ -111,7 +111,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   auto *closureTy = cs.createTypeVariable(closureLoc, /*options=*/0);
 
   cs.addUnsolvedConstraint(Constraint::create(
-      cs, ConstraintKind::DefaultClosureType, closureTy, defaultTy,
+      cs, ConstraintKind::FallbackType, closureTy, defaultTy,
       cs.getConstraintLocator(closure), /*referencedVars=*/{}));
 
   auto contextualTy =

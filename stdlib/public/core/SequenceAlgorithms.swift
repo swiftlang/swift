@@ -412,20 +412,18 @@ extension Sequence {
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()
     while true {
-      if let e1 = iter1.next() {
-        if let e2 = iter2.next() {
-          if try areInIncreasingOrder(e1, e2) {
-            return true
-          }
-          if try areInIncreasingOrder(e2, e1) {
-            return false
-          }
-          continue // Equivalent
-        }
+      guard let e1 = iter1.next() else {
+        return iter2.next() != nil
+      }
+      guard let e2 = iter2.next() else {
         return false
       }
-
-      return iter2.next() != nil
+      if try areInIncreasingOrder(e1, e2) {
+        return true
+      }
+      if try areInIncreasingOrder(e2, e1) {
+        return false
+      }
     }
   }
 }

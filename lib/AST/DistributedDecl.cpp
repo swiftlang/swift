@@ -56,7 +56,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
@@ -96,8 +95,9 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getConcreteReplacementForMemberSerializationRequirement(
-    ValueDecl *member) {
+Type swift::getSerializationRequirementTypesForMember(
+    ValueDecl *member,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements) {
   auto &C = member->getASTContext();
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
@@ -107,8 +107,10 @@ Type swift::getConcreteReplacementForMemberSerializationRequirement(
     return getDistributedSerializationRequirementType(classDecl, C.getDistributedActorDecl());
   }
 
-  /// === Maybe the value is declared in a protocol?
-  if (auto protocol = DC->getSelfProtocolDecl()) {
+  auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
+      ->getDeclaredInterfaceType();
+
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -116,8 +118,10 @@ Type swift::getConcreteReplacementForMemberSerializationRequirement(
       signature = DC->getGenericSignatureOfContext();
     }
 
-    auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
-                               ->getDeclaredInterfaceType();
+    // Also store all `SerializationRequirement : SomeProtocol` requirements
+    for (auto proto: signature->getRequiredProtocols(SerReqAssocType)) {
+      serializationRequirements.insert(proto);
+    }
 
     // Note that this may be null, e.g. if we're a distributed func inside
     // a protocol that did not declare a specific actor system requirement.
@@ -179,13 +183,7 @@ Type swift::getDistributedActorSystemResultHandlerType(
   auto module = system->getParentModule();
   Type selfType = system->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, DAS);
-  auto witness =
-      conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
-  if (auto alias = dyn_cast<TypeAliasType>(witness.getPointer())) {
-    return alias->getDecl()->getUnderlyingType();
-  } else {
-    return witness;
-  }
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
 }
 
 Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system) {
@@ -347,63 +345,39 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  if (!existentialRequirementTy->isExistentialType()) {
-    // SerializationRequirement must be an existential type
-    return false;
-  }
-
-  ExistentialType *serialReqType = existentialRequirementTy
-                                       ->castTo<ExistentialType>();
+  auto *serialReqType = existentialRequirementTy->getAs<ExistentialType>();
   if (!serialReqType || serialReqType->hasError()) {
     return false;
   }
 
-  auto desugaredTy = serialReqType->getConstraintType()->getDesugaredType();
-  auto flattenedRequirements =
-      flattenDistributedSerializationTypeToRequiredProtocols(
-          desugaredTy);
-  for (auto p : flattenedRequirements) {
+  auto layout = serialReqType->getExistentialLayout();
+  for (auto p : layout.getProtocols()) {
     requirementProtos.insert(p);
   }
 
   return true;
 }
 
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::flattenDistributedSerializationTypeToRequiredProtocols(
-    TypeBase *serializationRequirement) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  if (auto composition =
-          serializationRequirement->getAs<ProtocolCompositionType>()) {
-    for (auto member : composition->getMembers()) {
-      if (auto comp = member->getAs<ProtocolCompositionType>()) {
-        for (auto protocol :
-             flattenDistributedSerializationTypeToRequiredProtocols(comp)) {
-          serializationReqs.insert(protocol);
-        }
-      } else if (auto *protocol = member->getAs<ProtocolType>()) {
-        serializationReqs.insert(protocol->getDecl());
-      }
-    }
-  } else {
-    auto protocol = serializationRequirement->castTo<ProtocolType>()->getDecl();
-    serializationReqs.insert(protocol);
-  }
-
-  return serializationReqs;
-}
-
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
     ASTContext &C,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements) {
+    Type type) {
+  if (!type)
+    return false;
+
+  if (type->hasError())
+    return false;
+
   auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
   auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
 
-  if (allRequirements.size() != 2)
+  auto layout = type->getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  if (protocols.size() != 2)
     return false;
 
-  return allRequirements.count(encodable) &&
-         allRequirements.count(decodable);
+  return std::count(protocols.begin(), protocols.end(), encodable) == 1 &&
+      std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
 /******************************************************************************/
@@ -554,9 +528,13 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
 
-  if (requirements.size() != expectedRequirementsNum) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  sig->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+  if (reqs.size() != expectedRequirementsNum) {
     return false;
   }
 
@@ -571,26 +549,20 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // same_type: Act.ID FakeActorSystem.ActorID // LAST one
 
   // --- Check requirement: conforms_to: Act DistributedActor
-  auto actorReq = requirements[0];
-  auto distActorTy = C.getProtocol(KnownProtocolKind::DistributedActor)
-                       ->getInterfaceType()
-                       ->getMetatypeInstanceType();
+  auto actorReq = reqs[0];
   if (actorReq.getKind() != RequirementKind::Conformance) {
     return false;
   }
-  if (!actorReq.getSecondType()->isEqual(distActorTy)) {
+  if (!actorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
     return false;
   }
 
   // --- Check requirement: conforms_to: Err Error
-  auto errorReq = requirements[1];
-  auto errorTy = C.getProtocol(KnownProtocolKind::Error)
-                     ->getInterfaceType()
-                     ->getMetatypeInstanceType();
+  auto errorReq = reqs[1];
   if (errorReq.getKind() != RequirementKind::Conformance) {
     return false;
   }
-  if (!errorReq.getSecondType()->isEqual(errorTy)) {
+  if (!errorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Error)) {
     return false;
   }
 
@@ -605,10 +577,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     assert(ResParam && "Non void function, yet no Res generic parameter found");
     if (auto func = dyn_cast<FuncDecl>(this)) {
       auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
-                            ->getMetatypeInstanceType()
-                            ->getDesugaredType();
+                            ->getMetatypeInstanceType();
       auto resultParamType = func->mapTypeIntoContext(
-          ResParam->getInterfaceType()->getMetatypeInstanceType());
+          ResParam->getDeclaredInterfaceType());
       // The result of the function must be the `Res` generic argument.
       if (!resultType->isEqual(resultParamType)) {
         return false;
@@ -626,7 +597,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // -- Check requirement: same_type Actor.ID Self.ActorID
-  auto actorIdReq = requirements.back();
+  auto actorIdReq = reqs.back();
   if (actorIdReq.getKind() != RequirementKind::SameType) {
     return false;
   }
@@ -700,10 +671,14 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
     return false;
   }
 
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  fd->getGenericSignature()->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
   // No requirements on the generic parameter
-  if (fd->getGenericRequirements().size() != 0) {
+  if (!reqs.empty())
     return false;
-  }
 
   if (!fd->getResultInterfaceType()->isVoid())
     return false;
@@ -804,12 +779,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
       // the <Value> of the RemoteCallArgument<Value>
       auto remoteCallArgValueGenericTy =
-          mapTypeIntoContext(argGenericParams[0]->getInterfaceType())
-              ->getDesugaredType()
-              ->getMetatypeInstanceType();
+          mapTypeIntoContext(argGenericParams[0]->getDeclaredInterfaceType());
       // expected (the <Value> from the recordArgument<Value>)
       auto expectedGenericParamTy = mapTypeIntoContext(
-          ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+          ArgumentParam->getDeclaredInterfaceType());
 
       if (!remoteCallArgValueGenericTy->isEqual(expectedGenericParamTy)) {
             return false;
@@ -820,9 +793,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
 
     auto sig = getGenericSignature();
-    auto requirements = sig.getRequirements();
 
-    if (requirements.size() != expectedRequirementsNum) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (reqs.size() != expectedRequirementsNum) {
       return false;
     }
 
@@ -926,9 +903,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
 
   auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
 
-  if (requirements.size() != expectedRequirementsNum) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  sig->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+  if (reqs.size() != expectedRequirementsNum) {
     return false;
   }
 
@@ -939,11 +920,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // ...
 
   auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
-                        ->getMetatypeInstanceType()
-                        ->getDesugaredType();
+                        ->getMetatypeInstanceType();
 
   auto resultParamType = func->mapTypeIntoContext(
-      ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+      ArgumentParam->getDeclaredInterfaceType());
 
   // The result of the function must be the `Res` generic argument.
   if (!resultType->isEqual(resultParamType)) {
@@ -1036,8 +1016,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
 
     // --- Check: Argument: SerializationRequirement
     auto sig = getGenericSignature();
-    auto requirements = sig.getRequirements();
-    if (requirements.size() != 1) {
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (reqs.size() != 1) {
       return false;
     }
 
@@ -1052,14 +1037,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // --- Check requirement: conforms_to: Err Error
-    auto errorReq = requirements[0];
-    auto errorTy = C.getProtocol(KnownProtocolKind::Error)
-                       ->getInterfaceType()
-                       ->getMetatypeInstanceType();
+    auto errorReq = reqs[0];
     if (errorReq.getKind() != RequirementKind::Conformance) {
       return false;
     }
-    if (!errorReq.getSecondType()->isEqual(errorTy)) {
+    if (!errorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Error)) {
       return false;
     }
 
@@ -1146,10 +1128,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
     auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
-                          ->getMetatypeInstanceType()
-                          ->getDesugaredType();
+                          ->getMetatypeInstanceType();
     auto resultParamType = func->mapTypeIntoContext(
-        ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+        ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!resultType->isEqual(resultParamType)) {
       return false;
@@ -1244,11 +1225,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Check generic parameters in detail
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-    auto argumentType = func->mapTypeIntoContext(valueParam->getInterfaceType())
-                            ->getMetatypeInstanceType()
-                            ->getDesugaredType();
+    auto argumentType = func->mapTypeIntoContext(
+        valueParam->getInterfaceType()->getMetatypeInstanceType());
     auto resultParamType = func->mapTypeIntoContext(
-        ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+        ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!argumentType->isEqual(resultParamType)) {
       return false;
@@ -1267,50 +1247,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     }
 
     return true;
-}
-
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::extractDistributedSerializationRequirements(
-    ASTContext &C, ArrayRef<Requirement> allRequirements) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  auto DA = C.getDistributedActorDecl();
-  auto daSerializationReqAssocType =
-      DA->getAssociatedType(C.Id_SerializationRequirement);
-  auto daSystemSerializationReqTy = daSerializationReqAssocType->getInterfaceType();
-
-  for (auto req : allRequirements) {
-    if (req.getSecondType()->isAny()) {
-      continue;
-    }
-    if (!req.getFirstType()->hasDependentMember())
-      continue;
-
-    if (auto dependentMemberType =
-            req.getFirstType()->castTo<DependentMemberType>()) {
-      auto dependentTy =
-          dependentMemberType->getAssocType()->getInterfaceType();
-
-      if (dependentTy->isEqual(daSystemSerializationReqTy)) {
-        auto requirementProto = req.getSecondType();
-        if (auto proto = dyn_cast_or_null<ProtocolDecl>(
-                requirementProto->getAnyNominal())) {
-          serializationReqs.insert(proto);
-        } else {
-          auto serialReqType = requirementProto->castTo<ExistentialType>()
-                                   ->getConstraintType()
-                                   ->getDesugaredType();
-          auto flattenedRequirements =
-              flattenDistributedSerializationTypeToRequiredProtocols(
-                  serialReqType);
-          for (auto p : flattenedRequirements) {
-            serializationReqs.insert(p);
-          }
-        }
-      }
-    }
-  }
-
-  return serializationReqs;
 }
 
 /******************************************************************************/

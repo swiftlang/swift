@@ -1,24 +1,33 @@
+//===--- SourceManager.swift ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import ASTBridging
+import BasicBridging
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// A C++ source location.
-public typealias CxxSourceLoc = UnsafePointer<UInt8>
-
 /// A source manager that keeps track of the source files in the program.
 class SourceManager {
-  init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
-    self.cxxDiagnosticEngine = cxxDiagnosticEngine
+  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
+    self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 
-  /// A pointer to the C++ diagnostic engine.
-  let cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+  /// The bridged diagnostic engine (just the wrapped C++ `DiagnosticEngine`).
+  let bridgedDiagEngine: BridgedDiagnosticEngine
 
   /// The set of source files that have been exported to the C++ code of
   /// the program.
-  var exportedSourceFilesBySyntax: [
-    SourceFileSyntax : UnsafePointer<ExportedSourceFile>
-  ] = [:]
+  var exportedSourceFilesBySyntax: [SourceFileSyntax: UnsafePointer<ExportedSourceFile>] = [:]
 
   /// The set of nodes that have been detached from their parent nodes.
   ///
@@ -58,9 +67,9 @@ extension SourceManager {
 
     let detached: Node
     if let operatorTable = operatorTable {
-      detached = operatorTable.foldAll(node) { _ in }.as(Node.self)!.detach()
+      detached = operatorTable.foldAll(node) { _ in }.as(Node.self)!.detached
     } else {
-      detached = node.detach()
+      detached = node.detached
     }
 
     detachedNodes[Syntax(detached)] = (node.root, node.position.utf8Offset)
@@ -92,18 +101,18 @@ extension SourceManager {
 
     // The position of our node is...
     let finalPosition =
-      node.position                      // Our position relative to its root
-      + SourceLength(utf8Length: offset) // and that root's offset in its parent
+      node.position  // Our position relative to its root
+      + SourceLength(utf8Length: offset)  // and that root's offset in its parent
       + SourceLength(utf8Length: parentOffset.utf8Offset)
     return (rootSF, finalPosition)
   }
 
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
-  func cxxSourceLocation<Node: SyntaxProtocol>(
+  func bridgedSourceLoc<Node: SyntaxProtocol>(
     for node: Node,
     at position: AbsolutePosition? = nil
-  ) -> CxxSourceLoc? {
+  ) -> BridgedSourceLoc {
     // Find the source file and this node's position within it.
     guard let (sourceFile, rootPosition) = rootSourceFile(of: node) else {
       return nil
@@ -118,16 +127,9 @@ extension SourceManager {
     // Find the offset of the given position based on the root of the given
     // node.
     let position = position ?? node.position
-    let offsetWithinSyntaxNode =
-       position.utf8Offset - node.position.utf8Offset
-    let offsetFromSourceFile = rootPosition.utf8Offset + offsetWithinSyntaxNode
+    let nodeOffset = SourceLength(utf8Length: position.utf8Offset - node.position.utf8Offset)
+    let realPosition = rootPosition + nodeOffset
 
-    // Compute the resulting address.
-    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
-    else {
-      return nil
-    }
-    let address = bufferBaseAddress.advanced(by: offsetFromSourceFile)
-    return address
+    return BridgedSourceLoc(at: realPosition, in: exportedSourceFile.pointee.buffer)
   }
 }

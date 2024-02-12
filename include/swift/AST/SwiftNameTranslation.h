@@ -13,8 +13,9 @@
 #ifndef SWIFT_NAME_TRANSLATION_H
 #define SWIFT_NAME_TRANSLATION_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Identifier.h"
 
 namespace swift {
   class ValueDecl;
@@ -66,12 +67,23 @@ getNameForCxx(const ValueDecl *VD,
 enum RepresentationKind { Representable, Unsupported };
 
 enum RepresentationError {
+  UnrepresentableObjC,
   UnrepresentableAsync,
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,
   UnrepresentableGeneric,
-  UnrepresentableGenericRequirements
+  UnrepresentableGenericRequirements,
+  UnrepresentableThrows,
+  UnrepresentableIndirectEnum,
+  UnrepresentableEnumCaseType,
+  UnrepresentableEnumCaseTuple,
+  UnrepresentableProtocol,
+  UnrepresentableMoveOnly,
+  UnrepresentableNested,
 };
+
+/// Constructs a diagnostic that describes the given C++ representation error.
+Diagnostic diagnoseRepresenationError(RepresentationError error, ValueDecl *vd);
 
 struct DeclRepresentation {
   RepresentationKind kind;

@@ -17,6 +17,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -118,13 +119,18 @@ bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isOrContainsRawPointer();
 }
 
-bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = F.getTypeLowering(contextType);
+bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
+  auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
+  const TypeLowering &tyLowering = f->getTypeLowering(contextType);
   bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
          "a function type with context must either be non trivial or marked as containing a pointer");
   return result;
+}
+
+bool SILType::isOrContainsPack(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeLowering(contextType).isOrContainsPack();
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
@@ -160,6 +166,10 @@ bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
     .isReferenceCounted();
+}
+
+bool SILType::isReferenceCounted(SILFunction *f) const {
+  return isReferenceCounted(f->getModule());
 }
 
 bool SILType::isNoReturnFunction(SILModule &M,
@@ -250,12 +260,8 @@ static bool isSingleSwiftRefcounted(SILModule &M,
   if (Ty->isAnyExistentialType()) {
     auto layout = Ty->getExistentialLayout();
     // Must be no protocol constraints that aren't @objc or @_marker.
-    if (layout.containsNonObjCProtocol) {
-      for (auto proto : layout.getProtocols()) {
-        if (!proto->isObjC() && !proto->isMarkerProtocol()) {
-          return false;
-        }
-      }
+    if (layout.containsSwiftProtocol) {
+      return false;
     }
     
     // The Error existential has its own special layout.
@@ -296,13 +302,43 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
     && toTy.isHeapObjectReferenceType();
 }
 
+static bool needsFieldSubstitutions(const AbstractionPattern &origType) {
+  if (origType.isTypeParameter()) return false;
+  auto type = origType.getType();
+  if (!type->hasTypeParameter()) return false;
+  return type.findIf([](CanType type) {
+    return isa<PackExpansionType>(type);
+  });
+}
+
+static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
+                                          ValueDecl *field,
+                                          AbstractionPattern &origType) {
+  if (needsFieldSubstitutions(origType)) {
+    auto subMap = ty.getASTType()->getContextSubstitutionMap(
+                    &TC.M, field->getDeclContext());
+    origType = origType.withSubstitutions(subMap);
+  }
+}
+
+VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
+  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  assert(decl && "expected nominal type");
+  return getIndexedField(decl, fieldIndex);
+}
+
 SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
                               TypeExpansionContext context) const {
   AbstractionPattern origFieldTy = TC.getAbstractionPattern(field);
+  addFieldSubstitutionsIfNeeded(TC, *this, field, origFieldTy);
+
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
+    // We want to specifically use getASTType() here instead of getRawASTType()
+    // to ensure that we can correctly get our substituted field type. If we
+    // need to rewrap the type layer, we do it below.
     substFieldTy =
         getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
@@ -331,6 +367,23 @@ SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
 }
 
+SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {
+  VarDecl *field = getFieldDecl(fieldIndex);
+  return getFieldType(field, function->getModule(), function->getTypeExpansionContext());
+}
+
+StringRef SILType::getFieldName(intptr_t fieldIndex) const {
+  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  VarDecl *field = getIndexedField(decl, fieldIndex);
+  return field->getName().str();
+}
+
+unsigned SILType::getNumNominalFields() const {
+  auto *nominal = getNominalOrBoundGenericNominal();
+  assert(nominal && "expected nominal type");
+  return getNumFieldsInNominal(nominal);
+}
+
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
@@ -347,6 +400,9 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
     return SILType(SILType::getPrimitiveObjectType(box).getASTType(),
                    getCategory());
   }
+
+  auto origEltType = TC.getAbstractionPattern(elt);
+  addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
       &TC.M, elt, elt->getArgumentInterfaceType());
@@ -365,6 +421,15 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
                                     SILFunction *fn) const {
   return getEnumElementType(elt, fn->getModule(),
                             fn->getTypeExpansionContext());
+}
+
+EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
+  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    if ((int)elemWithIndex.index() == caseIndex)
+      return elemWithIndex.value();
+  }
+  llvm_unreachable("invalid enum case index");
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
@@ -453,6 +518,12 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   if (auto s = getStructOrBoundGenericStruct()) {
     return s->hasUnreferenceableStorage();
   }
+  // Tuples with pack expansions don't *actually* have unreferenceable
+  // storage, but the optimizer needs to be taught how to handle them,
+  // and it won't do that correctly in the short term.
+  if (auto t = getAs<TupleType>()) {
+    return t.containsPackExpansionType();
+  }
   return false;
 }
 
@@ -522,6 +593,7 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
     return ExistentialRepresentation::Class;
   
   // Otherwise, we need to use a fixed-sized buffer.
+  assert(!layout.isObjC());
   return ExistentialRepresentation::Opaque;
 }
 
@@ -592,8 +664,8 @@ CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
                             LookUpConformanceInSubstitutionMap(subMap),
                             sig);
   }
-  
-  return fieldTy.getASTType();
+
+  return fieldTy.getRawASTType();
 }
 
 ValueOwnershipKind
@@ -635,6 +707,15 @@ bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
 }
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+        .isAddressOnly();
+  }
+
+  return false;
+}
+
+bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
     return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
         .isAddressOnly();
@@ -785,6 +866,16 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
     }
   }
 
+  // The pattern of a pack expansion is lowered.
+  if (auto formalExpansion = dyn_cast<PackExpansionType>(formalType)) {
+    if (auto loweredExpansion = loweredType.getAs<PackExpansionType>()) {
+      return loweredExpansion.getCountType() == formalExpansion.getCountType()
+         && SILType::getPrimitiveAddressType(loweredExpansion.getPatternType())
+               .isLoweringOf(context, Mod, formalExpansion.getPatternType());
+    }
+    return false;
+  }
+
   // Dynamic self has the same lowering as its contained type.
   if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
     formalType = dynamicSelf.getSelfType();
@@ -811,7 +902,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
       SmallVector<SILParameterInfo, 4> newParams;
       SmallVector<SILYieldInfo, 4> newYields;
       SmallVector<SILResultInfo, 4> newResults;
-      Optional<SILResultInfo> newErrorResult;
+      llvm::Optional<SILResultInfo> newErrorResult;
       for (auto param : sft->getParameters()) {
         auto newParamTy = param.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
@@ -860,6 +951,12 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
 bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
   EnumDecl *decl = getEnumOrBoundGenericEnum();
   assert(decl && "Called for a non enum type");
+
+  // Since unavailable enum elements cannot be referenced in canonical SIL,
+  // enums with these elements cannot be treated as exhaustive types.
+  if (decl->hasCasesUnavailableDuringLowering())
+    return false;
+
   return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
                                        f->getResilienceExpansion());
 }
@@ -948,11 +1045,52 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   return SILType();
 }
 
-bool SILType::isMoveOnly() const {
-  // Nominal types are move-only if declared as such.
-  if (isMoveOnlyNominalType())
-    return true;
+bool SILType::isEscapable() const {
+  CanType ty = getASTType();
 
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
+
+  if (auto fnTy = getAs<SILFunctionType>()) {
+    return !fnTy->isNoEscape();
+  }
+  if (auto boxTy = getAs<SILBoxType>()) {
+    auto fields = boxTy->getLayout()->getFields();
+    assert(fields.size() == 1);
+    ty = fields[0].getLoweredType();
+  }
+
+  // TODO: Support ~Escapable in parameter packs.
+  //
+  // Treat all other SIL-specific types as Escapable.
+  if (isa<SILBlockStorageType,
+          SILBoxType,
+          SILPackType,
+          SILTokenType>(ty)) {
+    return true;
+  }
+  return ty->isEscapable();
+}
+
+bool SILType::isMoveOnly(bool orWrapped) const {
+  // If it's inside the move-only wrapper, return true iff we want to include
+  // such types as "move-only" in this query. Such values are typically
+  // just "no-implicit-copy" and not "move-only".
+  if (isMoveOnlyWrapped())
+    return orWrapped;
+
+  // Legacy check.
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    return getASTType()->isNoncopyable();
+  }
+
+  // NOTE: getASTType strips the MoveOnlyWrapper off!
+  CanType ty = getASTType();
+
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
 
   // TODO: Nonescaping closures ought to be treated as move-only in SIL.
   // They aren't marked move-only now, because the necessary move-only passes
@@ -965,19 +1103,180 @@ bool SILType::isMoveOnly() const {
     return fnTy->isTrivialNoEscape();
   }
    */
-  return isMoveOnlyWrapped();
+  if (isa<SILFunctionType>(ty))
+    return false;
+
+  // Treat all other SIL-specific types as Copyable.
+  if (isa<SILBlockStorageType,
+          SILBoxType,
+          SILPackType,
+          SILTokenType>(ty)) {
+    return false;
+  }
+
+  // Finally, for other ordinary types, ask the AST type.
+  return ty->isNoncopyable();
 }
 
-bool SILType::isMoveOnlyNominalType() const {
-  if (auto *nom = getNominalOrBoundGenericNominal())
-    if (nom->isMoveOnly())
-      return true;
+
+
+bool SILType::isValueTypeWithDeinit() const {
+  // Do not look inside an aggregate type that has a user-deinit, for which
+  // memberwise-destruction is not equivalent to aggregate destruction.
+  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+    return nominal->getValueTypeDestructor() != nullptr;
+  }
   return false;
 }
 
-bool SILType::isPureMoveOnly() const {
-  if (auto *nom = getNominalOrBoundGenericNominal())
-    if (nom->isMoveOnly())
+SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
+  auto metaType = castTo<MetatypeType>();
+  CanType instanceTy = metaType.getInstanceType();
+  auto &tl = function->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*function));
+  return tl.getLoweredType();
+}
+
+MetatypeRepresentation SILType::getRepresentationOfMetatype(SILFunction *function) const {
+  auto metaType = castTo<MetatypeType>();
+  return metaType->getRepresentation();
+}
+
+bool SILType::isOrContainsObjectiveCClass() const {
+  return getASTType().findIf([](Type ty) {
+    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
+      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
+        return true;
+    }
+    if (ty->is<ProtocolCompositionType>())
       return true;
+    return false;
+  });
+}
+
+static bool hasImmortalAttr(NominalTypeDecl *nominal) {
+  if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
+    if (semAttr->Value == semantics::ARC_IMMORTAL) {
+      return true;
+    }
+  }
   return false;
+}
+
+static bool nominalIsMarkedAsImmortal(NominalTypeDecl *nominal) {
+  if (hasImmortalAttr(nominal))
+    return true;
+
+  if (!isa<ProtocolDecl>(nominal)) {
+    for (ProtocolDecl *p : nominal->getAllProtocols()) {
+      if (hasImmortalAttr(p))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool SILType::isMarkedAsImmortal() const {
+  NominalTypeDecl *nominal = getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return false;
+
+  if (nominalIsMarkedAsImmortal(nominal))
+    return true;
+
+  if (ClassDecl *cl = dyn_cast<ClassDecl>(nominal)) {
+    cl = cl->getSuperclassDecl();
+    while (cl) {
+      if (nominalIsMarkedAsImmortal(cl))
+        return true;
+      cl = cl->getSuperclassDecl();
+    }
+  }
+  return false;
+}
+
+intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
+  auto *nominal = getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return -1;
+
+  SmallVector<NominalTypeDecl *, 5> decls;
+  decls.push_back(nominal);
+  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+    while ((cd = cd->getSuperclassDecl()) != nullptr) {
+      decls.push_back(cd);
+    }
+  }
+  std::reverse(decls.begin(), decls.end());
+
+  intptr_t idx = 0;
+  for (auto *decl : decls) {
+    for (VarDecl *field : decl->getStoredProperties()) {
+      if (field->getName().str() == fieldName)
+        return idx;
+      idx++;
+    }
+  }
+  return -1;
+}
+
+intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
+  auto *enumDecl = getEnumOrBoundGenericEnum();
+  if (!enumDecl)
+    return -1;
+
+  intptr_t idx = 0;
+  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
+    if (elem->getNameStr() == caseName)
+      return idx;
+    idx++;
+  }
+  return -1;
+}
+
+std::string SILType::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  print(os);
+  return str;
+}
+
+SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
+    return *this;
+  assert(!oldField.getLoweredType()->isNoncopyable() &&
+         "Cannot moveonlywrapped in a moveonly type");
+  auto newField =
+      SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),
+               oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}
+
+SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+  auto boxTy = castTo<SILBoxType>();
+  auto *oldLayout = boxTy->getLayout();
+  auto oldField = oldLayout->getFields()[0];
+  auto *moveOnlyWrapped =
+      oldField.getLoweredType()->getAs<SILMoveOnlyWrappedType>();
+  if (!moveOnlyWrapped)
+    return *this;
+  auto newField =
+      SILField(moveOnlyWrapped->getInnerType(), oldField.isMutable());
+  auto *newLayout =
+      SILLayout::get(fn->getASTContext(), oldLayout->getGenericSignature(),
+                     {newField}, oldLayout->capturesGenericEnvironment());
+  auto newBoxType = SILBoxType::get(fn->getASTContext(), newLayout,
+                                    boxTy->getSubstitutions());
+  return SILType::getPrimitiveObjectType(newBoxType);
+}
+
+bool SILType::isSendable(SILFunction *fn) const {
+  return getASTType()->isSendableType();
 }

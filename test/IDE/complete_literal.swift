@@ -1,18 +1,8 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL1 | %FileCheck %s -check-prefix=LITERAL1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | %FileCheck %s -check-prefix=LITERAL2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | %FileCheck %s -check-prefix=LITERAL3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | %FileCheck %s -check-prefix=LITERAL4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | %FileCheck %s -check-prefix=LITERAL5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL6 | %FileCheck %s -check-prefix=LITERAL6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL7 | %FileCheck %s -check-prefix=LITERAL7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL8 | %FileCheck %s -check-prefix=LITERAL8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL9 | %FileCheck %s -check-prefix=LITERAL9
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL10 | %FileCheck %s -check-prefix=LITERAL10
+// RUN: %batch-code-completion
 
 {
   1.#^LITERAL1^#
 }
-// LITERAL1:          Begin completions
 // LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       bigEndian[#Int#]; name=bigEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal/IsSystem: byteSwapped[#Int#]; name=byteSwapped{{$}}
@@ -21,7 +11,6 @@
 {
   1.1.#^LITERAL2^#
 }
-// LITERAL2:         Begin completions
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isNormal[#Bool#]; name=isNormal{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isFinite[#Bool#]; name=isFinite{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isZero[#Bool#]; name=isZero{{$}}
@@ -32,7 +21,6 @@
 {
   true.#^LITERAL3^#
 }
-// LITERAL3:         Begin completions
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: description[#String#]; name=description{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: hashValue[#Int#]; name=hashValue{{$}}
 
@@ -40,7 +28,6 @@
   "swift".#^LITERAL4^#
 }
 
-// LITERAL4:         Begin completions
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(:){{$}}
 
 // FIXME: we should show the qualified String.Index type.
@@ -83,7 +70,7 @@ func testArray(f1: Float) {
   _ = [1, 2, f1] #^LITERAL8^#
 }
 // LITERAL8-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .count[#Int#]; name=count
-// LITERAL8-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Float?#]; name=first
+// LITERAL8-DAG: Decl[InstanceVar]/Super/IsSystem:       .first[#Any?#]; name=first
 
 func testDict(f1: Float) {
   _ = ["foo": f1, "bar": "baz"] #^LITERAL9^#

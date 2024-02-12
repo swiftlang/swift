@@ -45,9 +45,7 @@ add_swift_host_library(swiftBasic STATIC
   BasicBridging.cpp
   BasicSourceInfo.cpp
   Cache.cpp
-  CBasicBridging.cpp
   ClusteredBitVector.cpp
-  CBasicBridging.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
@@ -78,6 +76,7 @@ add_swift_host_library(swiftBasic STATIC
   Unicode.cpp
   UUID.cpp
   Version.cpp
+  BlockList.cpp
 
   ${llvm_revision_inc}
   ${clang_revision_inc}
@@ -89,7 +88,7 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  LLVM_LINK_COMPONENTS support)
+  LLVM_LINK_COMPONENTS support targetparser)
 _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
@@ -101,6 +100,7 @@ target_link_libraries(swiftBasic PUBLIC
 target_link_libraries(swiftBasic PRIVATE
   ${UUID_LIBRARIES})
 
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/SwiftVersion.cmake)
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 

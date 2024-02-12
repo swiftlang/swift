@@ -34,6 +34,7 @@
 /// For more information about using arrays, see `Array` and `ArraySlice`, with
 /// which `ContiguousArray` shares most properties and methods.
 @frozen
+@_eagerMove
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _ContiguousArrayBuffer<Element>
@@ -52,6 +53,7 @@ public struct ContiguousArray<Element>: _DestructorSafeContainer {
 //===--- private helpers---------------------------------------------------===//
 extension ContiguousArray {
   @inlinable
+  @inline(__always)
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
     return _buffer.immutableCount
@@ -145,6 +147,10 @@ extension ContiguousArray: _ArrayProtocol {
     return _getCapacity()
   }
 
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
+
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
   public // @testable
@@ -203,6 +209,7 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   /// If the array is empty, `endIndex` is equal to `startIndex`.
   public var endIndex: Int {
     @inlinable
+    @inline(__always)
     get {
       return _getCount()
     }
@@ -972,8 +979,11 @@ extension ContiguousArray: RangeReplaceableCollection {
     if !keepCapacity {
       _buffer = _Buffer()
     }
-    else {
+    else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
+    }
+    else {
+      _buffer = _Buffer(_uninitializedCount: 0, minimumCapacity: capacity)
     }
   }
 
@@ -1031,6 +1041,7 @@ extension ContiguousArray: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {

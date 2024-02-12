@@ -31,7 +31,7 @@ protocol Invalid5<Element, Element> {
 
 protocol Sequence<Element> {
   associatedtype Element
-  // expected-note@-1 2{{protocol requires nested type 'Element'; do you want to add it?}}
+  // expected-note@-1 2{{protocol requires nested type 'Element'; add nested type 'Element' for conformance}}
 }
 
 extension Sequence {

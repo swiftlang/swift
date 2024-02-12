@@ -55,7 +55,7 @@ static bool canInvokeMoveByOnProperty(
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
-  return decl->isNonMutating();
+  return !decl->isMutating();
 }
 
 /// Get the stored properties of a nominal type that are relevant for
@@ -83,8 +83,8 @@ getStoredPropertiesForDifferentiation(
     if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    auto conformance = TypeChecker::conformsToProtocol(
-        varType, diffableProto, DC->getParentModule());
+    auto conformance = DC->getParentModule()->checkConformance(
+        varType, diffableProto);
     if (!conformance)
       continue;
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
@@ -117,8 +117,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf =
-      TypeChecker::conformsToProtocol(contextualType, diffableProto,
-                                      DC->getParentModule());
+      DC->getParentModule()->checkConformance(contextualType, diffableProto);
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
@@ -140,8 +139,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   // `Self` must conform to `AdditiveArithmetic`.
-  if (!TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
-                                       DC->getParentModule()))
+  if (!DC->getParentModule()->checkConformance(nominalTypeInContext, addArithProto))
     return false;
   for (auto *field : nominal->getStoredProperties()) {
     // `Self` must not have any `@noDerivative` stored properties.
@@ -149,8 +147,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
       return false;
     // `Self` must have all stored properties satisfy `Self == TangentVector`.
     auto fieldType = DC->mapTypeIntoContext(field->getValueInterfaceType());
-    auto conf = TypeChecker::conformsToProtocol(fieldType, diffableProto,
-                                                DC->getParentModule());
+    auto conf = DC->getParentModule()->checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
     auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
@@ -213,8 +210,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto,
-                                                 DC->getParentModule());
+    return (bool) DC->getParentModule()->checkConformance(varType, diffableProto);
   });
 }
 
@@ -266,7 +262,7 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
 
     // Create reference to parameter member: `offset.<member>`.
     VarDecl *paramMember = nullptr;
-    auto *paramNominal = paramDecl->getType()->getAnyNominal();
+    auto *paramNominal = paramDecl->getTypeInContext()->getAnyNominal();
     assert(paramNominal && "Parameter should have a nominal type");
     // Find parameter member corresponding to returned nominal member.
     for (auto *candidate : paramNominal->getStoredProperties()) {
@@ -317,6 +313,7 @@ static ValueDecl *deriveDifferentiable_method(
       C, StaticSpellingKind::None, declName, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   funcDecl->setSynthesized();
   if (!nominal->getSelfClassDecl())
@@ -419,8 +416,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberTanType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
     tangentProperty->setInterfaceType(memberTanType);
-    Pattern *memberPattern = NamedPattern::createImplicit(C, tangentProperty);
-    memberPattern->setType(memberTanType);
+    Pattern *memberPattern =
+        NamedPattern::createImplicit(C, tangentProperty, memberTanType);
     memberPattern =
         TypedPattern::createImplicit(C, memberPattern, memberTanType);
     memberPattern->setType(memberTanType);
@@ -555,8 +552,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     auto diffableConformance =
-        TypeChecker::conformsToProtocol(varType, diffableProto,
-                                        DC->getParentModule());
+        DC->getParentModule()->checkConformance(varType, diffableProto);
     // If stored property should not be diagnosed, continue.
     if (diffableConformance && 
         canInvokeMoveByOnProperty(vd, diffableConformance))
@@ -571,7 +567,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
           .diagnose(
               loc,
               diag::differentiable_nondiff_type_implicit_noderivative_fixit,
-              vd->getName(), vd->getType(), nominal->getName(),
+              vd->getName(), vd->getTypeInContext(), nominal->getName(),
               nominalCanDeriveAdditiveArithmetic)
           .fixItInsert(loc, "@noDerivative ");
       continue;
@@ -641,8 +637,7 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses,
                         getProtocolRequirementKind(requirement),
-                        requirement->getName(), getProtocolType(),
-                        /*AddFixIt=*/false);
+                        requirement, getProtocolType(), /*AddFixIt=*/false);
 
   // If derivation is possible, cancel the diagnostic and perform derivation.
   if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {
@@ -669,7 +664,7 @@ DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
   DiagnosticTransaction diagnosticTransaction(Context.Diags);
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
-  requirement->diagnose(diag::no_witnesses_type, requirement->getName());
+  requirement->diagnose(diag::no_witnesses_type, requirement);
 
   // If derivation is possible, cancel the diagnostic and perform derivation.
   if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {

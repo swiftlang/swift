@@ -14,35 +14,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/BridgingUtils.h"
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
-
-// Regex parser delivered via Swift modules.
-#include "swift/Parse/RegexParserBridging.h"
-static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
-void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
-  regexLiteralParsingFn = fn;
-}
 
 using namespace swift;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
-  assert(regexLiteralParsingFn);
 
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   auto regexText = Tok.getText();
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
-  unsigned version = 0;
+  size_t version = 0;
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  bool hadError =
-      regexLiteralParsingFn(regexText.str().c_str(), &version,
-                            /*captureStructureOut*/ capturesBuf.data(),
-                            /*captureStructureSize*/ capturesBuf.size(),
-                            /*diagBaseLoc*/ Tok.getLoc(), Diags);
+  bool hadError = swift_ASTGen_parseRegexLiteral(
+      regexText,
+      /*versionOut=*/&version,
+      /*captureStructureOut=*/capturesBuf.data(),
+      /*captureStructureSize=*/capturesBuf.size(),
+      /*diagBaseLoc=*/Tok.getLoc(), &Diags);
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);
 
@@ -52,4 +47,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(version >= 1);
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
+#else
+  llvm_unreachable("Lexer should not emit tok::regex_literal");
+#endif
 }

@@ -1,8 +1,8 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 // WITH_GETSET: Keyword/None:                       get; name=get
 // WITH_GETSET: Keyword/None:                       set; name=set
+// WITH_GETSET: Keyword/None:                       init; name=init
 // NO_GETSET-NOT: get
 // NO_GETSET-NOT: set
 

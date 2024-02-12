@@ -12,7 +12,10 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Stmt.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclGroup.h"
@@ -31,9 +34,12 @@ namespace {
 class ClangDeclFinder
     : public clang::RecursiveASTVisitor<ClangDeclFinder> {
   std::function<void(const clang::Decl *)> callback;
+  ClangModuleLoader *clangModuleLoader;
+
 public:
   template <typename Fn>
-  explicit ClangDeclFinder(Fn fn) : callback(fn) {}
+  explicit ClangDeclFinder(Fn fn, ClangModuleLoader *clangModuleLoader)
+      : callback(fn), clangModuleLoader(clangModuleLoader) {}
 
   bool VisitDeclRefExpr(clang::DeclRefExpr *DRE) {
     if (isa<clang::FunctionDecl>(DRE->getDecl()) ||
@@ -53,6 +59,29 @@ public:
     return true;
   }
 
+  bool VisitFunctionDecl(clang::FunctionDecl *functionDecl) {
+    for (auto paramDecl : functionDecl->parameters()) {
+      if (paramDecl->hasDefaultArg()) {
+        if (FuncDecl *defaultArgGenerator =
+                clangModuleLoader->getDefaultArgGenerator(paramDecl)) {
+          // Deconstruct the Swift function that was created in
+          // SwiftDeclSynthesizer::makeDefaultArgument and extract the
+          // underlying Clang function that was also synthesized.
+          BraceStmt *body = defaultArgGenerator->getTypecheckedBody();
+          auto returnStmt =
+              cast<ReturnStmt>(body->getSingleActiveElement().get<Stmt *>());
+          auto callExpr = cast<CallExpr>(returnStmt->getResult());
+          auto calledFuncDecl = cast<FuncDecl>(callExpr->getCalledValue());
+          auto calledClangFuncDecl =
+              cast<clang::FunctionDecl>(calledFuncDecl->getClangDecl());
+          callback(calledClangFuncDecl);
+        }
+      }
+    }
+
+    return true;
+  }
+
   bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
     callback(CXXCD);
     for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
@@ -64,6 +93,13 @@ public:
 
   bool VisitCXXConstructExpr(clang::CXXConstructExpr *CXXCE) {
     callback(CXXCE->getConstructor());
+    return true;
+  }
+
+  bool VisitCXXDeleteExpr(clang::CXXDeleteExpr *deleteExpr) {
+    if (auto cxxRecord = deleteExpr->getDestroyedType()->getAsCXXRecordDecl())
+      if (auto dtor = cxxRecord->getDestructor())
+        callback(dtor);
     return true;
   }
 
@@ -95,14 +131,28 @@ public:
     return true;
   }
 
+  bool VisitCXXInheritedCtorInitExpr(clang::CXXInheritedCtorInitExpr *CIE) {
+    if (auto ctor = CIE->getConstructor())
+      callback(ctor);
+    return true;
+  }
+
   // Do not traverse unevaluated expressions. Doing to might result in compile
   // errors if we try to instantiate an un-instantiatable template.
 
-  bool VisitCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return false; }
+  bool TraverseCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return true; }
 
-  bool VisitCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
-    return TIE->isPotentiallyEvaluated();
+  bool TraverseCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
+    if (TIE->isPotentiallyEvaluated())
+      clang::RecursiveASTVisitor<ClangDeclFinder>::TraverseCXXTypeidExpr(TIE);
+    return true;
   }
+
+  bool TraverseRequiresExpr(clang::RequiresExpr *RE) { return true; }
+
+  // Do not traverse type locs, as they might contain expressions that reference
+  // code that should not be instantiated and/or emitted.
+  bool TraverseTypeLoc(clang::TypeLoc TL) { return true; }
 
   bool shouldVisitTemplateInstantiations() const { return true; }
   bool shouldVisitImplicitCode() const { return true; }
@@ -167,6 +217,9 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       if (isa<clang::TagDecl>(DC)) {
         break;
       }
+      if (isa<clang::LinkageSpecDecl>(DC)) {
+        break;
+      }
       D = cast<const clang::Decl>(DC);
     }
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second) {
@@ -176,9 +229,10 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     stack.push_back(D);
   };
 
-  ClangDeclFinder refFinder(callback);
+  ClangModuleLoader *clangModuleLoader = Context.getClangModuleLoader();
+  ClangDeclFinder refFinder(callback, clangModuleLoader);
 
-  auto &clangSema = Context.getClangModuleLoader()->getClangSema();
+  auto &clangSema = clangModuleLoader->getClangSema();
 
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
@@ -209,18 +263,20 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // Unfortunately, implicitly defined CXXDestructorDecls don't have a real
     // body, so we need to traverse these manually.
     if (auto *dtor = dyn_cast<clang::CXXDestructorDecl>(next)) {
-      auto cxxRecord = dtor->getParent();
+      if (dtor->isImplicit() || dtor->hasBody()) {
+        auto cxxRecord = dtor->getParent();
 
-      for (auto field : cxxRecord->fields()) {
-        if (auto fieldCxxRecord = field->getType()->getAsCXXRecordDecl())
-          if (auto *fieldDtor = fieldCxxRecord->getDestructor())
-            callback(fieldDtor);
-      }
+        for (auto field : cxxRecord->fields()) {
+          if (auto fieldCxxRecord = field->getType()->getAsCXXRecordDecl())
+            if (auto *fieldDtor = fieldCxxRecord->getDestructor())
+              callback(fieldDtor);
+        }
 
-      for (auto base : cxxRecord->bases()) {
-        if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
-          if (auto *baseDtor = baseCxxRecord->getDestructor())
-            callback(baseDtor);
+        for (auto base : cxxRecord->bases()) {
+          if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
+            if (auto *baseDtor = baseCxxRecord->getDestructor())
+              callback(baseDtor);
+        }
       }
     }
 

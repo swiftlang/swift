@@ -26,7 +26,7 @@ namespace swift {
 /// integer.
 /// As a trade-off compared to relative pointers, this has load-time overhead in PIC
 /// and is only available on 32-bit targets.
-template <typename T>
+template <typename T, bool Nullable = false, typename Offset = int32_t>
 class AbsoluteFunctionPointer {
   T *Pointer;
   static_assert(sizeof(T *) == sizeof(int32_t),
@@ -48,7 +48,7 @@ public:
   }
 
   template <typename... ArgTy>
-  typename std::result_of<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
+  typename std::invoke_result<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
     static_assert(std::is_function<T>::value,
                   "T must be an explicit function type");
     return this->get()(std::forward<ArgTy>(arg)...);

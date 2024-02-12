@@ -17,10 +17,15 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/Serialization/Validation.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 
 namespace llvm {
   template <typename Info> class OnDiskIterableChainedHashTable;
+}
+
+namespace swift {
+enum class ModuleLoadingBehavior;
 }
 
 namespace swift {
@@ -98,6 +103,9 @@ class ModuleFileSharedCore {
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
 
+  /// \c true if this module was compiled with NoncopyableGenerics
+  bool RequiresNoncopyableGenerics;
+
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
 
@@ -110,12 +118,12 @@ public:
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
-    const unsigned RawImportControl : 2;
+    const unsigned RawImportControl : 3;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
     static unsigned rawControlFromKind(ImportFilterKind importKind) {
-      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+      return llvm::countr_zero(static_cast<unsigned>(importKind));
     }
     ImportFilterKind getImportControl() const {
       return static_cast<ImportFilterKind>(1 << RawImportControl);
@@ -128,7 +136,7 @@ public:
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader),
           IsScoped(isScoped) {
-      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+      assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
@@ -149,6 +157,12 @@ public:
     }
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+    bool isInternalOrBelow() const {
+      return getImportControl() == ImportFilterKind::InternalOrBelow;
+    }
+    bool isPackageOnly() const {
+      return getImportControl() == ImportFilterKind::PackageOnly;
     }
 
     bool isHeader() const { return IsHeader; }
@@ -213,6 +227,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   ArrayRef<RawBitOffset> Conformances;
+
+  /// Pack conformances referenced by this module.
+  ArrayRef<RawBitOffset> PackConformances;
 
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;
@@ -349,6 +366,9 @@ private:
     /// Whether this module was built with -experimental-hermetic-seal-at-link.
     unsigned HasHermeticSealAtLink : 1;
 
+    /// Whether this module was built with embedded Swift.
+    unsigned IsEmbeddedSwiftModule : 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 
@@ -368,8 +388,11 @@ private:
     /// \c true if this module was built with complete checking for concurrency.
     unsigned IsConcurrencyChecked: 1;
 
+    /// Whether this module is built with C++ interoperability enabled.
+    unsigned HasCxxInteroperability : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 4;
+    unsigned : 3;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -388,7 +411,10 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-      bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+      bool isFramework,
+      bool requiresOSSAModules,
+      bool requiresNoncopyableGenerics,
+      StringRef requiredSDK,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -524,14 +550,16 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
-       PathObfuscator &pathRecoverer,
+       bool isFramework, bool requiresOSSAModules,
+       bool requiresNoncopyableGenerics,
+       StringRef requiredSDK, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info, pathRecoverer);
+        requiresOSSAModules, requiresNoncopyableGenerics, requiredSDK, info,
+        pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);
@@ -557,6 +585,20 @@ public:
     return Name;
   }
 
+  StringRef getModulePackageName() const {
+    return ModulePackageName;
+  }
+
+  /// Is the module built with testing enabled?
+  bool isTestable() const {
+     return Bits.IsTestable;
+   }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Bits.ResilienceStrategy);
+  }
+
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
@@ -574,6 +616,28 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ///
+  /// If \p debuggerMode, more transitive dependencies should try to be loaded
+  /// as they can be useful in debugging.
+  ///
+  /// If \p isPartialModule, transitive dependencies should be loaded as we're
+  /// in merge-module mode.
+  ///
+  /// If \p packageName is set, transitive package dependencies are loaded if
+  /// loaded from the same package.
+  ///
+  /// If \p forTestable, get the desired loading behavior for a @testable
+  /// import. Reports non-public dependencies as required for a testable
+  /// client so it can access internal details, which in turn can reference
+  /// those non-public dependencies.
+  ModuleLoadingBehavior
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool debuggerMode,
+                               bool isPartialModule,
+                               StringRef packageName,
+                               bool forTestable) const;
 };
 
 template <typename T, typename RawData>

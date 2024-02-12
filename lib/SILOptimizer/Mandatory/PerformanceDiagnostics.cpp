@@ -26,6 +26,41 @@ using namespace swift;
 
 namespace {
 
+class PrettyStackTracePerformanceDiagnostics
+  : public llvm::PrettyStackTraceEntry {
+  const SILNode *node;
+  const char *action;
+
+public:
+  PrettyStackTracePerformanceDiagnostics(const char *action, SILNodePointer node)
+    : node(node), action(action) {}
+
+  virtual void print(llvm::raw_ostream &OS) const override {
+    OS << "While " << action << " -- visiting node ";
+    node->print(OS);
+    
+    if (auto inst = dyn_cast<SILInstruction>(node)) {
+      OS << "While visiting instruction in function ";
+      inst->getFunction()->print(OS);
+    }
+  }
+};
+
+class PrettyStackTraceSILGlobal
+  : public llvm::PrettyStackTraceEntry {
+  const SILGlobalVariable *node;
+  const char *action;
+
+public:
+    PrettyStackTraceSILGlobal(const char *action, SILGlobalVariable *node)
+    : node(node), action(action) {}
+
+  virtual void print(llvm::raw_ostream &OS) const override {
+    OS << "While " << action << " -- visiting node ";
+    node->print(OS);
+  }
+};
+
 /// Issues performance diagnostics for functions which are annotated with
 /// performance annotations, like @_noLocks, @_noAllocation.
 ///
@@ -59,6 +94,10 @@ public:
     return visitFunction(function, perfConstr, /*parentLoc*/ nullptr);
   }
 
+  bool visitFunctionEmbeddedSwift(SILFunction *function) {
+    return visitFunctionEmbeddedSwift(function, /*parentLoc*/ nullptr);
+  }
+
   /// Check functions _without_ performance annotations.
   ///
   /// This is need to check closure arguments of called performance-annotated
@@ -68,6 +107,9 @@ public:
 private:
   bool visitFunction(SILFunction *function, PerformanceConstraints perfConstr,
                         LocWithParent *parentLoc);
+
+  bool visitFunctionEmbeddedSwift(SILFunction *function,
+                                  LocWithParent *parentLoc);
 
   bool visitInst(SILInstruction *inst, PerformanceConstraints perfConstr,
                     LocWithParent *parentLoc);
@@ -115,6 +157,75 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
   }
 }
 
+/// Prints Embedded Swift specific performance diagnostics (no existentials,
+/// no metatypes, optionally no allocations) for \p function.
+bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
+    SILFunction *function, LocWithParent *parentLoc) {
+  // Don't check generic functions in embedded Swift, they're about to be
+  // removed anyway.
+  if (function->getLoweredFunctionType()->getSubstGenericSignature())
+    return false;
+
+  if (!function->isDefinition())
+    return false;
+
+  if (visitedFuncs.contains(function))
+    return false;
+  visitedFuncs[function] = PerformanceConstraints::None;
+
+  NonErrorHandlingBlocks neBlocks(function);
+
+  for (SILBasicBlock &block : *function) {
+    for (SILInstruction &inst : block) {
+      if (visitInst(&inst, PerformanceConstraints::None, parentLoc)) {
+        if (inst.getLoc().getSourceLoc().isInvalid()) {
+          auto demangledName = Demangle::demangleSymbolAsString(
+              inst.getFunction()->getName(),
+              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+          llvm::errs() << "in function " << demangledName << "\n";
+        }
+        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
+        return true;
+      }
+
+      if (auto as = FullApplySite::isa(&inst)) {
+        LocWithParent asLoc(inst.getLoc().getSourceLoc(), parentLoc);
+        LocWithParent *loc = &asLoc;
+        if (parentLoc &&
+            asLoc.loc == inst.getFunction()->getLocation().getSourceLoc())
+          loc = parentLoc;
+
+        for (SILFunction *callee : bca->getCalleeList(as)) {
+          if (visitFunctionEmbeddedSwift(callee, loc))
+            return true;
+        }
+      } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        PrettyStackTracePerformanceDiagnostics stackTrace(
+            "visitFunction::BuiltinInst (once, once with context)", &inst);
+
+        switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::Once:
+        case BuiltinValueKind::OnceWithContext:
+          if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
+            LocWithParent asLoc(bi->getLoc().getSourceLoc(), parentLoc);
+            LocWithParent *loc = &asLoc;
+            if (parentLoc &&
+                asLoc.loc == bi->getFunction()->getLocation().getSourceLoc())
+              loc = parentLoc;
+
+            if (visitFunctionEmbeddedSwift(fri->getReferencedFunction(), loc))
+              return true;
+          }
+          break;
+        default:
+          break;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Prints performance diagnostics for \p function.
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
@@ -122,15 +233,39 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  ReachingReturnBlocks rrBlocks(function);
   NonErrorHandlingBlocks neBlocks(function);
-                                       
+
   for (SILBasicBlock &block : *function) {
-    if (!rrBlocks.reachesReturn(&block) || !neBlocks.isNonErrorHandling(&block))
+    // Exclude fatal-error blocks.
+    if (isa<UnreachableInst>(block.getTerminator()))
       continue;
+
+    // TODO: it's not yet clear how to deal with error existentials.
+    // Ignore them for now. If we have typed throws we could ban error existentials
+    // because typed throws would provide and alternative.
+    if (isa<ThrowInst>(block.getTerminator()))
+      continue;
+
+    // If a function has multiple throws, all throw-path branch to the single throw-block.
+    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
+      if (isa<ThrowInst>(succ->getTerminator()))
+        continue;
+    }
+
+    if (!neBlocks.isNonErrorHandling(&block))
+      continue;
+
     for (SILInstruction &inst : block) {
-      if (visitInst(&inst, perfConstr, parentLoc))
+      if (visitInst(&inst, perfConstr, parentLoc)) {
+        if (inst.getLoc().getSourceLoc().isInvalid()) {
+          auto demangledName = Demangle::demangleSymbolAsString(
+              inst.getFunction()->getName(),
+              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+          llvm::errs() << "in function " << demangledName << "\n";
+        }
+        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         return true;
+      }
 
       if (auto as = FullApplySite::isa(&inst)) {
         if (isEffectFreeArraySemanticCall(&inst))
@@ -156,6 +291,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
         if (visitCallee(&inst, bca->getCalleeList(as), perfConstr, parentLoc))
           return true;
       } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        PrettyStackTracePerformanceDiagnostics stackTrace(
+            "visitFunction::BuiltinInst (once, once with context)", &inst);
+
         switch (bi->getBuiltinInfo().ID) {
           case BuiltinValueKind::Once:
           case BuiltinValueKind::OnceWithContext:
@@ -217,11 +355,20 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = tfi->getOperand();
     } else if (auto *cp = dyn_cast<CopyValueInst>(closure)) {
       closure = cp->getOperand();
+    } else if (auto *bb = dyn_cast<BeginBorrowInst>(closure)) {
+      closure = bb->getOperand();
+    } else if (auto *cv = dyn_cast<ConvertFunctionInst>(closure)) {
+      closure = cv->getOperand();
+    } else if (auto *md = dyn_cast<MarkDependenceInst>(closure)) {
+      closure = md->getValue();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.
       return false;
     } else {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "validating closure (function ref, callee) - unknown callee", callInst);
+
       diagnose(LocWithParent(callInst->getLoc().getSourceLoc(), parentLoc), diag::performance_unknown_callees);
       return true;
     }
@@ -245,6 +392,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
     loc = parentLoc;
 
   if (callees.isIncomplete()) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("incomplete", callInst);
+
     diagnose(*loc, diag::performance_unknown_callees);
     return true;
   }
@@ -259,6 +408,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
       return false;
 
     if (!callee->isDefinition()) {
+      PrettyStackTracePerformanceDiagnostics stackTrace("incomplete", callInst);
+
       diagnose(*loc, diag::performance_callee_unavailable);
       return true;
     }
@@ -291,8 +442,34 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
           break;
       }
     }
+    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+      if (auto *callee = apply->getReferencedFunctionOrNull()) {
+        // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
+        // It's a fatal error function, used for imported C enums.
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF" &&
+            !mt->getModule().getOptions().EmbeddedSwift) {
+          continue;
+        }
+      }
+    }
     return false;
   }
+  return true;
+}
+
+static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
+  // Only diagnose metatype and value_metatype instructions, for now.
+  if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
+    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
+    if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
+      Type instTy = metaTy->getInstanceType();
+      if (auto selfType = instTy->getAs<DynamicSelfType>())
+        instTy = selfType->getSelfType();
+      // Class metadata are supported in embedded Swift
+      return instTy->getClassOrBoundGenericClass() ? true : false;
+    }
+  }
+
   return true;
 }
 
@@ -302,10 +479,75 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
-  
+
+  if (perfConstr == PerformanceConstraints::NoExistentials &&
+      (impact & RuntimeEffect::Existential)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+    if (impactType) {
+      diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
+    } else {
+      diagnose(loc, diag::perf_diag_existential);
+    }
+    return true;
+  }
+
+  if ((perfConstr == PerformanceConstraints::NoObjCBridging ||
+       perfConstr == PerformanceConstraints::NoAllocation ||
+       perfConstr == PerformanceConstraints::NoLocks) &&
+      (impact & RuntimeEffect::ObjectiveC)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found objc effect", inst);
+
+    diagnose(loc, diag::performance_objectivec);
+    return true;
+  }
+
+  if (module.getOptions().EmbeddedSwift) {
+    if (impact & RuntimeEffect::Existential) {
+      PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+      if (impactType) {
+        diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
+      } else {
+        diagnose(loc, diag::embedded_swift_existential);
+      }
+      return true;
+    }
+
+    if (impact & RuntimeEffect::MetaData) {
+      if (!allowedMetadataUseInEmbeddedSwift(inst)) {
+        PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
+        if (impactType) {
+          diagnose(loc, diag::embedded_swift_metatype_type, impactType.getASTType());
+        } else {
+          diagnose(loc, diag::embedded_swift_metatype);
+        }
+        return true;
+      }
+    }
+
+    if (module.getOptions().NoAllocations) {
+      if (impact & RuntimeEffect::Allocating) {
+        PrettyStackTracePerformanceDiagnostics stackTrace("allocation", inst);
+        if (impactType) {
+          diagnose(loc, diag::embedded_swift_allocating_type, impactType.getASTType());
+        } else {
+          diagnose(loc, diag::embedded_swift_allocating);
+        }
+        return true;
+      }
+    }
+  }
+
+  if (perfConstr == PerformanceConstraints::None ||
+      perfConstr == PerformanceConstraints::NoExistentials ||
+      perfConstr == PerformanceConstraints::NoObjCBridging)
+    return false;
+
   if (impact & RuntimeEffect::Casting) {
     // TODO: be more specific on casting.
     // E.g. distinguish locking and allocating dynamic casts, etc.
+    PrettyStackTracePerformanceDiagnostics stackTrace("bad cast", inst);
+
     diagnose(loc, diag::performance_dynamic_casting);
     return true;
   }
@@ -315,14 +557,21 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   
     // Try to give a good error message by looking which type of code it is.
     switch (inst->getKind()) {
-    case SILInstructionKind::KeyPathInst:
+    case SILInstructionKind::KeyPathInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace("key path", inst);
       diagnose(loc, diag::performance_metadata, "using KeyPath");
       break;
+    }
     case SILInstructionKind::AllocGlobalInst:
-    case SILInstructionKind::GlobalValueInst:
+    case SILInstructionKind::GlobalValueInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+            "AllocGlobalInst | GlobalValueInst", inst);
       diagnose(loc, diag::performance_metadata, "global or static variables");
       break;
+    }
     case SILInstructionKind::PartialApplyInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "PartialApplyInst", inst);
       diagnose(loc, diag::performance_metadata,
                "generic closures or local functions");
       break;
@@ -330,27 +579,40 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::BeginApplyInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "ApplyInst | TryApplyInst | BeginApplyInst", inst);
       diagnose(loc, diag::performance_metadata, "generic function calls");
       break;
     }
     case SILInstructionKind::MetatypeInst:
       if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
-        break;
+        return false;
       LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
       // based on the involved type.
       if (impactType) {
+        PrettyStackTracePerformanceDiagnostics stackTrace(
+            "impactType (unrecognized instruction)", inst);
         diagnose(loc, diag::performance_metadata_type, impactType.getASTType());
         break;
       }
       // The default error message.
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "default error (fallthrough, unknown inst)", inst);
       diagnose(loc, diag::performance_metadata, "this code pattern");
       break;
     }
     return true;
   }
+  
+  if (perfConstr == PerformanceConstraints::NoRuntime)
+    return false;
+  
   if (impact & RuntimeEffect::Allocating) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found allocation effect", inst);
+
     switch (inst->getKind()) {
     case SILInstructionKind::BeginApplyInst:
       // Not all begin_applys necessarily allocate. But it's difficult to
@@ -371,6 +633,9 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     return true;
   }
   if (impact & RuntimeEffect::Deallocating) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found deallocation effect", inst);
+
     if (impactType) {
       switch (inst->getKind()) {
       case SILInstructionKind::StoreInst:
@@ -390,15 +655,14 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     diagnose(loc, diag::performance_deallocating, "this code pattern");
     return true;
   }
-  if (impact & RuntimeEffect::ObjectiveC) {
-    diagnose(loc, diag::performance_objectivec);
-    return true;
-  }
 
   if (perfConstr == PerformanceConstraints::NoAllocation)
     return false;
 
   // Handle locking-only effects.
+  
+  PrettyStackTracePerformanceDiagnostics stackTrace(
+      "found locking or ref counting effect", inst);
 
   if (impact & RuntimeEffect::Locking) {
     if (inst->getFunction()->isGlobalInit()) {
@@ -443,7 +707,7 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   }
 }
 
-void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {
+void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {  
   // Start with a valid location in the call tree.
   LocWithParent *validLoc = &loc;
   while (!validLoc->loc.isValid() && validLoc->parent) {
@@ -476,6 +740,30 @@ private:
     SILModule *module = getModule();
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
+
+    // Check that @_section, @_silgen_name is only on constant globals
+    for (SILGlobalVariable &g : module->getSILGlobals()) {
+      if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
+        PrettyStackTraceSILGlobal stackTrace(
+            "global inst", &g);
+
+        auto *decl = g.getDecl();
+        if (g.getSectionAttr()) {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
+            "@_section");
+        } else if (decl && g.isDefinition() &&
+                   decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
+            "@_silgen_name");
+        } else {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::global_must_be_compile_time_const);
+        }
+      }
+    }
+
     bool annotatedFunctionsFound = false;
 
     for (SILFunction &function : *module) {
@@ -486,18 +774,11 @@ private:
         if (function.wasDeserializedCanonical())
           continue;
 
-        if (!module->getOptions().EnablePerformanceAnnotations) {
-          module->getASTContext().Diags.diagnose(
-            function.getLocation().getSourceLoc(),
-            diag::performance_annotations_not_enabled);
-          return;
-        }
-
         diagnoser.visitFunction(&function, function.getPerfConstraints());
       }
     }
 
-    if (!annotatedFunctionsFound)
+    if (!annotatedFunctionsFound && !getModule()->getOptions().EmbeddedSwift)
       return;
 
     for (SILFunction &function : *module) {
@@ -509,6 +790,50 @@ private:
         diagnoser.checkNonAnnotatedFunction(&function);
       }
     }
+
+    if (getModule()->getOptions().EmbeddedSwift) {
+      // Run embedded Swift SIL checks for metatype/existential use, and
+      // allocation use (under -no-allocations mode). Try to start with public
+      // and exported functions to get better call tree information.
+      SmallVector<SILFunction *, 8> externallyVisibleFunctions;
+      SmallVector<SILFunction *, 8> vtableMembers;
+      SmallVector<SILFunction *, 8> others;
+      SmallVector<SILFunction *, 8> constructorsAndDestructors;
+
+      for (SILFunction &function : *module) {
+        auto func = function.getLocation().getAsASTNode<AbstractFunctionDecl>();
+        if (func) {
+          if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
+            constructorsAndDestructors.push_back(&function);
+            continue;
+          }
+          if (getMethodDispatch(func) == MethodDispatch::Class) {
+            vtableMembers.push_back(&function);
+            continue;
+          }
+        }
+
+        if (function.isPossiblyUsedExternally()) {
+          externallyVisibleFunctions.push_back(&function);
+          continue;
+        }
+
+        others.push_back(&function);
+      }
+
+      for (SILFunction *function : externallyVisibleFunctions) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : vtableMembers) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : others) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : constructorsAndDestructors) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+    }    
   }
 };
 

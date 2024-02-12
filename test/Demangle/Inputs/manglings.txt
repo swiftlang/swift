@@ -206,7 +206,6 @@ _TTSgSi__xyz ---> _TTSgSi__xyz
 _TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic<A>(A) -> A
 _TTSrq5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <serialized, Swift.Int> of test.generic<A>(A) -> A
 _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T:_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_} partial apply forwarder for reabstraction thunk helper from @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool)
-to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
 _TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T:_TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _T0S2SSbIxxxd_S2SSbIxiid_TRTA ---> {T:_T0S2SSbIxxxd_S2SSbIxiid_TR} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
 _T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTRTa ---> {T:_T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTR} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
@@ -293,6 +292,10 @@ _T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int)
 _$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> ()
 _$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWOy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
+_T0SqWOC ---> outlined init with copy of Swift.Optional
+_T0SqWOD ---> outlined assign with take of Swift.Optional
+_T0SqWOF ---> outlined assign with copy of Swift.Optional
+_T0SqWOH ---> outlined destroy of Swift.Optional
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
@@ -377,10 +380,10 @@ $sxq_Ilgnr_D ---> @differentiable(_linear) @callee_guaranteed (@in_guaranteed A)
 $sS3fIedgyywd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float)
 $sS5fIertyyywddw_D ---> @escaping @differentiable(reverse) @convention(thin) (@unowned Swift.Float, @unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float, @unowned @noDerivative Swift.Float)
 $syQo ---> $syQo
-$s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
+$s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee ---> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)
-$s7example1fyyYaF -> example.f() async -> ()
-$s7example1fyyYaKF -> example.f() async throws -> ()
+$s7example1fyyYaF ---> example.f() async -> ()
+$s7example1fyyYaKF ---> example.f() async throws -> ()
 s7example1fyyYjfYaKF -> example.f@differentiable(_forward) () async throws -> ()
 s7example1fyyYjrYaKF -> example.f@differentiable(reverse) () async throws -> ()
 s7example1fyyYjdYaKF -> example.f@differentiable () async throws -> ()
@@ -432,8 +435,8 @@ $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback fo
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
 $s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
-$sxxxIxzCXxxxesy -> $sxxxIxzCXxxxesy
-$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x -> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x
+$sxxxIxzCXxxxesy ---> $sxxxIxzCXxxxesy
+$Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x ---> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTATQ0_ ---> {T:$sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTR} (1) await resume partial function for partial apply forwarder for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTQ0_ ---> {T:} (1) await resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTY0_ ---> {T:} (1) suspend resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
@@ -443,17 +446,11 @@ $s7Library3fooyyFTwS ---> #_hasSymbol query for Library.foo() -> ()
 $s7Library5KlassCTwS ---> #_hasSymbol query for Library.Klass
 $s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swift_ide_test.myColorLiteral(red: Swift.Float, green: Swift.Float, blue: Swift.Float, alpha: Swift.Float) -> swift_ide_test.Color
 $s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
-$s4main4FlagVHa ---> runtime discoverable attribute record for main.Flag
-$s4main4FlagVAA4TestV11doSomethingyycvpfaHF ---> accessible function runtime record for runtime attribute generator of main.Test.doSomething : () -> () for attribute of main.Flag
-$s4main4FlagVAA10globalTest1a_ySi_SStcvpfa ---> runtime attribute generator of main.globalTest : (a: Swift.Int, _: Swift.String) -> () for attribute of main.Flag
-$s4main4FlagVAA4TestV11doSomethingyycvpfa ---> runtime attribute generator of main.Test.doSomething : () -> () for attribute of main.Flag
-$s4main4FlagVAA4TestV11doSomethingyycvpZfa ---> runtime attribute generator of static main.Test.doSomething : () -> () for attribute of main.Flag
-$s4main4FlagVAA4TestV1xSivpfa ---> runtime attribute generator of main.Test.x : Swift.Int for attribute of main.Flag
-$s4main9OtherFlagVAA4TestVfa ---> runtime attribute generator of main.Test for attribute of main.OtherFlag
-$s4main4TestVAA3ABCV4hereyySiFfa ---> runtime attribute generator of main.ABC.here(Swift.Int) -> () for attribute of main.Test
 $s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
 @__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
-@__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_ ---> accessor macro expansion #1 of myPropertyWrapper in accessor_macros.MyStruct.name : Swift.String
-@__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_ ---> peer macro expansion #1 of addCompletionHandler in macro_expand_peers.S.f(a: Swift.Int, for: Swift.String, _: Swift.Double) async -> Swift.String
-@__swiftmacro_25macro_expand_conformances7GenericV20DelegatedConformancefMc_ ---> conformance macro expansion #1 of DelegatedConformance in macro_expand_conformances.Generic
+@__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_ ---> peer macro @addCompletionHandler expansion #1 of f in macro_expand_peers.S
+@__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered
+$sxSo8_NSRangeVRlzCRl_Cr0_llySo12ModelRequestCyxq_GIsPetWAlYl_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(witness_method) @yield_once <A, B where A: AnyObject, B: AnyObject> @substituted <A> (@inout A) -> (@yields @inout __C._NSRange) for <__C.ModelRequest<A, B>>
+$SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI ---> $SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI
+$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF --> typed_throws.rethrowConcrete() throws(typed_throws.MyError) -> ()

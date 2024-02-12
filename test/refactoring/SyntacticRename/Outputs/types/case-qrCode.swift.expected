@@ -26,20 +26,20 @@ extension /*class-Animal:def*/Animal {
 
 enum /*enum-Barcode:def*/Barcode {
 	case upc(Int, Int, Int, Int)
-	case /*case-qrCode:def*/QRCode(String)
+	case /*case-qrCode:def*/<base>qrCode</base>(<arglabel index=0>code</arglabel><param index=0></param>: String)
 	case /*case-other:def*/other(Int)
 	case /*case-another:def*/another
 }
 var barCode: /*enum-Barcode*/Barcode = /*enum-Barcode*/Barcode.upc(1, 1, 1, 1)
-barCode = . /*case-qrCode:call*/QRCode("ABCDEFG")
-barCode = /*enum-Barcode*/Barcode . /*case-qrCode:call*/QRCode("J")
+barCode = . /*case-qrCode:call*/<base>qrCode</base>(<callarg index=0>code</callarg><callcolon index=0>: </callcolon>"ABCDEFG")
+barCode = /*enum-Barcode*/Barcode . /*case-qrCode:call*/<base>qrCode</base>(<callarg index=0>code</callarg><callcolon index=0>: </callcolon>"J")
 barCode = . /*case-other:call*/other(2)
 barCode = . /*case-another*/another
 
 switch barCode {
 case .upc(let a, let b, let c, let d):
 	print(a)
-case . /*case-qrCode*/QRCode(let s):
+case . /*case-qrCode*/<base>qrCode</base>(let s):
 	print(s)
 case . /*case-another*/another:
 	print(1)

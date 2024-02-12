@@ -233,7 +233,7 @@ extension InformallyFunging: NSFunging { }
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick any Initializable.Type, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var any Initializable }
-  // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[I2_BOX]]
+  // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[I2_BOX]]
   // CHECK:   [[PB:%.*]] = project_box [[I2_LIFETIME]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick any Initializable.Type to $@thick (@opened([[N:".*"]], any Initializable) Self).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]], any Initializable) Self).Type to $@objc_metatype (@opened([[N]], any Initializable) Self).Type

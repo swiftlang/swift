@@ -37,6 +37,7 @@
 #define SWIFT_SIL_DEBUGUTILS_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -189,6 +190,16 @@ inline Operand *getSingleDebugUse(SILValue value) {
   if (ii == ie)
     return nullptr;
   if (std::next(ii) != ie)
+    return nullptr;
+  return *ii;
+}
+
+/// If \p value has any debug user(s), return the operand associated with some
+/// use. Otherwise, returns nullptr.
+inline Operand *getAnyDebugUse(SILValue value) {
+  auto range = getDebugUses(value);
+  auto ii = range.begin(), ie = range.end();
+  if (ii == ie)
     return nullptr;
   return *ii;
 }
@@ -426,7 +437,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  Optional<SILDebugVariable> getVarInfo() const {
+  llvm::Optional<SILDebugVariable> getVarInfo() const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
@@ -460,13 +471,14 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      cast<DebugValueInst>(**this)->markAsMoved();
+      cast<DebugValueInst>(**this)->setUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocStack:
-      cast<AllocStackInst>(**this)->markAsMoved();
+      cast<AllocStackInst>(**this)->markUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocBox:
-      llvm_unreachable("Not implemented");
+      cast<AllocBoxInst>(**this)->setUsesMoveableValueDebugInfo();
+      break;
     }
   }
 
@@ -476,12 +488,11 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getWasMoved();
+      return cast<DebugValueInst>(**this)->getUsesMoveableValueDebugInfo();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getWasMoved();
+      return cast<AllocStackInst>(**this)->getUsesMoveableValueDebugInfo();
     case Kind::AllocBox:
-      // We do not support moving alloc box today, so we always return false.
-      return false;
+      return cast<AllocBoxInst>(**this)->getUsesMoveableValueDebugInfo();
     }
   }
 
@@ -500,7 +511,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::AllocStack:
       return cast<AllocStackInst>(**this);
     case Kind::AllocBox:
-      llvm_unreachable("Not implemented");
+      return cast<AllocBoxInst>(**this);
     }
   }
 
@@ -520,6 +531,19 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     return varName;
   }
 
+  std::optional<StringRef> maybeGetName() const {
+    assert(getKind() != Kind::Invalid);
+    if (auto varInfo = getVarInfo()) {
+      return varInfo->Name;
+    }
+
+    if (auto *decl = getDecl()) {
+      return decl->getBaseName().userFacingName();
+    }
+
+    return {};
+  }
+
   /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a
   /// name for it. If we have an invalid value or don't find var info or a decl,
   /// return "unknown".
@@ -532,29 +556,6 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     return inst.getName();
   }
 };
-
-inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
-    if (auto result = VarDeclCarryingInst(svi)) {
-      switch (result.getKind()) {
-      case VarDeclCarryingInst::Kind::Invalid:
-        llvm_unreachable("ShouldKind have never seen this");
-      case VarDeclCarryingInst::Kind::DebugValue:
-      case VarDeclCarryingInst::Kind::AllocStack:
-      case VarDeclCarryingInst::Kind::AllocBox:
-        return DebugVarCarryingInst(svi);
-      case VarDeclCarryingInst::Kind::GlobalAddr:
-      case VarDeclCarryingInst::Kind::RefElementAddr:
-        return DebugVarCarryingInst();
-      }
-    }
-  }
-
-  if (auto *use = getSingleDebugUse(value))
-    return DebugVarCarryingInst(use->getUser());
-
-  return DebugVarCarryingInst();
-}
 
 static_assert(sizeof(DebugVarCarryingInst) == sizeof(VarDeclCarryingInst) &&
                   alignof(DebugVarCarryingInst) == alignof(VarDeclCarryingInst),

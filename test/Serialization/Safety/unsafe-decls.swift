@@ -35,7 +35,7 @@ public protocol PublicProto {}
 // SAFETY-PRIVATE: Serialization safety, safe: 'PublicProto'
 internal protocol InternalProto {}
 // SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalProto'
-// NO-SAFETY-INTERNAL: Serialization safety, safe: 'InternalProto'
+// NO-SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalProto'
 private protocol PrivateProto {}
 // SAFETY-PRIVATE: Serialization safety, unsafe: 'PrivateProto'
 fileprivate protocol FileprivateProto {}

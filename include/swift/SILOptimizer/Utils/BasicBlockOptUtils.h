@@ -135,14 +135,20 @@ bool canCloneTerminator(TermInst *termInst);
 /// BasicBlockCloner handles this internally.
 class SinkAddressProjections {
   // Projections ordered from last to first in the chain.
-  SmallVector<SingleValueInstruction *, 4> projections;
-  SmallSetVector<SILValue, 4> inBlockDefs;
+  SmallVector<SingleValueInstruction *, 4> oldProjections;
+  // Cloned projections to avoid address phis.
+  SmallVectorImpl<SingleValueInstruction *> *newProjections;
+  llvm::SmallSetVector<SILValue, 4> inBlockDefs;
 
   // Transient per-projection data for use during cloning.
   SmallVector<Operand *, 4> usesToReplace;
   llvm::SmallDenseMap<SILBasicBlock *, Operand *, 4> firstBlockUse;
 
 public:
+  SinkAddressProjections(
+      SmallVectorImpl<SingleValueInstruction *> *newProjections = nullptr)
+      : newProjections(newProjections) {}
+
   /// Check for an address projection chain ending at \p inst. Return true if
   /// the given instruction is successfully analyzed.
   ///
@@ -163,6 +169,7 @@ public:
   ArrayRef<SILValue> getInBlockDefs() const {
     return inBlockDefs.getArrayRef();
   }
+
   /// Clone the chain of projections at their use sites.
   ///
   /// Return true if anything was done.
@@ -341,68 +348,6 @@ public:
 
   llvm::SmallVectorImpl<value_type> &getInstructionPairs() {
     return instructionpairs;
-  }
-};
-
-/// Utility class for cloning init values into the static initializer of a
-/// SILGlobalVariable.
-class StaticInitCloner : public SILCloner<StaticInitCloner> {
-  friend class SILInstructionVisitor<StaticInitCloner>;
-  friend class SILCloner<StaticInitCloner>;
-
-  /// The number of not yet cloned operands for each instruction.
-  llvm::DenseMap<SILInstruction *, int> numOpsToClone;
-
-  /// List of instructions for which all operands are already cloned (or which
-  /// don't have any operands).
-  llvm::SmallVector<SILInstruction *, 8> readyToClone;
-
-  SILInstruction *insertionPoint = nullptr;
-
-public:
-  StaticInitCloner(SILGlobalVariable *gVar)
-      : SILCloner<StaticInitCloner>(gVar) {}
-
-  StaticInitCloner(SILInstruction *insertionPoint)
-      : SILCloner<StaticInitCloner>(*insertionPoint->getFunction()),
-        insertionPoint(insertionPoint) {
-    Builder.setInsertionPoint(insertionPoint);
-  }
-
-  /// Add \p InitVal and all its operands (transitively) for cloning.
-  ///
-  /// Note: all init values must are added, before calling clone().
-  /// Returns false if cloning is not possible, e.g. if we would end up cloning
-  /// a reference to a private function into a function which is serialized.
-  bool add(SILInstruction *initVal);
-
-  /// Clone \p InitVal and all its operands into the initializer of the
-  /// SILGlobalVariable.
-  ///
-  /// \return Returns the cloned instruction in the SILGlobalVariable.
-  SingleValueInstruction *clone(SingleValueInstruction *initVal);
-
-  /// Convenience function to clone a single \p InitVal.
-  static void appendToInitializer(SILGlobalVariable *gVar,
-                                  SingleValueInstruction *initVal) {
-    StaticInitCloner cloner(gVar);
-    bool success = cloner.add(initVal);
-    (void)success;
-    assert(success && "adding initVal cannot fail for a global variable");
-    cloner.clone(initVal);
-  }
-
-protected:
-  SILLocation remapLocation(SILLocation loc) {
-    if (insertionPoint)
-      return insertionPoint->getLoc();
-    return ArtificialUnreachableLocation();
-  }
-
-  const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    if (insertionPoint)
-      return insertionPoint->getDebugScope();
-    return nullptr;
   }
 };
 

@@ -370,6 +370,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
+  @_unavailableInEmbedded
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -611,7 +612,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     self.init(mutating: unwrapped)
   }
   
-  /// Creates an immutable typed pointer referencing the same memory as the
+  /// Creates a mutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert.
@@ -620,7 +621,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
    self._rawValue = other._rawValue
   }
 
-  /// Creates an immutable typed pointer referencing the same memory as the
+  /// Creates a mutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
@@ -1131,6 +1132,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
+  @_unavailableInEmbedded
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
@@ -1153,6 +1155,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///            by the key path, or `nil`.
   @inlinable
   @_alwaysEmitIntoClient
+  @_unavailableInEmbedded
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
@@ -1172,3 +1175,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     )._unsafelyUnwrappedUnchecked
   }
 }
+
+@available(*, unavailable)
+extension UnsafePointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutablePointer: Sendable { }

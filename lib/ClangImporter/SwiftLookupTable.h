@@ -527,9 +527,6 @@ public:
   /// Retrieve the set of base names that are stored in the lookup table.
   SmallVector<SerializedSwiftName, 4> allBaseNames();
 
-  /// Retrieve the set of base names that are stored in the globals-as-members lookup table.
-  SmallVector<SerializedSwiftName, 4> allGlobalsAsMembersBaseNames();
-
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
   SmallVector<clang::NamedDecl *, 4>
@@ -552,7 +549,7 @@ public:
   /// entities should reside.
   SmallVector<SingleEntry, 4>
   lookupGlobalsAsMembers(SerializedSwiftName baseName,
-                         Optional<EffectiveClangContext> searchContext);
+                         llvm::Optional<EffectiveClangContext> searchContext);
 
   SmallVector<SingleEntry, 4>
   allGlobalsAsMembersInContext(EffectiveClangContext context);
@@ -560,11 +557,6 @@ public:
   /// Retrieve the set of global declarations that are going to be
   /// imported as members.
   SmallVector<SingleEntry, 4> allGlobalsAsMembers();
-
-  /// Retrieve the set of base names that are going to be imported as members in the
-  /// given context.
-  SmallVector<SerializedSwiftName, 4>
-  globalsAsMembersBaseNames(EffectiveClangContext context);
 
   /// Deserialize all entries.
   void deserializeAll();

@@ -21,26 +21,57 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
+bool UnresolvedMemberTypeCheckCompletionCallback::Result::canBeMergedWith(
+    const Result &Other, DeclContext &DC) const {
+  if (!isConvertibleTo(ExpectedTy, Other.ExpectedTy, /*openArchetypes=*/true,
+                       DC) &&
+      !isConvertibleTo(Other.ExpectedTy, ExpectedTy, /*openArchetypes=*/true,
+                       DC)) {
+    return false;
+  }
+  return true;
+}
+
+void UnresolvedMemberTypeCheckCompletionCallback::Result::merge(
+    const Result &Other, DeclContext &DC) {
+  assert(canBeMergedWith(Other, DC));
+  if (!ExpectedTy->isEqual(Other.ExpectedTy) &&
+      isConvertibleTo(ExpectedTy, Other.ExpectedTy, /*openArchetypes=*/true,
+                      DC)) {
+    // ExpectedTy is more general than Other.ExpectedTy. Complete based on the
+    // more general type because it offers more completion options.
+    ExpectedTy = Other.ExpectedTy;
+  }
+
+  IsImpliedResult |= Other.IsImpliedResult;
+  IsInAsyncContext |= Other.IsInAsyncContext;
+}
+
+void UnresolvedMemberTypeCheckCompletionCallback::addExprResult(
+    const Result &Res) {
+  auto ExistingRes =
+      llvm::find_if(ExprResults, [&Res, DC = DC](const Result &ExistingResult) {
+        return ExistingResult.canBeMergedWith(Res, *DC);
+      });
+  if (ExistingRes != ExprResults.end()) {
+    ExistingRes->merge(Res, *DC);
+  } else {
+    ExprResults.push_back(Res);
+  }
+}
+
 void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-
   bool IsAsync = isContextAsync(S, DC);
 
   // If the type couldn't be determined (e.g. because there isn't any context
   // to derive it from), let's not attempt to do a lookup since it wouldn't
   // produce any useful results anyway.
   if (ExpectedTy) {
-    // If ExpectedTy is a duplicate of any other result, ignore this solution.
-    auto IsEqual = [&](const Result &R) {
-      return R.ExpectedTy->isEqual(ExpectedTy);
-    };
-    if (!llvm::any_of(ExprResults, IsEqual)) {
-      bool SingleExprBody =
-          isImplicitSingleExpressionReturn(CS, CompletionExpr);
-      ExprResults.push_back({ExpectedTy, SingleExprBody, IsAsync});
-    }
+    bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
+    Result Res = {ExpectedTy, IsImpliedResult, IsAsync};
+    addExprResult(Res);
   }
 
   if (auto PatternType = getPatternMatchType(S, CompletionExpr)) {
@@ -48,17 +79,15 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
       return R.ExpectedTy->isEqual(PatternType);
     };
     if (!llvm::any_of(EnumPatternTypes, IsEqual)) {
-      EnumPatternTypes.push_back({PatternType,
-                                  /*IsImplicitSingleExpressionReturn=*/false,
-                                  IsAsync});
+      EnumPatternTypes.push_back(
+          {PatternType, /*isImpliedResult=*/false, IsAsync});
     }
   }
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
+void UnresolvedMemberTypeCheckCompletionCallback::collectResults(
     DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -74,8 +103,7 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
     originalTypes.insert(Result.ExpectedTy->getCanonicalType());
 
   for (auto &Result : ExprResults) {
-    Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsImplicitSingleExpressionReturn,
+    Lookup.setExpectedTypes({Result.ExpectedTy}, Result.IsImpliedResult,
                             /*expectsNonVoid*/ true);
     Lookup.setIdealExpectedType(Result.ExpectedTy);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
@@ -92,11 +120,16 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
     Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
   }
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
+
   // Offer completions when interpreting the pattern match as an
   // EnumElementPattern.
   for (auto &Result : EnumPatternTypes) {
     Type Ty = Result.ExpectedTy;
-    Lookup.setExpectedTypes({Ty}, /*IsImplicitSingleExpressionReturn=*/false,
+    Lookup.setExpectedTypes({Ty}, /*isImpliedResult=*/false,
                             /*expectsNonVoid=*/true);
     Lookup.setIdealExpectedType(Ty);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
@@ -108,7 +141,11 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
     }
 
     Lookup.getEnumElementPatternCompletions(Ty);
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }

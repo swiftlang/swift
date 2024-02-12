@@ -248,7 +248,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "The following example is illegal:\n\n"
       "    await withTaskGroup(...) { group in \n"
       "        await <task-local>.withValue(1234) {\n"
-      "            group.spawn { ... }\n"
+      "            group.addTask { ... }\n"
       "        }\n"
       "    }\n"
       "\n"
@@ -257,7 +257,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "    // bind task-local for all tasks spawned within the group\n"
       "    await <task-local>.withValue(1234) {\n"
       "        await withTaskGroup(...) { group in\n"
-      "            group.spawn { ... }\n"
+      "            group.addTask { ... }\n"
       "        }\n"
       "    }\n"
       "\n"
@@ -265,13 +265,13 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "\n"
       "    // bind-task-local for only specific child-task\n"
       "    await withTaskGroup(...) { group in\n"
-      "        group.spawn {\n"
+      "        group.addTask {\n"
       "            await <task-local>.withValue(1234) {\n"
       "                ... \n"
       "            }\n"
       "        }\n"
       "\n"
-      "        group.spawn { ... }\n"
+      "        group.addTask { ... }\n"
       "    }\n",
       (int)fileLength, file,
       (int)line);
@@ -294,7 +294,10 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   fflush(stderr);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif

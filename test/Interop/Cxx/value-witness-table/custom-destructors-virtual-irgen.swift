@@ -7,7 +7,7 @@
 import CustomDestructor
 
 // CHECK-LABEL: define {{.*}}void @"$s4main022testHasVirtualBaseWithD10DestructoryySpys5Int32VGF"
-// CHECK: call {{.*}}@{{_ZN28HasBaseWithVirtualDestructorD(1|2)Ev|"\?\?1HasBaseWithVirtualDestructor@@UEAA@XZ"}}(%struct.HasBaseWithVirtualDestructor*
+// CHECK: call {{.*}}@{{_ZN28HasBaseWithVirtualDestructorD(1|2)Ev|"\?\?1HasBaseWithVirtualDestructor@@UEAA@XZ"}}(ptr
 // CHECK: ret
 public func testHasVirtualBaseWithVirtualDestructor(
   _ ptr: UnsafeMutablePointer<Int32>

@@ -57,6 +57,7 @@ func _getFunctionFullNameFromMangledNameImpl(
 /// Given a function's mangled name, return a human readable name.
 /// Used e.g. by Distributed.RemoteCallTarget to hide mangled names.
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 public // SPI (Distributed)
 func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
   let mangledNameUTF8 = Array(mangledName.utf8)
@@ -86,6 +87,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 
 /// Returns the demangled qualified name of a metatype.
 @_semantics("typeName")
+@_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
@@ -100,6 +102,7 @@ public func _getMangledTypeName(_ type: Any.Type)
 
 /// Returns the mangled name for a given type.
 @available(SwiftStdlib 5.3, *)
+@_unavailableInEmbedded
 public // SPI
 func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
@@ -117,6 +120,7 @@ func _mangledTypeName(_ type: Any.Type) -> String? {
 
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
+@_unavailableInEmbedded
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
@@ -155,7 +159,18 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
 
+// Helper function that exploits a bug in rethrows checking to
+// allow us to call rethrows functions from generic typed-throws functions
+// and vice-versa.
+@usableFromInline
+@_alwaysEmitIntoClient
+@inline(__always)
+func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
+  try fn()
+}
 
-/// This is not a protocol you can explicitly use in your programs.
-/// It exists for the compiler and type checker for diagnostic purposes.
-@_marker public protocol _Copyable { }
+@_marker public protocol Copyable {}
+
+@_marker public protocol Escapable {}
+
+@_marker public protocol _BitwiseCopyable {}

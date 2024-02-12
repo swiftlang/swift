@@ -6,7 +6,11 @@ add_swift_host_library(swiftSymbolGraphGen STATIC
   Symbol.cpp
   SymbolGraph.cpp
   SymbolGraphGen.cpp
-  SymbolGraphASTWalker.cpp)
+  SymbolGraphASTWalker.cpp
+
+  LLVM_LINK_COMPONENTS
+  TargetParser
+  )
 
 target_link_libraries(swiftSymbolGraphGen PRIVATE
   swiftAST

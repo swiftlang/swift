@@ -99,9 +99,12 @@ extension ProjectedValue {
   /// it returns the `result` of the `visitor`, if the projected value does not escape.
   /// Returns nil, if the projected value escapes.
   ///
-  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: some Context) -> V.Result? {
-    var walker = EscapeWalker(visitor: visitor, context)
+  func visit<V: EscapeVisitorWithResult>(using visitor: V,
+                                         complexityBudget: Int = Int.max,
+                                         _ context: some Context) -> V.Result? {
+    var walker = EscapeWalker(visitor: visitor, complexityBudget: complexityBudget, context)
     if walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -117,6 +120,7 @@ extension ProjectedValue {
                                                       _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, context)
     if walker.walkDown(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -180,9 +184,17 @@ extension EscapeVisitor {
 protocol EscapeVisitorWithResult : EscapeVisitor {
   associatedtype Result
   var result: Result { get }
+
+  mutating func cleanupOnAbort()
 }
 
-private struct DefaultVisitor : EscapeVisitor {}
+extension EscapeVisitorWithResult {
+  mutating func cleanupOnAbort() {}
+}
+
+// FIXME: This ought to be marked private, but that triggers a compiler bug
+// in debug builds (rdar://117413192)
+struct DefaultVisitor : EscapeVisitor {}
 
 struct EscapeUtilityTypes {
 
@@ -361,10 +373,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is ApplyInst, is TryApplyInst, is BeginApplyInst:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
     case let pai as PartialApplyInst:
-      // This is a non-stack closure.
-      // For `stack` closures, `hasRelevantType` in `walkDown` will return false
-      // stopping the walk since they don't escape.
-      
       // Check whether the partially applied argument can escape in the body.
       if walkDownCallee(argOp: operand, apply: pai, path: path.with(knownType: nil)) == .abortWalk {
         return .abortWalk
@@ -376,8 +384,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // 2. something can escape in a destructor when the context is destroyed
       return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
     case let pta as PointerToAddressInst:
-      assert(operand.index == 0)
       return walkDownUses(ofAddress: pta, path: path.with(knownType: nil))
+    case let cv as ConvertFunctionInst:
+      return walkDownUses(ofValue: cv, path: path.with(knownType: nil))
     case let bi as BuiltinInst:
       switch bi.id {
       case .DestroyArray:
@@ -396,7 +405,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     case is StrongRetainInst, is RetainValueInst, is DebugValueInst, is ValueMetatypeInst,
       is InitExistentialMetatypeInst, is OpenExistentialMetatypeInst,
-      is ExistentialMetatypeInst, is DeallocRefInst, is SetDeallocatingInst, is FixLifetimeInst,
+      is ExistentialMetatypeInst, is DeallocRefInst, is FixLifetimeInst,
       is ClassifyBridgeObjectInst, is BridgeObjectToWordInst, is EndBorrowInst,
       is StrongRetainInst, is RetainValueInst,
       is ClassMethodInst, is SuperMethodInst, is ObjCMethodInst,
@@ -438,7 +447,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is StoreInst, is StoreWeakInst, is StoreUnownedInst:
       let store = instruction as! StoringInstruction
       assert(operand == store.destinationOperand)
-      if let si = store as? StoreInst, si.destinationOwnership == .assign {
+      if let si = store as? StoreInst, si.storeOwnership == .assign {
         if handleDestroy(of: operand.value, path: path.with(knownType: nil)) == .abortWalk {
           return .abortWalk
         }
@@ -481,7 +490,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // 1. the closure (with the captured values) itself can escape
       // 2. something can escape in a destructor when the context is destroyed
       return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
+    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path.projectionPath) {
         return .continueWalk
       }
@@ -492,9 +501,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return walkDownUses(ofValue: svi, path: path.with(knownType: nil))
     case let atp as AddressToPointerInst:
       return walkDownUses(ofValue: atp, path: path.with(knownType: nil))
-    case let ia as IndexAddrInst:
-      assert(operand.index == 0)
-      return walkDownUses(ofAddress: ia, path: path.with(knownType: nil))
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is DebugValueInst:
       return .continueWalk
@@ -549,7 +555,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   /// Handle an apply (full or partial) during the walk-down.
   private mutating
   func walkDownCallee(argOp: Operand, apply: ApplySite, path: Path) -> WalkResult {
-    guard let argIdx = apply.argumentIndex(of: argOp) else {
+    guard let calleeArgIdx = apply.calleeArgumentIndex(of: argOp) else {
       // The callee or a type dependent operand of the apply does not let escape anything.
       return .continueWalk
     }
@@ -558,6 +564,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     if !followLoads(at: path.projectionPath) &&
        // Except for begin_apply: it can yield an address value.
        !apply.isBeginApplyWithIndirectResults {
+      return .continueWalk
+    }
+
+    if argOp.value.type.isNoEscapeFunction {
+      // Per definition a `partial_apply [on_stack]` cannot escape the callee.
+      // Potential escapes of its captured values are already handled when visiting the `partial_apply`.
       return .continueWalk
     }
 
@@ -578,8 +590,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // The callees are not know, e.g. if the callee is a closure, class method, etc.
       return isEscaping
     }
-
-    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argIdx)
 
     for callee in callees {
       let effects = callee.effects
@@ -605,12 +615,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       case .escapingToArgument(let toArgIdx, let toPath):
         // Note: exclusive argument -> argument effects cannot appear, so we don't need to handle them here.
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
-          guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
+          guard let argOp = apply.operand(forCalleeArgumentIndex: toArgIdx) else {
             return isEscaping
           }
 
           // Continue at the destination of an arg-to-arg escape.
-          let arg = apply.arguments[callerToIdx]
+          let arg = argOp.value
           
           let p = Path(projectionPath: toPath, followStores: false, knownType: nil)
           if walkUp(addressOrValue: arg, path: p) == .abortWalk {
@@ -678,18 +688,18 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: def.type))
     case is AllocBoxInst:
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
-    case let arg as BlockArgument:
-      let block = arg.parentBlock
-      switch block.singlePredecessor!.terminator {
+    case let arg as Argument:
+      guard let termResult = TerminatorResult(arg) else { return isEscaping }
+      switch termResult.terminator {
       case let ta as TryApplyInst:
-        if block != ta.normalBlock { return isEscaping }
+        if termResult.successor != ta.normalBlock { return isEscaping }
         return walkUpApplyResult(apply: ta, path: path.with(knownType: nil))
       default:
         return isEscaping
       }
     case let ap as ApplyInst:
       return walkUpApplyResult(apply: ap, path: path.with(knownType: nil))
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
+    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path.projectionPath) {
         // When walking up we shouldn't end up at a load where followLoads is false,
         // because going from a (non-followLoads) address to a load always involves a class indirection.
@@ -738,7 +748,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       } else {
         return isEscaping
       }
-    case is PointerToAddressInst, is IndexAddrInst:
+    case is PointerToAddressInst:
       return walkUp(value: (def as! SingleValueInstruction).operands[0].value, path: path.with(knownType: nil))
     case let rta as RefTailAddrInst:
       return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0).with(knownType: nil))
@@ -766,10 +776,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         switch effect.kind {
         case .escapingToReturn(let toPath, let exclusive):
           if exclusive && path.projectionPath.matches(pattern: toPath) {
-            guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
+            guard let argOp = apply.operand(forCalleeArgumentIndex: effect.argumentIndex) else {
               return .abortWalk
             }
-            let arg = apply.arguments[callerArgIdx]
+            let arg = argOp.value
             
             let p = Path(projectionPath: effect.pathPattern, followStores: path.followStores, knownType: nil)
             if walkUp(addressOrValue: arg, path: p) == .abortWalk {
@@ -819,12 +829,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
 
   private func hasRelevantType(_ value: Value, at path: SmallProjectionPath) -> Bool {
-    if !value.hasTrivialNonPointerType {
-      return true
-    }
     if visitor.followTrivialTypes &&
        // When part of a class field only need to follow non-trivial types
        !path.hasClassProjection {
+      return true
+    }
+    if !value.hasTrivialNonPointerType {
       return true
     }
     return false

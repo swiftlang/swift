@@ -83,14 +83,14 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
       continue;
     }
 
-    // If we have a subclass of OwnershipForwardingMixin that doesnt directly
+    // If we have a subclass of ForwardingInstruction that doesnt directly
     // forward its operand to the result, treat the use as an unknown consuming
     // use.
     //
     // If we do not directly forward and we have an owned value (which we do
     // here), we could get back a different value. Thus we can not transform
     // such a thing from owned to guaranteed.
-    if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
+    if (auto *i = ForwardingInstruction::get(op->getUser())) {
       if (!i->preservesOwnership()) {
         tmpUnknownConsumingUses.push_back(op);
         continue;
@@ -166,7 +166,7 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   //
   // TODO: Hoist this out?
   SILInstruction *inst = introducer.value->getDefiningInstruction();
-  Optional<ValueLifetimeAnalysis> analysis;
+  llvm::Optional<ValueLifetimeAnalysis> analysis;
   if (!inst) {
     analysis.emplace(cast<SILArgument>(introducer.value),
                      getAllConsumingInsts());
@@ -278,6 +278,7 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::Phi: {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(OwnershipKind::Guaranteed);
+    phiArg->setReborrow(computeIsReborrow(phiArg));
     return phiArg;
   }
   case OwnedValueIntroducerKind::Struct: {
@@ -296,6 +297,7 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::BeginApply:
   case OwnedValueIntroducerKind::TryApply:
   case OwnedValueIntroducerKind::LoadTake:
+  case OwnedValueIntroducerKind::Move:
   case OwnedValueIntroducerKind::FunctionArgument:
   case OwnedValueIntroducerKind::PartialApplyInit:
   case OwnedValueIntroducerKind::AllocBoxInit:

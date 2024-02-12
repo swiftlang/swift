@@ -44,7 +44,8 @@ protected:
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   llvm::Type *FragmentStorageType = nullptr;
-  Optional<Size::int_type> SizeInBits;
+  llvm::Optional<Size::int_type> SizeInBits;
+  std::optional<uint32_t> NumExtraInhabitants;
   Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
@@ -54,10 +55,11 @@ protected:
 public:
   DebugTypeInfo() = default;
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
-                Optional<Size::int_type> SizeInBits = {},
+                llvm::Optional<Size::int_type> SizeInBits = {},
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false);
+                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false,
+                std::optional<uint32_t> NumExtraInhabitants = {});
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -108,10 +110,10 @@ public:
       assert(FragmentStorageType && "only defined types may have a size");
     return FragmentStorageType;
   }
-  Optional<Size::int_type> getTypeSizeInBits() const {
+  llvm::Optional<Size::int_type> getTypeSizeInBits() const {
     return SizeIsFragmentSize ? llvm::None : SizeInBits;
   }
-  Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
+  llvm::Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
@@ -119,6 +121,9 @@ public:
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isSizeFragmentSize() const { return SizeIsFragmentSize; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
+  std::optional<uint32_t> getNumExtraInhabitants() const {
+    return NumExtraInhabitants;
+  }
 
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
@@ -132,13 +137,13 @@ class CompletedDebugTypeInfo : public DebugTypeInfo {
   CompletedDebugTypeInfo(DebugTypeInfo DbgTy) : DebugTypeInfo(DbgTy) {}
 
 public:
-  static Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
+  static llvm::Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
     if (!DbgTy.getRawSizeInBits() || DbgTy.isSizeFragmentSize())
       return {};
     return CompletedDebugTypeInfo(DbgTy);
   }
 
-  static Optional<CompletedDebugTypeInfo>
+  static llvm::Optional<CompletedDebugTypeInfo>
   getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
     return CompletedDebugTypeInfo::get(
         DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM, /*IsFragment*/ false));

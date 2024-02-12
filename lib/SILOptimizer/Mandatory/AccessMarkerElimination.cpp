@@ -183,16 +183,16 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
         auto InvalidKind = SILAnalysis::InvalidationKind::Instructions;
         invalidateAnalysis(&F, InvalidKind);
       }
-
-      // Markers from all current SIL functions are stripped. Register a
-      // callback to strip an subsequently loaded functions on-the-fly.
-      if (!EnableOptimizedAccessMarkers) {
-        using NotificationHandlerTy =
-            FunctionBodyDeserializationNotificationHandler;
-        auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
-        std::unique_ptr<DeserializationNotificationHandler> ptr(n);
-        M.registerDeserializationNotificationHandler(std::move(ptr));
-      }
+    }
+    // Markers from all current SIL functions are stripped. Register a
+    // callback to strip an subsequently loaded functions on-the-fly.
+    if (!EnableOptimizedAccessMarkers && !M.checkHasAccessMarkerHandler()) {
+      using NotificationHandlerTy =
+        FunctionBodyDeserializationNotificationHandler;
+      auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
+      std::unique_ptr<DeserializationNotificationHandler> ptr(n);
+      M.registerDeserializationNotificationHandler(std::move(ptr));
+      M.setHasAccessMarkerHandler();
     }
   }
 };

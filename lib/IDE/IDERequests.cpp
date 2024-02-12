@@ -77,6 +77,10 @@ public:
   ResolvedCursorInfoPtr resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
@@ -96,17 +100,12 @@ private:
   bool isDone() const { return CursorInfo->isValid(); }
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type(),
-                  Optional<ReferenceMetaData> Data = None);
+                  llvm::Optional<ReferenceMetaData> Data = llvm::None);
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override;
-
-  // We want to be able to resolve symbols within expansions
-  bool shouldWalkMacroExpansions() override {
-    return true;
-  }
 };
 
 SourceManager &CursorInfoResolver::getSourceMgr() const
@@ -114,14 +113,30 @@ SourceManager &CursorInfoResolver::getSourceMgr() const
   return SrcFile.getASTContext().SourceMgr;
 }
 
+static bool locationMatches(SourceLoc currentLoc, SourceLoc toResolveLoc,
+                            SourceManager &SM) {
+  if (currentLoc == toResolveLoc)
+    return true;
+
+  if (currentLoc.getAdvancedLoc(-1) != toResolveLoc)
+    return false;
+
+  // Check if the location to resolve is a '@' or '#' and accept if so (to
+  // allow clients to send either the name location or the start of the
+  // attribute/expansion).
+  unsigned bufferID = SM.findBufferContainingLoc(toResolveLoc);
+  StringRef initialChar = SM.extractText({toResolveLoc, 1}, bufferID);
+  return initialChar == "@" || initialChar == "#";
+}
+
 bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
                                     ExtensionDecl *ExtTyRef, SourceLoc Loc,
                                     bool IsRef, Type Ty,
-                                    Optional<ReferenceMetaData> Data) {
+                                    llvm::Optional<ReferenceMetaData> Data) {
   if (!D->hasName())
     return false;
 
-  if (Loc != LocToResolve)
+  if (!locationMatches(Loc, LocToResolve, getSourceMgr()))
     return false;
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -136,7 +151,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   SmallVector<NominalTypeDecl *> ReceiverTypes;
   bool IsDynamic = false;
-  Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = None;
+  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      llvm::None;
   if (Expr *BaseE = getBase(ExprStack)) {
     if (isDynamicRef(BaseE, D)) {
       IsDynamic = true;
@@ -213,7 +229,13 @@ ResolvedCursorInfoPtr CursorInfoResolver::resolve(SourceLoc Loc) {
 }
 
 bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  if (!rangeContainsLoc(D->getSourceRangeIncludingAttrs()))
+  // Get char based source range for this declaration.
+  SourceRange SR = D->getSourceRangeIncludingAttrs();
+  auto &Context = D->getASTContext();
+  CharSourceRange CharSR =
+      Lexer::getCharSourceRangeFromSourceRange(Context.SourceMgr, SR);
+
+  if (!rangeContainsLoc(CharSR))
     return false;
 
   if (isa<ExtensionDecl>(D))
@@ -534,7 +556,7 @@ private:
   SourceLoc Start;
   SourceLoc End;
 
-  Optional<ResolvedRangeInfo> Result;
+  llvm::Optional<ResolvedRangeInfo> Result;
   std::vector<ContextInfo> ContextStack;
   ContextInfo &getCurrentDC() {
     assert(!ContextStack.empty());

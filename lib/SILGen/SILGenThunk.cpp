@@ -20,16 +20,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Callee.h"
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -84,14 +88,15 @@ SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
   if (constant.isForeignToNativeThunk()) {
     if (!SGM.hasFunction(constant))
       SGM.emitForeignToNativeThunk(constant);
-    return ManagedValue::forUnmanaged(B.createFunctionRefFor(
+    return ManagedValue::forObjectRValueWithoutOwnership(B.createFunctionRefFor(
         loc, SGM.getFunction(constant, NotForDefinition)));
   }
 
   // Otherwise, we need a dynamic dispatch thunk.
   SILFunction *F = SGM.getDynamicThunk(constant, constantTy);
 
-  return ManagedValue::forUnmanaged(B.createFunctionRefFor(loc, F));
+  return ManagedValue::forObjectRValueWithoutOwnership(
+      B.createFunctionRefFor(loc, F));
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
@@ -106,6 +111,23 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
+void SILGenModule::emitDistributedThunkForDecl(
+    llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
+  FuncDecl *thunkDecl =
+      varOrAFD.is<AbstractFunctionDecl *>()
+          ? varOrAFD.get<AbstractFunctionDecl *>()->getDistributedThunk()
+          : varOrAFD.get<VarDecl *>()->getDistributedThunk();
+  if (!thunkDecl)
+    return;
+
+  if (thunkDecl->isBodySkipped())
+    return;
+
+  auto thunk = SILDeclRef(thunkDecl).asDistributed();
+  emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+                         getFunction(thunk, ForDefinition));
+}
+
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isDistributedThunk() && "distributed thunks only");
@@ -117,6 +139,51 @@ void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
   assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
+
+namespace {
+
+/// Checker that validates that a distributed thunk is completely the same
+/// except that self can vary by isolation.
+struct DistributedThunkDiffChecker
+    : CanTypeDifferenceVisitor<DistributedThunkDiffChecker> {
+  using SuperTy = CanTypeDifferenceVisitor<DistributedThunkDiffChecker>;
+
+  bool visitSILFunctionTypeComponents(CanSILFunctionType type1,
+                                      CanSILFunctionType type2) {
+    // If they do not both have a self param. Just delegate to our parent.
+    if (!type1->hasSelfParam() || !type2->hasSelfParam()) {
+      return SuperTy::visitSILFunctionTypeComponents(type1, type2);
+    }
+
+    // Otherwise, we both have self. First check if we have the same number of
+    // parameters.
+    auto type1Params = type1->getParameters();
+    auto type2Params = type2->getParameters();
+    if (type1Params.size() != type2Params.size())
+      return visitDifferentTypeStructure(type1, type2);
+
+    // Then check if self is the same ignoring isolation.
+    auto self1 = type1Params.back();
+    auto self2 = type2Params.back();
+    auto self1Options = self1.getOptions() - SILParameterInfo::Isolated;
+    auto self2Options = self2.getOptions() - SILParameterInfo::Isolated;
+
+    if (self1.getConvention() != self2.getConvention() ||
+        !self1Options.containsOnly(self2Options))
+      return visitDifferentTypeStructure(type1, type2);
+
+    // Finally, check our self type, non-self components, results, and yields.
+    return visit(self1.getInterfaceType(), self2.getInterfaceType()) ||
+           visitComponentArray(type1, type2, type1Params.drop_back(),
+                               type2Params.drop_back()) ||
+           visitComponentArray(type1, type2, type1->getResults(),
+                               type2->getResults()) ||
+           visitComponentArray(type1, type2, type1->getYields(),
+                               type2->getYields());
+  }
+};
+
+} // namespace
 
 SILValue
 SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
@@ -142,18 +209,43 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-#ifndef NDEBUG
+
   auto constantFnTypeInContext =
-    SGM.Types.getLoweredType(constantInfo.SILFnType,
-                             B.getTypeExpansionContext())
-             .castTo<SILFunctionType>();
-  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext())
-          == constantFnTypeInContext);
-#endif
+      SGM.Types
+          .getLoweredType(constantInfo.SILFnType, B.getTypeExpansionContext())
+          .castTo<SILFunctionType>();
+  auto existingType =
+      f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext());
+  if (existingType != constantFnTypeInContext) {
+    auto emitError = [&] {
+      // This can happen for example when using @_silgen_name or @_extern(c)
+      // attributes
+      SGM.diagnose(loc.getSourceLoc(), diag::function_type_mismatch,
+                   existingType, constantFnTypeInContext);
+      SGM.diagnose(f->getLocation().getSourceLoc(),
+                   diag::function_declared_here);
+      return SILUndef::get(constantInfo.getSILType(), F);
+    };
+
+    // If we have a distributed thunk, see if we only differ by isolation.
+    if (f->isDistributed() && f->isThunk()) {
+      DistributedThunkDiffChecker diffChecker;
+      if (diffChecker.visit(existingType, constantFnTypeInContext)) {
+        return emitError();
+      }
+
+      // We differ only by isolation... so do not error.
+    } else {
+      // This can happen for example when using @_silgen_name or @_extern(c)
+      // attributes
+      return emitError();
+    }
+  }
+
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
-  else
-    return B.createFunctionRefFor(loc, f);
+
+  return B.createFunctionRefFor(loc, f);
 }
 
 static const clang::Type *prependParameterType(
@@ -197,17 +289,17 @@ static const clang::Type *prependParameterType(
 }
 
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
-    CanSILFunctionType blockType, CanType continuationTy,
-    AbstractionPattern origFormalType, CanGenericSignature sig,
-    ForeignAsyncConvention convention,
-    Optional<ForeignErrorConvention> foreignError) {
-  // Extract the result and error types from the continuation type.
-  auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
+    CanSILFunctionType blockType, CanType blockStorageType,
+    CanType continuationType, AbstractionPattern origFormalType,
+    CanGenericSignature sig, CalleeTypeInfo &calleeInfo) {
+  auto convention = *calleeInfo.foreign.async;
+  auto resumeType =
+      calleeInfo.substResultType->mapTypeOutOfContext()->getReducedType(sig);
 
   CanAnyFunctionType completionHandlerOrigTy = [&]() {
     auto completionHandlerOrigTy =
         origFormalType.getObjCMethodAsyncCompletionHandlerForeignType(convention, Types);
-    Optional<CanAnyFunctionType> maybeCompletionHandlerOrigTy;
+    llvm::Optional<CanAnyFunctionType> maybeCompletionHandlerOrigTy;
     if (auto fnTy =
             dyn_cast<AnyFunctionType>(completionHandlerOrigTy)) {
       maybeCompletionHandlerOrigTy = fnTy;
@@ -235,10 +327,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   // block buffer. The block storage holds the continuation we feed the
   // result values into.
   SmallVector<SILParameterInfo, 4> implArgs;
-  auto blockStorageTy = SILBlockStorageType::get(continuationTy);
-  implArgs.push_back(SILParameterInfo(blockStorageTy,
-                                ParameterConvention::Indirect_InoutAliasable));
-  
+  implArgs.push_back(SILParameterInfo(
+      blockStorageType, ParameterConvention::Indirect_InoutAliasable));
+
   std::copy(blockType->getParameters().begin(),
             blockType->getParameters().end(),
             std::back_inserter(implArgs));
@@ -246,30 +337,31 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   auto newClangTy = prependParameterType(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
-      getASTContext().getClangTypeForIRGen(blockStorageTy));
+      getASTContext().getClangTypeForIRGen(blockStorageType));
 
-  auto implTy = SILFunctionType::get(sig,
-         blockType->getExtInfo().intoBuilder()
-           .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
-           .withClangFunctionType(newClangTy)
-           .withIsPseudogeneric((bool)sig)
-           .build(),
-         SILCoroutineKind::None,
-         ParameterConvention::Direct_Unowned,
-         implArgs, {}, blockType->getResults(),
-         None,
-         SubstitutionMap(), SubstitutionMap(), getASTContext());
+  auto implTy = SILFunctionType::get(
+      sig,
+      blockType->getExtInfo()
+          .intoBuilder()
+          .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
+          .withClangFunctionType(newClangTy)
+          .withIsPseudogeneric((bool)sig)
+          .build(),
+      SILCoroutineKind::None, ParameterConvention::Direct_Unowned, implArgs, {},
+      blockType->getResults(), llvm::None, SubstitutionMap(), SubstitutionMap(),
+      getASTContext());
 
   auto loc = RegularLocation::getAutoGeneratedLocation();
 
   Mangle::ASTMangler Mangler;
   auto name = Mangler.mangleObjCAsyncCompletionHandlerImpl(
-    blockType, resumeType, sig,
-    convention.completionHandlerFlagParamIndex()
-      ? Optional<bool>(convention.completionHandlerFlagIsErrorOnZero())
-      : Optional<bool>(),
-    /*predefined*/ false);
-  
+      blockType, resumeType, sig,
+      convention.completionHandlerFlagParamIndex()
+          ? llvm::Optional<bool>(
+                convention.completionHandlerFlagIsErrorOnZero())
+          : llvm::Optional<bool>(),
+      /*predefined*/ false);
+
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
                                            IsBare, IsTransparent, IsSerialized,
@@ -291,25 +383,52 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       // Get the continuation out of the block object.
       auto blockStorage = params[0].getValue();
-      auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-      auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
-                                           LoadOwnershipQualifier::Trivial);
-      auto continuation = ManagedValue::forUnmanaged(continuationVal);
+      SILValue continuationAddr =
+          SGF.B.createProjectBlockStorage(loc, blockStorage);
+
+      auto &ctx = SGF.getASTContext();
+
+      bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
+
+      ManagedValue continuation;
+      if (checkedBridging) {
+        FormalEvaluationScope scope(SGF);
+
+        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType, sig);
+
+        auto underlyingValueAddr = SGF.emitOpenExistential(
+            loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
+            SGF.getLoweredType(underlyingValueTy), AccessKind::Read);
+
+        continuation = SGF.B.createUncheckedAddrCast(
+            loc, underlyingValueAddr,
+            SILType::getPrimitiveAddressType(
+                F->mapTypeIntoContext(continuationType)->getCanonicalType()));
+      } else {
+        auto continuationVal = SGF.B.createLoad(
+            loc, continuationAddr, LoadOwnershipQualifier::Trivial);
+        continuation =
+            ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+      }
 
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
       // for the fact that they are preceded by the block_storage arguments.
-      auto errorIndex = convention.completionHandlerErrorParamIndex().transform(
+      auto errorIndex = swift::transform(convention.completionHandlerErrorParamIndex(),
           [](auto original) { return original + 1; });
-      auto flagIndex = convention.completionHandlerFlagParamIndex().transform(
+      auto flagIndex = swift::transform(convention.completionHandlerFlagParamIndex(),
           [](auto original) { return original + 1; });
 
       FuncDecl *resumeIntrinsic;
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
-        auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
+        auto errorIntrinsic =
+            checkedBridging ? getResumeCheckedThrowingContinuationWithError()
+                            : getResumeUnsafeThrowingContinuationWithError();
 
         auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -374,17 +493,20 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                                         LookUpConformanceInModule(SwiftModule));
         SGF.emitApplyOfLibraryIntrinsic(loc, errorIntrinsic, subs,
                                         {continuation, nativeError},
                                         SGFContext());
         errorScope.pop();
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
-      } else if (foreignError) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
+      } else if (auto foreignError = calleeInfo.foreign.error) {
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
       } else {
-        resumeIntrinsic = getResumeUnsafeContinuation();
+        resumeIntrinsic = checkedBridging ? getResumeCheckedContinuation()
+                                          : getResumeUnsafeContinuation();
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
@@ -469,7 +591,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                                         LookUpConformanceInModule(SwiftModule));
         SGF.emitApplyOfLibraryIntrinsic(loc, resumeIntrinsic, subs,
                                         {continuation, resumeArg},
                                         SGFContext());
@@ -529,7 +651,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
-    serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
+    serializable = globalActorLinkage <= FormalLinkage::PublicNonUnique
       ? IsSerialized : IsNotSerialized;
   }
 
@@ -549,11 +671,14 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   SILGenFunctionBuilder builder(*this);
   auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   Mangle::ASTMangler mangler;
+  auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+    originalFnDeclRef.getAbstractFunctionDecl(),
+    derivativeId->getParameterIndices());
   auto name = mangler.mangleAutoDiffDerivativeFunction(
       originalFnDeclRef.getAbstractFunctionDecl(),
       derivativeId->getKind(),
       AutoDiffConfig(derivativeId->getParameterIndices(),
-                     IndexSubset::get(getASTContext(), 1, {0}),
+                     resultIndices,
                      derivativeId->getDerivativeGenericSignature()),
       /*isVTableThunk*/ true);
   auto *thunk = builder.getOrCreateFunction(
@@ -573,7 +698,12 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       derivativeId->getParameterIndices(),
       derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-  auto *loweredResultIndices = IndexSubset::get(getASTContext(), 1, {0});
+  // FIXME: Do we need to lower the result indices? Likely yes.
+  auto *loweredResultIndices =
+    autodiff::getFunctionSemanticResultIndices(
+      originalFnDeclRef.getAbstractFunctionDecl(),
+      derivativeId->getParameterIndices()
+    );
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredParamIndices, loweredResultIndices, originalFn);
   auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(

@@ -17,6 +17,8 @@
 
 using namespace swift;
 
+extern llvm::cl::opt<bool> SILPrintDebugInfo;
+
 //===----------------------------------------------------------------------===//
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
@@ -250,6 +252,24 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   auto *NewBB = BB->split(InsertPt);
   InsertPt = BB->end();
   return NewBB;
+}
+
+llvm::Optional<SILDebugVariable>
+SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
+                                    llvm::Optional<SILDebugVariable> Var,
+                                    SILLocation Loc) {
+  if (Var && shouldDropVariable(*Var, Loc))
+    return {};
+  if (!Var || !Var->ArgNo || !Var->Name.empty())
+    return Var;
+
+  auto *VD = Loc.getAsASTNode<VarDecl>();
+  if (VD && !VD->getName().empty())
+    return Var;
+
+  llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
+  Var->Name = Name;
+  return Var;
 }
 
 static bool setAccessToDeinit(BeginAccessInst *beginAccess) {
@@ -611,23 +631,31 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              bool poisonRefs,
                                              bool operandWasMoved,
                                              bool trace) {
+  if (shouldDropVariable(Var, Loc))
+    return nullptr;
+
   llvm::SmallString<4> Name;
+
   // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, None};
-  return insert(DebugValueInst::create(
-      getSILDebugLocation(Loc), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, operandWasMoved,
-      trace));
+  DebugLocOverrideRAII LocOverride{*this, llvm::None};
+  return insert(DebugValueInst::create(getSILDebugLocation(Loc, true), src,
+                                       getModule(),
+                                       *substituteAnonymousArgs(Name, Var, Loc),
+                                       poisonRefs, operandWasMoved, trace));
 }
 
 DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
                                                  SILDebugVariable Var,
                                                  bool wasMoved, bool trace) {
+  if (shouldDropVariable(Var, Loc))
+    return nullptr;
+
   llvm::SmallString<4> Name;
+
   // Debug location overrides cannot apply to debug addr instructions.
-  DebugLocOverrideRAII LocOverride{*this, None};
+  DebugLocOverrideRAII LocOverride{*this, llvm::None};
   return insert(DebugValueInst::createAddr(
-      getSILDebugLocation(Loc), src, getModule(),
+      getSILDebugLocation(Loc, true), src, getModule(),
       *substituteAnonymousArgs(Name, Var, Loc), wasMoved, trace));
 }
 
@@ -665,7 +693,7 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 /// Example:
 ///
 ///     %mt = metatype $@thick C.Type
-///     checked_cast_br %mt : $@thick C.Type to AnyObject.Type, bb1, bb2,
+///     checked_cast_br C.Type in %mt : $@thick C.Type to AnyObject.Type, bb1, bb2,
 ///                           forwarding: @owned
 ///   bb1(%arg : @owned AnyObject.Type):
 ///
@@ -696,7 +724,7 @@ static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
 SwitchEnumInst *SILBuilder::createSwitchEnum(
     SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   // Consider the operand's type to be the target's type since a switch
   // covers all cases including the default argument.
@@ -707,30 +735,30 @@ SwitchEnumInst *SILBuilder::createSwitchEnum(
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op,
-    SILType destLoweredTy, CanType destFormalTy,
-    SILBasicBlock *successBB, SILBasicBlock *failureBB,
-    ProfileCounter target1Count, ProfileCounter target2Count) {
+    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
+    SILBasicBlock *failureBB, ProfileCounter target1Count,
+    ProfileCounter target2Count) {
   auto forwardingOwnership =
       deriveForwardingOwnership(op, destLoweredTy, getFunction());
-  return createCheckedCastBranch(Loc, isExact, op, destLoweredTy, destFormalTy,
-                                 successBB, failureBB, forwardingOwnership,
-                                 target1Count, target2Count);
+  return createCheckedCastBranch(
+      Loc, isExact, op, srcFormalTy, destLoweredTy, destFormalTy, successBB,
+      failureBB, forwardingOwnership, target1Count, target2Count);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, SILType destLoweredTy,
-    CanType destFormalTy, SILBasicBlock *successBB, SILBasicBlock *failureBB,
-    ValueOwnershipKind forwardingOwnershipKind, ProfileCounter target1Count,
-    ProfileCounter target2Count) {
+    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
+    SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
+    ProfileCounter target1Count, ProfileCounter target2Count) {
   assert((!hasOwnership() || !failureBB->getNumArguments() ||
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
 
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op, destLoweredTy, destFormalTy,
-      successBB, failureBB, getFunction(), target1Count, target2Count,
-      forwardingOwnershipKind));
+      getSILDebugLocation(Loc), isExact, op, srcFormalTy, destLoweredTy,
+      destFormalTy, successBB, failureBB, getFunction(), target1Count,
+      target2Count, forwardingOwnershipKind));
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,

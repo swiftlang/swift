@@ -79,11 +79,6 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     if (isa<DeallocStackInst>(inst)) {
       return false;
     }
-    OwnershipForwardingMixin *ofm = nullptr;
-    if ((ofm = OwnershipForwardingMixin::get(inst)) &&
-        ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
-      return false;
-    }
     if (isa<FunctionRefInst>(inst)) {
       moves.push_back(inst);
       invariants.insert(inst);
@@ -293,7 +288,11 @@ static bool isSingleBlockLoop(SILLoop *L) {
          && "Loop not well formed");
 
   // Check whether the back-edge block is just a split-edge.
-  return ++BackEdge->begin() == BackEdge->end();
+  for (SILInstruction &inst : make_range(BackEdge->begin(), --BackEdge->end())) {
+    if (instructionInlineCost(inst) != InlineCost::Free)
+      return false;
+  }
+  return true;
 }
 
 /// We rotated a loop if it has the following properties.

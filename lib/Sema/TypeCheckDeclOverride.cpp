@@ -17,6 +17,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -35,7 +36,7 @@ static void adjustFunctionTypeForOverride(Type &type) {
   // with one returning Never?
   auto fnType = type->castTo<AnyFunctionType>();
   auto extInfo = fnType->getExtInfo();
-  extInfo = extInfo.withThrows(false);
+  extInfo = extInfo.withThrows(false, Type());
   if (!fnType->getExtInfo().isEqualTo(extInfo, useClangTypes(fnType)))
     type = fnType->withExtInfo(extInfo);
 }
@@ -338,8 +339,8 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
 
   // Check the parameter types.
   auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
-    Type paramTy = decl->getType();
-    Type parentParamTy = parentDecl->getType();
+    Type paramTy = decl->getTypeInContext();
+    Type parentParamTy = parentDecl->getTypeInContext();
 
     auto *repr = decl->getTypeRepr();
     if (!repr)
@@ -495,9 +496,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return None;
+            return llvm::None;
           return diags.diagnose(decl, diagKind,
                                 /*plural*/ std::min(numArgs, 2U), argTy);
         });
@@ -506,9 +507,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
       baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return None;
+            return llvm::None;
           return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
                                 base->getDescriptiveKind(), baseTy);
         });
@@ -559,7 +560,8 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
-          .limitBehavior(limit);
+          .limitBehaviorUntilSwiftVersion(limit, 6)
+          .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
       return false;
     });
     break;
@@ -594,8 +596,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     }
 
     auto diag = diags.diagnose(matchDecl, diag::overridden_near_match_here,
-                               matchDecl->getDescriptiveKind(),
-                               matchDecl->getName());
+                               matchDecl);
     if (attempt == OverrideCheckingAttempt::BaseName) {
       fixDeclarationName(diag, decl, matchDecl->getName());
     }
@@ -928,7 +929,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
     dc->lookupQualified(superContexts, DeclNameRef(membersName),
-                        NL_QualifiedDefault, members);
+                        decl->getLoc(), NL_QualifiedDefault, members);
   }
 
   // Check each member we found.
@@ -1212,9 +1213,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
         diagKind = diag::initializer_does_not_override;
       diags.diagnose(decl, diagKind, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
-      diags.diagnose(baseDecl, diag::overridden_near_match_here,
-                     baseDecl->getDescriptiveKind(),
-                     baseDecl->getName());
+      diags.diagnose(baseDecl, diag::overridden_near_match_here, baseDecl);
       emittedMatchError = true;
 
     } else if (!isa<AccessorDecl>(method) &&
@@ -1245,9 +1244,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
       diags.diagnose(decl, diag::subscript_does_not_override, isClassContext);
       noteFixableMismatchedTypes(decl, baseDecl);
-      diags.diagnose(baseDecl, diag::overridden_near_match_here,
-                     baseDecl->getDescriptiveKind(),
-                     baseDecl->getName());
+      diags.diagnose(baseDecl, diag::overridden_near_match_here, baseDecl);
       emittedMatchError = true;
 
     } else if (mayHaveMismatchedOptionals) {
@@ -1305,9 +1302,9 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch,
                      decl->getName())
-        .limitBehavior(limit);
-      diags.diagnose(baseDecl, diag::overridden_here)
-        .limitBehavior(limit);
+        .limitBehaviorUntilSwiftVersion(limit, 6)
+        .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
+      diags.diagnose(baseDecl, diag::overridden_here);
       return false;
     });
   }
@@ -1489,6 +1486,7 @@ namespace  {
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
     UNINTERESTING_ATTR(Borrowed)
+    UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)
@@ -1512,13 +1510,18 @@ namespace  {
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
+    UNINTERESTING_ATTR(NoRuntime)
+    UNINTERESTING_ATTR(NoExistentials)
+    UNINTERESTING_ATTR(NoObjCBridging)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
+    UNINTERESTING_ATTR(Extern)
     UNINTERESTING_ATTR(Final)
     UNINTERESTING_ATTR(MoveOnly)
     UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
+    UNINTERESTING_ATTR(LegacyConsuming)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
@@ -1532,6 +1535,8 @@ namespace  {
     UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
+    UNINTERESTING_ATTR(RawLayout)
+    UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
@@ -1544,6 +1549,8 @@ namespace  {
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
+    UNINTERESTING_ATTR(Used)
+    UNINTERESTING_ATTR(Section)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
@@ -1577,6 +1584,7 @@ namespace  {
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
     UNINTERESTING_ATTR(RestatedObjCConformance)
+    UNINTERESTING_ATTR(StorageRestrictions)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
@@ -1605,7 +1613,6 @@ namespace  {
     UNINTERESTING_ATTR(Nonisolated)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
-    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
@@ -1618,14 +1625,16 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+    UNINTERESTING_ATTR(ExtractConstantsFromMembers)
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
 
-    UNINTERESTING_ATTR(RuntimeMetadata)
-
     UNINTERESTING_ATTR(MacroRole)
     UNINTERESTING_ATTR(LexicalLifetimes)
+    UNINTERESTING_ATTR(NonEscapable)
+    UNINTERESTING_ATTR(UnsafeNonEscapableResult)
+    UNINTERESTING_ATTR(StaticExclusiveOnly)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1655,41 +1664,7 @@ namespace  {
       }
     }
 
-    void visitObjCAttr(ObjCAttr *attr) {
-      // Checking for overrides of declarations that are implicitly @objc
-      // and occur in class extensions, because overriding will no longer be
-      // possible under the Swift 4 rules.
-
-      // We only care about the storage declaration.
-      if (isa<AccessorDecl>(Override)) return;
-
-      // If @objc was explicit or handled elsewhere, nothing to do.
-      if (!attr->isSwift3Inferred()) return;
-
-      // If we aren't warning about Swift 3 @objc inference, we're done.
-      if (Override->getASTContext().LangOpts.WarnSwift3ObjCInference ==
-            Swift3ObjCInferenceWarnings::None)
-        return;
-
-      // If 'dynamic' was implicit, we'll already have warned about this.
-      if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>()) {
-        if (!dynamicAttr->isImplicit()) return;
-      }
-
-      // The overridden declaration needs to be in an extension.
-      if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
-
-      // Complain.
-      Diags.diagnose(Override, diag::override_swift3_objc_inference,
-                     Override->getDescriptiveKind(),
-                     Override->getName(),
-                     Base->getDeclContext()
-                       ->getSelfNominalTypeDecl()
-                       ->getName());
-      Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
-        .fixItInsert(Base->getAttributeInsertionLoc(false),
-                     "@objc ");
-    }
+    void visitObjCAttr(ObjCAttr *attr) {}
   };
 } // end anonymous namespace
 
@@ -1818,19 +1793,56 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
     return false;
 
   auto &diags = override->getASTContext().Diags;
-  if (auto *accessor = dyn_cast<AccessorDecl>(override)) {
-    diags.diagnose(override, diag::override_accessor_less_available,
-                   accessor->getDescriptiveKind(),
-                   accessor->getStorage()->getBaseName());
-    diags.diagnose(base, diag::overridden_here);
-    return true;
-  }
-
-  diags.diagnose(override, diag::override_less_available,
-                 override->getBaseName());
+  diags.diagnose(override, diag::override_less_available, override);
   diags.diagnose(base, diag::overridden_here);
 
   return true;
+}
+
+enum class OverrideUnavailabilityStatus {
+  /// The unavailability of the base decl and override decl are compatible.
+  Compatible,
+  /// The base decl is unavailable but the override decl is not.
+  BaseUnavailable,
+  /// Do not diagnose the unavailability of these decls.
+  Ignored,
+};
+
+static std::pair<OverrideUnavailabilityStatus, const AvailableAttr *>
+checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
+  if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
+    // If the parent of the override is unavailable, then the unavailability of
+    // the override decl is irrelevant.
+    if (overrideParent->getSemanticUnavailableAttr())
+      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+  }
+
+  if (auto *baseAccessor = dyn_cast<AccessorDecl>(base)) {
+    // Ignore implicit accessors since the diagnostics are likely to duplicate
+    // the diagnostics for the explicit accessors that availability was inferred
+    // from.
+    if (baseAccessor->isImplicit())
+      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+
+    if (auto *overrideAccessor = dyn_cast<AccessorDecl>(override)) {
+      // If base and override are accessors, check whether the unavailability of
+      // their storage matches. Diagnosing accessors with invalid storage
+      // produces redundant diagnostics.
+      if (checkOverrideUnavailability(overrideAccessor->getStorage(),
+                                      baseAccessor->getStorage())
+              .first != OverrideUnavailabilityStatus::Compatible)
+        return {OverrideUnavailabilityStatus::Ignored, nullptr};
+    }
+  }
+
+  auto &ctx = override->getASTContext();
+  auto *baseUnavailableAttr = base->getAttrs().getUnavailable(ctx);
+  auto *overrideUnavailableAttr = override->getAttrs().getUnavailable(ctx);
+
+  if (baseUnavailableAttr && !overrideUnavailableAttr)
+    return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
+
+  return {OverrideUnavailabilityStatus::Compatible, nullptr};
 }
 
 static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
@@ -1943,8 +1955,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     auto nominal = base->getDeclContext()->getSelfNominalTypeDecl();
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                   !isa<ExtensionDecl>(base->getDeclContext()),
-                   override->getDescriptiveKind(), override->getName(),
+                   !isa<ExtensionDecl>(base->getDeclContext()), override,
                    nominal->getName());
     // If the base and the override come from the same module, try to fix
     // the base declaration. Otherwise we can wind up diagnosing into e.g. the
@@ -1999,16 +2010,54 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(base, diag::overridden_here);
     }
   }
-  // If the overriding declaration is 'throws' but the base is not,
-  // complain. Do the same for 'async'
+
+  // Check effects.
   if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
-    if (overrideFn->hasThrows() &&
-        !cast<AbstractFunctionDecl>(base)->hasThrows()) {
+    // Determine the thrown errors in the base and override declarations.
+    auto baseFn = cast<AbstractFunctionDecl>(base);
+    Type overrideThrownError =
+        overrideFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+    Type baseThrownError =
+        baseFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+
+    if (baseThrownError && baseThrownError->hasTypeParameter()) {
+      auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+      baseThrownError = baseThrownError.subst(subs);
+      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+    }
+
+    if (overrideThrownError)
+      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+
+    // Check for a subtyping relationship.
+    switch (compareThrownErrorsForSubtyping(
+                overrideThrownError, baseThrownError, overrideFn)) {
+    case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects,
                      override->getDescriptiveKind(), "throwing");
       diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::Mismatch:
+      diags.diagnose(override, diag::override_typed_throws,
+                     override->getDescriptiveKind(), overrideThrownError,
+                     baseThrownError);
+      diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::ExactMatch:
+    case ThrownErrorSubtyping::Subtype:
+      // Proper subtyping.
+      break;
+
+    case ThrownErrorSubtyping::Dependent:
+      // Only in already ill-formed code.
+      assert(ctx.Diags.hadAnyError());
+      break;
     }
 
+    // If the override is 'async' but the base declaration is not, we have a
+    // problem.
     if (overrideFn->hasAsync() &&
         !cast<AbstractFunctionDecl>(base)->hasAsync()) {
       diags.diagnose(override, diag::override_with_more_effects,
@@ -2034,11 +2083,10 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       return (prop &&
               prop->isFinal() &&
               isa<ClassDecl>(prop->getDeclContext()) &&
-              cast<ClassDecl>(prop->getDeclContext())->isActor() &&
+              cast<ClassDecl>(prop->getDeclContext())->isAnyActor() &&
               !prop->isStatic() &&
               prop->getName() == ctx.Id_unownedExecutor &&
-              prop->getInterfaceType()->getAnyNominal() ==
-                ctx.getUnownedSerialExecutorDecl());
+              prop->getInterfaceType()->getAnyNominal() == ctx.getUnownedSerialExecutorDecl());
     };
 
     if (isActorUnownedExecutor()) {
@@ -2065,17 +2113,28 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   }
 
   // FIXME: Possibly should extend to more availability checking.
-  if (auto *attr = base->getAttrs().getUnavailable(ctx)) {
-    diagnoseUnavailableOverride(override, base, attr);
+  auto unavailabilityStatusAndAttr =
+      checkOverrideUnavailability(override, base);
+  auto *unavailableAttr = unavailabilityStatusAndAttr.second;
+
+  switch (unavailabilityStatusAndAttr.first) {
+  case OverrideUnavailabilityStatus::BaseUnavailable: {
+    diagnoseOverrideOfUnavailableDecl(override, base, unavailableAttr);
 
     if (isUnavailableInAllVersions(base)) {
       auto modifier = override->getAttrs().getAttribute<OverrideAttr>();
       if (modifier && modifier->isValid()) {
-        diags.diagnose(override, diag::suggest_removing_override,
-                       override->getBaseName())
-          .fixItRemove(modifier->getRange());
+        diags
+            .diagnose(override, diag::suggest_removing_override,
+                      override->getBaseName())
+            .fixItRemove(modifier->getRange());
       }
     }
+    break;
+  }
+  case OverrideUnavailabilityStatus::Compatible:
+  case OverrideUnavailabilityStatus::Ignored:
+    break;
   }
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
@@ -2161,7 +2220,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
       foundAny = true;
     }
 
-    return foundAny ? TypeWalker::Action::SkipChildren
+    return foundAny ? TypeWalker::Action::SkipNode
                     : TypeWalker::Action::Continue;
   });
 
@@ -2217,6 +2276,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::DidSet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Init:
       // These accessors are never part of the opaque set. Bail out early
       // to avoid computing the overridden declarations of the storage.
       return noResults;

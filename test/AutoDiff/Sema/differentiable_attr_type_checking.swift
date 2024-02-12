@@ -18,13 +18,13 @@ let globalConst: Float = 1
 var globalVar: Float = 1
 
 func testLocalVariables() {
-  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  // expected-error @+1 {{getter for 'getter' has no parameters to differentiate with respect to}}
   @differentiable(reverse)
   var getter: Float {
     return 1
   }
 
-  // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
+  // expected-error @+1 {{getter for 'getterSetter' has no parameters to differentiate with respect to}}
   @differentiable(reverse)
   var getterSetter: Float {
     get { return 1 }
@@ -528,7 +528,6 @@ func two9(x: Float, y: Float) -> Float {
 func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse, wrt: y)
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
@@ -558,7 +557,7 @@ public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
 
 public protocol HasRequirement {
   @differentiable(reverse)
-  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; do you want to add a stub?}}
+  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; add a stub for conformance}}
   func requirement<T: Differentiable>(_ x: T, _ y: T) -> T
 }
 
@@ -670,11 +669,9 @@ final class FinalClass: Differentiable {
 @differentiable(reverse, wrt: y)
 func inoutVoid(x: Float, y: inout Float) {}
 
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse)
 func multipleSemanticResults(_ x: inout Float) -> Float { x }
 
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @differentiable(reverse, wrt: y)
 func swap(x: inout Float, y: inout Float) {}
 
@@ -683,11 +680,23 @@ struct InoutParameters: Differentiable {
   mutating func move(by _: TangentVector) {}
 }
 
+extension NonDiffableStruct {
+  // expected-error @+1 {{cannot differentiate void function 'nondiffResult(x:y:z:)'}}
+  @differentiable(reverse)
+  static func nondiffResult(x: Int, y: inout NonDiffableStruct, z: Float) {}
+
+  @differentiable(reverse)
+  static func diffResult(x: Int, y: inout NonDiffableStruct, z: Float) -> Float {}
+
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'NonDiffableStruct' does not conform to 'Differentiable'}}
+  @differentiable(reverse, wrt: (y, z))
+  static func diffResult2(x: Int, y: inout NonDiffableStruct, z: Float) -> Float {}
+}
+
 extension InoutParameters {
   @differentiable(reverse)
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
 
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable(reverse)
   static func multipleSemanticResults(_ lhs: inout Self, rhs: Self) -> Self {}
 }
@@ -696,9 +705,30 @@ extension InoutParameters {
   @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) {}
 
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
   @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) -> Self {}
+}
+
+// Test tuple results.
+
+extension InoutParameters {
+  @differentiable(reverse)
+  static func tupleResults(_ x: Self) -> (Self, Self) {}
+
+  // Int does not conform to Differentiable
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+  @differentiable(reverse)
+  static func tupleResultsInt(_ x: Self) -> (Int, Self) {}
+
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+  @differentiable(reverse)
+  static func tupleResultsInt2(_ x: Self) -> (Self, Int) {}
+
+  @differentiable(reverse)
+  static func tupleResultsFloat(_ x: Self) -> (Float, Self) {}
+
+  @differentiable(reverse)
+  static func tupleResultsFloat2(_ x: Self) -> (Self, Float) {}
 }
 
 // Test accessors: `set`, `_read`, `_modify`.

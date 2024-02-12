@@ -1,3 +1,5 @@
+[** ‼️ The official C++ interoperability documentation is live at Swift.org and provides an up-to-date guide for mixing Swift and C++ ‼️ **](https://www.swift.org/documentation/cxx-interop/)
+
 # Guide: Calling Swift APIs from C++
 
 A Swift library author might want to expose their interface to C++, to allow a C++ codebase to interoperate with the Swift library.  This document describes how this can be accomplished, by first describing how Swift can expose its interface to C++, and then going into the details on how to use Swift APIs from C++.
@@ -591,7 +593,7 @@ enum value will abort the program.
 ### Resilient Enums
 
 A resilient Swift enumeration value could represent a case that's unknown to the client.
-Swift forces the client to check if the value is `@uknown default` when switching over
+Swift forces the client to check if the value is `@unknown default` when switching over
 the enumeration to account for that. C++ follows a similar principle,
 by exposing an `unknownDefault` case that can then be matched in a switch.
 

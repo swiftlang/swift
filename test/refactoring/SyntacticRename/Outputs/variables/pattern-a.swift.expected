@@ -17,8 +17,8 @@ var cat = {(a: Int) in aStruct . /*ivar-x*/x}
 var aTuple = (1, 1)
 
 switch aTuple {
-case (let /*pattern-a:def*/axolotl, let b):
-	print(/*pattern-a*/axolotl + b)
+case (let /*pattern-a:def*/<base>a</base>, let b):
+	print(/*pattern-a*/<base>a</base> + b)
 }
 
 var opt = Optional.some(1)

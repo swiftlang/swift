@@ -3,9 +3,9 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // Check with recovery instrumentation and the runtime option to continue execution.
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
+// RUN: %target-swiftc_driver %s -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -emit-ir -o %t.asan_recover.ll
 // RUN: %FileCheck -check-prefix=CHECK-IR -input-file=%t.asan_recover.ll %s
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -o %t_asan_recover
+// RUN: %target-swiftc_driver %s -g -sanitize=address -sanitize-recover=address -import-objc-header %S/asan_interface.h -o %t_asan_recover
 // RUN: %target-codesign %t_asan_recover
 // RUN: env %env-ASAN_OPTIONS=halt_on_error=0 %target-run %t_asan_recover > %t_asan_recover.stdout 2> %t_asan_recover.stderr
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDERR,CHECK-RECOVER-STDERR -input-file=%t_asan_recover.stderr %s
@@ -17,7 +17,7 @@
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDOUT,CHECK-NO-RECOVER-STDOUT -input-file=%t_asan_no_runtime_recover.stdout %s
 
 // Check that without recovery instrumentation and runtime option to continue execution that error recovery does not happen.
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -import-objc-header %S/asan_interface.h -o %t_asan_no_recover
+// RUN: %target-swiftc_driver %s -g -sanitize=address -import-objc-header %S/asan_interface.h -o %t_asan_no_recover
 // RUN: %target-codesign %t_asan_no_recover
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0,halt_on_error=0 not %target-run %t_asan_no_recover > %t_asan_no_recover.stdout 2> %t_asan_no_recover.stderr
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDERR -input-file=%t_asan_no_recover.stderr %s

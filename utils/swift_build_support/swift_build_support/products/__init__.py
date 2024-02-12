@@ -10,12 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
-from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
-from .earlyswiftsyntax import EarlySwiftSyntax
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
@@ -25,6 +23,7 @@ from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
+from .minimalstdlib import MinimalStdlib
 from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
@@ -33,19 +32,19 @@ from .swift import Swift
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
-from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
+from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
+from .wasmkit import WasmKit
+from .wasmstdlib import WasmStdlib
 from .xctest import XCTest
 from .zlib import Zlib
 
 __all__ = [
-    'BackDeployConcurrency',
     'CMark',
-    'Ninja',
     'Foundation',
     'LibCXX',
     'LibDispatch',
@@ -56,6 +55,7 @@ __all__ = [
     'LLBuild',
     'LLDB',
     'LLVM',
+    'MinimalStdlib',
     'Ninja',
     'PlaygroundSupport',
     'Swift',
@@ -64,15 +64,17 @@ __all__ = [
     'SwiftPM',
     'SwiftDriver',
     'EarlySwiftDriver',
-    'EarlySwiftSyntax',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',
-    'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
     'TSanLibDispatch',
     'SwiftDocC',
-    'SwiftDocCRender'
+    'SwiftDocCRender',
+    'WASILibc',
+    'WasmLLVMRuntimeLibs',
+    'WasmKit',
+    'WasmStdlib'
 ]

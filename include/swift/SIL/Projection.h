@@ -40,7 +40,7 @@ namespace swift {
 class SILBuilder;
 class ProjectionPath;
 using ProjectionPathSet = llvm::DenseSet<ProjectionPath>;
-using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
+using ProjectionPathList = llvm::SmallVector<llvm::Optional<ProjectionPath>, 8>;
 
 enum class SubSeqRelation_t : uint8_t {
   Unknown,
@@ -94,8 +94,9 @@ enum class ProjectionKind : unsigned {
   RefCast = 1,
   BitwiseCast = 2,
   TailElems = 3,
+  BlockStorageCast = 4,
   FirstPointerKind = Upcast,
-  LastPointerKind = TailElems,
+  LastPointerKind = BlockStorageCast,
 
   // Index Projection Kinds
   FirstIndexKind = 7,
@@ -120,6 +121,7 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
   case ProjectionKind::Upcast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
+  case ProjectionKind::BlockStorageCast:
     return true;
   case ProjectionKind::Struct:
   case ProjectionKind::Tuple:
@@ -318,15 +320,19 @@ public:
     auto *Ty = getPointer();
     assert(Ty->isCanonical());
     switch (getKind()) {
-      case ProjectionKind::Upcast:
-      case ProjectionKind::RefCast:
-      case ProjectionKind::BitwiseCast:
-        return SILType::getPrimitiveType(Ty->getCanonicalType(),
-                                         BaseType.getCategory());
-      case ProjectionKind::TailElems:
-        return SILType::getPrimitiveAddressType(Ty->getCanonicalType());
-      default:
-        llvm_unreachable("unknown cast projection type");
+    case ProjectionKind::Upcast:
+    case ProjectionKind::RefCast:
+    case ProjectionKind::BitwiseCast:
+      return SILType::getPrimitiveType(Ty->getCanonicalType(),
+                                       BaseType.getCategory());
+    case ProjectionKind::TailElems:
+      return SILType::getPrimitiveAddressType(Ty->getCanonicalType());
+    case ProjectionKind::BlockStorageCast: {
+      auto blockStorageTy = Ty->getCanonicalType()->castTo<SILBlockStorageType>();
+      return blockStorageTy->getCaptureAddressType();
+    }
+    default:
+      llvm_unreachable("unknown cast projection type");
     }
   }
 
@@ -421,6 +427,7 @@ public:
     case ProjectionKind::BitwiseCast:
       return true;
     case ProjectionKind::Upcast:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Struct:
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
@@ -445,6 +452,7 @@ public:
     case ProjectionKind::RefCast:
     case ProjectionKind::Tuple:
     case ProjectionKind::Upcast:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Box:
     case ProjectionKind::TailElems:
       return false;
@@ -570,8 +578,8 @@ public:
   /// *NOTE* This method allows for transitions from object types to address
   /// types via ref_element_addr. If Start is an address type though, End will
   /// always also be an address type.
-  static Optional<ProjectionPath> getProjectionPath(SILValue Start,
-                                                    SILValue End);
+  static llvm::Optional<ProjectionPath> getProjectionPath(SILValue Start,
+                                                          SILValue End);
 
   /// Treating a projection path as an ordered set, if RHS is a prefix of LHS,
   /// return the projection path with that prefix removed.
@@ -579,7 +587,7 @@ public:
   /// An example of this transformation would be:
   ///
   /// LHS = [A, B, C, D, E], RHS = [A, B, C] => Result = [D, E]
-  static Optional<ProjectionPath>
+  static llvm::Optional<ProjectionPath>
   removePrefix(const ProjectionPath &Path, const ProjectionPath &Prefix);
 
   /// Given the SILType Base, expand every leaf nodes in the type tree.
@@ -765,7 +773,7 @@ public:
     return llvm::makeArrayRef(ChildProjections);
   }
 
-  Optional<Projection> &getProjection() { return Proj; }
+  llvm::Optional<Projection> &getProjection() { return Proj; }
 
   const ArrayRef<Operand *> getNonProjUsers() const {
     return llvm::makeArrayRef(NonProjUsers);

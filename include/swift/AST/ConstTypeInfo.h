@@ -106,7 +106,7 @@ private:
 };
 
 struct TupleElement {
-  Optional<std::string> Label;
+  llvm::Optional<std::string> Label;
   swift::Type Type;
   std::shared_ptr<CompileTimeValue> Value;
 };
@@ -233,20 +233,18 @@ struct ConstValueTypePropertyInfo {
   swift::VarDecl *VarDecl;
   std::shared_ptr<CompileTimeValue> Value;
   llvm::Optional<AttrValueVector> PropertyWrappers;
-  llvm::Optional<AttrValueVector> RuntimeMetadataAttributes;
 
   ConstValueTypePropertyInfo(
       swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
-      llvm::Optional<AttrValueVector> PropertyWrappers,
-      llvm::Optional<AttrValueVector> RuntimeMetadataAttributes)
-      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers),
-        RuntimeMetadataAttributes(RuntimeMetadataAttributes) {}
+      llvm::Optional<AttrValueVector> PropertyWrappers)
+      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers)
+    {}
 
   ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
                              std::shared_ptr<CompileTimeValue> Value)
       : VarDecl(VarDecl), Value(Value),
-        PropertyWrappers(llvm::Optional<AttrValueVector>()),
-        RuntimeMetadataAttributes(llvm::Optional<AttrValueVector>()) {}
+        PropertyWrappers(llvm::Optional<AttrValueVector>())
+    {}
 };
 
 struct ConstValueTypeInfo {

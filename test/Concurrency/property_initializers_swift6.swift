@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -disable-availability-checking -warn-concurrency
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -strict-concurrency=complete -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -strict-concurrency=complete -emit-sil -o /dev/null -verify %s -enable-experimental-feature RegionBasedIsolation
 
+// REQUIRES: concurrency
 // REQUIRES: asserts
 
 @globalActor

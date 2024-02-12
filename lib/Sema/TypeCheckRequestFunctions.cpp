@@ -22,6 +22,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -52,7 +53,7 @@ Type InheritedTypeRequest::evaluate(
     context = TypeResolverContext::Inherited;
   }
 
-  Optional<TypeResolution> resolution;
+  llvm::Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
@@ -71,7 +72,7 @@ Type InheritedTypeRequest::evaluate(
     break;
   }
 
-  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
@@ -103,30 +104,22 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       return Type();
   }
 
-  for (unsigned int idx : indices(nominalDecl->getInherited())) {
-    auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
-
-    if (auto err = result.takeError()) {
-      // FIXME: Should this just return once a cycle is detected?
-      llvm::handleAllErrors(std::move(err),
-        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
-          /* cycle detected */
-        });
+  for (unsigned int idx : nominalDecl->getInherited().getIndices()) {
+    auto result = evaluateOrDefault(evaluator,
+                                    InheritedTypeRequest{nominalDecl, idx, stage},
+                                    Type());
+    if (!result)
       continue;
-    }
-
-    Type inheritedType = *result;
-    if (!inheritedType) continue;
 
     // If we found a class, return it.
-    if (inheritedType->getClassOrBoundGenericClass()) {
-      return inheritedType;
+    if (result->getClassOrBoundGenericClass()) {
+      return result;
     }
 
     // If we found an existential with a superclass bound, return it.
-    if (inheritedType->isExistentialType()) {
+    if (result->isExistentialType()) {
       if (auto superclassType =
-            inheritedType->getExistentialLayout().explicitSuperclass) {
+            result->getExistentialLayout().explicitSuperclass) {
         if (superclassType->getClassOrBoundGenericClass()) {
           return superclassType;
         }
@@ -140,19 +133,10 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 
 Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
                                   EnumDecl *enumDecl) const {
-  for (unsigned int idx : indices(enumDecl->getInherited())) {
-    auto inheritedTypeResult = evaluator(
-        InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface});
-
-    if (auto err = inheritedTypeResult.takeError()) {
-      llvm::handleAllErrors(std::move(err),
-        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
-          // cycle detected
-        });
-      continue;
-    }
-
-    auto &inheritedType = *inheritedTypeResult;
+  for (unsigned int idx : enumDecl->getInherited().getIndices()) {
+    auto inheritedType = evaluateOrDefault(evaluator,
+        InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface},
+        Type());
     if (!inheritedType) continue;
 
     // Skip protocol conformances.

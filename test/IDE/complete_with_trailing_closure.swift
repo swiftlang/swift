@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 public struct ItemWrapper {
   let content: Int
@@ -37,4 +36,3 @@ func foo() {
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyArray#];
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: map({#transform: (ItemWrapper) -> Int##(ItemWrapper) -> Int#})[#Void#];
-// CHECK: End completions

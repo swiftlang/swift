@@ -91,7 +91,7 @@ public func run_AngryPhonebook(_ n: Int) {
 // To keep the performance of various scripts roughly comparable, aim for
 // a total length of approximately 120 characters.
 // E.g.: `ascii.joined(separator: "").count == 124`
-// Every name should fit in 15-bytes UTF-8 encoded, to excercise the small
+// Every name should fit in 15-bytes UTF-8 encoded, to exercise the small
 // string optimization.
 // E.g.: `armenian.allSatisfy { $0._guts.isSmall } == true`
 

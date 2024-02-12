@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 protocol FontStyle {}
 struct FontStyleOne: FontStyle {}
@@ -16,7 +15,6 @@ func test() {
 
 // EXTENSION_APPLIED: Begin completions, 1 item
 // EXTENSION_APPLIED-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: variableDeclaredInConstraintExtension[#FontStyleOne#];
-// EXTENSION_APPLIED: End completions
 
 func test<T: FontStyle>(x: T) {
   x.#^COMPLETE_MEMBER_IN_GENERIC_CONTEXT?check=EXTENSION_NOT_APPLIED^#
@@ -25,7 +23,6 @@ func test<T: FontStyle>(x: T) {
 // EXTENSION_NOT_APPLIED: Begin completions, 1 item
 // EXTENSION_NOT_APPLIED-DAG: Keyword[self]/CurrNominal:          self[#T#];
 // EXTENSION_NOT_APPLIED-NOT: variableDeclaredInConstraintExtension
-// EXTENSION_NOT_APPLIED: End completions
 
 struct WrapperStruct<T: FontStyle> {
   let y: T
@@ -44,7 +41,6 @@ func test2<T: FontStyle>(x: T) {
   bar(FontStyleTwo()).#^COMPLETE_ON_GENERIC_FUNC^#
   // COMPLETE_ON_GENERIC_FUNC: Begin completions, 1 item
   // COMPLETE_ON_GENERIC_FUNC-DAG: Keyword[self]/CurrNominal:          self[#FontStyleTwo#];
-  // COMPLETE_ON_GENERIC_FUNC: End completions
 }
 
 // https://github.com/apple/swift/issues/55419
@@ -55,7 +51,7 @@ extension Indicator where T == Struct {
   static var activity: Indicator<Struct> { fatalError() }
 }
 
-func receiver<T>(_ inidicator: Indicator<T>) {}
+func receiver<T>(_ indicator: Indicator<T>) {}
 
 func test() {
   receiver(.#^COMPLETE_GENERIC_TYPE^#)
@@ -63,12 +59,10 @@ func test() {
 // COMPLETE_GENERIC_TYPE: Begin completions, 2 items
 // COMPLETE_GENERIC_TYPE: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
 // COMPLETE_GENERIC_TYPE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: activity[#Indicator<Struct>#];
-// COMPLETE_GENERIC_TYPE: End completions
 
-func testRecursive<T>(_ inidicator: Indicator<T>) {
+func testRecursive<T>(_ indicator: Indicator<T>) {
   testRecursive(.#^COMPLETE_RECURSIVE_GENERIC^#)
 // FIXME: We should be suggesting `.activity` here because the call to `testRecursive` happens with new generic parameters
 // COMPLETE_RECURSIVE_GENERIC: Begin completions, 1 item
 // COMPLETE_RECURSIVE_GENERIC-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
-// COMPLETE_RECURSIVE_GENERIC: End completions
 }

@@ -14,48 +14,31 @@
 //
 //===----------------------------------------------------------------------===//
 
-let Flags = [FrontendOption, NoDriverOption] in {
-
-def triple : Separate<["-"], "triple">, Alias<target>;
-
-def primary_file : Separate<["-"], "primary-file">,
-  HelpText<"Produce output for this file, not the whole module">;
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsFileList] in {
 
 def filelist : Separate<["-"], "filelist">,
   HelpText<"Specify source inputs in a file rather than on the command line">;
 def primary_filelist : Separate<["-"], "primary-filelist">,
   HelpText<"Specify primary inputs in a file rather than on the command line">;
+
+} // end let Flags = [FrontendOption, NoDriverOption, ArgumentIsFileList]
+
+
+let Flags = [FrontendOption, NoDriverOption, CacheInvariant] in {
+
 def output_filelist : Separate<["-"], "output-filelist">,
   HelpText<"Specify outputs in a file rather than on the command line">;
 def supplementary_output_file_map : Separate<["-"], "supplementary-output-file-map">,
   HelpText<"Specify supplementary outputs in a file rather than on the command line">;
+def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-filelist">,
+  HelpText<"Specify index unit output paths in a file rather than on the command line">;
 
-def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
-
-def emit_module_doc : Flag<["-"], "emit-module-doc">,
-  HelpText<"Emit a module documentation file based on documentation "
-           "comments">;
 def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
-
-def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
-  HelpText<"Output module source info file">;
-
-def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
-  HelpText<"Avoid getting source location from .swiftsourceinfo files">;
-
-def merge_modules
-  : Flag<["-"], "merge-modules">, ModeOpt,
-    HelpText<"Merge the input modules without otherwise processing them">;
-
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
-
-def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
-  HelpText<"Emit a Swift-style dependencies file">;
 def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
@@ -63,14 +46,64 @@ def emit_reference_dependencies_path
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
-
 def emit_abi_descriptor_path
   : Separate<["-"], "emit-abi-descriptor-path">, MetaVarName<"<path>">,
     HelpText<"Output the ABI descriptor of current module to <path>">;
-
 def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
+
+def diagnostic_documentation_path
+  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
+  HelpText<"Path to diagnostic documentation resources">;
+
+def dump_api_path : Separate<["-"], "dump-api-path">,
+  HelpText<"The path to output swift interface files for the compiled source files">;
+
+def group_info_path : Separate<["-"], "group-info-path">,
+  HelpText<"The path to collect the group information of the compiled module">;
+
+def prebuilt_module_cache_path :
+  Separate<["-"], "prebuilt-module-cache-path">,
+  HelpText<"Directory of prebuilt modules for loading module interfaces">;
+def prebuilt_module_cache_path_EQ :
+  Joined<["-"], "prebuilt-module-cache-path=">,
+  Alias<prebuilt_module_cache_path>;
+
+def backup_module_interface_path :
+  Separate<["-"], "backup-module-interface-path">,
+  HelpText<"Directory of module interfaces as backups to those from SDKs">;
+def backup_module_interface_path_EQ :
+  Joined<["-"], "backup-module-interface-path=">,
+  Alias<backup_module_interface_path>;
+
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
+
+} // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
+
+def primary_file : Separate<["-"], "primary-file">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Produce output for this file, not the whole module">;
+
+let Flags = [FrontendOption, NoDriverOption] in {
+
+def triple : Separate<["-"], "triple">, Alias<target>;
+
+def emit_module_doc : Flag<["-"], "emit-module-doc">,
+  HelpText<"Emit a module documentation file based on documentation "
+           "comments">;
+
+def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
+  HelpText<"Output module source info file">;
+def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
+  HelpText<"Avoid getting source location from .swiftsourceinfo files">;
+
+def merge_modules
+  : Flag<["-"], "merge-modules">, ModeOpt,
+    HelpText<"Merge the input modules without otherwise processing them">;
+def emit_reference_dependencies : Flag<["-"], "emit-reference-dependencies">,
+  HelpText<"Emit a Swift-style dependencies file">;
 
 def serialize_module_interface_dependency_hashes
   : Flag<["-"], "serialize-module-interface-dependency-hashes">,
@@ -111,6 +144,8 @@ def verify : Flag<["-"], "verify">,
            "annotations">;
 def verify_additional_file : Separate<["-"], "verify-additional-file">,
   HelpText<"Verify diagnostics in this file in addition to source files">;
+def verify_additional_prefix : Separate<["-"], "verify-additional-prefix">,
+  HelpText<"Check for diagnostics with the prefix expected-<PREFIX> as well as expected-">;
 def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
@@ -127,10 +162,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
   
-def diagnostic_documentation_path
-  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
-  HelpText<"Path to diagnostic documentation resources">;
-
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
   HelpText<"Enable checking of @testable">;
@@ -220,6 +251,9 @@ def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
 def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
   HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
 
+def parallel_scan : Flag<["-"], "parallel-scan">,
+   HelpText<"Perform dependency scanning in-parallel.">;
+
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
@@ -240,6 +274,9 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -283,11 +320,6 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_lexical_borrow_scopes :
-  Joined<["-"], "enable-lexical-borrow-scopes=">,
-  HelpText<"Whether to emit lexical borrow scopes (default: true)">,
-  MetaVarName<"true|false">;
-
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
   HelpText<"Enable experimental move only">;
@@ -322,6 +354,10 @@ def enable_experimental_async_top_level :
 
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
+
+def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
+  HelpText<"Control whether checked continuations are used when bridging "
+           "async calls from Swift to ObjC: 'on', 'off' ">;
 
 def debug_constraints : Flag<["-"], "debug-constraints">,
   HelpText<"Debug the constraint-based type checker">;
@@ -384,9 +420,6 @@ def disable_requirement_machine_reuse : Flag<["-"], "disable-requirement-machine
 def enable_requirement_machine_opaque_archetypes : Flag<["-"], "enable-requirement-machine-opaque-archetypes">,
   HelpText<"Enable more correct opaque archetype support, which is off by default because it might fail to produce a convergent rewrite system">;
 
-def warn_redundant_requirements : Flag<["-"], "warn-redundant-requirements">,
-  HelpText<"Emit warnings for redundant requirements in generic signatures">;
-
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
 
@@ -399,9 +432,15 @@ def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
+def debug_inverse_requirements : Flag<["-"], "debug-inverse-requirements">,
+  HelpText<"Print real requirements in -debug_generic_signatures output">;
+
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
+
+def experimental_lazy_typecheck : Flag<["-"], "experimental-lazy-typecheck">,
+  HelpText<"Type-check lazily as needed to produce requested outputs">;
 
 def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-swiftinterface-syntax">,
   HelpText<"Write an invalid declaration into swiftinterface files">;
@@ -441,6 +480,14 @@ def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
 
+def enable_implicit_backtracing_module_import : Flag<["-"],
+  "enable-implicit-backtracing-module-import">,
+  HelpText<"Enable the implicit import of the _Backtracing module.">;
+
+def disable_implicit_backtracing_module_import : Flag<["-"],
+  "disable-implicit-backtracing-module-import">,
+  HelpText<"Disable the implicit import of the _Backtracing module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
@@ -451,6 +498,9 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
   HelpText<"Enable speculative devirtualization pass.">;
+
+def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
+  HelpText<"Enables an optimization pass to demote async functions.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -464,6 +514,15 @@ def code_complete_call_pattern_heuristics : Flag<["-"], "code-complete-call-patt
 
 def disable_autolink_framework : Separate<["-"],"disable-autolink-framework">,
   HelpText<"Disable autolinking against the provided framework">;
+
+def disable_autolink_library : Separate<["-"],"disable-autolink-library">,
+  HelpText<"Disable autolinking against the provided library">;
+
+def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
+  HelpText<"Disable autolinking against all frameworks">;
+
+def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
+  HelpText<"Disable all Swift autolink directives">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
@@ -577,6 +636,10 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
+def force_workaround_broken_modules :
+  Flag<["-"], "experimental-force-workaround-broken-modules">,
+  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
@@ -586,23 +649,27 @@ def disable_experimental_string_processing :
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference via type witness systems">;
+  HelpText<"Enable experimental associated type inference improvements">;
+
+def disable_experimental_associated_type_inference :
+  Flag<["-"], "disable-experimental-associated-type-inference">,
+  HelpText<"Disable experimental associated type inference improvements">;
+
+def enable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
+  HelpText<"Enable experimental lifetime dependence inference">;
+
+def disable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "disable-experimental-lifetime-dependence-inference">,
+  HelpText<"Disable experimental lifetime dependence inference">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_conformance_availability_errors : Flag<["-"],
-  "enable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as errors">;
-
-def disable_conformance_availability_errors : Flag<["-"],
-  "disable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as warnings">;
-
 def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
-  HelpText<"Downgrade potential unavailability of enum case to a warning">;
+  HelpText<"Deprecated, will be removed in future versions">;
 
 def warn_on_editor_placeholder : Flag<["-"],
   "warn-on-editor-placeholder">,
@@ -613,16 +680,20 @@ def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 3 behavior)">;
+  HelpText<"Deprecated, has no effect">;
 
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
+
+def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Ignore all checks for module resilience.">;
   
 def enable_experimental_opaque_type_erasure : Flag<["-"], "enable-experimental-opaque-type-erasure">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -741,6 +812,9 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
   HelpText<"Allow throwing function calls without 'try'">;
 
+def throws_as_traps : Flag<["-"], "throws-as-traps">,
+  HelpText<"Turn all throw sites into immediate traps">;
+
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 
@@ -772,6 +846,10 @@ def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable
   
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
+
+def playground_option : Separate<["-"], "playground-option">,
+  Flags<[FrontendOption]>,
+  HelpText<"Provide an option to the playground transform (if enabled)">;
 
 def playground_high_performance : Flag<["-"], "playground-high-performance">,
   HelpText<"Omit instrumentation that has a high runtime performance impact">;
@@ -850,6 +928,11 @@ def cxx_interop_getters_setters_as_properties :
   HelpText<"Import getters and setters as computed properties in Swift">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_disable_requirement_at_import :
+  Flag<["-"], "disable-cxx-interop-requirement-at-import">,
+  HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -870,9 +953,6 @@ def index_system_modules : Flag<["-"], "index-system-modules">,
 def index_ignore_stdlib :
   Flag<["-"], "index-ignore-stdlib">,
   HelpText<"Avoid emitting index data for the standard library.">;
-
-def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-filelist">,
-  HelpText<"Specify index unit output paths in a file rather than on the command line">;
 
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
@@ -936,28 +1016,8 @@ def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
   HelpText<"Enable experimental support for one-way closure parameters">;
 
-def prebuilt_module_cache_path :
-  Separate<["-"], "prebuilt-module-cache-path">,
-  HelpText<"Directory of prebuilt modules for loading module interfaces">;
-def prebuilt_module_cache_path_EQ :
-  Joined<["-"], "prebuilt-module-cache-path=">,
-  Alias<prebuilt_module_cache_path>;
-
-def backup_module_interface_path :
-  Separate<["-"], "backup-module-interface-path">,
-  HelpText<"Directory of module interfaces as backups to those from SDKs">;
-def backup_module_interface_path_EQ :
-  Joined<["-"], "backup-module-interface-path=">,
-  Alias<backup_module_interface_path>;
-
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
-
-def dump_api_path : Separate<["-"], "dump-api-path">,
-  HelpText<"The path to output swift interface files for the compiled source files">;
-
-def group_info_path : Separate<["-"], "group-info-path">,
-  HelpText<"The path to collect the group information of the compiled module">;
 
 def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
 HelpText<"Diagnostics will be used in editor">;
@@ -1010,6 +1070,34 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
   HelpText<"Force type layout based lowering for structs">;
 
+def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
+  HelpText<"Enable layout string based value witnesses">;
+
+def enable_large_loadable_types_reg2mem : Flag<["-"], "enable-large-loadable-types-reg2mem">,
+  HelpText<"Enable large loadable types register to memory pass">;
+
+def disable_large_loadable_types_reg2mem : Flag<["-"], "disable-large-loadable-types-reg2mem">,
+  HelpText<"Disable large loadable types register to memory pass">;
+
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_pack_metadata_stack_promotion :
+    Joined<["-"], "enable-pack-metadata-stack-promotion=">,
+    HelpText<"Whether to skip heapifying stack metadata packs when possible.">,
+    MetaVarName<"true|false">;
+  def enable_pack_metadata_stack_promotion_noArg :
+    Flag<["-"], "enable-pack-metadata-stack-promotion">,
+    HelpText<"Skip heapifying stack metadata packs when possible.">;
+}
+
+def disable_layout_string_value_witnesses : Flag<["-"], "disable-layout-string-value-witnesses">,
+  HelpText<"Disable layout string based value witnesses">;
+
+def enable_layout_string_value_witnesses_instantiation : Flag<["-"], "enable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Enable runtime instantiation of layout string value witnesses for generic types">;
+
+def disable_layout_string_value_witnesses_instantiation : Flag<["-"], "disable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Disable runtime instantiation of layout string value witnesses for generic types">;
+
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
 
@@ -1028,9 +1116,6 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 def target_sdk_name : Separate<["-"], "target-sdk-name">,
   HelpText<"Canonical name of the target SDK used for compilation">;
 
-def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
-  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
-
 def candidate_module_file
   : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module may be ready to use for an interface">;
@@ -1047,10 +1132,19 @@ def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
 
+def experimental_skip_non_inlinable_function_bodies_is_lazy
+  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
+  HelpText<"Infer lazy typechecking for "
+           "-experimental-skip-non-inlinable-function-bodies">;
+
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
   HelpText<"Attempt to output .swiftmodule, regardless of compilation errors">;
+
+def experimental_skip_non_exportable_decls
+  : Flag<["-"], "experimental-skip-non-exportable-decls">,
+  HelpText<"Skip decls that are not exported to clients">;
 
 def bad_file_descriptor_retry_count:
   Separate<["-"], "bad-file-descriptor-retry-count">,
@@ -1072,12 +1166,17 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
-def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-  HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-           "when optimizing ownership will be lowered before serializing SIL">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
+    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
+            "when optimizing ownership will be lowered before serializing SIL">;
+}
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+
+def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
+  HelpText<"Disable SIL Opaque Values">;
 
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
@@ -1093,6 +1192,12 @@ def clang_header_expose_decls:
   HelpText<"Which declarations should be exposed in the generated clang header.">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"all-public|has-expose-attr">;
+
+def clang_header_expose_module:
+  Separate<["-"], "clang-header-expose-module">,
+  HelpText<"Allow the compiler to assume that APIs from the specified module are exposed to C/C++/Objective-C in another generated header, so that APIs in the current module that depend on declarations from the specified module can be exposed in the generated header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<imported-module-name>=<generated-header-name>">;
 
 def weak_link_at_target :
   Flag<["-"], "weak-link-at-target">,
@@ -1153,6 +1258,13 @@ def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
 
+def enable_objective_c_protocol_symbolic_references :
+  Flag<["-"], "enable-objective-c-protocol-symbolic-references">,
+  HelpText<"Enable objective-c protocol symbolic references">;
+def disable_objective_c_protocol_symbolic_references :
+  Flag<["-"], "disable-objective-c-protocol-symbolic-references">,
+  HelpText<"Disable objective-c protocol symbolic references">;
+
 def disable_emit_generic_class_ro_t_list :
   Flag<["-"], "disable-emit-generic-class-ro_t-list">,
   HelpText<"Disable emission of a section with references to class_ro_t of "
@@ -1162,7 +1274,47 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  HelpText<"Check compiler output determinisim by running it twice">;
+def always_compile_output_files :
+  Flag<["-"], "always-compile-output-files">,
+  HelpText<"Always compile output files even it might not change the results">;
+
+// CAS/Caching related options.
+def input_file_key : Separate<["-"], "input-file-key">,
+  HelpText<"Cache Key for input file">;
+def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
+  HelpText<"Cache Key for bridging header pch">;
+
+def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
+  HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
+
+def cas_fs: Separate<["-"], "cas-fs">,
+  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
+
+def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
+  HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
+
+
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
+
+def enable_ossa_complete_lifetimes :
+  Flag<["-"], "enable-ossa-complete-lifetimes">,
+  HelpText<"Require linear OSSA lifetimes after SILGen">;
+
+def platform_c_calling_convention :
+    Separate<["-"], "experimental-platform-c-calling-convention">,
+    HelpText<"Which calling convention is used to perform non-swift calls. "
+             "Defaults to llvm's standard C calling convention.">;
+def platform_c_calling_convention_EQ :
+    Joined<["-"], "experimental-platform-c-calling-convention=">,
+    Alias<platform_c_calling_convention>;
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

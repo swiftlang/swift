@@ -1,0 +1,5 @@
+module MyCxxModule {
+    header "bridge-cxx-types-to-objcxx.h"
+    export *
+    requires cplusplus
+}

@@ -13,9 +13,14 @@
 #ifndef SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PathRemapper.h"
 #include "llvm/Support/VersionTuple.h"
+
+#include <set>
+#include <string>
+#include <vector>
 
 namespace swift {
 
@@ -43,6 +48,7 @@ namespace swift {
     StringRef ModuleLinkName;
     StringRef ModuleInterface;
     std::vector<std::string> ExtraClangOptions;
+    std::vector<swift::PluginSearchOption> PluginSearchOptions;
 
     /// Path prefixes that should be rewritten in debug info.
     PathRemapper DebuggingOptionsPrefixMap;
@@ -149,7 +155,10 @@ namespace swift {
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
     bool HermeticSealAtLink = false;
+    bool EmbeddedSwiftModule = false;
     bool IsOSSA = false;
+    bool SkipNonExportableDecls = false;
+    bool ExplicitModuleBuild = false;
   };
 
 } // end namespace swift

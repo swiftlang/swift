@@ -52,7 +52,7 @@ CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
   return ValueRefCntPtr(new Value);
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+llvm::Optional<CodeCompletionCache::ValueRefCntPtr>
 CodeCompletionCache::get(const Key &K) {
   auto &TheCache = Impl->TheCache;
   llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
@@ -63,7 +63,7 @@ CodeCompletionCache::get(const Key &K) {
         V.value()->ModuleModificationTime !=
         ModuleStatus.getLastModificationTime()) {
       // Cache is stale.
-      V = None;
+      V = llvm::None;
       TheCache.remove(K);
     }
   } else if (nextCache && (V = nextCache->get(K))) {
@@ -104,7 +104,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion =
-    10; // Store if decl has an async alternative
+    11; // Added macro roles
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -230,6 +230,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
     auto associatedKind = static_cast<uint8_t>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
+    auto roles = CodeCompletionMacroRoles(*cursor++);
     auto notRecommended =
         static_cast<ContextFreeNotRecommendedReason>(*cursor++);
     auto diagSeverity =
@@ -266,7 +267,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, isAsync,
+            kind, associatedKind, opKind, roles, isSystem, isAsync,
             hasAsyncAlternative, string, moduleName, briefDocComment,
             makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
@@ -423,6 +424,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       } else {
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       }
+      LE.write(static_cast<uint8_t>(R->getMacroRoles().toRaw()));
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
@@ -504,17 +506,17 @@ static std::string getName(StringRef cacheDirectory,
   return std::string(name.str());
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+llvm::Optional<CodeCompletionCache::ValueRefCntPtr>
 OnDiskCodeCompletionCache::get(const Key &K) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(getName(cacheDirectory, K));
   if (!bufferOrErr)
-    return None;
+    return llvm::None;
 
   // Read the cached results, failing if they are out of date.
   auto V = CodeCompletionCache::createValue();
   if (!readCachedModule(bufferOrErr.get().get(), K, *V))
-    return None;
+    return llvm::None;
 
   return V;
 }
@@ -546,12 +548,12 @@ std::error_code OnDiskCodeCompletionCache::set(const Key &K, ValueRefCntPtr V) {
   return llvm::sys::fs::rename(tmpName.str(), name);
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+llvm::Optional<CodeCompletionCache::ValueRefCntPtr>
 OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(filename);
   if (!bufferOrErr)
-    return None;
+    return llvm::None;
 
   // Make up a key for readCachedModule.
   CodeCompletionCache::Key K{/*ModuleFilename=*/filename.str(),
@@ -569,7 +571,7 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
   auto V = CodeCompletionCache::createValue();
   if (!readCachedModule(bufferOrErr.get().get(), K, *V,
                         /*allowOutOfDate*/ true))
-    return None;
+    return llvm::None;
 
   return V;
 }

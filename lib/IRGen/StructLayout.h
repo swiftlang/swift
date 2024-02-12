@@ -60,7 +60,7 @@ enum class LayoutKind {
 class NonFixedOffsetsImpl;
 
 /// The type to pass around for non-fixed offsets.
-using NonFixedOffsets = Optional<NonFixedOffsetsImpl *>;
+using NonFixedOffsets = llvm::Optional<NonFixedOffsetsImpl *>;
 
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
@@ -283,6 +283,7 @@ private:
   SmallVector<SpareBitVector, 8> CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
+  bool IsLoadable = true;
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
   IsCopyable_t IsKnownCopyable = IsCopyable;
@@ -299,7 +300,10 @@ public:
   /// Add the default-actor header to the layout.  This must be the second
   /// thing added to the layout, following the Swift heap header.
   void addDefaultActorHeader(ElementLayout &elt);
-  
+  /// Add the non-default distributed actor header to the layout.
+  /// This must be the second thing added to the layout, following the Swift heap header.
+  void addNonDefaultDistributedActorHeader(ElementLayout &elt);
+
   /// Add a number of fields to the layout.  The field layouts need
   /// only have the TypeInfo set; the rest will be filled out.
   ///
@@ -323,6 +327,9 @@ public:
 
   /// Return whether the structure has a fixed-size layout.
   bool isFixedLayout() const { return IsFixedLayout; }
+
+  /// Return whether the structure has a loadable layout.
+  bool isLoadable() const { return IsLoadable; }
 
   /// Return whether the structure is known to be POD in the local
   /// resilience scope.
@@ -399,6 +406,9 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
+  /// Whether this layout 
+  bool IsLoadable;
+
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsCopyable_t IsKnownCopyable;
@@ -416,7 +426,7 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
+  StructLayout(IRGenModule &IGM, llvm::Optional<CanType> type,
                LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
@@ -431,6 +441,7 @@ public:
       headerSize(builder.getHeaderSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
+      IsLoadable(builder.isLoadable()),
       IsKnownTriviallyDestroyable(builder.isTriviallyDestroyable()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownCopyable(builder.isCopyable()),
@@ -464,6 +475,7 @@ public:
   }
 
   bool isFixedLayout() const { return IsFixedLayout; }
+  bool isLoadable() const { return IsLoadable; }
   llvm::Constant *emitSize(IRGenModule &IGM) const;
   llvm::Constant *emitAlignMask(IRGenModule &IGM) const;
 
@@ -473,6 +485,7 @@ public:
 };
 
 Size getDefaultActorStorageFieldOffset(IRGenModule &IGM);
+Size getNonDefaultDistributedActorStorageFieldOffset(IRGenModule &IGM);
 
 } // end namespace irgen
 } // end namespace swift

@@ -460,7 +460,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
-    if (!CSDesc.isClosureConsumed() || !CSDesc.closureHasRefSemanticContext()) {
+    if (!CSDesc.isClosureConsumed() || CSDesc.isTrivialNoEscapeParameter() ||
+        !CSDesc.closureHasRefSemanticContext()) {
       break;
     }
 
@@ -481,7 +482,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
-    if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
+    if (CSDesc.isClosureConsumed() && !CSDesc.isTrivialNoEscapeParameter() &&
+        CSDesc.closureHasRefSemanticContext())
       Builder.createReleaseValue(Closure->getLoc(), Closure,
                                  Builder.getDefaultAtomicity());
 
@@ -781,7 +783,8 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     return addToOldToNewClosureMap(
         origCalleeValue,
         Builder.createMarkDependence(CallSiteDesc.getLoc(), calleeValue,
-                                     CapturedMap[MD->getBase()]));
+                                     CapturedMap[MD->getBase()],
+                                     MarkDependenceKind::Escaping));
   }
 
 
@@ -1343,6 +1346,18 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         if ((ClosureParamInfo.isGuaranteed() || IsClosurePassedTrivially) &&
             !OnlyHaveThinToThickClosure &&
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
+          continue;
+        }
+
+        // Specializing a readnone, readonly, releasenone function with a
+        // nontrivial context is illegal. Inserting a release in such a function
+        // results in miscompilation after other optimizations.
+        // For now, the specialization is disabled.
+        //
+        // TODO: A @noescape closure should never be converted to an @owned
+        // argument regardless of the function attribute.
+        if (!OnlyHaveThinToThickClosure
+            && ApplyCallee->getEffectsKind() <= EffectsKind::ReleaseNone) {
           continue;
         }
 

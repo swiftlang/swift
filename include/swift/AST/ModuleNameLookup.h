@@ -36,7 +36,10 @@ enum class ResolutionKind {
   Overloadable,
 
   /// Lookup should match a single decl that declares a type.
-  TypesOnly
+  TypesOnly,
+
+  /// Lookup should only match macros.
+  MacrosOnly,
 };
 
 void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
@@ -62,7 +65,7 @@ void lookupInModule(const DeclContext *moduleOrFile,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     const DeclContext *moduleScopeContext,
-                    NLOptions options);
+                    SourceLoc loc, NLOptions options);
 
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.

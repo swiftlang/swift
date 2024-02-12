@@ -6,6 +6,9 @@
 
 // REQUIRES: tools-release,no_asan
 
+// For some reason this test times out sometimes when bulding for iOS: rdar://106375480
+// UNSUPPORTED: OS=ios
+
 public var gg = false
 
 enum SomeError : Error {

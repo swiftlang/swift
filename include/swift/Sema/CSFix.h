@@ -306,6 +306,9 @@ enum class FixKind : uint8_t {
   /// This issue should already have been diagnosed elsewhere.
   IgnoreUnresolvedPatternVar,
 
+  /// Ignore a nested UnresolvedPatternExpr in an ExprPattern, which is invalid.
+  IgnoreInvalidPatternInExpr,
+
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
 
@@ -372,6 +375,9 @@ enum class FixKind : uint8_t {
   /// `throws` attribute from the source function.
   DropThrowsAttribute,
 
+  /// Ignore a mismatch in the thrown error type.
+  IgnoreThrownErrorMismatch,
+
   /// Fix conversion from async to sync function by removing explicit
   /// `async` attribute from the source function.
   DropAsyncAttribute,
@@ -390,16 +396,15 @@ enum class FixKind : uint8_t {
   /// is marked as `inout`.
   AllowConversionThroughInOut,
 
-  /// Ignore either capability (read/write) or type mismatch in conversion
-  /// between two key path types.
-  IgnoreKeyPathContextualMismatch,
-
   /// Ignore a type mismatch between deduced element type and externally
   /// imposed one.
   IgnoreCollectionElementContextualMismatch,
 
   /// Produce a warning for a tuple label mismatch.
   AllowTupleLabelMismatch,
+
+  /// Allow an associated value mismatch for an enum element pattern.
+  AllowAssociatedValueMismatch,
 
   /// Produce an error for not getting a compile-time constant
   NotCompileTimeConst,
@@ -425,6 +430,46 @@ enum class FixKind : uint8_t {
 
   /// Produce an error about a type that must be Copyable
   MustBeCopyable,
+
+  /// Allow 'each' applied to a non-pack type.
+  AllowInvalidPackElement,
+
+  /// Allow pack references outside of pack expansions.
+  AllowInvalidPackReference,
+
+  /// Allow pack expansion expressions in a context that does not support them.
+  AllowInvalidPackExpansion,
+
+  /// Ignore `where` clause in a for-in loop with a pack expansion expression.
+  IgnoreWhereClauseInPackIteration,
+
+  /// Allow a pack expansion parameter of N elements to be matched
+  /// with a single tuple literal argument of the same arity.
+  DestructureTupleToMatchPackExpansionParameter,
+
+  /// Allow value pack expansion without pack references.
+  AllowValueExpansionWithoutPackReferences,
+
+  /// Ignore missing 'each' keyword before value pack reference.
+  IgnoreMissingEachKeyword,
+
+  /// Ignore the fact that member couldn't be referenced within init accessor
+  /// because its name doesn't appear in 'initializes' or 'accesses' attributes.
+  AllowInvalidMemberReferenceInInitAccessor,
+
+  /// Ignore an attempt to specialize non-generic type.
+  AllowConcreteTypeSpecialization,
+
+  /// Ignore an out-of-place \c then statement.
+  IgnoreOutOfPlaceThenStmt,
+
+  /// Ignore situations when provided number of generic arguments didn't match
+  /// expected number of parameters.
+  IgnoreGenericSpecializationArityMismatch,
+
+  /// Ignore situations when key path subscript index gets passed an invalid
+  /// type as an argument (something that is not a key path).
+  IgnoreKeyPathSubscriptIndexMismatch,
 };
 
 class ConstraintFix {
@@ -447,6 +492,12 @@ public:
     return Fix::classof(this) ? static_cast<const Fix *>(this) : nullptr;
   }
 
+  template <typename Fix>
+  const Fix *castTo() const {
+    assert(Fix::classof(this));
+    return static_cast<const Fix *>(this);
+  }
+
   FixKind getKind() const { return Kind; }
 
   /// Whether this fix fatal for the constraint solver, meaning that it cannot
@@ -464,7 +515,7 @@ public:
   }
 
   /// Determine the impact of this fix on the solution score, if any.
-  Optional<ScoreKind> impact() const;
+  llvm::Optional<ScoreKind> impact() const;
 
   virtual std::string getName() const = 0;
 
@@ -523,6 +574,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
                                     Type memberBaseType,
                                     ConstraintLocator *locator);
@@ -549,7 +604,7 @@ public:
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatRValueAsLValue;
   }
 };
@@ -587,7 +642,7 @@ public:
                                   llvm::ArrayRef<Identifier> correctLabels,
                                   ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RelabelArguments;
   }
 
@@ -674,7 +729,7 @@ public:
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SkipSameTypeRequirement;
   }
 };
@@ -699,7 +754,7 @@ public:
   static SkipSameShapeRequirement *create(ConstraintSystem &cs, Type lhs,
                                           Type rhs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SkipSameTypeRequirement;
   }
 };
@@ -725,7 +780,7 @@ public:
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SkipSuperclassRequirement;
   }
 };
@@ -786,7 +841,7 @@ public:
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ContextualMismatch;
   }
 };
@@ -812,7 +867,7 @@ public:
                                                 Type dictionaryTy, Type arrayTy,
                                                 ConstraintLocator *loc);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
   }
 };
@@ -830,7 +885,7 @@ public:
   static AllowWrappedValueMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                            ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowWrappedValueMismatch;
   }
 };
@@ -850,7 +905,7 @@ public:
   static MarkExplicitlyEscaping *create(ConstraintSystem &cs, Type lhs,
                                         Type rhs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ExplicitlyEscaping;
   }
 };
@@ -883,7 +938,7 @@ public:
                       FunctionType *toType,
                       ConstraintLocatorBuilder locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
   }
 };
@@ -907,7 +962,7 @@ public:
   static ForceOptional *create(ConstraintSystem &cs, Type fromType, Type toType,
                                ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ForceOptional;
   }
 };
@@ -944,7 +999,7 @@ public:
                       FunctionType *toType,
                       ConstraintLocatorBuilder locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;
   }
 };
@@ -956,7 +1011,6 @@ class DropThrowsAttribute final : public ContextualMismatch {
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::DropThrowsAttribute, fromType, toType,
                            locator) {
-    assert(fromType->isThrowing() != toType->isThrowing());
   }
 
 public:
@@ -969,11 +1023,35 @@ public:
                                      FunctionType *toType,
                                      ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DropThrowsAttribute;
   }
 };
 
+/// This is a contextual mismatch between the thrown error types of two
+/// function types, which could be repaired by fixing one of the types.
+class IgnoreThrownErrorMismatch final : public ContextualMismatch {
+  IgnoreThrownErrorMismatch(ConstraintSystem &cs, Type fromErrorType,
+                            Type toErrorType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::IgnoreThrownErrorMismatch,
+                           fromErrorType, toErrorType, locator) {
+    assert(!fromErrorType->isEqual(toErrorType));
+  }
+
+public:
+  std::string getName() const override { return "drop 'throws' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreThrownErrorMismatch *create(ConstraintSystem &cs,
+                                           Type fromErrorType,
+                                           Type toErrorType,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreThrownErrorMismatch;
+  }
+};
 /// This is a contextual mismatch between async and non-async
 /// function types, repair it by dropping `async` attribute.
 class DropAsyncAttribute final : public ContextualMismatch {
@@ -994,7 +1072,7 @@ public:
                                     FunctionType *toType,
                                     ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DropAsyncAttribute;
   }
 };
@@ -1014,7 +1092,7 @@ public:
   static ForceDowncast *create(ConstraintSystem &cs, Type fromType, Type toType,
                                ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ForceDowncast;
   }
 };
@@ -1033,7 +1111,7 @@ public:
   static AddAddressOf *create(ConstraintSystem &cs, Type argTy, Type paramTy,
                               ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddressOf;
   }
 };
@@ -1053,7 +1131,7 @@ public:
   static RemoveAddressOf *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                  ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveAddressOf;
   }
 };
@@ -1094,6 +1172,10 @@ public:
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
@@ -1101,43 +1183,16 @@ public:
                                           llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::GenericArgumentsMismatch;
   }
 
 private:
+  bool diagnose(const Solution &solution, ArrayRef<unsigned> mismatches,
+                bool asNote = false) const;
+
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
-  }
-};
-
-/// Detect situations where key path doesn't have capability required
-/// by the context e.g. read-only vs. writable, or either root or value
-/// types are incorrect e.g.
-///
-/// ```swift
-/// struct S { let foo: Int }
-/// let _: WritableKeyPath<S, Int> = \.foo
-/// ```
-///
-/// Here context requires a writable key path but `foo` property is
-/// read-only.
-class KeyPathContextualMismatch final : public ContextualMismatch {
-  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                            ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::IgnoreKeyPathContextualMismatch, lhs,
-                           rhs, locator) {}
-
-public:
-  std::string getName() const override {
-    return "fix key path contextual mismatch";
-  }
-
-  static KeyPathContextualMismatch *
-  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
-
-  static bool classof(ConstraintFix *fix) {
-    return fix->getKind() == FixKind::IgnoreKeyPathContextualMismatch;
   }
 };
 
@@ -1163,7 +1218,7 @@ public:
   static AutoClosureForwarding *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AutoClosureForwarding;
   }
 };
@@ -1187,7 +1242,7 @@ public:
                                                    Type pointerType,
                                                    ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowAutoClosurePointerConversion;
   }
 };
@@ -1212,7 +1267,7 @@ public:
   static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
                               ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveUnwrap;
   }
 };
@@ -1231,7 +1286,7 @@ public:
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::InsertCall;
   }
 };
@@ -1264,7 +1319,7 @@ public:
                                     bool usingProjection, Type base,
                                     Type wrapper, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::UsePropertyWrapper;
   }
 };
@@ -1299,7 +1354,7 @@ public:
                                  Type base, Type wrapper,
                                  ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::UseWrappedValue;
   }
 };
@@ -1320,9 +1375,13 @@ public:
     return "allow invalid property wrapper type";
   }
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPropertyWrapperType;
   }
 };
@@ -1346,7 +1405,7 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveProjectedValueArgument;
   }
 };
@@ -1365,7 +1424,7 @@ public:
   static UseSubscriptOperator *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::UseSubscriptOperator;
   }
 };
@@ -1454,6 +1513,8 @@ public:
   ValueDecl *getMember() const { return Member; }
 
   DeclNameRef getMemberName() const { return Name; }
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 };
 
 class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
@@ -1478,7 +1539,7 @@ public:
                                              DeclNameRef memberName,
                                              ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowMemberRefOnExistential;
   }
 };
@@ -1503,7 +1564,7 @@ public:
                                            ValueDecl *member, DeclNameRef usedName,
                                            ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTypeOrInstanceMember;
   }
 };
@@ -1529,7 +1590,7 @@ public:
                                                 ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPartialApplication;
   }
 };
@@ -1574,7 +1635,7 @@ public:
                                                  ConstructorDecl *init,
                                                  ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidInitRef;
   }
 
@@ -1590,17 +1651,19 @@ class AllowTupleTypeMismatch final : public ContextualMismatch {
   /// If this is an element mismatch, \c Index is the element index where the
   /// type mismatch occurred. If this is an arity or label mismatch, \c Index
   /// will be \c None.
-  Optional<unsigned> Index;
+  llvm::Optional<unsigned> Index;
 
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator, Optional<unsigned> index)
+                         ConstraintLocator *locator,
+                         llvm::Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator), Index(index) {}
+                           locator),
+        Index(index) {}
 
 public:
-  static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator,
-                                        Optional<unsigned> index = None);
+  static AllowTupleTypeMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator,
+         llvm::Optional<unsigned> index = llvm::None);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleTypeMismatch;
@@ -1671,7 +1734,7 @@ public:
   create(ConstraintSystem &cs, Type baseType, ValueDecl *member,
          DeclNameRef name, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowMutatingMemberOnRValueBase;
   }
 };
@@ -1696,7 +1759,7 @@ public:
                                                 FunctionType *contextualType,
                                                 ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowClosureParameterDestructuring;
   }
 };
@@ -1797,7 +1860,7 @@ public:
   create(ConstraintSystem &cs, FunctionType *contextualType,
          llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveExtraneousArguments;
   }
 
@@ -1866,7 +1929,7 @@ public:
                                          ValueDecl *member, DeclNameRef name,
                                          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
   }
 };
@@ -1886,7 +1949,7 @@ public:
   static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowAnyObjectKeyPathRoot;
   }
 };
@@ -1910,7 +1973,7 @@ public:
                                                   Type fnType,
                                                   ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowMultiArgFuncKeyPathMismatch;
   }
 };
@@ -1934,7 +1997,7 @@ public:
   static TreatKeyPathSubscriptIndexAsHashable *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatKeyPathSubscriptIndexAsHashable;
   }
 };
@@ -2012,7 +2075,7 @@ public:
   static RemoveReturn *create(ConstraintSystem &cs, Type resultTy,
                               ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveReturn;
   }
 };
@@ -2029,15 +2092,58 @@ public:
                                      Type paramTy,
                                      ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::NotCompileTimeConst;
+  }
+};
+
+/// Describes the reason why the type must be copyable
+struct NoncopyableMatchFailure {
+  enum Kind {
+    CopyableConstraint,
+    ExistentialCast,
+  };
+
+private:
+  Kind reason;
+  union {
+    Type type;
+  };
+
+  NoncopyableMatchFailure(Kind reason, Type type)
+      : reason(reason), type(type) {}
+
+public:
+  Kind getKind() const { return reason; }
+
+  Type getType() const {
+    switch (reason) {
+    case ExistentialCast:
+      return type;
+
+    case CopyableConstraint:
+      llvm_unreachable("no type payload");
+    };
+  }
+
+  static NoncopyableMatchFailure forCopyableConstraint() {
+    return NoncopyableMatchFailure(CopyableConstraint, Type());
+  }
+
+  static NoncopyableMatchFailure forExistentialCast(Type existential) {
+    assert(existential->isAnyExistentialType());
+    return NoncopyableMatchFailure(ExistentialCast, existential);
   }
 };
 
 class MustBeCopyable final : public ConstraintFix {
   Type noncopyableTy;
+  NoncopyableMatchFailure failure;
 
-  MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator);
+  MustBeCopyable(ConstraintSystem &cs,
+                 Type noncopyableTy,
+                 NoncopyableMatchFailure failure,
+                 ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "remove move-only from type"; }
@@ -2048,10 +2154,99 @@ public:
 
   static MustBeCopyable *create(ConstraintSystem &cs,
                              Type noncopyableTy,
+                             NoncopyableMatchFailure failure,
                              ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix const* fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::MustBeCopyable;
+  }
+};
+
+class AllowInvalidPackElement final : public ConstraintFix {
+  Type packElementType;
+
+  AllowInvalidPackElement(ConstraintSystem &cs, Type packElementType,
+                          ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPackElement, locator),
+        packElementType(packElementType) {}
+
+public:
+  std::string getName() const override {
+    return "allow concrete pack element";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidPackElement *create(ConstraintSystem &cs,
+                                         Type packElementType,
+                                         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidPackElement;
+  }
+};
+
+class AllowInvalidPackReference final : public ConstraintFix {
+  Type packType;
+
+  AllowInvalidPackReference(ConstraintSystem &cs, Type packType,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPackReference, locator),
+        packType(packType) {}
+
+public:
+  std::string getName() const override {
+    return "allow pack outside pack expansion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidPackReference *create(ConstraintSystem &cs,
+                                           Type packType,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidPackReference;
+  }
+};
+
+class AllowInvalidPackExpansion final : public ConstraintFix {
+  AllowInvalidPackExpansion(ConstraintSystem &cs,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPackExpansion, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow invalid pack expansion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidPackExpansion *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidPackExpansion;
+  }
+};
+
+class IgnoreWhereClauseInPackIteration final : public ConstraintFix {
+  IgnoreWhereClauseInPackIteration(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreWhereClauseInPackIteration, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore where clause in pack iteration";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreWhereClauseInPackIteration *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreWhereClauseInPackIteration;
   }
 };
 
@@ -2090,7 +2285,7 @@ public:
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch;
   }
 
@@ -2160,7 +2355,7 @@ public:
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SkipUnhandledConstructInResultBuilder;
   }
 };
@@ -2190,7 +2385,7 @@ public:
                       SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
                       ConstraintLocatorBuilder locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleSplatForSingleParameter;
   }
 };
@@ -2212,7 +2407,7 @@ public:
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreContextualType;
   }
 };
@@ -2236,7 +2431,7 @@ public:
                                                  Type sourceTy, Type destTy,
                                                  ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreAssignmentDestinationType;
   }
 };
@@ -2261,7 +2456,7 @@ public:
                                       Type paramType,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowConversionThroughInOut;
   }
 };
@@ -2315,7 +2510,7 @@ public:
                                          Type paramType,
                                          ConstraintLocatorBuilder locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ExpandArrayIntoVarargs;
   }
 };
@@ -2342,7 +2537,7 @@ public:
   create(ConstraintSystem &cs, Type rawTypeRepr, Type expectedType,
          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ExplicitlyConstructRawRepresentable;
   }
 };
@@ -2370,7 +2565,7 @@ public:
   static UseRawValue *create(ConstraintSystem &cs, Type rawReprType,
                              Type expectedType, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::UseRawValue;
   }
 };
@@ -2395,7 +2590,7 @@ public:
                                       Type toType, bool useConditionalCast,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::CoerceToCheckedCast;
   }
 };
@@ -2418,7 +2613,7 @@ public:
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RemoveCall;
   }
 };
@@ -2445,7 +2640,7 @@ public:
          Type dstType, ConversionRestrictionKind conversionKind,
          bool downgradeToWarning);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatEphemeralAsNonEphemeral;
   }
 };
@@ -2474,7 +2669,7 @@ public:
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyBaseTypeForContextualMember;
   }
 };
@@ -2495,7 +2690,7 @@ public:
   static SpecifyClosureParameterType *create(ConstraintSystem &cs,
                                              ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyClosureParameterType;
   }
 };
@@ -2518,7 +2713,7 @@ public:
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyClosureReturnType;
   }
 };
@@ -2537,7 +2732,7 @@ public:
   static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyObjectLiteralTypeImport;
   }
 };
@@ -2557,7 +2752,7 @@ public:
   static AddQualifierToAccessTopLevelName *create(ConstraintSystem &cs,
                                                   ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddQualifierToAccessTopLevelName;
   }
 };
@@ -2576,7 +2771,7 @@ public:
   static AllowNonClassTypeToConvertToAnyObject *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowNonClassTypeToConvertToAnyObject;
   }
 };
@@ -2608,7 +2803,7 @@ public:
                                           Type toType,
                                           ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowCoercionToForceCast;
   }
 };
@@ -2638,7 +2833,7 @@ public:
   static AllowKeyPathRootTypeMismatch *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowKeyPathRootTypeMismatch;
   }
 };
@@ -2659,7 +2854,7 @@ public:
   static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyKeyPathRootType;
   }
 };
@@ -2689,7 +2884,7 @@ public:
   attempt(ConstraintSystem &cs, Type baseTy, Type rootTy,
           ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::UnwrapOptionalBaseKeyPathApplication;
   }
 };
@@ -2721,7 +2916,7 @@ public:
   static SpecifyLabelToAssociateTrailingClosure *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyLabelToAssociateTrailingClosure;
   }
 };
@@ -2744,7 +2939,7 @@ public:
   static AllowKeyPathWithoutComponents *create(ConstraintSystem &cs,
                                                ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowKeyPathWithoutComponents;
   }
 };
@@ -2774,7 +2969,7 @@ public:
   static IgnoreInvalidResultBuilderBody *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreInvalidResultBuilderBody;
   }
 };
@@ -2795,7 +2990,7 @@ public:
   static IgnoreResultBuilderWithReturnStmts *
   create(ConstraintSystem &cs, Type builderTy, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreResultBuilderWithReturnStmts;
   }
 };
@@ -2821,7 +3016,7 @@ public:
   static IgnoreInvalidASTNode *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreInvalidASTNode;
   }
 };
@@ -2845,8 +3040,35 @@ public:
   static IgnoreUnresolvedPatternVar *
   create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreUnresolvedPatternVar;
+  }
+};
+
+class IgnoreInvalidPatternInExpr final : public ConstraintFix {
+  Pattern *P;
+
+  IgnoreInvalidPatternInExpr(ConstraintSystem &cs, Pattern *pattern,
+                             ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidPatternInExpr, locator),
+        P(pattern) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid Pattern nested in Expr";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidPatternInExpr *
+  create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidPatternInExpr;
   }
 };
 
@@ -2869,7 +3091,7 @@ public:
   static SpecifyContextualTypeForNil *create(ConstraintSystem & cs,
                                              ConstraintLocator * locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyContextualTypeForNil;
   }
 };
@@ -2892,7 +3114,7 @@ public:
   static SpecifyTypeForPlaceholder *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyTypeForPlaceholder;
   }
 };
@@ -2915,7 +3137,7 @@ public:
   static AllowRefToInvalidDecl *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowRefToInvalidDecl;
   }
 };
@@ -2947,7 +3169,7 @@ public:
           DeclNameRef memberName, FunctionRefKind functionRefKind,
           MemberLookupResult result, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() ==
            FixKind::SpecifyBaseTypeForOptionalUnresolvedMember;
   }
@@ -2984,7 +3206,7 @@ public:
   create(ConstraintSystem &cs, Type fromType, Type toType, CheckedCastKind kind,
          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowCheckedCastCoercibleOptionalType;
   }
 };
@@ -3006,7 +3228,7 @@ public:
                                       Type toType, CheckedCastKind kind,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowNoopCheckedCast;
   }
 };
@@ -3031,7 +3253,7 @@ public:
   attempt(ConstraintSystem &cs, Type fromType, Type toType,
           CheckedCastKind kind, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowNoopExistentialToCFTypeCheckedCast;
   }
 };
@@ -3058,7 +3280,7 @@ public:
   attempt(ConstraintSystem &cs, Type fromType, Type toType,
           CheckedCastKind kind, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowUnsupportedRuntimeCheckedCast;
   }
 };
@@ -3081,7 +3303,7 @@ public:
                                               CheckedCastKind kind,
                                               ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowCheckedCastToUnrelated;
   }
 };
@@ -3108,7 +3330,7 @@ public:
   static AllowInvalidStaticMemberRefOnProtocolMetatype *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() ==
            FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype;
   }
@@ -3135,6 +3357,28 @@ public:
   }
 };
 
+class AllowAssociatedValueMismatch final : public ContextualMismatch {
+  AllowAssociatedValueMismatch(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowAssociatedValueMismatch, fromType,
+                           toType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow associated value mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowAssociatedValueMismatch *create(ConstraintSystem &cs,
+                                              Type fromType, Type toType,
+                                              ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowAssociatedValueMismatch;
+  }
+};
+
 class AllowNonOptionalWeak final : public ConstraintFix {
   AllowNonOptionalWeak(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowNonOptionalWeak, locator) {}
@@ -3149,7 +3393,7 @@ public:
   static AllowNonOptionalWeak *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowNonOptionalWeak;
   }
 };
@@ -3193,39 +3437,6 @@ public:
   }
 };
 
-class AddExplicitExistentialCoercion final : public ConstraintFix {
-  Type ErasedResultType;
-
-  AddExplicitExistentialCoercion(ConstraintSystem &cs, Type erasedResultTy,
-                                 ConstraintLocator *locator,
-                                 FixBehavior fixBehavior)
-      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator,
-                      fixBehavior),
-        ErasedResultType(erasedResultTy) {}
-
-public:
-  std::string getName() const override {
-    return "add explicit existential type coercion";
-  }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  static bool
-  isRequired(ConstraintSystem &cs, Type resultTy,
-             ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-                 openedExistentials,
-             ConstraintLocatorBuilder locator);
-
-  static bool isRequired(ConstraintSystem &cs, Type resultTy,
-                         llvm::function_ref<Optional<Type>(TypeVariableType *)>
-                             findExistentialType,
-                         ConstraintLocatorBuilder locator);
-
-  static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
-                                                Type resultTy,
-                                                ConstraintLocator *locator);
-};
-
 class RenameConflictingPatternVariables final
     : public ConstraintFix,
       private llvm::TrailingObjects<RenameConflictingPatternVariables,
@@ -3265,7 +3476,7 @@ public:
   create(ConstraintSystem &cs, Type expectedTy, ArrayRef<VarDecl *> conflicts,
          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::RenameConflictingPatternVariables;
   }
 };
@@ -3291,7 +3502,7 @@ public:
   create(ConstraintSystem &cs, MacroDecl *macro,
          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::MacroMissingPound;
   }
 };
@@ -3315,8 +3526,236 @@ public:
                                           Type toType,
                                           ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowGlobalActorMismatch;
+  }
+};
+
+/// Passing an argument of tuple type to a value pack expansion parameter
+/// that expected N distinct elements.
+class DestructureTupleToMatchPackExpansionParameter final
+    : public ConstraintFix {
+  PackType *ParamShape;
+
+  DestructureTupleToMatchPackExpansionParameter(ConstraintSystem &cs,
+                                                PackType *paramShapeTy,
+                                                ConstraintLocator *locator)
+      : ConstraintFix(cs,
+                      FixKind::DestructureTupleToMatchPackExpansionParameter,
+                      locator),
+        ParamShape(paramShapeTy) {
+    assert(locator->isLastElement<LocatorPathElt::ApplyArgToParam>());
+  }
+
+public:
+  std::string getName() const override {
+    return "allow pack expansion to match tuple argument";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DestructureTupleToMatchPackExpansionParameter *
+  create(ConstraintSystem &cs, PackType *paramShapeTy,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::DestructureTupleToMatchPackExpansionParameter;
+  }
+};
+
+class AllowValueExpansionWithoutPackReferences final : public ConstraintFix {
+  AllowValueExpansionWithoutPackReferences(ConstraintSystem &cs,
+                                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowValueExpansionWithoutPackReferences,
+                      locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow value pack expansion without pack references";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowValueExpansionWithoutPackReferences *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowValueExpansionWithoutPackReferences;
+  }
+};
+
+class IgnoreMissingEachKeyword final : public ConstraintFix {
+  Type ValuePackType;
+
+  IgnoreMissingEachKeyword(ConstraintSystem &cs, Type valuePackTy,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreMissingEachKeyword, locator),
+        ValuePackType(valuePackTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow value pack reference without 'each'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreMissingEachKeyword *
+  create(ConstraintSystem &cs, Type valuePackTy, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreMissingEachKeyword;
+  }
+};
+
+class AllowInvalidMemberReferenceInInitAccessor final : public ConstraintFix {
+  DeclNameRef MemberName;
+
+  AllowInvalidMemberReferenceInInitAccessor(ConstraintSystem &cs,
+                                            DeclNameRef memberName,
+                                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidMemberReferenceInInitAccessor,
+                      locator),
+        MemberName(memberName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = MemberName.getString(scratch);
+    return "allow reference to member '" + memberName.str() +
+           "' in init accessor";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowInvalidMemberReferenceInInitAccessor *
+  create(ConstraintSystem &cs, DeclNameRef memberName,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidMemberReferenceInInitAccessor;
+  }
+};
+
+class AllowConcreteTypeSpecialization final : public ConstraintFix {
+  Type ConcreteType;
+
+  AllowConcreteTypeSpecialization(ConstraintSystem &cs, Type concreteTy,
+                                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowConcreteTypeSpecialization, locator),
+        ConcreteType(concreteTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow concrete type specialization";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowConcreteTypeSpecialization *
+  create(ConstraintSystem &cs, Type concreteTy, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowConcreteTypeSpecialization;
+  }
+};
+
+class IgnoreOutOfPlaceThenStmt final : public ConstraintFix {
+  IgnoreOutOfPlaceThenStmt(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreOutOfPlaceThenStmt, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore out-of-place ThenStmt";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreOutOfPlaceThenStmt *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreOutOfPlaceThenStmt;
+  }
+};
+
+class IgnoreGenericSpecializationArityMismatch final : public ConstraintFix {
+  ValueDecl *D;
+  unsigned NumParams;
+  unsigned NumArgs;
+  bool HasParameterPack;
+
+  IgnoreGenericSpecializationArityMismatch(ConstraintSystem &cs,
+                                           ValueDecl *decl, unsigned numParams,
+                                           unsigned numArgs,
+                                           bool hasParameterPack,
+                                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreGenericSpecializationArityMismatch,
+                      locator),
+        D(decl), NumParams(numParams), NumArgs(numArgs),
+        HasParameterPack(hasParameterPack) {}
+
+public:
+  std::string getName() const override {
+    return "ignore generic specialization mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreGenericSpecializationArityMismatch *
+  create(ConstraintSystem &cs, ValueDecl *decl, unsigned numParams,
+         unsigned numArgs, bool hasParameterPack, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreGenericSpecializationArityMismatch;
+  }
+};
+
+class IgnoreKeyPathSubscriptIndexMismatch final : public ConstraintFix {
+  Type ArgType;
+
+  IgnoreKeyPathSubscriptIndexMismatch(ConstraintSystem &cs, Type argTy,
+                                      ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreKeyPathSubscriptIndexMismatch,
+                      locator),
+        ArgType(argTy) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid key path subscript index";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreKeyPathSubscriptIndexMismatch *
+  create(ConstraintSystem &cs, Type argType, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreKeyPathSubscriptIndexMismatch;
   }
 };
 

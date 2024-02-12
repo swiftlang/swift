@@ -39,7 +39,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -463,7 +463,7 @@ private:
   }
 
   /// Checks the rules of order relation introduced among functions set.
-  /// Returns true, if sanity check has been passed, and false if failed.
+  /// Returns true, if soundness check has been passed, and false if failed.
   bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence
@@ -1092,9 +1092,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   LLVM_DEBUG(dbgs() << "  Merge into " << NewFunction->getName() << '\n');
 
   // Move the body of FirstF into the NewFunction.
-  NewFunction->getBasicBlockList().splice(NewFunction->begin(),
-                                          FirstF->getBasicBlockList());
-
+  NewFunction->splice(NewFunction->begin(), FirstF);
   auto NewArgIter = NewFunction->arg_begin();
   for (Argument &OrigArg : FirstF->args()) {
     Argument &NewArg = *NewArgIter++;
@@ -1188,6 +1186,9 @@ void SwiftMergeFunctions::removeEquivalenceClassFromTree(FunctionEntry *FE) {
 // Selects proper bitcast operation,
 // but a bit simpler then CastInst::getCastOpcode.
 static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
+  if (V->getType() == DestTy)
+    return V;
+
   Type *SrcTy = V->getType();
   if (SrcTy->isStructTy()) {
     assert(DestTy->isStructTy());
@@ -1260,29 +1261,6 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
-static llvm::AttributeList
-fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
-                                        llvm::AttributeList attrList) {
-  auto &context = fnType->getContext();
-  if (!context.supportsTypedPointers())
-    return attrList;
-
-  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
-    auto paramTy = fnType->getParamType(i);
-    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
-    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getNonOpaquePointerElementType());
-    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getNonOpaquePointerElementType());
-  }
-  return attrList;
-}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1355,9 +1333,9 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
                                             NewArgAttrs);
-    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
     NewCI->setAttributes(newAttrList);
-    CI->replaceAllUsesWith(NewCI);
+    Value *retVal = createCast(Builder, NewCI, CI->getType());
+    CI->replaceAllUsesWith(retVal);
     CI->eraseFromParent();
   }
   assert(Old->use_empty() && "should have replaced all uses of old function");

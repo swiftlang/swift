@@ -1,0 +1,304 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-redundant-move-value-elim %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @getOwned : $@convention(thin) () -> (@owned C)
+
+sil @borrow : $@convention(thin) (@guaranteed C) -> ()
+
+sil @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+
+// Test that move_value instructions are removed when they are "redundant".  A
+// move_value instruction is redundant when the lifetime it neither
+// - alters semantics (ownership, lexicality)
+// - enables optimization (e.g. separating the lifetimes limits the scope
+//   within which values can escape and one of lifetimes can be shrunk as a
+//   result)
+//
+// For example, when the lifetime of the moved-from and the moved-to values have
+// the same characteristics
+// - ownership
+// - lexicality
+// - escaping
+// then the move_value is redundant.
+//
+// The tests are named as follows:
+//
+// @test_{old_non_move_uses}_{old_characteristics}_{new_characteristics}
+// where old_non_move_uses is
+// - 0: none
+// - 1: non-consuming
+// - 2: consuming
+// where both old_characteristics and new_characteristics are of the form
+//
+// {is_owned}{is_lexical}{has_escaping_use}
+//
+// and both is_lexical and has_escaping_use are 1 or 0 depending on whether each
+// is true.
+//
+// So for example, in @test_1_100_110, there is a move_value instruction which ends
+// a lifetime that is both neither lexical nor escaping and begins a lifetime
+// which is lexical but not escaping.  Since the characteristics of the old and
+// new lifetimes differ, the move_value should be preserved.
+
+// Note that these tests all have two move_values.  That's just to make it a bit
+// easier to specify the characteristics of the first lifetime.  The move_value
+// of real interest for the tests is the second.
+
+// Non-move use: non-consuming
+// Old: owned   , lexical    , non-escaping
+// New: owned   , lexical    , non-escaping
+// Same.  Redundant.  Remove move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_110_110 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'test_1_110_110'
+sil [ossa] @test_1_110_110 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: owned   , lexical    , non-escaping
+// New: owned   , non-lexical, non-escaping
+// Different.  Non-redundant.  Keep move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_110_100 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         move_value [[LIFETIME]]
+// CHECK-LABEL: } // end sil function 'test_1_110_100'
+sil [ossa] @test_1_110_100 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value %lifetime : $C
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: non-owned   , lexical, non-escaping
+// New: lexiowned   , cal    , non-escaping
+// Different.  Non-redundant.  Keep move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_100_110 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         move_value [lexical] [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_1_100_110'
+sil [ossa] @test_1_100_110 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  apply %borrow(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value [lexical] %instance : $C
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: non-owned   , lexical, non-escaping
+// New: non-owned   , lexical, non-escaping
+// Same.  Redundant.  Remove move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_100_100 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'test_1_100_100'
+sil [ossa] @test_1_100_100 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  apply %borrow(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value %instance : $C
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: owned   , lexical    , escaping
+// New: owned   , lexical    , escaping
+// Same.  Redundant.  Remove move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_111_111 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         move_value [lexical] [[INSTANCE]]
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'test_1_111_111'
+sil [ossa] @test_1_111_111 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  %escape = ref_to_unmanaged %lifetime : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  %escape2 = ref_to_unmanaged %lifetime2 : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape2) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: owned   , lexical    , escaping
+// New: owned   , lexical    , non-escaping
+// Different.  Non-redundant.  Keep move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_111_110 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         move_value [lexical] [[LIFETIME]]
+// CHECK-LABEL: } // end sil function 'test_1_111_110'
+sil [ossa] @test_1_111_110 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  %escape = ref_to_unmanaged %lifetime : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: non-consuming
+// Old: owned   , lexical    , non-escaping
+// New: owned   , lexical    , escaping
+// Different, but only consuming use of original is move_value.  Redundant.
+// Remove move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_1_110_111 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'test_1_110_111'
+sil [ossa] @test_1_110_111 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  %escape = ref_to_unmanaged %lifetime2 : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: consuming
+// Old: owned   , lexical    , non-escaping
+// New: owned   , lexical    , escaping
+// Different, and non-move_value consuming use.  Non-redundant. Keep move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_2_110_111 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         destroy_value [[LIFETIME]]
+// CHECK:         move_value [lexical] [[LIFETIME]]
+// CHECK-LABEL: } // end sil function 'test_2_110_111'
+sil [ossa] @test_2_110_111 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  apply %borrow(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, left, right
+left:
+  destroy_value %lifetime : $C
+  br bottom
+right:
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  %escape = ref_to_unmanaged %lifetime2 : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  br bottom
+bottom:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Non-move use: no
+// Old: owned   , lexical    , non-escaping
+// New: owned   , lexical    , escaping
+// Different.  Redundant.  Remove move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_0_110_111 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'test_0_110_111'
+sil [ossa] @test_0_110_111 : $@convention(thin) () -> () {
+  %getOwned = function_ref @getOwned : $@convention(thin) () -> (@owned C)
+  %borrow = function_ref @borrow : $@convention(thin) (@guaranteed C) -> ()
+  %useUnmanaged = function_ref @useUnmanaged : $@convention(thin) (@sil_unmanaged C) -> ()
+  %instance = apply %getOwned() : $@convention(thin) () -> (@owned C)
+  %lifetime = move_value [lexical] %instance : $C
+  %lifetime2 = move_value [lexical] %lifetime : $C
+  %escape = ref_to_unmanaged %lifetime2 : $C to $@sil_unmanaged C
+  apply %useUnmanaged(%escape) : $@convention(thin) (@sil_unmanaged C) -> ()
+  apply %borrow(%lifetime2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %lifetime2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Moves from values with non-owned ownership cannot be removed.  Without owned
+// ownership, we can't determine whether the moved-from value has a pointer
+// escape.
+//
+// Non-move use: no
+// Old: none    , non-lexical, non-escaping
+// New: owned   , non-lexical, escaping
+// Different.  Non-redundant.  Keep move_value.
+//
+// CHECK-LABEL: sil [ossa] @test_0_000_100 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = enum $FakeOptional<C>, #FakeOptional.none!enumelt
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'test_0_000_100'
+sil [ossa] @test_0_000_100 : $@convention(thin) () -> () {
+  %none = enum $FakeOptional<C>, #FakeOptional.none!enumelt
+  %lifetime = move_value %none : $FakeOptional<C>
+  destroy_value %lifetime : $FakeOptional<C>
+  %retval = tuple ()
+  return %retval : $()
+}

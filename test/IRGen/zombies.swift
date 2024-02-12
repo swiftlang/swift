@@ -8,5 +8,8 @@ class C {
   init(i: Int) { self.i = i }
 }
 
-// CHECK: @"$s7zombies1CC1i33_{{.*}}vg" = hidden {{(dllexport )?}}alias void (), void ()* @_swift_dead_method_stub
-// CHECK: define internal void @_swift_dead_method_stub()
+// CHECK: @"$s7zombies1CC1i33_{{.*}}vs" = hidden {{(dllexport )?}}alias void (), ptr @"$s7zombies1CC1i33_45489CBEFBF369AB7AEE3A799A95D78DLLSivg"
+
+// CHECK: define hidden void @"$s7zombies1CC1i33_45489CBEFBF369AB7AEE3A799A95D78DLLSivg"()
+// CHECK: entry:
+// CHECK:  tail call void @swift_deletedMethodError()

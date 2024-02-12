@@ -139,12 +139,15 @@ public:
     //   return fields[0];
     // }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+        fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+    return llvm::None;
+  }
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return None;
+    return llvm::None;
   }
 };
 
@@ -208,7 +211,7 @@ public:
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-    return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
+    return StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
                         LayoutStrategy::Universal, fieldTypes);
   }
 };
@@ -313,12 +316,15 @@ public:
     //   return fields[0];
     // }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+        fields, T, getBestKnownAlignment().getValue(), *this);
   }
 
-  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
+    return llvm::None;
+  }
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-    return None;
+    return llvm::None;
   }
 };
 
@@ -377,7 +383,7 @@ public:
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-    return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
+    return StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
                         LayoutStrategy::Universal, fieldTypes);
   }
 };

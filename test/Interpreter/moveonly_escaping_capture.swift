@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // TODO: SIL optimizations cause a miscompile of deinit rdar://105798769
 // REQUIRES: swift_test_mode_optimize_none

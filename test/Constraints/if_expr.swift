@@ -90,7 +90,7 @@ func testNil3(_ x: Bool) {
 }
 func testNil4(_ x: Bool) {
   // FIXME: Bad diagnostic (#63130)
-  let _: _? = if x { nil } else { 42 } // expected-error {{type of expression is ambiguous without more context}}
+  let _: _? = if x { nil } else { 42 } // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 enum F<T> {
@@ -137,7 +137,7 @@ struct SQ : Q {
 
 func testAssociatedTypeReturn1() {
   func fn<T : Q>(_ fn: (T) -> T.X) {}
-  fn { x in // expected-error {{unable to infer type of a closure parameter 'x' in the current context}}
+  fn { x in // expected-error {{cannot infer type of closure parameter 'x' without a type annotation}}
     if .random() { "" } else { "" }
   }
   fn { (x: SQ) in
@@ -387,7 +387,6 @@ func testReturnMismatch() {
   let _ = if .random() {
     return 1 // expected-error {{unexpected non-void return value in void function}}
     // expected-note@-1 {{did you mean to add a return type?}}
-    // expected-error@-2 {{cannot 'return' in 'if' when used as expression}}
   } else {
     0
   }
@@ -461,6 +460,100 @@ func testThrowInference() {
       throw SomeError()
     }
   }
+}
+
+// MARK: Pound if
+
+func testPoundIf1() -> Int {
+  if .random() {
+    #if true
+    0
+    #else
+    ""
+    #endif
+  } else {
+    0
+  }
+}
+
+func testPoundIf2() -> String {
+  if .random() {
+    #if true
+    0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+}
+
+func testPoundIf3() -> String {
+  if .random() {
+    #if false
+    0
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+}
+
+func testPoundIf4() -> String {
+  let x = if .random() {
+    #if true
+    0 // expected-error {{branches have mismatching types 'Int' and 'String'}}
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+  return x
+}
+
+func testPoundIf5() -> String {
+  let x = if .random() {
+    #if false
+    0
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+  return x
+}
+
+func testPoundIfClosure1() -> Int {
+  let fn = {
+    if .random() {
+      #if true
+        0
+      #else
+        ""
+      #endif
+    } else {
+      0
+    }
+  }
+  return fn()
+}
+
+func testPoundIfClosure2() -> String {
+  let fn: () -> String = {
+    if .random() {
+      #if true
+        0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+      #else
+        ""
+      #endif
+    } else {
+      ""
+    }
+  }
+  return fn()
 }
 
 // MARK: Subtyping
@@ -557,9 +650,46 @@ func builderWithBinding() -> Either<String, Int> {
   }
 }
 
+@Builder
+func builderWithInvalidBinding() -> Either<String, Int> {
+  let str = (if .random() { "a" } else { "b" })
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  if .random() {
+    str
+  } else {
+    1
+  }
+}
+
+func takesBuilder(@Builder _ fn: () -> Either<String, Int>) {}
+
+func builderClosureWithBinding() {
+  takesBuilder {
+    // Make sure the binding gets type-checked as an if expression, but the
+    // other if block gets type-checked as a stmt.
+    let str = if .random() { "a" } else { "b" }
+    if .random() {
+      str
+    } else {
+      1
+    }
+  }
+}
+
+func builderClosureWithInvalidBinding()  {
+  takesBuilder {
+    let str = (if .random() { "a" } else { "b" })
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    if .random() {
+      str
+    } else {
+      1
+    }
+  }
+}
+
 func builderInClosure() {
-  func build(@Builder _ fn: () -> Either<String, Int>) {}
-  build {
+  takesBuilder {
     if .random() {
       ""
     } else {

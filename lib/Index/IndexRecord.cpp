@@ -233,10 +233,16 @@ public:
   }
 
   void finish() override {
-    for (auto &pair : TrackerByGroup) {
-      StringRef groupName = pair.first();
-      SymbolTracker &tracker = *pair.second;
-      bool cont = onFinish(groupName, tracker);
+    SmallVector<std::pair<StringRef, SymbolTracker *>, 0> SortedGroups;
+    for (auto &entry : TrackerByGroup) {
+      SortedGroups.emplace_back(entry.first(), entry.second.get());
+    }
+    llvm::sort(SortedGroups, llvm::less_first());
+
+    for (auto &pair : SortedGroups) {
+      StringRef groupName = pair.first;
+      SymbolTracker *tracker = pair.second;
+      bool cont = onFinish(groupName, *tracker);
       if (!cont)
         break;
     }
@@ -389,6 +395,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool explicitModulebuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -592,6 +599,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   bool indexSystemModules,
                                   bool skipStdlib,
                                   bool includeLocals,
+                                  bool explicitModuleBuild,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
                                   DiagnosticEngine &diags,
@@ -640,8 +648,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         bool withoutUnitName = true;
         if (FU->getKind() == FileUnitKind::ClangModule) {
           auto clangModUnit = cast<ClangModuleUnit>(LFU);
-          bool shouldIndexModule = indexClangModules &&
-              (!clangModUnit->isSystemModule() || indexSystemModules);
+          bool shouldIndexModule =
+              indexClangModules &&
+              (!mod->isNonUserModule() || indexSystemModules);
           withoutUnitName = !shouldIndexModule;
           if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
             moduleName = clangMod->getTopLevelModuleName();
@@ -662,15 +671,14 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           // We don't officially support binary swift modules, so normally
           // the index data for user modules would get generated while
           // building them.
-          bool isDistributedModule = mod->isSDKModule() ||
-                    mod->getASTContext().SearchPathOpts.getSDKPath().empty();
-          if (mod->isSystemModule() && indexSystemModules &&
-              (isDistributedModule || mod->isStdlibModule()) &&
+          if (mod->isNonUserModule() && indexSystemModules &&
               (!skipStdlib || !mod->isStdlibModule())) {
             emitDataForSwiftSerializedModule(mod, indexStorePath,
                                              indexClangModules,
                                              indexSystemModules, skipStdlib,
-                                             includeLocals, targetTriple,
+                                             includeLocals,
+                                             explicitModuleBuild,
+                                             targetTriple,
                                              clangCI, diags,
                                              unitWriter,
                                              pathRemapper,
@@ -697,7 +705,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         }
         clang::index::writer::OpaqueModule opaqMod =
             moduleNameScratch.createString(moduleName);
-        unitWriter.addASTFileDependency(*F, mod->isSystemModule(), opaqMod,
+        unitWriter.addASTFileDependency(*F, mod->isNonUserModule(), opaqMod,
                                         withoutUnitName);
 
         break;
@@ -715,6 +723,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool explicitModuleBuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -743,7 +752,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // Reload resilient modules from swiftinterface to avoid indexing
   // internal details.
   bool skipIndexingModule = false;
-  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+  // Note, we are unable to reload from interface on an explicit module build
+  if (!explicitModuleBuild &&
+      module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
       !module->isBuiltFromInterface() &&
       !module->isStdlibModule()) {
     module->getASTContext().setIgnoreAdjacentModules(true);
@@ -833,7 +844,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   }
 
   auto &fileMgr = clangCI.getFileManager();
-  bool isSystem = module->isSystemModule();
+  bool isSystem = module->isNonUserModule();
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
@@ -848,14 +859,13 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       targetTriple, sysrootPath, clangRemapper, getModuleInfoFromOpaqueModule);
 
   auto FE = fileMgr.getFile(filename);
-  bool isSystemModule = module->isSystemModule();
   for (auto &pair : records) {
     std::string &recordFile = pair.first;
     std::string &groupName = pair.second;
     if (recordFile.empty())
       continue;
     clang::index::writer::OpaqueModule mod = &groupName;
-    unitWriter.addRecordFile(recordFile, *FE, isSystemModule, mod);
+    unitWriter.addRecordFile(recordFile, *FE, isSystem, mod);
   }
 
   SmallVector<ImportedModule, 8> imports;
@@ -864,6 +874,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
                         indexSystemModules, skipStdlib, includeLocals,
+                        explicitModuleBuild,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, pathRemapper, initialFile);
 
@@ -880,14 +891,14 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
                      bool indexSystemModules, bool skipStdlib,
                      bool includeLocals, bool isDebugCompilation,
-                     StringRef targetTriple,
+                     bool isExplicitModuleBuild, StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
                      const PathRemapper &pathRemapper,
                      DiagnosticEngine &diags) {
   auto &fileMgr = clangCI.getFileManager();
   auto *module = primarySourceFile->getParentModule();
-  bool isSystem = module->isSystemModule();
+  bool isSystem = module->isNonUserModule();
   auto mainFile = fileMgr.getFile(primarySourceFile->getFilename());
   auto clangRemapper = pathRemapper.asClangPathRemapper();
   // FIXME: Get real values for the following.
@@ -901,15 +912,14 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
 
   // Module dependencies.
   SmallVector<ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(
-      imports, {ModuleDecl::ImportFilterKind::Exported,
-                ModuleDecl::ImportFilterKind::Default,
-                ModuleDecl::ImportFilterKind::ImplementationOnly});
+  primarySourceFile->getImportedModules(imports,
+                                        ModuleDecl::getImportFilterLocal());
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
                         indexSystemModules, skipStdlib, includeLocals,
-                        targetTriple, clangCI, diags, unitWriter,
-                        moduleNameScratch, pathRemapper, primarySourceFile);
+                        isExplicitModuleBuild, targetTriple, clangCI, diags,
+                        unitWriter, moduleNameScratch, pathRemapper,
+                        primarySourceFile);
 
   // File dependencies.
   for (auto *F : fileDependencies)
@@ -920,7 +930,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      auto file = fileMgr.getFile(filename);
                      unitWriter.addRecordFile(
                          recordFile, file ? *file : nullptr,
-                         module->isSystemModule(), /*Module=*/nullptr);
+                         module->isNonUserModule(), /*Module=*/nullptr);
                    });
 
   std::string error;
@@ -964,6 +974,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool skipStdlib,
                            bool includeLocals,
                            bool isDebugCompilation,
+                           bool isExplicitModuleBuild,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
                            const PathRemapper &pathRemapper) {
@@ -993,8 +1004,8 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
                               indexSystemModules, skipStdlib, includeLocals,
-                              isDebugCompilation, targetTriple,
-                              fileDependencies.getArrayRef(),
+                              isDebugCompilation, isExplicitModuleBuild,
+                              targetTriple, fileDependencies.getArrayRef(),
                               clangCI, pathRemapper, diags);
 }
 
@@ -1007,6 +1018,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool skipStdlib,
                            bool includeLocals,
                            bool isDebugCompilation,
+                           bool isExplicitModuleBuild,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
                            const PathRemapper &pathRemapper) {
@@ -1044,8 +1056,8 @@ bool index::indexAndRecord(ModuleDecl *module,
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
                                indexSystemModules, skipStdlib, includeLocals,
-                               isDebugCompilation, targetTriple,
-                               fileDependencies.getArrayRef(),
+                               isDebugCompilation, isExplicitModuleBuild,
+                               targetTriple, fileDependencies.getArrayRef(),
                                clangCI, pathRemapper, diags))
         return true;
       unitIndex += 1;

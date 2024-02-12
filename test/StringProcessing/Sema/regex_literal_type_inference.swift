@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 let r0 = #/./#
 let _: Regex<Substring> = r0

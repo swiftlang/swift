@@ -13,7 +13,8 @@ func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
   // CHECK: [[MARKED_BOX:%[0-9]+]] = mark_uninitialized [var] [[BOX]]
-  // CHECK: [[XADDR:%.*]] = project_box [[MARKED_BOX]]
+  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [var_decl] [[MARKED_BOX]]
+  // CHECK: [[XADDR:%.*]] = project_box [[XLIFETIME]]
   x.1 = c
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[XADDR]]
   // CHECK: [[X_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
@@ -343,7 +344,8 @@ func inout_arg(_ x: inout Int) {}
 func physical_inout(_ x: Int) {
   var x = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
+  // CHECK: [[XL:%.*]] = begin_borrow [var_decl] [[XADDR]]
+  // CHECK: [[PB:%.*]] = project_box [[XL]]
   inout_arg(&x)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @$s10properties9inout_arg{{[_0-9a-zA-Z]*}}F
@@ -369,7 +371,7 @@ func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
-  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[VADDR]]
+  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[VADDR]]
   // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @$s10properties3ValV{{[_0-9a-zA-Z]*}}is
@@ -666,7 +668,7 @@ class r19254812Derived: r19254812Base{
 // Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden [ossa] @$s10properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself]
-// CHECK: [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+// CHECK: [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
 // CHECK: [[PB_BOX:%.*]] = project_box [[LIFETIME]]
 
 // Initialization of the pi field: no copy_values/releases.
@@ -721,8 +723,9 @@ func testRedundantRetains() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10properties20testRedundantRetainsyyF : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
+// CHECK: [[MOVED_A:%[0-9]+]] = move_value [lexical] [var_decl] [[A]]
 // CHECK-NOT: copy_value
-// CHECK: destroy_value [[A]] : $RedundantRetains
+// CHECK: destroy_value [[MOVED_A]] : $RedundantRetains
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
 // CHECK: return
@@ -779,7 +782,8 @@ struct MutatingGetterStruct {
 
   // CHECK-LABEL: sil hidden [ossa] @$s10properties20MutatingGetterStructV4test
   // CHECK: [[X:%.*]] = alloc_box ${ var MutatingGetterStruct }, var, name "x"
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+  // CHECK-NEXT: [[XL:%.*]] = begin_borrow [var_decl] [[X]]
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[XL]]
   // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: apply {{%.*}}([[WRITE]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int

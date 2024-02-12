@@ -45,4 +45,11 @@ func caller(_ s: TopLevelStruct) {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   _ = s.property
+
+  // -- Verify key path
+  // CHECK: {{%.*}} = keypath $KeyPath<TopLevelStruct, TopLevelStruct>, (root $TopLevelStruct; gettable_property $TopLevelStruct,  id @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct, getter @$s11back_deploy14TopLevelStructV8propertyACvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed TopLevelStruct) -> @out TopLevelStruct)
+  _ = \TopLevelStruct.property
 }
+
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed TopLevelStruct) -> @out TopLevelStruct
+// CHECK: function_ref @$s11back_deploy14TopLevelStructV8propertyACvgTwb

@@ -456,6 +456,16 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T : _BitwiseCopyable>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    return Builtin.loadRaw((self + offset)._rawValue)
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
@@ -473,8 +483,6 @@ public struct UnsafeRawPointer: _Pointer {
       )
       return temporary.pointee
     }
-    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
-    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 }
 
@@ -1238,6 +1246,16 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance isn't associated
   ///   with the value in the range of memory referenced by this pointer.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T : _BitwiseCopyable>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    return Builtin.loadRaw((self + offset)._rawValue)
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
@@ -1255,8 +1273,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
       )
       return temporary.pointee
     }
-    //FIXME: reimplement with `loadRaw` when supported in SIL (rdar://96956089)
-    // e.g. Builtin.loadRaw((self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
@@ -1486,3 +1502,8 @@ extension OpaquePointer {
     self._rawValue = unwrapped._rawValue
   }
 }
+
+@available(*, unavailable)
+extension UnsafeRawPointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutableRawPointer: Sendable { }

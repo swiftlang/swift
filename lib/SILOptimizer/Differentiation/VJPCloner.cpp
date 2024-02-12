@@ -17,6 +17,8 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/AST/Types.h"
+
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
@@ -110,7 +112,7 @@ class VJPCloner::Implementation final
 
   /// Initializes a context object if needed.
   void emitLinearMapContextInitializationIfNeeded() {
-    if (!pullbackInfo.hasLoops())
+    if (!pullbackInfo.hasHeapAllocatedContext())
       return;
  
     // Get linear map struct size.
@@ -118,15 +120,21 @@ class VJPCloner::Implementation final
     auto pullbackTupleType =
       remapASTType(pullbackInfo.getLinearMapTupleType(returnBB)->getCanonicalType());
     Builder.setInsertionPoint(vjp->getEntryBlock());
-    auto topLevelSubcontextSize = emitMemoryLayoutSize(
-        Builder, original->getLocation(), pullbackTupleType);
+
+    auto pbTupleMetatypeType =
+        CanMetatypeType::get(pullbackTupleType, MetatypeRepresentation::Thick);
+    auto pbTupleMetatypeSILType =
+        SILType::getPrimitiveObjectType(pbTupleMetatypeType);
+    auto pbTupleMetatype =
+        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+
     // Create an context.
     pullbackContextValue = Builder.createBuiltin(
         original->getLocation(),
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffCreateLinearMapContext)),
-        SILType::getNativeObjectType(getASTContext()),
-        SubstitutionMap(), {topLevelSubcontextSize});
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffCreateLinearMapContextWithType)),
+        SILType::getNativeObjectType(getASTContext()), SubstitutionMap(),
+        {pbTupleMetatype});
     borrowedPullbackContextValue = Builder.createBeginBorrow(
         original->getLocation(), pullbackContextValue);
     LLVM_DEBUG(getADDebugStream()
@@ -148,8 +156,8 @@ class VJPCloner::Implementation final
       return builtinAutoDiffAllocateSubcontextGenericSignature;
     auto &ctx = getASTContext();
     auto *decl = cast<FuncDecl>(getBuiltinValueDecl(
-        ctx, ctx.getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext))));
+        ctx, ctx.getIdentifier(getBuiltinName(
+                 BuiltinValueKind::AutoDiffAllocateSubcontextWithType))));
     builtinAutoDiffAllocateSubcontextGenericSignature =
         decl->getGenericSignature();
     assert(builtinAutoDiffAllocateSubcontextGenericSignature);
@@ -370,6 +378,7 @@ public:
     // Create a new `checked_cast_branch` instruction.
     getBuilder().createCheckedCastBranch(
         ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+        getOpASTType(ccbi->getSourceFormalType()),
         getOpType(ccbi->getTargetLoweredType()),
         getOpASTType(ccbi->getTargetFormalType()),
         createTrampolineBasicBlock(ccbi, pbTupleVal, ccbi->getSuccessBB()),
@@ -448,24 +457,22 @@ public:
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
-    LLVM_DEBUG(auto &s = getADDebugStream() << "Active indices: params={";
+    LLVM_DEBUG(auto &s = getADDebugStream() << "Active indices: params=(";
                llvm::interleave(
                    activeParamIndices.begin(), activeParamIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
-               s << "}, results={"; llvm::interleave(
+               s << "), results=("; llvm::interleave(
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
-               s << "}\n";);
+               s << ")\n";);
 
     // Form expected indices.
-    auto numSemanticResults =
-        ai->getSubstCalleeType()->getNumResults() +
-        ai->getSubstCalleeType()->getNumIndirectMutatingParameters();
     AutoDiffConfig config(
         IndexSubset::get(getASTContext(),
                          ai->getArgumentsWithoutIndirectResults().size(),
                          activeParamIndices),
-        IndexSubset::get(getASTContext(), numSemanticResults,
+        IndexSubset::get(getASTContext(),
+                         ai->getSubstCalleeType()->getNumAutoDiffSemanticResults(),
                          activeResultIndices));
 
     // Emit the VJP.
@@ -517,8 +524,12 @@ public:
                      .getSILStorageInterfaceType()
                      .isDifferentiable(getModule())) {
               auto arg = ai->getArgumentsWithoutIndirectResults()[paramIndex];
-              auto startLoc = arg.getLoc().getStartSourceLoc();
-              auto endLoc = arg.getLoc().getEndSourceLoc();
+              // FIXME: This shouldn't be necessary and might indicate a bug in
+              // the transformation.
+              RegularLocation nonAutoGenLoc(arg.getLoc());
+              nonAutoGenLoc.markNonAutoGenerated();
+              auto startLoc = nonAutoGenLoc.getStartSourceLoc();
+              auto endLoc = nonAutoGenLoc.getEndSourceLoc();
               context
                   .emitNondifferentiabilityError(
                       arg, invoker, diag::autodiff_nondifferentiable_argument)
@@ -532,10 +543,11 @@ public:
           for (auto resultIndex : config.resultIndices->getIndices()) {
             SILType remappedResultType;
             if (resultIndex >= originalFnTy->getNumResults()) {
-              auto inoutArgIdx = resultIndex - originalFnTy->getNumResults();
-              auto inoutArg =
-                  *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-              remappedResultType = inoutArg->getType();
+              auto semanticResultArgIdx = resultIndex - originalFnTy->getNumResults();
+              auto semanticResultArg =
+                  *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                             semanticResultArgIdx);
+              remappedResultType = semanticResultArg->getType();
             } else {
               remappedResultType = originalFnTy->getResults()[resultIndex]
                                        .getSILStorageInterfaceType();
@@ -614,7 +626,7 @@ public:
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
-    NestedApplyInfo info{config, /*originalPullbackType*/ None};
+    NestedApplyInfo info{config, /*originalPullbackType*/ llvm::None};
     auto insertion = context.getNestedApplyInfo().try_emplace(ai, info);
     auto &nestedApplyInfo = insertion.first->getSecond();
     nestedApplyInfo = info;
@@ -886,58 +898,60 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto config = witness->getConfig();
 
   // Add pullback parameters based on original result indices.
-  SmallVector<unsigned, 4> inoutParamIndices;
+  SmallVector<unsigned, 4> semanticResultParamIndices;
   for (auto i : range(origTy->getNumParameters())) {
     auto origParam = origParams[i];
-    if (!origParam.isIndirectInOut())
+    if (!origParam.isAutoDiffSemanticResult())
       continue;
-    inoutParamIndices.push_back(i);
+    semanticResultParamIndices.push_back(i);
   }
+
   for (auto resultIndex : config.resultIndices->getIndices()) {
     // Handle formal result.
     if (resultIndex < origTy->getNumResults()) {
       auto origResult = origTy->getResults()[resultIndex];
       origResult = origResult.getWithInterfaceType(
           origResult.getInterfaceType()->getReducedType(witnessCanGenSig));
-      pbParams.push_back(getTangentParameterInfoForOriginalResult(
+      auto paramInfo = getTangentParameterInfoForOriginalResult(
           origResult.getInterfaceType()
               ->getAutoDiffTangentSpace(lookupConformance)
               ->getType()
               ->getReducedType(witnessCanGenSig),
-          origResult.getConvention()));
+          origResult.getConvention());
+      pbParams.push_back(paramInfo);
       continue;
     }
-    // Handle `inout` parameter.
+
+    // Handle semantic result parameter.
     unsigned paramIndex = 0;
-    unsigned inoutParamIndex = 0;
+    unsigned resultParamIndex = 0;
     for (auto i : range(origTy->getNumParameters())) {
       auto origParam = origTy->getParameters()[i];
-      if (!origParam.isIndirectMutating()) {
+      if (!origParam.isAutoDiffSemanticResult()) {
         ++paramIndex;
         continue;
       }
-      if (inoutParamIndex == resultIndex - origTy->getNumResults())
+      if (resultParamIndex == resultIndex - origTy->getNumResults())
         break;
       ++paramIndex;
-      ++inoutParamIndex;
+      ++resultParamIndex;
     }
-    auto inoutParam = origParams[paramIndex];
-    auto origResult = inoutParam.getWithInterfaceType(
-        inoutParam.getInterfaceType()->getReducedType(witnessCanGenSig));
-    auto inoutParamTanConvention =
-        config.isWrtParameter(paramIndex)
-            ? inoutParam.getConvention()
-            : ParameterConvention::Indirect_In_Guaranteed;
-    SILParameterInfo inoutParamTanParam(
-        origResult.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()
-            ->getReducedType(witnessCanGenSig),
-        inoutParamTanConvention);
-    pbParams.push_back(inoutParamTanParam);
+    auto resultParam = origParams[paramIndex];
+    auto origResult = resultParam.getWithInterfaceType(
+      resultParam.getInterfaceType()->getReducedType(witnessCanGenSig));
+
+    auto resultParamTanConvention = resultParam.getConvention();
+    if (!config.isWrtParameter(paramIndex))
+      resultParamTanConvention = ParameterConvention::Indirect_In_Guaranteed;
+
+    pbParams.emplace_back(origResult.getInterfaceType()
+                          ->getAutoDiffTangentSpace(lookupConformance)
+                          ->getType()
+                          ->getReducedType(witnessCanGenSig),
+                          resultParamTanConvention);
   }
 
-  if (pullbackInfo.hasLoops()) {
+  if (pullbackInfo.hasHeapAllocatedContext()) {
     // Accept a `AutoDiffLinarMapContext` heap object if there are loops.
     pbParams.push_back({
       getASTContext().TheNativeObjectType,
@@ -956,7 +970,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // Add pullback results for the requested wrt parameters.
   for (auto i : config.parameterIndices->getIndices()) {
     auto origParam = origParams[i];
-    if (origParam.isIndirectMutating())
+    if (origParam.isAutoDiffSemanticResult())
       continue;
     origParam = origParam.getWithInterfaceType(
         origParam.getInterfaceType()->getReducedType(witnessCanGenSig));
@@ -978,7 +992,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto *pbGenericEnv = pbGenericSig.getGenericEnvironment();
   auto pbType = SILFunctionType::get(
       pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
-      origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
+      origTy->getCalleeConvention(), pbParams, {}, adjResults, llvm::None,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 
@@ -992,6 +1006,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
+
   return pullback;
 }
 
@@ -1060,14 +1075,21 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     assert(enumEltType == rawPtrType);
     auto pbTupleType =
       remapASTType(pullbackInfo.getLinearMapTupleType(predBB)->getCanonicalType());
-    SILValue pbTupleSize =
-        emitMemoryLayoutSize(Builder, loc, pbTupleType);
+
+    auto pbTupleMetatypeType =
+        CanMetatypeType::get(pbTupleType, MetatypeRepresentation::Thick);
+    auto pbTupleMetatypeSILType =
+        SILType::getPrimitiveObjectType(pbTupleMetatypeType);
+    auto pbTupleMetatype =
+        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+
     auto rawBufferValue = builder.createBuiltin(
         loc,
-        getASTContext().getIdentifier(
-            getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
+        getASTContext().getIdentifier(getBuiltinName(
+            BuiltinValueKind::AutoDiffAllocateSubcontextWithType)),
         rawPtrType, SubstitutionMap(),
-        {borrowedPullbackContextValue, pbTupleSize});
+        {borrowedPullbackContextValue, pbTupleMetatype});
+
     auto typedBufferValue =
       builder.createPointerToAddress(
         loc, rawBufferValue, pbTupleVal->getType().getAddressType(),

@@ -216,29 +216,37 @@ class LLVM(cmake_product.CMakeProduct):
                 # space/time efficient than -g on that platform.
                 llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
-        build_targets = ['all']
-
-        if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
-           self.is_cross_compile_target(host_target):
-            build_targets = (self.args.llvm_ninja_targets_for_cross_compile_hosts)
-        elif self.args.llvm_ninja_targets:
-            build_targets = (self.args.llvm_ninja_targets)
-
-        # indicating we don't want to build LLVM should
-        # override any custom ninja target we specified
         if not self.args._build_llvm:
-            build_targets = ['clean']
-
-        if self.args.skip_build or not self.args.build_llvm:
+            # Indicating we don't want to build LLVM at all should
+            # override everything.
+            build_targets = []
+        elif self.args.skip_build or not self.args.build_llvm:
+            # We can't skip the build completely because the standalone
+            # build of Swift depends on these.
             build_targets = ['llvm-tblgen', 'clang-resource-headers',
                              'intrinsics_gen', 'clang-tablegen-targets']
-            if not self.args.build_toolchain_only:
+
+            # If we are not performing a toolchain-only build or generating
+            # Xcode projects, then we also want to include the following
+            # targets for testing purposes.
+            if (
+                not self.args.build_toolchain_only
+                and self.args.cmake_generator != 'Xcode'
+            ):
                 build_targets.extend([
                     'FileCheck',
                     'not',
                     'llvm-nm',
                     'llvm-size'
                 ])
+        else:
+            build_targets = ['all']
+
+            if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
+               self.is_cross_compile_target(host_target):
+                build_targets = (self.args.llvm_ninja_targets_for_cross_compile_hosts)
+            elif self.args.llvm_ninja_targets:
+                build_targets = (self.args.llvm_ninja_targets)
 
         if self.args.host_libtool:
             llvm_cmake_options.define('CMAKE_LIBTOOL', self.args.host_libtool)
@@ -338,6 +346,12 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define('LLVM_TABLEGEN', llvm_tblgen)
             clang_tblgen = os.path.join(host_build_dir, 'bin', 'clang-tblgen')
             llvm_cmake_options.define('CLANG_TABLEGEN', clang_tblgen)
+            confusable_chars_gen = os.path.join(host_build_dir, 'bin',
+                                                'clang-tidy-confusable-chars-gen')
+            llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
+                                      confusable_chars_gen)
+            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
+            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 

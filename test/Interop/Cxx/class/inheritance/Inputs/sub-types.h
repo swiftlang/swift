@@ -1,8 +1,3 @@
-template <class From, class To>
-To __swift_interopStaticCast(From from) {
-  return static_cast<To>(from);
-}
-
 struct Base {
   enum class EnumClass : char { eca = 2, ecb = 3, ecc = 4 };
   enum Enum { ea, eb, ec };

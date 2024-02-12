@@ -39,7 +39,7 @@ public struct LaterGeneric<T> {
 // CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum final {
 // CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO15returnsLaterOptAA0F7GenericVyACGyF");
 
-// CHECK: namespace Generics __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Generics") {
+// CHECK: namespace Generics SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Generics") {
 // CHECK-EMPTY:
 // CHECK-NEXT:  namespace _impl {
 // CHECK-EMPTY:

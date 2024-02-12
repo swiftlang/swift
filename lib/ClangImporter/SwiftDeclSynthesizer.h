@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class CallExpr;
+
 enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
   MakeUnlabeledValueInit = 0x01,
@@ -59,6 +61,10 @@ public:
   createVarWithPattern(DeclContext *dc, Identifier name, Type ty,
                        VarDecl::Introducer introducer, bool isImplicit,
                        AccessLevel access, AccessLevel setterAccess);
+
+  /// Create a reinterpretCast from the `exprType`, to the `givenType`.
+  static Expr *synthesizeReturnReinterpretCast(ASTContext &ctx, Type givenType,
+                                               Type exprType, Expr *baseExpr);
 
   /// Create a new named constant with the given value.
   ///
@@ -275,19 +281,24 @@ public:
   /// Given an imported C++ dereference operator (`operator*()`), create a
   /// `pointee` computed property.
   ///
-  /// \param dereferenceFunc function returning `Unsafe(Mutable)?Pointer<T>`
+  /// \param getter function returning `UnsafePointer<T>`
+  /// \param setter function returning `UnsafeMutablePointer<T>`
   /// \return computed property declaration
-  VarDecl *makeDereferencedPointeeProperty(FuncDecl *dereferenceFunc);
+  VarDecl *makeDereferencedPointeeProperty(FuncDecl *getter, FuncDecl *setter);
 
   /// Given a C++ pre-increment operator (`operator++()`). create a non-mutating
   /// function `successor() -> Self`.
   FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
-                         clang::CXXMethodDecl *clangOperator);
+                         clang::OverloadedOperatorKind opKind);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
+
+  CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
+                                const swift::Type &swiftParamTy,
+                                SourceLoc paramLoc);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

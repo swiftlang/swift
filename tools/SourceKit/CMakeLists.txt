@@ -8,6 +8,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(SEND_ERROR "SourceKit cannot be built standalone")
 endif()
 
+set(SOURCEKIT_SWIFT_SWAP_COMPILER FALSE)
 include(SwiftWindowsSupport)
 swift_swap_compiler_if_needed("SourceKit")
 
@@ -82,7 +83,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
   if (XCODE)
-    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx")
+    if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
       set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
@@ -101,7 +102,7 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 endif()
 
 if(SWIFT_BUILD_HOST_DISPATCH)
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
     set(SOURCEKIT_RUNTIME_DIR bin)
   else()
     set(SOURCEKIT_RUNTIME_DIR lib)
@@ -114,7 +115,7 @@ if(SWIFT_BUILD_HOST_DISPATCH)
       DESTINATION ${SOURCEKIT_RUNTIME_DIR}
       COMPONENT sourcekit-inproc)
   endif()
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
     swift_install_in_component(FILES
       $<TARGET_LINKER_FILE:dispatch>
       $<TARGET_LINKER_FILE:BlocksRuntime>

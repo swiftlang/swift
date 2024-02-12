@@ -22,40 +22,6 @@ class Derived1 : Base { }
 
 class Derived2 : Base { }
 
-// CHECK-LABEL: sil @test_checked_cast_br
-// CHECK: select_enum
-// CHECK: checked_cast_br
-// CHECK: integer_literal $Builtin.Int64, 1
-// CHECK: select_enum
-// CHECK: checked_cast_br
-// CHECK: integer_literal $Builtin.Int64, 2
-// CHECK: integer_literal $Builtin.Int64, 3
-// CHECK: return
-sil @test_checked_cast_br : $@convention(thin) (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 {
-bb0(%0 : $E, %1 : $Base, %2 : $Base, %3 : $Base, %4 : $Base):
-  %s1 = select_enum %0 : $E, case #E.A!enumelt: %1, default %2 : $Base
-  checked_cast_br %s1 : $Base to Derived1, bb1, bb2
-
-bb1(%a1 : $Derived1):
-  %i1 = integer_literal $Builtin.Int64, 1
-  br bb5(%i1 : $Builtin.Int64)
-
-bb2:
-  %s2 = select_enum %0 : $E, case #E.B!enumelt: %3, default %4 : $Base
-  checked_cast_br %s2 : $Base to Derived1, bb3, bb4
-
-bb3(%a2 : $Derived1):
-  %i2 = integer_literal $Builtin.Int64, 2
-  br bb5(%i2 : $Builtin.Int64)
-
-bb4:
-  %i3 = integer_literal $Builtin.Int64, 3
-  br bb5(%i3 : $Builtin.Int64)
-
-bb5(%a3 : $Builtin.Int64):
-  return %a3 : $Builtin.Int64
-}
-
 // CHECK-LABEL: sil @test_cond_br
 // CHECK: select_enum
 // CHECK: cond_br

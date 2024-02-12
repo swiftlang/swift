@@ -13,6 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -153,9 +154,10 @@ public:
   };
 
   void printInlineForThunk() const;
+  void printInlineForHelperFunction() const;
 
   void printNullability(
-      Optional<OptionalTypeKind> kind,
+      llvm::Optional<OptionalTypeKind> kind,
       NullabilityPrintKind printKind = NullabilityPrintKind::After) const;
 
   /// Returns true if \p name matches a keyword in any Clang language mode.
@@ -181,16 +183,16 @@ public:
 
   /// Print the Swift generic signature as C++ template declaration alongside
   /// its requirements.
-  void printGenericSignature(const CanGenericSignature &signature);
+  void printGenericSignature(GenericSignature signature);
 
   /// Print the `static_assert` statements used for legacy type-checking for
   /// generics in C++14/C++17 mode.
   void
-  printGenericSignatureInnerStaticAsserts(const CanGenericSignature &signature);
+  printGenericSignatureInnerStaticAsserts(GenericSignature signature);
 
   /// Print the C++ template parameters that should be passed for a given
   /// generic signature.
-  void printGenericSignatureParams(const CanGenericSignature &signature);
+  void printGenericSignatureParams(GenericSignature signature);
 
   /// Print the call to the C++ type traits that computes the underlying type /
   /// witness table pointer value that are passed to Swift for the given generic
@@ -230,8 +232,14 @@ public:
   /// Print the given **known** type as a C type.
   void printKnownCType(Type t, PrimitiveTypeMapping &typeMapping) const;
 
+  /// Print the nominal type's Swift mangled name as a typedef from a char to
+  /// the mangled name, and a static constexpr variable declaration, whose type
+  /// is the aforementioned typedef, and whose name is known to the debugger.
+  void printSwiftMangledNameForDebugger(const NominalTypeDecl *typeDecl);
+
 protected:
   raw_ostream &os;
+  swift::Mangle::ASTMangler mangler;
 };
 
 } // end namespace swift

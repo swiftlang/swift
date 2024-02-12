@@ -110,7 +110,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc protocol refs.
       if (auto proto = dyn_cast<ProtocolDecl>(type)) {
-        if (proto->isObjC()) {
+        if (proto->isObjC() && !IGM.canUseObjCSymbolicReferences()) {
           return false;
         }
       }
@@ -300,6 +300,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
     prefix = "default assoc type ";
     break;
 
+  case MangledTypeRefRole::FieldMetadata:
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
     prefix = "symbolic ";
@@ -396,6 +397,16 @@ std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
     appendGenericSignature(genericSig);
 
   appendAnyProtocolConformance(genericSig, type, conformance);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForMangledGetEnumTagForLayoutString(
+    CanType type) {
+  beginManglingWithoutPrefix();
+  Buffer << "get_enum_tag_for_layout_string"
+         << " ";
+
+  appendType(type, nullptr);
   return finalize();
 }
 

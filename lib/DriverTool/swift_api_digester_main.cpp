@@ -36,6 +36,9 @@
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Support/VirtualOutputBackends.h"
+#include "llvm/Support/raw_ostream.h"
 #include <functional>
 
 using namespace swift;
@@ -133,8 +136,8 @@ class BestMatchMatcher : public NodeMatcher {
     return MatchedRight.count(R) == 0 && CanMatch(L, R);
   }
 
-  Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector& Candidates) {
-    Optional<NodePtr> Best;
+  llvm::Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
+    llvm::Optional<NodePtr> Best;
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
         continue;
@@ -218,10 +221,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     N->getUsr().startswith("c:@E@");
   }
 
-  static Optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
+  static llvm::Optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
     auto LastPartIndex = N->getUsr().find_last_of('@');
     if (LastPartIndex == StringRef::npos)
-      return None;
+      return llvm::None;
     return N->getUsr().substr(LastPartIndex + 1);
   }
 
@@ -416,9 +419,9 @@ class SameNameNodeMatcher : public NodeMatcher {
   }
 
   // Given two SDK nodes, figure out the reason for why they have the same name.
-  Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
+  llvm::Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
-      return None;
+      return llvm::None;
     auto NameEqual = L->getPrintedName() == R->getPrintedName();
     auto UsrEqual = isUSRSame(L, R);
     if (NameEqual && UsrEqual)
@@ -428,7 +431,7 @@ class SameNameNodeMatcher : public NodeMatcher {
     else if (UsrEqual)
       return NameMatchKind::USR;
     else
-      return None;
+      return llvm::None;
   }
 
   struct NameMatchCandidate {
@@ -560,7 +563,7 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
     // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
     // We shouldn't include these decls in the ABI baseline file. This line is
     // added so the checker is backward compatible.
-    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+    if (D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient))
       return;
   }
   auto &Ctx = D->getSDKContext();
@@ -665,11 +668,11 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
-        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::Available,
                                                     D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient) &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_Marker)) {
+        !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
+        !D->hasDeclAttribute(DeclAttrKind::Marker)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
     }
   }
@@ -1796,7 +1799,7 @@ public:
   }
 };
 
-static Optional<uint8_t> findSelfIndex(SDKNode* Node) {
+static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
   if (auto func = dyn_cast<SDKNodeDeclAbstractFunc>(Node)) {
     return func->getSelfIndexOptional();
   } else if (auto vd = dyn_cast<SDKNodeDeclVar>(Node)) {
@@ -1807,7 +1810,7 @@ static Optional<uint8_t> findSelfIndex(SDKNode* Node) {
       }
     }
   }
-  return None;
+  return llvm::None;
 }
 
 /// Find cases where a diff is due to a change to being a type member
@@ -1826,13 +1829,16 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(),
-        rightParent->getKind() == SDKNodeKind::Root ?
-          StringRef() : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
-        right->getPrintedName(), findSelfIndex(right), None,
-        leftParent->getKind() == SDKNodeKind::Root ?
-          StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
-        left->getPrintedName()
-    };
+        rightParent->getKind() == SDKNodeKind::Root
+            ? StringRef()
+            : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        right->getPrintedName(),
+        findSelfIndex(right),
+        llvm::None,
+        leftParent->getKind() == SDKNodeKind::Root
+            ? StringRef()
+            : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        left->getPrintedName()};
     out.emplace_back(item);
     Detector.workOn(left, right);
   }
@@ -1932,7 +1938,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
       createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
-      std::move(allowedBreakages));
+      std::move(allowedBreakages),
+      /*DowngradeToWarning*/false);
   SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -2535,13 +2542,18 @@ public:
     switch (Action) {
     case ActionType::DumpSDK: {
       llvm::StringSet<> Modules;
-      return (prepareForDump(InitInvoke, Modules))
-                 ? 1
-                 : dumpSDKContent(InitInvoke, Modules,
-                                  getJsonOutputFilePath(
-                                      InitInvoke.getLangOptions().Target,
-                                      CheckerOpts.ABI, OutputFile, OutputDir),
-                                  CheckerOpts);
+      if (prepareForDump(InitInvoke, Modules))
+        return 1;
+      auto JsonOut =
+          getJsonOutputFilePath(InitInvoke.getLangOptions().Target,
+                                CheckerOpts.ABI, OutputFile, OutputDir);
+      std::error_code EC;
+      llvm::raw_fd_ostream fs(JsonOut, EC);
+      if (EC) {
+        llvm::errs() << "Cannot open JSON output file: " << JsonOut << "\n";
+        return 1;
+      }
+      return dumpSDKContent(InitInvoke, Modules, fs, CheckerOpts);
     }
     case ActionType::MigratorGen:
     case ActionType::DiagnoseSDKs: {
@@ -2605,7 +2617,13 @@ public:
     }
     case ActionType::GenerateEmptyBaseline: {
       SDKContext Ctx(CheckerOpts);
-      dumpSDKRoot(getEmptySDKNodeRoot(Ctx), OutputFile);
+      std::error_code EC;
+      llvm::raw_fd_ostream fs(OutputFile, EC);
+      if (EC) {
+        llvm::errs() << "Cannot open output file: " << OutputFile << "\n";
+        return 1;
+      }
+      dumpSDKRoot(getEmptySDKNodeRoot(Ctx), fs);
       return 0;
     }
     case ActionType::FindUsr: {

@@ -12,15 +12,13 @@ import Swift
 import gizmo
 
 // CHECK-LABEL: define {{.*}} @test
-// CHECK:  [[ALLOC1:%.*]] = call %objc_object* @objc_allocWithZone
-// CHECK:  [[CAST1:%.*]] = bitcast %objc_object* [[ALLOC1]] to [[KLASS:%.*]]*
+// CHECK:  [[ALLOC1:%.*]] = call ptr @objc_allocWithZone
 // CHECK:  br
 
-// CHECK:  [[ALLOC2:%.*]] = call %objc_object* @objc_allocWithZone
-// CHECK:  [[CAST2:%.*]] = bitcast %objc_object* [[ALLOC2]] to [[KLASS]]*
+// CHECK:  [[ALLOC2:%.*]] = call ptr @objc_allocWithZone
 // CHECK:  br
 
-// CHECK:  phi [[KLASS]]* [ [[CAST2]], %{{.*}} ], [ [[CAST1]], %{{.*}} ]
+// CHECK:  phi ptr [ [[ALLOC2]], %{{.*}} ], [ [[ALLOC1]], %{{.*}} ]
 // CHECK:  ret
 
 sil @test : $@convention(thin) (@owned Optional<Int>) -> () {
@@ -43,15 +41,13 @@ bb3(%3 : $Gizmo):
 }
 
 // CHECK-LABEL: define {{.*}} @class_test
-// CHECK:  [[ALLOC1:%.*]] = call %objc_object* @objc_allocWithZone
-// CHECK:  [[CAST1:%.*]] = bitcast %objc_object* [[ALLOC1]] to [[KLASS:%.*]]*
+// CHECK:  [[ALLOC1:%.*]] = call ptr @objc_allocWithZone
 // CHECK:  br
 
-// CHECK:  [[ALLOC2:%.*]] = call %objc_object* @objc_allocWithZone
-// CHECK:  [[CAST2:%.*]] = bitcast %objc_object* [[ALLOC2]] to [[KLASS]]*
+// CHECK:  [[ALLOC2:%.*]] = call ptr @objc_allocWithZone
 // CHECK:  br
 
-// CHECK:  phi [[KLASS]]* [ [[CAST2]], %{{.*}} ], [ [[CAST1]], %{{.*}} ]
+// CHECK:  phi ptr [ [[ALLOC2]], %{{.*}} ], [ [[ALLOC1]], %{{.*}} ]
 // CHECK:  ret
 
 

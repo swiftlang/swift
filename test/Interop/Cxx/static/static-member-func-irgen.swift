@@ -17,7 +17,7 @@ public func callStaticMemberFuncAddr() -> CInt {
 }
 
 // CHECK: define {{.*}}i32 @"$s4main24callStaticMemberFuncAddrs5Int32VyF"()
-// CHECK: call i32 ()* @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|"\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ"}}()
+// CHECK: call ptr @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|"\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ"}}()
 
-// CHECK: declare {{.*}}i32 ()* @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|"\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ"}}()
+// CHECK: declare {{.*}}ptr @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|"\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ"}}()
 

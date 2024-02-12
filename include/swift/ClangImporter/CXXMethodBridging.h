@@ -26,7 +26,7 @@ struct CXXMethodBridging {
         nameKind != NameKind::lower && nameKind != NameKind::snake)
       return Kind::unknown;
 
-    if (getClangName().startswith_insensitive("set")) {
+    if (getClangName().starts_with_insensitive("set")) {
       // Setters only have one parameter.
       if (method->getNumParams() != 1)
         return Kind::unknown;
@@ -43,7 +43,7 @@ struct CXXMethodBridging {
     if (method->getReturnType()->isVoidType())
       return Kind::unknown;
 
-    if (getClangName().startswith_insensitive("get")) {
+    if (getClangName().starts_with_insensitive("get")) {
       // Getters cannot take arguments.
       if (method->getNumParams() != 0)
         return Kind::unknown;

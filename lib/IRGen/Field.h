@@ -45,6 +45,7 @@ public:
     Var,
     MissingMember,
     DefaultActorStorage,
+    NonDefaultDistributedActorStorage,
     FirstArtificial = DefaultActorStorage
   };
   enum : uintptr_t { KindMask = 0x3 };

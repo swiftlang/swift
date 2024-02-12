@@ -205,3 +205,20 @@ func rdar94888357() {
 
   let _ = S<String, String>("") // expected-error {{generic type 'S' specialized with too many type parameters (got 2, but expected 1)}}
 }
+
+// https://github.com/apple/swift/issues/68417
+enum E {
+  subscript(x: inout Int) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
+  case c(x: inout Int) // expected-error {{'inout' may only be used on function or initializer parameters}}
+  func d(x: inout Int ...) {} // expected-error {{'inout' must not be used on variadic parameters}}
+  func e(x: inout Int) {} // ok
+  init(x: inout Int) {} // ok
+}
+
+do {
+  struct Test {
+    init(_: inout Int...) {} // expected-error {{'inout' must not be used on variadic parameters}}
+    func test(_: inout String...) {} // expected-error {{'inout' must not be used on variadic parameters}}
+    subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
+  }
+}

@@ -49,7 +49,6 @@
 // CHECK-NEXT: - (nullable instancetype)initWithCoder:(NSCoder * _Nonnull){{[a-zA-Z]+}} OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 
-
 import Foundation
 
 

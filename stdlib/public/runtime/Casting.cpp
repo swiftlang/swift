@@ -122,9 +122,32 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+std::string MetadataOrPack::nameForMetadata() const {
+  if (isNull())
+    return "<<nullptr>>";
+
+  if (isMetadata())
+    return ::nameForMetadata(getMetadata());
+
+  std::string result = "Pack{";
+  MetadataPackPointer pack = getMetadataPack();
+  for (size_t i = 0, e = pack.getNumElements(); i < e; ++i) {
+    if (i != 0)
+      result += ", ";
+    result += ::nameForMetadata(pack.getElements()[i]);
+  }
+  result += "}";
+
+  return result;
+}
+
 #else // SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 std::string swift::nameForMetadata(const Metadata *type, bool qualified) {
+  return "<<< type printer not available >>>";
+}
+
+std::string MetadataOrPack::nameForMetadata() const {
   return "<<< type printer not available >>>";
 }
 
@@ -496,7 +519,7 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
                                 const WitnessTable **conformance) {
   // Look up the witness table for protocols that need them.
   if (protocol.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocol(type, protocol.getSwiftProtocol());
+    auto witness = swift_conformsToProtocolCommon(type, protocol.getSwiftProtocol());
     if (!witness)
       return false;
     if (conformance)
@@ -1326,7 +1349,7 @@ extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 static const _ObjectiveCBridgeableWitnessTable *
 swift_conformsToObjectiveCBridgeable(const Metadata *T) {
   return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>
-    (swift_conformsToProtocol(T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable)));
+    (swift_conformsToProtocolCommon(T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable)));
 }
 
 static const _ObjectiveCBridgeableWitnessTable *

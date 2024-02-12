@@ -6,6 +6,6 @@ func foo() {
 
 func sink(receiveCompletion: (Int) -> Void, receiveValue: (Int) -> Void) { fatalError() }
 
-// CHECK: Begin completions, 1 items
+// CHECK: Begin completions, 2 items
 // CHECK-DAG: Pattern/Local/Flair[ArgLabels]:     {#receiveValue: (Int) -> Void {<#Int#> in|}#}[#(Int) -> Void#];
-// CHECK: End completions
+// CHECK-DAG: Keyword[self]/CurrNominal: .self[#Void#]; name=self

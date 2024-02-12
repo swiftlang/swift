@@ -400,11 +400,11 @@ func activeInoutParamControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float
 
 struct Mut: Differentiable {}
 extension Mut {
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (self, x))
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
-@differentiable(reverse, wrt: x)
+@differentiable(reverse, wrt: (nonactive, x))
 func nonActiveInoutParam(_ nonactive: inout Mut, _ x: Mut) {
   nonactive.mutatingMethod(x)
 }
@@ -416,14 +416,14 @@ func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
   return result
 }
 
-@differentiable(reverse, wrt: x)
+@differentiable(reverse, wrt: (nonactive, x))
 func activeInoutParamMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
   var result = nonactive
   result.mutatingMethod(x)
   nonactive = result
 }
 
-@differentiable(reverse, wrt: x)
+@differentiable(reverse, wrt: (nonactive, x))
 func activeInoutParamMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   var result = (nonactive, x)
   result.0.mutatingMethod(result.0)
@@ -716,7 +716,7 @@ func modify(_ s: Struct, _ x: Float) -> Float {
 func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
   // `Array<(Float, Float)>` does not conform to `Differentiable`.
   let array = [(x * y, x * y)]
-  // expected-note @-1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{7-7=withoutDerivative(at: }} {{12-12=)}}
+  // expected-note @-1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}} {{15-15=withoutDerivative(at: }} {{31-31=)}}
   return array[0].0
 }
 
@@ -741,7 +741,8 @@ struct TF_675 : Differentiable {
 let _: @differentiable(reverse) (Float) -> Float = TF_675().method
 
 // TF-918: Test parameter subset thunk + partially-applied original function.
-let _: @differentiable(reverse) (Float, Float) -> Float = (+) as @differentiable(reverse) (Float, @noDerivative Float) -> Float
+let _: @differentiable(reverse) (Float, @noDerivative Float) -> Float = (+) as @differentiable(reverse) (Float, Float) -> Float
+let _: @differentiable(reverse) (Float, @noDerivative Float) -> Float = (+) as @differentiable(reverse) (Float, @noDerivative Float) -> Float
 
 //===----------------------------------------------------------------------===//
 // Differentiation in fragile functions

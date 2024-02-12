@@ -178,7 +178,8 @@ protected:
   OSSALiveness &operator=(const OSSALiveness &) = delete;
 
 public:
-  OSSALiveness(SILValue def): ownershipDef(def), liveness(&discoveredBlocks) {}
+  OSSALiveness(SILValue def): ownershipDef(def),
+                              liveness(def->getFunction(), &discoveredBlocks) {}
 
   const SSAPrunedLiveness &getLiveness() const { return liveness; }
 
@@ -240,6 +241,11 @@ public:
 
   void compute(const DominanceInfo *domInfo,
                InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
+
+  /// Compute the boundary from the blocks discovered during liveness analysis.
+  void computeBoundary(PrunedLivenessBoundary &boundary) const {
+    liveness.computeBoundary(boundary);
+  }
 
   AddressUseKind getAddressUseKind() const { return addressUseKind; }
 

@@ -10,10 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A C++ type that represents a pair of two values.
+///
+/// C++ standard library type `std::pair` conforms to this protocol.
 public protocol CxxPair<First, Second> {
   associatedtype First
   associatedtype Second
 
-  var first: First { get }
-  var second: Second { get }
+  init(first: First, second: Second) // memberwise init, synthesized by Swift
+
+  var first: First { get set }
+  var second: Second { get set }
 }

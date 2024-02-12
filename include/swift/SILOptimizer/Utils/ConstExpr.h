@@ -127,6 +127,10 @@ private:
   ConstExprStepEvaluator(const ConstExprStepEvaluator &) = delete;
   void operator=(const ConstExprStepEvaluator &) = delete;
 
+  /// Set all addresses that could be mutated by the instruction to an
+  /// unknown symbolic value if it is not already so.
+  void setMutableAddressesToUnknown(SILInstruction *inst);
+
 public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
@@ -145,7 +149,8 @@ public:
   ///
   ///   Second element is None, if the evaluation is successful.
   ///   Otherwise, is an unknown symbolic value that contains the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<llvm::Optional<SILBasicBlock::iterator>,
+            llvm::Optional<SymbolicValue>>
   evaluate(SILBasicBlock::iterator instI);
 
   /// Skip the instruction without evaluating it and conservatively account for
@@ -164,7 +169,8 @@ public:
   ///
   ///   Second element is None if skipping the instruction is successful.
   ///   Otherwise, it is an unknown symbolic value containing the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<llvm::Optional<SILBasicBlock::iterator>,
+            llvm::Optional<SymbolicValue>>
   skipByMakingEffectsNonConstant(SILBasicBlock::iterator instI);
 
   /// Try evaluating an instruction and if the evaluation fails, skip the
@@ -183,10 +189,11 @@ public:
   ///
   ///   Second element is None if the evaluation is successful.
   ///   Otherwise, it is an unknown symbolic value containing the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<llvm::Optional<SILBasicBlock::iterator>,
+            llvm::Optional<SymbolicValue>>
   tryEvaluateOrElseMakeEffectsNonConstant(SILBasicBlock::iterator instI);
 
-  Optional<SymbolicValue> lookupConstValue(SILValue value);
+  llvm::Optional<SymbolicValue> lookupConstValue(SILValue value);
 
   /// Return the number of instructions evaluated for the last `evaluate`
   /// operation. This could be used by the clients to limit the number of

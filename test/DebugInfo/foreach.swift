@@ -2,11 +2,11 @@
 
 // Verify that variables bound in the foreach statements are in distinct scopes.
 let values = [1, 2, 3]
-// CHECK-DAG: ![[SCOPE1:[0-9]+]] ={{.*}}Block(scope: ![[MAIN:[0-9]+]],{{.*}}line: 7,
-// CHECK-DAG: ![[SCOPE2:[0-9]+]] ={{.*}}Block(scope: ![[MAIN2:[0-9]+]], {{.*}}line: 10,
 for val in values {
-// CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE1]]
+  // CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE1:[0-9]+]],{{.*}}line: [[@LINE-1]],
+// CHECK-DAG: ![[SCOPE1]] ={{.*}}Block({{.*}}line: [[@LINE-2]]
 }
 for val in values {
-// CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE2]]
+// CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE2:[0-9]+]]
+// CHECK-DAG: ![[SCOPE2]] ={{.*}}Block({{.*}}line: [[@LINE-2]]
 }

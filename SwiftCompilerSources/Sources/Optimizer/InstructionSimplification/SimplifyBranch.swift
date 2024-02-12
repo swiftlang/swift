@@ -70,8 +70,10 @@ private extension BranchInst {
       }
       parentBB.moveAllInstructions(toBeginOf: targetBB, context)
       parentBB.moveAllArguments(to: targetBB, context)
+      context.erase(block: parentBB)
     } else {
       targetBB.moveAllInstructions(toEndOf: parentBB, context)
+      context.erase(block: targetBB)
     }
   }
 }

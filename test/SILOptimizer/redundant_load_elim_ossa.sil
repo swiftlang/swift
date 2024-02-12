@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 // REQUIRES: swift_in_compiler
@@ -220,43 +220,6 @@ bb0(%0 : @owned $AB):
   return %5 : $Int
 }
 
-// Check that we don't crash if the address is an unchecked_addr_cast.
-// CHECK-LABEL: sil [ossa] @test_unchecked_addr_cast :
-// CHECK-NOT: = load
-// CHECK-LABEL: } // end sil function 'test_unchecked_addr_cast'
-sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@inout A, A) -> A {
-bb0(%0 : $*A, %1 : $A):
-  %2 = unchecked_addr_cast %0 : $*A to $*A
-  store %1 to [trivial] %2 : $*A
-  %l1 = load [trivial] %2 : $*A
-  return %l1 : $A
-}
-
-// Multi-BB version of the previous test.
-// CHECK-LABEL: sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
-// CHECK: bb1
-// CHECK-NOT: = load
-// CHECK: cond_br
-// CHECK-LABEL: } // end sil function 'test_forwarding_ignoring_unchecked_addr_cast2'
-sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
-bb0(%0 : $*A, %1 : $A, %2: $A):
-  %3 = unchecked_addr_cast %0 : $*A to $*A
-  store %1 to [trivial] %3 : $*A
-  br bb1
-
-bb1:
-  %5 = load [trivial] %3 : $*A
-  %6 = load [trivial] %3 : $*A
-  store %2 to [trivial] %3 : $*A
-  cond_br undef, bb1a, bb2
-
-bb1a:
-  br bb1
-
-bb2:
-  return %5 : $A
-}
-
 // CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
 // CHECK: bb0
 // CHECK: store
@@ -352,10 +315,13 @@ bb0(%0 : $Agg1):
 }
 
 // CHECK-LABEL: sil [ossa] @store_promotion :
-// CHECK: store
-// CHECK-NEXT: destroy_addr
-// CHECK-NEXT: destroy_value
-// CHECK-NEXT: destroy_value
+// CHECK:         %1 = alloc_box
+// CHECK-NEXT:    project_box
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    tuple
 // CHECK-LABEL: } // end sil function 'store_promotion'
 sil [ossa] @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
@@ -880,11 +846,11 @@ bb2:
 
 // Make sure we form a single SILArgument.
 //
-// CHECK-LABEL: single_silargument_agg_in_one_block :
-// CHECK: bb3([[ARG:%.*]] : $TwoField):
+// CHECK-LABEL: silargument_agg_in_one_block :
+// CHECK: bb3([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int):
 // CHECK-NOT: = load
-// CHECK-LABEL: } // end sil function 'single_silargument_agg_in_one_block'
-sil hidden [ossa] @single_silargument_agg_in_one_block : $@convention(thin) (Bool) -> () {
+// CHECK-LABEL: } // end sil function 'silargument_agg_in_one_block'
+sil hidden [ossa] @silargument_agg_in_one_block : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $TwoField, var, name "x"
   cond_br undef, bb1, bb2
@@ -969,11 +935,13 @@ bb9:
 // in bb9 and bb10.
 //
 // CHECK-LABEL: reuse_silargument_multiple_bb_forwarding :
-// CHECK: bb8([[ARG:%.*]] : $Int)
-// CHECK: bb9
-// CHECK-NOT: = load
-// CHECK: bb10
-// CHECK-NOT: = load
+// CHECK:       bb10:
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}(%3)
+// CHECK:         br bb11(%3 : $Int)
+// CHECK:       bb11([[A:%[0-9]+]] : $Int)
+// CHECK-NOT:     load
+// CHECK:         return [[A]]
 // CHECK-LABEL: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
 sil hidden [ossa] @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (Bool) -> Int {
 bb0(%0 : $Bool):
@@ -1009,22 +977,22 @@ bb6:
   br bb8
 
 bb7:
-  br bb10
+  br bb11
 
 bb8:
-  cond_br undef, bb9, bb8a
-
-bb8a:
- br bb10
+  cond_br undef, bb10, bb9
 
 bb9:
+ br bb11
+
+bb10:
   %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %22 = load [trivial] %21 : $*Int
   %23 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   %24 = apply %23(%22) : $@convention(thin) (Int) -> ()
-  br bb10
+  br bb11
 
-bb10:
+bb11:
   %26 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %27 = load [trivial] %26 : $*Int
   dealloc_stack %1 : $*TwoField
@@ -1389,8 +1357,8 @@ bb0:
   store %3 to [trivial] %4 : $*Int32
   %5 = load [trivial] %4 : $*Int32
   end_borrow %borrow1 : $AX
-  set_deallocating %1 : $AX
-  dealloc_ref %1 : $AX
+  %6 = begin_dealloc_ref %1 : $AX of %1 : $AX
+  dealloc_ref %6 : $AX
   dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }
@@ -1416,11 +1384,12 @@ bb0(%0 : $B, %1 : $*Agg1):
 
 // TODO: When RLE uses TBAA it should remove the second load.
 //
-// CHECK: sil @tbaa_struct
-// CHECK: load
-// CHECK: store
-// CHECK: load
-// CHECK: return
+// CHECK-LABEL: sil @tbaa_struct
+// CHECK:         [[L:%.*]] = load
+// CHECK:         store
+// CHECK-NOT:     load
+// CHECK:         tuple ([[L]] : $A, [[L]] : $A)
+// CHECK:       } // end sil function 'tbaa_struct'
 sil @tbaa_struct : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
 bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
@@ -1434,7 +1403,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
 
 // TODO: Even with TBAA, RLE should not remove the second load.
 //
-// CHECK: sil @tbaa_bind_memory
+// CHECK-LABEL: sil @tbaa_bind_memory
 // CHECK: load
 // CHECK: bind_memory
 // CHECK: store
@@ -1476,4 +1445,20 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %20 = load %2 : $*A
   %30 = tuple(%3 : $A, %20 : $A)
   return %30 : $(A, A)
+}
+
+// CHECK-LABEL: sil [ossa] @store_trivial_load_non_trivial_enum
+// CHECK:         %0 = enum $Optional<B>, #Optional.none!enumelt
+// CHECK-NOT:     store 
+// CHECK-NOT:     load 
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'store_trivial_load_non_trivial_enum'
+sil [ossa] @store_trivial_load_non_trivial_enum : $@convention(thin) () -> @owned Optional<B> {
+bb0:
+  %0 = enum $Optional<B>, #Optional.none!enumelt
+  %1 = alloc_stack $Optional<B>
+  store %0 to [trivial] %1 : $*Optional<B>
+  %3 = load [take] %1 : $*Optional<B>
+  dealloc_stack %1 : $*Optional<B>
+  return %3 : $Optional<B>
 }

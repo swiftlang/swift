@@ -143,7 +143,7 @@ public:
 
   /// The instruction that began the first in-progress access to the storage
   /// location. Used for diagnostic purposes.
-  Optional<RecordedAccess> FirstAccess = None;
+  llvm::Optional<RecordedAccess> FirstAccess = llvm::None;
 
 public:
   /// Increment the count for given access.
@@ -169,7 +169,7 @@ public:
     // If all open accesses are now ended, forget the location of the
     // first access.
     if (Reads == 0 && NonReads == 0)
-      FirstAccess = None;
+      FirstAccess = llvm::None;
   }
 
   /// Returns true when there are any accesses to this location in progress.
@@ -246,11 +246,11 @@ class AccessInfo {
 public:
   // Returns the previous access when beginning an access of the given Kind will
   // result in a conflict with a previous access.
-  Optional<RecordedAccess>
+  llvm::Optional<RecordedAccess>
   conflictsWithAccess(SILAccessKind Kind, const IndexTrieNode *SubPath) const {
     auto I = findFirstSubPathWithConflict(Kind, SubPath);
     if (I == SubAccesses.end())
-      return None;
+      return llvm::None;
 
     return I->FirstAccess;
   }
@@ -541,13 +541,19 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
+  SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
+  SILModule &M = FirstAccess.getInstruction()->getModule();
+  TypeExpansionContext TypeExpansionCtx(
+      *FirstAccess.getInstruction()->getFunction());
+  SILType firstAccessType = AccessSummaryAnalysis::getSubPathType(
+      BaseType, MainAccess.getSubPath(), M, TypeExpansionCtx);
+  bool isMoveOnly = firstAccessType.isMoveOnly();
+
   if (const ValueDecl *VD = Storage.getDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
-    SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
-    SILModule &M = FirstAccess.getInstruction()->getModule();
-    std::string PathDescription = getPathDescription(
-        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M,
-        TypeExpansionContext(*FirstAccess.getInstruction()->getFunction()));
+    std::string PathDescription =
+        getPathDescription(VD->getBaseName(), BaseType, MainAccess.getSubPath(),
+                           M, TypeExpansionCtx);
 
     // Determine whether we can safely suggest replacing the violation with
     // a call to MutableCollection.swapAt().
@@ -562,18 +568,35 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
             CallsToSwap, Ctx, CallToReplace, Base, SwapIndex1, SwapIndex2);
     }
 
-    auto D =
-        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
-                 diag::exclusivity_access_required,
-                 PathDescription, AccessKindForMain, SuggestSwapAt);
-    D.highlight(RangeForMain);
-    if (SuggestSwapAt)
-      addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
-                     Ctx.SourceMgr);
+    if (isMoveOnly) {
+        auto D = diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                          diag::exclusivity_access_required_moveonly,
+                          PathDescription, AccessKindForMain);
+        D.highlight(RangeForMain);
+        if (SuggestSwapAt)
+        addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
+                       Ctx.SourceMgr);
+    } else {
+        auto D = diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                          diag::exclusivity_access_required, PathDescription,
+                          AccessKindForMain, SuggestSwapAt);
+        D.highlight(RangeForMain);
+        if (SuggestSwapAt)
+        addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
+                       Ctx.SourceMgr);
+    }
   } else {
-    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
-             diag::exclusivity_access_required_unknown_decl, AccessKindForMain)
-        .highlight(RangeForMain);
+    if (isMoveOnly) {
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required_unknown_decl_moveonly,
+                 AccessKindForMain)
+            .highlight(RangeForMain);
+    } else {
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required_unknown_decl,
+                 AccessKindForMain)
+            .highlight(RangeForMain);
+    }
   }
   diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
            diag::exclusivity_conflicting_access)
@@ -606,12 +629,12 @@ static llvm::cl::opt<bool> ShouldAssertOnFailure(
 
 /// If making an access of the given kind at the given subpath would
 /// would conflict, returns the first recorded access it would conflict
-/// with. Otherwise, returns None.
-static Optional<RecordedAccess>
-shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
+/// with. Otherwise, returns llvm::None.
+static llvm::Optional<RecordedAccess>
+shouldReportAccess(const AccessInfo &Info, swift::SILAccessKind Kind,
                    const IndexTrieNode *SubPath) {
   if (Info.alreadyHadConflict())
-    return None;
+    return llvm::None;
 
   auto result = Info.conflictsWithAccess(Kind, SubPath);
   if (ShouldAssertOnFailure && result.has_value())
@@ -627,12 +650,12 @@ shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
 /// this will return the conflict for the aggregate. This approach guarantees
 /// determinism and makes it more  likely that we'll diagnose the most helpful
 /// conflict.
-static Optional<ConflictingAccess>
+static llvm::Optional<ConflictingAccess>
 findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
                               const AccessStorage &AccessStorage,
                               const AccessInfo &InProgressInfo) {
-  Optional<RecordedAccess> BestInProgressAccess;
-  Optional<RecordedAccess> BestArgAccess;
+  llvm::Optional<RecordedAccess> BestInProgressAccess;
+  llvm::Optional<RecordedAccess> BestArgAccess;
 
   for (const auto &MapPair : AS.getSubAccesses()) {
     const IndexTrieNode *SubPath = MapPair.getFirst();
@@ -653,7 +676,7 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
   }
 
   if (!BestArgAccess)
-    return None;
+    return llvm::None;
 
   return ConflictingAccess(AccessStorage, *BestInProgressAccess,
                            *BestArgAccess);
@@ -898,7 +921,7 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     return;
   }
 
-  // Sanity check to make sure entries are properly removed.
+  // Soundness check to make sure entries are properly removed.
   assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
          && "Entries were not properly removed?!");
 }
@@ -913,7 +936,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
   //      accesses must have begun in the same order on all edges. This ensures
   //      consistent diagnostics across changes to the exploration of the CFG.
   //    - On return from a function there are no in-progress accesses. This
-  //      enables a sanity check for lean analysis state at function exit.
+  //      enables a soundness check for lean analysis state at function exit.
   //    - Each end_access instruction corresponds to exactly one begin access
   //      instruction. (This is encoded in the EndAccessInst itself)
   //    - begin_access arguments cannot be basic block arguments.
@@ -927,13 +950,13 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 
   // For each basic block, track the stack of current accesses on
   // exit from that block.
-  llvm::SmallDenseMap<SILBasicBlock *, Optional<StorageMap>, 32>
+  llvm::SmallDenseMap<SILBasicBlock *, llvm::Optional<StorageMap>, 32>
       BlockOutAccesses;
 
   BlockOutAccesses[Fn.getEntryBlock()] = StorageMap();
 
   for (auto *BB : PO->getReversePostOrder()) {
-    Optional<StorageMap> &BBState = BlockOutAccesses[BB];
+    llvm::Optional<StorageMap> &BBState = BlockOutAccesses[BB];
 
     // Because we use a reverse post-order traversal, unless this is the entry
     // at least one of its predecessors must have been reached. Use the out
@@ -944,7 +967,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
       if (it == BlockOutAccesses.end())
         continue;
 
-      const Optional<StorageMap> &PredAccesses = it->getSecond();
+      const llvm::Optional<StorageMap> &PredAccesses = it->getSecond();
       if (PredAccesses) {
         BBState = PredAccesses;
         break;
@@ -954,7 +977,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
     // The in-progress accesses for the current program point, represented
     // as map from storage locations to the accesses in progress for the
     // location.
-    State.Accesses = BBState.getPointer();
+    State.Accesses = &*BBState;
     for (auto &I : *BB)
       checkForViolationsAtInstruction(I, State);
   }

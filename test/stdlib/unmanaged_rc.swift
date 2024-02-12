@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -O | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 // Make sure that when we invoke Unmanaged._withUnsafeGuaranteedRef, we do not
 // have any ref count overhead.
@@ -28,7 +29,7 @@ public func myPrint(_ k: Klass) { print(k) }
 // OPT: bb0([[UNMANAGED:%.*]] :
 // OPT:   [[UNMANAGED_REF:%.*]] = struct_extract [[UNMANAGED]]
 // OPT:   [[REF:%.*]] = unmanaged_to_ref [[UNMANAGED_REF]]
-// OPT:   [[REF_ELT_ADDR:%.*]] = ref_element_addr [[REF]] : $KlassContainer, #KlassContainer.k
+// OPT:   [[REF_ELT_ADDR:%.*]] = ref_element_addr [immutable] [[REF]] : $KlassContainer, #KlassContainer.k
 // OPT:   [[VALUE:%.*]] = load [[REF_ELT_ADDR]]
 // OPT:   apply {{%.*}}([[VALUE]])
 // OPT: } // end sil function '$s12unmanaged_rc12useUnmanagedyys0D0VyAA14KlassContainerCGF'

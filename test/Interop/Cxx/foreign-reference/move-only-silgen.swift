@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
 //
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
@@ -30,6 +30,6 @@ public func test() {
   _ = x.test()
 }
 
-// CHECK-LABEL: sil [clang MoveOnly.create] @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.create] @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
 
-// CHECK-LABEL: sil [clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32

@@ -21,23 +21,19 @@ extension HasFooGeneric {
   }
 }
 
-// SWIFT4_SELF_DOT_1: Begin completions
 // SWIFT4_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      foo[#Int#]; name=foo
 // SWIFT4_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      foo[#String#]; name=foo
 // SWIFT4_SELF_DOT_1-NOT: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // SWIFT4_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      bar[#String#]; name=bar
-// SWIFT4_SELF_DOT_1: End completions
 
 // But in Swift 5 mode, properties from this module currently always shadow
 // properties from the other module – therefore meaning that the properties from
 // the other module never show up in the overload set.
 // FIX-ME: It seems reasonable for both to show up in the overload set.
-// SWIFT5_SELF_DOT_1: Begin completions
 // SWIFT5_SELF_DOT_1-NOT: Decl[InstanceVar]/CurrNominal:      foo[#Int#]; name=foo
 // SWIFT5_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      foo[#String#]; name=foo
 // SWIFT5_SELF_DOT_1-NOT: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // SWIFT5_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:      bar[#String#]; name=bar
-// SWIFT5_SELF_DOT_1: End completions
 
 // For non-generic types, the variable overload signature was always the
 // null type, so `foo/bar: String` shadows `foo/bar: Int`.
@@ -49,19 +45,15 @@ extension HasFooNonGeneric {
   }
 }
 
-// SWIFT4_SELF_DOT_2: Begin completions
 // SWIFT4_SELF_DOT_2-NOT: Decl[InstanceVar]/CurrNominal:      foo[#Int#]; name=foo
 // SWIFT4_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      foo[#String#]; name=foo
 // SWIFT4_SELF_DOT_2-NOT: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // SWIFT4_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      bar[#String#]; name=bar
-// SWIFT4_SELF_DOT_2: End completions
 
 // Again, in Swift 5 mode, we currently consistently shadow the properties from
 // the other module.
 // FIX-ME: It seems reasonable to not shadow them.
-// SWIFT5_SELF_DOT_2: Begin completions
 // SWIFT5_SELF_DOT_2-NOT: Decl[InstanceVar]/CurrNominal:      foo[#Int#]; name=foo
 // SWIFT5_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      foo[#String#]; name=foo
 // SWIFT5_SELF_DOT_2-NOT: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // SWIFT5_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      bar[#String#]; name=bar
-// SWIFT5_SELF_DOT_2: End completions

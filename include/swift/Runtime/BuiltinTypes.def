@@ -62,6 +62,7 @@ BUILTIN_POINTER_TYPE(BO, "Builtin.UnknownObject")
 
 BUILTIN_POINTER_TYPE(Bc, "Builtin.RawUnsafeContinuation")
 BUILTIN_TYPE(BD, "Builtin.DefaultActorStorage")
+BUILTIN_TYPE(Bd, "Builtin.NonDefaultDistributedActorStorage")
 BUILTIN_TYPE(Be, "Builtin.Executor")
 BUILTIN_POINTER_TYPE(Bj, "Builtin.Job")
 

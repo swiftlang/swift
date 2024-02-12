@@ -1,5 +1,5 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=STRINGLITERAL | %FileCheck %s
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NORMAL | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 protocol View {}
 
@@ -25,14 +25,13 @@ struct Value {
 func test(values: [Value]) {
   _ = ForEach(values) { value in
     Text("foobar")
-    Text("value \(value.#^STRINGLITERAL^#)")
+    Text("value \(value.#^STRINGLITERAL?check=CHECK^#)")
   }
   _ = ForEach(values) { value in
     Text("foobar")
-    Text(value.#^NORMAL^#)
+    Text(value.#^NORMAL?check=CHECK^#)
   }
 }
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#Value#];
 // CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: name[#String#];
-// CHECK: End completions

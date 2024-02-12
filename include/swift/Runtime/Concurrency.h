@@ -39,12 +39,10 @@
 #endif
 
 // Does the runtime integrate with libdispatch?
-#ifndef SWIFT_CONCURRENCY_ENABLE_DISPATCH
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR || SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
+#if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH SWIFT_CONCURRENCY_USES_DISPATCH
 #else
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 1
-#endif
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
 #endif
 
 // Does the runtime provide priority escalation support?
@@ -530,7 +528,7 @@ void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
 /// func swift_taskGroup_hasTaskGroupRecord()
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_hasTaskGroupRecord();
+bool swift_taskGroup_hasTaskGroupRecord(); // FIXME: not used? we have swift_task_hasTaskGroupStatusRecord
 
 /// Signifies whether the current task is in the middle of executing the
 /// operation block of a `with(Throwing)TaskGroup(...) { <operation> }`.
@@ -540,6 +538,29 @@ bool swift_taskGroup_hasTaskGroupRecord();
 /// out-life the scope of a task-local value binding.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
+
+/// Push an executor preference onto the current task.
+/// The pushed reference does not keep the executor alive, and it is the
+/// responsibility of the end user to ensure that the task executor reference
+/// remains valid throughout the time it may be used by any task.
+///
+/// Runtime availability: Swift 9999.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskExecutorPreferenceStatusRecord*
+swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
+
+/// Remove a single task executor preference record from the current task.
+///
+/// Must be passed the record intended to be removed (returned by
+/// `swift_task_pushTaskExecutorPreference`).
+///
+/// Failure to remove the expected record should result in a runtime crash as it
+/// signals a bug in record handling by the concurrency library -- a record push
+/// must always be paired with a record pop.
+///
+/// Runtime availability: Swift 9999.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
@@ -660,7 +681,7 @@ void swift_task_localsCopyTo(AsyncTask* target);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                        TaskContinuationFunction *resumeFunction,
-                       ExecutorRef newExecutor);
+                       SerialExecutorRef newExecutor);
 
 /// Mark a task for enqueue on a new executor and then enqueue it.
 ///
@@ -671,7 +692,7 @@ void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
 /// synchronously when possible.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
-swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
+swift_task_enqueueTaskOnExecutor(AsyncTask *task, SerialExecutorRef executor);
 
 /// Enqueue the given job to run asynchronously on the given executor.
 ///
@@ -681,7 +702,7 @@ swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
 /// Generally you should call swift_task_switch to switch execution
 /// synchronously when possible.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueue(Job *job, ExecutorRef executor);
+void swift_task_enqueue(Job *job, SerialExecutorRef executor);
 
 /// Enqueue the given job to run asynchronously on the global
 /// execution pool.
@@ -714,6 +735,14 @@ bool swift_task_isOnExecutor(
     HeapObject * executor,
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_executor_isComplexEquality(SerialExecutorRef ref);
+
+/// Return the 64bit TaskID (if the job is an AsyncTask),
+/// or the 32bits of the job Id otherwise.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getJobTaskId(Job *job);
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
@@ -770,6 +799,19 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original);
 
+/// A hook to override the entrypoint to the main runloop used to drive the
+/// concurrency runtime and drain the main queue. This function must not return.
+/// Note: If the hook is wrapping the original function and the `compatOverride`
+///       is passed in, the `original` function pointer must be passed into the
+///       compatibility override function as the original function.
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
+    swift_task_asyncMainDrainQueue_original original);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride);
+
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_initialize(DefaultActor *actor);
@@ -786,7 +828,11 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
-/// Initialize the runtime storage for a distributed remote actor.
+/// Initialize the runtime storage for a non-default distributed actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
+
+/// Create and initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
@@ -808,7 +854,7 @@ void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
 /// Check if the actor is a distributed 'remote' actor instance.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_distributed_actor_is_remote(DefaultActor *actor);
+bool swift_distributed_actor_is_remote(HeapObject *actor);
 
 /// Do a primitive suspension of the current task, as if part of
 /// a continuation, although this does not provide any of the
@@ -861,7 +907,24 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_job_run(Job *job, ExecutorRef executor);
+void swift_job_run(Job *job, SerialExecutorRef executor);
+
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+///
+/// Runtime availability: Swift 9999
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_run_on_task_executor(Job *job,
+                                    TaskExecutorRef executor);
+
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+///
+/// Runtime availability: Swift 9999
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_run_on_serial_and_task_executor(Job *job,
+                                    SerialExecutorRef serialExecutor,
+                                    TaskExecutorRef taskExecutor);
 
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -869,22 +932,44 @@ AsyncTask *swift_task_getCurrent(void);
 
 /// Return the current thread's active executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getCurrentExecutor(void);
+SerialExecutorRef swift_task_getCurrentExecutor(void);
 
 /// Return the main-actor executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getMainExecutor(void);
+SerialExecutorRef swift_task_getMainExecutor(void);
+
+/// Return the preferred task executor of the current task,
+/// or ``TaskExecutorRef::undefined()`` if no preference.
+///
+/// A stored preference may be `undefined` explicitly,
+/// which is semantically equivalent to having no preference.
+///
+/// The returned reference must be treated carefully,
+/// because it is *unmanaged*, meaning that the fact
+/// that the task "has" this preference does not imply its lifetime.
+///
+/// Developers who use task executor preference MUST guarantee
+/// their lifetime exceeds any use of such executor. For example,
+/// they should be created as "forever" alive singletons, or otherwise
+/// guarantee their lifetime extends beyond all potential uses of them by tasks.
+///
+/// Runtime availability: Swift 9999
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_isCurrentExecutor(ExecutorRef executor);
+bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
-    uintptr_t line, ExecutorRef executor);
+    uintptr_t line, SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_startOnMainActor(AsyncTask* job);
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 

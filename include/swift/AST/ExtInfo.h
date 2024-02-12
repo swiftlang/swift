@@ -21,8 +21,9 @@
 #define SWIFT_EXTINFO_H
 
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/LifetimeDependence.h"
 
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -37,6 +38,7 @@ namespace swift {
 class AnyFunctionType;
 class ASTExtInfo;
 class ASTExtInfoBuilder;
+class ClangModuleLoader;
 class FunctionType;
 class SILExtInfo;
 class SILExtInfoBuilder;
@@ -45,6 +47,78 @@ enum class SILFunctionTypeRepresentation : uint8_t;
 } // namespace swift
 
 namespace swift {
+
+/// The formal isolation of a function type.
+class FunctionTypeIsolation {
+public:
+  enum class Kind : uint8_t {
+    /// The function is not isolated.
+    NonIsolated,
+
+    /// The function is isolated to a global actor.
+    GlobalActor,
+
+    /// The function has an isolated parameter; which one is indicated in
+    /// the parameter list.
+    Parameter,
+
+    /// The function's isolation is statically erased with @isolated(any).
+    Erased,
+  };
+
+  static constexpr size_t NumBits = 3; // future-proof this slightly
+  static constexpr size_t Mask = (1 << NumBits) - 1;
+
+private:
+  llvm::PointerIntPair<Type, NumBits, Kind> value;
+
+  FunctionTypeIsolation(Kind kind, Type type = Type()) : value(type, kind) {}
+
+public:
+  static FunctionTypeIsolation forNonIsolated() {
+    return { Kind::NonIsolated };
+  }
+  static FunctionTypeIsolation forGlobalActor(Type type) {
+    assert(type && "creating global actor isolation without an actor type");
+    return { Kind::GlobalActor, type };
+  }
+  static FunctionTypeIsolation forParameter() {
+    return { Kind::Parameter };
+  }
+  static FunctionTypeIsolation forErased() {
+    return { Kind::Erased };
+  }
+
+  Kind getKind() const { return value.getInt(); }
+  bool isNonIsolated() const {
+    return getKind() == Kind::NonIsolated;
+  }
+  bool isGlobalActor() const {
+    return getKind() == Kind::GlobalActor;
+  }
+  Type getGlobalActorType() const {
+    assert(getKind() == Kind::GlobalActor);
+    return value.getPointer();
+  }
+  bool isParameter() const {
+    return getKind() == Kind::Parameter;
+  }
+  bool isErased() const {
+    return getKind() == Kind::Erased;
+  }
+
+  // The opaque accessors below are just for the benefit of ExtInfoBuilder,
+  // which finds it convenient to break down the type separately.  Normal
+  // clients should use the accessors above.
+
+  Type getOpaqueType() const {
+    return value.getPointer();
+  }
+
+  static FunctionTypeIsolation fromOpaqueValues(Kind kind, Type type) {
+    return FunctionTypeIsolation(kind, type);
+  }
+};
 
 // MARK: - ClangTypeInfo
 /// Wrapper class for storing a clang::Type in an (AST|SIL)ExtInfo.
@@ -97,9 +171,9 @@ struct UnexpectedClangTypeError {
   const Kind errorKind;
   const clang::Type *type;
 
-  static Optional<UnexpectedClangTypeError> checkClangType(
-    SILFunctionTypeRepresentation fnRep, const clang::Type *type,
-    bool expectNonnullForCOrBlock, bool expectCanonical);
+  static llvm::Optional<UnexpectedClangTypeError>
+  checkClangType(SILFunctionTypeRepresentation fnRep, const clang::Type *type,
+                 bool expectNonnullForCOrBlock, bool expectCanonical);
 
   void dump();
 };
@@ -172,6 +246,15 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   /// constructor). Except for
   /// handling the "this" argument, has the same behavior as "CFunctionPointer".
   CXXMethod,
+
+  /// A KeyPath accessor function, which is thin and also uses the variadic
+  /// length generic components serialization in trailing buffer.
+  /// Each representation has a different convention for which parameters
+  /// have serialized generic type info.
+  KeyPathAccessorGetter,
+  KeyPathAccessorSetter,
+  KeyPathAccessorEquals,
+  KeyPathAccessorHash,
 };
 
 /// Returns true if the function with this convention doesn't carry a context.
@@ -202,6 +285,10 @@ isThinRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::CXXMethod:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return true;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -213,6 +300,31 @@ constexpr bool
 isThickRepresentation(Repr repr) {
   return !isThinRepresentation(repr);
 }
+
+/// Returns true if the function with this convention receives generic arguments
+/// from KeyPath argument buffer.
+constexpr bool
+isKeyPathAccessorRepresentation(SILFunctionTypeRepresentation rep) {
+  switch (rep) {
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
+      return true;
+    case SILFunctionTypeRepresentation::Thick:
+    case SILFunctionTypeRepresentation::Block:
+    case SILFunctionTypeRepresentation::Thin:
+    case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::CXXMethod:
+      return false;
+  }
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
+}
+
 
 constexpr SILFunctionTypeRepresentation
 convertRepresentation(FunctionTypeRepresentation rep) {
@@ -229,7 +341,7 @@ convertRepresentation(FunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled FunctionTypeRepresentation!");
 }
 
-inline Optional<FunctionTypeRepresentation>
+inline llvm::Optional<FunctionTypeRepresentation>
 convertRepresentation(SILFunctionTypeRepresentation rep) {
   switch (rep) {
   case SILFunctionTypeRepresentation::Thick:
@@ -245,7 +357,11 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
-    return None;
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
+    return llvm::None;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation!");
 }
@@ -264,6 +380,10 @@ constexpr bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return true;
   }
 
@@ -285,6 +405,10 @@ template <typename Repr> constexpr bool shouldStoreClangType(Repr repr) {
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return false;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation.");
@@ -301,8 +425,8 @@ class ASTExtInfoBuilder {
   // If bits are added or removed, then TypeBase::NumAFTExtInfoBits
   // and NumMaskBits must be updated, and they must match.
   //
-  //   |representation|noEscape|concurrent|async|throws|differentiability|
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  |     8 .. 10    |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability|
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -310,46 +434,65 @@ class ASTExtInfoBuilder {
     SendableMask = 1 << 5,
     AsyncMask = 1 << 6,
     ThrowsMask = 1 << 7,
-    DifferentiabilityMaskOffset = 8,
+    IsolationMaskOffset = 8,
+    IsolationMask = 0x7 << IsolationMaskOffset,
+    DifferentiabilityMaskOffset = 11,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
-    NumMaskBits = 11
+    NumMaskBits = 14
   };
+
+  static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
 
   unsigned bits; // Naturally sized for speed.
 
   ClangTypeInfo clangTypeInfo;
+
   Type globalActor;
+  Type thrownError;
+
+  LifetimeDependenceInfo lifetimeDependenceInfo;
 
   using Representation = FunctionTypeRepresentation;
 
-  ASTExtInfoBuilder(
-      unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor
-  ) : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor) {}
+  ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
+                    Type globalActor, Type thrownError,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
+        thrownError(thrownError),
+        lifetimeDependenceInfo(lifetimeDependenceInfo) {
+    assert(isThrowing() || !thrownError);
+    assert(hasGlobalActorFromBits(bits) == !globalActor.isNull());
+  }
 
 public:
   /// An ExtInfoBuilder for a typical Swift function: @convention(swift),
   /// @escaping, non-throwing, non-differentiable.
   ASTExtInfoBuilder()
-      : ASTExtInfoBuilder(Representation::Swift, false, false,
+      : ASTExtInfoBuilder(Representation::Swift, false, false, Type(),
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          FunctionTypeIsolation::forNonIsolated(),
+                          LifetimeDependenceInfo()) {}
 
   // Constructor for polymorphic type.
-  ASTExtInfoBuilder(Representation rep, bool throws)
-      : ASTExtInfoBuilder(rep, false, throws,
+  ASTExtInfoBuilder(Representation rep, bool throws, Type thrownError)
+      : ASTExtInfoBuilder(rep, false, throws, thrownError,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          FunctionTypeIsolation::forNonIsolated(),
+                          LifetimeDependenceInfo()) {}
 
   // Constructor with no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
-                    DifferentiabilityKind diffKind, const clang::Type *type,
-                    Type globalActor)
+                    Type thrownError, DifferentiabilityKind diffKind,
+                    const clang::Type *type, FunctionTypeIsolation isolation,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
                 (throws ? ThrowsMask : 0) |
                 (((unsigned)diffKind << DifferentiabilityMaskOffset) &
-                 DifferentiabilityMask),
-            ClangTypeInfo(type), globalActor) {}
+                 DifferentiabilityMask) |
+                (unsigned(isolation.getKind()) << IsolationMaskOffset),
+            ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
+            lifetimeDependenceInfo) {}
 
   void checkInvariants() const;
 
@@ -387,6 +530,31 @@ public:
   }
 
   Type getGlobalActor() const { return globalActor; }
+  Type getThrownError() const { return thrownError; }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return lifetimeDependenceInfo;
+  }
+
+  FunctionTypeIsolation::Kind getIsolationKind() const {
+    return getIsolationKindFromBits(bits);
+  }
+  static FunctionTypeIsolation::Kind getIsolationKindFromBits(unsigned bits) {
+    return FunctionTypeIsolation::Kind(
+             (bits & IsolationMask) >> IsolationMaskOffset);
+  }
+  bool isIsolationStaticallyErased() const {
+    return getIsolationKind() == FunctionTypeIsolation::Kind::Erased;
+  }
+  static bool hasGlobalActorFromBits(unsigned bits) {
+    return getIsolationKindFromBits(bits)
+             == FunctionTypeIsolation::Kind::GlobalActor;
+  }
+
+  FunctionTypeIsolation getIsolation() const {
+    return FunctionTypeIsolation::fromOpaqueValues(getIsolationKind(),
+                                                   globalActor);
+  }
 
   constexpr bool hasSelfParam() const {
     switch (getSILRepresentation()) {
@@ -395,6 +563,10 @@ public:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
       return false;
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Method:
@@ -412,48 +584,54 @@ public:
 
   // Note that we don't have setters. That is by design, use
   // the following with methods instead of mutating these objects.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withRepresentation(Representation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor);
+                             globalActor, thrownError, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
-    return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
-                                      : (bits & ~NoEscapeMask),
-                             clangTypeInfo, globalActor);
+    return ASTExtInfoBuilder(
+        noEscape ? (bits | NoEscapeMask) : (bits & ~NoEscapeMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
-    return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
-                                        : (bits & ~SendableMask),
-                             clangTypeInfo, globalActor);
+    return ASTExtInfoBuilder(
+        concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
-    return ASTExtInfoBuilder(async ? (bits | AsyncMask)
-                                   : (bits & ~AsyncMask),
-                             clangTypeInfo, globalActor);
+    return ASTExtInfoBuilder(async ? (bits | AsyncMask) : (bits & ~AsyncMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
-  ASTExtInfoBuilder withThrows(bool throws = true) const {
+  [[nodiscard]]
+  ASTExtInfoBuilder withThrows(bool throws, Type thrownError) const {
+    assert(throws || !thrownError);
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor);
+        globalActor, thrownError, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
+  ASTExtInfoBuilder withThrows() const {
+    return withThrows(true, Type());
+  }
+  [[nodiscard]]
   ASTExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return ASTExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo, globalActor);
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor);
+    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
+                             thrownError, lifetimeDependenceInfo);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -461,30 +639,45 @@ public:
   /// SIL type lowering transiently generates AST function types with SIL
   /// representations. However, they shouldn't persist in the AST, and
   /// don't need to be parsed, printed, or serialized.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder
   withSILRepresentation(SILFunctionTypeRepresentation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor);
+                             globalActor, thrownError, lifetimeDependenceInfo);
   }
 
-  LLVM_NODISCARD
-  ASTExtInfoBuilder withGlobalActor(Type globalActor) const {
-    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor);
+  [[nodiscard]]
+  ASTExtInfoBuilder withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             lifetimeDependenceInfo);
+  }
+
+  [[nodiscard]]
+  ASTExtInfoBuilder withIsolation(FunctionTypeIsolation isolation) const {
+    return ASTExtInfoBuilder(
+             (bits & ~IsolationMask)
+                | (unsigned(isolation.getKind()) << IsolationMaskOffset),
+             clangTypeInfo, isolation.getOpaqueType(), thrownError,
+             lifetimeDependenceInfo);
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddInteger(bits);
+    ID.AddPointer(clangTypeInfo.getType());
+    ID.AddPointer(globalActor.getPointer());
+    ID.AddPointer(thrownError.getPointer());
+    lifetimeDependenceInfo.Profile(ID);
   }
 
   bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
-      (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
-      globalActor.getPointer() == other.globalActor.getPointer();
-  }
-
-  constexpr std::tuple<unsigned, const void *, const void *>
-  getFuncAttrKey() const {
-    return std::make_tuple(
-        bits, clangTypeInfo.getType(), globalActor.getPointer());
+           (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
+           globalActor.getPointer() == other.globalActor.getPointer() &&
+           thrownError.getPointer() == other.thrownError.getPointer() &&
+           lifetimeDependenceInfo == other.lifetimeDependenceInfo;
   }
 }; // end ASTExtInfoBuilder
 
@@ -505,8 +698,10 @@ class ASTExtInfo {
   // Only for use by ASTExtInfoBuilder::build. Don't use it elsewhere!
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
 
-  ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor)
-      : builder(bits, clangTypeInfo, globalActor) {
+  ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
+             Type thrownError, LifetimeDependenceInfo lifetimeDependenceInfo)
+      : builder(bits, clangTypeInfo, globalActor, thrownError,
+                lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -551,11 +746,18 @@ public:
   constexpr bool hasContext() const { return builder.hasContext(); }
 
   Type getGlobalActor() const { return builder.getGlobalActor(); }
+  Type getThrownError() const { return builder.getThrownError(); }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return builder.getLifetimeDependenceInfo();
+  }
+
+  FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
 
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withRepresentation(ASTExtInfoBuilder::Representation rep) const {
     return builder.withRepresentation(rep).build();
   }
@@ -563,7 +765,7 @@ public:
   /// Helper method for changing only the noEscape field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withNoEscape for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
   }
@@ -571,7 +773,7 @@ public:
   /// Helper method for changing only the concurrent field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withConcurrent for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withConcurrent(bool concurrent = true) const {
     return builder.withConcurrent(concurrent).build();
   }
@@ -579,31 +781,54 @@ public:
   /// Helper method for changing only the throws field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withThrows for chaining.
-  LLVM_NODISCARD
-  ASTExtInfo withThrows(bool throws = true) const {
-    return builder.withThrows(throws).build();
+  [[nodiscard]]
+  ASTExtInfo withThrows(bool throws, Type thrownError) const {
+    return builder.withThrows(throws, thrownError).build();
+  }
+
+  /// Helper method for changing only the throws field.
+  ///
+  /// Prefer using \c ASTExtInfoBuilder::withThrows for chaining.
+  [[nodiscard]]
+  ASTExtInfo withThrows() const {
+    return builder.withThrows(true, Type()).build();
   }
 
   /// Helper method for changing only the async field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withAsync for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withAsync(bool async = true) const {
     return builder.withAsync(async).build();
   }
 
-  LLVM_NODISCARD
-  ASTExtInfo withGlobalActor(Type globalActor) const {
-    return builder.withGlobalActor(globalActor).build();
+  [[nodiscard]]
+  ASTExtInfo withIsolation(FunctionTypeIsolation isolation) const {
+    return builder.withIsolation(isolation).build();
   }
+
+  [[nodiscard]]
+  ASTExtInfo withoutIsolation() const {
+    return builder.withIsolation(FunctionTypeIsolation::forNonIsolated())
+      .build();
+  }
+
+  [[nodiscard]]
+  ASTExtInfo withGlobalActor(Type globalActor) const {
+    return builder.withIsolation(
+             FunctionTypeIsolation::forGlobalActor(globalActor))
+      .build();
+  }
+
+  [[nodiscard]] ASTExtInfo withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return builder.withLifetimeDependenceInfo(lifetimeDependenceInfo).build();
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
   bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);
-  }
-
-  constexpr std::tuple<unsigned, const void *, const void *>
-  getFuncAttrKey() const {
-    return builder.getFuncAttrKey();
   }
 }; // end ASTExtInfo
 
@@ -633,6 +858,10 @@ SILFunctionLanguage getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return SILFunctionLanguage::Swift;
   }
 
@@ -650,38 +879,46 @@ class SILExtInfoBuilder {
   // If bits are added or removed, then TypeBase::SILFunctionTypeBits
   // and NumMaskBits must be updated, and they must match.
 
-  //   |representation|pseudogeneric| noescape | concurrent | async |differentiability|
-  //   |    0 .. 3    |      4      |     5    |     6      |   7   |     8 .. 10     |
+  //   |representation|pseudogeneric| noescape | concurrent | async
+  //   |    0 .. 4    |      5      |     6    |     7      |   8
+  //   |differentiability|unimplementable|
+  //   |     9 .. 11     |      12       |
   //
   enum : unsigned {
-    RepresentationMask = 0xF << 0,
-    PseudogenericMask = 1 << 4,
-    NoEscapeMask = 1 << 5,
-    SendableMask = 1 << 6,
-    AsyncMask = 1 << 7,
-    DifferentiabilityMaskOffset = 8,
+    RepresentationMask = 0x1F << 0,
+    PseudogenericMask = 1 << 5,
+    NoEscapeMask = 1 << 6,
+    SendableMask = 1 << 7,
+    AsyncMask = 1 << 8,
+    DifferentiabilityMaskOffset = 9,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
-    NumMaskBits = 11
+    UnimplementableMask = 1 << 12,
+    NumMaskBits = 13
   };
 
   unsigned bits; // Naturally sized for speed.
 
   ClangTypeInfo clangTypeInfo;
 
+  LifetimeDependenceInfo lifetimeDependenceInfo;
+
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
 
-  SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : bits(bits), clangTypeInfo(clangTypeInfo.getCanonical()) {}
+  SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : bits(bits), clangTypeInfo(clangTypeInfo.getCanonical()),
+        lifetimeDependenceInfo(lifetimeDependenceInfo) {}
 
   static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
                                      bool isNoEscape, bool isSendable,
-                                     bool isAsync,
+                                     bool isAsync, bool isUnimplementable,
                                      DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) |
            (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
+           (isUnimplementable ? UnimplementableMask : 0) |
            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
             DifferentiabilityMask);
   }
@@ -691,24 +928,26 @@ public:
   /// non-pseudogeneric, non-differentiable.
   SILExtInfoBuilder()
       : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
-                                   false, false, false,
+                                   false, false, false, false,
                                    DifferentiabilityKind::NonDifferentiable),
-                          ClangTypeInfo(nullptr)) {}
+                          ClangTypeInfo(nullptr), LifetimeDependenceInfo()) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
-                    bool isSendable, bool isAsync,
-                    DifferentiabilityKind diffKind, const clang::Type *type)
-      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape,
-                                   isSendable, isAsync, diffKind),
-                          ClangTypeInfo(type)) {}
+                    bool isSendable, bool isAsync, bool isUnimplementable,
+                    DifferentiabilityKind diffKind, const clang::Type *type,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
+                                   isAsync, isUnimplementable, diffKind),
+                          ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
       : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
                                    info.isNoEscape(), info.isSendable(),
-                                   info.isAsync(),
+                                   info.isAsync(), /*unimplementable*/ false,
                                    info.getDifferentiabilityKind()),
-                          info.getClangTypeInfo()) {}
+                          info.getClangTypeInfo(),
+                          info.getLifetimeDependenceInfo()) {}
 
   void checkInvariants() const;
 
@@ -745,8 +984,16 @@ public:
            DifferentiabilityKind::NonDifferentiable;
   }
 
+  constexpr bool isUnimplementable() const {
+    return bits & UnimplementableMask;
+  }
+
   /// Get the underlying ClangTypeInfo value.
   ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return lifetimeDependenceInfo;
+  }
 
   constexpr bool hasSelfParam() const {
     switch (getRepresentation()) {
@@ -755,6 +1002,10 @@ public:
     case Representation::Thin:
     case Representation::CFunctionPointer:
     case Representation::Closure:
+    case Representation::KeyPathAccessorGetter:
+    case Representation::KeyPathAccessorSetter:
+    case Representation::KeyPathAccessorEquals:
+    case Representation::KeyPathAccessorHash:
       return false;
     case Representation::ObjCMethod:
     case Representation::Method:
@@ -778,6 +1029,10 @@ public:
     case Representation::WitnessMethod:
     case Representation::Closure:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case Representation::KeyPathAccessorGetter:
+    case Representation::KeyPathAccessorSetter:
+    case Representation::KeyPathAccessorEquals:
+    case Representation::KeyPathAccessorHash:
       return false;
     }
     llvm_unreachable("Unhandled Representation in switch.");
@@ -785,55 +1040,69 @@ public:
 
   // Note that we don't have setters. That is by design, use
   // the following with methods instead of mutating these objects.
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withRepresentation(Representation rep) const {
     return SILExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
-                                                       : ClangTypeInfo());
+                                                       : ClangTypeInfo(),
+                             lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withIsPseudogeneric(bool isPseudogeneric = true) const {
     return SILExtInfoBuilder(isPseudogeneric ? (bits | PseudogenericMask)
                                              : (bits & ~PseudogenericMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return SILExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
-                                          : (bits & ~SendableMask),
-                             clangTypeInfo);
+                                        : (bits & ~SendableMask),
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withAsync(bool isAsync = true) const {
     return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
+  SILExtInfoBuilder withUnimplementable(bool isUnimplementable = true) const {
+    return SILExtInfoBuilder(isUnimplementable ? (bits | UnimplementableMask)
+                                               : (bits & ~UnimplementableMask),
+                             clangTypeInfo, lifetimeDependenceInfo);
+  }
+  [[nodiscard]]
   SILExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return SILExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo);
+        clangTypeInfo, lifetimeDependenceInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical());
+    return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical(),
+                             lifetimeDependenceInfo);
+  }
+  [[nodiscard]] SILExtInfoBuilder withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return SILExtInfoBuilder(bits, clangTypeInfo, lifetimeDependenceInfo);
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddInteger(bits);
+    ID.AddPointer(clangTypeInfo.getType());
+    lifetimeDependenceInfo.Profile(ID);
   }
 
   bool isEqualTo(SILExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
            (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
-  }
-
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
-    return std::make_pair(bits, clangTypeInfo.getType());
   }
 }; // end SILExtInfoBuilder
 
@@ -854,8 +1123,9 @@ class SILExtInfo {
   // Only for use by SILExtInfoBuilder::build. Don't use it elsewhere!
   SILExtInfo(SILExtInfoBuilder builder) : builder(builder) {}
 
-  SILExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : builder(bits, clangTypeInfo) {
+  SILExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo,
+             LifetimeDependenceInfo lifetimeDependenceInfo)
+      : builder(bits, clangTypeInfo, lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -872,8 +1142,9 @@ public:
   /// A default ExtInfo but with a Thin convention.
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
-                             false, false, false,
-                             DifferentiabilityKind::NonDifferentiable, nullptr)
+                             false, false, false, false,
+                             DifferentiabilityKind::NonDifferentiable, nullptr,
+                             LifetimeDependenceInfo())
         .build();
   }
 
@@ -900,6 +1171,10 @@ public:
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
+  constexpr bool isUnimplementable() const {
+    return builder.isUnimplementable();
+  }
+
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return builder.getDifferentiabilityKind();
   }
@@ -907,6 +1182,10 @@ public:
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
   ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return builder.getLifetimeDependenceInfo();
+  }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 
@@ -934,15 +1213,17 @@ public:
     return builder.withAsync(isAsync).build();
   }
 
+  SILExtInfo withUnimplementable(bool isUnimplementable = true) const {
+    return builder.withUnimplementable(isUnimplementable).build();
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
+
   bool isEqualTo(SILExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);
   }
 
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
-    return builder.getFuncAttrKey();
-  }
-
-  Optional<UnexpectedClangTypeError> checkClangType() const;
+  llvm::Optional<UnexpectedClangTypeError> checkClangType() const;
 };
 
 /// Helper function to obtain the useClangTypes parameter for checking equality

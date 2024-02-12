@@ -283,11 +283,23 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
   case OperandOwnership::EndBorrow:
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
 
-  case OperandOwnership::Reborrow:
+  case OperandOwnership::Reborrow: {
     if (!asImpl().handleInnerReborrow(borrowEnd))
       return false;
 
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
+  }
+  case OperandOwnership::DestroyingConsume: {
+    // partial_apply [on_stack] can introduce borrowing operand and can have
+    // destroy_value consumes.
+    auto *pai = dyn_cast<PartialApplyInst>(borrowEnd->get());
+    // TODO: When we have ForwardingInstruction abstraction, walk the use-def
+    // chain to ensure we have a partial_apply [on_stack] def.
+    assert(pai && pai->isOnStack() ||
+           ForwardingInstruction::get(
+               cast<SingleValueInstruction>(borrowEnd->get())));
+    return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
+  }
 
   default:
     llvm_unreachable("expected borrow scope end");
@@ -305,14 +317,11 @@ bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
   // Inner adjacent reborrows are considered inner borrow scopes.
   if (auto phi = SILArgument::asPhi(ssaDef)) {
     if (!visitInnerAdjacentPhis(phi, [&](SILArgument *innerPhi) {
-      // TODO: Remove this call to isGuaranteedForwarding.
-      // The phi itself should know if it is a reborrow.
-      if (isGuaranteedForwarding(innerPhi)) {
-        return visitGuaranteedUses(innerPhi);
-      } else {
-        return visitInnerAdjacentReborrow(innerPhi);
-      }
-    })) {
+          if (innerPhi->isGuaranteedForwarding()) {
+            return visitGuaranteedUses(innerPhi);
+          }
+          return visitInnerAdjacentReborrow(innerPhi);
+        })) {
       return false;
     }
   }
@@ -388,8 +397,9 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::BitwiseEscape:
-  case OperandOwnership::EndBorrow:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
+  case OperandOwnership::EndBorrow:
+    return handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding);
 
   case OperandOwnership::Reborrow:
     if (!asImpl().handleOuterReborrow(use))

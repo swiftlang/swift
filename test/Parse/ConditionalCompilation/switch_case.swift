@@ -137,7 +137,7 @@ func foo(x: E, intVal: Int) {
   }
 
   // Empty check.
-  switch intVal { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
+  switch intVal { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}
 #if NEVER
     case 1:
       break

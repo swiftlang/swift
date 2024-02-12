@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 class BaseClass {
   func returnSelf() -> Self {}
@@ -25,4 +25,3 @@ class DerivedClass: BaseClass {
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/Super:         returnSelf()[#Self#];
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithStaticSelf()[#Void#];
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithDynamicSelf()[#Self#];
-// COVARIANT_SELF_RETURN: End completions

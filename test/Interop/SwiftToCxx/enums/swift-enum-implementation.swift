@@ -4,6 +4,9 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Enums -enable-experimental-cxx-interop -emit-clang-header-path %t/enums-default.h
+// RUN: %FileCheck %s < %t/enums-default.h
+
 public enum E {
     case x(Double)
     case y(UnsafeRawPointer?)
@@ -23,6 +26,11 @@ public enum E {
     public func printSelf() {
         print("self")
     }
+}
+
+public enum E2 {
+    case foobar
+    case baz
 }
 
 public struct S {
@@ -116,7 +124,7 @@ public struct S {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int getTen() const SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void printSelf() const SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
 // CHECK-NEXT: private:
-// CHECK:        SWIFT_INLINE_THUNK char * _Nonnull _destructiveProjectEnumData() {
+// CHECK:        SWIFT_INLINE_THUNK char * _Nonnull _destructiveProjectEnumData() noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -128,7 +136,7 @@ public struct S {
 // CHECK-NEXT:     enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:     return _getOpaquePointer();
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void _destructiveInjectEnumTag(unsigned tag) {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void _destructiveInjectEnumTag(unsigned tag) noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -139,7 +147,7 @@ public struct S {
 // CHECK-NEXT:     const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:     enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK unsigned _getEnumTag() const {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK unsigned _getEnumTag() const noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -166,7 +174,16 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
-// CHECK:      namespace Enums __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Enums") {
+
+// CHECK: class SWIFT_SYMBOL({{.*}}) E2 final {
+// CHECK: SWIFT_INLINE_THUNK operator cases() const {
+// CHECK: }
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getHashValue() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: private:
+
+// CHECK:      namespace Enums SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        SWIFT_INLINE_THUNK E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
@@ -219,7 +236,7 @@ public struct S {
 // CHECK-NEXT:     alignas(E) unsigned char buffer[sizeof(E)];
 // CHECK-NEXT:     auto *thisCopy = new(buffer) E(*this);
 // CHECK-NEXT:     char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
-// CHECK-NEXT:     return swift::_impl::implClassFor<S>::type::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     return swift::_impl::implClassFor<S>::type::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:       swift::_impl::implClassFor<S>::type::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
@@ -268,7 +285,7 @@ public struct S {
 // CHECK-NEXT:     return *this == E::foobar;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::init() {
-// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, _impl::$s5Enums1EOACycfC());
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }

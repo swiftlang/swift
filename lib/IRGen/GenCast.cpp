@@ -125,7 +125,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // of the metatype value to the subclass's static metatype instance.
   //
   // %1 = value_metatype $Super.Type, %0 : $A
-  // checked_cast_br [exact] %1 : $Super.Type to $Sub.Type
+  // checked_cast_br [exact] Super.Type in %1 : $Super.Type to $Sub.Type
   // =>
   // icmp eq %1, @metadata.Sub
   llvm::Value *objectMetadata = isMetatype ? from :
@@ -530,14 +530,10 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 
 
 /// Emit a checked cast to a protocol or protocol composition.
-void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
-                                  llvm::Value *value,
-                                  SILType srcType,
-                                  SILType destType,
-                                  CheckedCastMode mode,
-                                  Optional<MetatypeRepresentation> metatypeKind,
-                                  GenericSignature fnSig,
-                                  Explosion &ex) {
+void irgen::emitScalarExistentialDowncast(
+    IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
+    CheckedCastMode mode, llvm::Optional<MetatypeRepresentation> metatypeKind,
+    GenericSignature fnSig, Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
@@ -730,7 +726,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
   // If we're doing a conditional cast, and the ObjC protocol checks failed,
   // then the cast is done.
-  Optional<ConditionalDominanceScope> condition;
+  llvm::Optional<ConditionalDominanceScope> condition;
   llvm::BasicBlock *origBB = nullptr, *successBB = nullptr, *contBB = nullptr;
   if (!objcProtos.empty()) {
     switch (mode) {
@@ -885,6 +881,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     }
   };
 
+  bool sourceWrappedInOptional = false;
+
+  llvm::Optional<ConditionalDominanceScope> domScope;
   if (auto sourceOptObjectType = sourceLoweredType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
@@ -898,6 +897,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     value = std::move(optValue);
     sourceLoweredType = sourceOptObjectType;
     sourceFormalType = sourceFormalType.getOptionalObjectType();
+    sourceWrappedInOptional = true;
 
     // We need a null-check because the runtime function can't handle null in
     // some of the cases.
@@ -913,6 +913,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
       Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
 
       Builder.emitBlock(isNotNilContBB);
+      domScope.emplace(IGF);
     }
   }
 
@@ -1014,16 +1015,17 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     Explosion outRes;
     emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
                                   targetLoweredType, mode,
-                                  /*not a metatype*/ None,
-                                  fnSig,
-                                  outRes);
+                                  /*not a metatype*/ llvm::None, fnSig, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
 
-  if (llvm::Value *fastResult = emitFastClassCastIfPossible(IGF, instance,
-                                        sourceFormalType, targetFormalType)) {
-    out.add(fastResult);
+  if (llvm::Value *fastResult = emitFastClassCastIfPossible(
+          IGF, instance, sourceFormalType, targetFormalType,
+          sourceWrappedInOptional, nilCheckBB, nilMergeBB)) {
+    Explosion fastExplosion;
+    fastExplosion.add(fastResult);
+    returnNilCheckedResult(IGF.Builder, fastExplosion);
     return;
   }
 
@@ -1039,10 +1041,10 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 /// It also avoids a call to the metadata accessor of the class (which calls
 /// `swift_getInitializedObjCClass`). For comparing the metadata pointers it's
 /// not required that the metadata is fully initialized.
-llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
-                                                llvm::Value *instance,
-                                                CanType sourceFormalType,
-                                                CanType targetFormalType) {
+llvm::Value *irgen::emitFastClassCastIfPossible(
+    IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
+    CanType targetFormalType, bool sourceWrappedInOptional,
+    llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB) {
   if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(),
                                          sourceFormalType, targetFormalType)) {
     return nullptr;
@@ -1073,6 +1075,19 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
                               AncestryFlags::ObjCObjectModel;
   if (toClass->checkAncestry() & forbidden)
     return nullptr;
+
+  // If the source was originally wrapped in an Optional, check it for nil now.
+  if (sourceWrappedInOptional) {
+    auto isNotNil = IGF.Builder.CreateICmpNE(
+        instance, llvm::ConstantPointerNull::get(
+                      cast<llvm::PointerType>(instance->getType())));
+    auto *isNotNilContBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    nilMergeBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    nilCheckBB = IGF.Builder.GetInsertBlock();
+    IGF.Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
+
+    IGF.Builder.emitBlock(isNotNilContBB);
+  }
 
   // Get the metadata pointer of the destination class type.
   llvm::Value *destMetadata = IGF.IGM.getAddrOfTypeMetadata(targetFormalType);

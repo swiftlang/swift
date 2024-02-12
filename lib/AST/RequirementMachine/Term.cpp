@@ -128,10 +128,11 @@ bool Term::containsUnresolvedSymbols() const {
 ///
 /// This is used to implement Term::compare() and MutableTerm::compare()
 /// below.
-static Optional<int>
-shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
-                const Symbol *rhsBegin, const Symbol *rhsEnd,
-                RewriteContext &ctx) {
+static llvm::Optional<int> shortlexCompare(const Symbol *lhsBegin,
+                                           const Symbol *lhsEnd,
+                                           const Symbol *rhsBegin,
+                                           const Symbol *rhsEnd,
+                                           RewriteContext &ctx) {
   // First, compare the number of name symbols.
   unsigned lhsNameCount = 0;
   for (auto *iter = lhsBegin; iter != lhsEnd; ++iter) {
@@ -165,7 +166,7 @@ shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
     ++lhsBegin;
     ++rhsBegin;
 
-    Optional<int> result = lhs.compare(rhs, ctx);
+    llvm::Optional<int> result = lhs.compare(rhs, ctx);
     if (!result.has_value() || *result != 0) {
       assert(lhs != rhs);
       return result;
@@ -179,22 +180,21 @@ shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
 
 /// Shortlex order on terms. Returns None if the terms are identical except
 /// for an incomparable superclass or concrete type symbol at the end.
-Optional<int>
-Term::compare(Term other, RewriteContext &ctx) const {
+llvm::Optional<int> Term::compare(Term other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Shortlex order on mutable terms. Returns None if the terms are identical
 /// except for an incomparable superclass or concrete type symbol at the end.
-Optional<int>
-MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
+llvm::Optional<int> MutableTerm::compare(const MutableTerm &other,
+                                         RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Replace the subterm in the range [from,to) of this term with \p rhs.
 void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
   auto oldSize = size();
-  unsigned lhsLength = (unsigned)(to - from);
+  size_t lhsLength = (size_t)(to - from);
 
   if (lhsLength == rhs.size()) {
     // Copy the RHS to the LHS.
@@ -213,7 +213,7 @@ void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
     assert(lhsLength < rhs.size());
 
     // Copy the LHS-sized prefix of RHS to the LHS.
-    auto newTo = std::copy(rhs.begin(), rhs.begin() + lhsLength, from);
+    auto newTo = std::copy_n(rhs.begin(), lhsLength, from);
     assert(newTo == to);
 
     // Insert the remainder of the RHS term.

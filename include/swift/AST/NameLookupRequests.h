@@ -22,6 +22,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -37,6 +38,7 @@ class GenericContext;
 class GenericParamList;
 class LookupResult;
 enum class NLKind;
+class PotentialMacroExpansions;
 class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
@@ -166,7 +168,7 @@ public:
 
   // Caching
   bool isCached() const { return true; }
-  Optional<ClassDecl *> getCachedResult() const;
+  llvm::Optional<ClassDecl *> getCachedResult() const;
   void cacheResult(ClassDecl *value) const;
 };
 
@@ -187,7 +189,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  llvm::Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 
 public:
@@ -212,7 +214,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<ArrayRef<ValueDecl *>> getCachedResult() const;
+  llvm::Optional<ArrayRef<ValueDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ValueDecl *> value) const;
 };
 
@@ -235,7 +237,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
+  llvm::Optional<bool> getCachedResult() const;
   void cacheResult(bool) const;
 };
 
@@ -257,7 +259,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<NominalTypeDecl *> getCachedResult() const;
+  llvm::Optional<NominalTypeDecl *> getCachedResult() const;
   void cacheResult(NominalTypeDecl *value) const;
 
 public:
@@ -361,7 +363,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<DestructorDecl *> getCachedResult() const;
+  llvm::Optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
 };
 
@@ -382,7 +384,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<GenericParamList *> getCachedResult() const;
+  llvm::Optional<GenericParamList *> getCachedResult() const;
   void cacheResult(GenericParamList *value) const;
 };
 
@@ -430,7 +432,7 @@ class UnqualifiedLookupRequest
                            RequestFlags::Uncached |
                                RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  UnqualifiedLookupRequest(UnqualifiedLookupDescriptor);
 
 private:
   friend SimpleRequest;
@@ -456,7 +458,10 @@ class LookupInModuleRequest
                                 NLOptions),
           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  LookupInModuleRequest(
+      const DeclContext *, DeclName, NLKind,
+      namelookup::ResolutionKind, const DeclContext *,
+      SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -504,7 +509,9 @@ class ModuleQualifiedLookupRequest
                            RequestFlags::Uncached |
                               RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  ModuleQualifiedLookupRequest(const DeclContext *,
+                               ModuleDecl *, DeclNameRef,
+                               SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -528,7 +535,9 @@ class QualifiedLookupRequest
                                                  DeclNameRef, NLOptions),
                            RequestFlags::Uncached> {
 public:
-  using SimpleRequest::SimpleRequest;
+  QualifiedLookupRequest(const DeclContext *,
+                         SmallVector<NominalTypeDecl *, 4>,
+                         DeclNameRef, SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -579,7 +588,7 @@ class DirectLookupRequest
                            TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
                            RequestFlags::Uncached|RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  DirectLookupRequest(DirectLookupDescriptor, SourceLoc);
 
 private:
   friend SimpleRequest;
@@ -877,6 +886,64 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Determine the potential macro expansions for a given type or extension
+/// context.
+class PotentialMacroExpansionsInContextRequest
+    : public SimpleRequest<
+          PotentialMacroExpansionsInContextRequest,
+          PotentialMacroExpansions(TypeOrExtensionDecl),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  PotentialMacroExpansions evaluate(
+      Evaluator &evaluator, TypeOrExtensionDecl container) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Resolves the protocol referenced by an @_implements attribute.
+class ImplementsAttrProtocolRequest
+    : public SimpleRequest<ImplementsAttrProtocolRequest,
+                           ProtocolDecl *(const ImplementsAttr *, DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ProtocolDecl *evaluate(Evaluator &evaluator, const ImplementsAttr *attr,
+                         DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class LookupIntrinsicRequest
+    : public SimpleRequest<LookupIntrinsicRequest,
+                           FuncDecl *(ModuleDecl *, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, ModuleDecl *module,
+                     Identifier funcName) const;
 
 public:
   bool isCached() const { return true; }

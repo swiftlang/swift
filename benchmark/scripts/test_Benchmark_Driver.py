@@ -329,7 +329,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_run_benchmark_with_multiple_samples(self):
         self.driver.run("b1")
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b1")
+            ("/benchmarks/Benchmark_O-*", "b1", "--min-samples=2")
         )
         self.driver.run("b2", num_samples=5)
         self.subprocess_mock.assert_called_with(
@@ -339,19 +339,19 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_run_benchmark_with_specified_number_of_iterations(self):
         self.driver.run("b", num_iters=1)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--num-iters=1")
+            ("/benchmarks/Benchmark_O-*", "b", "--min-samples=2", "--num-iters=1")
         )
 
     def test_run_benchmark_for_specified_time(self):
         self.driver.run("b", sample_time=0.5)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--sample-time=0.5")
+            ("/benchmarks/Benchmark_O-*", "b", "--min-samples=2", "--sample-time=0.5")
         )
 
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run("b", verbose=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--verbose")
+            ("/benchmarks/Benchmark_O-*", "b", "--min-samples=2", "--verbose")
         )
 
     def test_run_batch(self):
@@ -363,7 +363,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.driver.tests = ["b1", "bx"]
         self.driver.run()
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "1", "bx")
+            ("/benchmarks/Benchmark_O-*", "1", "bx", "--min-samples=2")
         )
 
     def test_parse_results_from_running_benchmarks(self):
@@ -382,7 +382,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_measure_memory(self):
         self.driver.run("b", measure_memory=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--memory")
+            ("/benchmarks/Benchmark_O-*", "b", "--min-samples=2", "--memory")
         )
 
     def test_run_benchmark_independent_samples(self):
@@ -394,6 +394,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
                 (
                     "/benchmarks/Benchmark_O-*",
                     "b1",
+                    "--min-samples=2",
                     "--num-iters=1",
                     "--memory",
                 )

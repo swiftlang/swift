@@ -82,8 +82,46 @@ void getSolutionSpecificVarTypes(
     const constraints::Solution &S,
     llvm::SmallDenseMap<const VarDecl *, Type> &Result);
 
-/// Whether the given completion expression is the only expression in its
-/// containing closure or function body and its value is implicitly returned.
+/// While this RAII is alive the interface types of the variables defined in
+/// \c SolutionSpecificVarTypes are temporarily set to the types in the map.
+/// Afterwards, their types are restored.
+struct WithSolutionSpecificVarTypesRAII {
+  llvm::SmallDenseMap<const VarDecl *, Type> RestoreVarTypes;
+
+  WithSolutionSpecificVarTypesRAII(
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+    for (auto SolutionVarType : SolutionSpecificVarTypes) {
+      if (SolutionVarType.first->hasInterfaceType()) {
+        RestoreVarTypes[SolutionVarType.first] =
+            SolutionVarType.first->getInterfaceType();
+      } else {
+        RestoreVarTypes[SolutionVarType.first] = Type();
+      }
+      if (!SolutionVarType.second->hasArchetype()) {
+        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
+                         SolutionVarType.second);
+      } else {
+        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
+                         ErrorType::get(SolutionVarType.second));
+      }
+    }
+  }
+
+  ~WithSolutionSpecificVarTypesRAII() {
+    for (auto Var : RestoreVarTypes) {
+      setInterfaceType(const_cast<VarDecl *>(Var.first), Var.second);
+    }
+  }
+
+private:
+  /// Sets the interface type of \p VD, similar to \c VD->setInterfaceType
+  /// but also allows resetting the interface type of \p VD to null.
+  static void setInterfaceType(VarDecl *VD, Type Ty);
+};
+
+/// Whether the given completion expression is an implied result of a closure
+/// or function (e.g in a single-expression closure where the return is
+/// implicit).
 ///
 /// If these conditions are met, code completion needs to avoid penalizing
 /// completion results that don't match the expected return type when
@@ -91,8 +129,7 @@ void getSolutionSpecificVarTypes(
 /// written by the user, it's possible they intend the single expression not
 /// as the return value but merely the first entry in a multi-statement body
 /// they just haven't finished writing yet.
-bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
-                                      Expr *CompletionExpr);
+bool isImpliedResult(const constraints::Solution &S, Expr *CompletionExpr);
 
 /// Returns \c true iff the decl context \p DC allows calling async functions.
 bool isContextAsync(const constraints::Solution &S, DeclContext *DC);

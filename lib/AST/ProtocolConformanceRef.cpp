@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -41,6 +42,16 @@ ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
   }
 }
 
+bool ProtocolConformanceRef::isInvalid() const {
+  if (!Union)
+    return true;
+
+  if (auto pack = Union.dyn_cast<PackConformance *>())
+    return pack->isInvalid();
+
+  return false;
+}
+
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
   assert(!isInvalid());
 
@@ -57,10 +68,8 @@ ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               SubstitutionMap subMap,
                               SubstOptions options) const {
-  return subst(origType,
-               QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
+  InFlightSubstitutionViaSubMap IFS(subMap, options);
+  return subst(origType, IFS);
 }
 
 ProtocolConformanceRef
@@ -68,28 +77,33 @@ ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
                               LookupConformanceFn conformances,
                               SubstOptions options) const {
+  InFlightSubstitution IFS(subs, conformances, options);
+  return subst(origType, IFS);
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isInvalid())
     return *this;
 
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
-                                                       options));
+    return getConcrete()->subst(IFS);
   if (isPack())
-    return getPack()->subst(subs, conformances, options);
+    return getPack()->subst(IFS);
 
   // Handle abstract conformances below:
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
   if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(origArchetype)) {
       return *this;
     }
   }
 
   // Otherwise, compute the substituted type.
-  auto substType = origType.subst(subs, conformances, options);
+  auto substType = origType.subst(IFS);
 
   auto *proto = getRequirement();
 
@@ -104,20 +118,29 @@ ProtocolConformanceRef::subst(Type origType,
     return ProtocolConformanceRef::forInvalid();
   }
 
+  // If the type has been fully substituted and the requirement is for
+  // an invertible protocol, just do a module lookup. This avoids an infinite
+  // substitution issue by recognizing that these protocols are very simple
+  // (see rdar://119950540 for the general issue).
+  if (!substType->hasTypeParameter() && proto->getInvertibleProtocolKind())
+    return proto->getModuleContext()->lookupConformance(substType, proto);
+
   // Check the conformance map.
-  return conformances(origType->getCanonicalType(), substType, proto);
+  // FIXME: Pack element level?
+  return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
+                               /*level=*/0);
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
   if (isConcrete()) {
-    auto *concrete = getConcrete()->subst(
+    return getConcrete()->subst(
         [](SubstitutableType *type) -> Type {
           if (auto *archetypeType = type->getAs<ArchetypeType>())
             return archetypeType->getInterfaceType();
           return type;
         },
-        MakeAbstractConformanceForGenericType());
-    return ProtocolConformanceRef(concrete);
+        MakeAbstractConformanceForGenericType(),
+        SubstFlags::PreservePackExpansionLevel);
   } else if (isPack()) {
     return getPack()->subst(
         [](SubstitutableType *type) -> Type {
@@ -125,7 +148,8 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
             return archetypeType->getInterfaceType();
           return type;
         },
-        MakeAbstractConformanceForGenericType());
+        MakeAbstractConformanceForGenericType(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
   return *this;
@@ -163,17 +187,6 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   }
 
   return getConcrete()->getWitnessDeclRef(requirement);
-}
-
-Optional<ArrayRef<Requirement>>
-ProtocolConformanceRef::getConditionalRequirementsIfAvailable() const {
-  if (isConcrete())
-    return getConcrete()->getConditionalRequirementsIfAvailable();
-  else
-    // An abstract conformance is never conditional: any conditionality in the
-    // concrete types that will eventually pass through this at runtime is
-    // completely pre-checked and packaged up.
-    return ArrayRef<Requirement>();
 }
 
 ArrayRef<Requirement>
@@ -286,8 +299,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
     return true;
 
   // Check the conformances in the substitution map.
-  auto module = concrete->getDeclContext()->getParentModule();
-  auto subMap = concrete->getSubstitutions(module);
+  auto subMap = concrete->getSubstitutionMap();
   for (auto subConformance : subMap.getConformances()) {
     if (subConformance.hasUnavailableConformance())
       return true;
@@ -296,22 +308,21 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   return false;
 }
 
-bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
-  return forEachMissingConformance(module,
+bool ProtocolConformanceRef::hasMissingConformance() const {
+  return forEachMissingConformance(
       [](BuiltinProtocolConformance *builtin) {
         return true;
       });
 }
 
 bool ProtocolConformanceRef::forEachMissingConformance(
-    ModuleDecl *module,
     llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
   if (isInvalid() || isAbstract())
     return false;
 
   if (isPack()) {
     for (auto conformance : getPack()->getPatternConformances()) {
-      if (conformance.forEachMissingConformance(module, fn))
+      if (conformance.forEachMissingConformance(fn))
         return true;
     }
 
@@ -327,9 +338,9 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   }
 
   // Check conformances that are part of this conformance.
-  auto subMap = concreteConf->getSubstitutions(module);
+  auto subMap = concreteConf->getSubstitutionMap();
   for (auto conformance : subMap.getConformances()) {
-    if (conformance.forEachMissingConformance(module, fn))
+    if (conformance.forEachMissingConformance(fn))
       return true;
   }
 

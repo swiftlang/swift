@@ -5,6 +5,15 @@
 // RUN:   -define-availability "_macOS11_0:macOS 11.0" \
 // RUN:   -define-availability "_myProject 1.0:macOS 11.0" \
 // RUN:   -define-availability "_myProject 2.5:macOS 12.5"
+
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -enable-experimental-feature AvailabilityMacro='_iOS13Aligned:macOS 10.15, iOS 13.0' \
+// RUN:   -enable-experimental-feature AvailabilityMacro="_iOS14Aligned:macOS 11.0, iOS 14.0" \
+// RUN:   -enable-experimental-feature AvailabilityMacro='_iOS14:iOS 14.0' \
+// RUN:   -enable-experimental-feature AvailabilityMacro="_macOS11_0:macOS 11.0" \
+// RUN:   -enable-experimental-feature AvailabilityMacro='_myProject 1.0:macOS 11.0' \
+// RUN:   -enable-experimental-feature AvailabilityMacro="_myProject 2.5:macOS 12.5"
+
 // REQUIRES: OS=macosx
 
 @available(_iOS13Aligned, *)

@@ -14,7 +14,8 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SELF_RECURSIVE_REF]]([[X]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
+  // CHECK: [[MOVED_CLOSURE:%.*]] = move_value [lexical] [var_decl] [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[MOVED_CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   let sr = self_recursive
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
@@ -50,7 +51,8 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE]]
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[TRANS_CAPTURE_REF]]([[X]], [[Y]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
+  // CHECK: [[MOVED_CLOSURE:%.*]] = move_value [lexical] [var_decl] [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[MOVED_CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   let tc = transitive_capture_2
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
@@ -68,7 +70,8 @@ func local_recursion(_ x: Int, y: Int) {
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s15local_recursionAA_1yySi_SitFySicfU0_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_REF]]([[X]], [[Y]])
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [lexical] [[CLOSURE]]
+  // CHECK: [[MOVED_CLOSURE:%.*]] = move_value [lexical] [var_decl] [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[MOVED_CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
   // CHECK: apply [[B]]([[X]])

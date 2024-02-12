@@ -6,11 +6,11 @@
 
 import conformance_availability_overlapping_other
 
-extension HasUnavailableConformance : P {}
+extension HasUnavailableConformance : @retroactive P {}
 
-extension HasConditionallyAvailableConformance : P {}
+extension HasConditionallyAvailableConformance : @retroactive P {}
 
-extension HasAlwaysAvailableConformance : P {}
+extension HasAlwaysAvailableConformance : @retroactive P {}
 // expected-warning@-1 {{conformance of 'HasAlwaysAvailableConformance' to protocol 'P' was already stated in the type's module 'conformance_availability_overlapping_other'}}
 
 struct G<T : P> {}

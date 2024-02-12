@@ -44,7 +44,7 @@ extension MP {
 
 @main struct Main {
   static func main() async {
-    var tests = TestSuite("Async Throw")
+    let tests = TestSuite("Async Throw")
 
     if #available(SwiftStdlib 5.1, *) {
       tests.test("throwing of naturally direct but indirect reabstraction") {

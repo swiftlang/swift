@@ -91,7 +91,7 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
          "the de-serializer did set the wrong serialized flag");
   
   F->setBare(IsBare);
-  F->verify();
+  toVerify.push_back(F);
   Worklist.push_back(F);
   Changed = true;
   ++NumFuncLinked;
@@ -120,7 +120,8 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
     return;
   }
 
-  // In the performance pipeline, we deserialize all reachable functions.
+  // In the performance pipeline or embedded mode, we deserialize all reachable
+  // functions.
   if (isLinkAll())
     return deserializeAndPushToWorklist(F);
 
@@ -188,6 +189,10 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
       maybeAddFunctionToWorklist(impl, Vtbl->isSerialized());
     }
   }
+
+  if (auto *S = D->getSuperclassDecl()) {
+    linkInVTable(S);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,8 +239,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
     return false;
   auto conformance = c.getConcrete()->getRootConformance();
   return M.Types.protocolRequiresWitnessTable(conformance->getProtocol())
-    && isa<ClangModuleUnit>(conformance->getDeclContext()
-                                       ->getModuleScopeContext());
+    && conformance->isSynthesized();
 }
 
 void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
@@ -417,6 +421,15 @@ void SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
   linkInVTable(C);
 }
 
+void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
+  if (!Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  SILGlobalVariable *G = GAI->getReferencedGlobal();
+  G->setDeclaration(false);
+  G->setLinkage(stripExternalFromLinkage(G->getLinkage()));
+}
+
 //===----------------------------------------------------------------------===//
 //                             Top Level Routine
 //===----------------------------------------------------------------------===//
@@ -435,6 +448,11 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
+    // TODO: This should probably be done as a separate SIL pass ("internalize")
+    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      Fn->setLinkage(stripExternalFromLinkage(Fn->getLinkage()));
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
                             << Fn->getName() << "\n");
 
@@ -443,5 +461,10 @@ void SILLinkerVisitor::process() {
         visit(&I);
       }
     }
+  }
+
+  while (!toVerify.empty()) {
+    auto *fn = toVerify.pop_back_val();
+    fn->verify();
   }
 }

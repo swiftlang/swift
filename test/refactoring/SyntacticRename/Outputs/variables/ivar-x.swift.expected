@@ -2,17 +2,17 @@ var /*var-y:def*/y = 3
 /*var-y*/y = /*var-y*/y + 2 + /*var-y*/y
 
 struct Struct {
-	let /*ivar-x:def*/fox: Int
+	let /*ivar-x:def*/<base>x</base>: Int
 	var y: Int
 
 	func sum() -> Int {
-		return /*ivar-x*/fox + y
+		return /*ivar-x*/<base>x</base> + y
 	}
 }
 
 let aStruct = Struct(x: 10, y: 11)
-print(aStruct . /*ivar-x*/fox + aStruct.y)
-var cat = {(a: Int) in aStruct . /*ivar-x*/fox}
+print(aStruct . /*ivar-x*/<base>x</base> + aStruct.y)
+var cat = {(a: Int) in aStruct . /*ivar-x*/<base>x</base>}
 
 var aTuple = (1, 1)
 

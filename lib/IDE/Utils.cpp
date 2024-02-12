@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -622,16 +623,116 @@ remove(SourceManager &SM, CharSourceRange Range) {
   accept(SM, Range, "");
 }
 
+/// Given the expanded code for a particular macro, perform whitespace
+/// adjustments to make the refactoring more suitable for inline insertion.
+static StringRef
+adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
+                               StringRef expandedCode,
+                               llvm::SmallString<64> &scratch) {
+  scratch.clear();
+
+  switch (kind) {
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    // Attributes are added to the beginning, add a space to separate from
+    // any existing.
+    scratch += expandedCode;
+    scratch += " ";
+    return scratch;
+
+  case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::PeerMacroExpansion:
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+  case GeneratedSourceInfo::ExtensionMacroExpansion:
+    // All added to the end. Note that conformances are always expanded as
+    // extensions, hence treating them the same as peer.
+    scratch += "\n\n";
+    scratch += expandedCode;
+    scratch += "\n";
+    return scratch;
+
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+  case GeneratedSourceInfo::DeclarationMacroExpansion:
+  case GeneratedSourceInfo::CodeItemMacroExpansion:
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::PreambleMacroExpansion:
+  case GeneratedSourceInfo::BodyMacroExpansion:
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::PrettyPrinted:
+    return expandedCode;
+  }
+}
+
+void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
+    SourceManager &SM, unsigned bufferID, SourceFile *containingSF,
+    bool adjustExpansion, bool includeBufferName) {
+  auto generatedInfo = SM.getGeneratedSourceInfo(bufferID);
+  if (!generatedInfo || generatedInfo->originalSourceRange.isInvalid())
+    return;
+
+  auto rewrittenBuffer = SM.extractText(generatedInfo->generatedSourceRange);
+
+  // If there's no change, drop the edit entirely.
+  if (generatedInfo->originalSourceRange.getStart() ==
+          generatedInfo->originalSourceRange.getEnd() &&
+      rewrittenBuffer.empty())
+    return;
+
+  SmallString<64> scratchBuffer;
+  if (adjustExpansion) {
+    rewrittenBuffer = adjustMacroExpansionWhitespace(
+        generatedInfo->kind, rewrittenBuffer, scratchBuffer);
+  }
+
+  // `containingFile` is the file of the actual expansion site, where as
+  // `originalFile` is the possibly enclosing buffer. Concretely:
+  // ```
+  // // m.swift
+  // @AddMemberAttributes
+  // struct Foo {
+  //   // --- expanded from @AddMemberAttributes eg. @_someBufferName ---
+  //   @AddedAttribute
+  //   // ---
+  //   let someMember: Int
+  // }
+  // ```
+  //
+  // When expanding `AddedAttribute`, the expansion actually applies to the
+  // original source (`m.swift`) rather than the buffer of the expansion
+  // site (`@_someBufferName`). Thus, we need to include the path to the
+  // original source as well. Note that this path could itself be another
+  // expansion.
+  auto originalSourceRange = generatedInfo->originalSourceRange;
+  SourceFile *originalFile =
+      containingSF->getParentModule()->getSourceFileContainingLocation(
+          originalSourceRange.getStart());
+  StringRef originalPath;
+  if (originalFile->getBufferID().has_value() &&
+      containingSF->getBufferID() != originalFile->getBufferID()) {
+    originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
+  }
+
+  StringRef bufferName;
+  if (includeBufferName) {
+    bufferName = SM.getIdentifierForBuffer(bufferID);
+  }
+
+  accept(SM, {originalPath,
+              originalSourceRange,
+              bufferName,
+              rewrittenBuffer,
+              {}});
+}
+
 struct swift::ide::SourceEditJsonConsumer::Implementation {
   llvm::raw_ostream &OS;
-  std::vector<SingleEdit> AllEdits;
+  SourceEdits AllEdits;
   Implementation(llvm::raw_ostream &OS) : OS(OS) {}
   ~Implementation() {
     writeEditsInJson(AllEdits, OS);
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text.str()});
+    AllEdits.addEdit(SM, Range, Text);
   }
 };
 
@@ -707,6 +808,7 @@ public:
                     getBuffer());
     RewriteBuf.Initialize(Input);
     removeCommentLines(RewriteBuf, Input, "RUN");
+    removeCommentLines(RewriteBuf, Input, "REQUIRES");
     removeCommentLines(RewriteBuf, Input, "CHECK");
   }
 
@@ -849,8 +951,11 @@ bool swift::ide::isBeingCalled(ArrayRef<Expr *> ExprStack) {
     auto *AE = dyn_cast<ApplyExpr>(E);
     if (!AE || AE->isImplicit())
       continue;
-    if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(AE)) {
-      if (CRCE->getBase() == Target)
+    if (auto *CRCE = dyn_cast<ConstructorRefCallExpr>(AE->getFn())) {
+      auto *Base = CRCE->getBase();
+      while (auto *ICE = dyn_cast<ImplicitConversionExpr>(Base))
+        Base = ICE->getSubExpr();
+      if (Base == Target)
         return true;
     }
     if (isa<SelfApplyExpr>(AE))
@@ -989,3 +1094,36 @@ void swift::ide::getReceiverType(Expr *Base,
     Types.push_back(TyD);
   }
 }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+extern "C" {
+/// Low-level entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Parameters:
+///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
+///     syntax tree
+///   - locations: Pointer to a buffer of `BridgedSourceLoc` that should be
+///     resolved by the name matcher.
+///   - locationsCount: Number of elements in `locations`.
+/// - Returns: The opaque value of a `BridgedResolvedLocVector`.
+void *swift_SwiftIDEUtilsBridging_runNameMatcher(const void *sourceFilePtr,
+                                                 BridgedSourceLoc *locations,
+                                                 size_t locationsCount);
+}
+
+std::vector<ResolvedLoc>
+swift::ide::runNameMatcher(const SourceFile &sourceFile,
+                           ArrayRef<SourceLoc> locations) {
+  std::vector<BridgedSourceLoc> bridgedUnresolvedLocs;
+  bridgedUnresolvedLocs.reserve(locations.size());
+  for (SourceLoc loc : locations) {
+    bridgedUnresolvedLocs.push_back(BridgedSourceLoc(loc));
+  }
+
+  BridgedResolvedLocVector bridgedResolvedLocs =
+      swift_SwiftIDEUtilsBridging_runNameMatcher(
+          sourceFile.getExportedSourceFile(), bridgedUnresolvedLocs.data(),
+          bridgedUnresolvedLocs.size());
+  return bridgedResolvedLocs.takeUnbridged();
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX

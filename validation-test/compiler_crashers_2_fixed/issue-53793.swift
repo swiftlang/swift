@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify -emit-ir %s
+// RUN: %target-swift-frontend -disable-experimental-associated-type-inference -verify -emit-ir %s
 
 // Works with experimental associated type inference.
 // RUN: %target-swift-frontend -enable-experimental-associated-type-inference -emit-ir %s
@@ -7,7 +7,7 @@
 
 protocol P1 {
     associatedtype X
-    // expected-note@-1 {{protocol requires nested type 'X'; do you want to add it?}}
+    // expected-note@-1 {{protocol requires nested type 'X'; add nested type 'X' for conformance}}
     associatedtype A: P2 where A.X == X
 }
 

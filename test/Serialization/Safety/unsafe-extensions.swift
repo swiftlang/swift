@@ -48,7 +48,7 @@ extension ExtendedPublic : PublicProto {
 /// Internal
 internal protocol InternalProto {}
 // SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalProto'
-// NO-SAFETY-INTERNAL: Serialization safety, safe: 'InternalProto'
+// NO-SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalProto'
 internal struct ExtendedInternal {}
 // SAFETY-INTERNAL: Serialization safety, unsafe: 'ExtendedInternal'
 // NO-SAFETY-INTERNAL: Serialization safety, safe: 'ExtendedInternal'
@@ -88,7 +88,7 @@ extension ExtendedFileprivate : FileprivateProto {}
 /// Back to public
 extension ExtendedPublic : InternalProto {
 // SAFETY-INTERNAL: Serialization safety, unsafe: 'extension ExtendedPublic'
-// NO-SAFETY-INTERNAL: Serialization safety, safe: 'extension ExtendedPublic'
+// NO-SAFETY-INTERNAL: Serialization safety, unsafe: 'extension ExtendedPublic'
 }
 extension ExtendedPublic : PrivateProto {
 // SAFETY-PRIVATE: Serialization safety, unsafe: 'extension ExtendedPublic'

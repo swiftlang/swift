@@ -1,0 +1,13 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+// REQUIRES: synchronization
+
+%{
+  from gyb import expand
+
+  types = [
+    # Label    Type      a     b
+    ("UInt16", "UInt16", "12", "23"),
+  ]
+}%
+${expand("Tests.gyb-template", line_directive='', types=types)}

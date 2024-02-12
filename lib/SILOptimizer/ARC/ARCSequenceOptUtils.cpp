@@ -28,6 +28,7 @@ bool isARCSignificantTerminator(TermInst *TI) {
   // Be conservative for now. These actually perform some sort of operation
   // against the operand or can use the value in some way.
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::ReturnInst:
   case TermKind::UnwindInst:
   case TermKind::YieldInst:

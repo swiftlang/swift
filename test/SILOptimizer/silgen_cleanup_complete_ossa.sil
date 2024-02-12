@@ -1,0 +1,83 @@
+// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -enable-ossa-complete-lifetimes -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
+
+import Builtin
+
+sil_stage raw
+
+typealias AnyObject = Builtin.AnyObject
+
+class Klass {
+  var property: Builtin.Int64
+}
+class SubKlass : Klass {}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+struct Int {
+  var _value : Builtin.Int32
+}
+
+struct UInt8 {
+  var _value : Builtin.Int8
+}
+
+protocol P : AnyObject {}
+
+// =============================================================================
+// Test complete OSSA lifetimes
+// =============================================================================
+
+sil @unreachableHandler : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+// CHECK:   [[BOX:%.*]] = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
+// CHECK:   [[BORROW:%.,*]] = begin_borrow [lexical] [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
+// CHECK:   destroy_value [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK:   unreachable
+sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  %box = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
+  %borrow = begin_borrow [lexical] %box : ${ var FakeOptional<Klass> }
+  %project = project_box %borrow : ${ var FakeOptional<Klass> }, 0
+  store %0 to [init] %project : $*FakeOptional<Klass>
+  cond_br undef, bb1, bb4
+
+bb1:
+  %access = begin_access [read] [unknown] %project : $*FakeOptional<Klass>
+  %val = load [copy] %access : $*FakeOptional<Klass>
+  end_access %access : $*FakeOptional<Klass>
+  switch_enum %val : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb3, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  %21 = function_ref @unreachableHandler : $@convention(thin) () -> ()
+  %22 = apply %21() : $@convention(thin) () -> ()
+  unreachable
+
+bb3(%24 : @owned $Klass):
+  destroy_value %24 : $Klass
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  end_borrow %borrow : ${ var FakeOptional<Klass> }
+  destroy_value %box : ${ var FakeOptional<Klass> }
+  %36 = tuple ()
+  return %36 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
+// CHECK-NOT: destroy
+sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
+bb0(%0 : @owned $any P):
+  %1 = open_existential_ref %0 : $any P to $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self
+  %2 = init_existential_ref %1 : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self, $AnyObject
+  return %2 : $AnyObject
+}

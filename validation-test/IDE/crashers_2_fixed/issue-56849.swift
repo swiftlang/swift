@@ -36,4 +36,3 @@ struct BottomMenu: MyView {
 // CHECK: Begin completions, 2 items
 // CHECK: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: center[#MyAlignment#]; name=center
 // CHECK: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#MyAlignment#]; name=init()
-// CHECK: End completions

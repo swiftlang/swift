@@ -13,7 +13,7 @@
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
@@ -79,7 +79,7 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
   return false;
 }
 
-const Optional<llvm::VersionTuple>
+const llvm::Optional<llvm::VersionTuple>
 swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return llvm::VersionTuple(10, 10, 0);
@@ -99,7 +99,7 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isWatchOS())
     return llvm::VersionTuple(2, 0);
 
-  return None;
+  return llvm::None;
 }
 
 bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
@@ -175,13 +175,12 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
 
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
-  case llvm::Triple::UnknownOS:
-    llvm_unreachable("unknown OS");
   case llvm::Triple::ZOS:
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
   case llvm::Triple::DriverKit:
+  case llvm::Triple::XROS:
   case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
@@ -234,6 +233,11 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "haiku";
   case llvm::Triple::WASI:
     return "wasi";
+  case llvm::Triple::UnknownOS:
+    return "none";
+  case llvm::Triple::UEFI:
+  case llvm::Triple::LiteOS:
+    llvm_unreachable("unsupported OS");
   }
   llvm_unreachable("unsupported OS");
 }
@@ -335,15 +339,16 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
               .Default(tripleOSNameNoVersion);
 }
 
-static Optional<StringRef>
+static llvm::Optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
-  return llvm::StringSwitch<Optional<StringRef>>(tripleEnvironment)
-              .Cases("unknown", "", None)
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("simulator", StringRef("simulator"))
-  //          .Case ("macabi", StringRef("macabi"))
-              .Default(tripleEnvironment);
+  return llvm::StringSwitch<llvm::Optional<StringRef>>(tripleEnvironment)
+      .Cases("unknown", "", llvm::None)
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("simulator", StringRef("simulator"))
+      //          .Case ("macabi", StringRef("macabi"))
+      .Default(tripleEnvironment);
 }
 
 llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
@@ -356,7 +361,7 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
     StringRef newOS = getOSForAppleTargetSpecificModuleTriple(triple);
 
-    Optional<StringRef> newEnvironment =
+    llvm::Optional<StringRef> newEnvironment =
         getEnvironmentForAppleTargetSpecificModuleTriple(triple);
 
     if (!newEnvironment)
@@ -395,10 +400,10 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
                       unversionedOSName);
 }
 
-Optional<llvm::VersionTuple>
+llvm::Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
-  #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
   if (Triple.isMacOSX()) {
     llvm::VersionTuple OSVersion;
@@ -509,7 +514,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     }
   }
 
-  return None;
+  return llvm::None;
 }
 
 static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
@@ -528,7 +533,7 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
     if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
             clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
       return MacOStoMacCatalystMapping
-          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), None)
+          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), llvm::None)
           .value_or(llvm::VersionTuple(0, 0, 0));
     }
     return llvm::VersionTuple(0, 0, 0);

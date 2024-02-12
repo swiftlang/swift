@@ -182,12 +182,12 @@ public:
 
   /// Try to form a conversion that does an optional injection
   /// or optional-to-optional conversion followed by this conversion.
-  Optional<Conversion>
+  llvm::Optional<Conversion>
   adjustForInitialOptionalConversions(CanType newSourceType) const;
 
   /// Try to form a conversion that does a force-value followed by
   /// this conversion.
-  Optional<Conversion> adjustForInitialForceValue() const;
+  llvm::Optional<Conversion> adjustForInitialForceValue() const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &out) const;
@@ -226,9 +226,8 @@ public:
   bool isForced() const { return Forced; }
 };
 
-Optional<ConversionPeepholeHint>
-canPeepholeConversions(SILGenFunction &SGF,
-                       const Conversion &outerConversion,
+llvm::Optional<ConversionPeepholeHint>
+canPeepholeConversions(SILGenFunction &SGF, const Conversion &outerConversion,
                        const Conversion &innerConversion);
 
 /// An initialization where we ultimately want to apply a conversion to
@@ -250,7 +249,15 @@ private:
     Finished,
 
     /// The converted value has been extracted.
-    Extracted
+    Extracted,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and we haven't been finished yet.
+    PackExpanding,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and finishInitialization has been called.
+    FinishedPackExpanding,
   };
 
   StateTy State;
@@ -280,6 +287,7 @@ public:
       FinalContext(SGFContext(subInitialization.get())) {
     OwnedSubInitialization = std::move(subInitialization);
   }
+
   
   /// Return the conversion to apply to the unconverted value.
   const Conversion &getConversion() const {
@@ -341,13 +349,30 @@ public:
   }
   
   // Get the abstraction pattern, if any, the value is converted to.
-  Optional<AbstractionPattern> getAbstractionPattern() const override;
+  llvm::Optional<AbstractionPattern> getAbstractionPattern() const override;
 
   // Bookkeeping.
   void finishInitialization(SILGenFunction &SGF) override {
-    assert(getState() == Initialized);
-    State = Finished;
+    if (getState() == PackExpanding) {
+      FinalContext.getEmitInto()->finishInitialization(SGF);
+      State = FinishedPackExpanding;
+    } else {
+      assert(getState() == Initialized);
+      State = Finished;
+    }
   }
+
+  // Support pack-expansion initialization.
+  bool canPerformPackExpansionInitialization() const override {
+    if (auto finalInit = FinalContext.getEmitInto())
+      return finalInit->canPerformPackExpansionInitialization();
+    return false;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                llvm::function_ref<void(Initialization *into)> fn) override;
 };
 
 } // end namespace Lowering

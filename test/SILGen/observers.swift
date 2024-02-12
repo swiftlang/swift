@@ -18,7 +18,8 @@ public struct DidSetWillSetTests {
 
     // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
     // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
+    // CHECK:        [[SELF_LIFETIME:%.*]] = begin_borrow [var_decl] [[SELF]]
+    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
     // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
     // CHECK-NEXT:   assign %0 to [[P1]]
@@ -317,7 +318,8 @@ func local_observing_property(_ arg: Int) {
   // Alloc and initialize the property to the argument value.
   // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PB:%.*]] = project_box [[BOX]]
+  // CHECK: [[L:%.*]] = begin_borrow [var_decl] [[BOX]]
+  // CHECK: [[PB:%.*]] = project_box [[L]]
   // CHECK: store [[ARG]] to [trivial] [[PB]]
 }
 
@@ -396,7 +398,6 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]
-// CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]

@@ -46,7 +46,13 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
           }
           continue;
         }
-
+        if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
+          if (mvi->isLexical()) {
+            mvi->removeIsLexical();
+            madeChange = true;
+          }
+          continue;
+        }
         if (auto *asi = dyn_cast<AllocStackInst>(&inst)) {
           if (asi->isLexical()) {
             asi->removeIsLexical();

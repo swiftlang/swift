@@ -57,9 +57,12 @@ public:
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto *resultIndices =
+      autodiff::getFunctionSemanticResultIndices(func,
+                                                 derivativeId->getParameterIndices());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
-        IndexSubset::get(func->getASTContext(), 1, {0}),
+        resultIndices,
         derivativeId->getDerivativeGenericSignature());
     appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tj");
@@ -86,9 +89,12 @@ public:
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto *resultIndices =
+      autodiff::getFunctionSemanticResultIndices(func,
+                                                 derivativeId->getParameterIndices());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
-        IndexSubset::get(func->getASTContext(), 1, {0}),
+        resultIndices,
         derivativeId->getDerivativeGenericSignature());
     appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tq");
@@ -546,49 +552,86 @@ public:
   }
 
   std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
-                                                       CanGenericSignature sig) {
+                                                       CanGenericSignature sig,
+                                                       bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOb");
+    appendOperator(noValueWitness ? "WOB" : "WOb");
     return finalize();
   }
   std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
-                                                       CanGenericSignature sig) {
+                                                       CanGenericSignature sig,
+                                                       bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOc");
+    appendOperator(noValueWitness ? "WOC" : "WOc");
     return finalize();
   }
   std::string mangleOutlinedAssignWithTakeFunction(CanType t,
-                                                   CanGenericSignature sig) {
+                                                   CanGenericSignature sig,
+                                                   bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOd");
+    appendOperator(noValueWitness ? "WOD" : "WOd");
     return finalize();
   }
   std::string mangleOutlinedAssignWithCopyFunction(CanType t,
-                                                   CanGenericSignature sig) {
+                                                   CanGenericSignature sig,
+                                                   bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOf");
+    appendOperator(noValueWitness ? "WOF" : "WOf");
     return finalize();
   }
   std::string mangleOutlinedDestroyFunction(CanType t,
-                                            CanGenericSignature sig) {
+                                            CanGenericSignature sig,
+                                            bool noValueWitness) {
     beginMangling();
     appendType(t, sig);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("WOh");
+    appendOperator(noValueWitness ? "WOH" : "WOh");
     return finalize();
+  }
+
+  std::string mangleOutlinedEnumTagStoreFunction(CanType t,
+                                                 CanGenericSignature sig,
+                                                 unsigned enumCaseNum) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperatorParam("WOi", Index(enumCaseNum));
+    return finalize();
+  }
+
+  std::string mangleOutlinedEnumProjectDataForLoadFunction(CanType t,
+                                                 CanGenericSignature sig,
+                                                 unsigned enumCaseNum) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperatorParam("WOj", Index(enumCaseNum));
+    return finalize();
+  }
+
+  std::string mangleOutlinedEnumGetTag(CanType t, CanGenericSignature sig) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOg");
+    return finalize();
+
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
@@ -633,6 +676,8 @@ public:
                                            CanType type,
                                            ProtocolConformanceRef conformance);
 
+  std::string mangleSymbolNameForMangledGetEnumTagForLayoutString(CanType type);
+
   std::string
   mangleSymbolNameForUnderlyingTypeAccessorString(OpaqueTypeDecl *opaque,
                                                   unsigned index);
@@ -642,12 +687,6 @@ public:
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);
-
-  std::string
-  mangleRuntimeAccessibleAttributeRecord(const NominalTypeDecl *attr) {
-    assert(attr->getAttrs().hasAttribute<RuntimeMetadataAttr>());
-    return mangleNominalTypeSymbol(attr, "Ha");
-  }
 
 protected:
   SymbolicMangling

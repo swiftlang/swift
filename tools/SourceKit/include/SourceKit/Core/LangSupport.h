@@ -17,6 +17,9 @@
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/AST/Type.h"
+#include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/Refactoring/RenameLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -26,6 +29,7 @@
 #include <functional>
 #include <memory>
 #include <unordered_set>
+#include <variant>
 
 namespace llvm {
   class MemoryBuffer;
@@ -33,6 +37,8 @@ namespace llvm {
 
 namespace SourceKit {
 class GlobalConfig;
+using swift::ide::CancellableResult;
+using swift::ide::RenameLoc;
 
 struct EntityInfo {
   UIdent Kind;
@@ -46,7 +52,7 @@ struct EntityInfo {
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
-  Optional<UIdent> EffectiveAccess;
+  llvm::Optional<UIdent> EffectiveAccess;
 
   EntityInfo() = default;
 };
@@ -87,7 +93,7 @@ struct CodeCompletionInfo {
   StringRef AssocUSRs;
   UIdent SemanticContext;
   UIdent TypeRelation;
-  Optional<uint8_t> ModuleImportDepth;
+  llvm::Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
   bool IsSystem;
   unsigned NumBytesToErase;
@@ -117,8 +123,8 @@ struct CodeCompletionInfo {
     IndexRange parameterRange;
   };
 
-  Optional<DescriptionStructure> descriptionStructure;
-  Optional<ArrayRef<ParameterStructure>> parametersStructure;
+  llvm::Optional<DescriptionStructure> descriptionStructure;
+  llvm::Optional<ArrayRef<ParameterStructure>> parametersStructure;
 };
 
 struct ExpressionType {
@@ -215,11 +221,103 @@ enum class DiagnosticCategory {
   NoUsage
 };
 
+struct RawCharSourceRange {
+  unsigned Offset;
+  unsigned Length;
+};
+
+enum class MacroRoleBits: uint8_t {
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
+};
+
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroRole: uint32_t {
+#define MACRO_ROLE(Name, Description) \
+    Name = 1 << static_cast<uint8_t>(MacroRoleBits::Name),
+#include "swift/Basic/MacroRoles.def"
+};
+using MacroRoles = swift::OptionSet<MacroRole>;
+
+struct MacroExpansionInfo {
+  // See swift::ExternalMacroReference.
+  struct ExternalMacroReference {
+    std::string moduleName;
+    std::string typeName;
+
+    ExternalMacroReference(StringRef moduleName, StringRef typeName)
+        : moduleName(moduleName), typeName(typeName){};
+  };
+  // See swift::ExpandedMacroDefinition.
+  struct ExpandedMacroDefinition {
+    // 'Replacement.range' references some part of code in 'expansionText'.
+    // 'expansionText' will be replaced by the 'parameterIndex'-th argument of
+    // the macro.
+    struct Replacement {
+      RawCharSourceRange range;
+      unsigned parameterIndex;
+      Replacement(RawCharSourceRange range, unsigned parameterIndex)
+          : range(range), parameterIndex(parameterIndex) {}
+    };
+    std::string expansionText;
+    std::vector<Replacement> replacements;
+    std::vector<Replacement> genericReplacements;
+
+    ExpandedMacroDefinition(StringRef expansionText)
+        : expansionText(expansionText), replacements(), genericReplacements() {};
+  };
+
+  // Offset of the macro expansion syntax (i.e. attribute or #<macro name>) from
+  // the start of the source file.
+  unsigned offset;
+
+  // Macro roles.
+  MacroRoles roles;
+
+  // Tagged union of macro definition.
+  std::variant<ExternalMacroReference, ExpandedMacroDefinition> macroDefinition;
+
+  MacroExpansionInfo(unsigned offset, MacroRoles roles,
+                     ExternalMacroReference macroRef)
+      : offset(offset), roles(roles), macroDefinition(macroRef) {}
+  MacroExpansionInfo(unsigned offset, MacroRoles roles,
+                     ExpandedMacroDefinition definition)
+      : offset(offset), roles(roles), macroDefinition(definition) {}
+};
+
+/// Stores information about a given buffer, including its name and, if
+/// generated, its source text and original location.
+struct BufferInfo {
+  struct OriginalLocation {
+    std::shared_ptr<const BufferInfo> OrigBufferInfo;
+    unsigned OrigBufferID;
+    RawCharSourceRange Range;
+
+    OriginalLocation(std::shared_ptr<const BufferInfo> OrigBufferInfo,
+                     unsigned OrigBufferID, RawCharSourceRange Range)
+        : OrigBufferInfo(std::move(OrigBufferInfo)), OrigBufferID(OrigBufferID),
+          Range(Range) {}
+  };
+
+  std::string BufferName;
+  llvm::Optional<std::string> Contents;
+  llvm::Optional<OriginalLocation> OrigLocation;
+
+  BufferInfo(std::string BufferName, llvm::Optional<std::string> Contents,
+             llvm::Optional<OriginalLocation> OrigLocation)
+      : BufferName(std::move(BufferName)), Contents(std::move(Contents)),
+        OrigLocation(std::move(OrigLocation)) {}
+};
+using BufferInfoSharedPtr = std::shared_ptr<const BufferInfo>;
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
-    unsigned Offset;
-    unsigned Length;
+    RawCharSourceRange Range;
     std::string Text;
+
+    Fixit(RawCharSourceRange Range, std::string Text)
+        : Range(Range), Text(std::move(Text)) {}
   };
 
   std::string ID;
@@ -227,9 +325,9 @@ struct DiagnosticEntryInfoBase {
   unsigned Offset = 0;
   unsigned Line = 0;
   unsigned Column = 0;
-  std::string Filename;
+  BufferInfoSharedPtr FileInfo;
   SmallVector<DiagnosticCategory, 1> Categories;
-  SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
+  SmallVector<RawCharSourceRange, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
 };
@@ -238,6 +336,35 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   DiagnosticSeverityKind Severity = DiagnosticSeverityKind::Error;
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
+
+struct SwiftSemanticToken {
+  unsigned ByteOffset;
+  unsigned Length : 24;
+  // The code-completion kinds are a good match for the semantic kinds we want.
+  // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
+  swift::ide::CodeCompletionDeclKind Kind : 6;
+  unsigned IsRef : 1;
+  unsigned IsSystem : 1;
+
+  SwiftSemanticToken(swift::ide::CodeCompletionDeclKind Kind,
+                     unsigned ByteOffset, unsigned Length, bool IsRef,
+                     bool IsSystem)
+      : ByteOffset(ByteOffset), Length(Length), Kind(Kind), IsRef(IsRef),
+        IsSystem(IsSystem) {}
+
+  bool getIsRef() const { return static_cast<bool>(IsRef); }
+
+  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
+
+  UIdent getUIdentForKind();
+};
+
+#if !defined(_MSC_VER)
+static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, because static_assert is only for
+// keeping low memory usage.
+#endif
 
 struct SourceFileRange {
   /// The byte offset at which the range begins
@@ -293,9 +420,8 @@ public:
 
   virtual bool diagnosticsEnabled() = 0;
 
-  virtual void setDiagnosticStage(UIdent DiagStage) = 0;
-  virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
-                                UIdent DiagStage) = 0;
+  virtual void handleDiagnostics(ArrayRef<DiagnosticEntryInfo> DiagInfos,
+                                 UIdent DiagStage) = 0;
 
   virtual void handleSourceText(StringRef Text) = 0;
 
@@ -586,11 +712,19 @@ struct CursorInfoData {
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
   StringRef InternalDiagnostic;
-  llvm::ArrayRef<CursorSymbolInfo> Symbols;
+  llvm::SmallVector<CursorSymbolInfo, 1> Symbols;
   /// All available actions on the code under cursor.
-  llvm::ArrayRef<RefactoringInfo> AvailableActions;
+  llvm::SmallVector<RefactoringInfo, 8> AvailableActions;
   /// Whether the ASTContext was reused for this cursor info.
   bool DidReuseAST = false;
+  /// An allocator that can be used to allocate data that is referenced by this
+  /// \c CursorInfoData.
+  llvm::BumpPtrAllocator Allocator;
+
+  bool isEmpty() const {
+    return InternalDiagnostic.empty() && Symbols.empty() &&
+           AvailableActions.empty();
+  }
 
   void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
@@ -610,6 +744,9 @@ struct CursorInfoData {
 
 /// The result type of `LangSupport::getDiagnostics`
 typedef ArrayRef<DiagnosticEntryInfo> DiagnosticsResult;
+
+/// The result of `LangSupport::getSemanticTokens`.
+typedef std::vector<SwiftSemanticToken> SemanticTokensResult;
 
 struct RangeInfo {
   UIdent RangeKind;
@@ -637,15 +774,46 @@ enum class SemanticRefactoringKind {
 
 struct SemanticRefactoringInfo {
   SemanticRefactoringKind Kind;
+  // The name of the input buffer to start the refactoring in. This must either
+  // be empty (in which case the primary file for the AST is used), or exactly
+  // match the buffer identifier stored in the source manager.
+  StringRef InputBufferName;
   unsigned Line;
   unsigned Column;
   unsigned Length;
   StringRef PreferredName;
 };
 
-struct RelatedIdentsInfo {
-  /// (Offset,Length) pairs.
-  ArrayRef<std::pair<unsigned, unsigned>> Ranges;
+struct RelatedIdentInfo {
+  unsigned Offset;
+  unsigned Length;
+  swift::ide::RenameLocUsage Usage;
+};
+
+/// Result of `findRelatedIdentifiersInFile`.
+struct RelatedIdentsResult {
+  SmallVector<RelatedIdentInfo, 8> RelatedIdents;
+  std::optional<std::string> OldName;
+
+  RelatedIdentsResult(SmallVector<RelatedIdentInfo, 8> RelatedIdents,
+                      std::optional<std::string> OldName)
+      : RelatedIdents(RelatedIdents), OldName(OldName) {}
+
+  static RelatedIdentsResult empty() { return RelatedIdentsResult({}, ""); }
+};
+
+/// Represent one branch of an if config.
+/// Either `#if`, `#else` or `#elseif`.
+struct IfConfigInfo {
+  unsigned Offset;
+  bool IsActive;
+
+  IfConfigInfo(unsigned Offset, bool IsActive)
+      : Offset(Offset), IsActive(IsActive) {}
+};
+
+struct ActiveRegionsInfo {
+  ArrayRef<IfConfigInfo> Configs;
 };
 
 /// Filled out by LangSupport::findInterfaceDocument().
@@ -733,7 +901,7 @@ struct RenameRangeDetail {
   unsigned EndLine;
   unsigned EndColumn;
   UIdent Kind;
-  Optional<unsigned> ArgIndex;
+  llvm::Optional<unsigned> ArgIndex;
 };
 
 struct CategorizedRenameRanges {
@@ -741,31 +909,19 @@ struct CategorizedRenameRanges {
   std::vector<RenameRangeDetail> Ranges;
 };
 
-enum class RenameType {
-  Unknown,
-  Definition,
-  Reference,
-  Call
+struct IndexStoreOptions {
+  std::string IndexStorePath;
+  std::string IndexUnitOutputPath;
 };
 
-struct RenameLocation {
-  unsigned Line;
-  unsigned Column;
-  RenameType Type;
-};
-
-struct RenameLocations {
-  StringRef OldName;
-  StringRef NewName;
-  const bool IsFunctionLike;
-  const bool IsNonProtocolType;
-  std::vector<RenameLocation> LineColumnLocs;
-};
+struct IndexStoreInfo{};
 
 typedef std::function<void(RequestResult<ArrayRef<CategorizedEdits>> Result)>
     CategorizedEditsReceiver;
-typedef std::function<void(RequestResult<ArrayRef<CategorizedRenameRanges>> Result)>
+typedef std::function<void(
+    CancellableResult<std::vector<CategorizedRenameRanges>> Result)>
     CategorizedRenameRangesReceiver;
+typedef std::function<void(RequestResult<IndexStoreInfo> Result)> IndexToStoreReceiver;
 
 class DocInfoConsumer {
   virtual void anchor();
@@ -789,7 +945,7 @@ public:
 
   virtual bool finishSourceEntity(UIdent Kind) = 0;
 
-  virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info) = 0;
+  virtual bool handleDiagnostics(ArrayRef<DiagnosticEntryInfo> Diags) = 0;
 };
 
 struct TypeContextInfoItem {
@@ -876,20 +1032,25 @@ public:
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
 
+  virtual void indexToStore(StringRef InputFile,
+                            ArrayRef<const char *> Args,
+                            IndexStoreOptions Opts,
+                            SourceKitCancellationToken CancellationToken,
+                            IndexToStoreReceiver Receiver) = 0;
+
   virtual void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
                             OptionsDictionary *options,
                             CodeCompletionConsumer &Consumer,
                             ArrayRef<const char *> Args,
-                            Optional<VFSOptions> vfsOptions,
+                            llvm::Optional<VFSOptions> vfsOptions,
                             SourceKitCancellationToken CancellationToken) = 0;
 
-  virtual void
-  codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                   unsigned offset, OptionsDictionary *options,
-                   ArrayRef<FilterRule> filterRules,
-                   GroupedCodeCompletionConsumer &consumer,
-                   ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions,
-                   SourceKitCancellationToken CancellationToken) = 0;
+  virtual void codeCompleteOpen(
+      StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
+      OptionsDictionary *options, ArrayRef<FilterRule> filterRules,
+      GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
+      llvm::Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
@@ -908,17 +1069,16 @@ public:
   virtual void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
-  virtual void
-  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) = 0;
+  virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                          EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                          llvm::Optional<VFSOptions> vfsOptions) = 0;
 
-  virtual void editorOpenInterface(EditorConsumer &Consumer,
-                                   StringRef Name,
+  virtual void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
                                    StringRef ModuleName,
-                                   Optional<StringRef> Group,
+                                   llvm::Optional<StringRef> Group,
                                    ArrayRef<const char *> Args,
                                    bool SynthesizedExtensions,
-                                   Optional<StringRef> InterestedUSR) = 0;
+                                   llvm::Optional<StringRef> InterestedUSR) = 0;
 
   virtual void editorOpenTypeInterface(EditorConsumer &Consumer,
                                        ArrayRef<const char *> Args,
@@ -961,42 +1121,68 @@ public:
                                        EditorConsumer &Consumer) = 0;
 
   virtual void getCursorInfo(
-      StringRef Filename, unsigned Offset, unsigned Length, bool Actionables,
-      bool SymbolGraph, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool Actionables, bool SymbolGraph,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      llvm::Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void
-  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> VfsOptions,
+  getDiagnostics(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 llvm::Optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) = 0;
 
+  virtual void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)>
+          Receiver) = 0;
+
   virtual void
-  getNameInfo(StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
+  getNameInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
+              unsigned Offset, NameTranslatingInfo &Input,
               ArrayRef<const char *> Args,
               SourceKitCancellationToken CancellationToken,
               std::function<void(const RequestResult<NameTranslatingInfo> &)>
                   Receiver) = 0;
 
   virtual void getRangeInfo(
-      StringRef Filename, unsigned Offset, unsigned Length,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
   virtual void getCursorInfoFromUSR(
-      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      llvm::Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
+  /// - Parameters:
+  ///   - IncludeNonEditableBaseNames: If `true` also return results if the
+  ///     referenced declaration is an initializer or subscript. This is
+  ///     intended if the related identifiers response is used for rename, which
+  ///     allows renaming parameter labels of these declaration.
+  ///     If the function's base name should be highlighted, this should be
+  ///     `false` because e.g. highlighting a subscript with
+  ///     `IncludeNonEditableBaseNames = true` would return the locations of all
+  ///     `[` that call that subscript.
   virtual void findRelatedIdentifiersInFile(
-      StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+      std::function<void(const RequestResult<RelatedIdentsResult> &)>
+          Receiver) = 0;
+
+  virtual void findActiveRegionsInFile(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ActiveRegionsInfo> &)>
           Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
@@ -1010,31 +1196,27 @@ public:
                                 ArrayRef<const char *> Args,
                                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
-  virtual void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                               ArrayRef<RenameLocations> RenameLocations,
-                               ArrayRef<const char*> Args,
-                               CategorizedEditsReceiver Receiver) = 0;
-
-  virtual void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                                ArrayRef<RenameLocations> RenameLocations,
-                                ArrayRef<const char *> Args,
-                                CategorizedRenameRangesReceiver Receiver) = 0;
+  virtual CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLoc> RenameLocations,
+                   ArrayRef<const char *> Args) = 0;
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,
                         SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
-  virtual void semanticRefactoring(StringRef Filename,
+  virtual void semanticRefactoring(StringRef PrimaryFilePath,
                                    SemanticRefactoringInfo Info,
                                    ArrayRef<const char *> Args,
                                    SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
   virtual void collectExpressionTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
-      bool CanonicalType, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
+      bool FullyQualified, bool CanonicalType,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) = 0;
 
@@ -1042,8 +1224,9 @@ public:
   /// the source file. If `Offset` or `Length` are empty, variable types for
   /// the entire document are collected.
   virtual void collectVariableTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<unsigned> Offset,
+      llvm::Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;
@@ -1056,18 +1239,24 @@ public:
   virtual void getExpressionContextInfo(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
-      TypeContextInfoConsumer &Consumer, Optional<VFSOptions> vfsOptions) = 0;
+      TypeContextInfoConsumer &Consumer,
+      llvm::Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void getConformingMethodList(
       llvm::MemoryBuffer *inputBuf, unsigned Offset, OptionsDictionary *options,
       ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedTypes,
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
-      Optional<VFSOptions> vfsOptions) = 0;
+      llvm::Optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
+                                        ArrayRef<const char *> args,
+                                        ArrayRef<MacroExpansionInfo> expansions,
+                                        CategorizedEditsReceiver receiver) = 0;
 
   virtual void
   performCompile(StringRef Name, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> vfsOptions,
+                 llvm::Optional<VFSOptions> vfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<CompilationResult> &)>
                      Receiver) = 0;

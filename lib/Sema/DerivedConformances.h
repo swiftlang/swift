@@ -29,6 +29,7 @@ class AssociatedTypeDecl;
 class ASTContext;
 struct ASTNode;
 class CallExpr;
+class CaseStmt;
 class Decl;
 class DeclContext;
 class DeclRefExpr;
@@ -386,8 +387,12 @@ public:
   static CallExpr *createBuiltinCall(ASTContext &ctx,
                                      BuiltinValueKind builtin,
                                      ArrayRef<Type> typeArgs,
-                              ArrayRef<ProtocolConformanceRef> conformances,
                                      ArrayRef<Expr *> args);
+
+  /// Build a call to the stdlib function that should be called when unavailable
+  /// code is reached unexpectedly.
+  static CallExpr *
+  createDiagnoseUnavailableCodeReachedCallExpr(ASTContext &ctx);
 
   /// Returns true if this derivation is trying to use a context that isn't
   /// appropriate for deriving.
@@ -409,6 +414,12 @@ public:
   // return false
   static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
                                                Expr *rhsExpr);
+
+  // Return `nil` is the `testExp` is `false`.
+  static GuardStmt *returnNilIfFalseGuardTypeChecked(ASTContext &C,
+                                                     Expr *testExpr,
+                                                     Type optionalWrappedType);
+
   // return lhs < rhs
   static GuardStmt *
   returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);
@@ -446,6 +457,16 @@ public:
   static Pattern *enumElementPayloadSubpattern(
       EnumElementDecl *enumElementDecl, char varPrefix, DeclContext *varContext,
       SmallVectorImpl<VarDecl *> &boundVars, bool useLabels = false);
+
+  /// Creates a synthesized case statement that has the following structure:
+  ///
+  ///     case .<elt>, ..., .<elt>:
+  ///       _diagnoseUnavailableCodeReached()
+  ///
+  /// The number of \c .<elt> matches is equal to \p subPatternCount.
+  static CaseStmt *unavailableEnumElementCaseStmt(
+      Type enumType, EnumElementDecl *enumElementDecl, DeclContext *parentDC,
+      unsigned subPatternCount = 1);
 
   static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  DeclContext *varContext);

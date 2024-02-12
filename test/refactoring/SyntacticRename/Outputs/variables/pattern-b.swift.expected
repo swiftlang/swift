@@ -28,8 +28,8 @@ if let i = opt, let /*var-j:def*/j = opt2 {
 	print(i + /*var-j*/j)
 }
 
-var (a, /*pattern-b:def*/bee) = (1, 2)
-print(a + /*pattern-b*/bee)
+var (a, /*pattern-b:def*/<base>b</base>) = (1, 2)
+print(a + /*pattern-b*/<base>b</base>)
 
 struct S {
 	lazy var lazyVal: Int = {

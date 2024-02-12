@@ -28,14 +28,23 @@ public func makeString(_ s: String, _ y: String) -> String {
 #include "Stringer.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace Stringer;
 
   {
     auto s = String("hello world");
     printString(s);
+    swift::String s2 = "Hello literal";
+    printString(s2);
+    const char *literal = "Test literal via ptr";
+    printString(literal);
+    swift::String s3 = nullptr;
+    printString(s3);
   }
 // CHECK: '''hello world'''
+// CHECK-NEXT: '''Hello literal'''
+// CHECK-NEXT: '''Test literal via ptr'''
+// CHECK-NEXT: ''''''
 
   {
     std::string str = "test std::string";

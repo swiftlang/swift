@@ -121,6 +121,69 @@ SimpleMathTests.test("MultipleResults") {
   expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
 }
 
+// Test function with multiple `inout` parameters and a custom pullback.
+@differentiable(reverse)
+func swapCustom(_ x: inout Float, _ y: inout Float) {
+  let tmp = x; x = y; y = tmp
+}
+@derivative(of: swapCustom)
+func vjpSwapCustom(_ x: inout Float, _ y: inout Float) -> (
+  value: Void, pullback: (inout Float, inout Float) -> Void
+) {
+  swapCustom(&x, &y)
+  return ((), {v1, v2 in
+    let tmp = v1; v1 = v2; v2 = tmp
+  })
+}
+
+SimpleMathTests.test("MultipleResultsWithCustomPullback") {
+  func multiply_swapCustom(_ x: Float, _ y: Float) -> Float {
+    var tuple = (x, y)
+    swapCustom(&tuple.0, &tuple.1)
+    return tuple.0 * tuple.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapCustom))
+}
+
+// Test functions returning tuples.
+@differentiable(reverse)
+func swapTuple(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+
+@differentiable(reverse)
+func swapTupleCustom(_ x: Float, _ y: Float) -> (Float, Float) {
+  return (y, x)
+}
+@derivative(of: swapTupleCustom)
+func vjpSwapTupleCustom(_ x: Float, _ y: Float) -> (
+  value: (Float, Float), pullback: (Float, Float) -> (Float, Float)
+) {
+  return (swapTupleCustom(x, y), {v1, v2 in
+    return (v2, v1)
+  })
+}
+
+SimpleMathTests.test("ReturningTuples") {
+  func multiply_swapTuple(_ x: Float, _ y: Float) -> Float {
+    let result = swapTuple(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTuple))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTuple))
+
+  func multiply_swapTupleCustom(_ x: Float, _ y: Float) -> Float {
+    let result = swapTupleCustom(x, y)
+    return result.0 * result.1
+  }
+
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapTupleCustom))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapTupleCustom))
+}
+
 SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {
@@ -438,20 +501,17 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 
 // CHECK-LABEL: sil private [ossa] @${{.*}}doubled{{.*}}TJp{{.*}} : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float, [[PB0:%.*]] : {{.*}}, [[PB1:%.*]] : {{.*}}):
-// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
-// CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
-// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
-// CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
-// CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
-// CHECK:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"
-// CHECK:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], {{.*}})
-// CHECK:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
-// CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
-// CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
-// CHECK: }
+// CHECK: [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK: ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
+// CHECK: [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT:%.*]] = alloc_stack $SmallTestModel.TangentVector 
+// CHECK: store [[TMP1]] to [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT_FIELD:%.*]] = struct_element_addr [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector, #{{.*}}SmallTestModel.TangentVector.stored 
+// CHECK: [[TMP_RES_ADJ_STRUCT_ADD_ELT:%.*]] = alloc_stack $Float                        
+// CHECK: store [[ADJ_CONCRETE]] to [trivial] [[TMP_RES_ADJ_STRUCT_ADD_ELT]] : $*Float             
+// CHECK: [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()                
+// CHECK: {{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES_ADJ_STRUCT_FIELD]], [[TMP_RES_ADJ_STRUCT_ADD_ELT]], {{.*}}) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: [[RES_STRUCT:%.*]] = load [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector 
+// CHECK: return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 
 runAllTests()

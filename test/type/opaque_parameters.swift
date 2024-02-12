@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol P { }
 
@@ -21,7 +21,7 @@ extension Array: Q where Element: P, Element: Equatable {
   func takesA(_: Element) {}
 }
 
-extension Set: Q where Element: P, Element: Equatable { // expected-warning {{redundant conformance constraint 'Element' : 'Equatable'}}
+extension Set: Q where Element: P, Element: Equatable {
   func f() -> Element {
     return first!
   }
@@ -106,7 +106,7 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
 }
 
 

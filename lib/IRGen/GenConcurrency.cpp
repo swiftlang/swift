@@ -19,6 +19,7 @@
 
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
+#include "GenCall.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -156,10 +157,24 @@ void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
   out.add(impl);
 }
 
+void irgen::emitBuildOrdinaryTaskExecutorRef(
+    IRGenFunction &IGF, llvm::Value *executor, CanType executorType,
+    ProtocolConformanceRef executorConf, Explosion &out) {
+  // The implementation word of an "ordinary" executor is
+  // just the witness table pointer with no flags set.
+  llvm::Value *identity =
+      IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl = emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  out.add(identity);
+  out.add(impl);
+}
+
 void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                                llvm::Value *executor,
                                                CanType executorType,
-                                       ProtocolConformanceRef executorConf,
+                                               ProtocolConformanceRef executorConf,
                                                Explosion &out) {
   // The implementation word of an "ordinary" serial executor is
   // just the witness table pointer with no flags set.
@@ -168,6 +183,31 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
   llvm::Value *impl =
     emitWitnessTableRef(IGF, executorType, executorConf);
   impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  out.add(identity);
+  out.add(impl);
+}
+
+void irgen::emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
+                                               llvm::Value *executor,
+                                               CanType executorType,
+                                               ProtocolConformanceRef executorConf,
+                                               Explosion &out) {
+  llvm::Value *identity =
+    IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+
+  // The implementation word of an "complex equality" serial executor is
+  // the witness table pointer with the ExecutorKind::ComplexEquality flag set.
+  llvm::Value *impl =
+    emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  // NOTE: Refer to SerialExecutorRef::ExecutorKind for the flag values.
+  llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
+  auto complexEqualityExecutorKindFlag =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      0b01));
+  impl = IGF.Builder.CreateOr(impl, complexEqualityExecutorKindFlag);
 
   out.add(identity);
   out.add(impl);
@@ -201,7 +241,13 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   assert(subs.getReplacementTypes().size() == 1 &&
          "startAsyncLet should have a type substitution");
   auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
-  auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
+
+  llvm::Value *futureResultTypeMetadata =
+      llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    futureResultTypeMetadata =
+        IGF.emitAbstractTypeMetadataRef(futureResultType);
+  }
 
   // The concurrency runtime for older Apple OSes has a bug in task formation
   // for `async let`s that may manifest when trying to use room in the
@@ -244,6 +290,9 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
       IGF.IGM.markAsyncFunctionPointerForPadding(taskAsyncFunctionPointer);
     }
   }
+
+  // In embedded Swift, create and pass result type info.
+  taskOptions = addEmbeddedSwiftResultTypeInfo(IGF, taskOptions, subs);
   
   llvm::CallInst *call;
   if (localResultBuffer) {

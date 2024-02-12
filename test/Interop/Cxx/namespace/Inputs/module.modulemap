@@ -54,3 +54,8 @@ module Extensions {
   header "extensions.h"
   requires cplusplus
 }
+
+module Enums {
+  header "enums.h"
+  requires cplusplus
+}

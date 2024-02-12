@@ -19,6 +19,7 @@ import SwiftShims
 /// generated code for API availability checking.
 @_semantics("availability.osversion")
 @_effects(readnone)
+@_unavailableInEmbedded
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -48,6 +49,7 @@ public func _stdlib_isOSVersionAtLeast(
 // generated code for API availability checking.
 @_semantics("availability.osversion")
 @_effects(readnone)
+@_unavailableInEmbedded
 public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -71,6 +73,7 @@ public typealias _SwiftStdlibVersion = SwiftShims._SwiftStdlibVersion
 ///
 /// This function must not be called from inlinable code.
 @inline(__always)
+@_unavailableInEmbedded
 internal func _isExecutableLinkedOnOrAfter(
   _ stdlibVersion: _SwiftStdlibVersion
 ) -> Bool {
@@ -96,12 +99,17 @@ extension _SwiftStdlibVersion {
   public static var v5_8_0: Self { Self(_value: 0x050800) }
   @_alwaysEmitIntoClient
   public static var v5_9_0: Self { Self(_value: 0x050900) }
+  @_alwaysEmitIntoClient
+  public static var v5_10_0: Self { Self(_value: 0x050A00) }
+  @_alwaysEmitIntoClient
+  public static var v5_11_0: Self { Self(_value: 0x050B00) }
 
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v5_9_0 }
+  public static var current: Self { .v5_11_0 }
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension _SwiftStdlibVersion: CustomStringConvertible {
   @available(SwiftStdlib 5.7, *)
   public var description: String {

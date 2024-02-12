@@ -126,16 +126,10 @@
 // redundant rules. This is implemented in HomotopyReduction.cpp and
 // MinimalConformances.cpp.
 //
-// Minimization emits warnings about redundant rules by producing that
-// correspond to user-written requirements by producing RequirementError
-// values.
-//
 // After minimization, the remaining non-redundant rules are converted into
-// the Requirements of a minimal generic signature using the
-// RequirementBuilder.
-//
-// After minimization, the requirement machine undergoes a final state
-// transition into the immutable "frozen" state:
+// the Requirements of a minimal generic signature by the RequirementBuilder.
+// Then, the requirement machine undergoes a final state transition into the
+// immutable "frozen" state:
 //
 //   /-----------------------------\
 //  |  Complete RequirementMachine  |
@@ -279,7 +273,6 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false, protos,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -307,7 +300,7 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
-RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
+RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
@@ -323,12 +316,12 @@ RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithGenericSignatureRequirements(sig.getRequirements());
+  builder.initWithGenericSignature(sig.getGenericParams(),
+                                   sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -366,7 +359,7 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // For RequirementMachine::verify() when called by generic signature queries;
   // We have a single valid generic parameter at depth 0, index 0.
-  Params.push_back(component[0]->getSelfInterfaceType());
+  Params.push_back(component[0]->getSelfInterfaceType()->castTo<GenericTypeParamType>());
 
   if (Dump) {
     llvm::dbgs() << "Adding protocols";
@@ -381,7 +374,6 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, component,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -425,12 +417,11 @@ RequirementMachine::initWithWrittenRequirements(
   // Collect the top-level requirements, and all transitively-referenced
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
-  builder.initWithWrittenRequirements(requirements);
+  builder.initWithWrittenRequirements(genericParams, requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -557,8 +548,8 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   } else {
     out << "fresh signature <";
     for (auto paramTy : Params) {
-      out << " " << paramTy;
-      if (paramTy->castTo<GenericTypeParamType>()->isParameterPack())
+      out << " " << Type(paramTy);
+      if (paramTy->isParameterPack())
         out << "…";
     }
     out << " >";

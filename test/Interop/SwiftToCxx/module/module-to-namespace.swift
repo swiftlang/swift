@@ -9,7 +9,7 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: #define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR("Test", usrValue)
 
-// CHECK-LABEL: namespace Test __attribute__((swift_private)) SWIFT_SYMBOL_MODULE({{.*}}) {
+// CHECK-LABEL: namespace Test SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE({{.*}}) {
 // CHECK:       } // namespace Test
 // CHECK-EMPTY:
 // CHECK-NEXT: #undef SWIFT_SYMBOL

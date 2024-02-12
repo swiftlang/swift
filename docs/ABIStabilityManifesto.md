@@ -310,7 +310,7 @@ For the purposes of this document, "standard calling convention" refers to the C
 
 Calling convention stability pertains to public interfaces. The Swift compiler is free to choose any convention for internal (intra-module) functions and calls.
 
-For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
+For rationale and potentially-out-of-date details, see the [Swift Calling Convention Whitepaper](https://github.com/apple/swift/blob/main/docs/ABI/CallingConvention.rst). As part of nailing down the calling conventions, that document will either be updated with the final specifications of the calling conventions or else moved to a rationale document and a more succinct and rigorous specification put in its place.
 
 ### Register convention
 
@@ -343,7 +343,7 @@ The specific registers used in these roles are documented in [the calling conven
 
 Function signature lowering is the mapping of a function's source-language type, which includes formal parameters and results, all the way down to a physical convention, which dictates what values are stored in what registers and what values to pass on the stack.
 
-ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[#46928](https://github.com/apple/swift/issues/46928)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/main/docs/CallingConvention.rst#function-signature-lowering).
+ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[#46928](https://github.com/apple/swift/issues/46928)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/main/docs/ABI/CallingConvention.rst#function-signature-lowering).
 
 Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[#46531](https://github.com/apple/swift/issues/46531)].
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
@@ -204,23 +205,27 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
   return nullptr;
 }
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   auto It = BufIdentIDMap.find(BufIdentifier);
   if (It == BufIdentIDMap.end())
-    return None;
+    return llvm::None;
   return It->second;
 }
 
 SourceManager::~SourceManager() {
   for (auto &generated : GeneratedSourceInfos) {
     free((void*)generated.second.onDiskBufferCopyFileName.data());
+
+    if (generated.second.ancestors.size() > 0) {
+      delete [] generated.second.ancestors.data();
+    }
   }
 }
 
 /// Dump the contents of the given memory buffer to a file, returning the
 /// name of that file (when successful) and \c None otherwise.
-static Optional<std::string>
+static llvm::Optional<std::string>
 dumpBufferToFile(const llvm::MemoryBuffer *buffer,
                  const SourceManager &sourceMgr,
                  CharSourceRange originalSourceRange) {
@@ -229,7 +234,7 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
   llvm::sys::path::system_temp_directory(true, outputFileName);
   llvm::sys::path::append(outputFileName, "swift-generated-sources");
   if (llvm::sys::fs::create_directory(outputFileName))
-    return None;
+    return llvm::None;
 
   // Finalize the name of the resulting file. This is unique based on name
   // mangling.
@@ -267,7 +272,7 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
       }
     });
   if (ec)
-    return None;
+    return llvm::None;
 
   return outputFileName.str().str();
 }
@@ -356,7 +361,7 @@ StringRef SourceManager::getEntireTextForBuffer(unsigned BufferID) const {
 }
 
 StringRef SourceManager::extractText(CharSourceRange Range,
-                                     Optional<unsigned> BufferID) const {
+                                     llvm::Optional<unsigned> BufferID) const {
   assert(Range.isValid() && "range should be valid");
 
   if (!BufferID)
@@ -373,13 +378,9 @@ void SourceManager::setGeneratedSourceInfo(
   GeneratedSourceInfos[bufferID] = info;
 
   switch (info.kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion:
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
+#define MACRO_ROLE(Name, Description) \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 
@@ -394,30 +395,131 @@ void SourceManager::setGeneratedSourceInfo(
   }
 }
 
-Optional<GeneratedSourceInfo> SourceManager::getGeneratedSourceInfo(
-    unsigned bufferID
-) const {
+bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
+  return GeneratedSourceInfos.count(bufferID);
+}
+
+llvm::Optional<GeneratedSourceInfo>
+SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
-    return None;
+    return llvm::None;
   return known->second;
 }
 
-Optional<unsigned>
+namespace {
+  /// Compare the source location ranges for two buffers, as an ordering to
+  /// use for fast searches.
+  struct BufferIDRangeComparison {
+    const SourceManager *sourceMgr;
+
+    bool operator()(unsigned lhsID, unsigned rhsID) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      // If the source buffers are identical, we want the higher-numbered
+      // source buffers to occur first. This is important when uniquing.
+      if (lhsRange == rhsRange)
+        return lhsID > rhsID;
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getStart().getOpaquePointerValue(),
+          (const char *)rhsRange.getStart().getOpaquePointerValue());
+    }
+
+    bool operator()(unsigned lhsID, SourceLoc rhsLoc) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
+          (const char *)rhsLoc.getOpaquePointerValue());
+    }
+
+    bool operator()(SourceLoc lhsLoc, unsigned rhsID) const {
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsLoc.getOpaquePointerValue(),
+          (const char *)rhsRange.getEnd().getOpaquePointerValue());
+    }
+  };
+
+  /// Determine whether the source ranges for two buffers are equivalent.
+  struct BufferIDSameRange {
+    const SourceManager *sourceMgr;
+
+    bool operator()(unsigned lhsID, unsigned rhsID) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      return lhsRange == rhsRange;
+    }
+  };
+}
+
+llvm::Optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
-  // Search the buffers back-to front, so later alias buffers are
-  // visited first.
-  auto less_equal = std::less_equal<const char *>();
-  for (unsigned i = LLVMSourceMgr.getNumBuffers(), e = 1; i >= e; --i) {
-    auto Buf = LLVMSourceMgr.getMemoryBuffer(i);
-    if (less_equal(Buf->getBufferStart(), Loc.Value.getPointer()) &&
+
+  // If the cache is out-of-date, update it now.
+  unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
+  if (numBuffers != LocCache.numBuffersOriginal) {
+    LocCache.sortedBuffers.assign(
+        std::begin(range(1, numBuffers+1)), std::end(range(1, numBuffers+1)));
+    LocCache.numBuffersOriginal = numBuffers;
+
+    // Sort the buffer IDs by source range.
+    std::sort(LocCache.sortedBuffers.begin(),
+              LocCache.sortedBuffers.end(),
+              BufferIDRangeComparison{this});
+
+    // Remove lower-numbered buffers with the same source ranges as higher-
+    // numbered buffers. We want later alias buffers to be found first.
+    auto newEnd = std::unique(
+        LocCache.sortedBuffers.begin(), LocCache.sortedBuffers.end(),
+        BufferIDSameRange{this});
+    LocCache.sortedBuffers.erase(newEnd, LocCache.sortedBuffers.end());
+
+    // Forget the last buffer we looked at; it might have been replaced.
+    LocCache.lastBufferID = llvm::None;
+  }
+
+  // Determine whether the source location we're looking for is within the
+  // given buffer ID.
+  auto isInBuffer = [&](unsigned bufferID) {
+    auto less_equal = std::less_equal<const char *>();
+    auto buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
+
+    return less_equal(buffer->getBufferStart(), Loc.Value.getPointer()) &&
         // Use <= here so that a pointer to the null at the end of the buffer
         // is included as part of the buffer.
-        less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
-      return i;
+        less_equal(Loc.Value.getPointer(), buffer->getBufferEnd());
+  };
+
+  // Check the last buffer we looked in.
+  if (auto lastBufferID = LocCache.lastBufferID) {
+    if (isInBuffer(*lastBufferID))
+      return *lastBufferID;
   }
-  return None;
+
+  // Search the sorted list of buffer IDs.
+  auto found = std::lower_bound(LocCache.sortedBuffers.begin(),
+                                LocCache.sortedBuffers.end(),
+                                Loc,
+                                BufferIDRangeComparison{this});
+
+  // If the location was past the range covered by source buffers or
+  // is not within any of the source buffers, fail.
+  if (found == LocCache.sortedBuffers.end() || !isInBuffer(*found))
+    return llvm::None;
+
+  // Cache the buffer ID we just found, because the next location is likely to
+  // be close by.
+  LocCache.lastBufferID = *found;
+  return *found;
 }
 
 unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
@@ -429,6 +531,23 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
 
 bool SourceManager::isOwning(SourceLoc Loc) const {
   return findBufferContainingLocInternal(Loc).has_value();
+}
+
+SourceRange SourceRange::combine(ArrayRef<SourceRange> ranges) {
+  if (ranges.empty())
+    return SourceRange();
+
+  SourceRange result = ranges.front();
+  for (auto other : ranges.drop_front()) {
+    if (!other)
+      continue;
+    if (!result) {
+      result = other;
+      continue;
+    }
+    result.widen(other);
+  }
+  return result;
 }
 
 void SourceRange::widen(SourceRange Other) {
@@ -537,14 +656,14 @@ SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
   if (BegOffset && EndOffset) {
      return EndOffset.value() - BegOffset.value();
   }
-  return None;
+  return llvm::None;
 }
 
 llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                                                            unsigned Line,
                                                            unsigned Col) const {
   if (Line == 0) {
-    return None;
+    return llvm::None;
   }
   const bool LineEnd = (Col == ~0u);
   if (LineEnd)
@@ -554,7 +673,7 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                  ->getLLVMSourceMgr()
                  .FindLocForLineAndColumn(BufferId, Line, Col);
   if (!loc.isValid())
-    return None;
+    return llvm::None;
 
   auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
   const char *Ptr = loc.getPointer();
@@ -618,4 +737,109 @@ SourceManager::getLocForForeignLoc(SourceLoc otherLoc,
   }
 
   return SourceLoc();
+}
+
+/// Populate the ancestors list for this buffer, with the root source buffer
+/// at the beginning and the given source buffer at the end.
+static void populateAncestors(
+    const SourceManager &sourceMgr, unsigned bufferID,
+    SmallVectorImpl<unsigned> &ancestors) {
+  if (auto info = sourceMgr.getGeneratedSourceInfo(bufferID)) {
+    auto ancestorLoc = info->originalSourceRange.getStart();
+    if (ancestorLoc.isValid()) {
+      auto ancestorBufferID = sourceMgr.findBufferContainingLoc(ancestorLoc);
+      populateAncestors(sourceMgr, ancestorBufferID, ancestors);
+    }
+  }
+
+  ancestors.push_back(bufferID);
+}
+
+ArrayRef<unsigned> SourceManager::getAncestors(
+    unsigned bufferID, unsigned &scratch
+) const {
+  // If there is no generated source information for this buffer, then this is
+  // the only buffer here. Avoid memory allocation by using the scratch space
+  // we were given.
+  auto knownInfo = GeneratedSourceInfos.find(bufferID);
+  if (knownInfo == GeneratedSourceInfos.end()) {
+    scratch = bufferID;
+    return ArrayRef<unsigned>(&scratch, 1);
+  }
+
+  // If we already have the ancestors cached, use them.
+  if (!knownInfo->second.ancestors.empty())
+    return knownInfo->second.ancestors;
+
+  // Compute all of the ancestors. We only do this once for a given buffer.
+  SmallVector<unsigned, 4> ancestors;
+  populateAncestors(*this, bufferID, ancestors);
+
+  // Cache the ancestors in the generated source info record.
+  unsigned *ancestorsPtr = new unsigned [ancestors.size()];
+  std::copy(ancestors.begin(), ancestors.end(), ancestorsPtr);
+  knownInfo->second.ancestors = llvm::makeArrayRef(ancestorsPtr, ancestors.size());
+  return knownInfo->second.ancestors;
+}
+
+
+/// Determine whether the first source location precedes the second, accounting
+/// for macro expansions.
+static bool isBeforeInSource(
+    const SourceManager &sourceMgr, SourceLoc firstLoc, SourceLoc secondLoc,
+    bool allowEqual) {
+  // If the two locations are in the same source buffer, compare their pointers.
+  unsigned firstBufferID = sourceMgr.findBufferContainingLoc(firstLoc);
+  unsigned secondBufferID = sourceMgr.findBufferContainingLoc(secondLoc);
+  if (firstBufferID == secondBufferID) {
+    return sourceMgr.isBeforeInBuffer(firstLoc, secondLoc) ||
+        (allowEqual && firstLoc == secondLoc);
+  }
+
+  // If the two locations are in different source buffers, we need to compute
+  // the least common ancestor.
+  unsigned firstScratch, secondScratch;
+  auto firstAncestors = sourceMgr.getAncestors(firstBufferID, firstScratch);
+  auto secondAncestors = sourceMgr.getAncestors(secondBufferID, secondScratch);
+
+  // Find the first mismatch between the two ancestor lists; this is the
+  // point of divergence.
+  auto [firstMismatch, secondMismatch] = std::mismatch(
+      firstAncestors.begin(), firstAncestors.end(),
+      secondAncestors.begin(), secondAncestors.end());
+  assert(firstMismatch != firstAncestors.begin() &&
+         secondMismatch != secondAncestors.begin() &&
+         "Ancestors don't have the same root source file");
+
+  SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
+      ? firstLoc
+      : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
+          ->originalSourceRange.getEnd();
+  SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
+      ? secondLoc
+      : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
+          ->originalSourceRange.getEnd();
+  return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
+    (allowEqual && firstLocInLCA == secondLocInLCA);
+}
+
+bool SourceManager::isBefore(SourceLoc first, SourceLoc second) const {
+  return isBeforeInSource(*this, first, second, /*allowEqual=*/false);
+}
+
+bool SourceManager::isAtOrBefore(SourceLoc first, SourceLoc second) const {
+  return isBeforeInSource(*this, first, second, /*allowEqual=*/true);
+}
+
+bool SourceManager::containsTokenLoc(SourceRange range, SourceLoc loc) const {
+  return isAtOrBefore(range.Start, loc) && isAtOrBefore(loc, range.End);
+}
+
+bool SourceManager::containsLoc(SourceRange range, SourceLoc loc) const {
+  return isAtOrBefore(range.Start, loc) && isBefore(loc, range.End);
+}
+
+bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
+  return containsLoc(enclosing, inner.Start) &&
+      isAtOrBefore(inner.End, enclosing.End);
 }

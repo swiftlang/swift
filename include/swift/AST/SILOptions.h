@@ -31,9 +31,6 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert lexical markers.
-  Off = 0,
-
   // Insert lexical markers via lexical borrow scopes and the lexical flag on
   // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
   // Raw SIL.
@@ -59,17 +56,18 @@ enum class CopyPropagationOption : uint8_t {
 };
 
 enum class DestroyHoistingOption : uint8_t {
-  // Do not run SSADestroyHoisting.
+  // Do not run DestroyAddrHoisting.
   Off = 0,
 
-  // Run SSADestroyHoisting pass after AllocBoxToStack in the function passes.
+  // Run DestroyAddrHoisting pass after AllocBoxToStack in the function passes.
   On = 1
 };
 
 enum class CrossModuleOptimizationMode : uint8_t {
   Off = 0,
   Default = 1,
-  Aggressive = 2
+  Aggressive = 2,
+  Everything = 3,
 };
 
 class SILModule;
@@ -98,7 +96,7 @@ public:
   /// When this is 'On' the pipeline has default behavior.
   CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
 
-  /// Whether to run the SSADestroyHoisting pass.
+  /// Whether to run the DestroyAddrHoisting pass.
   ///
   /// When this 'On' the pipeline has the default behavior.
   DestroyHoistingOption DestroyHoisting = DestroyHoistingOption::On;
@@ -117,6 +115,9 @@ public:
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
 
+  /// Controls whether to run async demotion pass.
+  bool EnableAsyncDemotion = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -124,9 +125,6 @@ public:
 
   /// Controls whether cross module optimization is enabled.
   CrossModuleOptimizationMode CMOMode = CrossModuleOptimizationMode::Off;
-
-  /// Enables experimental performance annotations.
-  bool EnablePerformanceAnnotations = false;
 
   /// Enables the emission of stack protectors in functions.
   bool EnableStackProtection = true;
@@ -173,8 +171,20 @@ public:
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  // The kind of function bodies to skip emitting.
+  /// Require linear OSSA lifetimes after SILGen
+  bool OSSACompleteLifetimes = false;
+
+  /// Enable pack metadata stack "promotion".
+  ///
+  /// More accurately, enable skipping mandatory heapification of pack metadata
+  /// when possible.
+  bool EnablePackMetadataStackPromotion = true;
+
+  /// The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
+
+  /// Whether to skip declarations that are internal to the module.
+  bool SkipNonExportableDecls = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -265,6 +275,12 @@ public:
   /// Warning: this is not thread safe. It can only be enabled in case there
   /// is a single SILModule in a single thread.
   bool checkSILModuleLeaks = false;
+
+  /// Are we building in embedded Swift mode?
+  bool EmbeddedSwift = false;
+
+  /// Are we building in embedded Swift + -no-allocations?
+  bool NoAllocations = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

@@ -51,6 +51,9 @@ open class ManagedBuffer<Header, Element> {
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
+
+  @inlinable
+  deinit {}
 }
 
 extension ManagedBuffer {
@@ -560,6 +563,14 @@ public func isKnownUniquelyReferenced<T: AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
+
+#if $Embedded
+@inlinable
+public func isKnownUniquelyReferenced(_ object: inout Builtin.NativeObject) -> Bool
+{
+  return _isUnique(&object)
+}
+#endif
 
 /// Returns a Boolean value indicating whether the given object is known to
 /// have a single strong reference.

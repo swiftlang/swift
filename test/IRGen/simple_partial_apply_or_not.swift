@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-ir -module-name test %s | %FileCheck %s
-// RUN: %target-run-simple-swift %s | %FileCheck %s --check-prefix=CHECK-EXEC
+// RUN: %target-swift-emit-ir -Xllvm -sil-disable-pass=Simplification -module-name test %s | %FileCheck %s
+// RUN: %target-run-simple-swift -Xllvm -sil-disable-pass=Simplification %s | %FileCheck %s --check-prefix=CHECK-EXEC
 
 // REQUIRES: executable_test
 
@@ -23,7 +23,7 @@ struct State<T> {
 }
 
 struct S {
-  @State var value: Int = 1
+  @State var value: Int64 = 1
 
   init() {
     value = 10 // CRASH
@@ -38,11 +38,11 @@ print(s)
 // because the ABI of closure requires swiftself in the context parameter but
 // the method of this self type (struct S) does not.
 
-// CHECK: define {{.*}}swiftcc %T4test5StateV9Reference33_C903A018FCE7355FD30EF8324850EB90LLCySi_G* @"$s4test1SVACycfC"()
-// CHECK:  call swiftcc void {{.*}}"$s4test1SV5valueSivsTA
-// CHECK:  ret %T4test5StateV9Reference33_C903A018FCE7355FD30EF8324850EB90LLCySi_G
+// CHECK: define {{.*}}swiftcc ptr @"$s4test1SVACycfC"()
+// CHECK:  [[RES:%.*]] = call swiftcc ptr @"$s4test1SV5values5Int64VvpfP"(i64 1)
+// CHECK:  ret ptr [[RES]]
 
 // This used to crash.
 
 // CHECK-EXEC: Hello!
-// CHECK-EXEC: S(_value: main.State<Swift.Int>(ref: main.State<Swift.Int>.(unknown context at {{.*}}).Reference))
+// CHECK-EXEC: S(_value: main.State<Swift.Int64>(ref: main.State<Swift.Int64>.(unknown context at {{.*}}).Reference))

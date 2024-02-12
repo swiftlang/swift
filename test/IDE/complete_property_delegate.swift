@@ -32,11 +32,9 @@ class MyClass {
 
   func test() {
     let _ = #^CONTEXT^#
-// CONTEXT: Begin completions
 // CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      foo[#MyMember#];
 // CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      $foo[#String#];
 // CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      _foo[#Lazzzy<MyMember>#];
-// CONTEXT: End completions
 
     let _ = foo.#^CONTEXT_VARNAME^#
 // CONTEXT_VARNAME: Begin completions, 3 items
@@ -68,12 +66,10 @@ class MyClass {
 
 func paramTest(@Lazzzy arg: MyMember) {
     #^PARAM^#
-// PARAM: Begin completions
 // PARAM-DAG: Decl[LocalVar]/Local:               arg[#MyMember#]; name=arg
 // PARAM-DAG: Decl[LocalVar]/Local:               $arg[#String#]; name=$arg
 // PARAM-DAG: Decl[LocalVar]/Local:               _arg[#Lazzzy<MyMember>#]; name=_arg
 // PARAM-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg:)
-// PARAM: End completions
 }
 func closureTest() {
     func receive(fn: (MyMember) -> Void) {}
@@ -88,11 +84,9 @@ func localTest() {
     @Lazzzy var local: MyMember = .zero
 
     #^LOCAL^#
-// LOCAL: Begin completions
 // LOCAL-DAG: Decl[LocalVar]/Local:               local[#MyMember#]; name=local
 // LOCAL-DAG: Decl[LocalVar]/Local:               $local[#String#]; name=$local
 // LOCAL-DAG: Decl[LocalVar]/Local:               _local[#Lazzzy<MyMember>#]; name=_local
 // LOCAL-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg:)
-// LOCAL: End completions
 }
 

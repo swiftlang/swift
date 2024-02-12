@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -762,6 +762,7 @@ extension Unicode {
     case kannada = "Kannada"
     case katakana = "Katakana"
     case katakanaOrHiragana = "Katakana_Or_Hiragana"
+    case kawi = "Kawi"
     case kayahLi = "Kayah_Li"
     case kharoshthi = "Kharoshthi"
     case khitanSmallScript = "Khitan_Small_Script"
@@ -796,6 +797,7 @@ extension Unicode {
     case multani = "Multani"
     case myanmar = "Myanmar"
     case nabataean = "Nabataean"
+    case nagMundari = "Nag_Mundari"
     case nandinagari = "Nandinagari"
     case newa = "Newa"
     case newTaiLue = "New_Tai_Lue"
@@ -962,6 +964,7 @@ func classifyScriptProperty(
     case "java", "javanese":              return .javanese
     case "kali", "kayahli":               return .kayahLi
     case "kana", "katakana":              return .katakana
+    case "kawi":                          return .kawi
     case "khar", "kharoshthi":            return .kharoshthi
     case "khmr", "khmer":                 return .khmer
     case "khoj", "khojki":                return .khojki
@@ -994,6 +997,7 @@ func classifyScriptProperty(
     case "mtei", "meeteimayek":           return .meeteiMayek
     case "mult", "multani":               return .multani
     case "mymr", "myanmar":               return .myanmar
+    case "nagm", "nagmundari":           return .nagMundari
     case "nand", "nandinagari":           return .nandinagari
     case "narb", "oldnortharabian":       return .oldNorthArabian
     case "nbat", "nabataean":             return .nabataean

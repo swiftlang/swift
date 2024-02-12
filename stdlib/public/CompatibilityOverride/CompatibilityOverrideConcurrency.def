@@ -77,6 +77,11 @@
 #  define OVERRIDE_TASK_GROUP OVERRIDE
 #  define OVERRIDE_TASK_LOCAL OVERRIDE
 #  define OVERRIDE_TASK_STATUS OVERRIDE
+#ifndef HOOKED_OVERRIDE_TASK_NORETURN
+# define HOOKED_OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace,       \
+                                      typedArgs, namedArgs)                   \
+  OVERRIDE(name, void, attrs, ccAttrs, namespace, typedArgs, namedArgs)
+#endif
 #else
 #  ifndef OVERRIDE_ACTOR
 #    define OVERRIDE_ACTOR(...)
@@ -96,30 +101,45 @@
 #  ifndef OVERRIDE_TASK_STATUS
 #    define OVERRIDE_TASK_STATUS(...)
 #  endif
+#  ifndef HOOKED_OVERRIDE_TASK_NORETURN
+#    define HOOKED_OVERRIDE_TASK_NORETURN(...)
+#  endif
 #endif
 
 OVERRIDE_ACTOR(task_enqueue, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (class Job *job, ExecutorRef executor),
+               swift::, (Job *job, SerialExecutorRef executor),
                (job, executor))
 
 OVERRIDE_ACTOR(job_run, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (class Job *job, ExecutorRef executor),
+               swift::, (Job *job, SerialExecutorRef executor),
                (job, executor))
 
-OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
+OVERRIDE_ACTOR(job_run_on_task_executor, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (Job *job, TaskExecutorRef executor),
+               (job, executor))
+
+OVERRIDE_ACTOR(job_run_on_serial_and_task_executor, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (Job *job,
+                         SerialExecutorRef serialExecutor,
+                         TaskExecutorRef taskExecutor),
+               (job, serialExecutor, taskExecutor))
+
+OVERRIDE_ACTOR(task_getCurrentExecutor, SerialExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
 
 OVERRIDE_ACTOR(task_isCurrentExecutor, bool,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (ExecutorRef executor), (executor))
+               swift::, (SerialExecutorRef executor), (executor))
 
 OVERRIDE_ACTOR(task_switch, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
                swift::, (SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
-               TaskContinuationFunction *resumeFunction, ExecutorRef newExecutor),
+               TaskContinuationFunction *resumeFunction, SerialExecutorRef newExecutor),
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
@@ -181,9 +201,10 @@ OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               (size_t priority,
                AsyncTask *continuation), (priority, continuation))
 
-OVERRIDE_TASK(task_asyncMainDrainQueue, void,
-              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              , )
+HOOKED_OVERRIDE_TASK_NORETURN(task_asyncMainDrainQueue,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, ,)
+
 
 OVERRIDE_TASK(task_suspend, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -191,7 +212,7 @@ OVERRIDE_TASK(task_suspend, AsyncTask *,
 
 OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
+              (AsyncTask *task, SerialExecutorRef newExecutor), (task, newExecutor))
 
 OVERRIDE_TASK(continuation_init, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -373,6 +394,25 @@ OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
                      swift::, (AsyncTask *task, JobPriority newPriority),
                      (task, newPriority))
 
+OVERRIDE_TASK_STATUS(task_getPreferredTaskExecutor, TaskExecutorRef,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, , )
+
+OVERRIDE_TASK_STATUS(task_pushTaskExecutorPreference,
+                     TaskExecutorPreferenceStatusRecord*,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskExecutorRef executor),
+                     (executor))
+
+OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskExecutorPreferenceStatusRecord *record),
+                     (record))
+
+OVERRIDE_TASK(task_startOnMainActor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, (AsyncTask *task), (task))
+
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK
@@ -380,3 +420,4 @@ OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
 #undef OVERRIDE_TASK_GROUP
 #undef OVERRIDE_TASK_LOCAL
 #undef OVERRIDE_TASK_STATUS
+#undef HOOKED_OVERRIDE_TASK_NORETURN

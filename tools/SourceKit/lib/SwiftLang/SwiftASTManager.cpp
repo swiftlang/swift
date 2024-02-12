@@ -20,6 +20,7 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Tracing.h"
 
+#include "swift/AST/PluginLoader.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -106,6 +107,10 @@ struct SwiftInvocation::Implementation {
 
 SwiftInvocation::~SwiftInvocation() {
   delete &Impl;
+}
+
+ArrayRef<std::string> SwiftInvocation::getArgs() const {
+  return ArrayRef(Impl.Opts.Args);
 }
 
 void SwiftInvocation::applyTo(swift::CompilerInvocation &CompInvok) const {
@@ -553,10 +558,12 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats,
-      std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+      std::shared_ptr<RequestTracker> ReqTracker,
+      std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
       StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        ReqTracker(ReqTracker), SwiftExecutablePath(SwiftExecutablePath),
+        ReqTracker(ReqTracker), Plugins(Plugins),
+        SwiftExecutablePath(SwiftExecutablePath),
         RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
@@ -566,6 +573,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::shared_ptr<RequestTracker> ReqTracker;
+  std::shared_ptr<PluginRegistry> Plugins;
   /// The path of the swift-frontend executable.
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
@@ -605,6 +613,13 @@ struct SwiftASTManager::Implementation {
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
 
+  /// Queue on which consumers may be notified about results and cancellation.
+  /// This is essentially just a background queue to which we can jump to inform
+  /// consumers while making sure that no locks are currently claimed.
+  WorkQueue ConsumerNotificationQueue{
+      WorkQueue::Dequeuing::Concurrent,
+      "SwiftASTManager::Implementation::ConsumerNotificationQueue"};
+
   /// Remove all scheduled consumers that don't exist anymore. This is just a
   /// garbage-collection operation to make sure the \c ScheduledConsumers vector
   /// doesn't explode. One should never make assumptions that all consumers in
@@ -638,9 +653,10 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats,
-    std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+    std::shared_ptr<RequestTracker> ReqTracker,
+    std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
     StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
-    : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker,
+    : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker, Plugins,
                                SwiftExecutablePath, RuntimeResourcePath,
                                DiagnosticDocumentationPath)) {}
 
@@ -773,9 +789,11 @@ void SwiftASTManager::processASTAsync(
       // Cancel any consumers with the same OncePerASTToken.
       for (auto ScheduledConsumer : Impl.ScheduledConsumers) {
         if (ScheduledConsumer.OncePerASTToken == OncePerASTToken) {
-          if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
-            Consumer->requestCancellation();
-          }
+          Impl.ConsumerNotificationQueue.dispatch([ScheduledConsumer]() {
+            if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
+              Consumer->requestCancellation();
+            }
+          });
         }
       }
     }
@@ -785,11 +803,17 @@ void SwiftASTManager::processASTAsync(
   Producer->enqueueConsumer(ASTConsumer, fileSystem, shared_from_this());
 
   auto WeakConsumer = SwiftASTConsumerWeakRef(ASTConsumer);
-  Impl.ReqTracker->setCancellationHandler(CancellationToken, [WeakConsumer] {
-    if (auto Consumer = WeakConsumer.lock()) {
-      Consumer->requestCancellation();
-    }
-  });
+  auto WeakThis = std::weak_ptr<SwiftASTManager>(shared_from_this());
+  Impl.ReqTracker->setCancellationHandler(
+      CancellationToken, [WeakConsumer, WeakThis] {
+        if (auto This = WeakThis.lock()) {
+          This->Impl.ConsumerNotificationQueue.dispatch([WeakConsumer]() {
+            if (auto Consumer = WeakConsumer.lock()) {
+              Consumer->requestCancellation();
+            }
+          });
+        }
+      });
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -860,8 +884,11 @@ SwiftASTManager::Implementation::getMemoryBuffer(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) const {
   assert(FileSystem);
+  // Avoid memory-mapping as it could prevent the user from
+  // saving the file in the editor.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      FileSystem->getBufferForFile(Filename);
+      FileSystem->getBufferForFile(Filename, /*FileSize*/-1,
+          /*RequiresNullTerminator*/true, /*IsVolatile*/true);
   if (FileBufOrErr)
     return std::move(FileBufOrErr.get());
 
@@ -941,12 +968,14 @@ void ASTBuildOperation::requestConsumerCancellation(
     return;
   }
   Consumers.erase(ConsumerIndex);
-  Consumer->cancelled();
   if (Consumers.empty()) {
     // If there are no more consumers waiting for this result, cancel the AST
     // build.
     CancellationFlag->store(true, std::memory_order_relaxed);
   }
+  ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
+    Consumer->cancelled();
+  });
 }
 
 static void collectModuleDependencies(ModuleDecl *TopMod,
@@ -1018,11 +1047,15 @@ void ASTBuildOperation::informConsumer(SwiftASTConsumerRef Consumer) {
                     "more consumers attached to it and should not accept any "
                     "new consumers if the build operation was cancelled. Thus "
                     "this case should never happen.");
-    Consumer->cancelled();
+    ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer] {
+      Consumer->cancelled();
+    });
   } else if (Result.AST) {
     Result.AST->Impl.consumeAsync(Consumer, Result.AST);
   } else {
-    Consumer->failed(Result.Error);
+    ASTManager->Impl.ConsumerNotificationQueue.dispatch([Consumer, Error = Result.Error] {
+      Consumer->failed(Error);
+    });
   }
 }
 
@@ -1073,6 +1106,8 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     }
     return nullptr;
   }
+  CompIns.getASTContext().getPluginLoader().setRegistry(
+      ASTManager->Impl.Plugins.get());
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
@@ -1081,7 +1116,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
 
   CloseClangModuleFiles scopedCloseFiles(
       *CompIns.getASTContext().getClangModuleLoader());
-  Consumer.setInputBufferIDs(ASTRef->getCompilerInstance().getInputBufferIDs());
   CompIns.performSema();
 
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
@@ -1151,6 +1185,7 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
                             /*ExpectedOldState=*/State::Running);
         };
 
+        SmallVector<SwiftASTConsumerRef, 4> ConsumersToCancel;
         {
           llvm::sys::ScopedLock L(ConsumersAndResultMtx);
           if (Consumers.empty()) {
@@ -1161,24 +1196,25 @@ void ASTBuildOperation::schedule(WorkQueue Queue) {
           if (CancellationFlag->load(std::memory_order_relaxed)) {
             assert(false && "We should only set the cancellation flag if there "
                             "are no more consumers");
-            for (auto &Consumer : Consumers) {
-              Consumer->cancelled();
-            }
+            ConsumersToCancel = Consumers;
           }
+        }
+        for (auto &Consumer : ConsumersToCancel) {
+          Consumer->cancelled();
         }
 
         std::string Error;
         assert(!Result && "We should only be producing a result once");
         ASTUnitRef AST = buildASTUnit(Error);
-        SmallVector<SwiftASTConsumerRef, 4> LocalConsumers;
+        SmallVector<SwiftASTConsumerRef, 4> ConsumersToInform;
         {
           llvm::sys::ScopedLock L(ConsumersAndResultMtx);
           bool WasCancelled = CancellationFlag->load(std::memory_order_relaxed);
           Result.emplace(AST, Error, WasCancelled);
-          LocalConsumers = Consumers;
+          ConsumersToInform = Consumers;
           Consumers = {};
         }
-        for (auto &Consumer : LocalConsumers) {
+        for (auto &Consumer : ConsumersToInform) {
           informConsumer(Consumer);
         }
         DidFinishCallback();
@@ -1209,14 +1245,41 @@ bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
   return true;
 }
 
+/// Returns a build operation that `Consumer` can use, in order of the
+/// following:
+///   1. The latest finished build operation that either exactly matches, or
+///      can be used with snapshots
+///   2. If none, the latest in-progress build operation with the same
+///      conditions
+///   3. `nullptr` otherwise
 ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SwiftASTManagerRef Mgr) {
+  ASTBuildOperationRef LatestUsableOp;
+  Statistic *StatCount = nullptr;
   for (auto &BuildOp : llvm::reverse(BuildOperations)) {
-    if (BuildOp->isCancelled()) {
+    if (BuildOp->isCancelled())
+      continue;
+
+    // No point checking for a match, we already have one - we're just looking
+    // for a finished operation that can be used with the file contents of
+    // `BuildOp` at this point (which we will prefer over an incomplete
+    // operation, whether that exactly matches or not).
+    if (LatestUsableOp && !BuildOp->isFinished())
+      continue;
+
+    // Check for an exact match
+    if (BuildOp->matchesSourceState(FileSystem)) {
+      LatestUsableOp = BuildOp;
+      StatCount = &Mgr->Impl.Stats->numASTCacheHits;
+      if (BuildOp->isFinished())
+        break;
       continue;
     }
+
+    // Check for whether the operation can be used taking into account
+    // snapshots
     std::vector<ImmutableTextSnapshotRef> Snapshots;
     Snapshots.reserve(BuildOp->getFileContents().size());
     for (auto &FileContent : BuildOp->getFileContents()) {
@@ -1224,15 +1287,19 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
         Snapshots.push_back(FileContent.Snapshot);
       }
     }
-    if (BuildOp->matchesSourceState(FileSystem)) {
-      ++Mgr->Impl.Stats->numASTCacheHits;
-      return BuildOp;
-    } else if (Consumer->canUseASTWithSnapshots(Snapshots)) {
-      ++Mgr->Impl.Stats->numASTsUsedWithSnapshots;
-      return BuildOp;
+
+    if (Consumer->canUseASTWithSnapshots(Snapshots)) {
+      LatestUsableOp = BuildOp;
+      StatCount = &Mgr->Impl.Stats->numASTsUsedWithSnapshots;
+      if (BuildOp->isFinished())
+        break;
     }
   }
-  return nullptr;
+
+  if (StatCount) {
+    ++(*StatCount);
+  }
+  return LatestUsableOp;
 }
 
 void ASTProducer::enqueueConsumer(

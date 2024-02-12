@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
+// CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -48,3 +48,8 @@ public func passVoidReturnVoid() { print("passVoidReturnVoid") }
 // CHECK: SWIFT_INLINE_THUNK void passVoidReturnVoid() noexcept SWIFT_SYMBOL("s:9Functions014passVoidReturnC0yyF") {
 // CHECK: return _impl::$s9Functions014passVoidReturnC0yyF();
 // CHECK: }
+
+// CHECK: SWIFT_INLINE_THUNK void varFunctionSameName
+public func varFunctionSameName(_ x: CInt) {}
+
+public var varFunctionSameName: CInt = 0

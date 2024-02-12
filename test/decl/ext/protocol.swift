@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions
@@ -181,11 +181,11 @@ extension S1 {
 // ----------------------------------------------------------------------------
 
 protocol FooProtocol {}
-extension FooProtocol where Self: FooProtocol {} // expected-warning {{redundant conformance constraint 'Self' : 'FooProtocol'}}
+extension FooProtocol where Self: FooProtocol {}
 
 protocol AnotherFooProtocol {}
 protocol BazProtocol {}
-extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {} // expected-warning {{redundant conformance constraint 'Self' : 'AnotherFooProtocol'}}
+extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {}
 
 protocol AnotherBazProtocol {
   associatedtype BazValue

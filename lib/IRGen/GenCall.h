@@ -217,16 +217,22 @@ namespace irgen {
 
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
+  llvm::Value *addEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                              llvm::Value *taskOptions,
+                                              SubstitutionMap subs);
+
   /// Emit a call to swift_task_create[_f] with the given flags, options, and
   /// task function.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF,
-    llvm::Value *flags,
-    llvm::Value *taskGroup,
-    llvm::Value *futureResultType,
-    llvm::Value *taskFunction,
-    llvm::Value *localContextInfo,
-    SubstitutionMap subs);
+          IRGenFunction &IGF,
+          llvm::Value *flags,
+          llvm::Value *taskGroup,
+          llvm::Value *executor1,
+          llvm::Value *executor2,
+          llvm::Value *futureResultType,
+          llvm::Value *taskFunction,
+          llvm::Value *localContextInfo,
+          SubstitutionMap subs);
 
   /// Allocate task local storage for the provided dynamic size.
   Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
@@ -254,19 +260,22 @@ namespace irgen {
 
   void emitAsyncReturn(
       IRGenFunction &IGF, AsyncContextLayout &layout, CanSILFunctionType fnType,
-      Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
+      llvm::Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result,
                        Explosion &error);
 
-  Address emitAutoDiffCreateLinearMapContext(
-      IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
+  Address emitAutoDiffCreateLinearMapContextWithType(
+      IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype);
+
   Address emitAutoDiffProjectTopLevelSubcontext(
       IRGenFunction &IGF, Address context);
-  Address emitAutoDiffAllocateSubcontext(
-      IRGenFunction &IGF, Address context, llvm::Value *size);
+
+  Address
+  emitAutoDiffAllocateSubcontextWithType(IRGenFunction &IGF, Address context,
+                                         llvm::Value *subcontextMetatype);
 
   FunctionPointer getFunctionPointerForDispatchCall(IRGenModule &IGM,
                                                     const FunctionPointer &fn);

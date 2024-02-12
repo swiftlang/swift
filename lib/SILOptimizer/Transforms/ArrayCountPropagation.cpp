@@ -127,6 +127,12 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
         isa<DebugValueInst>(User))
       continue;
 
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
+      if (Def == MDI->getBase()) {
+        continue;
+      }
+    }
+
     // Array value projection.
     if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
       if (!recursivelyCollectUses(SEI))

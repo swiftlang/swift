@@ -27,6 +27,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <system_error>
 
@@ -71,7 +72,8 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
 }
 
 bool SourceLoader::canImportModule(ImportPath::Module path,
-                                   ModuleVersionInfo *versionInfo) {
+                                   ModuleVersionInfo *versionInfo,
+                                   bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -152,10 +154,15 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
   // nothing to do here.
 }
 
-Optional<const ModuleDependencyInfo*>
-SourceLoader::getModuleDependencies(StringRef moduleName,
-                                    ModuleDependenciesCache &cache,
-                                    InterfaceSubContextDelegate &delegate) {
+ModuleDependencyVector
+SourceLoader::getModuleDependencies(Identifier moduleName,
+                                    StringRef moduleOutputPath,
+                                    llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                                    const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
+                                    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                                    InterfaceSubContextDelegate &delegate,
+                                    llvm::TreePathPrefixMapper* mapper,
+                                    bool isTestableImport) {
   // FIXME: Implement?
-  return None;
+  return {};
 }

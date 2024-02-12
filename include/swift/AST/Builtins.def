@@ -538,6 +538,11 @@ BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinu
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
+/// packLength: <each T>(_: repeat each T) -> Int
+///
+/// Returns the number of items in a pack.
+BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -640,6 +645,9 @@ BUILTIN_MISC_OPERATION(UnprotectedStackAlloc, "unprotectedStackAlloc", "", Speci
 /// The range starting at `address`, previously allocated with
 /// Builtin.stackAlloc(), is deallocated from the stack.
 BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
+
+/// allocVector<Element>(Element.Type, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(AllocVector, "allocVector", "", Special)
 
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
@@ -756,9 +764,6 @@ BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
-// Swift3ImplicitObjCEntrypoint has type () -> ()
-BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
-
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
@@ -774,7 +779,11 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
-/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
+/// Initialize the extra storage state of a non-default distributed actor object.
+BUILTIN_MISC_OPERATION(InitializeNonDefaultDistributedActor,
+                       "initializeNonDefaultDistributedActor", "", Special)
+
+/// Allocate a "proxy" for a distributed remote actor.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
 
@@ -865,7 +874,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
-// Retrieve the ExecutorRef on which the current asynchronous
+// Retrieve the SerialExecutorRef on which the current asynchronous
 // function is executing, or nil if the function isn't running
 // anywhere in particular.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
@@ -974,6 +983,57 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
 
+/// createAsyncDiscardingTaskInGroup(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroup,
+    "createAsyncDiscardingTaskInGroup", "", Special)
+
+/// createAsyncTaskWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
+    "createAsyncTaskWithExecutor", "", Special)
+
+/// createAsyncTaskInGroupWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
+    "createAsyncTaskInGroupWithExecutor", "", Special)
+
+/// createAsyncDiscardingTaskInGroupWithExecutor(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     Builtin.Executor,                  // executor
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroupWithExecutor,
+    "createAsyncDiscardingTaskInGroupWithExecutor", "", Special)
+
+/// Build a Builtin.Executor value from an "ordinary" task executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
+    "buildOrdinaryTaskExecutorRef", "n", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
@@ -981,19 +1041,24 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
 
-// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+// autoDiffCreateLinearMapContextWithType: (T.Type) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContextWithType, "autoDiffCreateLinearMapContextWithType", "", Special)
 
 // autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
 
-// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
+// autoDiffAllocateSubcontextWithType: (Builtin.NativeObject, T.Type) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiffAllocateSubcontextWithType", "", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" serial executor
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
                                    "buildOrdinarySerialExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value from an "complex equality" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildComplexEqualitySerialExecutorRef,
+                                   "buildComplexEqualitySerialExecutorRef", "n", Special)
 
 /// Build a Builtin.Executor value from a default actor reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
@@ -1002,6 +1067,27 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
 /// Build a Builtin.Executor value for the main actor.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
                                    "buildMainActorExecutorRef", "n", Special)
+
+/// getEnumTag: <T>(_: T) -> Builtin.Int32
+///
+/// Given a dynamic generic value, unsafely assume it is an enum type and call
+/// the getEnumTag vwt function.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetEnumTag, "getEnumTag", "", Special)
+
+/// injectEnumTag: <T>(_: inout T, _: Builtin.Int32) -> ()
+///
+/// Given a dynamic inout generic value, unsafely assume it is an enum type and
+/// inject the given tag into it.
+///
+/// Note: This assume that either 1. the given tag has no payload or 2. the
+/// tag's payload is already initialized with the given source.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
+
+/// distributedActorAsAnyActor: <DA: DistributedActor>(_: DA) -> any Actor
+///
+/// For a given distributed actor that is known to be local, extract an
+/// `any Actor` existential that refers to the local actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

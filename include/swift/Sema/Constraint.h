@@ -25,6 +25,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Sema/ConstraintLocator.h"
+#include "swift/Sema/ContextualTypeInfo.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
@@ -49,23 +50,6 @@ class ConstraintFix;
 class ConstraintLocator;
 class ConstraintSystem;
 enum class TrailingClosureMatching;
-
-/// Describes contextual type information about a particular element
-/// (expression, statement etc.) within a constraint system.
-struct ContextualTypeInfo {
-  TypeLoc typeLoc;
-  ContextualTypePurpose purpose;
-
-  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
-
-  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
-      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
-
-  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
-      : typeLoc(typeLoc), purpose(purpose) {}
-
-  Type getType() const { return typeLoc.getType(); }
-};
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -186,14 +170,12 @@ enum class ConstraintKind : char {
   /// constraint.
   OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
-  /// to a second type (inferred closure type). This is effectively a
-  /// `Defaultable` constraint which a couple of differences:
+  /// to a second type. This is effectively a `Defaultable` constraint
+  /// which one significant difference:
   ///
-  /// - References inferred closure type and all of the outer parameters
-  ///   referenced by closure body.
   /// - Handled specially by binding inference, specifically contributes
   ///   to the bindings only if there are no contextual types available.
-  DefaultClosureType,
+  FallbackType,
   /// The first type represents a result of an unresolved member chain,
   /// and the second type is its base type. This constraint acts almost
   /// like `Equal` but also enforces following semantics:
@@ -224,7 +206,8 @@ enum class ConstraintKind : char {
   /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
   /// this discards function parameter flags.
   BindTupleOfFunctionParams,
-  /// The first type is a type pack, and the second type is its reduced shape.
+  /// The first type is a reduced shape of the second type (represented as a
+  /// pack type).
   ShapeOf,
   /// Represents explicit generic arguments provided for a reference to
   /// a declaration.
@@ -233,6 +216,11 @@ enum class ConstraintKind : char {
   /// an overload. The second type is a PackType containing the explicit
   /// generic arguments.
   ExplicitGenericArguments,
+  /// Both (first and second) pack types should have the same reduced shape.
+  SameShape,
+  /// The first type is a tuple containing a single unlabeled element that is a
+  /// pack expansion. The second type is its pattern type.
+  MaterializePackExpansion,
 };
 
 /// Classification of the different kinds of constraints.
@@ -282,6 +270,8 @@ enum class ConversionRestrictionKind {
   InoutToCPointer,
   /// Array-to-pointer conversion.
   ArrayToPointer,
+  /// Converting from array to a C pointer has `PointerToCPointer` semantics.
+  ArrayToCPointer,
   /// String-to-pointer conversion.
   StringToPointer,
   /// Pointer-to-pointer conversion.
@@ -598,7 +588,7 @@ public:
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
       ConstraintSystem &cs, Type argumentFnType, Type calleeType,
-      Optional<TrailingClosureMatching> trailingClosureMatching,
+      llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
@@ -616,9 +606,9 @@ public:
   ConstraintKind getKind() const { return Kind; }
 
   /// Retrieve the restriction placed on this constraint.
-  Optional<ConversionRestrictionKind> getRestriction() const {
+  llvm::Optional<ConversionRestrictionKind> getRestriction() const {
     if (!HasRestriction)
-      return None;
+      return llvm::None;
 
     return Restriction;
   }
@@ -696,9 +686,11 @@ public:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
-    case ConstraintKind::DefaultClosureType:
+    case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::SameShape:
+    case ConstraintKind::MaterializePackExpansion:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -888,7 +880,7 @@ public:
 
   /// For an applicable function constraint, retrieve the trailing closure
   /// matching rule.
-  Optional<TrailingClosureMatching> getTrailingClosureMatching() const;
+  llvm::Optional<TrailingClosureMatching> getTrailingClosureMatching() const;
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }

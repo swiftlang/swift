@@ -34,7 +34,10 @@ func f1(_ a: Swift.Int) -> Swift.Void { print(a) }
 import func Swift.print
 
 // rdar://14418336
-#import something_nonexistent // expected-error {{expected a macro identifier}} expected-error {{no such module 'something_nonexistent'}}
+#import something_nonexistent
+// expected-error@-1 {{no macro named 'import'}}
+// expected-error@-2 {{consecutive statements on a line}} 
+// expected-error@-3 {{cannot find 'something_nonexistent' in scope}}
 
 // Import specific decls
 import typealias Swift.Int
@@ -71,3 +74,4 @@ import func français.phoûx
 import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}
 
 @_exported @_implementationOnly import empty // expected-error {{module 'empty' cannot be both exported and implementation-only}} {{12-33=}}
+// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}

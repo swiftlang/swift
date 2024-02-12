@@ -21,9 +21,12 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -103,11 +106,11 @@ template <typename KeyT, typename ValueT> class Memoizer {
 public:
   Memoizer() = default;
 
-  Optional<ValueT> findExisting(KeyT key) {
+  llvm::Optional<ValueT> findExisting(KeyT key) {
     auto iter = memos.find(key);
     if (iter != memos.end())
       return iter->second;
-    return None;
+    return llvm::None;
   }
 
   /// \p createFn must create a \ref ValueT that corresponds to the \ref KeyT
@@ -148,12 +151,13 @@ private:
   Map<Key1, InnerMap> map;
 
 public:
-  Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
+  llvm::Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
     auto iter = map.find(k1);
     if (iter == map.end())
-      return None;
+      return llvm::None;
     auto iter2 = iter->second.find(k2);
-    return iter2 == iter->second.end() ? None : Optional<Value>(iter2->second);
+    return iter2 == iter->second.end() ? llvm::None
+                                       : llvm::Optional<Value>(iter2->second);
   }
 
   NullablePtr<const InnerMap> find(const Key1 &k1) const {
@@ -252,12 +256,14 @@ public:
   bool insert(const Key2 &k2, const Key1 &k1, Value &v) {
     return insert(k1, k2, v);
   }
-  Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
+  llvm::Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
     auto v = map1.find(k1, k2);
     assert(assertConsistent(v, map2.find(k2, k1)));
     return v;
   }
-  Optional<Value> find(const Key2 &k2, Key1 &k1) const { return find(k1, k2); }
+  llvm::Optional<Value> find(const Key2 &k2, Key1 &k1) const {
+    return find(k1, k2);
+  }
 
   /// Return the submap for a given Key1. May create one, after the fashion of
   /// the standard library.
@@ -357,8 +363,9 @@ private:
 /// \Note The returned graph should not be escaped from the callback.
 bool withReferenceDependencies(
     llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
-    const DependencyTracker &depTracker, StringRef outputPath,
-    bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
+    const DependencyTracker &depTracker, llvm::vfs::OutputBackend &backend,
+    StringRef outputPath, bool alsoEmitDotFile,
+    llvm::function_ref<bool(SourceFileDepGraph &&)>);
 
 //==============================================================================
 // MARK: Enums
@@ -596,7 +603,7 @@ struct std::hash<typename swift::fine_grained_dependencies::NodeKind> {
 namespace swift {
 namespace fine_grained_dependencies {
 using ContextNameFingerprint =
-    std::tuple<std::string, std::string, Optional<std::string>>;
+    std::tuple<std::string, std::string, llvm::Optional<std::string>>;
 }
 } // namespace swift
 
@@ -642,7 +649,7 @@ class DepGraphNode {
   /// frontend creates an interface node,
   //  it adds a dependency to it from the implementation source file node (which
   //  has the interfaceHash as its fingerprint).
-  Optional<Fingerprint> fingerprint;
+  llvm::Optional<Fingerprint> fingerprint;
 
   friend ::llvm::yaml::MappingTraits<DepGraphNode>;
 
@@ -650,7 +657,7 @@ public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DepGraphNode() : key(), fingerprint() {}
 
-  DepGraphNode(DependencyKey key, Optional<Fingerprint> fingerprint)
+  DepGraphNode(DependencyKey key, llvm::Optional<Fingerprint> fingerprint)
       : key(key), fingerprint(fingerprint) {}
   DepGraphNode(const DepGraphNode &other) = default;
 
@@ -666,7 +673,9 @@ public:
     this->key = key;
   }
 
-  const Optional<Fingerprint> getFingerprint() const { return fingerprint; }
+  const llvm::Optional<Fingerprint> getFingerprint() const {
+    return fingerprint;
+  }
   /// When driver reads a SourceFileDepGraphNode, it may be a node that was
   /// created to represent a name-lookup (a.k.a a "depend") in the frontend. In
   /// that case, the node represents an entity that resides in some other file
@@ -675,7 +684,7 @@ public:
   /// (someday) have a fingerprint. In order to preserve the
   /// ModuleDepGraphNode's identity but bring its fingerprint up to date, it
   /// needs to set the fingerprint *after* the node has been created.
-  void setFingerprint(Optional<Fingerprint> fp) { fingerprint = fp; }
+  void setFingerprint(llvm::Optional<Fingerprint> fp) { fingerprint = fp; }
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &os) const;
@@ -722,7 +731,8 @@ public:
   SourceFileDepGraphNode() : DepGraphNode() {}
 
   /// Used by the frontend to build nodes.
-  SourceFileDepGraphNode(DependencyKey key, Optional<Fingerprint> fingerprint,
+  SourceFileDepGraphNode(DependencyKey key,
+                         llvm::Optional<Fingerprint> fingerprint,
                          bool isProvides)
       : DepGraphNode(key, fingerprint), isProvides(isProvides) {
     assert(key.verify());
@@ -855,15 +865,16 @@ public:
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
-  findExistingNodePairOrCreateAndAddIfNew(const DependencyKey &interfaceKey,
-                                          Optional<Fingerprint> fingerprint);
+  findExistingNodePairOrCreateAndAddIfNew(
+      const DependencyKey &interfaceKey,
+      llvm::Optional<Fingerprint> fingerprint);
 
   NullablePtr<SourceFileDepGraphNode>
   findExistingNode(const DependencyKey &key);
 
   SourceFileDepGraphNode *
   findExistingNodeOrCreateIfNew(const DependencyKey &key,
-                                const Optional<Fingerprint> fingerprint,
+                                const llvm::Optional<Fingerprint> fingerprint,
                                 bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
@@ -876,13 +887,14 @@ public:
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful. If \p allowSwiftModule is true, try to load the information
   /// from a swiftmodule file if appropriate.
-  Optional<SourceFileDepGraph> static loadFromPath(
+  llvm::Optional<SourceFileDepGraph> static loadFromPath(
       StringRef, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
-  Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
-  Optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
+  llvm::Optional<SourceFileDepGraph> static loadFromBuffer(
+      llvm::MemoryBuffer &);
+  llvm::Optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
       llvm::MemoryBuffer &);
 
   void verifySame(const SourceFileDepGraph &other) const;
@@ -895,7 +907,8 @@ public:
 
   bool verifySequenceNumber() const;
 
-  void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
+  void emitDotFile(llvm::vfs::OutputBackend &outputBackend,
+                   StringRef outputPath, DiagnosticEngine &diags);
 
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());

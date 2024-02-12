@@ -117,7 +117,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   let x:Int = 5
-  if true {  // expected-note {{condition always evaluates to true}}
+  if 1 == 1 {  // expected-note {{condition always evaluates to true}}
     exit(); 
   }
   return x; // expected-warning {{will never be executed}}

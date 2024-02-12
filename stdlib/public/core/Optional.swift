@@ -289,6 +289,7 @@ public enum Optional<Wrapped>: ExpressibleByNilLiteral {
   }
 }
 
+@_unavailableInEmbedded
 extension Optional: CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
@@ -781,3 +782,5 @@ extension Optional: _ObjectiveCBridgeable {
 #endif
 
 extension Optional: Sendable where Wrapped: Sendable { }
+
+extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }

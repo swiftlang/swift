@@ -95,7 +95,7 @@ void RedundantPhiEliminationPass::run() {
 
 #ifndef NDEBUG
 static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
-  SmallSetVector<SILPhiArgument *, 4> worklist;
+  llvm::SmallSetVector<SILPhiArgument *, 4> worklist;
   SmallVector<SILValue, 4> incomingValues;
   worklist.insert(phi);
 
@@ -265,7 +265,7 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
     
     if (auto *inst1 = dyn_cast<SingleValueInstruction>(val1)) {
       // Bail if the instructions have any side effects.
-      if (inst1->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
+      if (inst1->getMemoryBehavior() != MemoryBehavior::None)
         return false;
 
       // Allocation instructions are defined to have no side-effects.
@@ -368,8 +368,8 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
   VarDecl *field = nullptr;
   SILType newType;
-  Optional<SILLocation> loc;
-  
+  llvm::Optional<SILLocation> loc;
+
   // First step: collect all phi-arguments which can be transformed.
   unsigned workIdx = 0;
   while (workIdx < collectedPhiArgs.size()) {

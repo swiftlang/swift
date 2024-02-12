@@ -1,0 +1,12 @@
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -verify
+import Builtin
+
+sil @stack_alloc_builtin: $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, -1
+  %1 = integer_literal $Builtin.Word, 8
+  %2 = builtin "stackAlloc"(%0 : $Builtin.Word, %1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer // expected-error{{allocation capacity must be greater than or equal to zero}}
+  %3 = builtin "stackDealloc"(%2 : $Builtin.RawPointer) : $()
+  %r = tuple ()
+  return %r : $()
+}

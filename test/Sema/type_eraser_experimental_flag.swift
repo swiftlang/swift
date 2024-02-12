@@ -11,7 +11,7 @@ struct ConcreteP: P, Hashable {}
 
 // CHECK-LABEL: testTypeErased
 func testTypeErased() -> some P {
-  // CHECK: underlying_to_opaque_expr{{.*}}'some P'
-  // CHECK-NEXT: call_expr implicit type='AnyP'
+  // CHECK: underlying_to_opaque_expr{{.*}}"some P"
+  // CHECK-NEXT: call_expr implicit type="AnyP"
   ConcreteP()
 }

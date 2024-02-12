@@ -62,7 +62,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    Optional<Fingerprint> fp = None;
+    llvm::Optional<Fingerprint> fp = llvm::None;
     if (!idc->getDecl()->isImplicit() && fileUnit) {
       fp = fileUnit->loadFingerprint(idc);
     }
@@ -91,7 +91,6 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     return {};
 
   case BodyKind::TypeChecked:
@@ -172,11 +171,35 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       parser.CurDeclContext = generatedInfo->declContext;
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::DeclarationMacroExpansion:
+    case GeneratedSourceInfo::CodeItemMacroExpansion:
+      if (parser.CurDeclContext->isTypeContext()) {
+        parser.parseExpandedMemberList(items);
+      } else {
+        parser.parseTopLevelItems(items);
+      }
+      break;
+
     case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::PreambleMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::PrettyPrinted: {
       parser.parseTopLevelItems(items);
+      break;
+    }
+
+    case GeneratedSourceInfo::BodyMacroExpansion: {
+      // Prime the lexer.
+      if (parser.Tok.is(tok::NUM_TOKENS))
+        parser.consumeTokenWithoutFeedingReceiver();
+
+      if (parser.Tok.is(tok::l_brace)) {
+        if (auto body =
+                parser.parseBraceItemList(diag::invalid_diagnostic)
+                  .getPtrOrNull())
+          items.push_back(body);
+      }
+
       break;
     }
 
@@ -208,7 +231,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
     }
 
-    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+    case GeneratedSourceInfo::ExtensionMacroExpansion: {
       parser.parseTopLevelItems(items);
       break;
     }
@@ -217,7 +241,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     parser.parseTopLevelItems(items);
   }
 
-  Optional<ArrayRef<Token>> tokensRef;
+  llvm::Optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = parser.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
@@ -230,12 +254,12 @@ evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
   return std::get<0>(getStorage());
 }
 
-Optional<SourceFileParsingResult>
+llvm::Optional<SourceFileParsingResult>
 ParseSourceFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   auto items = SF->getCachedTopLevelItems();
   if (!items)
-    return None;
+    return llvm::None;
 
   return SourceFileParsingResult{*items, SF->AllCollectedTokens,
                                  SF->InterfaceHasher};

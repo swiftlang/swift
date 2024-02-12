@@ -38,6 +38,8 @@ enum class ImportedAccessorKind : unsigned {
   PropertySetter,
   SubscriptGetter,
   SubscriptSetter,
+  DereferenceGetter,
+  DereferenceSetter,
 };
 enum { NumImportedAccessorKindBits = 3 };
 
@@ -261,21 +263,21 @@ public:
 
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
-  Optional<ForeignErrorConvention::Info> getErrorInfo() const {
+  llvm::Optional<ForeignErrorConvention::Info> getErrorInfo() const {
     if (info.hasErrorInfo)
       return info.errorInfo;
-    return None;
+    return llvm::None;
   }
 
   /// For names that map Objective-C methods with completion handlers into
   /// async Swift methods, describes how the mapping is performed.
-  Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
+  llvm::Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
     if (info.hasAsyncInfo) {
       assert(!info.hasAsyncAlternateInfo
              && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return None;
+    return llvm::None;
   }
 
   /// For names with a variant that maps Objective-C methods with completion
@@ -286,21 +288,25 @@ public:
   /// and gives you the contents of \c getAsyncInfo() on the async method's
   /// name. It is not set on the async method's name, and it is not set if a
   /// non-async method doesn't have an async equivalent.
-  Optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
+  llvm::Optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
     if (info.hasAsyncAlternateInfo) {
       assert(!info.hasAsyncInfo && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return None;
+    return llvm::None;
   }
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  Optional<unsigned> getSelfIndex() const {
+  llvm::Optional<unsigned> getSelfIndex() const {
     if (info.hasSelfIndex)
       return info.selfIndex;
-    return None;
+    return llvm::None;
   }
+
+  /// Retrieve the base name as an identifier, including mapping special
+  /// names like 'init' or 'subscript' to identifiers.
+  Identifier getBaseIdentifier(ASTContext &ctx) const;
 
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
@@ -324,6 +330,8 @@ public:
     case ImportedAccessorKind::None:
     case ImportedAccessorKind::SubscriptGetter:
     case ImportedAccessorKind::SubscriptSetter:
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return false;
 
     case ImportedAccessorKind::PropertyGetter:
@@ -338,10 +346,29 @@ public:
     case ImportedAccessorKind::None:
     case ImportedAccessorKind::PropertyGetter:
     case ImportedAccessorKind::PropertySetter:
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return false;
 
     case ImportedAccessorKind::SubscriptGetter:
     case ImportedAccessorKind::SubscriptSetter:
+      return true;
+    }
+
+    llvm_unreachable("Invalid ImportedAccessorKind.");
+  }
+
+  bool isDereferenceAccessor() const {
+    switch (getAccessorKind()) {
+    case ImportedAccessorKind::None:
+    case ImportedAccessorKind::PropertyGetter:
+    case ImportedAccessorKind::PropertySetter:
+    case ImportedAccessorKind::SubscriptGetter:
+    case ImportedAccessorKind::SubscriptSetter:
+      return false;
+
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return true;
     }
 
@@ -478,24 +505,22 @@ private:
                          const clang::IdentifierInfo *proposedName,
                          const clang::TypedefNameDecl *cfTypedef);
 
-  Optional<ForeignErrorConvention::Info>
+  llvm::Optional<ForeignErrorConvention::Info>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  Optional<ForeignAsyncConvention::Info>
-  considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
-                      StringRef baseName,
-                      SmallVectorImpl<StringRef> &paramNames,
-                      ArrayRef<const clang::ParmVarDecl *> params,
-                      bool isInitializer,
-                      Optional<unsigned> explicitCompletionHandlerParamIndex,
-                      CustomAsyncName customName,
-                      Optional<unsigned> completionHandlerFlagParamIndex,
-                      bool completionHandlerFlagIsZeroOnError,
-                      Optional<ForeignErrorConvention::Info> errorInfo);
+  llvm::Optional<ForeignAsyncConvention::Info> considerAsyncImport(
+      const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
+      SmallVectorImpl<StringRef> &paramNames,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
+      llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
+      CustomAsyncName customName,
+      llvm::Optional<unsigned> completionHandlerFlagParamIndex,
+      bool completionHandlerFlagIsZeroOnError,
+      llvm::Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

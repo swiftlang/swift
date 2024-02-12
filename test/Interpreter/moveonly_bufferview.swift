@@ -1,14 +1,9 @@
-// TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize_none
 
-// Until we get support for emitting value witnesses for deinits, do not run
-// this with optimizations.
-
-@_moveOnly
-public struct BufferView<T> {
+public struct BufferView<T>: ~Copyable {
     var ptr: UnsafeBufferPointer<T>
 
     var count: Int {
@@ -23,7 +18,7 @@ public struct BufferView<T> {
 }
 
 extension Array {
-    public mutating func withBufferView<U>(_ f: (__shared BufferView<Element>) -> U) -> U {
+    public mutating func withBufferView<U>(_ f: (borrowing BufferView<Element>) -> U) -> U {
         return withUnsafeBufferPointer {
             return f(BufferView(ptr: $0))
         }
@@ -31,7 +26,7 @@ extension Array {
 }
 
 func testBufferView(_ x: __owned [Int]) {
-    var y = _move x
+    var y = consume x
     // CHECK: 1
     // CHECK: 2
     // CHECK: 3
@@ -46,7 +41,7 @@ func testBufferView(_ x: __owned [Int]) {
 func getBool() -> Bool { return true }
 
 func testConditionalBufferView(_ x: __owned [Int]) {
-    (_move x).withUnsafeBufferPointer {
+    (consume x).withUnsafeBufferPointer {
         let y = BufferView(ptr: $0)
         // CHECK: 4
         // CHECK: 5

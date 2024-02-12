@@ -223,7 +223,7 @@ void BasicBlockCloner::sinkAddressProjections() {
 //
 // Return true on success, even if projections is empty.
 bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
-  projections.clear();
+  oldProjections.clear();
   inBlockDefs.clear();
 
   SILBasicBlock *bb = inst->getParent();
@@ -237,7 +237,7 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
     }
     if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
       if (addressProj->isPure()) {
-        projections.push_back(addressProj);
+        oldProjections.push_back(addressProj);
         return true;
       }
     }
@@ -252,12 +252,12 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return false;
   }
   // Recurse upward through address projections.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
+  for (unsigned idx = 0; idx < oldProjections.size(); ++idx) {
     // Only one address result/operand can be handled per instruction.
-    if (projections.size() != idx + 1)
+    if (oldProjections.size() != idx + 1)
       return false;
 
-    for (SILValue operandVal : projections[idx]->getOperandValues())
+    for (SILValue operandVal : oldProjections[idx]->getOperandValues())
       if (!pushOperandVal(operandVal))
         return false;
   }
@@ -267,13 +267,13 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
 // Clone the projections gathered by 'analyzeAddressProjections' at
 // their use site outside this block.
 bool SinkAddressProjections::cloneProjections() {
-  if (projections.empty())
+  if (oldProjections.empty())
     return false;
 
-  SILBasicBlock *bb = projections.front()->getParent();
+  SILBasicBlock *bb = oldProjections.front()->getParent();
   // Clone projections in last-to-first order.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
-    auto *oldProj = projections[idx];
+  for (unsigned idx = 0; idx < oldProjections.size(); ++idx) {
+    auto *oldProj = oldProjections[idx];
     assert(oldProj->getParent() == bb);
     // Reset transient per-projection sets.
     usesToReplace.clear();
@@ -297,9 +297,12 @@ bool SinkAddressProjections::cloneProjections() {
       auto *useBB = use->getUser()->getParent();
       auto *firstUse = firstBlockUse.lookup(useBB);
       SingleValueInstruction *newProj;
-      if (use == firstUse)
+      if (use == firstUse) {
         newProj = cast<SingleValueInstruction>(oldProj->clone(use->getUser()));
-      else {
+        if (newProjections) {
+          newProjections->push_back(newProj);
+        }
+      } else {
         newProj = cast<SingleValueInstruction>(firstUse->get());
         assert(newProj->getParent() == useBB);
         newProj->moveFront(useBB);
@@ -308,62 +311,4 @@ bool SinkAddressProjections::cloneProjections() {
     }
   }
   return true;
-}
-
-bool StaticInitCloner::add(SILInstruction *initVal) {
-  // Don't schedule an instruction twice for cloning.
-  if (numOpsToClone.count(initVal) != 0)
-    return true;
-
-  if (auto *funcRef = dyn_cast<FunctionRefInst>(initVal)) {
-    // We cannot inline non-public functions into functions which are serialized.
-    if (!getBuilder().isInsertingIntoGlobal() &&
-        getBuilder().getFunction().isSerialized() &&
-        !funcRef->getReferencedFunction()->hasValidLinkageForFragileRef()) {
-      return false;
-    }
-  }
-
-  ArrayRef<Operand> operands = initVal->getAllOperands();
-  numOpsToClone[initVal] = operands.size();
-  if (operands.empty()) {
-    // It's an instruction without operands, e.g. a literal. It's ready to be
-    // cloned first.
-    readyToClone.push_back(initVal);
-  } else {
-    // Recursively add all operands.
-    for (const Operand &operand : operands) {
-      if (!add(cast<SingleValueInstruction>(operand.get())))
-        return false;
-    }
-  }
-  return true;
-}
-
-SingleValueInstruction *
-StaticInitCloner::clone(SingleValueInstruction *initVal) {
-  assert(numOpsToClone.count(initVal) != 0 && "initVal was not added");
-  
-  if (!isValueCloned(initVal)) {
-    // Find the right order to clone: all operands of an instruction must be
-    // cloned before the instruction itself.
-    while (!readyToClone.empty()) {
-      SILInstruction *inst = readyToClone.pop_back_val();
-
-      // Clone the instruction into the SILGlobalVariable
-      visit(inst);
-
-      // Check if users of I can now be cloned.
-      for (SILValue result : inst->getResults()) {
-        for (Operand *use : result->getUses()) {
-          SILInstruction *user = use->getUser();
-          if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
-            readyToClone.push_back(user);
-        }
-      }
-      if (inst == initVal)
-        break;
-    }
-  }
-  return cast<SingleValueInstruction>(getMappedValue(initVal));
 }

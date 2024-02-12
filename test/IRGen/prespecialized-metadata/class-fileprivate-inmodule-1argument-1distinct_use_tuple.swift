@@ -23,15 +23,15 @@ func consume<T>(_ t: T) {
 //       should be no call to __swift_instantiateConcreteTypeFromMangledName.
 
 //      CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-//      CHECK:   [[METADATA:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName(
+//      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
 // CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCySi_SStGMD"
-//      CHECK:   {{%[0-9]+}} = call swiftcc %T4main5Value[[UNIQUE_ID_1]]LLC* @"$s4main5Value[[UNIQUE_ID_1]]LLC5firstADyxGx_tcfC"(
-// CHECK-SAME:     %swift.opaque* noalias nocapture {{%[0-9]+}}, 
-// CHECK-SAME:     %swift.type* swiftself [[METADATA]]
+//      CHECK:   {{%[0-9]+}} = call swiftcc ptr @"$s4main5Value[[UNIQUE_ID_1]]LLC5firstADyxGx_tcfC"(
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr swiftself [[METADATA]]
 // CHECK-SAME:   )
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     %swift.opaque* noalias nocapture {{%[0-9]+}}, 
-// CHECK-SAME:     %swift.type* [[METADATA]])
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {
   consume( Value(first: (13, "13")) )

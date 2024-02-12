@@ -24,8 +24,13 @@
 #include <initializer_list>
 
 namespace swift {
-
-using llvm::None;
+/// The Swift standard library also has an `OptionSet` type that is imported
+/// when using C++ to Swift interop within the compiler.
+/// Since the Swift stdlib is also imported in the `swift` namespace, the two
+/// types would conflict. Move the compiler's OptionSet into a sub-namespace
+/// to avoid collisions. Below we do `using namespace optionset`, which makes
+/// the C++ `OptionSet` type available everywhere the `swift` namespace is used.
+namespace optionset {
 
 /// The class template \c OptionSet captures a set of options stored as the
 /// bits in an unsigned integral value.
@@ -153,7 +158,8 @@ private:
                               Flags>::value,
                 "operator| should produce an OptionSet");
 };
-
+} // end namespace optionset
+using namespace optionset;
 } // end namespace swift
 
 #endif // SWIFT_BASIC_OPTIONSET_H

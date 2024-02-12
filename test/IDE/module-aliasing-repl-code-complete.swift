@@ -17,10 +17,8 @@
 // RUN: %target-swift-ide-test -repl-code-completion -source-filename %t/FileLib2.swift -module-alias XLogging=AppleLogging -I %t > %t/result2.txt
 // RUN: %FileCheck %s < %t/result2.txt
 
-// CHECK: Begin completions
 // CHECK-NOT: AppleLogging
 // CHECK: XLogging
-// CHECK: End completions
 
 // BEGIN FileLogging.swift
 public struct Logger {

@@ -165,7 +165,7 @@ public:
   int getDebugID() const;
 
   void setDebugName(llvm::StringRef name);
-  Optional<llvm::StringRef> getDebugName() const;
+  llvm::Optional<llvm::StringRef> getDebugName() const;
 
   SILFunction *getParent() { return Parent; }
   SILFunction *getFunction() { return getParent(); }
@@ -230,6 +230,52 @@ public:
   reverse_iterator rend() { return InstList.rend(); }
   const_reverse_iterator rbegin() const { return InstList.rbegin(); }
   const_reverse_iterator rend() const { return InstList.rend(); }
+
+  llvm::iterator_range<iterator> getRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<iterator> getRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
 
   /// Allows deleting instructions while iterating over all instructions of the
   /// block.
@@ -350,24 +396,31 @@ public:
   /// replacePhiArgumentAndRAUW.
   SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
                                      ValueOwnershipKind kind,
-                                     const ValueDecl *decl = nullptr);
+                                     const ValueDecl *decl = nullptr,
+                                     bool isReborrow = false,
+                                     bool isEscaping = false);
 
   /// Replace phi argument \p i and RAUW all uses.
-  SILPhiArgument *
-  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
-                                      ValueOwnershipKind kind,
-                                      const ValueDecl *decl = nullptr);
+  SILPhiArgument *replacePhiArgumentAndReplaceAllUses(
+      unsigned i, SILType type, ValueOwnershipKind kind,
+      const ValueDecl *decl = nullptr, bool isReborrow = false,
+      bool isEscaping = false);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
-  /// list. Optionally you can pass in a value decl parameter.
+  /// list. Optionally you can pass in a value decl parameter, reborrow flag and
+  /// escaping flag.
   SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
+                                    const ValueDecl *D = nullptr,
+                                    bool isReborrow = false,
+                                    bool isEscaping = false);
 
   /// Insert a new SILPhiArgument with type \p Ty and \p Decl at position \p
   /// AtArgPos.
   SILPhiArgument *insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                     ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
+                                    const ValueDecl *D = nullptr,
+                                    bool isReborrow = false,
+                                    bool isEscaping = false);
 
   /// Remove all block arguments.
   void dropAllArguments();
@@ -427,11 +480,6 @@ public:
     return getTerminator()->getSingleSuccessorBlock();
   }
 
-  /// Returns true if \p BB is a successor of this block.
-  bool isSuccessorBlock(SILBasicBlock *Block) const {
-    return getTerminator()->isSuccessorBlock(Block);
-  }
-
   using SuccessorBlockListTy = TermInst::SuccessorBlockListTy;
   using ConstSuccessorBlockListTy = TermInst::ConstSuccessorBlockListTy;
 
@@ -457,12 +505,6 @@ public:
 
   iterator_range<pred_iterator> getPredecessorBlocks() const {
     return {pred_begin(), pred_end()};
-  }
-
-  bool isPredecessorBlock(SILBasicBlock *BB) const {
-    return any_of(
-        getPredecessorBlocks(),
-        [&BB](const SILBasicBlock *PredBB) -> bool { return BB == PredBB; });
   }
 
   SILBasicBlock *getSinglePredecessorBlock() {
@@ -519,6 +561,17 @@ public:
   void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
+
+#ifndef NDEBUG
+  /// Print the ID of the block, bbN.
+  void dumpID(bool newline = true) const;
+
+  /// Print the ID of the block with \p OS, bbN.
+  void printID(llvm::raw_ostream &OS, bool newline = true) const;
+
+  /// Print the ID of the block with \p Ctx, bbN.
+  void printID(SILPrintContext &Ctx, bool newline = true) const;
+#endif
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {
@@ -733,6 +786,29 @@ namespace swift {
 
 inline SILFunction *SILInstruction::getFunction() const {
   return getParent()->getParent();
+}
+
+inline bool SILInstruction::visitPriorInstructions(
+    llvm::function_ref<bool(SILInstruction *)> visitor) {
+  if (auto *previous = getPreviousInstruction()) {
+    return visitor(previous);
+  }
+  for (auto *predecessor : getParent()->getPredecessorBlocks()) {
+    if (!visitor(&predecessor->back()))
+      return false;
+  }
+  return true;
+}
+inline bool SILInstruction::visitSubsequentInstructions(
+    llvm::function_ref<bool(SILInstruction *)> visitor) {
+  if (auto *next = getNextInstruction()) {
+    return visitor(next);
+  }
+  for (auto *successor : getParent()->getSuccessorBlocks()) {
+    if (!visitor(&successor->front()))
+      return false;
+  }
+  return true;
 }
 
 inline SILInstruction *SILInstruction::getPreviousInstruction() {

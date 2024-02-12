@@ -49,6 +49,9 @@ ERROR(alignment_less_than_natural,none,
 ERROR(alignment_more_than_maximum,none,
       "@_alignment cannot increase alignment above maximum alignment of %0",
       (unsigned))
+      
+ERROR(raw_layout_dynamic_type_layout_unsupported,none,
+      "@_rawLayout is not yet supported for layouts dependent on generic types", ())
 
 ERROR(temporary_allocation_size_negative,none,
       "allocation capacity must be greater than or equal to zero", ())
@@ -58,6 +61,9 @@ ERROR(temporary_allocation_alignment_not_positive,none,
       "alignment value must be greater than zero", ())
 ERROR(temporary_allocation_alignment_not_power_of_2,none,
       "alignment value must be a power of two", ())
+
+ERROR(explosion_size_oveflow,none,
+      "explosion size too large", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

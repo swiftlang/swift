@@ -12,6 +12,7 @@
 
 #include "TestOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -36,7 +37,10 @@ enum Opt {
 };
 
 // Create prefix string literals used in Options.td.
-#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
+#define PREFIX(NAME, VALUE)                                                    \
+  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+      NAME##_init, std::size(NAME##_init) - 1);
 #include "Options.inc"
 #undef PREFIX
 
@@ -53,9 +57,9 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 };
 
 // Create OptTable class for parsing actual command line arguments
-class TestOptTable : public llvm::opt::OptTable {
+class TestOptTable : public llvm::opt::GenericOptTable {
 public:
-  TestOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
+  TestOptTable() : GenericOptTable(InfoTable) {}
 };
 
 } // end anonymous namespace
@@ -120,6 +124,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
+        .Case("active-regions", SourceKitRequest::ActiveRegions)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
         .Case("structure", SourceKitRequest::Structure)
         .Case("format", SourceKitRequest::Format)
@@ -138,7 +143,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
-        .Case("syntactic-rename", SourceKitRequest::SyntacticRename)
         .Case("find-rename-ranges", SourceKitRequest::FindRenameRanges)
         .Case("find-local-rename-ranges", SourceKitRequest::FindLocalRenameRanges)
         .Case("translate", SourceKitRequest::NameTranslation)
@@ -150,8 +154,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
         .Case("diags", SourceKitRequest::Diagnostics)
+        .Case("semantic-tokens", SourceKitRequest::SemanticTokens)
         .Case("compile", SourceKitRequest::Compile)
         .Case("compile.close", SourceKitRequest::CompileClose)
+        .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
+        .Case("index-to-store", SourceKitRequest::IndexToStore)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
         .Default(SourceKitRequest::None);
@@ -192,7 +199,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- extract-comment\n"
                      << "- module-groups\n"
                      << "- range\n"
-                     << "- syntactic-rename\n"
                      << "- find-rename-ranges\n"
                      << "- find-local-rename-ranges\n"
                      << "- translate\n"
@@ -202,6 +208,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- collect-type\n"
                      << "- global-config\n"
                      << "- dependency-updated\n"
+                     << "- syntactic-expandmacro\n"
+                     << "- index-to-store\n"
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) << "- refactoring." #ID "\n"
 #include "swift/Refactoring/RefactoringKinds.def"
                         "\n";
@@ -214,12 +222,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       return true;
     }
 
-    case OPT_offset:
-      if (StringRef(InputArg->getValue()).getAsInteger(10, Offset)) {
+    case OPT_offset: {
+      unsigned offset;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, offset)) {
         llvm::errs() << "error: expected integer for 'offset'\n";
         return true;
       }
+
+      Offset = offset;
       break;
+    }
 
     case OPT_length:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Length)) {
@@ -334,6 +346,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       Inputs.push_back(InputArg->getValue());
       break;
 
+    case OPT_primary_file:
+      PrimaryFile = InputArg->getValue();
+      break;
+
     case OPT_rename_spec:
       RenameSpecPath = InputArg->getValue();
       break;
@@ -417,6 +433,14 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       VFSName = InputArg->getValue();
       break;
 
+    case OPT_index_store_path:
+      IndexStorePath = InputArg->getValue();
+      break;
+
+    case OPT_index_unit_output_path:
+      IndexUnitOutputPath = InputArg->getValue();
+      break;
+
     case OPT_module_cache_path:
       ModuleCachePath = InputArg->getValue();
       break;
@@ -446,6 +470,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       DisableImplicitStringProcessingModuleImport = true;
       break;
 
+    case OPT_disable_implicit_backtracing_module_import:
+      DisableImplicitBacktracingModuleImport = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
@@ -466,7 +494,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 void TestOptions::printHelp(bool ShowHidden) const {
 
   // Based off of swift/lib/Driver/Driver.cpp, at Driver::printHelp
-  //FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
+  // FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
   // Maybe not for modes such as Interactive, Batch, AutolinkExtract, etc,
   // as in Driver.cpp. But could be useful for extra info, like HelpHidden.
 

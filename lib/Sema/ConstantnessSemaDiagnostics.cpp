@@ -71,14 +71,14 @@ static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDec
     // We are looking at a top-level os_log function that accepts level and
     // possibly custom log object. Those need not be constants, but every other
     // parameter must be.
-    paramType = param->getType();
+    paramType = param->getTypeInContext();
     nominal = paramType->getNominalOrBoundGenericNominal();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
-  paramType = param->getType();
+  paramType = param->getTypeInContext();
   structDecl = paramType->getStructOrBoundGenericStruct();
   if (!structDecl)
     return false;
@@ -339,6 +339,10 @@ void swift::diagnoseConstantArgumentRequirement(
   public:
     ConstantReqCallWalker(DeclContext *DC) : DC(DC), insideClosure(false) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.
@@ -349,15 +353,8 @@ void swift::diagnoseConstantArgumentRequirement(
         return walkToClosureExprPre(closureExpr);
       }
 
-      // Interpolated expressions' bodies will be type checked
-      // separately so exit early to avoid duplicate diagnostics.
-      // The caveat is that they won't be checked inside closure
-      // bodies because we manually check all closures to avoid
-      // duplicate diagnostics. Therefore we must still descend into
-      // interpolated expressions if we are inside of a closure.
-      if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
-          (isa<InterpolatedStringLiteralExpr>(expr) && !insideClosure))
-        return Action::SkipChildren(expr);
+      if (!expr || isa<ErrorExpr>(expr) || !expr->getType())
+        return Action::SkipNode(expr);
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
         diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }

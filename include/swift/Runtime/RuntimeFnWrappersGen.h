@@ -44,6 +44,7 @@ llvm::Constant *getRuntimeFn(llvm::Module &Module, llvm::Constant *&cache,
                              llvm::ArrayRef<llvm::Type *> retTypes,
                              llvm::ArrayRef<llvm::Type *> argTypes,
                              llvm::ArrayRef<llvm::Attribute::AttrKind> attrs,
+                             llvm::ArrayRef<llvm::MemoryEffects> memEffects,
                              irgen::IRGenModule *IGM = nullptr);
 
 llvm::FunctionType *getRuntimeFnType(llvm::Module &Module,

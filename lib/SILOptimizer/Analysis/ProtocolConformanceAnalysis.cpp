@@ -34,6 +34,11 @@ public:
                     &ProtocolConformanceCache)
       : ProtocolConformanceCache(ProtocolConformanceCache) {}
 
+  /// Walk everything in a macro
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     /// (1) Walk over all NominalTypeDecls to determine conformances.
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -65,7 +70,12 @@ public:
 };
 } // end anonymous namespace
 
-void ProtocolConformanceAnalysis::init() {
+// FIXME: This could be implemented as a request.
+void ProtocolConformanceAnalysis::populateConformanceCacheIfNecessary() {
+  if (ProtocolConformanceCache.has_value())
+    return;
+
+  ProtocolConformanceCache.emplace();
 
   // We only do this in Whole-Module compilation mode.
   if (!M->isWholeModule())
@@ -79,7 +89,7 @@ void ProtocolConformanceAnalysis::init() {
 
   /// This operation is quadratic and should only be performed
   /// in whole module compilation!
-  NominalTypeWalker Walker(ProtocolConformanceCache);
+  NominalTypeWalker Walker(*ProtocolConformanceCache);
   for (auto *D : Decls) {
     D->walk(Walker);
   }

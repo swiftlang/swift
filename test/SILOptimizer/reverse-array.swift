@@ -36,7 +36,7 @@ public func reverseArray(_ a: [Int]) -> [Int] {
 // CHECK:     begin_cow_mutation
 // CHECK-NOT: {{.*(_cow_mutation|cond_fail)}}
 // CHECK:     end_cow_mutation
-// CHECK-NOT: {{.*(_cow_mutation|cond_fail)}}
+// CHECK:     end_cow_mutation
 
 // In SIL we fail to eliminate the bounds check of the input array.
 // But that's okay, because LLVM can do that.

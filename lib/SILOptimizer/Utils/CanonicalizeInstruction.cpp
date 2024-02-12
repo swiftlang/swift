@@ -21,13 +21,13 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -35,10 +35,6 @@ using namespace swift;
 
 // Tracing within the implementation can also be activated by the pass.
 #define DEBUG_TYPE pass.debugType
-
-llvm::cl::opt<bool> EnableLoadSplittingDebugInfo(
-    "sil-load-splitting-debug-info", llvm::cl::init(false),
-    llvm::cl::desc("Create debug fragments at -O for partial loads"));
 
 // Vtable anchor.
 CanonicalizeInstruction::~CanonicalizeInstruction() {}
@@ -80,7 +76,7 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 
 // If simplification is successful, return a valid iterator to the next
 // instruction that wasn't erased.
-static Optional<SILBasicBlock::iterator>
+static llvm::Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its
   // scope. Nothing needs to be added to the worklist except for Result,
@@ -89,7 +85,7 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   auto result = simplifyAndReplaceAllSimplifiedUsesAndErase(
       inst, pass.callbacks, &pass.deadEndBlocks);
   if (!pass.callbacks.hadCallbackInvocation())
-    return None;
+    return llvm::None;
 
   return result;
 }
@@ -258,7 +254,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   // Create a new address projection instruction and load instruction for each
   // unique projection.
   Projection *lastProj = nullptr;
-  Optional<LoadOperation> lastNewLoad;
+  llvm::Optional<LoadOperation> lastNewLoad;
   for (auto &pair : projections) {
     auto &proj = pair.proj;
     auto *extract = pair.extract;
@@ -282,7 +278,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     pass.notifyNewInstruction(projInst);
 
     // When loading a trivial subelement, convert ownership.
-    Optional<LoadOwnershipQualifier> loadOwnership =
+    llvm::Optional<LoadOwnershipQualifier> loadOwnership =
         loadInst.getOwnershipQualifier();
     if (loadOwnership.has_value()) {
       if (*loadOwnership != LoadOwnershipQualifier::Unqualified &&
@@ -301,19 +297,6 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     }
     pass.notifyNewInstruction(**lastNewLoad);
 
-    // FIXME: This drops debug info at -Onone load-splitting is required at
-    // -Onone for exclusivity diagnostics. Fix this by
-    // 
-    // 1. At -Onone, preserve the original load when pass.preserveDebugInfo is
-    // true, but moving it out of its current access scope and into an "unknown"
-    // access scope, which won't be enforced as an exclusivity violation.
-    //
-    // 2. At -O, create "debug fragments" recover as much debug info as possible
-    // by creating debug_value fragments for each new partial load. Currently
-    // disabled because of LLVM back-end crashes.
-    if (!pass.preserveDebugInfo && EnableLoadSplittingDebugInfo) {
-      createDebugFragments(*loadInst, proj, lastNewLoad->getLoadInst());
-    }
     if (loadOwnership) {
       if (*loadOwnership == LoadOwnershipQualifier::Copy) {
         // Destroy the loaded value wherever the aggregate load was destroyed.
@@ -336,6 +319,10 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     nextII = killInstruction(extract, nextII, pass);
   }
 
+  // Preserve the original load's debug information.
+  if (pass.preserveDebugInfo) {
+    swift::salvageLoadDebugInfo(loadInst);
+  }
   // Remove the now unused borrows.
   for (auto *borrow : borrows)
     nextII = killInstAndIncidentalUses(borrow, nextII, pass);
@@ -344,9 +331,8 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   for (auto *destroy : lifetimeEndingInsts)
     nextII = killInstruction(destroy, nextII, pass);
 
-  // FIXME: remove this temporary hack to advance the iterator beyond
-  // debug_value. A soon-to-be merged commit migrates CanonicalizeInstruction to
-  // use InstructionDeleter.
+  // TODO: remove this hack to advance the iterator beyond debug_value and check
+  // SILInstruction::isDeleted() in the caller instead.
   while (nextII != loadInst->getParent()->end()
          && nextII->isDebugInstruction()) {
     ++nextII;
@@ -398,6 +384,14 @@ broadenSingleElementStores(StoreInst *storeInst,
         decl->getStoredProperties().size() != 1)
       break;
 
+    // If the struct is a move-only type, even though the single element in
+    // the struct is trivial, the struct would be non-trivial. In this case, we
+    // need a much more compelx analysis to determine the store ownership
+    // qualifier. Such an analysis is not suitable in the canonicalize pass. So,
+    // bail out.
+    if (baseAddrType.isMoveOnly()) {
+      break;
+    }
     projections.push_back(Projection(inst));
     op = baseAddr;
   }
@@ -491,6 +485,11 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
                            !isNestedLexicalBeginBorrow(bbi)))
     return next;
 
+  // Borrow scopes representing a VarDecl can't be eliminated during the raw
+  // stage because they may be needed for diagnostics.
+  if (bbi->isFromVarDecl() && (bbi->getModule().getStage() == SILStage::Raw))
+    return next;
+
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not
   // optimize such cases. Otherwise, we can eliminate our borrow and instead use
@@ -537,16 +536,16 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
   return killInstruction(inst, next, pass);
 }
 
-static Optional<SILBasicBlock::iterator>
+static llvm::Optional<SILBasicBlock::iterator>
 tryEliminateUnneededForwardingInst(SILInstruction *i,
                                    CanonicalizeInstruction &pass) {
-  assert(OwnershipForwardingMixin::isa(i) &&
+  assert(ForwardingInstruction::isa(i) &&
          "Must be an ownership forwarding inst");
   if (auto *svi = dyn_cast<SingleValueInstruction>(i))
     if (svi->getNumOperands() == 1)
       return eliminateUnneededForwardingUnarySingleValueInst(svi, pass);
 
-  return None;
+  return llvm::None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -579,7 +578,7 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   auto *fn = inst->getFunction();
   if (!preserveDebugInfo && fn->hasOwnership()
       && fn->getModule().getStage() != SILStage::Raw) {
-    if (OwnershipForwardingMixin::isa(inst))
+    if (ForwardingInstruction::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;
   }

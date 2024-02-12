@@ -25,10 +25,8 @@ import complete_testable_helper
 
 #^TOP_LEVEL^#
 
-// TOP_LEVEL-ALL: Begin completions
 // TOP_LEVEL-ALL-DAG: Decl[Struct]/OtherModule[complete_testable_helper]: PublicStruct[#PublicStruct#]; name=PublicStruct
 // TOP_LEVEL-TESTABLE-DAG: Decl[Struct]/OtherModule[complete_testable_helper]: InternalStruct[#InternalStruct#]; name=InternalStruct
-// TOP_LEVEL-ALL: End completions
 
 // TOP_LEVEL-NEG-NOT: InternalStruct
 // TOP_LEVEL-ALL-NEG-NOT: PrivateStruct
@@ -36,10 +34,8 @@ import complete_testable_helper
 func test(value: PublicStruct) {
   value.#^MEMBER^#
 
-  // MEMBER-ALL: Begin completions
   // MEMBER-ALL-DAG: Decl[InstanceMethod]/CurrNominal:   publicMethod()[#Void#]; name=publicMethod()
   // MEMBER-TESTABLE-DAG: Decl[InstanceMethod]/CurrNominal:   internalMethod()[#Void#]; name=internalMethod()
-  // MEMBER-ALL: End completions
 
   // MEMBER-NEG-NOT: internalMethod
   // MEMBER-ALL-NEG-NOT: privateMethod

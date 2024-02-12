@@ -52,17 +52,17 @@
 
 @_spiOnly @_spi(SomeSPIGroup) import A_SPIOnlyImported
 // CHECK-PUBLIC-NOT: A_SPIOnlyImported
-// CHECK-PRIVATE: {{^}}/*@_spiOnly*/ @_spi(SomeSPIGroup) import A_SPIOnlyImported
+// CHECK-PRIVATE: {{^}}@_spiOnly @_spi(SomeSPIGroup) import A_SPIOnlyImported
 
 /// This is also imported as SPI only via FileB.swift
 @_spiOnly import ConstantSPIOnly
 // CHECK-PUBLIC-NOT: ConstantSPIOnly
-// CHECK-PRIVATE: {{^}}/*@_spiOnly*/ import ConstantSPIOnly
+// CHECK-PRIVATE: {{^}}@_spiOnly import ConstantSPIOnly
 
 /// This is also imported as SPI only via FileB.swift
 @_implementationOnly import InconsistentIOI
 // CHECK-PUBLIC-NOT: InconsistentIOI
-// CHECK-PRIVATE: {{^}}/*@_spiOnly*/ import InconsistentIOI
+// CHECK-PRIVATE: {{^}}@_spiOnly import InconsistentIOI
 
 /// This is also imported as SPI only via FileB.swift
 import InconsistentPublic

@@ -16,27 +16,27 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/ObjectFile.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
-#include "swift/Basic/Dwarf.h"
-#include "llvm/Object/ELFObjectFile.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ManagedStatic.h"
 #include <fstream>
 #include <sstream>
 
@@ -46,13 +46,14 @@ using namespace llvm::MachO;
 
 static bool validateModule(
     llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
+    bool requiresNoncopyableGenerics,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
-      data, requiresOSSAModules,
-      /*requiredSDK*/ StringRef(), /*requiresRevisionMatch*/ false,
-      &extendedInfo, /* dependencies*/ nullptr, &searchPaths);
+      data, requiresOSSAModules, requiresNoncopyableGenerics,
+      /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
+      &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;
@@ -88,6 +89,25 @@ static bool validateModule(
                    << (searchPath.IsFramework ? "true" : "false");
       llvm::outs() << ", system=" << (searchPath.IsSystem ? "true" : "false")
                    << "\n";
+    }
+    llvm::outs() << "- Plugin Search Options:\n";
+    for (auto opt : extendedInfo.getPluginSearchOptions()) {
+      StringRef optStr;
+      switch (opt.first) {
+      case swift::PluginSearchOption::Kind::PluginPath:
+        optStr = "-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::ExternalPluginPath:
+        optStr = "-external-plugin-path";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginLibrary:
+        optStr = "-load-plugin-library";
+        break;
+      case swift::PluginSearchOption::Kind::LoadPluginExecutable:
+        optStr = "-load-plugin-executable";
+        break;
+      }
+      llvm::outs() << "    " << optStr << " " << opt.second << "\n";
     }
   }
 
@@ -190,15 +210,19 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
         continue;
       }
       llvm::StringRef Name = *NameOrErr;
-      if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF && Name == swift::ELFASTSectionName) ||
-          (COFF && Name == swift::COFFASTSectionName)) {
+      if ((MachO && Name == swift::SwiftObjectFileFormatMachO().getSectionName(
+                                swift::ReflectionSectionKind::swiftast)) ||
+          (ELF && Name == swift::SwiftObjectFileFormatELF().getSectionName(
+                              swift::ReflectionSectionKind::swiftast)) ||
+          (COFF && Name == swift::SwiftObjectFileFormatCOFF().getSectionName(
+                               swift::ReflectionSectionKind::swiftast))) {
         uint64_t Size = Section.getSize();
 
-        llvm::Expected<llvm::StringRef> ContentsReference = Section.getContents();
+        llvm::Expected<llvm::StringRef> ContentsReference =
+            Section.getContents();
         if (!ContentsReference) {
           llvm::errs() << "error: " << name << " "
-            << errorToErrorCode(OF.takeError()).message() << "\n";
+                       << errorToErrorCode(OF.takeError()).message() << "\n";
           return false;
         }
         char *Module = Alloc.Allocate<char>(Size);
@@ -230,6 +254,9 @@ int main(int argc, char **argv) {
   opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
                     cat(Visible));
 
+  opt<std::string> Filter("filter", desc("triple for filtering modules"),
+                          cat(Visible));
+
   opt<std::string> ModuleCachePath(
       "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
@@ -255,6 +282,12 @@ int main(int argc, char **argv) {
 
   opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
                               desc("Serialize modules in OSSA"), cat(Visible));
+
+  opt<bool> EnableNoncopyableGenerics(
+      "enable-noncopyable-generics",
+      init(false),
+      desc("Serialize modules with NoncopyableGenerics"),
+      cat(Visible));
 
   ParseCommandLineOptions(argc, argv);
 
@@ -300,7 +333,8 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, info, extendedInfo, searchPaths)) {
+                        EnableOSSAModules, EnableNoncopyableGenerics,
+                        info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
     }
@@ -325,6 +359,13 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
 
+  if (EnableNoncopyableGenerics)
+    Invocation.getLangOptions()
+      .enableFeature(swift::Feature::NoncopyableGenerics);
+  else
+    Invocation.getLangOptions()
+      .disableFeature(swift::Feature::NoncopyableGenerics);
+
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
   }
@@ -342,12 +383,20 @@ int main(int argc, char **argv) {
     ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
   }
 
-  for (auto &Module : Modules)
-    if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
-                         StringRef(Module.first, Module.second), modules)) {
-      llvm::errs() << "error: Failed to parse AST section!\n";
+  llvm::SmallString<0> error;
+  llvm::raw_svector_ostream errs(error);
+  llvm::Triple filter(Filter);
+  for (auto &Module : Modules) {
+    auto Result = parseASTSection(
+        *CI.getMemoryBufferSerializedModuleLoader(),
+        StringRef(Module.first, Module.second), filter);
+    if (auto E = Result.takeError()) {
+      std::string error = toString(std::move(E));
+      llvm::errs() << "error: Failed to parse AST section! " << error << "\n";
       return 1;
     }
+    modules.insert(modules.end(), Result->begin(), Result->end());
+  }
 
   // Attempt to import all modules we found.
   for (auto path : modules) {

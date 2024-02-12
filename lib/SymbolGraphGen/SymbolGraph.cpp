@@ -31,9 +31,9 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-                         Optional<ModuleDecl *> ExtendedModule,
+                         llvm::Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         Optional<llvm::VersionTuple> ModuleVersion,
+                         llvm::Optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
     : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
       ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
@@ -63,41 +63,51 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   Opts.PrintUserInaccessibleAttrs = false;
-  Opts.SkipPrivateStdlibDecls = true;
-  Opts.SkipUnderscoredStdlibProtocols = true;
+  Opts.SkipPrivateStdlibDecls = !Walker.Options.PrintPrivateStdlibSymbols;
+  Opts.SkipUnderscoredStdlibProtocols = !Walker.Options.PrintPrivateStdlibSymbols;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
   Opts.PrintFactoryInitializerComment = false;
+  Opts.PrintMacroDefinitions = false;
 
   Opts.ExclusiveAttrList.clear();
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
-#include "swift/AST/Attr.def"
+#define TYPE_ATTR(X, C)                                                        \
+  ExcludeAttrs.insert(std::make_pair("TypeAttrKind::" #C, TypeAttrKind::C));
+#include "swift/AST/TypeAttr.def"
 
   // Allow the following type attributes:
-  ExcludeAttrs.erase("TAK_autoclosure");
-  ExcludeAttrs.erase("TAK_convention");
-  ExcludeAttrs.erase("TAK_noescape");
-  ExcludeAttrs.erase("TAK_escaping");
-  ExcludeAttrs.erase("TAK_inout");
+  ExcludeAttrs.erase("TypeAttrKind::Autoclosure");
+  ExcludeAttrs.erase("TypeAttrKind::Convention");
+  ExcludeAttrs.erase("TypeAttrKind::NoEscape");
+  ExcludeAttrs.erase("TypeAttrKind::Escaping");
+  ExcludeAttrs.erase("TypeAttrKind::Inout");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
   // symbol graphs.
-  ExcludeAttrs.insert(std::make_pair("DAK_Available", DAK_Available));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inline", DAK_Inline));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inlinable", DAK_Inlinable));
-  ExcludeAttrs.insert(std::make_pair("DAK_Prefix", DAK_Prefix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Available", DeclAttrKind::Available));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inline", DeclAttrKind::Inline));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inlinable", DeclAttrKind::Inlinable));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Prefix", DeclAttrKind::Prefix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Postfix", DeclAttrKind::Postfix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Infix", DeclAttrKind::Infix));
 
   // In "emit modules separately" jobs, access modifiers show up as attributes,
   // but we don't want them to be printed in declarations
-  ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
-  ExcludeAttrs.insert(std::make_pair("DAK_SetterAccess", DAK_SetterAccess));
+  ExcludeAttrs.insert(std::make_pair("DeclAttrKind::AccessControl",
+                                     DeclAttrKind::AccessControl));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::SetterAccess", DeclAttrKind::SetterAccess));
 
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
@@ -128,17 +138,16 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintOverrideKeyword = false;
   Options.PrintGenericRequirements = false;
 
-  #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-    Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X) \
-    Options.ExcludeAttrList.push_back(TAK_##X);
-  #include "swift/AST/Attr.def"
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
+  Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
+#define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
+#include "swift/AST/DeclAttr.def"
 
   // Don't include these attributes in subheadings.
-  Options.ExcludeAttrList.push_back(DAK_Final);
-  Options.ExcludeAttrList.push_back(DAK_Mutating);
-  Options.ExcludeAttrList.push_back(DAK_NonMutating);
-  Options.ExcludeAttrList.push_back(TAK_escaping);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Final);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::NonMutating);
+  Options.ExcludeAttrList.push_back(TypeAttrKind::Escaping);
 
   return Options;
 }
@@ -190,15 +199,6 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
 // MARK: - Symbols (Nodes)
 
 void SymbolGraph::recordNode(Symbol S) {
-  if (Walker.Options.SkipProtocolImplementations && S.getInheritedDecl()) {
-    const auto *DocCommentProvidingDecl =
-      getDocCommentProvidingDecl(S.getLocalSymbolDecl(), /*AllowSerialized=*/true);
-
-    // allow implementation symbols to remain if they have their own comment
-    if (DocCommentProvidingDecl != S.getLocalSymbolDecl())
-      return;
-  }
-
   Nodes.insert(S);
 
   // Record all of the possible relationships (edges) originating
@@ -269,11 +269,13 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
+    case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
     case swift::DeclContextKind::TopLevelCodeDecl:
+    case swift::DeclContextKind::SerializedTopLevelCodeDecl:
     case swift::DeclContextKind::SubscriptDecl:
     case swift::DeclContextKind::AbstractFunctionDecl:
-    case swift::DeclContextKind::SerializedLocal:
+    case swift::DeclContextKind::Package:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
     case swift::DeclContextKind::MacroDecl:
@@ -283,15 +285,21 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
 
 bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
     const NominalTypeDecl *Owner) const {
-  const auto *FD = dyn_cast<FuncDecl>(VD);
-  if (!FD) {
+  DeclName Name;
+  if (const auto *FD = dyn_cast<FuncDecl>(VD)) {
+    Name = FD->getEffectiveFullName();
+  } else {
+    Name = VD->getName();
+  }
+
+  if (!Name) {
     return true;
   }
+
   auto *DC = const_cast<DeclContext*>(Owner->getDeclContext());
 
   ResolvedMemberResult Result =
-    resolveValueMember(*DC, Owner->getSelfTypeInContext(),
-                       FD->getEffectiveFullName());
+    resolveValueMember(*DC, Owner->getSelfTypeInContext(), Name);
 
   const auto ViableCandidates =
     Result.getMemberDecls(InterestedMemberKind::All);
@@ -390,7 +398,7 @@ void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
   const auto VD = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto &InheritanceLoc : NTD->getInherited()) {
+    for (const auto &InheritanceLoc : NTD->getInherited().getEntries()) {
       auto Ty = InheritanceLoc.getType();
       if (!Ty) {
         continue;
@@ -494,6 +502,13 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
       });
     } else {
       for (const auto *Conformance : NTD->getAllConformances()) {
+        // Check to make sure that this conformance wasn't declared via an
+        // unconditionally-unavailable extension. If so, don't add that to the graph.
+        if (const auto *ED = dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext())) {
+          if (isUnconditionallyUnavailableOnAllPlatforms(ED)) {
+            continue;
+          }
+        }
         recordEdge(
             S, Symbol(this, Conformance->getProtocol(), nullptr),
             RelationshipKind::ConformsTo(),
@@ -635,6 +650,19 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
+namespace {
+
+const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
+  auto reqs = VD->getSatisfiedProtocolRequirements();
+
+  if (!reqs.empty())
+    return reqs.front();
+  else
+    return nullptr;
+}
+
+}
+
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -696,9 +724,20 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
     // Special cases below.
 
+    // If we've been asked to skip protocol implementations, filter them out here.
+    if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
+      // Allow them to stay if they have their own doc comment
+      const auto *DocCommentProvidingDecl = getDocCommentProvidingDecl(VD);
+      if (DocCommentProvidingDecl != VD)
+        return true;
+    }
+
     // Symbols from exported-imported modules should only be included if they
     // were originally public.
-    if (Walker.isFromExportedImportedModule(D) &&
+    // We force compiler-equality here to ensure that the presence of an underlying
+    // Clang module does not prevent internal Swift symbols from being emitted when
+    // MinimumAccessLevel is set to `internal` or below.
+    if (Walker.isFromExportedImportedModule(D, /*countUnderlyingClangModule*/false) &&
         VD->getFormalAccess() < AccessLevel::Public) {
       return true;
     }

@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -unavailable-decl-optimization=complete)
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -17,6 +18,25 @@ enum Combo<T: Hashable, U: Hashable>: Hashable {
   case both(T, U)
 }
 
+@available(*, unavailable)
+struct UnavailableStruct: Hashable {}
+
+enum HasUnavailableCases: Hashable {
+  case available
+  case availablePayload(Int)
+
+  @available(*, unavailable)
+  case unavailable
+
+  @available(*, unavailable)
+  case unavailablePayload(UnavailableStruct)
+}
+
+enum AllUnavailableCases: Hashable {
+  @available(*, unavailable)
+  case nope
+}
+
 var EnumSynthesisTests = TestSuite("EnumSynthesis")
 
 EnumSynthesisTests.test("BasicEquatability/Hashability") {
@@ -28,7 +48,7 @@ EnumSynthesisTests.test("BasicEquatability/Hashability") {
   ], equalityOracle: { $0 == $1 })
 }
 
-// Not guaranteed by the semantics of Hashable, but we sanity check that the
+// Not guaranteed by the semantics of Hashable, but we soundness check that the
 // synthesized hash function is good enough to not let nearby values collide.
 EnumSynthesisTests.test("CloseValuesDoNotCollide") {
   expectNotEqual(Token.string("foo").hashValue, Token.string("goo").hashValue)
@@ -50,6 +70,13 @@ EnumSynthesisTests.test("CloseGenericValuesDoNotCollide") {
   expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("goo", 3).hashValue)
   expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("foo", 4).hashValue)
   expectNotEqual(Combo<String, Int>.both("foo", 3).hashValue, Combo<String, Int>.both("goo", 4).hashValue)
+}
+
+EnumSynthesisTests.test("HasUnavailableCasesEquatability/Hashability") {
+  checkHashable([
+    HasUnavailableCases.available,
+    HasUnavailableCases.availablePayload(2),
+  ], equalityOracle: { $0 == $1 })
 }
 
 func hashEncode(_ body: (inout Hasher) -> ()) -> Int {

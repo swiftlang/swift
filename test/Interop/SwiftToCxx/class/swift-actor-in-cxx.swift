@@ -4,6 +4,10 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor.h)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Actor  -emit-clang-header-path %t/actor-public.h -enable-experimental-cxx-interop -disable-availability-checking
+// RN: %FileCheck %s < %t/actor-public.h
+// RUN: %check-interop-cxx-header-in-clang(%t/actor-public.h)
+
 // RUN: %target-swift-frontend %s -typecheck -module-name Actor -enable-library-evolution -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/actor-evo.h -disable-availability-checking
 // RUN: %FileCheck %s < %t/actor-evo.h
 
@@ -30,7 +34,7 @@ public final actor ActorWithField {
   }
 }
 
-// CHECK: namespace Actor __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Actor") {
+// CHECK: namespace Actor SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Actor") {
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Actor0A9WithFieldCACycfC(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init()
 // CHECK: SWIFT_EXTERN void $s5Actor0A9WithFieldC6methodyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // method()
 

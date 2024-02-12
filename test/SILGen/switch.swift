@@ -456,7 +456,7 @@ class E : C {}
 // CHECK-LABEL: sil hidden [ossa] @$s6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@guaranteed B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
@@ -479,7 +479,7 @@ func test_isa_class_1(x: B) {
   // CHECK-NEXT:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case is D2:
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
@@ -489,7 +489,7 @@ func test_isa_class_1(x: B) {
     b()
 
   // CHECK: [[IS_NOT_D2]]([[CASTFAIL_D2:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
@@ -510,7 +510,7 @@ func test_isa_class_1(x: B) {
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   case is C:
   // CHECK: [[IS_C]]([[CAST_C:%.*]] : @guaranteed $C):
@@ -539,83 +539,87 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
   switch x {
 
-  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   case let y as D1 where runced():
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
   // CHECK:   [[CAST_D1_COPY:%.*]] = copy_value [[CAST_D1]]
-  // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [lexical] [[CAST_D1_COPY]]
+  // CHECK:   [[MOVED_D1_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_D1_COPY]]
   // CHECK:   function_ref @$s6switch6runcedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
 
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @$s6switch1ayyF
+  // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [[MOVED_D1_COPY]]
   // CHECK:   [[CAST_D1_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D1_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D1_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_D1_COPY]]
-  // CHECK:   destroy_value [[CAST_D1_COPY]]
+  // CHECK:   destroy_value [[MOVED_D1_COPY]]
   // CHECK:   br [[CONT:bb[0-9]+]]([[RET]] : $AnyObject)
     a()
     return y
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   destroy_value [[CAST_D1_COPY]]
+  // CHECK:   destroy_value [[MOVED_D1_COPY]]
   // CHECK:   br [[NEXT_CASE:bb5]]
 
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case let y as D2:
   // CHECK: [[CASE2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
-  // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [lexical] [[CAST_D2_COPY]]
+  // CHECK:   [[MOVED_CAST_D2_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_D2_COPY]]
   // CHECK:   function_ref @$s6switch1byyF
+  // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[MOVED_CAST_D2_COPY]]
   // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D2_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D2_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]]
-  // CHECK:   destroy_value [[CAST_D2_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_D2_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     b()
     return y
 
   // CHECK: [[IS_NOT_D2]]([[NOCAST_D2:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
-  // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [lexical] [[CAST_E_COPY]]
+  // CHECK:   [[MOVED_CAST_E_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_E_COPY]]
   // CHECK:   function_ref @$s6switch6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
 
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s6switch1cyyF
+  // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [[MOVED_CAST_E_COPY]]
   // CHECK:   [[CAST_E_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_E_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]]
-  // CHECK:   destroy_value [[CAST_E_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_E_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     c()
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK:    destroy_value [[CAST_E_COPY]]
+  // CHECK:    destroy_value [[MOVED_CAST_E_COPY]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]
-  // CHECK:   checked_cast_br [[X]] : $B to C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
   case let y as C:
   // CHECK: [[CASE4]]([[CAST_C:%.*]] : @guaranteed $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
-  // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [lexical] [[CAST_C_COPY]]
+  // CHECK:   [[MOVED_CAST_C_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_C_COPY]]
   // CHECK:   function_ref @$s6switch1dyyF
+  // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [[MOVED_CAST_C_COPY]]
   // CHECK:   [[CAST_C_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_C_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_C_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_C_COPY]]
-  // CHECK:   destroy_value [[CAST_C_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_C_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     d()
     return y
@@ -1346,7 +1350,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
-// CHECK:   checked_cast_br [[TUP_0_VAL]] : $Klass to AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br Klass in [[TUP_0_VAL]] : $Klass to AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
 //
 // CHECK: [[IS_ANYOBJECT_BB]]([[ANYOBJECT:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[ANYOBJECT_COPY:%.*]] = copy_value [[ANYOBJECT]]
@@ -1371,10 +1375,9 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 //
 // CHECK: [[IS_ANY_BB]]:
 // CHECK-NEXT:   [[ANYOBJECT:%.*]] = load [take] [[ANYOBJECT_ADDR]]
-// CHECK-NEXT:   begin_borrow
+// CHECK-NEXT:   [[MOVED:%.*]] = move_value
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   end_borrow
-// CHECK-NEXT:   destroy_value [[ANYOBJECT]]
+// CHECK-NEXT:   destroy_value [[MOVED]]
 // CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
 // CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]
 // CHECK-NEXT:   dealloc_stack [[OPT_ANY_ADDR]]
@@ -1538,15 +1541,16 @@ func addressOnlyFallthroughCaller() {
 //
 // CHECK: [[BB_A]]([[BB_A_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_A_ARG_COPY:%.*]] = copy_value [[BB_A_ARG]]
-// CHECK:   [[BB_A_ARG_COPY_BORROW:%.*]] = begin_borrow [lexical] [[BB_A_ARG_COPY]]
+// CHECK:   [[BB_A_ARG_COPY_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_A_ARG_COPY]]
+// CHECK:   [[BB_A_ARG_COPY_BORROW:%.*]] = begin_borrow [[BB_A_ARG_COPY_MOVE]]
 // CHECK:   apply {{%.*}}([[BB_A_ARG_COPY_BORROW]])
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_A_ARG_COPY_BORROW]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_A_ARG_COPY_MOVE]]
 // CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
 //
 // CHECK: [[BB_B]]([[BB_B_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_B_ARG_COPY:%.*]] = copy_value [[BB_B_ARG]]
-// CHECK:   [[BB_B_ARG_COPY_BORROW:%.*]] = begin_borrow [lexical] [[BB_B_ARG_COPY]]
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_B_ARG_COPY_BORROW]]
+// CHECK:   [[BB_B_ARG_COPY_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_B_ARG_COPY]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_B_ARG_COPY_MOVE]]
 // CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
 //
 // CHECK: [[BB_AB:bb[0-9]+]]([[BB_AB_PHI:%.*]] : @owned
@@ -1557,8 +1561,8 @@ func addressOnlyFallthroughCaller() {
 //
 // CHECK: [[BB_C]]([[BB_C_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_C_COPY:%.*]] = copy_value [[BB_C_ARG]]
-// CHECK:   [[BB_C_BORROWED_COPY:%.*]] = begin_borrow [lexical] [[BB_C_COPY]]
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_C_BORROWED_COPY]]
+// CHECK:   [[BB_C_BORROWED_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_C_COPY]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_C_BORROWED_MOVE]]
 // CHECK:   br [[BB_ABC]]([[RESULT]] :
 //
 // CHECK: [[BB_ABC]]([[BB_ABC_ARG:%.*]] : @owned

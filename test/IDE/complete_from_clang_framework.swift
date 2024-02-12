@@ -49,13 +49,10 @@ struct SwiftStruct {
 // Test that we don't include Clang completions in unexpected places.
 func testSwiftCompletions(foo: SwiftStruct) {
   foo.#^SWIFT_COMPLETIONS^#
-// SWIFT_COMPLETIONS: Begin completions
 // SWIFT_COMPLETIONS-NEXT: Keyword[self]/CurrNominal: self[#SwiftStruct#]; name=self
 // SWIFT_COMPLETIONS-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
-// SWIFT_COMPLETIONS-NEXT: End completions
 }
 
-// CLANG_FOO: Begin completions
 // CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooEnum1[#FooEnum1#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FooEnum1X[#FooEnum1#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[Struct]/OtherModule[Foo]:       FooEnum2[#FooEnum2#]{{; name=.+$}}
@@ -93,31 +90,23 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_REDEF_1[#Int32#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_REDEF_2[#Int32#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: theLastDeclInFoo()[#Void#]{{; name=.+$}}
-// CLANG_FOO: End completions
 
-// CLANG_FOO_SUB: Begin completions
 // CLANG_FOO_SUB-DAG: Decl[FreeFunction]/OtherModule[Foo.FooSub]: fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_FOO_SUB-DAG: Decl[Struct]/OtherModule[Foo.FooSub]:       FooSubEnum1[#FooSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubEnum1X[#FooSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_SUB-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]:    FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_FOO_SUB: End completions
 
-// CLANG_FOO_HELPER: Begin completions
 // CLANG_FOO_HELPER-DAG: Decl[FreeFunction]/OtherModule[FooHelper]: fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:    FooHelperUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
 // CLANG_FOO_HELPER-DAG: Decl[GlobalVar]/OtherModule[FooHelper]:    FooHelperUnnamedEnumeratorA2[#Int#]{{; name=.+$}}
-// CLANG_FOO_HELPER: End completions
 
-// CLANG_FOO_HELPER_SUB: Begin completions
 // CLANG_FOO_HELPER_SUB-DAG: Decl[FreeFunction]/OtherModule[FooHelper.FooHelperSub]: fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_FOO_HELPER_SUB-DAG: Decl[Struct]/OtherModule[FooHelper.FooHelperSub]:       FooHelperSubEnum1[#FooHelperSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubEnum1X[#FooHelperSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubEnum1Y[#FooHelperSubEnum1#]{{; name=.+$}}
 // CLANG_FOO_HELPER_SUB-DAG: Decl[GlobalVar]/OtherModule[FooHelper.FooHelperSub]:    FooHelperSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
-// CLANG_FOO_HELPER_SUB: End completions
 
-// CLANG_BAR: Begin completions
 // CLANG_BAR-DAG: Decl[FreeFunction]/OtherModule[Bar]: barFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_BAR-DAG: Decl[Class]/OtherModule[Bar]:        BarForwardDeclaredClass[#BarForwardDeclaredClass#]{{; name=.+$}}
 // CLANG_BAR-DAG: Decl[Struct]/OtherModule[Bar]:       BarForwardDeclaredEnum[#BarForwardDeclaredEnum#]{{; name=.+$}}
@@ -125,11 +114,8 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule[Bar]:    BAR_MACRO_1[#Int32#]{{; name=.+$}}
 // CLANG_BAR-DAG: Decl[Struct]/OtherModule[Bar]:       SomeItemSet[#SomeItemSet#]
 // CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[Bar]:    SomeEnvironment[#SomeItemSet#]
-// CLANG_BAR: End completions
 
-// CLANG_BOTH_FOO_BAR: Begin completions
 // CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[{{(Foo|Bar)}}]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_BOTH_FOO_BAR: End completions
 
 // CLANG_QUAL_FOO_NEGATIVE-NOT: bar
 // CLANG_QUAL_FOO_NEGATIVE-NOT: :{{.*}}Bar
@@ -220,7 +206,6 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule[Foo]:        .FooRepeatedMembers[#FooRepeatedMembers#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]: .FooClassWithClassProperties[#FooClassWithClassProperties#];
 // CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule[Foo]: .SCNFilterMode[#SCNFilterMode#];
-// CLANG_QUAL_FOO_2: End completions
 }
 
 func testCompleteModuleQualifiedBar1() {
@@ -232,34 +217,27 @@ func testCompleteModuleQualifiedBar1() {
 
 func testCompleteFunctionCall1() {
   fooFunc1#^FUNCTION_CALL_1^#
-// FUNCTION_CALL_1: Begin completions
 // FUNCTION_CALL_1-NEXT: Decl[FreeFunction]/OtherModule[Foo]/Flair[ArgLabels]: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
-// FUNCTION_CALL_1-NEXT: End completions
 }
 
 func testCompleteFunctionCall2() {
   fooFunc1AnonymousParam#^FUNCTION_CALL_2^#
-// FUNCTION_CALL_2: Begin completions
 // FUNCTION_CALL_2-NEXT: Decl[FreeFunction]/OtherModule[Foo]/Flair[ArgLabels]: ({#Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
-// FUNCTION_CALL_2-NEXT: End completions
 }
 
 func testCompleteStructMembers1() {
   FooStruct1#^CLANG_STRUCT_MEMBERS_1^#
-// CLANG_STRUCT_MEMBERS_1: Begin completions
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct1.Type#]; name=self
 // CLANG_STRUCT_MEMBERS_1-NEXT: Keyword/CurrNominal: .Type[#FooStruct1.Type#]; name=Type
-// CLANG_STRUCT_MEMBERS_1-NEXT: End completions
 }
 
 func testCompleteClassMembers1() {
   FooClassBase#^CLANG_CLASS_MEMBERS_1^#
 // FIXME: do we want to show curried instance functions for Objective-C classes?
-// CLANG_CLASS_MEMBERS_1: Begin completions
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc0({#(self): FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
@@ -280,13 +258,11 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#(self): FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooClassBase.Type#]; name=self
 // CLANG_CLASS_MEMBERS_1-NEXT: Keyword/CurrNominal: .Type[#FooClassBase.Type#]; name=Type
-// CLANG_CLASS_MEMBERS_1-NEXT: End completions
 }
 
 func testCompleteClassMembers2() {
   FooClassDerived#^CLANG_CLASS_MEMBERS_2^#
 
-// CLANG_CLASS_MEMBERS_2: Begin completions
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooInstanceFunc0({#(self): FooClassDerived#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooInstanceFunc1({#(self): FooClassDerived#})[#(Int32) -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooInstanceFunc2({#(self): FooClassDerived#})[#(Int32, withB: Int32) -> Void#]{{; name=.+$}}
@@ -314,12 +290,10 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#(self): FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Keyword[self]/CurrNominal: .self[#FooClassDerived.Type#]; name=self
 // CLANG_CLASS_MEMBERS_2-NEXT: Keyword/CurrNominal: .Type[#FooClassDerived.Type#]; name=Type
-// CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 
 func testCompleteInstanceMembers1(fooObject: FooClassDerived) {
   fooObject#^CLANG_INSTANCE_MEMBERS_1^#
-// CLANG_INSTANCE_MEMBERS_1: Begin completions
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:      .fooProperty1[#Int32#]{{; name=.+$}}
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:      .fooProperty2[#Int32#]{{; name=.+$}}
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:      .fooProperty3[#Int32#]{{; name=.+$}}
@@ -342,11 +316,9 @@ func testCompleteInstanceMembers1(fooObject: FooClassDerived) {
 // Check the FooHelper module is suggested even though it's not imported directly
 func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER^# {
   let x = #^EXPR_MODULE_QUALIFIER^#
-// MODULE_QUALIFIER: Begin completions
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
 // MODULE_QUALIFIER-DAG: Decl[Module]/None/IsSystem: Swift[#Module#]; name=Swift
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Foo[#Module#]; name=Foo
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: FooHelper[#Module#]; name=FooHelper
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Bar[#Module#]; name=Bar
-// MODULE_QUALIFIER: End completions
 }

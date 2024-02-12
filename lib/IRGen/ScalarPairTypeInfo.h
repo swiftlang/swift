@@ -159,13 +159,14 @@ public:
     }
   }
 
-  void packIntoEnumPayload(IRGenFunction &IGF,
+  void packIntoEnumPayload(IRGenModule &IGM,
+                           IRBuilder &builder,
                            EnumPayload &payload,
                            Explosion &src,
                            unsigned offset) const override {
-    payload.insertValue(IGF, src.claimNext(), offset);
-    payload.insertValue(IGF, src.claimNext(),
-      offset + asDerived().getSecondElementOffset(IGF.IGM).getValueInBits());
+    payload.insertValue(IGM, builder, src.claimNext(), offset);
+    payload.insertValue(IGM, builder, src.claimNext(),
+      offset + asDerived().getSecondElementOffset(IGM).getValueInBits());
   }
   
   void unpackFromEnumPayload(IRGenFunction &IGF,
@@ -194,10 +195,12 @@ public:
   static bool isFirstElementTrivial() {
     return true;
   }
-  void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *value,
-                              Optional<Atomicity> atomicity = None) const {}
-  void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *value,
-                               Optional<Atomicity> atomicity = None) const {}
+  void emitRetainFirstElement(
+      IRGenFunction &IGF, llvm::Value *value,
+      llvm::Optional<Atomicity> atomicity = llvm::None) const {}
+  void emitReleaseFirstElement(
+      IRGenFunction &IGF, llvm::Value *value,
+      llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *value,
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);
@@ -206,10 +209,12 @@ public:
   static bool isSecondElementTrivial() {
     return true;
   }
-  void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *value,
-                               Optional<Atomicity> atomicity = None) const {}
-  void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *value,
-                                Optional<Atomicity> atomicity = None) const {}
+  void emitRetainSecondElement(
+      IRGenFunction &IGF, llvm::Value *value,
+      llvm::Optional<Atomicity> atomicity = llvm::None) const {}
+  void emitReleaseSecondElement(
+      IRGenFunction &IGF, llvm::Value *value,
+      llvm::Optional<Atomicity> atomicity = llvm::None) const {}
   void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *value,
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);

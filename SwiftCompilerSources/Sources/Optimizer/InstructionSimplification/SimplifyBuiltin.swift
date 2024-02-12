@@ -22,9 +22,41 @@ extension BuiltinInst : OnoneSimplifyable {
         optimizeIsConcrete(allowArchetypes: false, context)
       case .IsSameMetatype:
         optimizeIsSameMetatype(context)
+      case .Once:
+        optimizeBuiltinOnce(context)
+      case .CanBeObjCClass:
+        optimizeCanBeClass(context)
+      case .AssertConf:
+        optimizeAssertConfig(context)
+      case .Sizeof,
+           .Strideof,
+           .Alignof:
+        optimizeTargetTypeConst(context)
+      case .DestroyArray,
+           .CopyArray,
+           .TakeArrayNoAlias,
+           .TakeArrayFrontToBack,
+           .TakeArrayBackToFront,
+           .AssignCopyArrayNoAlias,
+           .AssignCopyArrayFrontToBack,
+           .AssignCopyArrayBackToFront,
+           .AssignTakeArray,
+           .AllocVector,
+           .IsPOD:
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CreateAsyncTask:
+        // In embedded Swift, CreateAsyncTask needs a thin metatype
+        if context.options.enableEmbeddedSwift {
+          optimizeArgumentToThinMetatype(argument: 1, context)
+        }
+      case .ICMP_EQ:
+        constantFoldIntegerEquality(isEqual: true, context)
+      case .ICMP_NE:
+        constantFoldIntegerEquality(isEqual: false, context)
       default:
-        // TODO: handle other builtin types
-        break
+        if let literal = constantFold(context) {
+          uses.replaceAll(with: literal, context)
+        }
     }
   }
 }
@@ -64,6 +96,175 @@ private extension BuiltinInst {
 
     uses.replaceAll(with: result, context)
   }
+
+  func optimizeBuiltinOnce(_ context: SimplifyContext) {
+    guard let callee = calleeOfOnce, callee.isDefinition else {
+      return
+    }
+    context.notifyDependency(onBodyOf: callee)
+
+    // If the callee is side effect-free we can remove the whole builtin "once".
+    // We don't use the callee's memory effects but instead look at all callee instructions
+    // because memory effects are not computed in the Onone pipeline, yet.
+    // This is no problem because the callee (usually a global init function )is mostly very small,
+    // or contains the side-effect instruction `alloc_global` right at the beginning.
+    if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
+      return
+    }
+    for use in uses {
+      let ga = use.instruction as! GlobalAddrInst
+      ga.clearToken(context)
+    }
+    context.erase(instruction: self)
+  }
+
+  var calleeOfOnce: Function? {
+    let callee = operands[1].value
+    if let fri = callee as? FunctionRefInst {
+      return fri.referencedFunction
+    }
+    return nil
+  }
+
+  func optimizeCanBeClass(_ context: SimplifyContext) {
+    guard let ty = substitutionMap.replacementTypes[0] else {
+      return
+    }
+    let literal: IntegerLiteralInst
+    switch ty.canBeClass {
+    case .IsNot:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(0,  type: type)
+    case .Is:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(1,  type: type)
+    case .CanBe:
+      return
+    default:
+      fatalError()
+    }
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
+  }
+
+  func optimizeAssertConfig(_ context: SimplifyContext) {
+    let literal: IntegerLiteralInst
+    switch context.options.assertConfiguration {
+    case .enabled:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(1,  type: type)
+    case .disabled:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(0,  type: type)
+    default:
+      return
+    }
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
+  }
+  
+  func optimizeTargetTypeConst(_ context: SimplifyContext) {
+    guard let ty = substitutionMap.replacementTypes[0] else {
+      return
+    }
+    
+    let value: Int?
+    switch id {
+    case .Sizeof:
+      value = ty.getStaticSize(context: context)
+    case .Strideof:
+      value = ty.getStaticStride(context: context)
+    case .Alignof:
+      value = ty.getStaticAlignment(context: context)
+    default:
+      fatalError()
+    }
+    
+    guard let value else {
+      return
+    }
+    
+    let builder = Builder(before: self, context)
+    let literal = builder.createIntegerLiteral(value, type: type)
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
+  }
+  
+  func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
+    let type: Type
+
+    if let metatypeInst = operands[argument].value as? MetatypeInst {
+      type = metatypeInst.type
+    } else if let initExistentialInst = operands[argument].value as? InitExistentialMetatypeInst {
+      type = initExistentialInst.metatype.type
+    } else {
+      return
+    }
+
+    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
+      return
+    }
+    
+    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
+    let builder = Builder(before: self, context)
+    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    operands[argument].set(to: newMetatype, context)
+  }
+
+  func constantFoldIntegerEquality(isEqual: Bool, _ context: SimplifyContext) {
+    if constantFoldStringNullPointerCheck(isEqual: isEqual, context) {
+      return
+    }
+    if let literal = constantFold(context) {
+      uses.replaceAll(with: literal, context)
+    }
+  }
+
+  func constantFoldStringNullPointerCheck(isEqual: Bool, _ context: SimplifyContext) -> Bool {
+    if operands[1].value.isZeroInteger &&
+       operands[0].value.lookThroughScalarCasts is StringLiteralInst
+    {
+      let builder = Builder(before: self, context)
+      let result = builder.createIntegerLiteral(isEqual ? 0 : 1, type: type)
+      uses.replaceAll(with: result, context)
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+}
+
+private extension Value {
+  var isZeroInteger: Bool {
+    if let literal = self as? IntegerLiteralInst,
+       let value = literal.value
+    {
+      return value == 0
+    }
+    return false
+  }
+
+  var lookThroughScalarCasts: Value {
+    guard let bi = self as? BuiltinInst else {
+      return self
+    }
+    switch bi.id {
+    case .ZExt, .ZExtOrBitCast, .PtrToInt:
+      return bi.operands[0].value.lookThroughScalarCasts
+    default:
+      return self
+    }
+  }
+}
+
+private func hasSideEffectForBuiltinOnce(_ instruction: Instruction) -> Bool {
+  switch instruction {
+  case is DebugStepInst, is DebugValueInst:
+    return false
+  default:
+    return instruction.mayReadOrWriteMemory ||
+           instruction.hasUnspecifiedSideEffects
+  }
 }
 
 private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Function) -> Bool? {
@@ -76,8 +277,13 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsTy = lhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
+  let lhsMetatype = lhsExistential.metatype.type
+  let rhsMetatype = rhsExistential.metatype.type
+  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+    return nil
+  }
+  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.

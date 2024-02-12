@@ -115,3 +115,19 @@ func test_rdar15293354() {
 
 test_rdar15293354()
 
+
+
+
+func testStaticObject() {
+  print("testStaticObject")                     // CHECK: testStaticObject
+
+  enum Static {
+    static let staticObject = SwiftClassBase()
+  }
+  weak var w: SwiftClassBase?
+  printState(w)                                 // CHECK-NEXT: is nil
+  w = Static.staticObject
+  printState(w)                                 // CHECK-NEXT: is present
+}
+
+testStaticObject()

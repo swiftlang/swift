@@ -146,13 +146,13 @@ MAP_TYPE("__swift_shims_dispatch_data_t", ObjCId, 0, "Dispatch", "dispatch_data_
 MAP_TYPE("SEL",  ObjCSel, 0, "ObjectiveC", "Selector", false, DoNothing)
 MAP_STDLIB_TYPE("Class", ObjCClass, 0, "AnyClass", false, DoNothing)
 MAP_STDLIB_TYPE(
-  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSInteger),
+  swift::getSwiftName(KnownFoundationEntity::NSInteger),
   SignedWord, 0, "Int", false, DefineOnly)
 
 // Treat NSUInteger specially: exposing it as a typealias for "Int" would be
 // confusing.
 MAP_STDLIB_TYPE(
-  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSUInteger),
+  swift::getSwiftName(KnownFoundationEntity::NSUInteger),
   UnsignedWord, 0, "Int", false, DoNothing)
 
 // CGFloat.

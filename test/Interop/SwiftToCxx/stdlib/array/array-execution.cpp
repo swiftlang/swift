@@ -26,14 +26,20 @@ public func printArray(_ val: Array<CInt>) {
     print(val)
 }
 
+public func printStrings(_ strings: [String]) {
+  for s in strings {
+    print("GOT STRING '\(s)'")
+  }
+  print("DONE PRINTING.")
+}
+
 //--- array-execution.cpp
 
 #include <cassert>
 #include "UseArray.h"
 
 int main() {
-  using namespace Swift;
-
+  using namespace swift;
   {
     Array<int> val = UseArray::createArray(2);
     UseArray::printArray(UseArray::passthroughArray(val));
@@ -53,12 +59,19 @@ int main() {
     assert(val.getCapacity() >= 1);
     auto zeroInt = val[0];
     assert(zeroInt == -11);
-    auto firstInt = val.remove(0);
+    auto firstInt = val.removeAt(0);
     assert(firstInt == -11);
     assert(val.getCount() == 0);
     UseArray::printArray(val);
   }
 // CHECK-NEXT: [-11]
 // CHECK-NEXT: []
+  {
+    auto array = swift::Array<swift::String>::init();
+    array.append("123456789ABCDEFG");
+    UseArray::printStrings(array);
+  }
+// CHECK-NEXT: GOT STRING '123456789ABCDEFG'
+// CHECK-NEXT: DONE PRINTING
   return 0;
 }

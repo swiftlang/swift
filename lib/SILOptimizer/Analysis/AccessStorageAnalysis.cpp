@@ -75,12 +75,12 @@ static bool updateAccessKind(SILAccessKind &LHS, SILAccessKind RHS) {
   return changed;
 }
 
-static bool updateOptionalAccessKind(Optional<SILAccessKind> &LHS,
-                                     Optional<SILAccessKind> RHS) {
-  if (RHS == None)
+static bool updateOptionalAccessKind(llvm::Optional<SILAccessKind> &LHS,
+                                     llvm::Optional<SILAccessKind> RHS) {
+  if (RHS == llvm::None)
     return false;
 
-  if (LHS == None) {
+  if (LHS == llvm::None) {
     LHS = RHS;
     return true;
   }
@@ -104,7 +104,7 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
 }
 
 bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
-  if (unidentifiedAccess == None) {
+  if (unidentifiedAccess == llvm::None) {
     unidentifiedAccess = accessKind;
     return true;
   }
@@ -172,7 +172,7 @@ bool AccessStorageResult::mergeAccesses(
     // Merge StorageAccessInfo into already-mapped AccessStorage.
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
-  if (other.unidentifiedAccess != None)
+  if (other.unidentifiedAccess != llvm::None)
     changed |= updateUnidentifiedAccess(other.unidentifiedAccess.value());
 
   return changed;
@@ -334,7 +334,7 @@ void AccessStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
-  if (unidentifiedAccess != None) {
+  if (unidentifiedAccess != llvm::None) {
     os << "  unidentified accesses: "
        << getSILAccessKindName(unidentifiedAccess.value()) << "\n";
   }
@@ -359,15 +359,15 @@ bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
   // If FunctionSideEffects can be summarized, use that information.
 
   auto b = F->getMemoryBehavior(/*observeRetains*/ false);
-  if (b == SILInstruction::MemoryBehavior::MayHaveSideEffects) {
+  if (b == MemoryBehavior::MayHaveSideEffects) {
     setWorstEffects();
     // May as well consider this a successful summary since there are no
     // instructions to visit anyway.
     return true;
   }
-  if (b >= SILInstruction::MemoryBehavior::MayWrite) {
+  if (b >= MemoryBehavior::MayWrite) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Modify);
-  } else if (b == SILInstruction::MemoryBehavior::MayRead) {
+  } else if (b == MemoryBehavior::MayRead) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Read);
   }
 

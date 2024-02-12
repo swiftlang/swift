@@ -115,8 +115,6 @@ TypeInfo::~TypeInfo() {
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
-  assert(cast<llvm::PointerType>(ptr->getType())
-             ->isOpaqueOrPointeeTypeMatches(getStorageType()));
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }
 
@@ -934,7 +932,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
     occupiedIndex = index;
     spareIndex = spareBitBias;
   } else {
-    auto occupiedBitMask = APInt::getAllOnesValue(occupiedBitCount);
+    auto occupiedBitMask = APInt::getAllOnes(occupiedBitCount);
     occupiedBitMask = occupiedBitMask.zext(32);
     auto occupiedBitMaskValue = llvm::ConstantInt::get(C, occupiedBitMask);
     occupiedIndex = IGF.Builder.CreateAnd(index, occupiedBitMaskValue);
@@ -947,11 +945,11 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   
   // Scatter the occupied bits.
   auto OccupiedBits = ~SpareBits.asAPInt();
-  llvm::Value *occupied = emitScatterBits(IGF, OccupiedBits,
+  llvm::Value *occupied = emitScatterBits(IGF.IGM, IGF.Builder, OccupiedBits,
                                           occupiedIndex, 0);
   
   // Scatter the spare bits.
-  llvm::Value *spare = emitScatterBits(IGF, SpareBits.asAPInt(),
+  llvm::Value *spare = emitScatterBits(IGF.IGM, IGF.Builder, SpareBits.asAPInt(),
                                        spareIndex, 0);
   
   // Combine the values and store to the destination.
@@ -988,7 +986,8 @@ namespace {
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {}
-    void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
+    void packIntoEnumPayload(IRGenModule &IGM,
+                             IRBuilder &builder, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
@@ -1200,7 +1199,7 @@ namespace {
       }
     }
     
-    void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
+    void reexplode(Explosion &sourceExplosion,
                    Explosion &targetExplosion) const override {
       for (auto scalarTy : ScalarTypes) {
         (void)scalarTy;
@@ -1210,7 +1209,7 @@ namespace {
     
     void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
               Explosion &targetExplosion, Atomicity atomicity) const override {
-      reexplode(IGF, sourceExplosion, targetExplosion);
+      reexplode(sourceExplosion, targetExplosion);
     }
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
@@ -1245,12 +1244,13 @@ namespace {
                              (offset + getFixedSize()).asCharUnits());
     }
     
-    void packIntoEnumPayload(IRGenFunction &IGF,
+    void packIntoEnumPayload(IRGenModule &IGM,
+                             IRBuilder &builder,
                              EnumPayload &payload,
                              Explosion &source,
                              unsigned offset) const override {
       for (auto scalarTy: ScalarTypes) {
-        payload.insertValue(IGF, source.claimNext(), offset);
+        payload.insertValue(IGM, builder, source.claimNext(), offset);
         offset += scalarTy->getIntegerBitWidth();
       }
     }
@@ -1372,6 +1372,11 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
+    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
+                                llvm::Value *capacity,
+                                const Twine &name) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1483,7 +1488,7 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
-Optional<YAMLTypeInfoNode>
+llvm::Optional<YAMLTypeInfoNode>
 TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   auto &mangledName = const_cast<TypeConverter *>(this)->DeclMangledNames[decl];
   if (mangledName.empty())
@@ -1492,7 +1497,7 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
 
   auto found = LegacyTypeInfos.find(mangledName);
   if (found == LegacyTypeInfos.end())
-    return None;
+    return llvm::None;
 
   return found->second;
 }
@@ -1825,6 +1830,16 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
 }
 
 const TypeInfo &
+TypeConverter::getDynamicTupleTypeInfo(IsCopyable_t isCopyable) {
+  auto &cache = DynamicTupleTI[(unsigned)isCopyable];
+  if (cache) return *cache;
+  cache = convertDynamicTupleType(isCopyable);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
+}
+
+const TypeInfo &
 TypeConverter::getResilientStructTypeInfo(IsCopyable_t isCopyable,
                                           IsABIAccessible_t isAccessible) {
   auto &cache = ResilientStructTI[(unsigned)isCopyable][(unsigned)isAccessible];
@@ -1956,13 +1971,13 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
-  // Get the primary archetype.
-  auto root = t->getRoot();
-
-  // If there is no primary (IOW, it's an opened archetype), the archetype is
-  // an exemplar.
-  if (!isa<PrimaryArchetypeType>(root) && !isa<VariadicSequenceType>(root))
+  if (isa<LocalArchetypeType>(t) || isa<OpaqueTypeArchetypeType>(t))
     return t;
+
+  assert(isa<PrimaryArchetypeType>(t) || isa<PackArchetypeType>(t));
+
+  // Get the root archetype.
+  auto root = t->getRoot();
 
   // Retrieve the generic environment of the archetype.
   auto genericEnv = root->getGenericEnvironment();
@@ -1998,7 +2013,8 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
         return type;
       },
       MakeAbstractConformanceForGenericType(),
-      SubstFlags::AllowLoweredTypes);
+      SubstFlags::AllowLoweredTypes |
+      SubstFlags::PreservePackExpansionLevel);
     return CanType(exemplified);
   }
 }
@@ -2158,7 +2174,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     case BuiltinFloatType::IEEE80: {
       llvm::Type *floatTy = llvm::Type::getX86_FP80Ty(ctx);
       uint64_t ByteSize = IGM.DataLayout.getTypeAllocSize(floatTy);
-      unsigned align = IGM.DataLayout.getABITypeAlignment(floatTy);
+      unsigned align = IGM.DataLayout.getABITypeAlign(floatTy).value();
       return RetTy{ floatTy, Size(ByteSize), Alignment(align) };
     }
     case BuiltinFloatType::IEEE128:
@@ -2280,6 +2296,20 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
     return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
+  case TypeKind::BuiltinNonDefaultDistributedActorStorage: {
+    // Builtin.NonDefaultDistributedActorStorage represents the extra storage
+    // (beyond the heap header) of a distributed actor that is not a default actor.
+    // It is fixed-size and totally opaque.
+    auto numWords = NumWords_NonDefaultDistributedActor;
+
+    auto ty = llvm::StructType::create(IGM.getLLVMContext(),
+                                 llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                                       "swift.nondefaultdistributedactor");
+    auto size = IGM.getPointerSize() * numWords;
+    auto align = Alignment(2 * IGM.getPointerAlignment().getValue());
+    auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
+    return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
+  }
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
@@ -2330,6 +2360,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertPackType(cast<SILPackType>(ty));
   case TypeKind::PackArchetype:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
     llvm_unreachable("pack archetypes and expansions should not be seen in "
                      " arbitrary type positions");
   case TypeKind::SILToken:
@@ -2408,6 +2439,17 @@ namespace {
     bool visitStructDecl(StructDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
+
+      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+
+      // If our struct has a raw layout, it may be dependent on the like type.
+      if (rawLayout) {
+        if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
+          return visit((*likeType)->getCanonicalType());
+        } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          return visit(likeArray->first->getCanonicalType());
+        }
+      }
 
       for (auto field : decl->getStoredProperties()) {
         if (visit(field->getInterfaceType()->getCanonicalType()))
@@ -2803,9 +2845,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
         || structDecl->hasClangNode())
       return SILType();
 
-    // A single-field struct with custom alignment has different layout from its
+    // A single-field struct with custom layout has different layout from its
     // field.
-    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>())
+    if (structDecl->getAttrs().hasAttribute<AlignmentAttr>()
+        || structDecl->getAttrs().hasAttribute<RawLayoutAttr>())
       return SILType();
 
     // If there's only one stored property, we have the layout of its field.
@@ -2863,19 +2906,28 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
                           llvm::function_ref<void ()> indirectCleanup) {
   auto ty = T.getASTType();
   auto nominal = ty->getAnyNominal();
+
   // We are only concerned with move-only type deinits here.
   if (!nominal || !nominal->getValueTypeDestructor()) {
     return false;
   }
-  
-  auto deinit = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
-  assert(deinit && "type has a deinit declared in AST but SIL deinit record is not present!");
-    
+
+  auto deinitTable = IGF.getSILModule().lookUpMoveOnlyDeinit(
+      nominal, false /*deserialize lazily*/);
+
+  // If we do not have a deinit table already deserialized, call the value
+  // witness instead.
+  if (!deinitTable) {
+    irgen::emitDestroyCall(IGF, T, indirect());
+    indirectCleanup();
+    return true;
+  }
+
   // The deinit should take a single value parameter of the nominal type, either
   // by @owned or indirect @in convention.
-  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinit->getImplementation(),
+  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinitTable->getImplementation(),
                                                NotForDefinition);
-  auto deinitTy = deinit->getImplementation()->getLoweredFunctionType();
+  auto deinitTy = deinitTable->getImplementation()->getLoweredFunctionType();
   auto deinitFP = FunctionPointer::forDirect(IGF.IGM, deinitFn,
                                              nullptr, deinitTy);
   assert(deinitTy->getNumParameters() == 1
@@ -2951,7 +3003,7 @@ bool irgen::tryEmitConsumeUsingDeinit(IRGenFunction &IGF, Explosion &explosion,
   return tryEmitDeinitCall(IGF, T,
     // Direct parameter case
     [&](Explosion &arg) {
-      ti->reexplode(IGF, explosion, arg);
+      ti->reexplode(explosion, arg);
     },
     // Indirect parameter setup
     [&]() -> Address {

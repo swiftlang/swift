@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // provides coverage for rdar://71548470
 
@@ -51,12 +56,10 @@ func referenceGlobalActor2() {
 }
 
 
-// expected-note@+2 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
-// expected-note@+1 {{add '@SomeGlobalActor' to make global function 'referenceAsyncGlobalActor()' part of global actor 'SomeGlobalActor'}}
+// expected-note@+1 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
 func referenceAsyncGlobalActor() {
-  let y = asyncGlobalActFn // expected-note{{calls to let 'y' from outside of its actor context are implicitly asynchronous}}
+  let y = asyncGlobalActFn
   y() // expected-error{{'async' call in a function that does not support concurrency}}
-  // expected-error@-1{{call to global actor 'SomeGlobalActor'-isolated let 'y' in a synchronous nonisolated context}}
 }
 
 
@@ -129,11 +132,12 @@ func fromAsync() async {
   a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
 }
 
-// expected-note@+1{{mutation of this var is only permitted within the actor}}
+// expected-minimal-and-targeted-note @+2 {{mutation of this var is only permitted within the actor}}
+// expected-complete-and-tns-error @+1 {{top-level code variables cannot have a global actor}}
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }
-// expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a non-isolated context}}
+// expected-minimal-and-targeted-error @+1 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a non-isolated context}}
 topLevelSyncFunction(&value)
 
 // Strict checking based on inferred Sendable/async/etc.
@@ -150,7 +154,7 @@ class Sub: Super {
 
   func g2() {
     Task.detached {
-      self.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
+      self.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     }
   }

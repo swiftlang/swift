@@ -29,6 +29,7 @@
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Thread.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
 #include <new>
 
@@ -99,15 +100,23 @@ void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
 /// should generally use a higher-level function.
 void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 
-/// release() establishes a happens-before relation with a preceding acquire()
-/// on the same address.
-void _swift_tsan_acquire(void *addr);
-void _swift_tsan_release(void *addr);
-/// Technically, this consume relies on implicit HW address dependency ordering
-/// and is paired with a corresponding release. Since TSAN doesn't know how to
-/// reason about this, we tell TSAN it's an acquire instead. See also
-/// SWIFT_MEMORY_ORDER_CONSUME definition.
-#define _swift_tsan_consume _swift_tsan_acquire
+/// Tell TSan about an acquiring load
+inline void _swift_tsan_acquire(void *addr) {
+  swift::tsan::acquire(addr);
+}
+/// Tell TSan about a releasing store
+inline void _swift_tsan_release(void *addr) {
+  swift::tsan::release(addr);
+}
+/// Tell TSan about a consuming load
+inline void _swift_tsan_consume(void *addr) {
+  // TSan doesn't support consume, so pretend it's an acquire.
+  //
+  // Note that that means that TSan won't generate errors for non-dependent
+  // reads, so this isn't entirely safe if you're relying solely on TSan to
+  // spot bugs.
+  swift::tsan::acquire(addr);
+}
 
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
@@ -123,10 +132,10 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
 #endif
 
 // The task listed as argument is escalated to a new priority. Pass that
-// inforamtion along to the executor that it is enqueued into.
+// information along to the executor that it is enqueued into.
 SWIFT_CC(swift)
 void
-swift_executor_escalate(ExecutorRef executor, AsyncTask *task, JobPriority newPriority);
+swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task, JobPriority newPriority);
 
 /*************** Methods for Status records manipulation ******************/
 
@@ -204,6 +213,30 @@ SWIFT_CC(swift)
 void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
+/// Update the status record by scanning through all records and removing
+/// those which match the condition. This can also be used to inspect
+/// "remaining" records.
+///
+/// The `whenRemoved` function is called after a record indicated by
+/// `condition` returning `true` was removed. It can be used to e.g.
+/// deallocate or perform additional cleanup.
+///
+/// The `updateStatus` function can be used to update the status after all
+/// records have been inspected. It may be invoked multiple times inside a RMW
+/// loop, therefore must be idempotent.
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    ActiveTaskStatus& status,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
 /// Remove a status record from the current task. This must be called
 /// synchronously with the task.
 SWIFT_CC(swift)
@@ -280,12 +313,9 @@ public:
   void *_reserved;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
-    fillWithSuccess(future->getStoragePtr(), future->getResultType(),
-                    successResultPointer);
-  }
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType,
-                       OpaqueValue *result) {
-    successType->vw_initializeWithCopy(result, src);
+    OpaqueValue *src = future->getStoragePtr();
+    OpaqueValue *result = successResultPointer;
+    future->getResultType().vw_initializeWithCopy(result, src);
   }
 
   void fillWithError(AsyncTask::FutureFragment *future) {
@@ -400,7 +430,8 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
 #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     /// Whether the task is actively running. On systems which cannot track the
-    /// identity of the drainer (see above), we use one bit in the flags to track
+    /// identity of the drainer (see above), we use one bit in the flags to
+    /// track
     /// whether or not task is running. Otherwise, the drain lock tells us
     /// whether or not it is running.
     IsRunning = 0x800,
@@ -423,6 +454,16 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// The task has a dependency and therefore, also a
     /// TaskDependencyStatusRecord in the status record list.
     HasTaskDependency = 0x4000,
+
+    /// Whether the task has a task executor preference record stored.
+    /// By storing this flag we can avoid taking the task record lock
+    /// when running a task when we know there is no task executor preference
+    /// to look for.
+    ///
+    /// If a task has a task executor preference, we must find the record and
+    /// use the task executor preference when we'd otherwise be running on
+    /// the generic global pool.
+    HasTaskExecutorPreference = 0x8000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -527,7 +568,6 @@ public:
     assert(!dispatch_lock_is_locked(ExecutionLock));
     return ActiveTaskStatus(Record, Flags, dispatch_lock_value_for_self());
   } else {
-    assert(dispatch_lock_is_locked_by_self(ExecutionLock));
     return ActiveTaskStatus(Record, Flags, ExecutionLock & ~DLOCK_OWNER_MASK);
   }
 #else
@@ -586,6 +626,25 @@ public:
     return ActiveTaskStatus(Record, Flags & ~HasTaskDependency, ExecutionLock);
 #else
     return ActiveTaskStatus(Record, Flags & ~HasTaskDependency);
+#endif
+  }
+
+  /// Is there a task preference record in the linked list of status records?
+  bool hasTaskExecutorPreference() const {
+    return Flags & HasTaskExecutorPreference;
+  }
+  ActiveTaskStatus withTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference);
+#endif
+  }
+  ActiveTaskStatus withoutTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference);
 #endif
   }
 
@@ -726,6 +785,15 @@ struct AsyncTask::PrivateStorage {
   /// Called on the thread that was previously executing the task that we are
   /// now trying to complete.
   void complete(AsyncTask *task) {
+    // If during task creation we created a task preference record;
+    // we must destroy it here; The record is task-local allocated,
+    // so we must do so specifically here, before the task-local storage
+    // elements are destroyed; in order to respect stack-discipline of
+    // the task-local allocator.
+    if (task->hasInitialTaskExecutorPreferenceRecord()) {
+    task->dropInitialTaskExecutorPreferenceRecord();
+    }
+
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
@@ -773,8 +841,10 @@ struct AsyncTask::PrivateStorage {
 
   // Destroy the opaque storage of the task
   void destroy() {
+#ifndef NDEBUG
     auto oldStatus = _status().load(std::memory_order_relaxed);
     assert(oldStatus.isComplete());
+#endif
 
     this->~PrivateStorage();
   }
@@ -928,7 +998,8 @@ inline void AsyncTask::flagAsRunning() {
 /// onto by the original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
+inline void
+AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
@@ -966,6 +1037,8 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
     // dependency record (Eg. newly created)
     assert(_private().dependencyRecord == nullptr);
 
+    // TODO: do we need to do tracking for task executors...? I guess no since
+    // they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
     TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
@@ -1101,12 +1174,28 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   this->flagAsSuspended(record);
 }
 
+/// Returns true if the task has any kind of task executor preference,
+/// including an initial task executor preference (set during task creation).
+inline bool AsyncTask::hasTaskExecutorPreferenceRecord() const {
+  if (hasInitialTaskExecutorPreferenceRecord()) {
+    // an "initial" setting is valid for the entire lifetime of a task,
+    // so we don't need to check anything else; there definitely is at
+    // least one preference record.
+    return true;
+  }
+
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  return oldStatus.hasTaskExecutorPreference();
+}
+
 // READ ME: This is not a dead function! Do not remove it! This is a function
 // that can be used when debugging locally to instrument when a task
 // actually is dealloced.
 inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
+
+// ==== Task Local Values -----------------------------------------------------
 
 inline void AsyncTask::localValuePush(const HeapObject *key,
                                       /* +1 */ OpaqueValue *value,

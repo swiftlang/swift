@@ -138,8 +138,8 @@ void DifferentiableActivityInfo::propagateVaried(
     if (isVaried(operand->get(), i)) {
       for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : applySite.getInoutArguments())
-        propagateVariedInwardsThroughProjections(inoutArg, i);
+      for (auto semresArg : applySite.getAutoDiffSemanticResultArguments())
+        propagateVariedInwardsThroughProjections(semresArg, i);
       // Propagate variedness to apply site direct results.
       forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
@@ -231,13 +231,13 @@ void DifferentiableActivityInfo::propagateVaried(
 
 /// Returns the accessor kind of the given SIL function, if it is a lowered
 /// accessor. Otherwise, return `None`.
-static Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
+static llvm::Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
   auto *dc = fn->getDeclContext();
   if (!dc)
-    return None;
+    return llvm::None;
   auto *accessor = dyn_cast_or_null<AccessorDecl>(dc->getAsDecl());
   if (!accessor)
-    return None;
+    return llvm::None;
   return accessor->getAccessorKind();
 }
 
@@ -303,15 +303,25 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
     return;
   }
   setUseful(value, dependentVariableIndex);
+
   // If the given value is a basic block argument, propagate usefulness to
   // incoming values.
   if (auto *bbArg = dyn_cast<SILPhiArgument>(value)) {
     SmallVector<SILValue, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-    for (auto incomingValue : incomingValues)
-      setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
-    return;
+    if (bbArg->getSingleTerminatorOperands(incomingValues)) {
+      for (auto incomingValue : incomingValues)
+        setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
+      return;
+    } else if (bbArg->isTerminatorResult()) {
+      if (TryApplyInst *tai = dyn_cast<TryApplyInst>(bbArg->getTerminatorForResult())) {
+        propagateUseful(tai, dependentVariableIndex);
+        return;
+      } else
+        llvm::report_fatal_error("unknown terminator with result");
+   } else
+      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
+  
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;
@@ -398,7 +408,7 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
-          isa<BeginBorrowInst>(res))
+          isa<BeginBorrowInst>(res) || isa<InitEnumDataAddrInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
@@ -419,12 +429,15 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
       continue;
     // The second tuple field of the return value is the `RawPointer`.
     for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `pointer_to_address`. That
-      // instruction's first use is a `store` whose source is useful; its
+      // The `RawPointer` passes through a `mark_dependence(pointer_to_address`.
+      // That instruction's first use is a `store` whose source is useful; its
       // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
-      assert(ptai && "Expected `pointer_to_address` user for uninitialized "
-                     "array intrinsic");
+      auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+      assert(
+          mdi &&
+          "Expected a mark_dependence user for uninitialized array intrinsic.");
+      auto *ptai = dyn_cast<PointerToAddressInst>(getSingleNonDebugUser(mdi));
+      assert(ptai && "Expected a pointer_to_address.");
       setUseful(ptai, dependentVariableIndex);
       // Propagate usefulness through array element addresses:
       // `pointer_to_address` and `index_addr` instructions.

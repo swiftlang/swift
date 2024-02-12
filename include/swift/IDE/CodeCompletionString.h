@@ -16,6 +16,8 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
@@ -32,7 +34,7 @@ class CodeCompletionStringChunk {
 
 public:
   enum class ChunkKind {
-    /// "open", "public", "internal", "fileprivate", or "private".
+    /// "open", "public", "package", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
     /// such as @"available".
@@ -352,7 +354,7 @@ public:
   }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
-  Optional<unsigned>
+  llvm::Optional<unsigned>
   getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
   /// Print a debug representation of the code completion string to \p OS.

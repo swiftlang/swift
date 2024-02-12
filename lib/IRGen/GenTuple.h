@@ -55,18 +55,30 @@ namespace irgen {
   /// Return the offset to the given tuple element, if it's fixed.
   ///
   /// This API is used by RemoteAST.
-  Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
-                                            SILType tupleType,
-                                            unsigned fieldNo);
+  llvm::Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
+                                                  SILType tupleType,
+                                                  unsigned fieldNo);
 
   /// Returns the index of the element in the llvm struct type which represents
   /// \p fieldNo in \p tupleType.
   ///
   /// Returns None if the tuple element is an empty type and therefore has no
   /// corresponding element in the llvm type.
-  Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
-                                                        SILType tupleType,
-                                                        unsigned fieldNo);
+  llvm::Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
+                                                              SILType tupleType,
+                                                              unsigned fieldNo);
+
+  /// Emit a string encoding the labels in the given tuple type.
+  llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
+                                       CanTupleType type);
+
+  /// Load the NumElements of a tuple type metadata.
+  llvm::Value *emitTupleTypeMetadataLength(IRGenFunction &IGF,
+                                           llvm::Value *metadata);
+
+  llvm::Value *emitTupleTypeMetadataElementType(IRGenFunction &IGF,
+                                                llvm::Value *metadata,
+                                                llvm::Value *index);
 } // end namespace irgen
 } // end namespace swift
 

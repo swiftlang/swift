@@ -1,3 +1,4 @@
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
 // RUN: %target-build-swift -emit-module -module-name Module %S/Inputs/loaded_module_trace_empty.swift -o %t/Module.swiftmodule -module-cache-path %t/cache
@@ -26,7 +27,9 @@
 // CHECK-DAG: {"name":"Swift","path":"{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}","isImportedDirectly":true,"supportsLibraryEvolution":true}
 // CHECK-DAG: {"name":"SwiftOnoneSupport","path":"{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}","isImportedDirectly":true,"supportsLibraryEvolution":true}
 // CHECK-DAG: {"name":"Module","path":"{{[^"]*\\[/\\]}}Module.swiftmodule","isImportedDirectly":false,"supportsLibraryEvolution":false}
-// CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPlugin.dylib|libPlugin.so|Plugin.dll}}","isImportedDirectly":false,"supportsLibraryEvolution":false}
+// CHECK: ],
+// CHECK: "swiftmacros":[
+// CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPlugin.dylib|libPlugin.so|Plugin.dll}}"}
 // CHECK: ]
 // CHECK: }
 
@@ -34,3 +37,5 @@
 // CHECK-CONFIRM-ONELINE: {"name":{{.*}}]}
 
 import Module2
+
+@freestanding(expression) macro echo<T>(_: T) -> T = #externalMacro(module: "Plugin", type: "EchoMacro")

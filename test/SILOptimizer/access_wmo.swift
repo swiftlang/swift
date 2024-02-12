@@ -225,7 +225,7 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: end_access [[A4]]
 //
-// WMO: [[KP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; settable_property $Int,  id #C.keyPathProp!getter : (C) -> () -> Int, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+// WMO: [[KP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; settable_property $Int,  id #C.keyPathProp!getter : (C) -> () -> Int, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @in_guaranteed C) -> ())
 // function_ref setKeyPath(_:_:_:)
 // WMO: [[F2:%.*]] = function_ref @$s10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
 // WMO: apply [[F2]](%0, [[KP]], %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()

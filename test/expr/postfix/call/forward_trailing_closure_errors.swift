@@ -20,7 +20,7 @@ func testUnlabeledParamMatching(i: Int, fn: ((Int) -> Int) -> Void) {
 
 // When "fuzzy matching is disabled, this will fail.
 func forwardMatchFailure( // expected-note{{declared here}}
-  onError: ((Error) -> Void)? = nil,
+  onError: ((any Error) -> Void)? = nil,
   onCompletion: (Int) -> Void
 ) { }
 

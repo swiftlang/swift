@@ -49,15 +49,20 @@ public:
     return OwnershipKind::OWNERSHIP;                                           \
   }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+CONSTANT_OWNERSHIP_INST(Owned, UnownedCopyValue)
+CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)                      \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
   CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  CONSTANT_OWNERSHIP_INST(Owned, Load##Name)                                   \
+  CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
+  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
+  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   CONSTANT_OWNERSHIP_INST(None, RefTo##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
@@ -66,6 +71,7 @@ public:
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(None, GlobalValue)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
@@ -76,9 +82,10 @@ CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, ExplicitCopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MoveValue)
 CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
+CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
+CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
-CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -93,9 +100,13 @@ CONSTANT_OWNERSHIP_INST(Owned, ObjCMetatypeToObject)
 // not though.
 CONSTANT_OWNERSHIP_INST(None, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(None, AllocStack)
+CONSTANT_OWNERSHIP_INST(None, AllocVector)
 CONSTANT_OWNERSHIP_INST(None, AllocPack)
+CONSTANT_OWNERSHIP_INST(None, AllocPackMetadata)
 CONSTANT_OWNERSHIP_INST(None, PackLength)
 CONSTANT_OWNERSHIP_INST(None, BeginAccess)
+CONSTANT_OWNERSHIP_INST(None, MoveOnlyWrapperToCopyableAddr)
+CONSTANT_OWNERSHIP_INST(None, CopyableToMoveOnlyWrapperAddr)
 CONSTANT_OWNERSHIP_INST(None, BindMemory)
 CONSTANT_OWNERSHIP_INST(None, RebindMemory)
 CONSTANT_OWNERSHIP_INST(None, BridgeObjectToWord)
@@ -130,8 +141,8 @@ CONSTANT_OWNERSHIP_INST(None, ProjectExistentialBox)
 CONSTANT_OWNERSHIP_INST(None, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(None, RefTailAddr)
 CONSTANT_OWNERSHIP_INST(None, RefToRawPointer)
+CONSTANT_OWNERSHIP_INST(None, SelectEnum)
 CONSTANT_OWNERSHIP_INST(None, SelectEnumAddr)
-CONSTANT_OWNERSHIP_INST(None, SelectValue)
 CONSTANT_OWNERSHIP_INST(None, StringLiteral)
 CONSTANT_OWNERSHIP_INST(None, StructElementAddr)
 CONSTANT_OWNERSHIP_INST(None, SuperMethod)
@@ -162,6 +173,7 @@ CONSTANT_OWNERSHIP_INST(None, PackPackIndex)
 CONSTANT_OWNERSHIP_INST(None, ScalarPackIndex)
 CONSTANT_OWNERSHIP_INST(None, PackElementGet)
 CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
+CONSTANT_OWNERSHIP_INST(None, Vector)
 
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -176,6 +188,7 @@ CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TuplePackExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // OpenExistentialValue opens the boxed value inside an existential
@@ -226,9 +239,9 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     return OwnershipKind::None;
 
   auto mergedValue = ValueOwnershipKind::merge(makeOptionalTransformRange(
-      ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
+      ops, [&i](const Operand &op) -> llvm::Optional<ValueOwnershipKind> {
         if (i->isTypeDependentOperand(op))
-          return None;
+          return llvm::None;
         return op.get()->getOwnershipKind();
       }));
 
@@ -264,8 +277,6 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(UncheckedValueCast)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
-FORWARDING_OWNERSHIP_INST(SelectEnum)
-FORWARDING_OWNERSHIP_INST(Enum)
 FORWARDING_OWNERSHIP_INST(MarkDependence)
 // NOTE: init_existential_ref from a reference counting perspective is not
 // considered to be "owned" since it doesn't affect reference counts. That being
@@ -279,10 +290,31 @@ FORWARDING_OWNERSHIP_INST(MarkDependence)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
 FORWARDING_OWNERSHIP_INST(LinearFunction)
-FORWARDING_OWNERSHIP_INST(MarkMustCheck)
+FORWARDING_OWNERSHIP_INST(MarkUnresolvedNonCopyableValue)
+FORWARDING_OWNERSHIP_INST(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
+FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableBox)
 #undef FORWARDING_OWNERSHIP_INST
+
+ValueOwnershipKind
+ValueOwnershipKindClassifier::visitEnumInst(EnumInst *I) {
+  if (!I->getModule().useLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
+    // During address lowering, an address-only enum instruction will eventually
+    // be lowered to inject_enum_addr/init_enum_data_addr, initializing a
+    // non-trivial storage location.  So prior to AddressLowering (in opaque
+    // values mode) such an enum instruction produces a non-trivial value,
+    // without regard to whether it is in a trivial case.  Otherwise, non-trivial
+    // storage would fail to be destroy_addr'd.
+    assert(!I->getType().isTrivial(*I->getFunction()));
+    // An enum instruction is representation changing, so its address-only
+    // operand must be owned.
+    return OwnershipKind::Owned;
+  }
+  return I->getType().isTrivial(*I->getFunction())
+             ? ValueOwnershipKind(OwnershipKind::None)
+             : I->getForwardingOwnershipKind();
+}
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitUncheckedOwnershipConversionInst(
@@ -351,6 +383,10 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   }
 
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDropDeinitInst(DropDeinitInst *ddi) {
+  return ddi->getType().isAddress() ? OwnershipKind::None : OwnershipKind::Owned;
 }
 
 ValueOwnershipKind
@@ -504,6 +540,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackAlloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedStackAlloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackDealloc)
+CONSTANT_OWNERSHIP_BUILTIN(None, AllocVector)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToUCheckedTrunc)
@@ -544,7 +581,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AtomicStore)
 CONSTANT_OWNERSHIP_BUILTIN(None, Once)
 CONSTANT_OWNERSHIP_BUILTIN(None, OnceWithContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
-CONSTANT_OWNERSHIP_BUILTIN(None, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionAtLeast)
@@ -553,18 +589,25 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroup)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroup)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskWithExecutor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroupWithExecutor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroupWithExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeNonDefaultDistributedActor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContextWithType)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
-CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontextWithType)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinaryTaskExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
@@ -576,6 +619,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
 CONSTANT_OWNERSHIP_BUILTIN(None, Copy)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
+CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

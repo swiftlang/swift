@@ -23,6 +23,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
@@ -33,13 +34,13 @@ using namespace fine_grained_dependencies;
 //==============================================================================
 
 AbstractSourceFileDepGraphFactory::AbstractSourceFileDepGraphFactory(
-    bool hadCompilationError, StringRef swiftDeps,
-    Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
-    DiagnosticEngine &diags)
+    bool hadCompilationError, StringRef swiftDeps, Fingerprint fileFingerprint,
+    bool emitDotFileAfterConstruction, DiagnosticEngine &diags,
+    llvm::vfs::OutputBackend &backend)
     : hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
       fileFingerprint(fileFingerprint),
-      emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
-}
+      emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags),
+      backend(backend) {}
 
 SourceFileDepGraph AbstractSourceFileDepGraphFactory::construct() {
   addSourceFileNodesToGraph();
@@ -49,7 +50,7 @@ SourceFileDepGraph AbstractSourceFileDepGraphFactory::construct() {
   }
   assert(g.verify());
   if (emitDotFileAfterConstruction)
-    g.emitDotFile(swiftDeps, diags);
+    g.emitDotFile(backend, swiftDeps, diags);
   return std::move(g);
 }
 
@@ -64,7 +65,8 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
+    const DependencyKey &interfaceKey,
+    llvm::Optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
@@ -76,8 +78,8 @@ void AbstractSourceFileDepGraphFactory::addADefinedDecl(
 
 void AbstractSourceFileDepGraphFactory::addAUsedDecl(
     const DependencyKey &defKey, const DependencyKey &useKey) {
-  auto *defNode =
-      g.findExistingNodeOrCreateIfNew(defKey, None, false /* = !isProvides */);
+  auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, llvm::None,
+                                                  false /* = !isProvides */);
 
   // If the depended-upon node is defined in this file, then don't
   // create an arc to the user, when the user is the whole file.
@@ -111,7 +113,7 @@ void AbstractSourceFileDepGraphFactory::addAUsedDecl(
 
 void AbstractSourceFileDepGraphFactory::addAnExternalDependency(
     const DependencyKey &defKey, const DependencyKey &useKey,
-    Optional<Fingerprint> maybeFP) {
+    llvm::Optional<Fingerprint> maybeFP) {
   auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, maybeFP,
                                                   false /* = !isProvides */);
 

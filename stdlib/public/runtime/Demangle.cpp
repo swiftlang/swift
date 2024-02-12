@@ -247,6 +247,129 @@ _buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
   return nullptr;
 }
 
+// Build a demangled type tree for a type pack.
+static Demangle::NodePointer
+_buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
+                                Demangle::Demangler &Dem) {
+  using namespace Demangle;
+
+  auto node = Dem.createNode(Node::Kind::Pack);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto elt = _swift_buildDemanglingForMetadata(pack.getElements()[i], Dem);
+    if (elt == nullptr)
+      return nullptr;
+
+    node->addChild(elt, Dem);
+  }
+
+  return node;
+}
+
+/// Build an array of demangling trees for each generic argument to the given
+/// generic type context descriptor.
+///
+/// Note:
+/// - The input array has an entry for those generic parameter descriptors which
+///   are key arguments only.
+/// - The output array has an entry for each generic parameter descriptor,
+///   whether or not it is a key argument.
+///
+/// The generic parameters which are not key arguments were made non-canonical
+/// by constraining them to a concrete type or another generic parameter.
+///
+/// We figure out their type by looking at the same-type requirements of the
+/// generic context. We demangle their type from the requirement, using the
+/// generic arguments area as the substitution map; this gives us the metadata
+/// for their argument. Then we convert the metadata to a mangling.
+///
+/// The output array is flat; the generic parameters of each depth are
+/// concatenated together.
+static bool _buildDemanglingForGenericArgs(
+    const TypeContextDescriptor *description,
+    const Metadata *const *genericArgs,
+    llvm::SmallVectorImpl<NodePointer> &demangledGenerics,
+    Demangle::Demangler &Dem) {
+  auto generics = description->getGenericContext();
+  if (!generics)
+    return true;
+
+  auto packHeader = generics->getGenericPackShapeHeader();
+  auto packDescriptors = generics->getGenericPackShapeDescriptors();
+
+  llvm::SmallVector<MetadataOrPack> allGenericArgs;
+
+  auto numKeyArgs = 0;
+  for (auto param : generics->getGenericParams()) {
+    if (param.hasKeyArgument()) {
+      numKeyArgs += 1;
+    }
+  }
+
+  // _gatherWrittenGenericParameters expects to immediately read key generic
+  // arguments, so skip past the shape classes if we have any.
+  auto nonShapeClassGenericArgs = genericArgs + packHeader.NumShapeClasses;
+
+  llvm::ArrayRef<const void *> genericArgsRef(
+      reinterpret_cast<const void * const *>(nonShapeClassGenericArgs), numKeyArgs);
+
+  if (!_gatherWrittenGenericParameters(description, genericArgsRef,
+                                       allGenericArgs, Dem)) {
+    return false;
+  }
+
+  auto argIndex = 0;
+  auto packIndex = 0;
+
+  for (auto param : generics->getGenericParams()) {
+    auto genericArg = allGenericArgs[argIndex];
+
+    switch (param.getKind()) {
+    case GenericParamKind::Type: {
+      auto metadata = genericArg.getMetadata();
+      auto genericArgDemangling =
+        _swift_buildDemanglingForMetadata(metadata, Dem);
+
+      if (!genericArgDemangling) {
+        return false;
+      }
+
+      demangledGenerics.push_back(genericArgDemangling);
+      break;
+    }
+
+    case GenericParamKind::TypePack: {
+      auto packDescriptor = packDescriptors[packIndex];
+      assert(packDescriptor.Kind == GenericPackKind::Metadata);
+      assert(packDescriptor.ShapeClass < packHeader.NumShapeClasses);
+
+      // Arg index is not interested in the shape classes, but the pack
+      // descriptor's index is in terms of the shape classes.
+      assert(packDescriptor.Index == argIndex + packHeader.NumShapeClasses);
+
+      MetadataPackPointer pack(genericArg.getMetadataPack());
+      size_t count = reinterpret_cast<size_t>(genericArgs[packDescriptor.ShapeClass]);
+
+      auto genericArgDemangling = _buildDemanglingForMetadataPack(pack, count, Dem);
+      if (genericArgDemangling == nullptr)
+        return false;
+
+      demangledGenerics.push_back(genericArgDemangling);
+      packIndex += 1;
+      break;
+    }
+
+    default:
+      // We don't know about this kind of parameter.
+      return false;
+    }
+
+    argIndex += 1;
+  }
+
+  return true;
+}
+
 /// Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
 _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
@@ -258,9 +381,14 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto classType = static_cast<const ClassMetadata *>(type);
+
+    if (!classType->isTypeMetadata()) {
+      return nullptr;
+    }
+
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
-    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
+    while (classType->isArtificialSubclass())
       classType = classType->Superclass;
 #endif
     description = classType->getDescription();
@@ -291,33 +419,16 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     return nullptr;
   }
 
-  // Gather the complete set of generic arguments that must be written to
-  // form this type.
-  llvm::SmallVector<const Metadata *, 8> allGenericArgs;
-  gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
-
-  // Demangle the generic arguments.
   llvm::SmallVector<NodePointer, 8> demangledGenerics;
-  for (auto genericArg : allGenericArgs) {
-    // When there is no generic argument, put in a placeholder.
-    if (!genericArg) {
-      auto placeholder = Dem.createNode(Node::Kind::Tuple);
-      auto emptyList = Dem.createNode(Node::Kind::TypeList);
-      placeholder->addChild(emptyList, Dem);
-      auto type = Dem.createNode(Node::Kind::Type);
-      type->addChild(placeholder, Dem);
-      demangledGenerics.push_back(type);
-      continue;
-    }
-
-    // Demangle this argument.
-    auto genericArgDemangling =
-      _swift_buildDemanglingForMetadata(genericArg, Dem);
-    if (!genericArgDemangling)
+  if (description->isGeneric()) {
+    auto genericArgs = description->getGenericArguments(type);
+    // Gather the complete set of generic arguments that must be written to
+    // form this type.
+    if (!_buildDemanglingForGenericArgs(description, genericArgs,
+                                        demangledGenerics, Dem))
       return nullptr;
-    demangledGenerics.push_back(genericArgDemangling);
   }
-  
+
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
@@ -408,7 +519,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 #endif
 
       auto protocolNode =
-          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, Dem);
+          _buildDemanglingForContext(protocol.getSwiftProtocol(), {}, Dem);
       if (!protocolNode)
         return nullptr;
 
@@ -616,8 +727,18 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           (Node::IndexType)MangledDifferentiabilityKind::Linear), Dem);
       break;
     }
-    if (func->isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isThrowing()) {
+      if (auto thrownError = func->getThrownError()) {
+        auto thrownErrorTypeNode =
+          _swift_buildDemanglingForMetadata(thrownError, Dem);
+        NodePointer thrownErrorNode =
+            Dem.createNode(Node::Kind::TypedThrowsAnnotation);
+        thrownErrorNode->addChild(thrownErrorTypeNode, Dem);
+        funcNode->addChild(thrownErrorNode, Dem);
+      } else {
+        funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+      }
+    }
     if (func->isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
@@ -633,6 +754,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto metatype = static_cast<const MetatypeMetadata *>(type);
     auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType,
                                                       Dem);
+    if (!instance)
+      return nullptr;
+
     auto typeNode = Dem.createNode(Node::Kind::Type);
     typeNode->addChild(instance, Dem);
     auto node = Dem.createNode(Node::Kind::Metatype);
@@ -696,6 +820,25 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   // Not a type.
   return nullptr;
+}
+
+Demangle::NodePointer
+swift::_buildDemanglingForGenericType(const TypeContextDescriptor *description,
+                                      const void *const *arguments,
+                                      Demangle::Demangler &Dem) {
+  auto kind = description->getKind();
+  if (kind != ContextDescriptorKind::Class &&
+      kind != ContextDescriptorKind::Enum &&
+      kind != ContextDescriptorKind::Struct)
+    return nullptr;
+
+  llvm::SmallVector<NodePointer, 8> demangledGenerics;
+  if (!_buildDemanglingForGenericArgs(description,
+                                      (const Metadata *const *)arguments,
+                                      demangledGenerics, Dem))
+    return nullptr;
+
+  return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
 // NB: This function is not used directly in the Swift codebase, but is

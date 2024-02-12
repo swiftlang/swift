@@ -195,10 +195,11 @@ enum class CompletionKind : uint8_t {
   StmtOrExpr,
   PostfixExprBeginning,
   PostfixExpr,
-  PostfixExprParen,
   KeyPathExprObjC,
   KeyPathExprSwift,
   TypeDeclResultBeginning,
+  TypeBeginning,
+  TypeSimpleOrComposition,
   TypeSimpleBeginning,
   TypeSimpleWithDot,
   TypeSimpleWithoutDot,
@@ -211,8 +212,8 @@ enum class CompletionKind : uint8_t {
   EffectsSpecifier,
   PoundAvailablePlatform,
   CallArg,
-  LabeledTrailingClosure,
   ReturnStmtExpr,
+  ThenStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
 
@@ -228,6 +229,9 @@ enum class CompletionKind : uint8_t {
   ForEachPatternBeginning,
   TypeAttrBeginning,
   OptionalBinding,
+
+  /// Completion after `~` in an inheritance clause.
+  WithoutConstraintType
 };
 
 enum class CodeCompletionDiagnosticSeverity : uint8_t {
@@ -316,6 +320,39 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
+enum class CodeCompletionMacroRole : uint8_t {
+  Expression = 1 << 0,
+  Declaration = 1 << 1,
+  CodeItem = 1 << 2,
+  AttachedVar = 1 << 3,
+  AttachedContext = 1 << 4,
+  AttachedDecl = 1 << 5,
+};
+using CodeCompletionMacroRoles = OptionSet<CodeCompletionMacroRole>;
+
+enum class CodeCompletionFilterFlag : uint16_t {
+  Expr = 1 << 0,
+  Type = 1 << 1,
+  PrecedenceGroup = 1 << 2,
+  Module = 1 << 3,
+  ExpressionMacro = 1 << 4,
+  DeclarationMacro = 1 << 5,
+  CodeItemMacro = 1 << 6,
+  AttachedVarMacro = 1 << 7,
+  AttachedContextMacro = 1 << 8,
+  AttachedDeclMacro = 1 << 9,
+};
+using CodeCompletionFilter = OptionSet<CodeCompletionFilterFlag>;
+
+CodeCompletionMacroRoles getCompletionMacroRoles(const Decl *D);
+
+CodeCompletionMacroRoles
+getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds);
+
+CodeCompletionMacroRoles getCompletionMacroRoles(CodeCompletionFilter filter);
+
+CodeCompletionFilter getCompletionFilter(CodeCompletionMacroRoles roles);
+
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
 class ContextFreeCodeCompletionResult {
@@ -333,6 +370,8 @@ class ContextFreeCodeCompletionResult {
 
   CodeCompletionOperatorKind KnownOperatorKind : 6;
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
+
+  CodeCompletionMacroRoles MacroRoles;
 
   bool IsSystem : 1;
   bool IsAsync : 1;
@@ -359,17 +398,18 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef NameForDiagnostics;
 
 public:
-  /// Memberwise initializer. \p AssociatedKInd is opaque and will be
+  /// Memberwise initializer. \p AssociatedKind is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
   /// completion item is an operator, it will be determined based on the
-  /// compleiton string.
+  /// completion string.
   ///
-  /// \note The caller must ensure that the \p CompleitonString and all the
+  /// \note The caller must ensure that the \p CompletionString and all the
   /// \c Ref types outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem, bool IsAsync,
+      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionMacroRoles MacroRoles, bool IsSystem, bool IsAsync,
       bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
@@ -380,8 +420,9 @@ public:
       NullTerminatedStringRef DiagnosticMessage,
       NullTerminatedStringRef FilterName,
       NullTerminatedStringRef NameForDiagnostics)
-      : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
-        IsAsync(IsAsync), HasAsyncAlternative(HasAsyncAlternative),
+      : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
+        MacroRoles(MacroRoles), IsSystem(IsSystem), IsAsync(IsAsync),
+        HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
@@ -488,6 +529,8 @@ public:
     return KnownOperatorKind;
   }
 
+  CodeCompletionMacroRoles getMacroRoles() const { return MacroRoles; }
+
   bool isSystem() const { return IsSystem; };
 
   bool isAsync() const { return IsAsync; };
@@ -509,6 +552,14 @@ public:
   ContextFreeNotRecommendedReason getNotRecommendedReason() const {
     return NotRecommended;
   }
+
+  ContextualNotRecommendedReason calculateContextualNotRecommendedReason(
+      ContextualNotRecommendedReason explicitReason,
+      bool canCurrDeclContextHandleAsync) const;
+
+  CodeCompletionResultTypeRelation calculateContextualTypeRelation(
+      const DeclContext *dc, const ExpectedTypeContext *typeContext,
+      const USRBasedTypeContext *usrTypeContext) const;
 
   CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
     return DiagnosticSeverity;
@@ -572,6 +623,7 @@ private:
   CodeCompletionResultTypeRelation TypeDistance : 3;
   static_assert(int(CodeCompletionResultTypeRelation::MAX_VALUE) < 1 << 3, "");
 
+public:
   /// Memberwise initializer
   /// The \c ContextFree result must outlive this result. Typically, this is
   /// done by allocating the two in the same sink or adopting the context free
@@ -584,25 +636,6 @@ private:
       : ContextFree(ContextFree), SemanticContext(SemanticContext),
         Flair(Flair.toRaw()), NotRecommended(NotRecommended),
         NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
-
-public:
-  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
-  /// information.
-  /// This computes the type relation between the completion item and its
-  /// expected type context.
-  /// See \c CodeCompletionResultType::calculateTypeRelation for documentation
-  /// on \p USRTypeContext.
-  /// The \c ContextFree result must outlive this result. Typically, this is
-  /// done by allocating the two in the same sink or adopting the context free
-  /// sink in the sink that allocates this result.
-  CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
-                       SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
-                       const ExpectedTypeContext *TypeContext,
-                       const DeclContext *DC,
-                       const USRBasedTypeContext *USRTypeContext,
-                       bool CanCurrDeclContextHandleAsync,
-                       ContextualNotRecommendedReason NotRecommended);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;

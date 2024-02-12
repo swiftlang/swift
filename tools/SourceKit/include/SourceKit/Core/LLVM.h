@@ -34,8 +34,8 @@ namespace llvm {
   template<typename T> class ArrayRef;
   template<unsigned InternalLen> class SmallString;
   template<typename T, unsigned N> class SmallVector;
-  template<typename T> class SmallVectorImpl;
-  template<typename T> class Optional;
+  template <typename T>
+  class SmallVectorImpl;
 
   template<typename T>
   struct SaveAndRestore;
@@ -82,15 +82,13 @@ namespace SourceKit {
   using llvm::cast_or_null;
   
   // ADT's.
-  using llvm::StringRef;
-  using llvm::Twine;
   using llvm::ArrayRef;
+  using llvm::SaveAndRestore;
   using llvm::SmallString;
   using llvm::SmallVector;
   using llvm::SmallVectorImpl;
-  using llvm::SaveAndRestore;
-  using llvm::Optional;
-  using llvm::None;
+  using llvm::StringRef;
+  using llvm::Twine;
 
   // Reference counting.
   using llvm::IntrusiveRefCntPtr;

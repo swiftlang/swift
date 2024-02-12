@@ -103,13 +103,16 @@ using namespace swift::hashable_support;
 - (id /* NSString */)description {
   auto error = (const SwiftError *)self;
   auto value = error->getValue();
+  auto type = error->type;
 
   // Copy the value, since it will be consumed by getDescription.
   ValueBuffer copyBuf;
-  auto copy = error->type->allocateBufferIn(&copyBuf);
+  auto copy = type->allocateBufferIn(&copyBuf);
   error->type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
 
-  return getDescription(copy, error->type);
+  id description = getDescription(copy, type);
+  type->deallocateBufferIn(&copyBuf);
+  return description;
 }
 
 - (NSInteger)code {
@@ -194,7 +197,7 @@ const Metadata *swift::getNSErrorMetadata() {
 extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
 
 const WitnessTable *swift::findErrorWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &PROTOCOL_DESCR_SYM(s5Error));
+  return swift_conformsToProtocolCommon(srcType, &PROTOCOL_DESCR_SYM(s5Error));
 }
 
 id swift::dynamicCastValueToNSError(OpaqueValue *src,
@@ -386,7 +389,7 @@ const HashableWitnessTable *SwiftError::getHashableConformance() const {
   const HashableWitnessTable *expectedWT = nullptr;
   const HashableWitnessTable *wt =
       reinterpret_cast<const HashableWitnessTable *>(
-          swift_conformsToProtocol(type, &HashableProtocolDescriptor));
+          swift_conformsToProtocolCommon(type, &HashableProtocolDescriptor));
   hashableConformance.compare_exchange_strong(
       expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
       std::memory_order_acq_rel);
@@ -610,7 +613,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
     return false;
 
   // Is the target type a bridgeable error?
-  auto witness = swift_conformsToProtocol(destType,
+  auto witness = swift_conformsToProtocolCommon(destType,
                                           TheObjectiveCBridgeableError);
 
   if (witness) {

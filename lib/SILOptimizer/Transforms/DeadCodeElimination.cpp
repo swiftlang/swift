@@ -215,7 +215,6 @@ void DCE::markInstructionLive(SILInstruction *Inst) {
 
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
 
-  markControllingTerminatorsLive(Inst->getParent());
   Worklist.push_back(Inst);
 }
 
@@ -275,8 +274,26 @@ void DCE::markLive() {
         addReverseDependency(beginAccess, &I);
         break;
       }
-      case SILInstructionKind::DestroyValueInst:
-      case SILInstructionKind::EndBorrowInst:
+      case SILInstructionKind::DestroyValueInst: {
+        auto phi = PhiValue(I.getOperand(0));
+        // Disable DCE of phis which are lexical or may have a pointer escape.
+        if (phi && (phi->isLexical() || findPointerEscape(phi))) {
+          markInstructionLive(&I);
+        }
+        // The instruction is live only if it's operand value is also live
+        addReverseDependency(I.getOperand(0), &I);
+        break;
+      }
+      case SILInstructionKind::EndBorrowInst: {
+        auto phi = PhiValue(I.getOperand(0));
+        // If there is a pointer escape or phi is lexical, disable DCE.
+        if (phi && (findPointerEscape(phi) || phi->isLexical())) {
+          markInstructionLive(&I);
+        }
+        // The instruction is live only if it's operand value is also live
+        addReverseDependency(I.getOperand(0), &I);
+        break;
+      }
       case SILInstructionKind::EndLifetimeInst: {
         // The instruction is live only if it's operand value is also live
         addReverseDependency(I.getOperand(0), &I);
@@ -305,11 +322,6 @@ void DCE::markLive() {
           for (auto root : roots) {
             disableBorrowDCE(root);
           }
-        }
-        // If we have a lexical borrow scope or a pointer escape, disable DCE.
-        if (borrowInst->isLexical() ||
-            hasPointerEscape(BorrowedValue(borrowInst))) {
-          disableBorrowDCE(borrowInst);
         }
         break;
       }
@@ -372,9 +384,9 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
-
   case TermKind::UnreachableInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
@@ -450,6 +462,8 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
 // Given an instruction which is considered live, propagate that liveness
 // back to the instructions that produce values it consumes.
 void DCE::propagateLiveness(SILInstruction *I) {
+  markControllingTerminatorsLive(I->getParent());
+
   if (!isa<TermInst>(I)) {
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
@@ -476,6 +490,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
+  case TermKind::ThrowAddrInst:
     return;
 
   case TermKind::ReturnInst:
@@ -643,7 +658,9 @@ bool DCE::removeDead() {
 
         endLifetimeOfLiveValue(phiArg->getIncomingPhiValue(pred), insertPt);
       }
-      erasePhiArgument(&BB, i);
+      erasePhiArgument(&BB, i, /*cleanupDeadPhiOps=*/true,
+                       InstModCallbacks().onCreateNewInst(
+                           [&](auto *inst) { markInstructionLive(inst); }));
       Changed = true;
       BranchesChanged = true;
     }
@@ -668,7 +685,8 @@ bool DCE::removeDead() {
         }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
         LLVM_DEBUG(Inst->dump());
-        LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "with jump to: BB" << postDom->getDebugID() << "\n");
 
         replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();

@@ -34,28 +34,48 @@ struct RequirementError {
     /// A type requirement on a trivially invalid subject type,
     /// e.g. Bool: Collection.
     InvalidRequirementSubject,
+    /// An inverse constraint applied to an invalid subject type,
+    /// e.g., each T : ~Copyable
+    InvalidInverseSubject,
+    /// The inverse constraint requirement cannot applied to the subject because
+    /// it's an outer generic parameter, e.g.,
+    ///   protocol P { func f() where Self: ~Copyable }
+    InvalidInverseOuterSubject,
     /// An invalid shape requirement, e.g. T.shape == Int.shape
     InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,
+    /// An inverse requirement that conflicts with the computed requirements of
+    /// a generic parameter, e.g., T : Copyable, T : ~Copyable
+    ConflictingInverseRequirement,
     /// A recursive requirement, e.g. T == G<T.A>.
     RecursiveRequirement,
-    /// A redundant requirement, e.g. T == T.
-    RedundantRequirement,
+    /// A not-yet-supported same-element requirement, e.g. each T == Int.
+    UnsupportedSameElement,
   } kind;
 
+private:
   /// The invalid requirement.
-  Requirement requirement;
+  union {
+    Requirement requirement;
+    InverseRequirement inverse;
+  };
+public:
 
   /// A requirement that conflicts with \c requirement. Both
   /// requirements will have the same subject type.
-  Optional<Requirement> conflictingRequirement;
+  llvm::Optional<Requirement> conflictingRequirement;
 
   SourceLoc loc;
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
-    : kind(kind), requirement(requirement), conflictingRequirement(None), loc(loc) {}
+      : kind(kind), requirement(requirement),
+        conflictingRequirement(llvm::None), loc(loc) {}
+
+  RequirementError(Kind kind, InverseRequirement inverse, SourceLoc loc)
+      : kind(kind), inverse(inverse),
+        conflictingRequirement(llvm::None), loc(loc) {}
 
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,
@@ -63,6 +83,18 @@ private:
     : kind(kind), requirement(requirement), conflictingRequirement(conflict), loc(loc) {}
 
 public:
+  Requirement getRequirement() const {
+    assert(!(kind == Kind::InvalidInverseOuterSubject ||
+             kind == Kind::ConflictingInverseRequirement));
+    return requirement;
+  }
+
+  InverseRequirement getInverse() const {
+    assert(kind == Kind::InvalidInverseOuterSubject ||
+           kind == Kind::ConflictingInverseRequirement);
+    return inverse;
+  }
+
   static RequirementError forInvalidTypeRequirement(Type subjectType,
                                                     Type constraint,
                                                     SourceLoc loc) {
@@ -73,6 +105,22 @@ public:
   static RequirementError forInvalidRequirementSubject(Requirement req,
                                                        SourceLoc loc) {
     return {Kind::InvalidRequirementSubject, req, loc};
+  }
+
+  static RequirementError forInvalidInverseSubject(Requirement req,
+                                                   SourceLoc loc) {
+    return {Kind::InvalidInverseSubject, req, loc};
+  }
+
+  static
+  RequirementError forInvalidInverseOuterSubject(InverseRequirement req) {
+    return {Kind::InvalidInverseOuterSubject, req, req.loc};
+  }
+
+  static RequirementError forConflictingInverseRequirement(
+                                               InverseRequirement req,
+                                               SourceLoc loc) {
+    return {Kind::ConflictingInverseRequirement, req, loc};
   }
 
   static RequirementError forInvalidShapeRequirement(Requirement req,
@@ -91,14 +139,13 @@ public:
     return {Kind::ConflictingRequirement, first, second, loc};
   }
 
-  static RequirementError forRedundantRequirement(Requirement req,
-                                                  SourceLoc loc) {
-    return {Kind::RedundantRequirement, req, loc};
-  }
-
   static RequirementError forRecursiveRequirement(Requirement req,
                                                   SourceLoc loc) {
     return {Kind::RecursiveRequirement, req, loc};
+  }
+
+  static RequirementError forSameElement(Requirement req, SourceLoc loc) {
+    return {Kind::UnsupportedSameElement, req, loc};
   }
 };
 

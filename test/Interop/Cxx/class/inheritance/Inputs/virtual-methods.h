@@ -8,6 +8,13 @@ struct Base {
   virtual void foo() = 0;
 };
 
+struct Base2 { virtual int f() = 0; };
+struct Base3 { virtual int f() { return 24; } };
+struct Derived2 : public Base2 { virtual int f() {  return 42; } };
+struct Derived3 : public Base3 { virtual int f() {  return 42; } };
+struct Derived4 : public Base3 { };
+struct DerivedFromDerived2 : public Derived2 {};
+
 template <class T>
 struct Derived : Base {
   inline void foo() override {
@@ -27,3 +34,7 @@ struct Unused : Base {
 };
 
 using UnusedInt = Unused<int>;
+
+struct VirtualNonAbstractBase {
+  virtual void nonAbstractMethod() const;
+};

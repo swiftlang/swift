@@ -11,7 +11,7 @@ import Foo
 // RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path=%t.ccp == \
 // RUN:     -req=complete -pos=2:1 %s -- %s -F %S/../Inputs/libIDE-mock-sdk > %t.completions2
 
-// Sanity check the results
+// Soundness check the results
 // RUN: %FileCheck %s < %t.completions1
 // RUN: %FileCheck %s < %t.completions2
 // CHECK: key.name: "FooStruct

@@ -30,6 +30,7 @@ target_sources(swiftSIL PRIVATE
   SILSuccessor.cpp
   SILSymbolVisitor.cpp
   SILType.cpp
+  SILTypeSubstitution.cpp
   SILUndef.cpp
   SILVTable.cpp
   SILValue.cpp

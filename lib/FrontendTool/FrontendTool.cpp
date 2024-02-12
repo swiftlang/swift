@@ -36,7 +36,6 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -51,6 +50,9 @@
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
+#include "swift/Frontend/CachedDiagnostics.h"
+#include "swift/Frontend/CachingUtils.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -71,7 +73,10 @@
 
 #include "clang/Lex/Preprocessor.h"
 
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -81,6 +86,8 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -105,10 +112,12 @@ static std::string displayName(StringRef MainExecutablePath) {
 
 static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
-                                         const FrontendOptions &opts) {
+                                         const FrontendOptions &opts,
+                                         llvm::vfs::OutputBackend &backend) {
   opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
-        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
+        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f,
+                                                   backend);
       });
 }
 
@@ -123,37 +132,22 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
       });
 }
 
-/// Gets an output stream for the provided output filename, or diagnoses to the
-/// provided AST Context and returns null if there was an error getting the
-/// stream.
-static std::unique_ptr<llvm::raw_fd_ostream>
-getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
-  std::error_code errorCode;
-  auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFilename, errorCode, llvm::sys::fs::OF_None);
-  if (errorCode) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                       OutputFilename, errorCode.message());
-    return nullptr;
-  }
-  return os;
-}
-
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
-                     StringRef OutputFilename) {
-  auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
-  if (!OS) return true;
-  SM.print(*OS, M, Opts);
-
-  return M->getASTContext().hadError();
+                     StringRef OutputFilename,
+                     llvm::vfs::OutputBackend &Backend) {
+  return withOutputPath(M->getDiags(), Backend, OutputFilename,
+                        [&](raw_ostream &out) -> bool {
+                          SM.print(out, M, Opts);
+                          return M->getASTContext().hadError();
+                        });
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
-                     const CompilerInstance &Instance,
+                     CompilerInstance &Instance,
                      const SILOptions &Opts) {
   return writeSIL(SM, Instance.getMainModule(), Opts,
-                  PSPs.OutputFilename);
+                  PSPs.OutputFilename, Instance.getOutputBackend());
 }
 
 /// Prints the Objective-C "generated header" interface for \p M to \p
@@ -166,14 +160,14 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \returns true if there were any errors
 ///
 /// \see swift::printAsClangHeader
-static bool printAsClangHeaderIfNeeded(
+static bool printAsClangHeaderIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     StringRef outputPath, ModuleDecl *M, StringRef bridgingHeader,
     const FrontendOptions &frontendOpts, const IRGenOptions &irGenOpts,
     clang::HeaderSearch &clangHeaderSearchInfo) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(
-      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+  return withOutputPath(
+      M->getDiags(), outputBackend, outputPath, [&](raw_ostream &out) -> bool {
         return printAsClangHeader(out, M, bridgingHeader, frontendOpts,
                                   irGenOpts, clangHeaderSearchInfo);
       });
@@ -187,7 +181,8 @@ static bool printAsClangHeaderIfNeeded(
 ///
 /// \see swift::emitSwiftInterface
 static bool
-printModuleInterfaceIfNeeded(StringRef outputPath,
+printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
+                             StringRef outputPath,
                              ModuleInterfaceOptions const &Opts,
                              LangOptions const &LangOpts,
                              ModuleDecl *M) {
@@ -205,10 +200,10 @@ printModuleInterfaceIfNeeded(StringRef outputPath,
     diags.diagnose(SourceLoc(),
                    diag::warn_unsupported_module_interface_library_evolution);
   }
-  return withOutputFile(diags, outputPath,
+  return withOutputPath(diags, outputBackend, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
-    return swift::emitSwiftInterface(out, Opts, M);
-  });
+                          return swift::emitSwiftInterface(out, Opts, M);
+                        });
 }
 
 namespace {
@@ -220,7 +215,7 @@ class JSONFixitWriter
   std::string FixitsOutputPath;
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
-  std::vector<SingleEdit> AllEdits;
+  SourceEdits AllEdits;
 
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
@@ -233,9 +228,8 @@ private:
                         const DiagnosticInfo &Info) override {
     if (!(FixitAll || shouldTakeFixit(Info)))
       return;
-    for (const auto &Fix : Info.FixIts) {
-      AllEdits.push_back({SM, Fix.getRange(), Fix.getText().str()});
-    }
+    for (const auto &Fix : Info.FixIts)
+      AllEdits.addEdit(SM, Fix.getRange(), Fix.getText());
   }
 
   bool finishProcessing() override {
@@ -255,7 +249,7 @@ private:
       return true;
     }
 
-    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OS);
+    swift::writeEditsInJson(AllEdits, *OS);
     return false;
   }
 };
@@ -286,7 +280,7 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumDecls += SF->getTopLevelDecls().size();
-  C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
+  C.NumLocalTypeDecls += SF->getLocalTypeDecls().size();
   C.NumObjCMethods += SF->ObjCMethods.size();
 
   SmallVector<OperatorDecl *, 2> operators;
@@ -317,6 +311,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
+    C.NumMacroPluginDependencies = D->getMacroPluginDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -372,15 +367,17 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
+  auto OutputBackend = Instance.getOutputBackend().clone();
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
-    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash,
+                                             /*cached=*/false);
     return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
-      opts.InputsAndOutputs.getSingleOutputFilename());
+      opts.InputsAndOutputs.getSingleOutputFilename(), /*cached=*/false);
 }
 
 static bool precompileClangModule(const CompilerInstance &Instance) {
@@ -416,12 +413,18 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
   // and isntead directly use the current \c Instance for compilation.
-  if (FEOpts.ExplicitInterfaceBuild)
+  //
+  // FIXME: -typecheck-module-from-interface is the exception here because
+  // currently we need to ensure it still reads the flags written out
+  // in the .swiftinterface file itself. Instead, creation of that
+  // job should incorporate those flags.
+  if (FEOpts.ExplicitInterfaceBuild &&
+      !(FEOpts.isTypeCheckAction() && !FEOpts.EnableCaching))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
         Invocation.getOutputFilename(),
-        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        /* shouldSerializeDeps */ true,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
   else
     return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
@@ -434,6 +437,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()),
+      RequireNoncopyableGenerics_t(Invocation.getLangOptions()),
       IgnoreAdjacentModules);
 }
 
@@ -517,8 +521,13 @@ static bool dumpAST(CompilerInstance &Instance) {
     for (SourceFile *sourceFile: primaryFiles) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
-      auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-      sourceFile->dump(*OS, /*parseIfNeeded*/ true);
+      if (withOutputPath(Instance.getASTContext().Diags,
+                         Instance.getOutputBackend(), OutputFilename,
+                         [&](raw_ostream &out) -> bool {
+                           sourceFile->dump(out, /*parseIfNeeded*/ true);
+                           return false;
+                         }))
+        return true;
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
@@ -543,17 +552,19 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
 
   using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
   return fine_grained_dependencies::withReferenceDependencies(
-      SF, *Instance.getDependencyTracker(), outputPath, alsoEmitDotFile,
-      [&](SourceFileDepGraph &&g) -> bool {
+      SF, *Instance.getDependencyTracker(), Instance.getOutputBackend(),
+      outputPath, alsoEmitDotFile, [&](SourceFileDepGraph &&g) -> bool {
         const bool hadError =
             fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
-                Instance.getDiags(), outputPath, g);
+                Instance.getDiags(), Instance.getOutputBackend(), outputPath,
+                g);
 
         // If path is stdout, cannot read it back, so check for "-"
         assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
         if (alsoEmitDotFile)
-          g.emitDotFile(outputPath, Instance.getDiags());
+          g.emitDotFile(Instance.getOutputBackend(), outputPath,
+                        Instance.getDiags());
         return hadError;
       });
 }
@@ -659,7 +670,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasReferenceDependenciesPath() &&
+          .InputsAndOutputs.hasReferenceDependenciesFilePath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
@@ -721,10 +732,12 @@ static bool emitConstValuesForWholeModuleIfNeeded(
     return true;
   auto ConstValues = gatherConstValuesForModule(Protocols,
                                                 Instance.getMainModule());
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-  writeAsJSONToFile(ConstValues, OS);
-  return false;
+
+  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                        ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
+                          writeAsJSONToFile(ConstValues, OS);
+                          return false;
+                        });
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
@@ -750,9 +763,11 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
       continue;
 
     auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
-    writeAsJSONToFile(ConstValues, OS);
+    withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                   ConstValuesFilePath, [&](llvm::raw_ostream &OS) {
+                     writeAsJSONToFile(ConstValues, OS);
+                     return false;
+                   });
   }
 }
 
@@ -767,9 +782,12 @@ static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
   auto ModuleSemanticPath = frontendOpts.InputsAndOutputs
     .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
     .ModuleSemanticInfoOutputPath;
-  llvm::raw_fd_ostream OS(ModuleSemanticPath, EC, llvm::sys::fs::OF_None);
-  OS << "{}\n";
-  return false;
+
+  return withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                        ModuleSemanticPath, [&](llvm::raw_ostream &OS) {
+                          OS << "{}\n";
+                          return false;
+                        });
 }
 
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
@@ -794,7 +812,36 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
+  return writeTBD(Instance.getMainModule(), TBDPath,
+                  Instance.getOutputBackend(), tbdOpts);
+}
+
+static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
+                               llvm::vfs::OutputBackend &Backend) {
+  return withOutputPath(M->getDiags(), Backend, OutputPath,
+                        [&](raw_ostream &OS) -> bool {
+                          writeAPIJSONFile(M, OS, /*PrettyPrinted=*/false);
+                          return false;
+                        });
+}
+
+static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasAPIDescriptorOutputPath())
+    return false;
+
+  if (!frontendOpts.InputsAndOutputs.isWholeModule()) {
+    Instance.getDiags().diagnose(
+        SourceLoc(), diag::api_descriptor_only_supported_in_whole_module);
+    return false;
+  }
+
+  const std::string &APIDescriptorPath =
+      Invocation.getAPIDescriptorPathForWholeModule();
+
+  return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
+                            Instance.getOutputBackend());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -911,20 +958,18 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
-    std::string BridgingHeaderPathForPrint;
-    if (!opts.ImplicitObjCHeaderPath.empty()) {
+    std::string BridgingHeaderPathForPrint = Instance.getBridgingHeaderPath();
+    if (!BridgingHeaderPathForPrint.empty()) {
       if (opts.BridgingHeaderDirForPrint.has_value()) {
         // User specified preferred directory for including, use that dir.
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
-          llvm::sys::path::filename(opts.ImplicitObjCHeaderPath));
+          llvm::sys::path::filename(BridgingHeaderPathForPrint));
         BridgingHeaderPathForPrint = (std::string)Buffer;
-      } else {
-        // By default, include the given bridging header path directly.
-        BridgingHeaderPathForPrint = opts.ImplicitObjCHeaderPath;
       }
     }
     hadAnyError |= printAsClangHeaderIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
         Invocation.getIRGenOptions(),
@@ -940,6 +985,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
     hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getModuleInterfaceOutputPathForWholeModule(),
         Invocation.getModuleInterfaceOptions(),
         Invocation.getLangOptions(),
@@ -949,18 +995,36 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.PrintPrivateInterfaceContent = true;
+    privOpts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
         Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
         privOpts,
+        Invocation.getLangOptions(),
+        Instance.getMainModule());
+  }
+  if (opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath()) {
+    // Copy the settings from the module interface to add package decl printing.
+    ModuleInterfaceOptions pkgOpts = Invocation.getModuleInterfaceOptions();
+    pkgOpts.setInterfaceMode(PrintOptions::InterfaceMode::Package);
+    pkgOpts.ModulesToSkipInPublicInterface.clear();
+
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
+        Invocation.getPackageModuleInterfaceOutputPathForWholeModule(),
+        pkgOpts,
         Invocation.getLangOptions(),
         Instance.getMainModule());
   }
 
   {
     hadAnyError |= writeTBDIfNeeded(Instance);
+  }
+
+  {
+    hadAnyError |= writeAPIDescriptorIfNeeded(Instance);
   }
 
   {
@@ -1139,7 +1203,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                               Instance.getDependencyTracker(), opts);
+                               Instance.getDependencyTracker(), opts,
+                               Instance.getOutputBackend());
 
   // Emit extracted constant values for every file in the batch
   emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
@@ -1248,10 +1313,7 @@ static bool performScanDependencies(CompilerInstance &Instance) {
     else
       return dependencies::scanDependencies(Instance);
   } else {
-    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
-      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
-    else
-      return dependencies::batchScanDependencies(Instance, batchScanInput);
+    return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 
@@ -1333,7 +1395,8 @@ static bool performAction(CompilerInstance &Instance,
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::EmitImportedModules:
-    return emitImportedModules(Instance.getMainModule(), opts);
+    return emitImportedModules(Instance.getMainModule(), opts,
+                               Instance.getOutputBackend());
 
   // MARK: Dependency Scanning Actions
   case FrontendOptions::ActionType::ScanDependencies:
@@ -1349,13 +1412,25 @@ static bool performAction(CompilerInstance &Instance,
                                 [](CompilerInstance &Instance) {
                                   return Instance.getASTContext().hadError();
                                 });
+  case FrontendOptions::ActionType::Immediate: {
+    const auto &Ctx = Instance.getASTContext();
+    if (Ctx.LangOpts.hasFeature(Feature::LazyImmediate)) {
+      ReturnValue = RunImmediatelyFromAST(Instance);
+      return Ctx.hadError();
+    }
+    return withSemanticAnalysis(
+        Instance, observer, [&](CompilerInstance &Instance) {
+          assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
+                 "All actions not requiring SILGen must have been handled!");
+          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+        });
+  }
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
-  case FrontendOptions::ActionType::Immediate:
   case FrontendOptions::ActionType::EmitAssembly:
   case FrontendOptions::ActionType::EmitIRGen:
   case FrontendOptions::ActionType::EmitIR:
@@ -1374,6 +1449,37 @@ static bool performAction(CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
+/// Try replay the compiler result from cache.
+///
+/// Return true if all the outputs are fetched from cache. Otherwise, return
+/// false and will not replay any output.
+static bool tryReplayCompilerResults(CompilerInstance &Instance) {
+  if (!Instance.supportCaching() ||
+      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
+    return false;
+
+  assert(Instance.getCompilerBaseKey() &&
+         "Instance is not setup correctly for replay");
+
+  auto *CDP = Instance.getCachingDiagnosticsProcessor();
+  assert(CDP && "CachingDiagnosticsProcessor needs to be setup for replay");
+
+  // Don't capture diagnostics from replay.
+  CDP->endDiagnosticCapture();
+
+  bool replayed = replayCachedCompilerOutputs(
+      Instance.getObjectStore(), Instance.getActionCache(),
+      *Instance.getCompilerBaseKey(), Instance.getDiags(),
+      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
+
+  // If we didn't replay successfully, re-start capture.
+  if (!replayed)
+    CDP->startDiagnosticCapture();
+
+  return replayed;
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -1384,6 +1490,9 @@ static bool performCompile(CompilerInstance &Instance,
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  if (tryReplayCompilerResults(Instance))
+    return false;
 
   // To compile LLVM IR, just pass it off unmodified.
   if (opts.InputsAndOutputs.shouldTreatAsLLVM())
@@ -1404,13 +1513,17 @@ static bool performCompile(CompilerInstance &Instance,
   }() && "Only supports parsing .swift files");
 
   bool hadError = performAction(Instance, ReturnValue, observer);
+  auto canIgnoreErrorForExit = [&Instance, &opts]() {
+    return opts.AllowModuleWithCompilerErrors ||
+      (opts.isTypeCheckAction() && Instance.downgradeInterfaceVerificationErrors());
+  };
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
   if (Instance.hasASTContext() &&
       FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
-    if (!opts.AllowModuleWithCompilerErrors)
+    if (!canIgnoreErrorForExit())
       hadError |= Instance.getASTContext().hadError();
   }
   return hadError;
@@ -1437,11 +1550,11 @@ static bool serializeModuleSummary(SILModule *SM,
                                    const PrimarySpecificPaths &PSPs,
                                    const ASTContext &Context) {
   auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
-  return withOutputFile(Context.Diags, summaryOutputPath,
-                        [&](llvm::raw_ostream &out) {
-                          out << "Some stuff";
-                          return false;
-                        });
+  return withOutputPath(Context.Diags, Context.getOutputBackend(),
+                           summaryOutputPath, [&](llvm::raw_ostream &out) {
+                             out << "Some stuff";
+                             return false;
+                           });
 }
 
 static GeneratedModule
@@ -1496,8 +1609,14 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
       return false;
     }
 
+    // Embedded Swift does not support TBD.
+    if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
+      return false;
+    }
+
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
+    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive ||
+        Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Everything) {
       return false;
     }
 
@@ -1608,6 +1727,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
       createTargetMachine(opts, Instance.getASTContext());
 
+  TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
@@ -1618,6 +1738,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
                      TargetMachine.get(), OutputFilename,
+                     Instance.getOutputBackend(),
                      Instance.getStatsReporter());
 }
 
@@ -1633,7 +1754,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -1696,7 +1817,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
       auto *Mod = MSF.get<ModuleDecl *>();
       fine_grained_dependencies::withReferenceDependencies(
-          Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
+          Mod, *Instance.getDependencyTracker(),
+          Instance.getOutputBackend(), Mod->getModuleFilename(),
           alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
             serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get(), &g);
             return false;
@@ -1780,9 +1902,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
   llvm::GlobalVariable *HashGlobal;
-  auto IRModule = generateIR(
-      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
-      OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
+  auto IRModule =
+      generateIR(IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+                 OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
 
   // Cancellation check after IRGen.
   if (Instance.isCancellationRequested())
@@ -1845,6 +1967,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.IndexIgnoreStdlib,
                                  opts.IndexIncludeLocals,
                                  isDebugCompilation,
+                                 opts.DisableImplicitModules,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),
                                  Invocation.getIRGenOptions().FilePrefixMap);
@@ -1863,6 +1986,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.IndexIgnoreStdlib,
                                  opts.IndexIncludeLocals,
                                  isDebugCompilation,
+                                 opts.DisableImplicitModules,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),
                                  Invocation.getIRGenOptions().FilePrefixMap);
@@ -2067,6 +2191,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto finishDiagProcessing = [&](int retValue, bool verifierEnabled) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
     PDC.setSuppressOutput(false);
+    if (auto *CDP = Instance->getCachingDiagnosticsProcessor()) {
+      // Don't cache if build failed.
+      if (retValue)
+        CDP->endDiagnosticCapture();
+    }
     bool diagnosticsError = Instance->getDiags().finishProcessing();
     // If the verifier is enabled and did not encounter any verification errors,
     // return 0 even if the compile failed. This behavior isn't ideal, but large
@@ -2124,18 +2253,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<Optional<PrettyStackTraceFileContents>[]>(
-        configurationFileBuffers.size());
+      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
+          configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              Optional<PrettyStackTraceFileContents> &trace) {
-    trace.emplace(*buffer);
-  });
-
-  // Setting DWARF Version depend on platform
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = swift::DWARFVersion;
+              llvm::Optional<PrettyStackTraceFileContents> &trace) {
+             trace.emplace(*buffer);
+           });
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
@@ -2305,7 +2430,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
   std::string InstanceSetupError;
-  if (Instance->setup(Invocation, InstanceSetupError)) {
+  if (Instance->setup(Invocation, InstanceSetupError, Args)) {
     int ReturnCode = 1;
     if (Invocation.getFrontendOptions().FrontendParseableOutput)
       emitParseableFinishedMessage(ReturnCode);
@@ -2324,6 +2449,23 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
+  CompilerInstance::HashingBackendPtrTy HashBackend = nullptr;
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    // Setup a verfication instance to run.
+    std::unique_ptr<CompilerInstance> VerifyInstance =
+        std::make_unique<CompilerInstance>();
+    std::string InstanceSetupError;
+    // This should not fail because it passed already.
+    (void)VerifyInstance->setup(Invocation, InstanceSetupError, Args);
+
+    // Run the first time without observer and discard return value;
+    int ReturnValueTest = 0;
+    (void)performCompile(*VerifyInstance, ReturnValueTest,
+                         /*observer*/ nullptr);
+    // Get the hashing output backend and free the compiler instance.
+    HashBackend = VerifyInstance->getHashingBackend();
+  }
+
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, ReturnValue, observer);
 
@@ -2335,6 +2477,44 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       PDC.setSuppressOutput(false);
       diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
       HadError = true;
+    }
+  }
+
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    // Collect all output files.
+    auto ReHashBackend = Instance->getHashingBackend();
+    std::set<std::string> AllOutputs;
+    llvm::for_each(HashBackend->outputFiles(), [&](StringRef F) {
+      AllOutputs.insert(F.str());
+    });
+    llvm::for_each(ReHashBackend->outputFiles(), [&](StringRef F) {
+      AllOutputs.insert(F.str());
+    });
+
+    DiagnosticEngine &diags = Instance->getDiags();
+    for (auto &Filename : AllOutputs) {
+      auto O1 = HashBackend->getHashValueForFile(Filename);
+      if (!O1) {
+        diags.diagnose(SourceLoc(), diag::error_output_missing, Filename,
+                       /*SecondRun=*/false);
+        HadError = true;
+        continue;
+      }
+      auto O2 = ReHashBackend->getHashValueForFile(Filename);
+      if (!O2) {
+        diags.diagnose(SourceLoc(), diag::error_output_missing, Filename,
+                       /*SecondRun=*/true);
+        HadError = true;
+        continue;
+      }
+      if (*O1 != *O2) {
+        diags.diagnose(SourceLoc(), diag::error_nondeterministic_output,
+                       Filename, *O1, *O2);
+        HadError = true;
+        continue;
+      }
+      diags.diagnose(SourceLoc(), diag::matching_output_produced, Filename,
+                     *O1);
     }
   }
 

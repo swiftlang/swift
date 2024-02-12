@@ -208,7 +208,6 @@ def _apply_default_arguments(args):
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
         args.test_swiftformat = False
-        args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
         args.test_swiftdocc = False
 
@@ -452,6 +451,12 @@ def create_argument_parser():
            help='enable sanitizer coverage for swift tools. Necessary for '
                 'fuzzing swiftc')
 
+    option('--swift-enable-backtracing', toggle_true,
+           default=True,
+           help='enable backtracing support')
+    option('--swift-runtime-fixed-backtracer-path', store,
+           help='if set, provide a fixed path for the Swift backtracer')
+
     option('--compiler-vendor', store,
            choices=['none', 'apple'],
            default=defaults.COMPILER_VENDOR,
@@ -567,6 +572,9 @@ def create_argument_parser():
            metavar='LITARGS',
            help='lit args to use when testing')
 
+    option('--color-in-tests', toggle_true, default=True,
+           help='Enable color output in lit tests')
+
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
@@ -653,9 +661,6 @@ def create_argument_parser():
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
 
-    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
-           help='build back-deployment support for concurrency')
-
     option('--install-llvm', toggle_true,
            help='install llvm')
 
@@ -685,9 +690,6 @@ def create_argument_parser():
     option(['--swiftformat'], toggle_true('build_swiftformat'),
            help='build swift-format')
 
-    option(['--swiftevolve'], toggle_true('build_swiftevolve'),
-           help='build the swift-evolve tool')
-
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
     option(['--swiftdocc'], toggle_true('build_swiftdocc'),
@@ -706,12 +708,24 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-lint',
+           toggle_true('sourcekitlsp_lint'),
+           help='verify that sourcekit-lsp Source code is formatted correctly')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
            toggle_true('swiftsyntax_verify_generated_files'),
-           help='set to verify that the generated files in the source tree '
+           help='set to verify that the generated files in the source tree ' +
                 'match the ones that would be generated from current main')
+    option('--swiftsyntax-enable-test-fuzzing',
+           toggle_true('swiftsyntax_enable_test_fuzzing'),
+           help='set to modify test cases in SwiftParserTest to check for ' +
+                'round-trip failures and assertion failures')
+    option('--swiftsyntax-enable-rawsyntax-validation',
+           toggle_true('swiftsyntax_enable_rawsyntax_validation'),
+           help='set to validate that RawSyntax layout nodes contain children of ' +
+                'the expected types and that RawSyntax tokens have the expected ' +
+                'token kinds')
     option('--swiftsyntax-lint',
            toggle_true('swiftsyntax_lint'),
            help='verify that swift-syntax Source code is formatted correctly')
@@ -723,8 +737,6 @@ def create_argument_parser():
            help='install the SourceKit stress tester')
     option(['--install-swift-driver'], toggle_true('install_swift_driver'),
            help='install new Swift driver')
-    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
-           help='install SwiftEvolve')
     option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
            help='install Swift DocC')
     option(['--toolchain-benchmarks'],
@@ -735,6 +747,14 @@ def create_argument_parser():
            toggle_true('build_swift_inspect'),
            help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
+    option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
+           help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
+    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
+           help='build the stdlib for WebAssembly target into a'
+                'separate build directory ')
+    option(['--wasmkit'], toggle_true('build_wasmkit'),
+           help='build WasmKit')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1073,6 +1093,18 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-swift-remote-mirror', toggle_true,
+           default=True,
+           help='Build Remote Mirror')
+
+    option('--build-swift-external-generic-metadata-builder', toggle_true,
+           default=True,
+           help='Build External Generic Metadata Builder')
+
+    option('--build-swift-libexec', toggle_true,
+           default=True,
+           help='build auxiliary executables')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
@@ -1199,6 +1231,7 @@ def create_argument_parser():
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
     option('--skip-test-cmark', toggle_false('test_cmark'),
+           default=False,
            help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
@@ -1217,8 +1250,6 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
            help='skip testing swift-format')
-    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
-           help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
@@ -1227,6 +1258,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
+    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
+           help='skip testing stdlib for WebAssembly')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1235,7 +1268,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,
@@ -1295,21 +1328,36 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift differentiable programming.')
 
-    option('--enable-experimental-concurrency', toggle_true,
-           default=True,
+    option('--enable-experimental-concurrency', toggle_true, default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-cxx-interop', toggle_true,
+           default=True,
+           help='Enable experimental C++ interop.')
+
+    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
+           default=True,
+           help='Ship the <swift/bridging> header for C++ interop')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,
            help='Enable experimental Swift distributed actors.')
 
+    option('--enable-experimental-noncopyable-generics', toggle_true,
+           default=False,
+           help='Enable experimental NoncopyableGenerics.')
+
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')
 
-    option('--enable-experimental-reflection', toggle_true,
+    option('--enable-experimental-observation', toggle_true,
            default=True,
-           help='Enable experimental Swift reflection.')
+           help='Enable experimental Swift observation.')
+
+    option('--enable-synchronization', toggle_true,
+           default=True,
+           help='Enable Swift Synchronization.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

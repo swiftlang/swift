@@ -58,6 +58,7 @@ class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementReprKind Kind : 2;
   bool Invalid : 1;
+  bool IsExpansionPattern : 1;
   TypeRepr *FirstType;
 
   /// The second element represents the right-hand side of the constraint.
@@ -72,13 +73,17 @@ class RequirementRepr {
   StringRef AsWrittenString;
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeRepr *FirstType, TypeRepr *SecondType)
+                  TypeRepr *FirstType, TypeRepr *SecondType,
+                  bool IsExpansionPattern)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
+      IsExpansionPattern(IsExpansionPattern),
       FirstType(FirstType), SecondType(SecondType) { }
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementReprKind Kind,
-                  TypeRepr *FirstType, LayoutConstraintLoc SecondLayout)
+                  TypeRepr *FirstType, LayoutConstraintLoc SecondLayout,
+                  bool IsExpansionPattern)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
+      IsExpansionPattern(IsExpansionPattern),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
 public:
@@ -92,8 +97,10 @@ public:
   /// subject must conform, or superclass from which the subject must inherit.
   static RequirementRepr getTypeConstraint(TypeRepr *Subject,
                                            SourceLoc ColonLoc,
-                                           TypeRepr *Constraint) {
-    return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint };
+                                           TypeRepr *Constraint,
+                                           bool IsExpansionPattern) {
+    return { ColonLoc, RequirementReprKind::TypeConstraint, Subject, Constraint,
+             IsExpansionPattern };
   }
 
   /// Construct a new same-type requirement.
@@ -104,8 +111,10 @@ public:
   /// \param SecondType The second type.
   static RequirementRepr getSameType(TypeRepr *FirstType,
                                      SourceLoc EqualLoc,
-                                     TypeRepr *SecondType) {
-    return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType };
+                                     TypeRepr *SecondType,
+                                     bool IsExpansionPattern) {
+    return { EqualLoc, RequirementReprKind::SameType, FirstType, SecondType,
+             IsExpansionPattern };
   }
 
   /// Construct a new layout-constraint requirement.
@@ -118,9 +127,10 @@ public:
   /// subject must conform.
   static RequirementRepr getLayoutConstraint(TypeRepr *Subject,
                                              SourceLoc ColonLoc,
-                                             LayoutConstraintLoc Layout) {
+                                             LayoutConstraintLoc Layout,
+                                             bool IsExpansionPattern) {
     return {ColonLoc, RequirementReprKind::LayoutConstraint, Subject,
-            Layout};
+            Layout, IsExpansionPattern};
   }
 
   /// Determine the kind of requirement
@@ -128,6 +138,12 @@ public:
 
   /// Determine whether this requirement is invalid.
   bool isInvalid() const { return Invalid; }
+
+  /// Whether this requirement repr is the pattern of a requirement
+  /// expansion, e.g. `repeat G<each T> == (each U).A`
+  bool isExpansionPattern() const {
+    return IsExpansionPattern;
+  }
 
   /// Mark this requirement invalid.
   void setInvalid() { Invalid = true; }

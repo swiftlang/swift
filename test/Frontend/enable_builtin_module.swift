@@ -1,6 +1,7 @@
 // RUN: not %target-swift-frontend -typecheck -show-diagnostics-after-fatal -D BUILTIN_IMPORT %s 2>&1 | %FileCheck -check-prefix CHECK-NO-BUILTIN %s
 // RUN: not %target-swift-frontend -typecheck -show-diagnostics-after-fatal  -enable-builtin-module %s 2>&1 | %FileCheck -check-prefix CHECK-NO-BUILTIN-IMPORT %s
 // RUN: %target-swift-frontend -typecheck -enable-builtin-module -D BUILTIN_IMPORT %s
+// RUN: %target-swift-frontend -typecheck -enable-experimental-feature BuiltinModule -D BUILTIN_IMPORT %s
 
 // CHECK-NO-BUILTIN: no such module 'Builtin'
 

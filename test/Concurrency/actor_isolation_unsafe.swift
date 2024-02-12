@@ -1,20 +1,29 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-tns- -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @globalActor
 actor SomeGlobalActor {
   static let shared = SomeGlobalActor()
 }
 
+// expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 @MainActor(unsafe) func globalMain() { } // expected-note {{calls to global function 'globalMain()' from outside of its actor context are implicitly asynchronous}}
 
+// expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 @SomeGlobalActor(unsafe) func globalSome() { } // expected-note 2{{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
+// expected-complete-tns-note @-1 {{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
 
 // ----------------------------------------------------------------------
 // Witnessing and unsafe global actor
 // ----------------------------------------------------------------------
 protocol P1 {
-  @MainActor(unsafe) func onMainActor() // expected-note{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
+  // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
+  @MainActor(unsafe) func onMainActor() // expected-note 2{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
 }
 
 struct S1_P1: P1 {
@@ -29,8 +38,9 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
-struct S4_P1_quietly: P1 {
+struct S4_P1_not_quietly: P1 {
   @SomeGlobalActor func onMainActor() { }
+  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
 }
 
 @SomeGlobalActor
@@ -38,29 +48,34 @@ struct S4_P1: P1 {
   @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
 }
 
-
+// expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 @MainActor(unsafe)
 protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }
 
 struct S5_P2: P2 {
   func f() { } // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   func g() { }
 }
 
 nonisolated func testP2(x: S5_P2, p2: P2) {
-  p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  p2.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY
-  x.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  x.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
 func testP2_noconcurrency(x: S5_P2, p2: P2) {
-  p2.f() // okay, not concurrency-related code
+  // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
+  p2.f() // okay without complete. with targeted/minimal not concurrency-related code.
+  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // okay
-  x.f() // okay, not concurrency-related code
+  x.f() // okay without complete. with targeted/minimal not concurrency-related code
+  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
@@ -68,24 +83,26 @@ func testP2_noconcurrency(x: S5_P2, p2: P2) {
 // Overriding and unsafe global actor
 // ----------------------------------------------------------------------
 class C1 {
+  // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   @MainActor(unsafe) func method() { } // expected-note{{overridden declaration is here}}
 }
 
 class C2: C1 {
   override func method() { // expected-note 2{{overridden declaration is here}}
-    globalSome() // okay
+    globalSome() // okay when not in complete
+    // expected-complete-tns-warning @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
 class C3: C1 {
   nonisolated override func method() {
-    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
+    globalSome() // expected-warning{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
   }
 }
 
 class C4: C1 {
   @MainActor override func method() {
-    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
+    globalSome() // expected-warning{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
@@ -101,12 +118,14 @@ class C6: C2 {
 }
 
 class C7: C2 {
+  // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   @SomeGlobalActor(unsafe) override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from main actor-isolated overridden declaration}}
-    globalMain() // expected-error{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    globalMain() // expected-warning{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     globalSome() // okay
   }
 }
 
+// expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 @MainActor(unsafe) // expected-note {{'GloballyIsolatedProto' is isolated to global actor 'MainActor' here}}
 protocol GloballyIsolatedProto {
 }

@@ -2,7 +2,7 @@
 
 protocol P {
   associatedtype A
-  // expected-note@-1 5{{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 5{{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 
 struct S1<T> {}

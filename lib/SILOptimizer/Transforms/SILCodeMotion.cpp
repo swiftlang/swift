@@ -564,6 +564,10 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
   if (FindResult == ValueToCaseMap.end())
     return false;
 
+  // If the enum has a deinit, preserve the original release.
+  if (hasValueDeinit(RVI->getOperand()))
+    return false;
+
   // If we do not have any argument, just delete the release value.
   if (!(*FindResult)->second->hasAssociatedValues()) {
     RVI->eraseFromParent();
@@ -620,6 +624,10 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
                                 "list for release_value's operand. Bailing!\n");
       continue;
     }
+
+    // If the enum has a deinit, preserve the original release.
+    if (hasValueDeinit(Op))
+      return false;
 
     auto &EnumBBCaseList = (*R)->second;
     // If we don't have an enum tag for each predecessor of this BB, bail since
@@ -811,7 +819,7 @@ void BBEnumTagDataflowState::dump() const {
   llvm::dbgs() << "Dumping state for BB" << BB.get()->getDebugID() << "\n";
   llvm::dbgs() << "Block States:\n";
   for (auto &P : ValueToCaseMap) {
-    if (!P.hasValue()) {
+    if (!P) {
       llvm::dbgs() << "  Skipping blotted value.\n";
       continue;
     }
@@ -827,7 +835,7 @@ void BBEnumTagDataflowState::dump() const {
   llvm::dbgs() << "Predecessor States:\n";
   // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
   for (auto &P : EnumToEnumBBCaseListMap) {
-    if (!P.hasValue()) {
+    if (!P) {
       llvm::dbgs() << "  Skipping blotted value.\n";
       continue;
     }
@@ -948,7 +956,7 @@ enum OperandRelation {
 ///
 /// bb1:
 ///  %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.Some!enumelt
-///  checked_cast_br [exact] %3 : $X to $X, bb4, bb5 // id: %4
+///  checked_cast_br [exact] X in %3 : $X to $X, bb4, bb5 // id: %4
 ///
 /// bb4(%10 : $X):                                    // Preds: bb1
 ///  strong_release %10 : $X
@@ -1074,7 +1082,7 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   auto *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
-    return None;
+    return llvm::None;
 
   assert(FirstStruct->getNumOperands() == SecondStruct->getNumOperands() &&
          FirstStruct->getType() == SecondStruct->getType() &&
@@ -1087,20 +1095,20 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
     if (FirstStruct->getOperand(i) != SecondStruct->getOperand(i)) {
       // Only track one different operand for now
       if (DifferentOperandIndex)
-        return None;
+        return llvm::None;
       DifferentOperandIndex = i;
     }
   }
 
   if (!DifferentOperandIndex)
-    return None;
+    return llvm::None;
 
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
   SILType ArgTy = FirstStruct->getOperand(*DifferentOperandIndex)->getType();
   if (!ArgTy.is<BuiltinIntegerType>())
-    return None;
+    return llvm::None;
 
   return *DifferentOperandIndex;
 }
@@ -1508,6 +1516,10 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
       RCIA->getRCIdentityRoot(Switch->getOperand()))
     return false;
 
+  // If the enum has a deinit, preserve the original release.
+  assert(!hasValueDeinit(Ptr) &&
+         "enum with deinit is not RC-identical to its payload");
+
   // If S has a default case bail since the default case could represent
   // multiple cases.
   //
@@ -1577,6 +1589,10 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   if (RCIA->getRCIdentityRoot(Ptr) !=
       RCIA->getRCIdentityRoot(SEI->getEnumOperand()))
     return false;
+
+  // If the enum has a deinit, preserve the original release.
+  assert(!hasValueDeinit(Ptr) &&
+         "enum with deinit is not RC-identical to its payload");
 
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we

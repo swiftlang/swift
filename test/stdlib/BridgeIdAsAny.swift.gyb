@@ -346,7 +346,7 @@ BridgeAnything.test("SwiftValue(mixed values)/Hashable") {
     }
     return lhs / 2 == rhs / 2
   }
-  checkHashable(boxedXs, equalityOracle: equalityOracle)
+  checkHashable(boxedXs, equalityOracle: equalityOracle, allowIncompleteHashing: true)
 }
 
 runAllTests()

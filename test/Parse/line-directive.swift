@@ -14,6 +14,17 @@ x // expected-error {{parameterless closing #sourceLocation() directive without 
 
 #sourceLocation(file: x.swift, line: 1) // expected-error{{expected filename string literal}}
 
+// expected-warning@+1 {{expected starting line number for #sourceLocation directive; this is an error in Swift 6}}
+#sourceLocation(file: "x.swift", line: 0xff)
+
+#sourceLocation()
+
+// expected-warning@+1 {{'#sourceLocation' cannot be a multi-line string literal; this is an error in Swift 6}}
+#sourceLocation(file: """
+x.swift
+y.swift
+""", line: 42)
+
 #sourceLocation(file: "x.swift", line: 42)
 x x ; // should be ignored by expected_error because it is in a different file
 x
@@ -30,8 +41,8 @@ public struct S {
 // expected-error@+5{{operators must have one or two arguments}}
 // expected-error@+4{{member operator '/()' must have at least one argument of type 'S'}}
 // expected-error@+3{{expected '{' in body of function declaration}}
-// expected-error@+2{{consecutive declarations on a line must be separated by ';}}
-// expected-error@+1{{expected a macro identifier}}
+// expected-error@+2 {{consecutive declarations on a line must be separated by ';}}
+// expected-error@+1 {{expected a macro identifier}}
 / ###line 25 "line-directive.swift"
 }
 // expected-error@+1{{#line directive was renamed to #sourceLocation}}

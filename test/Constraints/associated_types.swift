@@ -62,8 +62,8 @@ protocol XReqt {}
 protocol YReqt {}
 
 protocol SameTypedDefaultWithReqts {
-    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; do you want to add it?}}
-    associatedtype Y: YReqt // expected-note{{protocol requires nested type 'Y'; do you want to add it?}}
+    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; add nested type 'X' for conformance}}
+    associatedtype Y: YReqt // expected-note{{protocol requires nested type 'Y'; add nested type 'Y' for conformance}}
     static var x: X { get }
     static var y: Y { get }
 }
@@ -86,7 +86,7 @@ struct UsesSameTypedDefaultWithoutSatisfyingReqts: SameTypedDefaultWithReqts {
 }
 
 protocol SameTypedDefaultBaseWithReqts {
-    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; do you want to add it?}}
+    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; add nested type 'X' for conformance}}
     static var x: X { get }
 }
 protocol SameTypedDefaultDerivedWithReqts: SameTypedDefaultBaseWithReqts {

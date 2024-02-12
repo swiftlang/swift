@@ -25,7 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 
@@ -47,11 +47,11 @@ static StringRef toFileName(const SanitizerKind kind) {
   llvm_unreachable("Unknown sanitizer");
 }
 
-static Optional<SanitizerKind> parse(const char* arg) {
-  return llvm::StringSwitch<Optional<SanitizerKind>>(arg)
-      #define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
-      #include "swift/Basic/Sanitizers.def"
-      .Default(None);
+static llvm::Optional<SanitizerKind> parse(const char *arg) {
+  return llvm::StringSwitch<llvm::Optional<SanitizerKind>>(arg)
+#define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
+#include "swift/Basic/Sanitizers.def"
+      .Default(llvm::None);
 }
 
 llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
@@ -131,7 +131,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    Optional<SanitizerKind> optKind = parse(arg);
+    llvm::Optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {
@@ -182,36 +182,27 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
   }
 
-  // Scudo can only be run with ubsan.
-  if (sanitizerSet & SanitizerKind::Scudo) {
-    OptionSet<SanitizerKind> allowedSet;
-    allowedSet |= SanitizerKind::Scudo;
-    allowedSet |= SanitizerKind::Undefined;
-
-    auto forbiddenOptions = sanitizerSet - allowedSet;
-
-    if (forbiddenOptions) {
-      SanitizerKind forbidden;
-
-      if (forbiddenOptions & SanitizerKind::Address) {
-        forbidden = SanitizerKind::Address;
-      } else if (forbiddenOptions & SanitizerKind::Thread) {
-          forbidden = SanitizerKind::Thread;
-      } else {
-        assert(forbiddenOptions & SanitizerKind::Fuzzer);
-        forbidden = SanitizerKind::Fuzzer;
+  // Scudo must be run standalone
+  if (sanitizerSet.contains(SanitizerKind::Scudo) &&
+      !sanitizerSet.containsOnly(SanitizerKind::Scudo)) {
+    auto diagnoseSanitizerKind = [&Diags, A, &sanitizerSet](SanitizerKind kind) {
+      // Don't diagnose Scudo, but diagnose anything else
+      if (kind != SanitizerKind::Scudo && sanitizerSet.contains(kind)) {
+        SmallString<128> b1;
+        SmallString<128> b2;
+        Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+            (A->getOption().getPrefixedName()
+             + toStringRef(SanitizerKind::Scudo)).toStringRef(b1),
+            (A->getOption().getPrefixedName()
+             + toStringRef(kind)).toStringRef(b2));
       }
+    };
 
-      SmallString<128> b1;
-      SmallString<128> b2;
-      Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
-          (A->getOption().getPrefixedName()
-              + toStringRef(SanitizerKind::Scudo)).toStringRef(b1),
-          (A->getOption().getPrefixedName()
-              + toStringRef(forbidden)).toStringRef(b2));
-      }
+#define SANITIZER(enm, kind, name, file) \
+    diagnoseSanitizerKind(SanitizerKind::kind);
+#include "swift/Basic/Sanitizers.def"
+
   }
-
   return sanitizerSet;
 }
 
@@ -222,7 +213,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    Optional<SanitizerKind> optKind = parse(arg);
+    llvm::Optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {
@@ -261,6 +252,20 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
 // Note this implementation cannot be inlined at its use site because it calls
 // `toStringRef(const SanitizerKind).`
 bool swift::parseSanitizerAddressUseODRIndicator(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags) {
+  // Warn if ASan isn't enabled.
+  if (!(enabledSanitizers & SanitizerKind::Address)) {
+    Diags.diagnose(
+        SourceLoc(), diag::warning_option_requires_specific_sanitizer,
+        A->getOption().getPrefixedName(), toStringRef(SanitizerKind::Address));
+    return false;
+  }
+
+  return true;
+}
+
+bool swift::parseSanitizerUseStableABI(
     const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
     DiagnosticEngine &Diags) {
   // Warn if ASan isn't enabled.

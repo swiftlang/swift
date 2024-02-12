@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix minimal-targeted- -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns- -verify-additional-prefix complete- -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix targeted-complete-tns- -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // Verify that we don't allow actor-isolated state to be passed via inout
 // Check:
@@ -31,14 +36,14 @@ actor TestActor {
   var value2: Int = 1 // expected-note 4{{property declared here}}
   var points: [Point] = [] // expected-note {{property declared here}}
 
-  subscript(x : inout Int) -> Int { // expected-error {{'inout' must not be used on subscript parameters}}
+  subscript(x : inout Int) -> Int { // expected-error {{'inout' may only be used on function or initializer parameters}}
     x += 1
     return x
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
+@Sendable func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
 @available(SwiftStdlib 5.1, *)
 enum Container {
   static let modifyAsyncValue = modifyAsynchronously
@@ -96,7 +101,9 @@ extension TestActor {
 
 // external class method call
 @available(SwiftStdlib 5.1, *)
-class NonAsyncClass {
+class NonAsyncClass { // expected-targeted-complete-note {{class 'NonAsyncClass' does not conform to the 'Sendable' protocol}}
+  // expected-targeted-complete-tns-note @-1 {{class 'NonAsyncClass' does not conform to the 'Sendable' protocol}}
+  // expected-tns-note @-2 {{class 'NonAsyncClass' does not conform to the 'Sendable' protocol}}
   func modifyOtherAsync(_ other : inout Int) async {
     // ...
   }
@@ -114,20 +121,26 @@ extension TestActor {
   func passStateIntoDifferentClassMethod() async {
     let other = NonAsyncClass()
     let otherCurry = other.modifyOtherAsync
-    // expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
+    // expected-targeted-complete-tns-warning @-1 {{non-sendable type 'NonAsyncClass' exiting actor-isolated context in call to non-isolated instance method 'modifyOtherAsync' cannot cross actor boundary}}
     await other.modifyOtherAsync(&value2)
-    // expected-error@+1{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
+    // expected-error @-1 {{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
+    // expected-targeted-complete-warning @-2 {{passing argument of non-sendable type 'NonAsyncClass' outside of actor-isolated context may introduce data races}}
+
     await otherCurry(&value1)
+    // expected-error @-1 {{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
+
     other.modifyOtherNotAsync(&value2) // This is okay since it's not async!
 
   }
 
   func callMutatingFunctionOnStruct() async {
+    // expected-targeted-complete-warning @+4 {{passing argument of non-sendable type 'inout Point' outside of actor-isolated context may introduce data races}}
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
-    // expected-error@+2:51{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
-    // expected-error@+1:71{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+2:38{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:58{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &nextPosition.x, y: &nextPosition.y)
 
+    // expected-targeted-complete-warning @+4 {{passing argument of non-sendable type 'inout Point' outside of actor-isolated context may introduce data races}}
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
     // expected-error@+2:38{{actor-isolated property 'value1' cannot be passed 'inout' to 'async' function call}}
     // expected-error@+1:50{{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
@@ -201,20 +214,26 @@ struct MyGlobalActor {
 }
 
 @MyGlobalActor var number: Int = 0
-// expected-note@-1{{var declared here}}
-// expected-note@-2{{var declared here}}
-// expected-note@-3{{mutation of this var is only permitted within the actor}}
+// expected-note @-1 {{var declared here}}
+// expected-note @-2 {{var declared here}}
+// expected-note @-3 {{mutation of this var is only permitted within the actor}}
+// expected-complete-tns-error @-4 {{top-level code variables cannot have a global actor}}
+// expected-complete-tns-note @-5 4{{mutation of this var is only permitted within the actor}}
 
-// expected-error@+3{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-// expected-error@+2{{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a non-isolated context}}
+
 if #available(SwiftStdlib 5.1, *) {
-let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
+  let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
+  // expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+  // expected-minimal-targeted-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a non-isolated context}}
+  // expected-complete-tns-error @-3 {{main actor-isolated var 'number' can not be used 'inout' from a non-isolated context}}
 }
 
 // attempt to pass global state owned by the global actor to another async function
-// expected-error@+2{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
 @available(SwiftStdlib 5.1, *)
 @MyGlobalActor func sneaky() async { await modifyAsynchronously(&number) }
+// expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+// expected-complete-tns-error @-2 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
+
 
 // It's okay to pass actor state inout to synchronous functions!
 
@@ -223,10 +242,13 @@ func globalSyncFunction(_ foo: inout Int) { }
 @MyGlobalActor func globalActorSyncFunction(_ foo: inout Int) { }
 @available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorAsyncOkay() async { globalActorSyncFunction(&number) }
+// expected-complete-tns-error @-1 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
 @available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorAsyncOkay2() async { globalSyncFunction(&number) }
+// expected-complete-tns-error @-1 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
 @available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorSyncOkay() { globalSyncFunction(&number) }
+// expected-complete-tns-error @-1 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
 
 // Gently unwrap things that are fine
 @available(SwiftStdlib 5.1, *)
@@ -241,5 +263,62 @@ struct Dog {
   mutating func woof() async {
     // This used to cause the compiler to crash, but should be fine
     await cat?.meow()
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func passToAsync(_: Int) async {}
+
+@available(SwiftStdlib 5.1, *)
+func wrapInClosure(
+  @_inheritActorContext _ block: @Sendable () async throws -> Void
+) async {}
+
+@available(SwiftStdlib 5.1, *)
+extension Array {
+  var mutateAsynchronously: Int {
+    mutating get async { 0 }
+  }
+
+  subscript(mutateAsynchronously i: Int) -> Int {
+    mutating get async { 0 }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ProtectArray {
+  var array: [Int] = []
+  // expected-note@-1 {{property declared here}}
+
+  func test() async {
+    // FIXME: this is invalid too!
+    _ = await array.mutateAsynchronously
+    // expected-targeted-complete-tns-warning@-1 {{non-sendable type '@lvalue [Int]' exiting actor-isolated context in call to non-isolated property 'mutateAsynchronously' cannot cross actor boundary}}
+
+    _ = await array[mutateAsynchronously: 0]
+    // expected-error@-1 {{actor-isolated property 'array' cannot be passed 'inout' to 'async' function call}}
+    // expected-targeted-complete-tns-warning@-2 {{non-sendable type 'inout Array<Int>' exiting actor-isolated context in call to non-isolated subscript 'subscript(mutateAsynchronously:)' cannot cross actor boundary}}
+
+    await passToAsync(array[0])
+
+    await wrapInClosure {
+      _ = array[0]
+      array.append(1)
+    }
+  }
+}
+
+extension Optional {
+  mutating func mutate() async {}
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ProtectDictionary {
+  var dict: [Int: Int] = [:]
+
+  func invalid() async {
+    await dict[0].mutate()
+    // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in Swift 6}}
+    // expected-targeted-complete-warning@-2 {{passing argument of non-sendable type 'inout Optional<Int>' outside of actor-isolated context may introduce data races}}
   }
 }

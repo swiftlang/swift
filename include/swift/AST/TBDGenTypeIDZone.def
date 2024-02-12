@@ -20,7 +20,7 @@ SWIFT_REQUEST(TBDGen, PublicSymbolsRequest,
               std::vector<std::string>(TBDGenDescriptor),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TBDGen, SymbolSourceMapRequest,
-              SymbolSourceMap(TBDGenDescriptor),
+              const SymbolSourceMap *(TBDGenDescriptor),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TBDGen, APIGenRequest, apigen::API(TBDGenDescriptor), Uncached,
               NoLocationInfo)

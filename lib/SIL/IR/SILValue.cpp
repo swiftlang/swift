@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
@@ -106,13 +107,13 @@ SILInstruction *ValueBase::getNextInstruction() {
   return nullptr;
 }
 
-Optional<ValueBase::DefiningInstructionResult>
+llvm::Optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return DefiningInstructionResult{inst, 0};
   if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
     return DefiningInstructionResult{result->getParent(), result->getIndex()};
-  return None;
+  return llvm::None;
 }
 
 bool SILPhiArgument::isLexical() const {
@@ -152,6 +153,42 @@ bool ValueBase::isLexical() const {
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
   return false;
+}
+
+namespace swift::test {
+// Arguments:
+// - value
+// Dumps:
+// - value
+// - whether it's lexical
+static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
+                                                   auto &arguments,
+                                                   auto &test) {
+  auto value = arguments.takeValue();
+  auto isLexical = value->isLexical();
+  value->print(llvm::outs());
+  auto *boolString = isLexical ? "true" : "false";
+  llvm::outs() << boolString << "\n";
+});
+} // end namespace swift::test
+
+bool ValueBase::isGuaranteedForwarding() const {
+  if (getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
+  // terminator results.
+  if (canOpcodeForwardInnerGuaranteedValues(this) ||
+      isa<SILFunctionArgument>(this)) {
+    return true;
+  }
+  // If not a phi, return false
+  auto *phi = dyn_cast<SILPhiArgument>(this);
+  if (!phi || !phi->isPhi()) {
+    return false;
+  }
+
+  return phi->isGuaranteedForwarding();
 }
 
 bool ValueBase::hasDebugTrace() const {
@@ -250,13 +287,17 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 
   switch (Convention) {
-  case SILArgumentConvention::Indirect_In:
-    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
-                                                    : OwnershipKind::Owned;
-    break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
-    value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
-                                                    : OwnershipKind::Guaranteed;
+    value = moduleConventions.isTypeIndirectForIndirectParamConvention(
+                Type.getASTType())
+                ? OwnershipKind::None
+                : OwnershipKind::Guaranteed;
+    break;
+  case SILArgumentConvention::Indirect_In:
+    value = moduleConventions.isTypeIndirectForIndirectParamConvention(
+                Type.getASTType())
+                ? OwnershipKind::None
+                : OwnershipKind::Owned;
     break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
@@ -290,12 +331,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S)
     : value(OwnershipKind::Any) {
-  auto Result = llvm::StringSwitch<Optional<OwnershipKind::innerty>>(S)
+  auto Result = llvm::StringSwitch<llvm::Optional<OwnershipKind::innerty>>(S)
                     .Case("unowned", OwnershipKind::Unowned)
                     .Case("owned", OwnershipKind::Owned)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
-                    .Default(None);
+                    .Default(llvm::None);
   if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
   value = Result.value();
@@ -431,6 +472,10 @@ void Operand::print(llvm::raw_ostream &os) const {
      << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
      << '\n'
      << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
+SILFunction *Operand::getFunction() const {
+  return getUser()->getFunction();
 }
 
 //===----------------------------------------------------------------------===//

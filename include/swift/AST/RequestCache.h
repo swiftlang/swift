@@ -259,12 +259,11 @@ public:
   }
 
   template <typename Request>
-  void insert(Request req, typename Request::OutputType val) {
+  bool insert(Request req, typename Request::OutputType val) {
     auto *cache = getCache<Request>();
     auto result = cache->insert({RequestKey<Request>(std::move(req)),
-                                 std::move(val)});
-    assert(result.second && "Request result was already cached");
-    (void) result;
+                                std::move(val)});
+    return result.second;
   }
 
   template <typename Request>

@@ -23,9 +23,9 @@ namespace ide {
 class ExprTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 public:
   struct Result {
-    /// If the code completion expression is an implicit return in a
+    /// If the code completion expression is an implied result, e.g in a
     /// single-expression closure.
-    bool IsImplicitSingleExpressionReturn;
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
@@ -75,7 +75,7 @@ private:
   /// If \c AddUnresolvedMemberCompletions is false, the
   /// \p UnresolvedMemberBaseType is ignored.
   void addResult(
-      bool IsImplicitSingleExpressionReturn, bool IsInAsyncContext,
+      bool IsImpliedResult, bool IsInAsyncContext,
       Type UnresolvedMemberBaseType,
       llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes);
 
@@ -90,9 +90,8 @@ public:
         AddUnresolvedMemberCompletions(AddUnresolvedMemberCompletions) {}
 
   /// \param CCLoc The location of the code completion token.
-  void deliverResults(SourceLoc CCLoc,
-                      ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(SourceLoc CCLoc,
+                      ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

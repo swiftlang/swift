@@ -1,3 +1,6 @@
+// rdar://108082630 this test is flaky in ASAN bot
+// UNSUPPORTED: asan
+
 // RUN: %sourcekitd-test -req=sema %s -- %s | %FileCheck %s -check-prefix=NONE
 // RUN: %sourcekitd-test -req=track-compiles == -req=version | %FileCheck %s -check-prefix=NONE
 // RUN: %sourcekitd-test -req=track-compiles -req-opts=value=0 \

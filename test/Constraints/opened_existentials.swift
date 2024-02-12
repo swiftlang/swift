@@ -1,9 +1,13 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol Q { }
 
 protocol P {
   associatedtype A: Q
+}
+
+protocol P1<A> {
+  associatedtype A
 }
 
 extension Int: P {
@@ -228,6 +232,7 @@ func testTakeValueAndClosure(p: any P) {
 protocol B {
   associatedtype C: P where C.A == Double
   associatedtype D: P
+  associatedtype E: P1 where E.A == Double
 }
 
 protocol D {
@@ -242,34 +247,36 @@ extension B {
 
 func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   func getC<T: B>(_: T) -> T.C { fatalError() }
+  func getE<T: B>(_: T) -> T.E { fatalError() }
   func getTuple<T: B>(_: T) -> (T, T.C) { fatalError() }
   func getNoError<T: B>(_: T) -> T.C.A { fatalError() }
   func getComplex<T: B>(_: T) -> ([(x: (a: T.C, b: Int), y: Int)], [Int: T.C]) { fatalError() }
 
   func overloaded<T: B>(_: T) -> (x: Int, y: T.C) { fatalError() }
   func overloaded<T: P>(_: T) -> Int { 42 }
-  // expected-note@-1 {{candidate requires that 'any B' conform to 'P' (requirement specified as 'T' : 'P')}}
 
-  _ = getC(v) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{14-14=as any P}}
+  _ = getC(v) // Ok
   _ = getC(v) as any P // Ok
-
-  _ = getTuple(v) // expected-error {{inferred result type '(any B, any P)' requires explicit coercion due to loss of generic requirements}} {{18-18=as (any B, any P)}}
+  
+  _ = getE(v) // Ok
+  _ = getE(v) as any P1<Double> // Ok
+  
+  _ = getTuple(v) // Ok
   _ = getTuple(v) as (any B, any P) // Ok
+  // Ok because T.C.A == Double
+  _ = getNoError(v)
 
-  _ = getNoError(v) // Ok because T.C.A == Double
-
-  _ = getComplex(v) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{20-20=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  _ = getComplex(v) // Ok
   _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
 
-  _ = overloaded(v) // expected-error {{no exact matches in call to local function 'overloaded'}}
-  // expected-note@-1 {{inferred result type '(x: Int, y: any P)' requires explicit coercion due to loss of generic requirements}} {{20-20=as (x: Int, y: any P)}}
+  _ = overloaded(v) // Ok
 
   func acceptsAny<T>(_: T) {}
 
-  acceptsAny(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{21-21=as any P}}
+  acceptsAny(getC(v)) // Ok
   acceptsAny(getC(v) as any P) // Ok
 
-  acceptsAny(getComplex(v)) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{27-27=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
+  acceptsAny(getComplex(v)) // Ok
   acceptsAny(getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]))
 
   func getAssocNoRequirements<T: B>(_: T) -> (Int, [T.D]) { fatalError() }
@@ -277,31 +284,135 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   _ = getAssocNoRequirements(v) // Ok, `D` doesn't have any requirements
 
   // Test existential opening from protocol extension access
-  _ = v.getC() // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{13-13=as any P}}
+  _ = v.getC() // Ok
   _ = v.getC() as any P // Ok
 
-  _ = v.testVar // expected-error {{inferred result type '(Int, [any P])' requires explicit coercion due to loss of generic requirements}} {{16-16=as (Int, [any P])}}
+  _ = v.testVar // Ok
   _ = v.testVar as (Int, [any P])
 
-  func getE<T: D>(_: T) -> T.E { fatalError() }
+  func getF<T: D>(_: T) -> T.E { fatalError() }
 
-  _ = getE(otherV) // Ok `E` doesn't have a `where` clause
+  _ = getF(otherV) // Ok `E` doesn't have a `where` clause
 
   func getSelf<T: B>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
   func getSelf<T: D>(_: T) -> T { fatalError() } // expected-note {{found this candidate}}
 
-  _ = getSelf(v) // expected-error {{inferred result type 'any B' requires explicit coercion due to loss of generic requirements}} {{17-17=as any B}}
+  _ = getSelf(v) // Ok
   _ = getSelf(v) as any B // Ok
   _ = getSelf(otherV) as any B & D // expected-error {{ambiguous use of 'getSelf'}}
 
   func getBDSelf<T: D>(_: T) -> T { fatalError() }
-  _ = getBDSelf(otherV) // expected-error {{inferred result type 'any B & D' requires explicit coercion due to loss of generic requirements}} {{24-24=as any B & D}}
+  _ = getBDSelf(otherV) // Ok
   _ = getBDSelf(otherV) as any B & D // Ok
 
   func getP<T: P>(_: T) {}
-  getP(getC(v)) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}} {{8-8=(}} {{15-15=as any P)}}
-  getP(v.getC()) // expected-error {{inferred result type 'any P' requires explicit coercion due to loss of generic requirements}}  {{8-8=(}} {{14-14=as any P)}}
+  getP(getC(v)) // Ok
+  getP(v.getC()) // Ok
 
   getP((getC(v) as any P))   // Ok - parens avoid opening suppression
   getP((v.getC() as any P))  // Ok - parens avoid opening suppression
+}
+
+class C1 {}
+class C2<T>: C1 {}
+
+// Test Associated Types
+protocol P2 {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P2) {
+  let _ = p.returnAssocTypeB()  // returns C1
+}
+
+protocol Q2 : P2 where A == Int {}
+
+do {
+  let q: any Q2
+  let _ = q.returnAssocTypeB() // returns C1
+}
+
+// Test Primary Associated Types
+protocol P3<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P3<Int>) {
+  let _ = p.returnAssocTypeB() // returns C2<A>
+}
+
+func testAssocReturn(p: any P3<any P3<String>>) {
+  let _ = p.returnAssocTypeB()
+}
+
+protocol P4<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnPrimaryAssocTypeA() -> A
+  func returnAssocTypeCollection() -> any Collection<A>
+}
+
+ //Confirm there is no way to access Primary Associated Type directly
+func testPrimaryAssocReturn(p: any P4<Int>) {
+  let _ = p.returnPrimaryAssocTypeA()
+}
+
+func testPrimaryAssocCollection(p: any P4<Float>) {
+  let _: any Collection<Float> = p.returnAssocTypeCollection()
+}
+
+protocol P5<X> {
+  associatedtype X = Void
+}
+
+struct K<T>: P5 {
+  typealias X = T
+}
+
+extension P5 {
+  @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+  func foo() -> some P5<X>{
+    K<X>()
+  }
+  func bar(_ handler: @escaping (X) -> Void) -> some P5<X> {
+    K<X>()
+  }
+}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+func testFoo(_ p: any P5<String>) -> any P5 {
+  p.foo()
+}
+
+func testFooGeneric<U>(_ p: any P5<Result<U, Error>>) -> any P5 {
+  p.foo()
+}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+func testBar<U>(_ p: any P5<Result<U, Error>>) -> any P5 {
+  p.bar { _ in }
+}
+
+enum Node<T> {
+  case e(any P5)
+  case f(any P5<Result<T, Error>>)
+}
+
+struct S<T, U> {
+  @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+  func foo(_ elt: Node<U>) -> Node<T>? {
+    switch elt {
+    case let .e(p):
+      return .e(p)
+    case let .f(p):
+      return .e(p.bar { _ in })
+    }
+  }
 }

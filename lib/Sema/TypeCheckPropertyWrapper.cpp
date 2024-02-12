@@ -38,7 +38,9 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    nominal->lookupQualified(nominal, DeclNameRef(name), NL_QualifiedDefault,
+    nominal->lookupQualified(nominal, DeclNameRef(name),
+                             nominal->getStartLoc(),
+                             NL_QualifiedDefault,
                              decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
@@ -80,8 +82,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   VarDecl *var = vars.front();
   if (isDeclNotAsAccessibleAsParent(var, nominal)) {
     var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
-                  var->getFormalAccess(), var->getDescriptiveKind(),
-                  var->getName(), nominal->getDeclaredType(),
+                  var->getFormalAccess(), var, nominal->getDeclaredType(),
                   nominal->getFormalAccess());
     return nullptr;
   }
@@ -94,9 +95,12 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
         nominal->getName());
     return nullptr;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("variable cannot have erased isolation");
+
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
-  case ActorIsolation::Independent:
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     break;
   }
@@ -230,16 +234,15 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
       case NonViableReason::Inaccessible:
         init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
-                       init->getFormalAccess(), init->getDescriptiveKind(),
-                       init->getName(), nominal->getDeclaredType(),
-                       nominal->getFormalAccess());
+                       init->getFormalAccess(), init,
+                       nominal->getDeclaredType(), nominal->getFormalAccess());
         break;
 
       case NonViableReason::ParameterTypeMismatch:
         init->diagnose(diag::property_wrapper_wrong_initial_value_init,
                        init->getName(), paramType,
                        valueVar->getValueInterfaceType());
-        valueVar->diagnose(diag::decl_declared_here, valueVar->getName());
+        valueVar->diagnose(diag::decl_declared_here, valueVar);
         break;
       }
     }
@@ -261,7 +264,7 @@ static bool enclosingInstanceTypeIsNever(ASTContext &ctx, SubscriptDecl *subscri
   if (param->getArgumentName() != ctx.Id_enclosingInstance)
     return false;
 
-  auto paramTy = param->getType();
+  auto paramTy = param->getTypeInContext();
   auto neverTy = ctx.getNeverType();
   return neverTy->isEqual(paramTy);
 }
@@ -318,8 +321,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
   if (isDeclNotAsAccessibleAsParent(subscript, nominal)) {
     subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                         subscript->getFormalAccess(),
-                        subscript->getDescriptiveKind(),
-                        subscript->getName(), nominal->getDeclaredType(),
+                        subscript, nominal->getDeclaredType(),
                         nominal->getFormalAccess());
     return nullptr;
   }
@@ -348,6 +350,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   SmallVector<ValueDecl *, 2> decls;
   nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
+                           nominal->getStartLoc(),
                            NL_QualifiedDefault, decls);
 
   PropertyWrapperTypeInfo result;
@@ -437,8 +440,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   auto dc = var->getDeclContext();
   llvm::TinyPtrVector<CustomAttr *> result;
 
-  auto attachedAttrs = var->getSemanticAttrs();
-  for (auto attr : attachedAttrs.getAttributes<CustomAttr>()) {
+  for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto *nominal = evaluateOrDefault(
@@ -480,6 +482,9 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    // Note: Getting the semantic attrs here would trigger a request cycle.
+    auto attachedAttrs = var->getAttrs();
+
     // Check for conflicting attributes.
     if (attachedAttrs.hasAttribute<LazyAttr>() ||
         attachedAttrs.hasAttribute<NSCopyingAttr>() ||
@@ -519,8 +524,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else
         whichKind = 2;
-      var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getName(), whichKind, var->getDescriptiveKind())
+      var->diagnose(diag::property_with_wrapper_in_bad_context, var, whichKind)
         .highlight(attr->getRange());
 
       continue;
@@ -600,7 +604,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     using namespace constraints;
     auto dc = var->getInnermostDeclContext();
     ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
-    auto target = SolutionApplicationTarget::forUninitializedWrappedVar(var);
+    auto target = SyntacticElementTarget::forUninitializedWrappedVar(var);
     auto solutions = cs.solve(target, FreeTypeVariableBinding::Disallow);
 
     if (!solutions || !cs.applySolution(solutions->front(), target)) {
@@ -651,7 +655,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 }
 
 Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
-                                    Optional<unsigned> limit) {
+                                    llvm::Optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)

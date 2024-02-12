@@ -22,15 +22,13 @@ class LangOptions;
 
 /// Enumeration describing all of the named features.
 enum class Feature {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
 #include "swift/Basic/Features.def"
 };
 
 constexpr unsigned numFeatures() {
   enum Features {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
 #include "swift/Basic/Features.def"
     NumFeatures
   };
@@ -65,6 +63,10 @@ llvm::Optional<Feature> getExperimentalFeature(llvm::StringRef name);
 /// Get the major language version in which this feature was introduced, or
 /// \c None if it does not have such a version.
 llvm::Optional<unsigned> getFeatureLanguageVersion(Feature feature);
+
+/// Determine whether this feature should be included in the
+/// module interface
+bool includeInModuleInterface(Feature feature);
 
 }
 

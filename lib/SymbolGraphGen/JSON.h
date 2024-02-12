@@ -15,7 +15,7 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_JSON_H
 #define SWIFT_SYMBOLGRAPHGEN_JSON_H
 
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/VersionTuple.h"
 #include "swift/AST/GenericSignature.h"
@@ -46,7 +46,7 @@ void serialize(const swift::GenericTypeParamType *Param, llvm::json::OStream &OS
 void serialize(const ModuleDecl &M, llvm::json::OStream &OS, llvm::Triple Target);
 
 void filterGenericParams(
-    TypeArrayView<GenericTypeParamType> GenericParams,
+    ArrayRef<GenericTypeParamType *> GenericParams,
     SmallVectorImpl<const GenericTypeParamType*> &FilteredParams,
     SubstitutionMap SubMap = {});
 

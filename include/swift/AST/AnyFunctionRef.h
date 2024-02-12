@@ -13,14 +13,16 @@
 #ifndef SWIFT_AST_ANY_FUNCTION_REF_H
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
-#include "swift/Basic/Compiler.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -56,7 +58,7 @@ public:
 
   /// Construct an AnyFunctionRef from a decl context that might be
   /// some sort of function.
-  static Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+  static llvm::Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
     if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
       return AnyFunctionRef(fn);
     }
@@ -65,7 +67,7 @@ public:
       return AnyFunctionRef(ace);
     }
 
-    return None;
+    return llvm::None;
   }
 
   CaptureInfo getCaptureInfo() const {
@@ -92,18 +94,6 @@ public:
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 
-  bool hasSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
-  }
-
-  Expr *getSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
-  }
-
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
@@ -126,6 +116,11 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
         return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+      if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
+        if (CD->hasLifetimeDependentReturn()) {
+          return CD->getResultInterfaceType();
+        }
+      }
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
@@ -150,16 +145,15 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  void setParsedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setParsedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::Parsed);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
       return;
     }
@@ -167,16 +161,15 @@ public:
     llvm_unreachable("autoclosures don't have statement bodies");
   }
 
-  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setTypecheckedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
       return;
     }
@@ -304,8 +297,8 @@ private:
           if (mapIntoContext)
             valueTy = AD->mapTypeIntoContext(valueTy);
           YieldTypeFlags flags(AD->getAccessorKind() == AccessorKind::Modify
-                                 ? ValueOwnership::InOut
-                                 : ValueOwnership::Shared);
+                                 ? ParamSpecifier::InOut
+                                 : ParamSpecifier::LegacyShared);
           buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
           return buffer;
         }

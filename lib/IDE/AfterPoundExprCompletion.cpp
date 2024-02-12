@@ -22,7 +22,6 @@ using namespace swift::constraints;
 using namespace swift::ide;
 
 void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
-  auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   bool IsAsync = isContextAsync(S, DC);
@@ -32,29 +31,33 @@ void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
     return R.ExpectedTy->isEqual(ExpectedTy);
   };
   if (!llvm::any_of(Results, IsEqual)) {
-    bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    Results.push_back({ExpectedTy, SingleExprBody, IsAsync});
+    bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
+    Results.push_back({ExpectedTy, IsImpliedResult, IsAsync});
   }
 }
 
-void AfterPoundExprCompletion::deliverResults(
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+void AfterPoundExprCompletion::collectResults(
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
 
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+
   for (auto &Result : Results) {
-    Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsImplicitSingleExpressionReturn,
+    Lookup.setExpectedTypes({Result.ExpectedTy}, Result.IsImpliedResult,
                             /*expectsNonVoid=*/true);
     Lookup.addPoundAvailable(ParentStmtKind);
-    Lookup.addPoundLiteralCompletions(/*needPound=*/false);
     Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);
-    Lookup.getMacroCompletions(/*needPound=*/false);
+    Lookup.getMacroCompletions(CodeCompletionMacroRole::Expression);
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           /*CanCurrDeclContextHandleAsync=*/false);
 }

@@ -41,9 +41,14 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
   if count > 0 {
     // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
+    let storageType: _ContiguousArrayStorage<Element>.Type
+    #if !$Embedded
+    storageType = getContiguousArrayStorageType(for: Element.self)
+    #else
+    storageType = _ContiguousArrayStorage<Element>.self
+    #endif
     let bufferObject = Builtin.allocWithTailElems_1(
-       getContiguousArrayStorageType(for: Element.self),
-       builtinCount, Element.self)
+       storageType, builtinCount, Element.self)
 
     let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
@@ -94,6 +99,7 @@ func _finalizeUninitializedArray<Element>(
 }
 #endif
 
+@_unavailableInEmbedded
 extension Collection {  
   // Utility method for collections that wish to implement
   // CustomStringConvertible and CustomDebugStringConvertible using a bracketed

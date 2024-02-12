@@ -17,8 +17,9 @@
 #ifndef SWIFT_IRGEN_CALLEMISSION_H
 #define SWIFT_IRGEN_CALLEMISSION_H
 
-#include "Temporary.h"
+#include "Address.h"
 #include "Callee.h"
+#include "Temporary.h"
 
 namespace llvm {
   class CallSite;
@@ -49,6 +50,10 @@ protected:
   /// Temporaries required by the call.
   TemporarySet Temporaries;
 
+  /// Temporaries required by the call that are not mapped to any
+  /// SIL value.
+  SmallVector<StackAddress, 8> RawTempraries;
+
   /// The function we're going to call.
   Callee CurCallee;
 
@@ -72,12 +77,17 @@ protected:
   /// invocation of the call.
   llvm::BasicBlock *invokeUnwindDest = nullptr;
 
+  unsigned IndirectTypedErrorArgIdx = 0;
+
+
   virtual void setFromCallee();
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
   virtual void emitCallToUnmappedExplosion(llvm::CallBase *call,
                                            Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  void setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
+                                   Explosion &out);
   virtual FunctionPointer getCalleeFunctionPointer() = 0;
   llvm::CallBase *emitCallSite();
 
@@ -134,6 +144,15 @@ public:
 
   virtual llvm::Value *getResumeFunctionPointer() = 0;
   virtual llvm::Value *getAsyncContext() = 0;
+
+  void setIndirectTypedErrorResultSlot(llvm::Value *addr) {
+    Args[IndirectTypedErrorArgIdx] = addr;
+  }
+
+  void setIndirectTypedErrorResultSlotArgsIndex(unsigned idx) {
+    assert(idx != 0);
+    IndirectTypedErrorArgIdx = idx;
+  }
 };
 
 std::unique_ptr<CallEmission>

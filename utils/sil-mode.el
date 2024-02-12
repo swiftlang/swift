@@ -130,7 +130,7 @@
    ;; swift declaration as well handled at the top.
    `(,(regexp-opt '("init_enum_data_addr" "unchecked_enum_data"
                     "unchecked_take_enum_data_addr" "inject_enum_addr"
-                    "select_enum" "select_value" "select_enum_addr")
+                    "select_enum" "select_enum_addr")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
@@ -185,6 +185,18 @@
                   'words) . font-lock-keyword-face)
    ;; Debug Info
    `(,(regexp-opt '("loc" "scope" "parent" "inlined_at")
+                  'words) . font-lock-keyword-face)
+   ;; noimplicit copy
+   `(,(regexp-opt '("moveonlywrapper_to_copyable" "moveonlywrapper_to_copyable_addr"
+                    "copyable_to_moveonlywrapper" "copyable_to_moveonlywrapper_addr"
+                    "moveonlywrapper_to_copyable_box")
+                  'words) . font-lock-keyword-face)
+   ;; pack
+   `(,(regexp-opt '("pack_length" "open_pack_element" "pack_element_get" "pack_element_set"
+                    "alloc_pack" "alloc_pack_metadata"
+                    "tuple_pack_element_addr" "tuple_pack_extract"
+                    "dynamic_pack_index" "pack_pack_index" "scalar_pack_index"
+                    "dealloc_pack" "dealloc_pack_metadata")
                   'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)

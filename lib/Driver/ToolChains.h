@@ -53,13 +53,22 @@ protected:
       const llvm::opt::ArgList &inputArgs,
       llvm::opt::ArgStringList &arguments) const override;
 
+  void addPlatformSpecificPluginFrontendArgs(
+      const OutputInfo &OI,
+      const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
-    
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
+
   void validateArguments(DiagnosticEngine &diags,
                          const llvm::opt::ArgList &args,
                          StringRef defaultTarget) const override;
@@ -73,26 +82,26 @@ protected:
   std::string getGlobalDebugPathRemapping() const override;
   
   /// Retrieve the target SDK version for the given target triple.
-  Optional<llvm::VersionTuple>
-  getTargetSDKVersion(const llvm::Triple &triple) const ;
+  llvm::Optional<llvm::VersionTuple>
+  getTargetSDKVersion(const llvm::Triple &triple) const;
 
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
   /// when there will be a linker job.
-  mutable Optional<clang::DarwinSDKInfo> SDKInfo;
+  mutable llvm::Optional<clang::DarwinSDKInfo> SDKInfo;
 
-  const Optional<llvm::Triple> TargetVariant;
+  const llvm::Optional<llvm::Triple> TargetVariant;
 
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple,
-         const Optional<llvm::Triple> &TargetVariant) :
-      ToolChain(D, Triple), TargetVariant(TargetVariant) {}
+         const llvm::Optional<llvm::Triple> &TargetVariant)
+      : ToolChain(D, Triple), TargetVariant(TargetVariant) {}
 
   ~Darwin() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
-  
-  Optional<llvm::Triple> getTargetVariant() const {
+
+  llvm::Optional<llvm::Triple> getTargetVariant() const {
     return TargetVariant;
   }
 };
@@ -107,8 +116,12 @@ protected:
 public:
   Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Windows() = default;
+
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
@@ -162,6 +175,9 @@ public:
   ~GenericUnix() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {

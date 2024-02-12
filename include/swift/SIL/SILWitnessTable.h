@@ -238,12 +238,8 @@ public:
   /// Return the protocol for which this witness table is a conformance.
   ProtocolDecl *getProtocol() const;
 
-  /// Return the formal type which conforms to the protocol.
-  ///
-  /// Note that this will not be a substituted type: it may only be meaningful
-  /// in the abstract context of the conformance rather than the context of any
-  /// particular use of it.
-  CanType getConformingType() const;
+  /// Return the nominal type declaration which conforms to the protocol.
+  NominalTypeDecl *getConformingNominal() const;
 
   /// Return the symbol name of the witness table that will be propagated to the
   /// object file level.

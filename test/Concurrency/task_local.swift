@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -emit-sil -verify -o /dev/null %s
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -emit-sil -verify -o /dev/null %s
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @available(SwiftStdlib 5.1, *)
 struct TL {

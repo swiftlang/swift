@@ -218,10 +218,12 @@ void LoopRegionFunctionInfo::verify() {
 
       // If R and OtherR are blocks, then OtherR should be a successor of the
       // real block.
-      if (R->isBlock() && OtherR->isBlock())
-        assert(R->getBlock()->isSuccessorBlock(OtherR->getBlock()) &&
+      if (R->isBlock() && OtherR->isBlock()) {
+        auto succs = R->getBlock()->getSuccessors();
+        assert(std::find(succs.begin(), succs.end(), OtherR->getBlock()) != succs.end() &&
                "Expected either R was not a block or OtherR was a CFG level "
                "successor of R.");
+      }
     }
   }
 #endif
@@ -1027,7 +1029,7 @@ struct alledge_iterator {
     return copy;
   }
 
-  bool operator==(alledge_iterator rhs) {
+  bool operator==(alledge_iterator rhs) const {
     if (Wrapper->Region != rhs.Wrapper->Region)
       return false;
     if (SubregionIter != rhs.SubregionIter)
@@ -1039,7 +1041,7 @@ struct alledge_iterator {
     return BackedgeIter == rhs.BackedgeIter;
   }
 
-  bool operator!=(alledge_iterator rhs) { return !(*this == rhs); }
+  bool operator!=(alledge_iterator rhs) const { return !(*this == rhs); }
 };
 
 } // end anonymous namespace

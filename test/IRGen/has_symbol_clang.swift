@@ -11,5 +11,5 @@ public func testClangDecls() {
 }
 
 // --- clangFunc(_:) ---
-// CHECK: define linkonce_odr hidden i1 @"$sSo9clangFuncyys5Int32VFTwS"() #1 {
-// CHECK:   ret i1 icmp ne (void (i32)* @clangFunc, void (i32)* null)
+// CHECK: define linkonce_odr hidden i1 @"$sSo9clangFuncyys5Int32VFTwS"() #1{{( comdat)?}} {
+// CHECK:   ret i1 icmp ne (ptr @clangFunc, ptr null)

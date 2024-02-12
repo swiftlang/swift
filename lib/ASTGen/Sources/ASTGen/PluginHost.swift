@@ -10,29 +10,104 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CASTBridging
-import CBasicBridging
+import ASTBridging
+import BasicBridging
+import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
+import swiftLLVMJSON
 
-struct PluginError: Error {}
+enum PluginError: String, Error, CustomStringConvertible {
+  case stalePlugin = "plugin is stale"
+  case failedToSendMessage = "failed to send request to plugin"
+  case failedToReceiveMessage = "failed to receive result from plugin"
+  case invalidReponseKind = "plugin returned invalid result"
+
+  var description: String { rawValue }
+}
 
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
-  opaqueHandle: UnsafeMutableRawPointer
-) {
+  opaqueHandle: UnsafeMutableRawPointer,
+  cxxDiagnosticEngine: UnsafeMutableRawPointer?
+) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
-  plugin.initialize()
+
+  do {
+    try plugin.initialize()
+    return true
+  } catch {
+    // Don't care the actual error. Probably the plugin is completely broken.
+    // The failure is diagnosed in the caller.
+    return false
+  }
 }
 
 @_cdecl("swift_ASTGen_deinitializePlugin")
 public func _deinitializePlugin(
   opaqueHandle: UnsafeMutableRawPointer
 ) {
-  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
   plugin.deinitialize()
 }
 
+/// Load the library plugin in the plugin server.
+/// This should be called inside lock.
+@_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
+func swift_ASTGen_pluginServerLoadLibraryPlugin(
+  opaqueHandle: UnsafeMutableRawPointer,
+  libraryPath: UnsafePointer<CChar>,
+  moduleName: UnsafePointer<CChar>,
+  errorOut: UnsafeMutablePointer<BridgedStringRef>?
+) -> Bool {
+  let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
+
+  if plugin.capability?.features.contains(.loadPluginLibrary) != true {
+    errorOut?.pointee = allocateBridgedString("compiler plugin not loaded: '\(libraryPath); invalid plugin server")
+    return false
+  }
+  assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
+  let libraryPath = String(cString: libraryPath)
+  let moduleName = String(cString: moduleName)
+
+  do {
+    let result = try plugin.sendMessageAndWaitWithoutLock(
+      .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
+    )
+    guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
+      throw PluginError.invalidReponseKind
+    }
+    if loaded {
+      assert(diagnostics.isEmpty)
+      return true
+    }
+    let errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
+    errorOut?.pointee = allocateBridgedString(errorMsgs);
+    return false
+  } catch {
+    errorOut?.pointee = allocateBridgedString("\(error)")
+    return false
+  }
+}
+
 struct CompilerPlugin {
+  struct Capability {
+    enum Feature: String {
+      case loadPluginLibrary = "load-plugin-library"
+    }
+
+    var protocolVersion: Int
+    var features: Set<Feature>
+
+    init(_ message: PluginMessage.PluginCapability) {
+      self.protocolVersion = message.protocolVersion
+      if let features = message.features {
+        self.features = Set(features.compactMap(Feature.init(rawValue:)))
+      } else {
+        self.features = []
+      }
+    }
+  }
+
   let opaqueHandle: UnsafeMutableRawPointer
 
   private func withLock<R>(_ body: () throws -> R) rethrows -> R {
@@ -43,85 +118,101 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-//      // FIXME: Add -dump-plugin-message option?
-//      data.withMemoryRebound(to: UInt8.self) { buffer in
-//        print(">> " + String(decoding: buffer, as: UTF8.self))
-//      }
-      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
+      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, count: data.count))
     }
     if hadError {
-      throw PluginError()
+      throw PluginError.failedToSendMessage
     }
   }
 
   private func waitForNextMessage() throws -> PluginToHostMessage {
-    var result: BridgedData = BridgedData()
+    var result = BridgedData()
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
-    defer { BridgedData_free(result) }
+    defer { result.free() }
     guard !hadError else {
-      throw PluginError()
+      throw PluginError.failedToReceiveMessage
     }
-    let data = UnsafeBufferPointer(start: result.baseAddress, count: result.size)
-//    // FIXME: Add -dump-plugin-message option?
-//    data.withMemoryRebound(to: UInt8.self) { buffer in
-//      print("<< " + String(decoding: buffer, as: UTF8.self))
-//    }
+    let data = UnsafeBufferPointer(start: result.baseAddress, count: result.count)
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
+  }
+
+  func sendMessageAndWaitWithoutLock(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
+    try sendMessage(message)
+    return try waitForNextMessage()
   }
 
   func sendMessageAndWait(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
     try self.withLock {
-      try sendMessage(message)
-      return try waitForNextMessage()
+      guard !Plugin_spawnIfNeeded(opaqueHandle) else {
+        throw PluginError.stalePlugin
+      }
+      return try sendMessageAndWaitWithoutLock(message);
     }
   }
 
-  func initialize() {
-    self.withLock {
-      // Get capability.
-      let response: PluginToHostMessage
-      do {
-        try self.sendMessage(.getCapability)
-        response = try self.waitForNextMessage()
-      } catch {
-        assertionFailure(String(describing: error))
-        return
-      }
-      switch response {
-      case .getCapabilityResult(capability: let capability):
-        let ptr = UnsafeMutablePointer<PluginMessage.PluginCapability>.allocate(capacity: 1)
-        ptr.initialize(to: capability)
-        Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
-      default:
-        assertionFailure("invalid response")
-      }
+  /// Initialize the plugin. This should be called inside lock.
+  func initialize() throws {
+    // Send host capability and get plugin capability.
+    let hostCapability = PluginMessage.HostCapability(
+      protocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER
+    )
+    let request = HostToPluginMessage.getCapability(capability: hostCapability)
+    let response = try self.sendMessageAndWaitWithoutLock(request)
+    guard case .getCapabilityResult(let capability) = response else {
+      throw PluginError.invalidReponseKind
+    }
+
+    deinitializePluginCapabilityIfExist()
+
+    let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+    ptr.initialize(to: .init(capability))
+    Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
+  }
+
+  /// Deinitialize and unset the plugin capability stored in C++
+  /// 'LoadedExecutablePlugin'. This should be called inside lock.
+  func deinitializePluginCapabilityIfExist() {
+    if let ptr = Plugin_getCapability(opaqueHandle) {
+      let capabilityPtr = UnsafeMutableRawPointer(mutating: ptr)
+        .assumingMemoryBound(to: PluginMessage.PluginCapability.self)
+      capabilityPtr.deinitialize(count: 1)
+      capabilityPtr.deallocate()
+      Plugin_setCapability(opaqueHandle, nil)
     }
   }
+
   func deinitialize() {
     self.withLock {
-      if let ptr = Plugin_getCapability(opaqueHandle) {
-        let capabilityPtr = UnsafeMutableRawPointer(mutating: ptr)
-          .assumingMemoryBound(to: PluginMessage.PluginCapability.self)
-        capabilityPtr.deinitialize(count: 1)
-        capabilityPtr.deallocate()
-      }
+      deinitializePluginCapabilityIfExist()
     }
   }
 
-  var capability: PluginMessage.PluginCapability {
+  var capability: Capability? {
     if let ptr = Plugin_getCapability(opaqueHandle) {
-      return ptr.assumingMemoryBound(to: PluginMessage.PluginCapability.self).pointee
+      return ptr.assumingMemoryBound(to: Capability.self).pointee
     }
-    return PluginMessage.PluginCapability(protocolVersion: 0)
+    return nil
+  }
+
+  var executableFilePath: String {
+    return String(cString: Plugin_getExecutableFilePath(opaqueHandle))
   }
 }
 
 class PluginDiagnosticsEngine {
-  private let cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+  private let bridgedDiagEngine: BridgedDiagnosticEngine
   private var exportedSourceFileByName: [String: UnsafePointer<ExportedSourceFile>] = [:]
 
-  init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
-    self.cxxDiagnosticEngine = cxxDiagnosticEngine
+  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
+    self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
+  }
+
+  /// Failable convenience initializer for optional cxx engine pointer.
+  convenience init?(cxxDiagnosticEngine: UnsafeMutableRawPointer?) {
+    guard let cxxDiagnosticEngine = cxxDiagnosticEngine else {
+      return nil
+    }
+    self.init(cxxDiagnosticEngine: cxxDiagnosticEngine)
   }
 
   /// Register an 'ExportedSourceFile' to the engine. So the engine can get
@@ -142,7 +233,8 @@ class PluginDiagnosticsEngine {
       message: diagnostic.message + (messageSuffix ?? ""),
       severity: diagnostic.severity,
       position: diagnostic.position,
-      highlights: diagnostic.highlights)
+      highlights: diagnostic.highlights
+    )
 
     // Emit Fix-Its.
     for fixIt in diagnostic.fixIts {
@@ -150,7 +242,8 @@ class PluginDiagnosticsEngine {
         message: fixIt.message,
         severity: .note,
         position: diagnostic.position,
-        fixItChanges: fixIt.changes)
+        fixItChanges: fixIt.changes
+      )
     }
 
     // Emit any notes as follow-ons.
@@ -158,7 +251,8 @@ class PluginDiagnosticsEngine {
       emitSingle(
         message: note.message,
         severity: .note,
-        position: note.position)
+        position: note.position
+      )
     }
   }
   /// Emit single C++ diagnostic.
@@ -175,77 +269,105 @@ class PluginDiagnosticsEngine {
     case .error: bridgedSeverity = .error
     case .note: bridgedSeverity = .note
     case .warning: bridgedSeverity = .warning
+    case .remark: bridgedSeverity = .remark
+    @unknown default: bridgedSeverity = .error
     }
 
     // Emit the diagnostic
     var mutableMessage = message
-    let diag = mutableMessage.withUTF8 { messageBuffer in
-      SwiftDiagnostic_create(
-        cxxDiagnosticEngine, bridgedSeverity,
-        cxxSourceLocation(at: position),
-        messageBuffer.baseAddress, messageBuffer.count)
+    let diag = mutableMessage.withBridgedString { bridgedMessage in
+      BridgedDiagnostic(
+        at: bridgedSourceLoc(at: position),
+        message: bridgedMessage,
+        severity: bridgedSeverity,
+        engine: bridgedDiagEngine
+      )
     }
 
     // Emit highlights
     for highlight in highlights {
-      guard let (startLoc, endLoc) = cxxSourceRange(for: highlight) else {
+      guard let (startLoc, endLoc) = bridgedSourceRange(for: highlight) else {
         continue
       }
-      SwiftDiagnostic_highlight(diag, startLoc, endLoc)
+      diag.highlight(start: startLoc, end: endLoc)
     }
 
     // Emit changes for a Fix-It.
     for change in fixItChanges {
-      guard let (startLoc, endLoc) = cxxSourceRange(for: change.range) else {
+      guard let (startLoc, endLoc) = bridgedSourceRange(for: change.range) else {
         continue
       }
       var newText = change.newText
-      newText.withUTF8 { textBuffer in
-        SwiftDiagnostic_fixItReplace(
-          diag, startLoc, endLoc, textBuffer.baseAddress, textBuffer.count)
+      newText.withBridgedString { bridgedFixItText in
+        diag.fixItReplace(
+          start: startLoc,
+          end: endLoc,
+          replacement: bridgedFixItText
+        )
       }
     }
 
-    SwiftDiagnostic_finish(diag)
+    diag.finish()
+  }
+
+  /// Emit diagnostics.
+  func emit(
+    _ diagnostics: [PluginMessage.Diagnostic],
+    messageSuffix: String? = nil
+  ) {
+    for diagnostic in diagnostics {
+      self.emit(diagnostic)
+    }
+  }
+
+  func diagnose(error: Error) {
+    self.emitSingle(
+      message: String(describing: error),
+      severity: .error,
+      position: .invalid
+    )
+  }
+
+  func diagnose(message: String, severity: PluginMessage.Diagnostic.Severity) {
+    self.emitSingle(message: message, severity: severity, position: .invalid)
   }
 
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
-  private func cxxSourceLocation(
-    at offset: Int, in fileName: String
-  ) -> CxxSourceLoc? {
+  private func bridgedSourceLoc(
+    at offset: Int,
+    in fileName: String
+  ) -> BridgedSourceLoc {
     // Find the corresponding exported source file.
-    guard let exportedSourceFile = exportedSourceFileByName[fileName]
-    else {
+    guard let exportedSourceFile = exportedSourceFileByName[fileName] else {
       return nil
     }
 
     // Compute the resulting address.
-    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
-    else {
+    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
-    return bufferBaseAddress.advanced(by: offset)
+    return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.
-  private func cxxSourceLocation(
+  private func bridgedSourceLoc(
     at position: PluginMessage.Diagnostic.Position
-  ) -> CxxSourceLoc? {
-    cxxSourceLocation(at: position.offset, in: position.fileName)
+  ) -> BridgedSourceLoc {
+    return bridgedSourceLoc(at: position.offset, in: position.fileName)
   }
 
   /// C++ source range from a range value from a plugin.
-  private func cxxSourceRange(
+  private func bridgedSourceRange(
     for range: PluginMessage.Diagnostic.PositionRange
-  ) -> (start: CxxSourceLoc, end: CxxSourceLoc)? {
-    guard
-      let start = cxxSourceLocation(at: range.startOffset, in: range.fileName),
-      let end = cxxSourceLocation(at: range.endOffset, in: range.fileName)
-    else {
+  ) -> (start: BridgedSourceLoc, end: BridgedSourceLoc)? {
+    let start = bridgedSourceLoc(at: range.startOffset, in: range.fileName)
+    let end = bridgedSourceLoc(at: range.endOffset, in: range.fileName)
+
+    if !start.isValid || !end.isValid {
       return nil
     }
-    return (start: start, end: end )
+    return (start: start, end: end)
   }
 }
 
@@ -261,14 +383,11 @@ extension PluginMessage.Syntax {
     case syntax.is(AttributeSyntax.self): kind = .attribute
     default: return nil
     }
+
     let source = syntax.description
-
-
-    let sourceStr = String(decoding: sourceFilePtr.pointee.buffer, as: UTF8.self)
     let fileName = sourceFilePtr.pointee.fileName
     let fileID = "\(sourceFilePtr.pointee.moduleName)/\(sourceFilePtr.pointee.fileName.basename)"
-    let converter = SourceLocationConverter(file: fileName, source: sourceStr)
-    let loc = converter.location(for: syntax.position)
+    let loc = sourceFilePtr.pointee.sourceLocationConverter.location(for: syntax.position)
 
     self.init(
       kind: kind,
@@ -277,7 +396,36 @@ extension PluginMessage.Syntax {
         fileID: fileID,
         fileName: fileName,
         offset: loc.offset,
-        line: loc.line!,
-        column: loc.column!))
+        line: loc.line,
+        column: loc.column
+      )
+    )
+  }
+
+  init?(syntax: Syntax) {
+    let kind: PluginMessage.Syntax.Kind
+    switch true {
+    case syntax.is(DeclSyntax.self): kind = .declaration
+    case syntax.is(ExprSyntax.self): kind = .expression
+    case syntax.is(StmtSyntax.self): kind = .statement
+    case syntax.is(TypeSyntax.self): kind = .type
+    case syntax.is(PatternSyntax.self): kind = .pattern
+    case syntax.is(AttributeSyntax.self): kind = .attribute
+    default: return nil
+    }
+
+    let source = syntax.description
+
+    self.init(
+      kind: kind,
+      source: source,
+      location: .init(
+        fileID: "",
+        fileName: "",
+        offset: 0,
+        line: 0,
+        column: 0
+      )
+    )
   }
 }

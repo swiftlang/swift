@@ -195,11 +195,7 @@ extension ArraySlice {
   func _checkSubscript(
     _ index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
-#if _runtime(_ObjC)
     _buffer._checkValidSubscript(index)
-#else
-    _buffer._checkValidSubscript(index)
-#endif
     return _DependenceToken()
   }
 
@@ -264,6 +260,10 @@ extension ArraySlice: _ArrayProtocol {
   public var capacity: Int {
     return _getCapacity()
   }
+
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
 
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
@@ -1071,8 +1071,15 @@ extension ArraySlice: RangeReplaceableCollection {
     if !keepCapacity {
       _buffer = _Buffer()
     }
-    else {
+    else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
+    }
+    else {
+      let buffer = _ContiguousArrayBuffer<Element>(
+        _uninitializedCount: 0,
+        minimumCapacity: capacity
+      )
+      _buffer = _Buffer(_buffer: buffer, shiftedToStartIndex: startIndex)
     }
   }
 
@@ -1130,6 +1137,7 @@ extension ArraySlice: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {

@@ -1,8 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift
-// RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t
+// RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift \
+// RUN:  -enable-library-evolution -swift-version 5
+// RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
+// RUN:  -enable-library-evolution -swift-version 5
 
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t \
+// RUN:  -enable-library-evolution -swift-version 5
 
 import NormalLibrary
 @_implementationOnly import BADLibrary
@@ -117,7 +120,7 @@ extension Array where Element == BadStruct {
   subscript(okay _: Int) -> Int { 0 } // okay
 }
 
-extension Int: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+extension Int: @retroactive BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 struct TestExtensionConformanceOkay {}
 extension TestExtensionConformanceOkay: BadProto {} // okay
 

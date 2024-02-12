@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_in_compiler
 
 /// The convention in this test is that the Swift declaration comes before its FileCheck lines.
 
@@ -89,8 +90,9 @@ distributed actor MyDistActor {
 // CHECK:    [[SYSTEM_ACC:%[0-9]+]] = begin_access [deinit] [static] [[REF_SYS_D2]] : $*FakeActorSystem
 // CHECK:    destroy_addr [[SYSTEM_ACC]] : $*FakeActorSystem
 // CHECK:    end_access [[SYSTEM_ACC]] : $*FakeActorSystem
-// CHECK:    builtin "destroyDefaultActor"([[SELF]] : $MyDistActor) : $()
-// CHECK:    dealloc_partial_ref [[SELF]]
+// CHECK:    [[EI:%.*]] = end_init_let_ref [[SELF]]
+// CHECK:    builtin "destroyDefaultActor"([[EI]] : $MyDistActor) : $()
+// CHECK:    dealloc_partial_ref [[EI]]
 // CHECK:    throw
 
 

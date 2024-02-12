@@ -182,7 +182,9 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
     return attrs.addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   case ValueWitness::GetEnumTagSinglePayload:
-    return attrs.addFnAttribute(ctx, llvm::Attribute::ReadOnly)
+    return attrs
+        .addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                 ctx, llvm::MemoryEffects::readOnly()))
         .addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
@@ -459,6 +461,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                     IGF.getOptions().PointerAuth.ValueWitnesses,
                                         slot, index);
 
+  witness->setName(getValueWitnessName(index));
   return FunctionPointer::createSigned(FunctionPointer::Kind::Function, witness,
                                        authInfo, signature);
 }
@@ -578,8 +581,11 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     // MaximumAlignment.
     byteCount = alignUpToMaximumAlignment(IGM.SizeTy, byteCount);
     auto address = emitTaskAlloc(byteCount, align);
-    return {address, address.getAddress()};
-  // In coroutines, call llvm.coro.alloca.alloc.
+    auto stackAddress = StackAddress{address, address.getAddress()};
+    stackAddress = stackAddress.withAddress(
+        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
+    return stackAddress;
+    // In coroutines, call llvm.coro.alloca.alloc.
   } else if (isCoroutine()) {
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
@@ -603,7 +609,11 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     auto ptr = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_get,
                                            {allocToken});
 
-    return {Address(ptr, IGM.Int8Ty, align), allocToken};
+    auto stackAddress =
+        StackAddress{Address(ptr, IGM.Int8Ty, align), allocToken};
+    stackAddress = stackAddress.withAddress(
+        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
+    return stackAddress;
   }
 
   // Otherwise, use a dynamic alloca.
@@ -840,7 +850,7 @@ getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
       true /*noinline*/);
 
   // This function is readonly.
-  cast<llvm::Function>(func)->addFnAttr(llvm::Attribute::ReadOnly);
+  cast<llvm::Function>(func)->setOnlyReadsMemory();
   return func;
 }
 

@@ -553,8 +553,8 @@ func rdar_48114578() {
   struct S<T> {
     var value: T
 
-    static func valueOf<T>(_ v: T) -> S<T> {
-      return S<T>(value: v)
+    static func valueOf<U>(_ v: U) -> S<U> {
+      return S<U>(value: v)
     }
   }
 
@@ -634,6 +634,7 @@ func rdar_50467583_and_50909555() {
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
     // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-5 * {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
   }
   
   // rdar://problem/50909555

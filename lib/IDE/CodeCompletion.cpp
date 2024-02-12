@@ -103,7 +103,8 @@ std::string swift::ide::removeCodeCompletionTokens(
 
 namespace {
 
-class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
+                                    public DoneParsingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -112,7 +113,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   SourceLoc DotLoc;
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
-  DeclAttrKind AttrKind;
+  CustomSyntaxAttributeKind AttrKind;
 
   /// When the code completion token occurs in a custom attribute, the attribute
   /// it occurs in. Used so we can complete inside the attribute even if it's
@@ -123,24 +124,23 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  IDEInspectionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
+  bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
-  bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
-  bool IsAtStartOfLine = false;
-  Optional<DeclKind> AttTargetDK;
-  Optional<StmtKind> ParentStmtKind;
+  llvm::Optional<DeclKind> AttTargetDK;
+  llvm::Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
   SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
-  Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
+  llvm::Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
     // Figure out the kind of type-check we'll be performing.
@@ -169,7 +169,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
 
       return std::make_pair(*T, ReferencedDecl);
     }
-    return None;
+    return llvm::None;
   }
 
   /// \returns true on success, false on failure.
@@ -233,11 +233,10 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : IDEInspectionCallbacks(P), CompletionContext(CompletionContext),
-        Consumer(Consumer) {
-  }
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-  void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
+  void setAttrTargetDeclKind(llvm::Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
     else if (DK == DeclKind::Param)
@@ -258,11 +257,12 @@ public:
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeForEachInKeyword() override;
-  void completePostfixExpr(Expr *E, bool hasSpace) override;
-  void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
+  void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeDeclResultBeginning() override;
+  void completeTypeBeginning() override;
+  void completeTypeSimpleOrComposition() override;
   void completeTypeSimpleBeginning() override;
   void completeTypeSimpleWithDot(TypeRepr *TR) override;
   void completeTypeSimpleWithoutDot(TypeRepr *TR) override;
@@ -270,10 +270,11 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
-  void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+                             bool HasLabel) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) override;
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -282,19 +283,18 @@ public:
   void completeImportDecl(ImportPath::Builder &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
-  void completeLabeledTrailingClosure(CodeCompletionExpr *E,
-                                      bool isAtStartOfLine) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
 
   bool canPerformCompleteLabeledTrailingClosure() const override {
     return true;
   }
 
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
-                         Optional<unsigned> yieldIndex) override;
+                         llvm::Optional<unsigned> yieldIndex) override;
   void completeAfterPoundExpr(CodeCompletionExpr *E,
-                              Optional<StmtKind> ParentKind) override;
+                              llvm::Optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
   void completeGenericRequirement() override;
@@ -303,12 +303,21 @@ public:
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
   void completeOptionalBinding() override;
+  void completeWithoutConstraintType() override;
 
   void doneParsing(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
-  bool trySolverCompletion(bool MaybeFuncBody);
+
+  void typeCheckWithLookup(TypeCheckCompletionCallback &Lookup,
+                           SourceLoc CompletionLoc);
+  void postfixCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
+  void unresolvedMemberCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
+  void keyPathExprCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
+  void callCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
+  void globalCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
+  void afterPoundCompletion(SourceLoc CompletionLoc, bool MaybeFuncBody);
 };
 } // end anonymous namespace
 
@@ -388,7 +397,8 @@ void CodeCompletionCallbacksImpl::completeForEachInKeyword() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
+void CodeCompletionCallbacksImpl::completePostfixExpr(CodeCompletionExpr *E,
+                                                      bool hasSpace) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
@@ -402,34 +412,9 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
     CompleteExprSelectorContext = ParseExprSelectorContext;
   }
 
-  ParsedExpr = E;
+  ParsedExpr = E->getBase();
+  CodeCompleteTokenExpr = E;
   CurDeclContext = P.CurDeclContext;
-}
-
-void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
-                                                           Expr *CodeCompletionE) {
-  assert(P.Tok.is(tok::code_complete));
-
-  // Don't produce any results in an enum element.
-  if (InEnumElementRawValue)
-    return;
-
-  Kind = CompletionKind::PostfixExprParen;
-  ParsedExpr = E;
-  CurDeclContext = P.CurDeclContext;
-  CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
-
-  ShouldCompleteCallPatternAfterParen = true;
-  if (CompletionContext.getCallPatternHeuristics()) {
-    // Lookahead one token to decide what kind of call completions to provide.
-    // When it appears that there is already code for the call present, just
-    // complete values and/or argument labels.  Otherwise give the entire call
-    // pattern.
-    Token next = P.peekToken();
-    if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
-      ShouldCompleteCallPatternAfterParen = false;
-    }
-  }
 }
 
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
@@ -451,16 +436,27 @@ void CodeCompletionCallbacksImpl::completeTypeDeclResultBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeBeginning() {
+  Kind = CompletionKind::TypeBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeSimpleOrComposition() {
+  Kind = CompletionKind::TypeSimpleOrComposition;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
-                                                        int Index) {
+void CodeCompletionCallbacksImpl::completeDeclAttrParam(
+    CustomSyntaxAttributeKind DK, int Index, bool HasLabel) {
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
+  AttrParamHasLabel = HasLabel;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -484,7 +480,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
-    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
+    CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -549,34 +545,10 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   this->DotLoc = DotLoc;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
-                                                  bool isFirst) {
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::CallArg;
-
-  ShouldCompleteCallPatternAfterParen = false;
-  if (isFirst) {
-    ShouldCompleteCallPatternAfterParen = true;
-    if (CompletionContext.getCallPatternHeuristics()) {
-      // Lookahead one token to decide what kind of call completions to provide.
-      // When it appears that there is already code for the call present, just
-      // complete values and/or argument labels.  Otherwise give the entire call
-      // pattern.
-      Token next = P.peekToken();
-      if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
-        ShouldCompleteCallPatternAfterParen = false;
-      }
-    }
-  }
-}
-
-void CodeCompletionCallbacksImpl::completeLabeledTrailingClosure(
-    CodeCompletionExpr *E, bool isAtStartOfLine) {
-  CurDeclContext = P.CurDeclContext;
-  CodeCompleteTokenExpr = E;
-  Kind = CompletionKind::LabeledTrailingClosure;
-  IsAtStartOfLine = isAtStartOfLine;
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -585,8 +557,14 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
-                                                    Optional<unsigned> index) {
+void CodeCompletionCallbacksImpl::completeThenStmt(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::ThenStmtExpr;
+}
+
+void CodeCompletionCallbacksImpl::completeYieldStmt(
+    CodeCompletionExpr *E, llvm::Optional<unsigned> index) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   // TODO: use a different completion kind when completing without an index
@@ -595,7 +573,7 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
 }
 
 void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
-    CodeCompletionExpr *E, Optional<StmtKind> ParentKind) {
+    CodeCompletionExpr *E, llvm::Optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::AfterPoundExpr;
@@ -661,6 +639,11 @@ void CodeCompletionCallbacksImpl::completeOptionalBinding() {
   Kind = CompletionKind::OptionalBinding;
 }
 
+void CodeCompletionCallbacksImpl::completeWithoutConstraintType() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::WithoutConstraintType;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::TypeAttrBeginning;
@@ -693,7 +676,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
                             bool IsConcurrencyEnabled) {
   auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
-                                 Optional<DeclAttrKind> DAK) -> bool {
+                                 llvm::Optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
     case CodeCompletionKeywordKind::kw_protocol:
     case CodeCompletionKeywordKind::kw_class:
@@ -706,8 +689,9 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     }
     return false;
   };
-  auto isTopLevelOnlyDeclIntroducer = [](CodeCompletionKeywordKind Kind,
-                                         Optional<DeclAttrKind> DAK) -> bool {
+  auto isTopLevelOnlyDeclIntroducer =
+      [](CodeCompletionKeywordKind Kind,
+         llvm::Optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
     case CodeCompletionKeywordKind::kw_operator:
     case CodeCompletionKeywordKind::kw_precedencegroup:
@@ -721,7 +705,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
   };
 
   auto getFlair = [&](CodeCompletionKeywordKind Kind,
-                      Optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
+                      llvm::Optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
     if (isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
       // Type decls are common in library file top-level.
       if (isTypeDeclIntroducer(Kind, DAK))
@@ -766,19 +750,19 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
       // These modifiers are invalid for decls in function body.
       if (DAK) {
         switch (*DAK) {
-        case DeclAttrKind::DAK_Lazy:
-        case DeclAttrKind::DAK_Final:
-        case DeclAttrKind::DAK_Infix:
-        case DeclAttrKind::DAK_Frozen:
-        case DeclAttrKind::DAK_Prefix:
-        case DeclAttrKind::DAK_Postfix:
-        case DeclAttrKind::DAK_Dynamic:
-        case DeclAttrKind::DAK_Override:
-        case DeclAttrKind::DAK_Optional:
-        case DeclAttrKind::DAK_Required:
-        case DeclAttrKind::DAK_Convenience:
-        case DeclAttrKind::DAK_AccessControl:
-        case DeclAttrKind::DAK_Nonisolated:
+        case DeclAttrKind::Lazy:
+        case DeclAttrKind::Final:
+        case DeclAttrKind::Infix:
+        case DeclAttrKind::Frozen:
+        case DeclAttrKind::Prefix:
+        case DeclAttrKind::Postfix:
+        case DeclAttrKind::Dynamic:
+        case DeclAttrKind::Override:
+        case DeclAttrKind::Optional:
+        case DeclAttrKind::Required:
+        case DeclAttrKind::Convenience:
+        case DeclAttrKind::AccessControl:
+        case DeclAttrKind::Nonisolated:
           return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
 
         default:
@@ -786,11 +770,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
         }
       }
     }
-    return None;
+    return llvm::None;
   };
 
   auto AddDeclKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
-                            Optional<DeclAttrKind> DAK) {
+                            llvm::Optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
       // Treat keywords that could be the start of a pattern specially.
       return;
@@ -811,27 +795,27 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 
     // Special case for 'actor'. Get the same flair with 'kw_class'.
     if (Kind == CodeCompletionKeywordKind::None && Name == "actor")
-      flair = getFlair(CodeCompletionKeywordKind::kw_class, None);
+      flair = getFlair(CodeCompletionKeywordKind::kw_class, llvm::None);
 
     addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"", flair);
   };
 
 #define DECL_KEYWORD(kw)                                                       \
-  AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
+  AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, llvm::None);
 #include "swift/AST/TokenKinds.def"
   // Manually add "actor" because it's a contextual keyword.
-  AddDeclKeyword("actor", CodeCompletionKeywordKind::None, None);
+  AddDeclKeyword("actor", CodeCompletionKeywordKind::None, llvm::None);
 
   // Context-sensitive keywords.
   auto AddCSKeyword = [&](StringRef Name, DeclAttrKind Kind) {
     AddDeclKeyword(Name, CodeCompletionKeywordKind::None, Kind);
   };
 
-#define CONTEXTUAL_CASE(KW, CLASS) AddCSKeyword(#KW, DAK_##CLASS);
+#define CONTEXTUAL_CASE(KW, CLASS) AddCSKeyword(#KW, DeclAttrKind::CLASS);
 #define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
-#include <swift/AST/Attr.def>
+#include <swift/AST/DeclAttr.def>
 #undef CONTEXTUAL_CASE
 }
 
@@ -871,11 +855,36 @@ static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
 static void addAccessorKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "get", CodeCompletionKeywordKind::None);
   addKeyword(Sink, "set", CodeCompletionKeywordKind::None);
+  addKeyword(Sink, "init", CodeCompletionKeywordKind::None);
 }
 
 static void addObserverKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "willSet", CodeCompletionKeywordKind::None);
   addKeyword(Sink, "didSet", CodeCompletionKeywordKind::None);
+}
+
+static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *DC) {
+  // `return nil` is not actually represented as a `ReturnExpr` in the AST but
+  // gets translated to a `FailStmt`. We thus can't produce the 'nil' completion
+  // using the solver-based implementation. Add the result manually.
+  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl())) {
+    if (ctor->isFailable()) {
+      Type resultType = ctor->getResultInterfaceType();
+
+      // Note that `TypeContext` must stay alive for the duration of
+      // `~CodeCodeCompletionResultBuilder()`.
+      ExpectedTypeContext TypeContext;
+      TypeContext.setPossibleTypes({resultType});
+
+      CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
+                                          SemanticContextKind::None);
+      Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
+      Builder.addKeyword("nil");
+      Builder.addTypeAnnotation(resultType, {});
+      Builder.setResultTypes(resultType);
+      Builder.setTypeContext(TypeContext, DC);
+    }
+  }
 }
 
 void swift::ide::addExprKeywords(CodeCompletionResultSink &Sink,
@@ -920,10 +929,6 @@ void swift::ide::addSuperKeyword(CodeCompletionResultSink &Sink,
   Builder.addTypeAnnotation(ST, PrintOptions());
 }
 
-static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
-  addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
-}
-
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None);
@@ -961,7 +966,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
-  case CompletionKind::LabeledTrailingClosure:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
   case CompletionKind::PlatformConditon:
@@ -972,6 +976,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtLabel:
   case CompletionKind::TypeAttrBeginning:
   case CompletionKind::OptionalBinding:
+  case CompletionKind::WithoutConstraintType:
     break;
 
   case CompletionKind::EffectsSpecifier:
@@ -1004,18 +1009,28 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addClosureSignatureKeywordsIfApplicable(Sink, CurDeclContext);
 
     LLVM_FALLTHROUGH;
-  case CompletionKind::ReturnStmtExpr:
-  case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
+    // We need to add 'let' and 'var' keywords in expression position here as
+    // we initially parse patterns as expressions.
+    // FIXME: We ought to be able to determine if we're in a pattern context and
+    // only enable 'let' and 'var' in that case.
+    addLetVarKeywords(Sink);
+
+    LLVM_FALLTHROUGH;
+  case CompletionKind::ReturnStmtExpr:
+    addKeywordsAfterReturn(Sink, CurDeclContext);
+    LLVM_FALLTHROUGH;
+  case CompletionKind::ThenStmtExpr:
+  case CompletionKind::YieldStmtExpr:
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink, CurDeclContext);
-    addLetVarKeywords(Sink);
     addExprKeywords(Sink, CurDeclContext);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
+    if (Kind == CompletionKind::ForEachSequence)
+      addKeyword(Sink, "repeat", CodeCompletionKeywordKind::kw_repeat);
     break;
 
   case CompletionKind::CallArg:
-  case CompletionKind::PostfixExprParen:
     // Note that we don't add keywords here as the completion might be for
     // an argument list pattern. We instead add keywords later in
     // CodeCompletionCallbacksImpl::doneParsing when we know we're not
@@ -1044,16 +1059,15 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     }
     break;
 
-  case CompletionKind::TypeDeclResultBeginning: {
-    auto DC = CurDeclContext;
-    if (ParsedDecl && ParsedDecl == CurDeclContext->getAsDecl())
-      DC = ParsedDecl->getDeclContext();
-    if (!isa<ProtocolDecl>(DC))
-      if (DC->isTypeContext() || isa_and_nonnull<FuncDecl>(ParsedDecl))
-        addOpaqueTypeKeyword(Sink);
-
+  case CompletionKind::TypeBeginning:
+    addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
     LLVM_FALLTHROUGH;
-  }
+  case CompletionKind::TypeDeclResultBeginning:
+  case CompletionKind::TypeSimpleOrComposition:
+    addKeyword(Sink, "some", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "any", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "each", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleBeginning:
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
@@ -1130,6 +1144,8 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addSimpleTypedParameter("Int");
     Builder.addRightParen();
   });
+
+#ifndef SWIFT_BUILD_SWIFT_SYNTAX
   addWithName("warning", CodeCompletionKeywordKind::pound_warning,
               [&] (CodeCompletionResultBuilder &Builder) {
     Builder.addLeftParen();
@@ -1146,6 +1162,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addTextChunk("\"");
     Builder.addRightParen();
   });
+#endif
 
   addWithName("if ", CodeCompletionKeywordKind::pound_if,
               [&] (CodeCompletionResultBuilder &Builder) {
@@ -1190,6 +1207,9 @@ static void addPlatformConditions(CodeCompletionResultSink &Sink) {
   });
   addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
     Builder.addTextChunk("simulator");
+  });
+  addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("macCatalyst");
   });
   addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
     Builder.addTextChunk(">=");
@@ -1243,11 +1263,14 @@ void swift::ide::postProcessCompletionResults(
     // names at non-type name position are "rare".
     if (result->getKind() == CodeCompletionResultKind::Declaration &&
         result->getAssociatedDeclKind() == CodeCompletionDeclKind::Protocol &&
+        Kind != CompletionKind::TypeBeginning &&
+        Kind != CompletionKind::TypeSimpleOrComposition &&
         Kind != CompletionKind::TypeSimpleBeginning &&
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
-        Kind != CompletionKind::GenericRequirement) {
+        Kind != CompletionKind::GenericRequirement &&
+        Kind != CompletionKind::WithoutConstraintType) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
       modified = true;
     }
@@ -1273,9 +1296,10 @@ void swift::ide::postProcessCompletionResults(
   }
 }
 
-void swift::ide::deliverCompletionResults(
+void swift::ide::collectCompletionResults(
     CodeCompletionContext &CompletionContext, CompletionLookup &Lookup,
-    DeclContext *DC, CodeCompletionConsumer &Consumer) {
+    DeclContext *DC, const ExpectedTypeContext &TypeContext,
+    bool CanCurrDeclContextHandleAsync) {
   auto &SF = *DC->getParentSourceFile();
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
@@ -1284,9 +1308,7 @@ void swift::ide::deliverCompletionResults(
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
-    SF.getImportedModules(directImport,
-                          {ModuleDecl::ImportFilterKind::Default,
-                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    SF.getImportedModules(directImport, ModuleDecl::getImportFilterLocal());
     for (auto import : directImport)
       explictlyImportedModules.insert(import.importedModule);
 
@@ -1354,11 +1376,10 @@ void swift::ide::deliverCompletionResults(
         std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
-        RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
+        RequestedModules.push_back({std::move(K), TheModule, Request.Filter});
 
         auto TheModuleName = TheModule->getName();
-        if (Request.IncludeModuleQualifier &&
+        if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
             (!Lookup.isHiddenModuleName(TheModuleName) ||
              explictlyImportedModules.contains(TheModule)) &&
             seenModuleNames.insert(TheModuleName).second)
@@ -1373,23 +1394,17 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
+      Lookup.getToplevelCompletions(Request.Filter);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();
-      if (Request.IncludeModuleQualifier &&
+      if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
           seenModuleNames.insert(curModule->getName()).second)
         Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
-      SF.getImportedModules(
-          Imports, {
-                       ModuleDecl::ImportFilterKind::Exported,
-                       ModuleDecl::ImportFilterKind::Default,
-                       ModuleDecl::ImportFilterKind::ImplementationOnly,
-                       ModuleDecl::ImportFilterKind::SPIAccessControl,
-                   });
+      SF.getImportedModules(Imports, ModuleDecl::getImportFilterLocal());
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))
@@ -1404,180 +1419,194 @@ void swift::ide::deliverCompletionResults(
                                CompletionContext.CodeCompletionKind, DC,
                                /*Sink=*/nullptr);
 
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC,
-                                   Lookup.canCurrDeclContextHandleAsync());
+  CompletionContext.addResultsFromModules(RequestedModules, TypeContext, DC,
+                                          CanCurrDeclContextHandleAsync);
 }
 
-bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
-  assert(ParsedExpr || CurDeclContext);
+void CodeCompletionCallbacksImpl::typeCheckWithLookup(
+    TypeCheckCompletionCallback &Lookup, SourceLoc CompletionLoc) {
+  llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+      Context.CompletionCallback, &Lookup);
+  if (AttrWithCompletion) {
+    /// The attribute might not be attached to the AST if there is no var
+    /// decl it could be attached to. Type check it standalone.
 
-  SourceLoc CompletionLoc = ParsedExpr
-                                ? ParsedExpr->getLoc()
-                                : CurDeclContext->getASTContext()
-                                      .SourceMgr.getIDEInspectionTargetLoc();
+    // First try to check it as an attached macro.
+    auto resolvedMacro = evaluateOrDefault(
+        CurDeclContext->getASTContext().evaluator,
+        ResolveMacroRequest{AttrWithCompletion, CurDeclContext},
+        ConcreteDeclRef());
 
-  auto typeCheckWithLookup = [this, &CompletionLoc](
-                                 TypeCheckCompletionCallback &Lookup) {
-    llvm::SaveAndRestore<TypeCheckCompletionCallback*>
-      CompletionCollector(Context.CompletionCallback, &Lookup);
-    if (AttrWithCompletion) {
-      /// The attribute might not be attached to the AST if there is no var decl
-      /// it could be attached to. Type check it standalone.
+    // If that fails, type check as a call to the attribute's type. This is
+    // how, e.g., property wrappers are modelled.
+    if (!resolvedMacro) {
       ASTNode Call = CallExpr::create(
           CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
           AttrWithCompletion->getArgs(), /*implicit=*/true);
       typeCheckContextAt(
           TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
           CompletionLoc);
-    } else {
-      typeCheckContextAt(
-          TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-          CompletionLoc);
     }
+  } else {
+    typeCheckContextAt(
+        TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+        CompletionLoc);
+  }
 
-    // This (hopefully) only happens in cases where the expression isn't
-    // typechecked during normal compilation either (e.g. member completion in a
-    // switch case where there control expression is invalid). Having normal
-    // typechecking still resolve even these cases would be beneficial for
-    // tooling in general though.
-    if (!Lookup.gotCallback()) {
-      if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-        llvm::errs() << "--- Fallback typecheck for code completion ---\n";
-      }
-      Lookup.fallbackTypeCheck(CurDeclContext);
+  // This (hopefully) only happens in cases where the expression isn't
+  // typechecked during normal compilation either (e.g. member completion in a
+  // switch case where there control expression is invalid). Having normal
+  // typechecking still resolve even these cases would be beneficial for
+  // tooling in general though.
+  if (!Lookup.gotCallback()) {
+    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+      llvm::errs() << "--- Fallback typecheck for code completion ---\n";
     }
-  };
-
-  switch (Kind) {
-  case CompletionKind::DotExpr: {
-    assert(CodeCompleteTokenExpr);
-    assert(CurDeclContext);
-
-    PostfixCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext);
-    typeCheckWithLookup(Lookup);
-
-    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-
-    Expr *CheckedBase = CodeCompleteTokenExpr->getBase();
-    Lookup.deliverResults(CheckedBase, CurDeclContext, DotLoc,
-                          isInsideObjCSelector(), CompletionContext, Consumer);
-    return true;
-  }
-  case CompletionKind::UnresolvedMember: {
-    assert(CodeCompleteTokenExpr);
-    assert(CurDeclContext);
-
-    UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                                       CurDeclContext);
-    typeCheckWithLookup(Lookup);
-
-    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
-    return true;
-  }
-  case CompletionKind::KeyPathExprSwift: {
-    assert(CurDeclContext);
-
-    // IDEInspectionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
-    // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
-    auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
-    KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
-    typeCheckWithLookup(Lookup);
-
-    Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
-    return true;
-  }
-  case CompletionKind::CallArg: {
-    assert(CodeCompleteTokenExpr);
-    assert(CurDeclContext);
-    ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                               CurDeclContext);
-    typeCheckWithLookup(Lookup);
-
-    Lookup.deliverResults(ShouldCompleteCallPatternAfterParen, CompletionLoc,
-                          CurDeclContext, CompletionContext, Consumer);
-    return true;
-  }
-  case CompletionKind::AccessorBeginning:
-  case CompletionKind::CaseStmtBeginning:
-  case CompletionKind::ForEachSequence:
-  case CompletionKind::PostfixExprBeginning:
-  case CompletionKind::StmtOrExpr: {
-    assert(CurDeclContext);
-
-    bool AddUnresolvedMemberCompletions =
-        (Kind == CompletionKind::CaseStmtBeginning);
-    ExprTypeCheckCompletionCallback Lookup(
-        CodeCompleteTokenExpr, CurDeclContext, AddUnresolvedMemberCompletions);
-    if (CodeCompleteTokenExpr) {
-      // 'CodeCompletionTokenExpr == nullptr' happens when completing e.g.
-      //   var x: Int {
-      //     get { ... }
-      //     #^COMPLETE^#
-      //   }
-      // In this case we don't want to provide any expression results. We still
-      // need to have a TypeCheckCompletionCallback so we can call
-      // deliverResults on it to deliver the keyword results from the completion
-      // context's result sink to the consumer.
-      typeCheckWithLookup(Lookup);
-    }
-
-    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-
-    SourceLoc CCLoc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    Lookup.deliverResults(CCLoc, CompletionContext, Consumer);
-    return true;
-  }
-  case CompletionKind::AfterPoundExpr: {
-    assert(CodeCompleteTokenExpr);
-    assert(CurDeclContext);
-
-    AfterPoundExprCompletion Lookup(CodeCompleteTokenExpr, CurDeclContext,
-                                    ParentStmtKind);
-    typeCheckWithLookup(Lookup);
-
-    addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
-
-    Lookup.deliverResults(CompletionContext, Consumer);
-    return true;
-  }
-  default:
-    return false;
+    Lookup.fallbackTypeCheck(CurDeclContext);
   }
 }
 
-// Undoes the single-expression closure/function body transformation on the
-// given DeclContext and its parent contexts if they have a single expression
-// body that contains the code completion location.
-//
-// FIXME: Remove this once all expression position completions are migrated
-// to work via TypeCheckCompletionCallback.
-static void undoSingleExpressionReturn(DeclContext *DC) {
-  auto updateBody = [](BraceStmt *BS, ASTContext &Ctx) -> bool {
-    ASTNode LastElem = BS->getLastElement();
-    auto *RS = dyn_cast_or_null<ReturnStmt>(LastElem.dyn_cast<Stmt*>());
+void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
+                                                    bool MaybeFuncBody) {
+  assert(CodeCompleteTokenExpr);
+  assert(CurDeclContext);
 
-    if (!RS || !RS->isImplicit())
-      return false;
+  PostfixCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext);
+  typeCheckWithLookup(Lookup, CompletionLoc);
 
-    BS->setLastElement(RS->getResult());
-    return true;
-  };
+  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-  while (ClosureExpr *CE = dyn_cast_or_null<ClosureExpr>(DC)) {
-    if (CE->hasSingleExpressionBody()) {
-      if (updateBody(CE->getBody(), CE->getASTContext()))
-        CE->setBody(CE->getBody(), false);
+  bool IncludeOperators = (Kind == CompletionKind::PostfixExpr);
+
+  Lookup.collectResults(DotLoc, isInsideObjCSelector(), IncludeOperators,
+                        HasSpace, CompletionContext);
+
+  // Check if we are completing after a call that already has a trailing
+  // closure. In that case, also suggest labels for additional trailing
+  // closures.
+  if (auto AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
+    if (AE->getArgs()->hasAnyTrailingClosures()) {
+      ASTContext &Ctx = CurDeclContext->getASTContext();
+
+      // Modify the call that has the code completion expression as an
+      // additional argument, restore the original arguments afterwards.
+      auto OriginalArgs = AE->getArgs();
+      llvm::SmallVector<Argument> ArgsWithCC(OriginalArgs->begin(),
+                                             OriginalArgs->end());
+      auto CC = new (Ctx) CodeCompletionExpr(CodeCompleteTokenExpr->getLoc());
+      ArgsWithCC.emplace_back(SourceLoc(), Identifier(), CC);
+      auto ArgList =
+          ArgumentList::create(Ctx, OriginalArgs->getLParenLoc(), ArgsWithCC,
+                               OriginalArgs->getRParenLoc(),
+                               OriginalArgs->getFirstTrailingClosureIndex(),
+                               OriginalArgs->isImplicit());
+      AE->setArgs(ArgList);
+      SWIFT_DEFER { AE->setArgs(OriginalArgs); };
+
+      // Perform argument label completions on the newly created call.
+      ArgumentTypeCheckCompletionCallback Lookup(CC, CurDeclContext);
+
+      llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+          Context.CompletionCallback, &Lookup);
+      typeCheckContextAt(TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
+                         CompletionLoc);
+      Lookup.collectResults(/*IsLabeledTrailingClosure=*/true, CompletionLoc,
+                            CurDeclContext, CompletionContext);
     }
-    DC = DC->getParent();
   }
-  if (FuncDecl *FD = dyn_cast_or_null<FuncDecl>(DC)) {
-    if (FD->hasSingleExpressionBody()) {
-      if (updateBody(FD->getBody(), FD->getASTContext()))
-        FD->setHasSingleExpressionBody(false);
-    }
+
+  Consumer.handleResults(CompletionContext);
+}
+
+void CodeCompletionCallbacksImpl::unresolvedMemberCompletion(
+    SourceLoc CompletionLoc, bool MaybeFuncBody) {
+  assert(CodeCompleteTokenExpr);
+  assert(CurDeclContext);
+
+  UnresolvedMemberTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                                     CurDeclContext);
+  typeCheckWithLookup(Lookup, CompletionLoc);
+
+  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+  Lookup.collectResults(CurDeclContext, DotLoc, CompletionContext);
+  Consumer.handleResults(CompletionContext);
+}
+
+void CodeCompletionCallbacksImpl::keyPathExprCompletion(SourceLoc CompletionLoc,
+                                                        bool MaybeFuncBody) {
+  assert(CurDeclContext);
+
+  // CodeCompletionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
+  // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
+  auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
+  KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
+  typeCheckWithLookup(Lookup, CompletionLoc);
+
+  Lookup.collectResults(CurDeclContext, DotLoc, CompletionContext);
+  Consumer.handleResults(CompletionContext);
+}
+
+void CodeCompletionCallbacksImpl::callCompletion(SourceLoc CompletionLoc,
+                                                 bool MaybeFuncBody) {
+  assert(CodeCompleteTokenExpr);
+  assert(CurDeclContext);
+  ArgumentTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
+                                             CurDeclContext);
+  typeCheckWithLookup(Lookup, CompletionLoc);
+
+  Lookup.collectResults(/*IsLabeledTrailingClosure=*/false, CompletionLoc,
+                        CurDeclContext, CompletionContext);
+  Consumer.handleResults(CompletionContext);
+}
+
+void CodeCompletionCallbacksImpl::globalCompletion(SourceLoc CompletionLoc,
+                                                   bool MaybeFuncBody) {
+  assert(CurDeclContext);
+
+  bool AddUnresolvedMemberCompletions = false;
+  switch (Kind) {
+  case CompletionKind::CaseStmtBeginning:
+  case CompletionKind::ThenStmtExpr:
+    AddUnresolvedMemberCompletions = true;
+    break;
+  default:
+    break;
   }
+  ExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext,
+                                         AddUnresolvedMemberCompletions);
+  if (CodeCompleteTokenExpr) {
+    // 'CodeCompletionTokenExpr == nullptr' happens when completing e.g.
+    //   var x: Int {
+    //     get { ... }
+    //     #^COMPLETE^#
+    //   }
+    // In this case we don't want to provide any expression results. We still
+    // need to have a TypeCheckCompletionCallback so we can call
+    // deliverResults on it to deliver the keyword results from the completion
+    // context's result sink to the consumer.
+    typeCheckWithLookup(Lookup, CompletionLoc);
+  }
+
+  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+
+  SourceLoc CCLoc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
+  Lookup.collectResults(CCLoc, CompletionContext);
+  Consumer.handleResults(CompletionContext);
+}
+
+void CodeCompletionCallbacksImpl::afterPoundCompletion(SourceLoc CompletionLoc,
+                                                       bool MaybeFuncBody) {
+  assert(CodeCompleteTokenExpr);
+  assert(CurDeclContext);
+
+  AfterPoundExprCompletion Lookup(CodeCompleteTokenExpr, CurDeclContext,
+                                  ParentStmtKind);
+  typeCheckWithLookup(Lookup, CompletionLoc);
+
+  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
+
+  Lookup.collectResults(CompletionContext);
+  Consumer.handleResults(CompletionContext);
 }
 
 void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
@@ -1600,10 +1629,43 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       CurDeclContext = DC;
   }
 
-  if (trySolverCompletion(MaybeFuncBody))
-    return;
+  assert(ParsedExpr || CurDeclContext);
 
-  undoSingleExpressionReturn(CurDeclContext);
+  SourceLoc CompletionLoc = ParsedExpr
+                                ? ParsedExpr->getLoc()
+                                : CurDeclContext->getASTContext()
+                                      .SourceMgr.getIDEInspectionTargetLoc();
+  switch (Kind) {
+  case CompletionKind::PostfixExpr:
+  case CompletionKind::DotExpr: 
+    postfixCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  case CompletionKind::UnresolvedMember:
+    unresolvedMemberCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  case CompletionKind::KeyPathExprSwift:
+    keyPathExprCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  case CompletionKind::CallArg:
+    callCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  case CompletionKind::AccessorBeginning:
+  case CompletionKind::CaseStmtBeginning:
+  case CompletionKind::ForEachSequence:
+  case CompletionKind::PostfixExprBeginning:
+  case CompletionKind::StmtOrExpr:
+  case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
+  case CompletionKind::ThenStmtExpr:
+    globalCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  case CompletionKind::AfterPoundExpr:
+    afterPoundCompletion(CompletionLoc, MaybeFuncBody);
+    return;
+  default:
+    break;
+  }
+
   if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
     typeCheckContextAt(
@@ -1616,7 +1678,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-  Optional<Type> ExprType;
+  llvm::Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
     if (auto *checkedExpr = findParsedExpr(CurDeclContext,
@@ -1630,8 +1692,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ParsedExpr->setType(*ExprType);
     }
 
-    if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
-        Kind != CompletionKind::CallArg &&
+    if (!ExprType && Kind != CompletionKind::CallArg &&
         Kind != CompletionKind::KeyPathExprObjC)
       return;
   }
@@ -1655,12 +1716,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   if (PreferFunctionReferencesToCalls)
     Lookup.setPreferFunctionReferencesToCalls();
 
-  auto DoPostfixExprBeginning = [&] (){
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    Lookup.getSelfTypeCompletionInDeclContext(Loc, /*isForDeclResult=*/false);
-  };
-
   switch (Kind) {
   case CompletionKind::None:
   case CompletionKind::DotExpr:
@@ -1673,64 +1728,12 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AccessorBeginning:
   case CompletionKind::CaseStmtBeginning:
+  case CompletionKind::PostfixExpr:
+  case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::YieldStmtExpr:
+  case CompletionKind::ThenStmtExpr:
     llvm_unreachable("should be already handled");
     return;
-
-  case CompletionKind::PostfixExpr: {
-    Lookup.setHaveLeadingSpace(HasSpace);
-    if (isDynamicLookup(*ExprType))
-      Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-    /// We set the type of ParsedExpr explicitly above. But we don't want an
-    /// unresolved type in our AST when we type check again for operator
-    /// completions. Remove the type of the ParsedExpr and see if we can come up
-    /// with something more useful based on the the full sequence expression.
-    if (ParsedExpr->getType()->is<UnresolvedType>()) {
-      ParsedExpr->setType(nullptr);
-    }
-    Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
-    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
-    break;
-  }
-
-  case CompletionKind::PostfixExprParen: {
-    Lookup.setHaveLParen(true);
-
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-
-    if (ShouldCompleteCallPatternAfterParen) {
-      ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
-      Lookup.setExpectedTypes(
-          ParentContextInfo.getPossibleTypes(),
-          ParentContextInfo.isImplicitSingleExpressionReturn());
-      if (!ContextInfo.getPossibleCallees().empty()) {
-        for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-          Lookup.tryFunctionCallCompletions(typeAndDecl.Type, typeAndDecl.Decl,
-                                            typeAndDecl.SemanticContext);
-      } else if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
-                              (*ExprType)->is<AnyMetatypeType>())) {
-        Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-      }
-    } else {
-      // Add argument labels, then fallthrough to get values.
-      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
-    }
-
-    if (!Lookup.FoundFunctionCalls ||
-        (Lookup.FoundFunctionCalls &&
-         Lookup.FoundFunctionsWithoutFirstKeyword)) {
-      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isImplicitSingleExpressionReturn());
-      Lookup.setHaveLParen(false);
-
-      // Add any keywords that can be used in an argument expr position.
-      addSuperKeyword(CompletionContext.getResultSink(), CurDeclContext);
-      addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
-
-      DoPostfixExprBeginning();
-    }
-    break;
-  }
 
   case CompletionKind::KeyPathExprObjC: {
     if (DotLoc.isValid())
@@ -1742,7 +1745,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       if (isDynamicLookup(*ExprType))
         Lookup.setIsDynamicLookup();
 
-      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
+      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl(),
+                                     /*IncludeFunctionCallCompletions=*/true);
     } else {
       SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
       Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
@@ -1752,6 +1756,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::TypeDeclResultBeginning:
+  case CompletionKind::TypeBeginning:
+  case CompletionKind::TypeSimpleOrComposition:
   case CompletionKind::TypeSimpleBeginning: {
     auto Loc = Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getTypeCompletionsInDeclContext(Loc);
@@ -1798,30 +1804,59 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       default:
         break;
       }
-    }
-    if (!ExpectedCustomAttributeKinds) {
+
+      switch (*AttTargetDK) {
+      case DeclKind::Var:
+      case DeclKind::Subscript:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+        break;
+      case DeclKind::Struct:
+      case DeclKind::Class:
+      case DeclKind::Protocol:
+      case DeclKind::Enum:
+      case DeclKind::Extension:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+        break;
+      default:
+        break;
+      }
+      if (*AttTargetDK != DeclKind::Param) {
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      }
+    } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
       ExpectedCustomAttributeKinds |= CustomAttributeKind::PropertyWrapper;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
     }
-    Lookup.setExpectedTypes(/*Types=*/{},
-                            /*isImplicitSingleExpressionReturn=*/false,
+
+    Lookup.setExpectedTypes(/*Types=*/{}, /*isImpliedResult=*/false,
                             /*preferNonVoid=*/false,
                             ExpectedCustomAttributeKinds);
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
-    // - ParamDecl/VarDecl/FuncDecl: Function Builders.
+    // - ParamDecl/VarDecl/FuncDecl: Result Builders.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getIDEInspectionTargetLoc());
+
+    // Macro name at attribute position after '@'.
+    CodeCompletionMacroRoles macroRoles =
+        getCompletionMacroRoles(ExpectedCustomAttributeKinds);
+    if (macroRoles) {
+      Lookup.getMacroCompletions(macroRoles);
+    }
     break;
   }
   case CompletionKind::AttributeDeclParen: {
-    Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex);
+    Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex,
+                                            AttrParamHasLabel);
     break;
   }
   case CompletionKind::PoundAvailablePlatform: {
@@ -1835,141 +1870,18 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       Lookup.addImportModuleNames();
     break;
   }
-  case CompletionKind::LabeledTrailingClosure: {
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-
-    SmallVector<PossibleParamInfo, 2> params;
-    // Only complete function type parameters
-    llvm::copy_if(ContextInfo.getPossibleParams(), std::back_inserter(params),
-                  [](const PossibleParamInfo &P) {
-                    // nullptr indicates out of bounds.
-                    if (!P.Param)
-                      return true;
-                    return P.Param->getPlainType()
-                        ->lookThroughAllOptionalTypes()
-                        ->is<AnyFunctionType>();
-                  });
-
-    bool allRequired = false;
-    if (!params.empty()) {
-      Lookup.addCallArgumentCompletionResults(
-          params, /*isLabeledTrailingClosure=*/true);
-      allRequired = llvm::all_of(
-          params, [](const PossibleParamInfo &P) { return P.IsRequired; });
-    }
-
-    // If there're optional parameters, do global completion or member
-    // completion depending on the completion is happening at the start of line.
-    if (!allRequired) {
-      if (IsAtStartOfLine) {
-        //   foo() {}
-        //   <HERE>
-
-        auto &Sink = CompletionContext.getResultSink();
-        if (isa<Initializer>(CurDeclContext))
-          CurDeclContext = CurDeclContext->getParent();
-
-        if (CurDeclContext->isTypeContext()) {
-          // Override completion (CompletionKind::NominalMemberBeginning).
-          addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency);
-          addLetVarKeywords(Sink);
-          SmallVector<StringRef, 0> ParsedKeywords;
-          CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
-                                                  ParsedKeywords, SourceLoc());
-          OverrideLookup.getOverrideCompletions(SourceLoc());
-        } else {
-          // Global completion (CompletionKind::PostfixExprBeginning).
-          addDeclKeywords(Sink, CurDeclContext,
-                          Context.LangOpts.EnableExperimentalConcurrency);
-          addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
-          addSuperKeyword(Sink, CurDeclContext);
-          addLetVarKeywords(Sink);
-          addExprKeywords(Sink, CurDeclContext);
-          addAnyTypeKeyword(Sink, Context.TheAnyType);
-          DoPostfixExprBeginning();
-        }
-      } else {
-        //   foo() {} <HERE>
-        // Member completion.
-        Expr *analyzedExpr = ContextInfo.getAnalyzedExpr();
-        if (!analyzedExpr)
-          break;
-
-        // Only if the completion token is the last token in the call.
-        if (analyzedExpr->getEndLoc() != CodeCompleteTokenExpr->getLoc())
-          break;
-
-        Type resultTy = analyzedExpr->getType();
-        // If the call expression doesn't have a type, fallback to:
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 1) Try to type check removing CodeCompletionExpr from the call.
-          Expr *removedExpr = analyzedExpr;
-          removeCodeCompletionExpr(CurDeclContext->getASTContext(),
-                                   removedExpr);
-          ConcreteDeclRef referencedDecl;
-          auto optT = getTypeOfCompletionContextExpr(
-              CurDeclContext->getASTContext(), CurDeclContext,
-              CompletionTypeCheckKind::Normal, removedExpr, referencedDecl);
-          if (optT) {
-            resultTy = *optT;
-            analyzedExpr->setType(resultTy);
-          }
-        }
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 2) Infer it from the possible callee info.
-          if (!ContextInfo.getPossibleCallees().empty()) {
-            auto calleeInfo = ContextInfo.getPossibleCallees()[0];
-            resultTy = calleeInfo.Type->getResult();
-            analyzedExpr->setType(resultTy);
-          }
-        }
-        if (!resultTy || resultTy->is<ErrorType>()) {
-          // 3) Give up providing postfix completions.
-          break;
-        }
-
-        auto &SM = CurDeclContext->getASTContext().SourceMgr;
-        auto leadingChar = SM.extractText(
-            {SM.getIDEInspectionTargetLoc().getAdvancedLoc(-1), 1});
-        Lookup.setHaveLeadingSpace(leadingChar.find_first_of(" \t\f\v") !=
-                                   StringRef::npos);
-
-        if (isDynamicLookup(resultTy))
-          Lookup.setIsDynamicLookup();
-        Lookup.getValueExprCompletions(resultTy, /*VD=*/nullptr);
-        Lookup.getOperatorCompletions(analyzedExpr, leadingSequenceExprs);
-        Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
-      }
-    }
-    break;
-  }
-
-  case CompletionKind::ReturnStmtExpr : {
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    SmallVector<Type, 2> possibleReturnTypes;
-    collectPossibleReturnTypesFromContext(CurDeclContext, possibleReturnTypes);
-    Lookup.setExpectedTypes(possibleReturnTypes,
-                            /*isImplicitSingleExpressionReturn*/ false);
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    break;
-  }
-
-  case CompletionKind::YieldStmtExpr: {
-    SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-    if (auto FD = dyn_cast<AccessorDecl>(CurDeclContext)) {
-      if (FD->isCoroutine()) {
-        // TODO: handle multi-value yields.
-        Lookup.setExpectedTypes(FD->getStorage()->getValueInterfaceType(),
-                                /*isImplicitSingleExpressionReturn*/ false);
-      }
-    }
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    break;
-  }
 
   case CompletionKind::AfterPoundDirective: {
     addPoundDirectives(CompletionContext.getResultSink());
+
+    CodeCompletionMacroRoles roles;
+    if (!CurDeclContext || !CurDeclContext->isTypeContext()) {
+      roles |= CodeCompletionMacroRole::Expression;
+      roles |= CodeCompletionMacroRole::CodeItem;
+    }
+    roles |= CodeCompletionMacroRole::Declaration;
+    Lookup.getMacroCompletions(roles);
+
     // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
     // position.
     break;
@@ -2010,6 +1922,11 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
+  case CompletionKind::WithoutConstraintType: {
+    Lookup.addWithoutConstraintTypes();
+    break;
+  }
+
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
@@ -2019,7 +1936,10 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
-  deliverCompletionResults(CompletionContext, Lookup, CurDeclContext, Consumer);
+  collectCompletionResults(CompletionContext, Lookup, CurDeclContext,
+                           *Lookup.getExpectedTypeContext(),
+                           Lookup.canCurrDeclContextHandleAsync());
+  Consumer.handleResults(CompletionContext);
 }
 
 namespace {
@@ -2033,8 +1953,10 @@ public:
                                      CodeCompletionConsumer &Consumer)
       : CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-      IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-    return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
+  Callbacks createCallbacks(Parser &P) override {
+    auto callbacks = std::make_shared<CodeCompletionCallbacksImpl>(
+        P, CompletionContext, Consumer);
+    return {callbacks, callbacks};
   }
 };
 } // end anonymous namespace

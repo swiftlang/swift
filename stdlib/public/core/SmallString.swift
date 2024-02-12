@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -79,12 +79,14 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_32)
     return 10
 #elseif os(Android) && arch(arm64)
     return 14
-#else
+#elseif _pointerBitWidth(_64)
     return 15
+#else
+#error("Unknown platform")
 #endif
   }
 
@@ -241,7 +243,9 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &_storage, f)
+    let len = try withUnsafeMutableBytes(of: &_storage) {
+      try f(.init(start: $0.baseAddress, count: _SmallString.capacity))
+    }
 
     if len <= 0 {
       _debugPrecondition(len == 0)
@@ -259,7 +263,7 @@ extension _SmallString {
   ) {
     _internalInvariant(index > 0)
     _internalInvariant(index <= _SmallString.capacity)
-    //FIXME: Verify this on big-endian architecture
+    // FIXME: Verify this on big-endian architecture
     let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* ( 8 &- Swift.min(index, 8))))
     let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- Swift.max(index, 8))))
     storage.0 &= (index <= 0) ? 0 : mask0.littleEndian
@@ -311,17 +315,7 @@ extension _SmallString {
   ) rethrows {
     self.init()
     try self.withMutableCapacity {
-      let capacity = $0.count
-      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
-      // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
-      // duration of the closure. Accessing self after this rebind is undefined.
-      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: capacity)
-      defer {
-        // Restore the memory type of self._storage
-        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
-      }
-      return try initializer(
-        UnsafeMutableBufferPointer<UInt8>(start: ptr, count: capacity))
+      try $0.withMemoryRebound(to: UInt8.self, initializer)
     }
     self._invariantCheck()
   }
@@ -346,7 +340,7 @@ extension _SmallString {
   }
 }
 
-#if _runtime(_ObjC) && !(arch(i386) || arch(arm) || arch(arm64_32))
+#if _runtime(_ObjC) && _pointerBitWidth(_64)
 // Cocoa interop
 extension _SmallString {
   // Resiliently create from a tagged cocoa string

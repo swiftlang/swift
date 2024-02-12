@@ -13,8 +13,12 @@
 #ifndef SWIFT_SIL_SILPARSERSTATE_H
 #define SWIFT_SIL_SILPARSERSTATE_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/SIL/SILFunction.h"
+
+#include "llvm/ADT/DenseMap.h"
 
 //===----------------------------------------------------------------------===//
 // SILParserState

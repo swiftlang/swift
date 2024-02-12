@@ -25,6 +25,7 @@ import ArrayOfGenericPOD
 import ArrayOfGenericRef
 import ArrayOfPOD
 import ArrayOfRef
+import ArrayRemoveAll
 import ArraySetElement
 import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
@@ -112,6 +113,7 @@ import Memset
 import MirrorTest
 import MonteCarloE
 import MonteCarloPi
+import NaiveRangeReplaceableCollectionConformance
 import NibbleSort
 import NIOChannelPipeline
 import NSDictionaryCastToSwift
@@ -188,6 +190,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringRepeating
 import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
@@ -215,6 +218,7 @@ register(ArrayOfGenericPOD.benchmarks)
 register(ArrayOfGenericRef.benchmarks)
 register(ArrayOfPOD.benchmarks)
 register(ArrayOfRef.benchmarks)
+register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
 register(ArraySubscript.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
@@ -302,6 +306,7 @@ register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
+register(NaiveRangeReplaceableCollectionConformance.benchmarks)
 register(NSDictionaryCastToSwift.benchmarks)
 register(NSErrorTest.benchmarks)
 #if canImport(Darwin)
@@ -379,6 +384,7 @@ register(StringEnum.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
+register(StringRepeating.benchmarks)
 register(StringReplaceSubrange.benchmarks)
 
 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {

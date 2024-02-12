@@ -35,6 +35,7 @@ enum class SourceKitRequest {
   CodeCompleteSetPopularAPI,
   TypeContextInfo,
   ConformingMethodList,
+  ActiveRegions,
   CursorInfo,
   RangeInfo,
   RelatedIdents,
@@ -55,7 +56,6 @@ enum class SourceKitRequest {
   PrintDiags,
   ExtractComment,
   ModuleGroups,
-  SyntacticRename,
   FindRenameRanges,
   FindLocalRenameRanges,
   NameTranslation,
@@ -67,8 +67,11 @@ enum class SourceKitRequest {
   GlobalConfiguration,
   DependencyUpdated,
   Diagnostics,
+  SemanticTokens,
   Compile,
   CompileClose,
+  SyntacticMacroExpansion,
+  IndexToStore,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/Refactoring/RefactoringKinds.def"
 };
@@ -76,7 +79,13 @@ enum class SourceKitRequest {
 struct TestOptions {
   SourceKitRequest Request = SourceKitRequest::None;
   std::vector<std::string> Inputs;
+  /// The name of the underlying \c SourceFile.
   std::string SourceFile;
+  /// The path to the primary file when building the AST, ie. when making a
+  /// request from inside a macro expansion, this would be the real file on
+  /// disk where as \c SourceFile is the name of the expansion's buffer.
+  /// Defaults to \c SourceFile when not given.
+  std::string PrimaryFile;
   std::string TextInputFile;
   std::string JsonRequestPath;
   std::string RenameSpecPath;
@@ -87,7 +96,7 @@ struct TestOptions {
   unsigned Col = 0;
   unsigned EndLine = 0;
   unsigned EndCol = 0;
-  unsigned Offset = 0;
+  llvm::Optional<unsigned> Offset;
   unsigned Length = 0;
   std::string SwiftVersion;
   bool PassVersionAsString = false;
@@ -126,6 +135,8 @@ struct TestOptions {
   bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
   bool DisableImplicitStringProcessingModuleImport = false;
+  bool EnableImplicitBacktracingModuleImport = false;
+  bool DisableImplicitBacktracingModuleImport = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {
@@ -138,6 +149,8 @@ struct TestOptions {
   llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool ShellExecution = false;
+  std::string IndexStorePath;
+  std::string IndexUnitOutputPath;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
 };

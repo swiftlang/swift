@@ -63,16 +63,16 @@ public func test_not_hoist_weakly_linked4() {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s24weak_import_native_hoist29test_weakly_linked_enum_cases1eSi0a1_b1_c1_D7_helper1EO_tF
-// CHECK:  [[TAG:%.*]] = call i32 %getEnumTag(
-// CHECK:  [[STRONG_CASE:%.*]] = load i32, i32* @"$s31weak_import_native_hoist_helper1EO6strongyA2CmFWC"
+// CHECK:  [[TAG:%.*]] = call i32 %{{[^,]+}}(
+// CHECK:  [[STRONG_CASE:%.*]] = load i32, ptr @"$s31weak_import_native_hoist_helper1EO6strongyA2CmFWC"
 // CHECK:  [[IS_STRONG:%.*]] = icmp eq i32 [[TAG]], [[STRONG_CASE]]
 // CHECK:  br i1 [[IS_STRONG]], label %[[BB0:[0-9]+]], label %[[BB1:[0-9]+]]
 //
 // CHECK:  [[BB1]]:
-// CHECK:  br i1 icmp eq ({{.*}} ptrtoint (i32* @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC" to {{.*}}), {{.*}} 0), label %[[BB2:[0-9]+]], label %[[BB3:[0-9]+]]
+// CHECK:  br i1 icmp eq ({{.*}} ptrtoint (ptr @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC" to {{.*}}), {{.*}} 0), label %[[BB2:[0-9]+]], label %[[BB3:[0-9]+]]
 //
 // CHECK:  [[BB3]]:
-// CHECK:  [[WEAK_CASE:%.*]] = load i32, i32* @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC"
+// CHECK:  [[WEAK_CASE:%.*]] = load i32, ptr @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC"
 // CHECK:  [[IS_WEAK:%.*]] = icmp eq i32 [[TAG]], [[WEAK_CASE]]
 // CHECK:  br label %[[BB2]]
 //

@@ -15,7 +15,7 @@
 // REQUIRES: OS=macosx
 
 import Darwin
-import Dispatch
+import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
 import StdlibUnittest
 
 // These are an attempt to simulate some kind of async work, and the
@@ -159,7 +159,7 @@ func withVouchers(call: @Sendable @escaping (voucher_t?, voucher_t?, voucher_t?)
 
       // Clear any voucher that the call adopted.
       adopt(voucher: nil)
-      group.leave()
+      group.leave() // expected-complete-tns-warning {{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
     }
     group.wait()
 
@@ -348,7 +348,7 @@ if #available(SwiftStdlib 5.1, *) {
            _ = await (g, add)
 
            if await n.get() >= limit {
-             group.leave()
+             group.leave() // expected-warning 2{{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
            } else {
              await n.increment()
              await detachedTask()

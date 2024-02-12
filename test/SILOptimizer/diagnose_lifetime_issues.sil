@@ -27,6 +27,7 @@ class WeakCycle {
   weak var c: WeakCycle?
 }
 
+sil [ossa] @$s24diagnose_lifetime_issues8DelegateCACycfC : $@convention(method) (@thick Delegate.Type) -> @owned Delegate
 sil [ossa] @$s24diagnose_lifetime_issues10MyDelegateCACycfC : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
 sil [ossa] @$s24diagnose_lifetime_issues14strongDelegate1dyAA0D0C_tF : $@convention(method) (@guaranteed Delegate, @guaranteed Container) -> ()
 
@@ -118,4 +119,42 @@ bb0(%0 : $@thick WeakCycle.Type):
   %2 = function_ref @testStoresWeakly : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle
   %3 = apply %2(%1) : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle
   return %3 : $WeakCycle
+}
+
+// Helper
+sil private [ossa] @testBorrowInDefer$defer : $@convention(thin) (@guaranteed Delegate) -> () {
+bb0(%0 : @closureCapture @guaranteed $Delegate):
+  debug_value %0 : $Delegate, let, name "delegate", argno 1
+  fix_lifetime %0 : $Delegate
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// Test no warning for a value kept alive within a call which does not escape its argument.
+sil hidden [ossa] @testBorrowinDefer : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : @guaranteed $Container):
+  debug_value %0 : $Container, let, name "container", argno 1
+  %2 = metatype $@thick Delegate.Type
+  // function_ref Delegate.__allocating_init()
+  %3 = function_ref @$s24diagnose_lifetime_issues8DelegateCACycfC : $@convention(method) (@thick Delegate.Type) -> @owned Delegate
+
+  // This is the owned allocation.
+  %4 = apply %3(%2) : $@convention(method) (@thick Delegate.Type) -> @owned Delegate
+  %6 = copy_value %4 : $Delegate
+  %7 = enum $Optional<Delegate>, #Optional.some!enumelt, %6 : $Delegate
+  %8 = ref_element_addr %0 : $Container, #Container.delegate
+  %9 = begin_access [modify] [dynamic] %8 : $*@sil_weak Optional<Delegate>
+
+  // This is the weak assignment.
+  store_weak %7 to %9 : $*@sil_weak Optional<Delegate>
+  destroy_value %7 : $Optional<Delegate>
+  end_access %9 : $*@sil_weak Optional<Delegate>
+
+  // This call keeps the parent alive
+  %15 = function_ref @testBorrowInDefer$defer : $@convention(thin) (@guaranteed Delegate) -> () // user: %16
+  %16 = apply %15(%4) : $@convention(thin) (@guaranteed Delegate) -> ()
+
+  destroy_value %4 : $Delegate
+  %18 = tuple ()
+  return %18 : $()
 }

@@ -5,8 +5,7 @@
 // RUN: %target-swift-frontend %t/clean.swift -typecheck -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -emit-clang-header-path %t/decls.h
 // RUN: %FileCheck %s < %t/decls.h
 
-// CHECK-NOT: unsupported
-// CHECK: supported
+// RUN: %check-interop-cxx-header-in-clang(%t/decls.h)
 
 public protocol Proto { init() }
 
@@ -35,3 +34,30 @@ public enum unsupportedGenericEnum<T: Proto> {
     case A
     case B(T)
 }
+
+public struct Struct1<IntType: FixedWidthInteger> {
+  private var value: IntType
+
+  public init(rawValue: IntType) {
+    self.value = rawValue
+  }
+}
+
+public class Class1 {
+  public var index1: Struct1<UInt32> { .init(rawValue: 123) }
+}
+
+// CHECK: supported
+
+// CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
+// CHECK: 'index1' cannot be printed
+
+// CHECK: class Struct1 { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'Struct1' can not yet be represented in C++");
+
+// CHECK: // Unavailable in C++: Swift global function 'unsupportedFunc(_:)'.
+
+// CHECK: class unsupportedGenericClass { } SWIFT_UNAVAILABLE_MSG("generic generic class 'unsupportedGenericClass' can not yet be exposed to C++");
+// CHECK-EMPTY:
+// CHECK-NEXT: class unsupportedGenericEnum { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic enum 'unsupportedGenericEnum' can not yet be represented in C++");
+// CHECK-EMPTY:
+// CHECK-NEXT: class unsupportedGenericStruct { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedGenericStruct' can not yet be represented in C++");

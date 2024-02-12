@@ -1,7 +1,12 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable -strict-concurrency=targeted
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable -strict-concurrency=complete
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
+
 import Foundation
 import ObjCConcurrency
 

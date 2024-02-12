@@ -28,8 +28,9 @@ class AsyncTask;
 class DefaultActor;
 class Job;
 class SerialExecutorWitnessTable;
+class TaskExecutorWitnessTable;
 
-/// An unmanaged reference to an executor.
+/// An unmanaged reference to a serial executor.
 ///
 /// This type corresponds to the type Optional<Builtin.Executor> in
 /// Swift.  The representation of nil in Optional<Builtin.Executor>
@@ -53,17 +54,33 @@ class SerialExecutorWitnessTable;
 ///   bits off before accessing the witness table, so setting them
 ///   in the future should back-deploy as long as the witness table
 ///   reference is still present.
-class ExecutorRef {
+class SerialExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
   uintptr_t Implementation;
 
   // We future-proof the ABI here by masking the low bits off the
   // implementation pointer before using it as a witness table.
+  //
+  // We have 3 bits for future use remaining here.
   enum: uintptr_t {
     WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
   };
 
-  constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
+  /// The kind is stored in the free bits in the `Implementation` witness table reference.
+  enum class ExecutorKind : uintptr_t {
+    /// Ordinary executor.
+    ///
+    /// Note that the "Generic" executor is also implicitly "Ordinary".
+    /// To check if an executor is Generic, explicitly check this by calling `isGeneric`.
+    Ordinary = 0b00,
+    /// Executor that may need to participate in complex "same context" checks,
+    /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
+    ComplexEquality = 0b01,
+  };
+
+  static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
+
+  constexpr SerialExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
 
 public:
@@ -72,24 +89,35 @@ public:
   /// environment, it's presumed to be okay to switch synchronously
   /// to an actor.  As an executor request, this represents a request
   /// to drop whatever the current actor is.
-  constexpr static ExecutorRef generic() {
-    return ExecutorRef(nullptr, 0);
+  constexpr static SerialExecutorRef generic() {
+    return SerialExecutorRef(nullptr, 0);
   }
 
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
-  static ExecutorRef forDefaultActor(DefaultActor *actor) {
+  static SerialExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
-    return ExecutorRef(actor, 0);
+    return SerialExecutorRef(actor, 0);
   }
 
   /// Given a pointer to a serial executor and its SerialExecutor
   /// conformance, return an executor reference for it.
-  static ExecutorRef forOrdinary(HeapObject *identity,
+  static SerialExecutorRef forOrdinary(HeapObject *identity,
                            const SerialExecutorWitnessTable *witnessTable) {
     assert(identity);
     assert(witnessTable);
-    return ExecutorRef(identity, reinterpret_cast<uintptr_t>(witnessTable));
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+        static_cast<uintptr_t>(ExecutorKind::Ordinary);
+    return SerialExecutorRef(identity, wtable);
+  }
+
+  static SerialExecutorRef forComplexEquality(HeapObject *identity,
+                                        const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+                  static_cast<uintptr_t>(ExecutorKind::ComplexEquality);
+    return SerialExecutorRef(identity, wtable);
   }
 
   HeapObject *getIdentity() const {
@@ -99,6 +127,23 @@ public:
   /// Is this the generic executor reference?
   bool isGeneric() const {
     return Identity == 0;
+  }
+
+  ExecutorKind getExecutorKind() const {
+    return static_cast<ExecutorKind>(Implementation & ~WitnessTableMask);
+  }
+
+  /// Is this an ordinary executor reference?
+  /// These executor references are the default kind, and have no special treatment elsewhere in the system.
+  bool isOrdinary() const {
+    return getExecutorKind() == ExecutorKind::Ordinary;
+  }
+
+  /// Is this an `complex-equality` executor reference?
+  /// These executor references should implement `isSameExclusiveExecutionContext` which will be invoked
+  /// when two executors are compared for being the same exclusive execution context.
+  bool isComplexEquality() const {
+    return getExecutorKind() == ExecutorKind::ComplexEquality;
   }
 
   /// Is this a default-actor executor reference?
@@ -118,7 +163,7 @@ public:
 
   /// Do we have to do any work to start running as the requested
   /// executor?
-  bool mustSwitchToRun(ExecutorRef newExecutor) const {
+  bool mustSwitchToRun(SerialExecutorRef newExecutor) const {
     return Identity != newExecutor.Identity;
   }
 
@@ -126,12 +171,106 @@ public:
   bool isMainExecutor() const;
 
   /// Get the raw value of the Implementation field, for tracing.
-  uintptr_t getRawImplementation() { return Implementation; }
+  uintptr_t getRawImplementation() const {
+    return Implementation & WitnessTableMask;
+  }
 
-  bool operator==(ExecutorRef other) const {
+  bool operator==(SerialExecutorRef other) const {
     return Identity == other.Identity;
   }
-  bool operator!=(ExecutorRef other) const {
+  bool operator!=(SerialExecutorRef other) const {
+    return !(*this == other);
+  }
+};
+
+class TaskExecutorRef {
+  HeapObject *Identity; // Not necessarily Swift reference-countable
+  uintptr_t Implementation;
+
+  // We future-proof the ABI here by masking the low bits off the
+  // implementation pointer before using it as a witness table.
+  //
+  // We have 3 bits for future use remaining here.
+  enum: uintptr_t {
+    WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
+  };
+
+  /// The kind is stored in the free bits in the `Implementation` witness table reference.
+  enum class TaskExecutorKind : uintptr_t {
+    /// Ordinary executor.
+    Ordinary = 0b00,
+  };
+
+  static_assert(static_cast<uintptr_t>(TaskExecutorKind::Ordinary) == 0);
+
+  constexpr TaskExecutorRef(HeapObject *identity, uintptr_t implementation)
+    : Identity(identity), Implementation(implementation) {}
+
+public:
+
+  // Only public for CompatibilityOverrideConcurrency stubs.
+  // Prefer `TaskExecutorRef::undefined` instead.
+  explicit TaskExecutorRef() : Identity(nullptr), Implementation(0) {
+    assert(isUndefined());
+  }
+
+  constexpr static TaskExecutorRef undefined() {
+    return TaskExecutorRef(nullptr, 0);
+  }
+
+  /// Given a pointer to a serial executor and its TaskExecutor
+  /// conformance, return an executor reference for it.
+  static TaskExecutorRef forOrdinary(HeapObject *identity,
+                           const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+        static_cast<uintptr_t>(TaskExecutorKind::Ordinary);
+    return TaskExecutorRef(identity, wtable);
+  }
+
+  HeapObject *getIdentity() const {
+    return Identity;
+  }
+
+  /// Is this the generic executor reference?
+  bool isUndefined() const {
+    return Identity == 0;
+  }
+
+  bool isDefined() const { return !isUndefined(); }
+
+  TaskExecutorKind getExecutorKind() const {
+    return static_cast<TaskExecutorKind>(Implementation & ~WitnessTableMask);
+  }
+
+  /// Is this an ordinary executor reference?
+  /// These executor references are the default kind, and have no special treatment elsewhere in the system.
+  bool isOrdinary() const {
+    return getExecutorKind() == TaskExecutorKind::Ordinary;
+  }
+
+  const TaskExecutorWitnessTable *getTaskExecutorWitnessTable() const {
+    assert(!isUndefined());
+    auto table = Implementation & WitnessTableMask;
+    return reinterpret_cast<const TaskExecutorWitnessTable*>(table);
+  }
+
+//  /// Do we have to do any work to start running as the requested
+//  /// executor?
+//  bool mustSwitchToRun(TaskExecutorRef newExecutor) const {
+//    return Identity != newExecutor.Identity;
+//  }
+
+  /// Get the raw value of the Implementation field, for tracing.
+  uintptr_t getRawImplementation() const {
+    return Implementation & WitnessTableMask;
+  }
+
+  bool operator==(TaskExecutorRef other) const {
+    return Identity == other.Identity;
+  }
+  bool operator!=(TaskExecutorRef other) const {
     return !(*this == other);
   }
 };

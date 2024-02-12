@@ -51,6 +51,7 @@ TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
 TYPE("private-swiftinterface", PrivateSwiftModuleInterfaceFile,  "private.swiftinterface",  "")
+TYPE("package-swiftinterface", PackageSwiftModuleInterfaceFile,  "package.swiftinterface",  "")
 TYPE("swiftmodulesummary",  SwiftModuleSummaryFile,    "swiftmodulesummary", "")
 TYPE("swiftsourceinfo",     SwiftSourceInfoFile,       "swiftsourceinfo", "")
 TYPE("assembly",            Assembly,                  "s",               "")
@@ -98,5 +99,9 @@ TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
 TYPE("abi-baseline-json",   SwiftABIDescriptor,        "abi.json",        "")
+TYPE("api-descriptor-json", SwiftAPIDescriptor,        "",                "")
+TYPE("fixit",               SwiftFixIt,                "",                "")
+TYPE("module-semantic-info", ModuleSemanticInfo,       "",                "")
+TYPE("cached-diagnostics",  CachedDiagnostics,         "",                "")
 
 #undef TYPE

@@ -15,3 +15,4 @@ class C {
 
 // RUN: %refactor -extract-function -source-filename %s -pos=7:18 -end-pos=7:23 >> %t.result/ExplicitGetter.swift
 // RUN: diff -u %S/Outputs/extract_from_accessor/ExplicitGetter.swift.expected %t.result/ExplicitGetter.swift
+// REQUIRES: swift_swift_parser

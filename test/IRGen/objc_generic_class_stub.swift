@@ -16,4 +16,4 @@ public class ConcreteNSObjectSubclass : GenericNSObjectSubclass<Int> {}
 
 // CHECK-LABEL: @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt" = internal global %objc_full_class_stub {{.*}} @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMU{{(\.ptrauth)?}}"
 
-// CHECK-LABEL: @objc_class_stubs = internal global {{.*}} @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt" {{.*}}, section "__DATA,__objc_stublist,regular,no_dead_strip"
+// CHECK-LABEL: @objc_class_stubs = internal global {{.*}} @"$s23objc_generic_class_stub24ConcreteNSObjectSubclassCMt"{{.*}}, section "__DATA,__objc_stublist,regular,no_dead_strip"

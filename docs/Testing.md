@@ -489,6 +489,11 @@ Other substitutions:
   directory exists and is empty.  Equivalent to
   ``rm -rf directory-name && mkdir -p directory-name``.
 
+* ``%host_sdk%``, ``%host_triple%``: Host SDK path and triple for '-target'.
+  These can be used for build host tools/libraries in test cases.
+
+* ``%host-swift-build``: Build swift tools/libraries for the host.
+
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 

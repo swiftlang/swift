@@ -145,7 +145,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     }
     os.indent(indent) << "] values: [\n";
     for (SymbolicClosureArgument closureArg : args) {
-      Optional<SymbolicValue> value = closureArg.second;
+      llvm::Optional<SymbolicValue> value = closureArg.second;
       if (!value.has_value()) {
         os.indent(indent + 2) << "nil\n";
         continue;
@@ -1137,7 +1137,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   } else {
     elt = aggregate.getAggregateMembers()[elementNo];
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      eltType = decl->getStoredProperties()[elementNo]->getType();
+      eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");
       eltType = tuple->getElement(elementNo).getType();
@@ -1174,6 +1174,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   if (accessPath.empty())
     return newElement;
 
+  // Callers are required to ensure unknowns are not passed. However,
+  // the recurisve call can pass an unknown as an aggregate.
+  if (aggregate.getKind() == SymbolicValue::Unknown)
+    return aggregate;
+
   // If we have an uninit memory, then scalarize it into an aggregate to
   // continue.  This happens when memory objects are initialized piecewise.
   if (aggregate.getKind() == SymbolicValue::UninitMemory) {
@@ -1208,7 +1213,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   } else {
     oldElts = aggregate.getAggregateMembers();
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      eltType = decl->getStoredProperties()[elementNo]->getType();
+      eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");
       eltType = tuple->getElement(elementNo).getType();

@@ -1,4 +1,5 @@
-extension (Int, Int) {}
+typealias Crap = () -> ()
+extension Crap {}
 
 // RUN: %sourcekitd-test -req=sema %s -- %s | %FileCheck %s -check-prefix=NO_OVERRIDE
 

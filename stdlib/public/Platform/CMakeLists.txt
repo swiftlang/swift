@@ -42,8 +42,8 @@ set(swiftDarwin_common_options
       DEPENDS ${darwin_depends})
 
 
-if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING" AND
-   ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING" AND
+   SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
 
   set(swiftDarwin_common_bootstrapping_options
       ${swiftDarwin_common_options}
@@ -77,6 +77,55 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
     INSTALL_IN_COMPONENT sdk-overlay
     MACCATALYST_BUILD_FLAVOR "zippered")
 
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  set(SWIFT_ENABLE_REFLECTION OFF)
+
+  add_custom_target(embedded-darwin ALL)
+  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+    list(GET list 0 arch)
+    list(GET list 1 mod)
+    list(GET list 2 triple)
+
+    if(NOT "${mod}" MATCHES "-macos$")
+      continue()
+    endif()
+
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    set(SWIFT_SDK_embedded_PATH ${SWIFT_SDK_OSX_PATH})
+    set(SWIFT_SDK_embedded_ARCH_${arch}_PATH ${SWIFT_SDK_OSX_PATH})
+    set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
+    add_swift_target_library_single(
+      embedded-darwin-${mod}
+      swiftDarwin
+      ONLY_SWIFTMODULE
+      IS_SDK_OVERLAY IS_FRAGILE
+
+      Platform.swift
+      TiocConstants.swift
+      POSIXError.swift
+      MachError.swift
+
+      GYB_SOURCES
+        tgmath.swift.gyb
+        Darwin.swift.gyb
+      
+      SWIFT_COMPILE_FLAGS
+        -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+      C_COMPILE_FLAGS
+        -D__MACH__ -D__APPLE__ -ffreestanding
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
+      DEPENDS embedded-stdlib-${mod}
+      INSTALL_IN_COMPONENT stdlib
+      )
+    add_dependencies(embedded-darwin embedded-darwin-${mod})
+  endforeach()
+endif()
+
 set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")
   set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU FREESTANDING)
@@ -97,6 +146,39 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     TARGET_SDKS "${swiftGlibc_target_sdks}"
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS glibc_modulemap)
+
+add_swift_target_library(swiftMusl ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      Musl.swift.gyb
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS MUSL
+    INSTALL_IN_COMPONENT sdk-overlay)
+
+add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      WASILibc.swift.gyb
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS WASI
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS wasilibc_modulemap)
 
 add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ucrt.swift
@@ -180,7 +262,7 @@ foreach(sdk ${SWIFT_SDKS})
     # with its own native sysroot, create a native modulemap without a sysroot
     # prefix. This is the one we'll install instead.
     if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/" AND
-       NOT (${sdk} STREQUAL ANDROID AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
+       NOT (sdk STREQUAL "ANDROID" AND NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL ""))
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
 
       handle_gyb_source_single(glibc_modulemap_native_target
@@ -217,3 +299,50 @@ endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
 set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay glibc_modulemap)
+
+set(wasilibc_modulemap_target_list)
+if("WASI" IN_LIST SWIFT_SDKS)
+  set(wasilibc_modulemap_source "wasi-libc.modulemap")
+  foreach(arch ${SWIFT_SDK_WASI_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_WASI_LIB_SUBDIR}/${arch}")
+    set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+
+    add_custom_command_target(
+      copy_wasilibc_modulemap_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_static}
+      OUTPUT ${module_dir}/${wasilibc_modulemap_source} ${module_dir_static}/${wasilibc_modulemap_source}
+      COMMENT "Copying WASILibc modulemap to resource directories")
+    add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_resource})
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_resource})
+
+    swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
+  endforeach()
+endif()
+add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})
+set_property(TARGET wasilibc_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay wasilibc_modulemap)
+
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  swift_install_in_component(FILES
+      ucrt.modulemap
+      vcruntime.apinotes
+      vcruntime.modulemap
+      winsdk.modulemap
+    DESTINATION "share"
+    COMPONENT sdk-overlay)
+endif()

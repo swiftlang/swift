@@ -17,7 +17,7 @@
 
 #include "SwiftTargetInfo.h"
 #include "IRGenModule.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/DataLayout.h"
 #include "swift/ABI/System.h"
 #include "swift/AST/ASTContext.h"

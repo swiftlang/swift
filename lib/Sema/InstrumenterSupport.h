@@ -42,18 +42,19 @@ class InstrumenterBase {
 protected:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
-  Optional<DeclNameRef> ModuleIdentifier;
-  Optional<DeclNameRef> FileIdentifier;
+  llvm::Optional<DeclNameRef> ModuleIdentifier;
+  llvm::Optional<DeclNameRef> FileIdentifier;
 
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                        const ParameterList *PL = nullptr,
                                         bool TopLevel = false) = 0;
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
   /// FileIdentifier, if available.
-  Expr *buildIDArgumentExpr(Optional<DeclNameRef> name, SourceRange SR);
+  Expr *buildIDArgumentExpr(llvm::Optional<DeclNameRef> name, SourceRange SR);
 
   class ClosureFinder : public ASTWalker {
   private:
@@ -61,10 +62,16 @@ protected:
 
   public:
     ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
+
+    /// Walk only the expansion of the macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
-        return Action::SkipChildren(S); // don't walk into brace statements; we
-                           // need to respect nesting!
+        return Action::SkipNode(S); // don't walk into brace statements; we
+                                    // need to respect nesting!
       } else {
         return Action::Continue(S);
       }
@@ -73,8 +80,9 @@ protected:
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
-          BraceStmt *NB = I.transformBraceStmt(B);
-          CE->setBody(NB, false);
+          const ParameterList *PL = CE->getParameters();
+          BraceStmt *NB = I.transformBraceStmt(B, PL);
+          CE->setBody(NB);
           // just with the entry and exit logging this is going to
           // be more than a single expression!
         }

@@ -294,11 +294,11 @@ struct HTTP2StreamStateMachine {
 }
 
 @inline(never)
-func testSimpleRequestResponse() -> Bool {
+func testSimpleRequestResponse(_ n: Int) -> Bool {
     var successful = true
 
-    var server = HTTP2StreamStateMachine(localRole: .server, localWindow: 1<<16, remoteWindow: 1<<16)
-    var client = HTTP2StreamStateMachine(localRole: .client, localWindow: 1<<16, remoteWindow: 1<<16)
+    var server = HTTP2StreamStateMachine(localRole: .server, localWindow: 1<<16, remoteWindow: n)
+    var client = HTTP2StreamStateMachine(localRole: .client, localWindow: 1<<16, remoteWindow: n)
 
     successful = successful && client.sendHeaders(isEndStreamSet: false)
     successful = successful && server.receiveHeaders(isEndStreamSet: false)
@@ -329,11 +329,11 @@ func testSimpleRequestResponse() -> Bool {
 }
 
 @inline(never)
-func testPushedRequests() -> Bool {
+func testPushedRequests(_ n: Int) -> Bool {
     var successful = true
 
-    var server = HTTP2StreamStateMachine(sentPushPromiseWithLocalInitialWindowSize: 1<<16)
-    var client = HTTP2StreamStateMachine(receivedPushPromiseWithRemoteInitialWindowSize: 1<<16)
+    var server = HTTP2StreamStateMachine(sentPushPromiseWithLocalInitialWindowSize: n)
+    var client = HTTP2StreamStateMachine(receivedPushPromiseWithRemoteInitialWindowSize: n)
 
     successful = successful && client.sendWindowUpdate(windowIncrement: 1024)
 
@@ -358,11 +358,11 @@ func testPushedRequests() -> Bool {
 }
 
 @inline(never)
-func testPushingRequests() -> Bool {
+func testPushingRequests(_ n: Int) -> Bool {
     var successful = true
 
-    var server = HTTP2StreamStateMachine(localRole: .server, localWindow: 1<<16, remoteWindow: 1<<16)
-    var client = HTTP2StreamStateMachine(localRole: .client, localWindow: 1<<16, remoteWindow: 1<<16)
+    var server = HTTP2StreamStateMachine(localRole: .server, localWindow: 1<<16, remoteWindow: n)
+    var client = HTTP2StreamStateMachine(localRole: .client, localWindow: 1<<16, remoteWindow: n)
 
     successful = successful && client.sendHeaders(isEndStreamSet: true)
     successful = successful && server.receiveHeaders(isEndStreamSet: true)
@@ -381,10 +381,10 @@ func testPushingRequests() -> Bool {
 
 @inline(never)
 func run_HTTP2StateMachine(_ n: Int) {
-    for _ in 0 ..< 1000000 * n {
-        check(testSimpleRequestResponse())
-        check(testPushedRequests())
-        check(testPushingRequests())
+    for i in 0 ..< 100000 * n {
+        check(testSimpleRequestResponse(identity(i)))
+        check(testPushedRequests(identity(i)))
+        check(testPushingRequests(identity(i)))
     }
 }
 

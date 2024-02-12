@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg -enable-ossa-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //
@@ -884,58 +884,6 @@ enum IntEnum : Int32 {
   case E2
 }
 
-// CHECK-LABEL: sil [ossa] @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
-// CHECK-DAG: [[X2:%[0-9]+]] = integer_literal $Builtin.Int32, 0
-// CHECK-DAG: [[X5:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.none!enumelt
-// CHECK-DAG: [[X6:%[0-9]+]] = integer_literal $Builtin.Int32, 2
-// CHECK-DAG: [[X7:%[0-9]+]] = enum $IntEnum, #IntEnum.E2!enumelt
-// CHECK-DAG: [[X8:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X7]] : $IntEnum
-// CHECK-DAG: [[X9:%[0-9]+]] = integer_literal $Builtin.Int32, 1
-// CHECK-DAG: [[X10:%[0-9]+]] = enum $IntEnum, #IntEnum.E1!enumelt
-// CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X10]] : $IntEnum
-// CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
-// CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X12]] : $IntEnum
-// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
-// CHECK-DAG: return [[X14]] : $Optional<IntEnum>
-sil [ossa] @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
-bb0(%0 : $Builtin.Int32):
-  %2 = integer_literal $Builtin.Int32, 0
-  %4 = builtin "cmp_eq_Int32"(%2 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %4, bb1, bb2
-
-bb1:
-  %6 = enum $IntEnum, #IntEnum.E0!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt, %6 : $IntEnum
-  br bb7(%7 : $Optional<IntEnum>)
-
-bb2:
-  %9 = integer_literal $Builtin.Int32, 1
-  %10 = builtin "cmp_eq_Int32"(%9 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %10, bb3, bb4
-
-bb3:
-  %12 = enum $IntEnum, #IntEnum.E1!enumelt
-  %13 = enum $Optional<IntEnum>, #Optional.some!enumelt, %12 : $IntEnum
-  br bb7(%13 : $Optional<IntEnum>)
-
-bb4:
-  %15 = integer_literal $Builtin.Int32, 2
-  %16 = builtin "cmp_eq_Int32"(%15 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %16, bb5, bb6
-
-bb5:
-  %18 = enum $IntEnum, #IntEnum.E2!enumelt
-  %19 = enum $Optional<IntEnum>, #Optional.some!enumelt, %18 : $IntEnum
-  br bb7(%19 : $Optional<IntEnum>)
-
-bb6:
-  %21 = enum $Optional<IntEnum>, #Optional.none!enumelt
-  br bb7(%21 : $Optional<IntEnum>)
-
-bb7(%23 : $Optional<IntEnum>):
-  return %23 : $Optional<IntEnum>
-}
-
 // CHECK-LABEL: sil [ossa] @checked_cast_anyobject_metatypeinst_to_class
 // CHECK: bb0
 // CHECK-NOT: checked_cast
@@ -946,7 +894,7 @@ bb7(%23 : $Optional<IntEnum>):
 sil [ossa] @checked_cast_anyobject_metatypeinst_to_class : $@convention(thin)() -> () {
 bb0:
   %0 = metatype $@thick AnyObject.Protocol
-  checked_cast_br %0 : $@thick AnyObject.Protocol to B.Type, bb1, bb2
+  checked_cast_br AnyObject.Protocol in %0 : $@thick AnyObject.Protocol to B.Type, bb1, bb2
 
 bb1(%3 : $@thick B.Type):
   br bb3
@@ -1371,7 +1319,7 @@ bb3(%a3 : $Builtin.Int1):
 sil [ossa] @successful_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
 bb0:
   %1 = alloc_ref $B
-  checked_cast_br [exact] %1 : $B to B, bb1, bb2
+  checked_cast_br [exact] B in %1 : $B to B, bb1, bb2
 
 bb1(%2 : @owned $B):
   destroy_value %2 : $B
@@ -1399,7 +1347,7 @@ sil [ossa] @failing_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
 bb0:
   %1 = alloc_ref $E
   %2 = upcast %1 : $E to $B
-  checked_cast_br [exact] %2 : $B to B, bb1, bb2
+  checked_cast_br [exact] B in %2 : $B to B, bb1, bb2
 
 bb1(%3 : @owned $B):
   destroy_value %3 : $B
@@ -1838,4 +1786,60 @@ bb5:
 
 bb6(%14 : $FakeBool):
   return %14 : $FakeBool
+}
+
+struct Err: Error {
+  var i: Int
+}
+
+sil @callee1 : $@convention(thin) (Int) -> @out Int
+sil @callee2 : $@convention(thin) (Int) -> (@out Int, @error_indirect Err)
+
+// CHECK-LABEL: sil [ossa] @try_apply_to_apply_with_indirect_error1 :
+// CHECK:         [[OUT:%.*]] = alloc_stack $Int
+// CHECK:         apply {{%[0-9]+}}([[OUT]], %0)
+// CHECK:       } // end sil function 'try_apply_to_apply_with_indirect_error1'
+sil [ossa] @try_apply_to_apply_with_indirect_error1 : $@convention(method) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee1 : $@convention(thin) (Int) -> @out Int
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> @out Int to $@noescape @callee_guaranteed (Int) -> @out Int
+  %3 = convert_function %2 : $@noescape @callee_guaranteed (Int) -> @out Int to $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err), forwarding: @owned
+  %4 = alloc_stack $Int
+  %5 = alloc_stack $Err
+  try_apply %3(%4, %5, %0) : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err), normal bb10, error bb11
+
+bb10(%7 : $()):
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  destroy_value %3 : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err)
+  %r = tuple ()
+  return  %r : $()
+
+bb11:
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  destroy_value %3 : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err)
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @try_apply_to_apply_with_indirect_error2 :
+// CHECK:         [[OUT:%.*]] = alloc_stack $Int
+// CHECK:         [[ERR:%.*]] = alloc_stack $Err
+// CHECK:         apply [nothrow] {{%[0-9]+}}([[OUT]], [[ERR]], %0)
+// CHECK:       } // end sil function 'try_apply_to_apply_with_indirect_error2'
+sil [ossa] @try_apply_to_apply_with_indirect_error2 : $@convention(method) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee2 : $@convention(thin) (Int) -> (@out Int, @error_indirect Err)
+  %4 = alloc_stack $Int
+  %5 = alloc_stack $Err
+  try_apply %1(%4, %5, %0) : $@convention(thin) (Int) -> (@out Int, @error_indirect Err), normal bb10, error bb11
+
+bb10(%7 : $()):
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  %r = tuple ()
+  return  %r : $()
+
+bb11:
+  unreachable
 }

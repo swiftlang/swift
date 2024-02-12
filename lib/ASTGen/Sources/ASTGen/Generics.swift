@@ -1,86 +1,85 @@
-import CASTBridging
-import SwiftParser
+//===--- Generics.swift ---------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  func visit(_ node: GenericParameterClauseSyntax) -> ASTNode {
-    let lAngleLoc = self.base.advanced(by: node.leftAngleBracket.position.utf8Offset).raw
-    let whereLoc = node.genericWhereClause.map {
-      self.base.advanced(by: $0.whereKeyword.position.utf8Offset).raw
-    }
-    let rAngleLoc = self.base.advanced(by: node.rightAngleBracket.position.utf8Offset).raw
-    return .misc(
-      self.withBridgedParametersAndRequirements(node) { params, reqs in
-        return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
-      })
+  func generate(genericParameterClause node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
+    .createParsed(
+      self.ctx,
+      leftAngleLoc: self.generateSourceLoc(node.leftAngle),
+      parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+      rightAngleLoc: self.generateSourceLoc(node.rightAngle)
+    )
   }
 
-  func visit(_ node: GenericParameterSyntax) -> ASTNode {
-    var nodeName = node.name.text
-    let name = nodeName.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
-    }
-    let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
-    let ellipsisLoc = node.ellipsis.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+  func generate(genericParameter node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
+    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
-    return .decl(
-      GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, ellipsisLoc, node.indexInParent / 2,
-        ellipsisLoc != nil))
+    var genericParameterIndex: Int?
+    for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
+      if sibling == node {
+        genericParameterIndex = index
+        break
+      }
+    }
+    guard let genericParameterIndex = genericParameterIndex else {
+      preconditionFailure("Node not part of the parent?")
+    }
+
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      eachKeywordLoc: self.generateSourceLoc(node.eachKeyword),
+      name: name,
+      nameLoc: nameLoc,
+      inheritedType: self.generate(type: node.inheritedType),
+      index: genericParameterIndex
+    )
   }
-}
 
-extension ASTGenVisitor {
-  private func withBridgedParametersAndRequirements<T>(
-    _ node: GenericParameterClauseSyntax,
-    action: (BridgedArrayRef, BridgedArrayRef) -> T
-  ) -> T {
-    var params = [UnsafeMutableRawPointer]()
-    var requirements = [BridgedRequirementRepr]()
-    for param in node.genericParameterList {
-      let loweredParameter = self.visit(param).rawValue
-      params.append(loweredParameter)
-
-      guard let requirement = param.inheritedType else {
-        continue
-      }
-
-      let loweredRequirement = self.visit(requirement)
-      GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredRequirement.rawValue)
-    }
-
-    if let nodeRequirements = node.genericWhereClause?.requirementList {
-      for requirement in nodeRequirements {
-        switch requirement.body {
-        case .conformanceRequirement(let conformance):
-          let firstType = self.visit(conformance.leftTypeIdentifier).rawValue
-          let separatorLoc = self.base.advanced(by: conformance.colon.position.utf8Offset).raw
-          let secondType = self.visit(conformance.rightTypeIdentifier).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .typeConstraint,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .sameTypeRequirement(let sameType):
-          let firstType = self.visit(sameType.leftTypeIdentifier).rawValue
-          let separatorLoc = self.base.advanced(by: sameType.equalityToken.position.utf8Offset).raw
-          let secondType = self.visit(sameType.rightTypeIdentifier).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .sameType,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .layoutRequirement(_):
-          fatalError("Cannot handle layout requirements!")
-        }
+  func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
+    let requirements = node.requirements.lazy.map {
+      switch $0.requirement {
+      case .conformanceRequirement(let conformance):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.generateSourceLoc(conformance.colon),
+          Kind: .typeConstraint,
+          FirstType: self.generate(type: conformance.leftType),
+          SecondType: self.generate(type: conformance.rightType)
+        )
+      case .sameTypeRequirement(let sameType):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.generateSourceLoc(sameType.equal),
+          Kind: .sameType,
+          FirstType: self.generate(type: sameType.leftType),
+          SecondType: self.generate(type: sameType.rightType)
+        )
+      case .layoutRequirement(_):
+        // FIXME: Implement layout requirement translation.
+        fatalError("Translation of layout requirements not implemented!")
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
     }
-    return params.withBridgedArrayRef { params in
-      return requirements.withBridgedArrayRef { reqs in
-        return action(params, reqs)
-      }
-    }
+
+    return BridgedTrailingWhereClause.createParsed(
+      self.ctx,
+      whereKeywordLoc: self.generateSourceLoc(node.whereKeyword),
+      requirements: requirements.bridgedArray(in: self)
+    )
   }
 }

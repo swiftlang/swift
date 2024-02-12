@@ -53,6 +53,11 @@ struct UInt8 {
   var _value : Builtin.Int8
 }
 
+enum KlassOptional {
+  case some(Klass)
+  case none
+}
+
 sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
 sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
@@ -140,9 +145,10 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @multiple_store_vals3 :
 // CHECK-NOT: alloc_stack
-// CHECK: [[COPY0:%.*]] = copy_value %0 : $Klass
+// The COPY0 copy/destroy is eliminated by owned value canonicalization.
+//      : [[COPY0:%.*]] = copy_value %0 : $Klass
 // CHECK: [[COPY1:%.*]] = copy_value %1 : $Klass
-// CHECK: destroy_value [[COPY0]] : $Klass
+//      : destroy_value [[COPY0]] : $Klass
 // CHECK: [[FUNC:%.*]] = function_ref @blackhole_spl :
 // CHECK: apply [[FUNC]]([[COPY1]]) : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: destroy_value [[COPY1]] : $Klass
@@ -348,8 +354,9 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @basic_block_with_loads_copy_and_take :
 // CHECK-NOT: alloc_stack
-// CHECK: [[COPY:%.*]] = copy_value %0 : $Klass
-// CHECK: destroy_value [[COPY]] : $Klass
+// The COPY/destroy pair is eliminated by owned value canonicalization.
+//      : [[COPY:%.*]] = copy_value %0 : $Klass
+//      : destroy_value [[COPY]] : $Klass
 // CHECK: destroy_value %0 : $Klass
 // CHECK-LABEL: } // end sil function 'basic_block_with_loads_copy_and_take'
 sil [ossa] @basic_block_with_loads_copy_and_take : $@convention(thin) (@owned Klass) -> () {
@@ -1026,16 +1033,10 @@ bb12:
   return %39 : $()
 }
 
-enum KlassOptional {
-  case some(Klass)
-  case none
-}
-
 sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
 
 // CHECK-LABEL: sil [ossa] @test_deadphi4 :
-// mem2reg cannot optimize an enum location which spans over multiple blocks.
-// CHECK:         alloc_stack
+// CHECK-NOT:         alloc_stack
 // CHECK-LABEL: } // end sil function 'test_deadphi4'
 sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
 bb0(%0 : @owned $KlassOptional):
@@ -1225,4 +1226,70 @@ entry(%instance : @owned $AnyObject):
   dealloc_stack %74 : $*AnyObject
   %82 = tuple ()
   return %82 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_borrow_none :
+// CHECK:       alloc_stack
+// CHECK-NOT:   alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_borrow_none'
+sil [ossa] @test_enum_store_borrow_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %2 = store_borrow %none to %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %2 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  end_borrow %2 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_none :
+// CHECK:       alloc_stack
+// CHECK-NOT:   alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_none'
+sil [ossa] @test_enum_store_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %1 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
 }

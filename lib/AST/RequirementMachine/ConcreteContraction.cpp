@@ -200,7 +200,8 @@ class ConcreteContraction {
     Other
   };
 
-  Optional<Type> substTypeParameterRec(Type type, Position position) const;
+  llvm::Optional<Type> substTypeParameterRec(Type type,
+                                             Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
@@ -233,8 +234,8 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-Optional<Type> ConcreteContraction::substTypeParameterRec(
-    Type type, Position position) const {
+llvm::Optional<Type>
+ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
   // If we have a superclass (T : C) or same-type requirement (T == C),
   // don't substitute T, since then we end up with 'C == C' or 'C : C',
@@ -271,7 +272,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
     auto baseType = memberType->getBase();
     auto substBaseType = substTypeParameterRec(baseType, Position::BaseType);
     if (!substBaseType)
-      return None;
+      return llvm::None;
 
     // A resolved DependentMemberType stores an associated type declaration.
     //
@@ -301,7 +302,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
           llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
                        << proto->getName() << "\n";
         }
-        return None;
+        return llvm::None;
       }
 
       return assocType->getDeclaredInterfaceType()
@@ -322,7 +323,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
         llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
                      << *substBaseType << "\n";
       }
-      return None;
+      return llvm::None;
     }
 
     // Substitute the base type into the member type.
@@ -332,7 +333,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Replace the generic parameter at the root of \p type, which must be a
@@ -356,13 +357,12 @@ Type ConcreteContraction::substTypeParameter(
 
 /// Substitute all type parameters occurring in structural positions of \p type.
 Type ConcreteContraction::substType(Type type) const {
-  return type.transformRec(
-      [&](Type type) -> Optional<Type> {
-        if (!type->isTypeParameter())
-          return None;
+  return type.transformRec([&](Type type) -> llvm::Optional<Type> {
+    if (!type->isTypeParameter())
+      return llvm::None;
 
-        return substTypeParameter(type, Position::Other);
-      });
+    return substTypeParameter(type, Position::Other);
+  });
 }
 
 /// Substitute all type parameters occurring in the given requirement.
@@ -690,23 +690,8 @@ bool ConcreteContraction::performConcreteContraction(
     // Otherwise, desugar the requirement again, since we might now have a
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
-    if (req.inferred) {
-      // Discard errors from desugaring a substituted requirement that
-      // was inferred. For example, if we have something like
-      //
-      //   <T, U where T == Int, U == Set<T>>
-      //
-      // The inferred requirement 'T : Hashable' from 'Set<>' will
-      // be substituted with 'T == Int' to get 'Int : Hashable'.
-      //
-      // Desugaring will diagnose a redundant conformance requirement,
-      // but we want to ignore that, since the user did not explicitly
-      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
-      SmallVector<RequirementError, 4> discardErrors;
-      desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
-    } else {
-      desugarRequirement(substReq, req.loc, reqs, errors);
-    }
+    SmallVector<InverseRequirement, 4> ignoreInverses;
+    desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
 
     for (auto desugaredReq : reqs) {
       if (Debug) {
@@ -714,7 +699,7 @@ bool ConcreteContraction::performConcreteContraction(
         desugaredReq.dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
-      result.push_back({desugaredReq, req.loc, req.inferred});
+      result.push_back({desugaredReq, req.loc});
     }
 
     if (preserveSameTypeRequirement(req.req) &&
@@ -728,7 +713,7 @@ bool ConcreteContraction::performConcreteContraction(
 
       // Make the duplicated requirement 'inferred' so that we don't diagnose
       // it as redundant.
-      result.push_back({req.req, SourceLoc(), /*inferred=*/true});
+      result.push_back({req.req, SourceLoc()});
     }
   }
 

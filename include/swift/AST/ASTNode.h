@@ -50,6 +50,15 @@ namespace swift {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
+    // These are needed for lldb.
+    ASTNode(Expr *E) : PointerUnion(E) {}
+    ASTNode(Stmt *S) : PointerUnion(S) {}
+    ASTNode(Decl *D) : PointerUnion(D) {}
+    ASTNode(Pattern *P) : PointerUnion(P) {}
+    ASTNode(TypeRepr *T) : PointerUnion(T) {}
+    ASTNode(StmtConditionElement *S) : PointerUnion(S) {}
+    ASTNode(CaseLabelItem *C) : PointerUnion(C) {}
+
     SourceRange getSourceRange() const;
 
     /// Return the location of the start of the statement.

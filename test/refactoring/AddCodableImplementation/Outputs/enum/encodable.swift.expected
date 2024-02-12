@@ -25,17 +25,15 @@ enum Payload_E: Encodable {
     case value
   }
 
-  func encode(to encoder: Encoder) throws {
+  func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: Payload_E.CodingKeys.self)
 
     switch self {
     case .plain(let a0):
-
       var nestedContainer = container.nestedContainer(keyedBy: Payload_E.PlainCodingKeys.self, forKey: Payload_E.CodingKeys.plain)
 
       try nestedContainer.encode(a0, forKey: Payload_E.PlainCodingKeys._0)
-      case .pair(let key, let value):
-
+    case .pair(let key, let value):
       var nestedContainer = container.nestedContainer(keyedBy: Payload_E.PairCodingKeys.self, forKey: Payload_E.CodingKeys.pair)
 
       try nestedContainer.encode(key, forKey: Payload_E.PairCodingKeys.key)

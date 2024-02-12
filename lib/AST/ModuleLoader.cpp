@@ -59,6 +59,11 @@ void DependencyTracker::addIncrementalDependency(StringRef File,
   }
 }
 
+void DependencyTracker::addMacroPluginDependency(StringRef File,
+                                                 Identifier ModuleName) {
+  macroPluginDeps.insert({ModuleName, std::string(File)});
+}
+
 ArrayRef<std::string>
 DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
@@ -67,6 +72,11 @@ DependencyTracker::getDependencies() const {
 ArrayRef<DependencyTracker::IncrementalDependency>
 DependencyTracker::getIncrementalDependencies() const {
   return incrementalDeps;
+}
+
+ArrayRef<DependencyTracker::MacroPluginDependency>
+DependencyTracker::getMacroPluginDependencies() const {
+  return macroPluginDeps.getArrayRef();
 }
 
 std::shared_ptr<clang::DependencyCollector>
@@ -94,7 +104,9 @@ static bool findOverlayFilesInDirectory(ASTContext &ctx, StringRef path,
     callback(file);
   }
 
-  if (error && error != std::errc::no_such_file_or_directory) {
+  // A CAS file list returns operation not permitted on directory iterations.
+  if (error && error != std::errc::no_such_file_or_directory &&
+      error != std::errc::operation_not_permitted) {
     ctx.Diags.diagnose(diagLoc, diag::cannot_list_swiftcrossimport_dir,
                        moduleName, error.message(), path);
   }
@@ -178,7 +190,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
                                                      StringRef moduleName) const {
   using namespace llvm::sys;
   using namespace file_types;
-  Optional<std::string> modulePath;
+  llvm::Optional<std::string> modulePath;
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
 
@@ -211,8 +223,6 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
       break;
     }
     case swift::ModuleDependencyKind::SwiftSource: {
-      auto *swiftSourceDep = getAsSwiftSourceModule();
-      assert(!swiftSourceDep->sourceFiles.empty());
       return result;
     }
     case swift::ModuleDependencyKind::SwiftPlaceholder: {

@@ -6,7 +6,7 @@
 
 #if MISSING_FROM_MODULE
 import MissingHeader
-// CHECK-MODULE-MAP: {{.*}}{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}module.map:{{[0-9]+:[0-9]+}}: error: header 'this-header-does-not-exist.h' not found
+// CHECK-MODULE-MAP: {{.*}}{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}module.modulemap:{{[0-9]+:[0-9]+}}: error: header 'this-header-does-not-exist.h' not found
 // CHECK-MODULE-MAP: broken-modules.swift:[[@LINE-2]]:8: error: could not build Objective-C module 'MissingHeader'
 
 #else

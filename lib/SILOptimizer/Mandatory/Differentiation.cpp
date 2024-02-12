@@ -445,7 +445,7 @@ static SILValue reapplyFunctionConversion(
 ///
 /// Returns `None` on failure, signifying that a diagnostic has been emitted
 /// using `invoker`.
-static Optional<std::pair<SILValue, AutoDiffConfig>>
+static llvm::Optional<std::pair<SILValue, AutoDiffConfig>>
 emitDerivativeFunctionReference(
     DifferentiationTransformer &transformer, SILBuilder &builder,
     const AutoDiffConfig &desiredConfig, AutoDiffDerivativeFunctionKind kind,
@@ -475,7 +475,7 @@ emitDerivativeFunctionReference(
               original, invoker,
               diag::
                   autodiff_function_noderivative_parameter_not_differentiable);
-          return None;
+          return llvm::None;
         }
       }
       auto borrowedDiffFunc =
@@ -526,7 +526,7 @@ emitDerivativeFunctionReference(
         context.emitNondifferentiabilityError(
             original, invoker,
             diag::autodiff_opaque_function_not_differentiable);
-        return None;
+        return llvm::None;
       }
       // Check and diagnose non-differentiable arguments.
       auto originalFnTy = originalFn->getLoweredFunctionType();
@@ -537,18 +537,18 @@ emitDerivativeFunctionReference(
                  .isDifferentiable(context.getModule())) {
           auto diag = context.emitNondifferentiabilityError(
               original, invoker, diag::autodiff_nondifferentiable_argument);
-          return None;
+          return llvm::None;
         }
       }
       // Check and diagnose non-differentiable results.
       for (auto resultIndex : desiredResultIndices->getIndices()) {
         SILType resultType;
         if (resultIndex >= originalFnTy->getNumResults()) {
-          auto inoutParamIdx = resultIndex - originalFnTy->getNumResults();
-          auto inoutParam =
-              *std::next(originalFnTy->getIndirectMutatingParameters().begin(),
-                         inoutParamIdx);
-          resultType = inoutParam.getSILStorageInterfaceType();
+          auto semanticResultParamIdx = resultIndex - originalFnTy->getNumResults();
+          auto semanticResultParam =
+              *std::next(originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+                         semanticResultParamIdx);
+          resultType = semanticResultParam.getSILStorageInterfaceType();
         } else {
           resultType = originalFnTy->getResults()[resultIndex]
                            .getSILStorageInterfaceType();
@@ -556,7 +556,7 @@ emitDerivativeFunctionReference(
         if (!resultType.isDifferentiable(context.getModule())) {
           context.emitNondifferentiabilityError(
               original, invoker, diag::autodiff_nondifferentiable_result);
-          return None;
+          return llvm::None;
         }
       }
       // Check and diagnose external declarations.
@@ -564,9 +564,9 @@ emitDerivativeFunctionReference(
         context.emitNondifferentiabilityError(
             original, invoker,
             diag::autodiff_external_nondifferentiable_function);
-        return None;
+        return llvm::None;
       }
-      // Sanity check passed. Create a new differentiability witness and
+      // Soundness check passed. Create a new differentiability witness and
       // canonicalize it.
       GenericSignature contextualDerivativeGenSig = GenericSignature();
       if (invoker.getKind() ==
@@ -576,7 +576,8 @@ emitDerivativeFunctionReference(
                 .second->getDerivativeGenericSignature();
       auto derivativeConstrainedGenSig =
           autodiff::getConstrainedDerivativeGenericSignature(
-              originalFn->getLoweredFunctionType(), desiredParameterIndices,
+              originalFn->getLoweredFunctionType(),
+              desiredParameterIndices, desiredResultIndices,
               contextualDerivativeGenSig,
               LookUpConformanceInModule(context.getModule().getSwiftModule()));
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
@@ -586,7 +587,7 @@ emitDerivativeFunctionReference(
           /*vjp*/ nullptr, /*isSerialized*/ false);
       if (transformer.canonicalizeDifferentiabilityWitness(
               minimalWitness, invoker, IsNotSerialized))
-        return None;
+        return llvm::None;
     }
     assert(minimalWitness);
     if (original->getFunction()->isSerialized() &&
@@ -603,7 +604,7 @@ emitDerivativeFunctionReference(
           fragileKind,
           isa_and_nonnull<AbstractClosureExpr>(
               originalFRI->getLoc().getAsASTNode<Expr>()));
-      return None;
+      return llvm::None;
     }
     // TODO(TF-482): Move generic requirement checking logic to
     // `getExactDifferentiabilityWitness` and
@@ -623,7 +624,7 @@ emitDerivativeFunctionReference(
             context, original->getType().castTo<SILFunctionType>(),
             minimalWitness->getDerivativeGenericSignature(), substMap, invoker,
             original.getLoc().getSourceLoc()))
-      return None;
+      return llvm::None;
     DifferentiabilityWitnessFunctionKind witnessKind;
     switch (kind) {
     case AutoDiffDerivativeFunctionKind::JVP:
@@ -657,7 +658,7 @@ emitDerivativeFunctionReference(
     if (requirementDecl->getDerivativeFunctionConfigurations().empty()) {
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_protocol_member_not_differentiable);
-      return None;
+      return llvm::None;
     }
     // Find the minimal derivative configuration: minimal parameter indices and
     // corresponding derivative generic signature. If it does not exist, produce
@@ -670,7 +671,7 @@ emitDerivativeFunctionReference(
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
-      return None;
+      return llvm::None;
     }
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
@@ -703,7 +704,7 @@ emitDerivativeFunctionReference(
     if (methodDecl->getDerivativeFunctionConfigurations().empty()) {
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_class_member_not_differentiable);
-      return None;
+      return llvm::None;
     }
     // Find the minimal derivative configuration: minimal parameter indices and
     // corresponding derivative generic signature. If it does not exist, produce
@@ -715,7 +716,7 @@ emitDerivativeFunctionReference(
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
-      return None;
+      return llvm::None;
     }
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethod->getType().castTo<SILFunctionType>();
@@ -739,7 +740,7 @@ emitDerivativeFunctionReference(
   // Emit the general opaque function error.
   context.emitNondifferentiabilityError(
       original, invoker, diag::autodiff_opaque_function_not_differentiable);
-  return None;
+  return llvm::None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -750,15 +751,16 @@ static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    IsSerialized_t isSerialized) {
   auto original = witness->getOriginalFunction();
+  auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating VJP:\n\t";
+    s << "Creating VJP for " << original->getName() << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
+    s << "Config: " << config << "\n\t";
   });
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto config = witness->getConfig();
 
   // === Create an empty VJP. ===
   Mangle::DifferentiationMangler mangler;
@@ -794,15 +796,16 @@ static SILFunction *createEmptyJVP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    IsSerialized_t isSerialized) {
   auto original = witness->getOriginalFunction();
+  auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating JVP:\n\t";
+    s << "Creating JVP for " << original->getName() << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
+    s << "Config: " << config << "\n\t";
   });
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto config = witness->getConfig();
 
   Mangle::DifferentiationMangler mangler;
   auto jvpName = mangler.mangleDerivativeFunction(
@@ -854,7 +857,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
       /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),
       SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
       /*interfaceYields*/ {}, neverResultInfo,
-      /*interfaceErrorResults*/ None, {}, {}, context.getASTContext());
+      /*interfaceErrorResults*/ llvm::None, {}, {}, context.getASTContext());
   auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
   auto *fatalErrorFn = fnBuilder.getOrCreateFunction(
       loc, fatalErrorFuncName, SILLinkage::PublicExternal, fatalErrorFnType,

@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 enum MyEnum {
   case east, west
@@ -21,14 +20,11 @@ struct TestStruct {
 // AFTER_PAREN: Begin completions, 2 items
 // AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#wrappedValue: MyEnum#}[')'][#MyStruct#]; name=wrappedValue:
 // AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: MyEnum#}, {#arg2: Int#}[')'][#MyStruct#]; name=arg1:arg2:
-// AFTER_PAREN: End completions
 
   @MyStruct(arg1: #^ARG_MyEnum_NODOT^#
   var test2
-// ARG_MyEnum_NODOT: Begin completions
 // ARG_MyEnum_NODOT-DAG: Decl[Struct]/CurrModule:            TestStruct[#TestStruct#]; name=TestStruct
 // ARG_MyEnum_NODOT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalMyEnum[#MyEnum#]; name=globalMyEnum
-// ARG_MyEnum_NODOT: End completions
 
   @MyStruct(arg1: .#^ARG_MyEnum_DOT^#
   var test3
@@ -36,13 +32,10 @@ struct TestStruct {
 // ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     east[#MyEnum#]; name=east
 // ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     west[#MyEnum#]; name=west
 // ARG_MyEnum_DOT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
-// ARG_MyEnum_DOT: End completions
 
   @MyStruct(arg1: MyEnum.#^ARG_MyEnum_NOBINDING^#)
-// ARG_MyEnum_NOBINDING: Begin completions
 // ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: east[#MyEnum#];
 // ARG_MyEnum_NOBINDING-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: west[#MyEnum#];
-// ARG_MyEnum_NOBINDINaG: End completions
 
   // FIXME: No call patterns are suggested if we are completing in variable with multiple property wrappers (rdar://91480982)
   func sync1() {}
@@ -50,7 +43,6 @@ struct TestStruct {
   @MyStruct(arg1: MyEnum.east, #^SECOND_ARG1^#) var test4
 // SECOND_ARG1: Begin completions, 1 items
 // SECOND_ARG1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Int#}[#Int#];
-// SECOND_ARG1: End completions
 
   @MyStruct(arg1: MyEnum.east, #^SECOND_ARG1_LABEL_NO_VAR?check=SECOND_ARG1^#)
 
@@ -58,9 +50,7 @@ struct TestStruct {
   func sync2() {}
 
   @MyStruct(arg1: MyEnum.east, arg2: #^SECOND_ARG^#) var test4
-// SECOND_ARG: Begin completions
 // SECOND_ARG-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalInt[#Int#]; name=globalInt
-// SECOND_ARG: End completions
 
   @MyStruct(arg1: MyEnum.east, arg2: #^SECOND_ARG_NO_VAR?check=SECOND_ARG^#)
 

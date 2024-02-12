@@ -1,5 +1,6 @@
 
 add_swift_host_library(swiftSema STATIC
+  AssociatedTypeInference.cpp
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
@@ -34,6 +35,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformances.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
+  LifetimeDependence.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   PCMacro.cpp
@@ -41,9 +43,11 @@ add_swift_host_library(swiftSema STATIC
   PreCheckExpr.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
+  SyntacticElementTarget.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
+  TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp
   TypeCheckCircularity.cpp
   TypeCheckCodeCompletion.cpp
@@ -58,15 +62,14 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
   TypeCheckGeneric.cpp
+  TypeCheckInvertible.cpp
   TypeCheckMacros.cpp
   TypeCheckNameLookup.cpp
   TypeCheckPattern.cpp
   TypeCheckPropertyWrapper.cpp
   TypeCheckProtocol.cpp
-  TypeCheckProtocolInference.cpp
   TypeCheckRegex.cpp
   TypeCheckRequestFunctions.cpp
-  TypeCheckRuntimeMetadataAttr.cpp
   TypeCheckStmt.cpp
   TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
@@ -74,7 +77,7 @@ add_swift_host_library(swiftSema STATIC
   TypeChecker.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     target_compile_options(swiftSema PRIVATE /O2 /Ob2)
   else()
     target_compile_options(swiftSema PRIVATE -O3)
@@ -86,13 +89,9 @@ target_link_libraries(swiftSema PRIVATE
   swiftParse
   swiftSerialization)
 
-if (SWIFT_SWIFT_PARSER)
-  target_compile_definitions(swiftSema
-    PRIVATE
-    SWIFT_SWIFT_PARSER
-  )
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftSema PRIVATE
-    $<TARGET_OBJECTS:swiftASTGen>)
+    swiftASTGen)
 endif()
 
 set_swift_llvm_is_available(swiftSema)

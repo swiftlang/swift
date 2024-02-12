@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 // LOCAL_STRING_TESTVALUE-NOT: name=testValue
 // LOCAL_STRING_TESTVALUE:     Decl[LocalVar]/Local: testValue[#String#]; name=testValue
@@ -142,11 +141,7 @@ func test_Local_OutNominal() {
     static var testValue: String = ""
     struct Inner {
       static func test() {
-        // FIXME: Currently any 'testValue' is not suggested. But since this is
-        // in 'static', 'Outer.testValue' is visible and usable.
-        // Note that the local 'testValue: Int' is not usable because struct
-        // decl cannot close over local values in outer scope.
-        #^Local_OutNominal?check=OUTNOMINAL_STRING_TESTVALUE_STATIC;xfail=rdar92479209^#
+        #^Local_OutNominal?check=OUTNOMINAL_STRING_TESTVALUE_STATIC^#
       }
     }
   }
@@ -164,13 +159,11 @@ func test_Global_Local() {
 
 func test_GenericParam_Local<testValue>(_: testValue) {
   var testValue: String = ""
-  // FIXME: The generic parameter is suggested because lookupVisibleDeclsImpl() reports it first.
-  #^GenericParam_Local?check=LOCAL_STRING_TESTVALUE;xfail=FIXME^#
+  #^GenericParam_Local?check=LOCAL_STRING_TESTVALUE^#
 }
 
 func test_GenericParam_Param<testValue>(testValue: String, _: testValue) {
-  // FIXME: The generic parameter is suggested because lookupVisibleDeclsImpl() reports it first.
-  #^GenericParam_Param?check=LOCAL_STRING_TESTVALUE;xfail=FIXME^#
+  #^GenericParam_Param?check=LOCAL_STRING_TESTVALUE^#
 }
 
 func test_GenericParam_LocalClosure<testValue>(_: testValue) {
@@ -199,7 +192,6 @@ func test_LocalFunc_LocalVar() {
   var testValue: String = ""
   #^LocalFunc_LocalVar^#
 // LocalFunc_LocalVar-NOT: name=testValue
-// LocalFunc_LocalVar-DAG: Decl[FreeFunction]/Local:           testValue({#arg: Int#})[#Void#]; name=testValue(arg:)
 // LocalFunc_LocalVar-DAG: Decl[LocalVar]/Local:               testValue[#String#]; name=testValue
 // LocalFunc_LocalVar-NOT: name=testValue
 }

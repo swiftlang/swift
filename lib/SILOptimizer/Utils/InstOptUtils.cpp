@@ -22,7 +22,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
@@ -56,14 +55,15 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-Optional<SILBasicBlock::iterator> swift::getInsertAfterPoint(SILValue val) {
+llvm::Optional<SILBasicBlock::iterator>
+swift::getInsertAfterPoint(SILValue val) {
   if (auto *inst = val->getDefiningInstruction()) {
     return std::next(inst->getIterator());
   }
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
   }
-  return None;
+  return llvm::None;
 }
 
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
@@ -308,6 +308,15 @@ void swift::eraseUsesOfValue(SILValue v) {
     inst->replaceAllUsesOfAllResultsWithUndef();
     inst->eraseFromParent();
   }
+}
+
+bool swift::hasValueDeinit(SILType type) {
+  // Do not look inside an aggregate type that has a user-deinit, for which
+  // memberwise-destruction is not equivalent to aggregate destruction.
+  if (auto *nominal = type.getNominalOrBoundGenericNominal()) {
+    return nominal->getValueTypeDestructor() != nullptr;
+  }
+  return false;
 }
 
 SILValue swift::
@@ -821,9 +830,10 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   if (isa<ConvertEscapeToNoEscapeInst>(inst))
     return true;
 
-  // Look through copy_value, begin_borrow. They are inert for our purposes, but
-  // we need to look through it.
-  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst);
+  // Look through copy_value, begin_borrow, move_value. They are inert for our
+  // purposes, but we need to look through it.
+  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst) ||
+         isa<MoveValueInst>(inst);
 }
 
 static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
@@ -892,13 +902,14 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
   callbacks.createdNewInst(u.get<ReleaseValueInst *>());
 }
 
-// *HEY YOU, YES YOU, PLEASE READ*. Even though a textual partial apply is
-// printed with the convention of the closed over function upon it, all
-// non-inout arguments to a partial_apply are passed at +1. This includes
-// arguments that will eventually be passed as guaranteed or in_guaranteed to
-// the closed over function. This is because the partial apply is building up a
-// boxed aggregate to send off to the closed over function. Of course when you
-// call the function, the proper conventions will be used.
+// NOTE: The ownership of the partial_apply argument does not match the
+// convention of the closed over function. All non-inout arguments to a
+// partial_apply are passed at +1 for regular escaping closures and +0 for
+// closures that have been promoted to partial_apply [on_stack]. An escaping
+// partial apply stores each capture in an owned box, even for guaranteed and
+// in_guaranteed argument convention. A non-escaping/on-stack closure either
+// borrows its arguments or takes an inout_aliasable address. Non-escaping
+// closures do not support owned arguments.
 void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILValue arg,
                                            SILParameterInfo paramInfo,
@@ -990,6 +1001,14 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
     return false;
   }
 
+  // We must not introduce copies for move only types.
+  // TODO: in OSSA, instead of bailing, it's possible to destroy the arguments
+  //       without the need of copies.
+  for (Operand *argOp : argsToHandle) {
+    if (argOp->get()->getType().isMoveOnly())
+      return false;
+  }
+
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
 
@@ -1024,11 +1043,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
   if (pa && pa->isOnStack()) {
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {
-      if (isa<DeallocStackInst>(use->getUser())
-          || isa<DebugValueInst>(use->getUser()))
-        deleteInsts.push_back(use->getUser());
-      else if (!deadMarkDependenceUser(use->getUser(), deleteInsts))
+      SILInstruction *user = use->getUser();
+      if (isa<DeallocStackInst>(user)
+          || isa<DebugValueInst>(user)
+          || isa<DestroyValueInst>(user)) {
+        deleteInsts.push_back(user);
+      } else if (!deadMarkDependenceUser(user, deleteInsts)) {
         return false;
+      }
     }
     for (auto *inst : reverse(deleteInsts))
       callbacks.deleteInst(inst);
@@ -1109,13 +1131,23 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
   return changed;
 }
 
-/// True if a type can be expanded without a significant increase to code size.
+// True if a type can be expanded without a significant increase to code size.
+//
+// False if expanding a type is invalid. For example, expanding a
+// struct-with-deinit drops the deinit.
 bool swift::shouldExpand(SILModule &module, SILType ty) {
   // FIXME: Expansion
   auto expansion = TypeExpansionContext::minimal();
 
   if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
     return false;
+  }
+  // A move-only-with-deinit type cannot be SROA.
+  //
+  // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
+  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+    if (nominalTy->getValueTypeDestructor())
+      return false;
   }
   if (EnableExpandAll) {
     return true;
@@ -1307,7 +1339,7 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
     return;
   }
 
-  // Incidental uses of an addres are meaningless with regard to the loaded
+  // Incidental uses of an address are meaningless with regard to the loaded
   // value.
   if (isIncidentalUse(inst) || isa<BeginUnpairedAccessInst>(inst))
     return;
@@ -1315,60 +1347,11 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
-/// Are the callees that could be called through Decl statically
-/// knowable based on the Decl and the compilation mode?
-bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
-  if (decl.isForeign)
-    return false;
-  return calleesAreStaticallyKnowable(module, decl.getDecl());
-}
-
-/// Are the callees that could be called through Decl statically
-/// knowable based on the Decl and the compilation mode?
-bool swift::calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd) {
-  assert(isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd));
-
-  // Only handle members defined within the SILModule's associated context.
-  if (!cast<DeclContext>(vd)->isChildContextOf(module.getAssociatedContext()))
-    return false;
-
-  if (vd->isDynamic()) {
-    return false;
-  }
-
-  if (!vd->hasAccess())
-    return false;
-
-  // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (vd->getEffectiveAccess()) {
-  case AccessLevel::Open:
-    return false;
-  case AccessLevel::Public:
-  case AccessLevel::Package:
-    if (isa<ConstructorDecl>(vd)) {
-      // Constructors are special: a derived class in another module can
-      // "override" a constructor if its class is "open", although the
-      // constructor itself is not open.
-      auto *nd = vd->getDeclContext()->getSelfNominalTypeDecl();
-      if (nd->getEffectiveAccess() == AccessLevel::Open)
-        return false;
-    }
-    LLVM_FALLTHROUGH;
-  case AccessLevel::Internal:
-    return module.isWholeModule();
-  case AccessLevel::FilePrivate:
-  case AccessLevel::Private:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled access level in switch.");
-}
-
-Optional<FindLocalApplySitesResult>
+llvm::Optional<FindLocalApplySitesResult>
 swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   SmallVector<Operand *, 32> worklist(fri->use_begin(), fri->use_end());
 
-  Optional<FindLocalApplySitesResult> f;
+  llvm::Optional<FindLocalApplySitesResult> f;
   f.emplace();
 
   // Optimistically state that we have no escapes before our def-use dataflow.
@@ -1441,14 +1424,14 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   // If we did escape and didn't find any apply sites, then we have no
   // information for our users that is interesting.
   if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
-    return None;
+    return llvm::None;
   return f;
 }
 
 /// Insert destroys of captured arguments of partial_apply [stack].
 void swift::insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
-    llvm::function_ref<bool(SILValue)> shouldInsertDestroy,
+    llvm::function_ref<SILValue(SILValue)> getValueToDestroy,
     SILLocation origLoc) {
   assert(pai->isOnStack());
 
@@ -1457,14 +1440,14 @@ void swift::insertDestroyOfCapturedArguments(
                                     pai->getModule());
   auto loc = CleanupLocation(origLoc);
   for (auto &arg : pai->getArgumentOperands()) {
-    SILValue argValue = arg.get();
-    BeginBorrowInst *argBorrow = dyn_cast<BeginBorrowInst>(argValue);
-    if (argBorrow) {
-      argValue = argBorrow->getOperand();
-      builder.createEndBorrow(loc, argBorrow);
-    }
-    if (!shouldInsertDestroy(argValue))
+    SILValue argValue = getValueToDestroy(arg.get());
+    if (!argValue)
       continue;
+
+    assert(!pai->getFunction()->hasOwnership()
+           || (argValue->getOwnershipKind().isCompatibleWith(
+                 OwnershipKind::Owned)));
+
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
@@ -1472,26 +1455,30 @@ void swift::insertDestroyOfCapturedArguments(
   }
 }
 
-void swift::insertDeallocOfCapturedArguments(PartialApplyInst *pai,
-                                             DominanceInfo *domInfo) {
+void swift::insertDeallocOfCapturedArguments(
+  PartialApplyInst *pai,
+  DominanceInfo *domInfo,
+  llvm::function_ref<SILValue(SILValue)> getAddressToDealloc)
+{
   assert(pai->isOnStack());
 
   ApplySite site(pai);
   SILFunctionConventions calleeConv(site.getSubstCalleeType(),
                                     pai->getModule());
   for (auto &arg : pai->getArgumentOperands()) {
-    SILValue argValue = arg.get();
-    if (auto argBorrow = dyn_cast<BeginBorrowInst>(argValue)) {
-      argValue = argBorrow->getOperand();
-    }
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
     if (!paramInfo.isIndirectInGuaranteed())
       continue;
 
+    SILValue argValue = getAddressToDealloc(arg.get());
+    if (!argValue) {
+      continue;
+    }
+
     SmallVector<SILBasicBlock *, 4> boundary;
-    auto *asi = cast<AllocStackInst>(arg.get());
+    auto *asi = cast<AllocStackInst>(argValue);
     computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
 
     SmallVector<Operand *, 2> uses;
@@ -1769,9 +1756,14 @@ SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
 
 bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
-  if (!OwnershipForwardingMixin::isa(forwardingInst) ||
-      isa<AllArgOwnershipForwardingSingleValueInst>(forwardingInst))
+  auto fwdOp = ForwardingOperation(forwardingInst);
+  if (!fwdOp) {
     return false;
+  }
+  auto *singleFwdOp = fwdOp.getSingleForwardingOperand();
+  if (!singleFwdOp) {
+    return false;
+  }
 
   SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));
   while (!worklist.empty()) {
@@ -1794,7 +1786,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
 
   // Now that we know we can perform our transform, set all uses of
   // forwardingInst to be used of its operand and then delete \p forwardingInst.
-  auto newValue = forwardingInst->getOperand(0);
+  auto newValue = singleFwdOp->get();
   while (!forwardingInst->use_empty()) {
     auto *use = *(forwardingInst->use_begin());
     use->set(newValue);
@@ -1826,6 +1818,10 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
 }
 
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
+//
+// TODO: whenever a debug_value is inserted at a new location, check that no
+// other debug_value instructions exist between the old and new location for
+// the same variable.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
@@ -1845,7 +1841,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         }
       }
   }
-
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
   // we need to make sure any of its related `debug_value` instruction
@@ -1907,6 +1902,23 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
+  }
+}
+
+void swift::salvageLoadDebugInfo(LoadOperation load) {
+  for (Operand *debugUse : getDebugUses(load.getLoadInst())) {
+    // Create a new debug_value rather than reusing the old one so the
+    // SILBuilder adds 'expr(deref)' to account for the indirection.
+    auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
+    auto varInfo = debugInst->getVarInfo();
+    if (!varInfo)
+      continue;
+
+    // The new debug_value must be "hoisted" to the load to ensure that the
+    // address is still valid.
+    SILBuilder(load.getLoadInst(), debugInst->getDebugScope())
+      .createDebugValueAddr(debugInst->getLoc(), load.getOperand(),
+                            varInfo.value());
   }
 }
 

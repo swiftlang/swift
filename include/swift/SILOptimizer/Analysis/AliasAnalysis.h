@@ -22,6 +22,10 @@ namespace swift {
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
+///
+/// This wrapper sits above the SwiftCompilerSource implementation of
+/// AliasAnalysis. The implementation calls into AliasAnalysis.swift via
+/// BridgedAliasAnalysis whenever the result may depend on escape analysis.
 class AliasAnalysis {
 public:
 
@@ -85,7 +89,7 @@ private:
   /// The alias() method uses this map to cache queries.
   llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
 
-  using MemoryBehavior = SILInstruction::MemoryBehavior;
+  using MemoryBehavior = MemoryBehavior;
 
   /// MemoryBehavior value cache.
   ///
@@ -129,6 +133,8 @@ private:
 public:
   AliasAnalysis(SILPassManager *PM) : PM(PM) {}
 
+  ~AliasAnalysis();
+
   static SILAnalysisKind getAnalysisKind() { return SILAnalysisKind::Alias; }
 
   /// Perform an alias query to see if V1, V2 refer to the same values.
@@ -159,17 +165,27 @@ public:
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
   }
 
-  /// Use the alias analysis to determine the memory behavior of Inst with
-  /// respect to V.
+  /// Compute the effects of Inst's memory behavior on the memory pointed to by
+  /// the value V.
+  ///
+  /// This is the top-level API for memory behavior.
+  ///
+  /// 1. MemoryBehaviorVisitor overrides select instruction types. Types that
+  /// have no override default to SILInstruction::getMemoryBehavior(), which is
+  /// not specific to the memory pointed to by V.
+  ///
+  /// 2. For instruction types overridden by MemoryBehaviorVisitor, this uses
+  /// alias analysis to disambiguate the Inst's memory effects from the memory
+  /// pointed to by value V. 'mayAlias' is used for memory operations and
+  /// 'getMemoryEffectOnEscapedAddress' is used for calls and releases.
+  ///
+  /// 3. For calls, alias analysis uses callee analysis to retrieve function
+  /// side effects which provides the memory behavior of each argument.
   MemoryBehavior computeMemoryBehavior(SILInstruction *Inst, SILValue V);
-
-  /// Use the alias analysis to determine the memory behavior of Inst with
-  /// respect to V.
-  MemoryBehavior computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V);
 
   /// Returns true if \p Inst may read from memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayRead.
+  /// For details see MemoryBehavior::MayRead.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayRead ||
@@ -180,7 +196,7 @@ public:
   /// Returns true if \p Inst may write to memory or deinitialize memory at
   /// address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayWrite.
+  /// For details see MemoryBehavior::MayWrite.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayWrite ||
@@ -191,7 +207,7 @@ public:
   /// Returns true if \p Inst may read from memory, write to memory or
   /// deinitialize memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return MemoryBehavior::None != B;
@@ -203,20 +219,37 @@ public:
   /// Returns true if \p Ptr may be released by the builtin \p BI.
   bool canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr);
 
-  /// Returns true if the address(es of) `addr` can escape to `toInst`.
-  MemoryBehavior getMemoryBehaviorOfInst(SILValue addr, SILInstruction *toInst);
+  int getComplexityBudget(SILValue valueInFunction);
 
   /// Returns true if the object(s of) `obj` can escape to `toInst`.
+  ///
+  /// Special entry point into BridgedAliasAnalysis (escape analysis) for use in
+  /// ARC analysis.
   bool isObjectReleasedByInst(SILValue obj, SILInstruction *toInst);
 
   /// Is the `addr` within all reachable objects/addresses, when start walking
   /// from `obj`?
+  ///
+  /// Special entry point into BridgedAliasAnalysis (escape analysis) for use in
+  /// ARC analysis.
   bool isAddrVisibleFromObject(SILValue addr, SILValue obj);
+
+  /// MARK: implementation helpers for MemBehaviorVisitor.
+
+  /// If the address(es of) `addr` can escape to `toInst` (based on escape
+  /// analysis), return the memory effect of `toInst` on the escaped memory.
+  ///
+  /// This should not be called directly; it is an implementation helper for
+  /// querying escape analysis.
+  MemoryBehavior getMemoryEffectOnEscapedAddress(SILValue addr, SILInstruction *toInst);
+
+protected:
+  /// Use the alias analysis to determine the memory behavior of Inst with
+  /// respect to V.
+  MemoryBehavior computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V);
 
   /// Returns true if `lhs` can reference the same field as `rhs`.
   bool canReferenceSameField(SILValue lhs, SILValue rhs);
-
-  int getEstimatedFunctionSize(SILValue valueInFunction);
 };
 
 

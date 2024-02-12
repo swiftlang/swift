@@ -20,42 +20,42 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedWitnessTableEntry
     
-    public typealias Kind = swift.SILWitnessTable.WitnessKind
-    
+    public typealias Kind = BridgedWitnessTableEntry.Kind
+
     public var kind: Kind {
-      return SILWitnessTableEntry_getKind(bridged)
+      return bridged.getKind()
     }
     
     public var methodFunction: Function? {
       assert(kind == .Method)
-      return SILWitnessTableEntry_getMethodFunction(bridged).function
+      return bridged.getMethodFunction().function
     }
 
     public var description: String {
-      let stdString = SILWitnessTableEntry_debugDescription(bridged)
-      return String(_cxxString: stdString)
+      return String(taking: bridged.getDebugDescription())
     }
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedArrayRef
+    fileprivate let base: BridgedWitnessTableEntry
+    public let count: Int
     
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { return Int(bridged.numElements) }
+    public var endIndex: Int { return count }
     
     public subscript(_ index: Int) -> Entry {
-      assert(index >= 0 && index < endIndex)
-      return Entry(bridged: BridgedWitnessTableEntry(ptr: bridged.data! + index &* BridgedWitnessTableEntrySize))
+      assert(index >= startIndex && index < endIndex)
+      return Entry(bridged: base.advanceBy(index))
     }
   }
 
   public var entries: EntryArray {
-    EntryArray(bridged: SILWitnessTable_getEntries(bridged))
+    let entries = bridged.getEntries()
+    return EntryArray(base: entries.base, count: entries.count)
   }
 
   public var description: String {
-    let stdString = SILWitnessTable_debugDescription(bridged)
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }
 
@@ -68,28 +68,28 @@ public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildre
   public typealias EntryArray = WitnessTable.EntryArray
 
   public var entries: EntryArray {
-    EntryArray(bridged: SILDefaultWitnessTable_getEntries(bridged))
+    let entries = bridged.getEntries()
+    return EntryArray(base: entries.base, count: entries.count)
   }
 
   public var description: String {
-    let stdString = SILDefaultWitnessTable_debugDescription(bridged)
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }
 
 extension OptionalBridgedWitnessTable {
-  public var table: WitnessTable? {
-    if let p = ptr {
-      return WitnessTable(bridged: BridgedWitnessTable(ptr: p))
+  public var witnessTable: WitnessTable? {
+    if let table = table {
+      return WitnessTable(bridged: BridgedWitnessTable(table: table))
     }
     return nil
   }
 }
 
 extension OptionalBridgedDefaultWitnessTable {
-  public var table: DefaultWitnessTable? {
-    if let p = ptr {
-      return DefaultWitnessTable(bridged: BridgedDefaultWitnessTable(ptr: p))
+  public var defaultWitnessTable: DefaultWitnessTable? {
+    if let table = table {
+      return DefaultWitnessTable(bridged: BridgedDefaultWitnessTable(table: table))
     }
     return nil
   }

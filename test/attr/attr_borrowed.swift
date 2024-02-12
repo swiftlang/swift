@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 
 import Foundation
 
@@ -17,4 +18,13 @@ var string = ""
 @objc class A {
   @_borrowed // expected-error {{property cannot be '@_borrowed' if it is '@objc dynamic'}}
   @objc dynamic var title: String { return "" }
+}
+
+public class Holder {
+  @_borrowed var one: String {
+    get async { "" } // expected-error {{getter cannot be '@_borrowed' if it is 'async' or 'throws'}}
+  }
+  @_borrowed var two: String {
+    get throws { "" } // expected-error {{getter cannot be '@_borrowed' if it is 'async' or 'throws'}}
+  }
 }

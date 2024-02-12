@@ -106,6 +106,7 @@ namespace {
     
     const Options options;
     const bool isOriginallyTypeLookup;
+    const bool isOriginallyMacroLookup;
     const NLOptions baseNLOptions;
 
     // Outputs
@@ -167,7 +168,8 @@ namespace {
 #pragma mark common helper declarations
     static NLOptions
     computeBaseNLOptions(const UnqualifiedLookupOptions options,
-                         const bool isOriginallyTypeLookup);
+                         const bool isOriginallyTypeLookup,
+                         const bool isOriginallyMacroLookup);
 
     void findResultsAndSaveUnavailables(
         const DeclContext *lookupContextForThisContext,
@@ -260,7 +262,10 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   DebugClient(M.getDebugClient()),
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
-  baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
+  isOriginallyMacroLookup(options.contains(Flags::MacroLookup)),
+  baseNLOptions(
+      computeBaseNLOptions(
+        options, isOriginallyTypeLookup, isOriginallyMacroLookup)),
   Results(Results),
   IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
@@ -275,6 +280,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   FrontendStatsTracer StatsTracer(Ctx.Stats,
                                   "performUnqualifiedLookup",
                                   DC->getParentSourceFile());
+
+  if (options.contains(UnqualifiedLookupFlags::ModuleLookup)) {
+    lookForAModuleWithTheGivenName(DC->getModuleScopeContext());
+    recordCompletionOfAScope();
+    return;
+  }
 
   if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
@@ -333,7 +344,8 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
     return;
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
+  contextForLookup->lookupQualified(selfBounds, Name, factory->Loc,
+                                    baseNLOptions, Lookup);
   for (auto Result : Lookup) {
     auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
     auto baseDecl = getBaseDeclForResult(baseDC);
@@ -397,21 +409,29 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
     return false;
   }
 
-  // Find the condition that defined the self decl,
-  // and check that both its LHS and RHS are 'self'
-  for (auto cond : conditionalStmt->getCond()) {
-    if (auto pattern = cond.getPattern()) {
-      if (pattern->getBoundName() != Ctx.Id_self) {
-        continue;
-      }
-    }
+  return conditionalStmt->rebindsSelf(Ctx);
+}
 
-    if (auto selfDRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
-      return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-    }
+// Finds the nearest parent closure, which would define the
+// permitted usage of implicit self. In closures this is most
+// often just `dc` itself, but in functions defined in the
+// closure body this would be some parent context.
+ClosureExpr *closestParentClosure(DeclContext *dc) {
+  if (!dc) {
+    return nullptr;
   }
 
-  return false;
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
+    return closure;
+  }
+
+  // Stop searching if we find a type decl, since types always
+  // redefine what 'self' means, even when nested inside a closure.
+  if (dc->getContextKind() == DeclContextKind::GenericTypeDecl) {
+    return nullptr;
+  }
+
+  return closestParentClosure(dc->getParent());
 }
 
 ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
@@ -425,7 +445,7 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   // self _always_ refers to the context's self `ParamDecl`, even if there
   // is another local decl with the name `self` that would be found by
   // `lookupSingleLocalDecl`.
-  auto closureExpr = dyn_cast<ClosureExpr>(factory->DC);
+  auto closureExpr = closestParentClosure(factory->DC);
   if (!closureExpr) {
     return nullptr;
   }
@@ -516,12 +536,16 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
-                                               : ResolutionKind::Overloadable;
+                      : isOriginallyMacroLookup ? ResolutionKind::MacrosOnly
+                      : ResolutionKind::Overloadable;
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(Flags::ExcludeMacroExpansions))
+    nlOptions |= NL_ExcludeMacroExpansions;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
-                 NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
+                 NLKind::UnqualifiedLookup, resolutionKind, dc,
+                 Loc, nlOptions);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -607,12 +631,15 @@ void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
-    const bool isOriginallyTypeLookup) {
+    const bool isOriginallyTypeLookup,
+    const bool isOriginallyMacroLookup) {
   NLOptions baseNLOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
     baseNLOptions |= NL_ProtocolMembers;
   if (isOriginallyTypeLookup)
     baseNLOptions |= NL_OnlyTypes;
+  if (isOriginallyMacroLookup)
+    baseNLOptions |= NL_OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
     baseNLOptions |= NL_IgnoreAccessControl;
   return baseNLOptions;

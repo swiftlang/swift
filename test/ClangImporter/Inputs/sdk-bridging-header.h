@@ -1,4 +1,5 @@
 @import ObjectiveC;
+#import <stdbool.h>
 
 @class NSArray;
 
@@ -11,3 +12,5 @@
 + (nonnull MyPredicate *)and:(nonnull NSArray *)subpredicates;
 + (nonnull MyPredicate *)or:(nonnull NSArray *)subpredicates;
 @end
+
+#define MY_TRUE true

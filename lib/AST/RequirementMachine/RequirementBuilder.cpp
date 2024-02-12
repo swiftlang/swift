@@ -133,7 +133,7 @@ class RequirementBuilder {
   // Input parameters.
   const RewriteSystem &System;
   const PropertyMap &Map;
-  TypeArrayView<GenericTypeParamType> GenericParams;
+  ArrayRef<GenericTypeParamType *> GenericParams;
   bool ReconstituteSugar;
   bool Debug;
 
@@ -147,7 +147,7 @@ public:
   std::vector<ProtocolTypeAlias> Aliases;
 
   RequirementBuilder(const RewriteSystem &system, const PropertyMap &map,
-                     TypeArrayView<GenericTypeParamType> genericParams,
+                     ArrayRef<GenericTypeParamType *> genericParams,
                      bool reconstituteSugar)
     : System(system), Map(map),
       GenericParams(genericParams),
@@ -166,11 +166,11 @@ public:
 }  // end namespace
 
 static Type replaceTypeParametersWithErrorTypes(Type type) {
-  return type.transformRec([](Type t) -> Optional<Type> {
-      if (t->isTypeParameter())
-        return ErrorType::get(t->getASTContext());
-      return None;
-    });
+  return type.transformRec([](Type t) -> llvm::Optional<Type> {
+    if (t->isTypeParameter())
+      return ErrorType::get(t->getASTContext());
+    return llvm::None;
+  });
 }
 
 void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
@@ -312,6 +312,7 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
 
       auto &component = Components[rule.getRHS()];
       assert(!component.ConcreteType);
+      (void) component;
       Components[rule.getRHS()].ConcreteType = concreteType;
     } else {
       Components[rule.getRHS()].Aliases.push_back(name);
@@ -380,7 +381,7 @@ void
 RequirementMachine::buildRequirementsFromRules(
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {

@@ -28,12 +28,17 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
     return;
 
   auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback)
+  if (!fallback || isa<AbstractClosureExpr>(fallback->DC)) {
+    // If the expression is embedded in a closure, the constraint system tries
+    // to retrieve that closure's type, which will fail since we won't have
+    // generated any type variables for it. Thus, fallback type checking isn't
+    // available in this case.
     return;
+  }
 
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+  SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
+                                          Type(),
+                                          /*isDiscared=*/true);
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
                              [&](const Solution &S) { sawSolution(S); });
 }
@@ -42,12 +47,17 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
 Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
                                       ASTNode Node) {
+  // Use the contextual type, unless it is still unresolved, in which case fall
+  // back to getting the type from the expression.
+  if (auto ContextualType = S.getContextualType(Node)) {
+    if (!ContextualType->hasUnresolvedType())
+      return ContextualType;
+  }
+
   if (!S.hasType(Node)) {
     assert(false && "Expression wasn't type checked?");
     return nullptr;
   }
-
-  auto &CS = S.getConstraintSystem();
 
   Type Result;
 
@@ -57,9 +67,6 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
     Result = S.getResolvedType(Node);
   }
 
-  if (!Result || Result->is<UnresolvedType>()) {
-    Result = CS.getContextualType(Node, /*forConstraint=*/false);
-  }
   if (Result && Result->is<UnresolvedType>()) {
     Result = Type();
   }
@@ -81,7 +88,13 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
 /// \endcode
 /// If the code completion expression occurs in such an AST, return the
 /// declaration of the \c $match variable, otherwise return \c nullptr.
-static VarDecl *getMatchVarIfInPatternMatch(Expr *E, ConstraintSystem &CS) {
+static VarDecl *getMatchVarIfInPatternMatch(Expr *E, const Solution &S) {
+  if (auto EP = S.getExprPatternFor(E))
+    return EP.get()->getMatchVar();
+
+  // TODO: Once ExprPattern type-checking is fully moved into the solver,
+  // the below can be deleted.
+  auto &CS = S.getConstraintSystem();
   auto &Context = CS.getASTContext();
 
   auto *Binary = dyn_cast_or_null<BinaryExpr>(CS.getParentExpr(E));
@@ -109,20 +122,21 @@ static VarDecl *getMatchVarIfInPatternMatch(Expr *E, ConstraintSystem &CS) {
 }
 
 Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
-  if (auto MatchVar = getMatchVarIfInPatternMatch(E, S.getConstraintSystem())) {
-    Type MatchVarType;
-    // If the MatchVar has an explicit type, it's not part of the solution. But
-    // we can look it up in the constraint system directly.
-    if (auto T = S.getConstraintSystem().getVarType(MatchVar)) {
-      MatchVarType = T;
-    } else {
-      MatchVarType = getTypeForCompletion(S, MatchVar);
-    }
-    if (MatchVarType) {
-      return MatchVarType;
-    }
-  }
-  return nullptr;
+  auto MatchVar = getMatchVarIfInPatternMatch(E, S);
+  if (!MatchVar)
+    return nullptr;
+
+  if (S.hasType(MatchVar))
+    return S.getResolvedType(MatchVar);
+
+  // If the ExprPattern wasn't solved as part of the constraint system, it's
+  // not part of the solution.
+  // TODO: This can be removed once ExprPattern type-checking is fully part
+  // of the constraint system.
+  if (auto T = S.getConstraintSystem().getVarType(MatchVar))
+    return T;
+
+  return getTypeForCompletion(S, MatchVar);
 }
 
 void swift::ide::getSolutionSpecificVarTypes(
@@ -136,20 +150,13 @@ void swift::ide::getSolutionSpecificVarTypes(
   }
 }
 
-bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
-                                                  Expr *CompletionExpr) {
-  Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
-  if (!ParentExpr)
-    return CS.getContextualTypePurpose(CompletionExpr) == CTP_ReturnSingleExpr;
+void WithSolutionSpecificVarTypesRAII::setInterfaceType(VarDecl *VD, Type Ty) {
+  VD->getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{VD},
+                                            std::move(Ty));
+}
 
-  if (auto *ParentCE = dyn_cast<ClosureExpr>(ParentExpr)) {
-    if (ParentCE->hasSingleExpressionBody() &&
-        ParentCE->getSingleExpressionBody() == CompletionExpr) {
-      ASTNode Last = ParentCE->getBody()->getLastElement();
-      return !Last.isStmt(StmtKind::Return) || Last.isImplicit();
-    }
-  }
-  return false;
+bool swift::ide::isImpliedResult(const Solution &S, Expr *CompletionExpr) {
+  return S.isImpliedResult(CompletionExpr).has_value();
 }
 
 bool swift::ide::isContextAsync(const constraints::Solution &S,
@@ -165,9 +172,8 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    closure that doesn't contain any async calles. Thus the closure is
   //    type-checked as non-async, but it might get converted to an async
   //    closure based on its contextual type
-  auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
-  if (target != S.solutionApplicationTargets.end()) {
-    if (auto ContextTy = target->second.getClosureContextualType()) {
+  if (auto target = S.getTargetFor(dyn_cast<ClosureExpr>(DC))) {
+    if (auto ContextTy = target->getClosureContextualType()) {
       if (auto ContextFuncTy =
               S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
         return ContextFuncTy->isAsync();

@@ -13,7 +13,6 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -143,6 +142,22 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+namespace {
+
+template<typename Container>
+bool containsValue(
+    const Container &container,
+    typename Container::value_type const &element
+) {
+  for (const auto &value : container) {
+    if (value == element)
+      return true;
+  }
+
+  return false;
+}
+
+}
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -177,12 +192,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-aarch64-use-tbi");
   }
 
-  if (output.getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
-    arguments.push_back("-warn-on-potentially-unavailable-enum-case");
-  }
-
   // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin()) {
+  if (Triple.isOSDarwin() &&
+      !containsValue(
+          inputArgs
+            .getAllArgValues(options::OPT_enable_experimental_feature),
+          "Embedded")) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -211,6 +226,24 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_root)) {
+    arguments.push_back("-windows-sdk-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_version)) {
+    arguments.push_back("-windows-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_root)) {
+    arguments.push_back("-visualc-tools-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_version)) {
+    arguments.push_back("-visualc-tools-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+
+
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
   }
@@ -218,7 +251,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
-  inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
@@ -239,6 +271,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension_library);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
@@ -249,6 +282,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
+  inputArgs.AddLastArg(arguments, options::OPT_dwarf_version);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
@@ -275,6 +309,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_stable_abi_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
@@ -299,14 +334,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
-  inputArgs.AddLastArg(arguments, options::OPT_load_plugin_library);
-  inputArgs.AddLastArg(arguments, options::OPT_load_plugin_executable);
+  inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
 
   // Pass on any build config options
@@ -356,9 +388,32 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
   }
 
+  // Specify default plugin search path options after explicitly specified
+  // options.
+  inputArgs.AddAllArgs(arguments, options::OPT_plugin_search_Group);
+  addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
+
+  addPluginArguments(inputArgs, arguments);
+
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
+}
+
+void ToolChain::addPlatformSpecificPluginFrontendArgs(
+    const OutputInfo &OI,
+    const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  // Overridden where necessary.
 }
 
 static void addRuntimeLibraryFlags(const OutputInfo &OI,
@@ -700,13 +755,18 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
+  case file_types::TY_SwiftFixIt:
+  case file_types::TY_ModuleSemanticInfo:
+  case file_types::TY_CachedDiagnostics:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -825,6 +885,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -961,13 +1025,18 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_PackageSwiftModuleInterfaceFile:
     case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
     case file_types::TY_IndexUnitOutputPath:
     case file_types::TY_SwiftABIDescriptor:
+    case file_types::TY_SwiftAPIDescriptor:
     case file_types::TY_ConstValues:
+    case file_types::TY_SwiftFixIt:
+    case file_types::TY_ModuleSemanticInfo:
+    case file_types::TY_CachedDiagnostics:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -1112,6 +1181,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
@@ -1127,8 +1199,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -1400,9 +1470,10 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
   getResourceDirPath(LibPath, Args, /*Shared=*/true);
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
-  llvm::sys::path::append(LibPath, "clang", "lib",
-                          T.isOSDarwin() ? "darwin"
-                                         : getPlatformNameForTriple(T));
+  StringRef platformName = "darwin";
+  if (!T.isOSDarwin())
+    platformName = T.isAndroid() ? "linux" : getPlatformNameForTriple(T);
+  llvm::sys::path::append(LibPath, "clang", "lib", platformName);
 }
 
 /// Get the runtime library link path, which is platform-specific and found
@@ -1460,7 +1531,8 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
   if (!scratchPath.empty())
     runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
-  if (!SDKPath.empty()) {
+  // Only Darwin places libraries directly in /sdk/usr/lib/swift/.
+  if (Triple.isOSDarwin() && !SDKPath.empty()) {
     if (!scratchPath.empty()) {
       // If we added the secondary resource dir, we also need the iOSSupport
       // directory.

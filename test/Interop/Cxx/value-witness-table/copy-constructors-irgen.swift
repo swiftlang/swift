@@ -6,12 +6,8 @@
 import CopyConstructors
 
 // CHECK-LABEL: define swiftcc void @"$s4main31testUserProvidedCopyConstructor3objSo03HascdeF0V_AEtAE_tF"
-// CHECK: [[T0_DEST:%.*]] = bitcast %TSo30HasUserProvidedCopyConstructorV* [[ARG0:%[0-9]+]] to %struct.HasUserProvidedCopyConstructor*
-// CHECK: [[T0_SRC:%.*]] = bitcast %TSo30HasUserProvidedCopyConstructorV* [[ARG2:%[0-9]+]] to %struct.HasUserProvidedCopyConstructor*
-// CHECK: call void @_ZN30HasUserProvidedCopyConstructorC1ERKS_(%struct.HasUserProvidedCopyConstructor* [[T0_DEST]], %struct.HasUserProvidedCopyConstructor* [[T0_SRC]])
-// CHECK: [[T1_DEST:%.*]] = bitcast %TSo30HasUserProvidedCopyConstructorV* [[ARG1:%[0-9]+]] to %struct.HasUserProvidedCopyConstructor*
-// CHECK: [[T1_SRC:%.*]] = bitcast %TSo30HasUserProvidedCopyConstructorV* [[ARG2]] to %struct.HasUserProvidedCopyConstructor*
-// CHECK: call void @_ZN30HasUserProvidedCopyConstructorC1ERKS_(%struct.HasUserProvidedCopyConstructor* [[T1_DEST]], %struct.HasUserProvidedCopyConstructor* [[T1_SRC]])
+// CHECK: call void @_ZN30HasUserProvidedCopyConstructorC1ERKS_(ptr [[ARG0:%[0-9]+]], ptr [[ARG2:%[0-9]+]])
+// CHECK: call void @_ZN30HasUserProvidedCopyConstructorC1ERKS_(ptr [[ARG1:%[0-9]+]], ptr [[ARG2]])
 // CHECK: ret void
 
 // CHECK-LABEL: define linkonce_odr void @_ZN30HasUserProvidedCopyConstructorC1ERKS_

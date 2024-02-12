@@ -33,6 +33,7 @@ class C {}
 // CHECK-LABEL: sil [ossa] @foo
 // CHECK: begin_borrow {{%[^,]+}}
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
+// CHECK: begin_borrow [var_decl] {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'foo'
 sil [ossa] @foo : $@convention(thin) () -> () {
   %instance = alloc_ref $C
@@ -40,7 +41,32 @@ sil [ossa] @foo : $@convention(thin) () -> () {
   end_borrow %guaranteed_c2 : $C
   %guaranteed_c = begin_borrow [lexical] %instance : $C
   end_borrow %guaranteed_c : $C
+  %guaranteed_c3 = begin_borrow [var_decl] %instance : $C
+  end_borrow %guaranteed_c3 : $C
   destroy_value %instance : $C
   %res = tuple ()
   return %res : $()
 }
+
+// CHECK-LABEL: sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
+// CHECK: bb3([[ARG:%.*]] : @reborrow @guaranteed $C):
+// CHECK: } // end sil function 'reborrowTest'
+sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b1 = begin_borrow %0 : $C
+  br bb3(%b1 : $C)
+
+bb2:
+  %b2 = begin_borrow %0 : $C
+  br bb3(%b2 : $C)
+
+bb3(%r : @reborrow @guaranteed $C):
+  end_borrow %r : $C
+  destroy_value %0 : $C
+  %9999 = tuple()
+  return %9999 : $()
+}
+

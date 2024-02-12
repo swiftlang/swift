@@ -180,6 +180,8 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
       }
       return 1;
     }
+    case DLQ_GetObjCInteropIsEnabled:
+      break;
   }
 
   return 0;
@@ -187,7 +189,10 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
 
 static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
                                        void *context) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-qual"
   free((void *)bytes);
+#pragma clang diagnostic pop
 }
 
 static
@@ -652,10 +657,13 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
           void *outFreeContext = NULL;
           // !!! FIXME !!! obtain the pointer by properly projecting the enum value
           // Next lines are a hack to prove the concept.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-qual"
           const void *rawPtr
             = PipeMemoryReader_readBytes((void *)&Pipe, EnumInstance, 8, &outFreeContext);
           uintptr_t instance = *(uintptr_t *)rawPtr & 0xffffffffffffff8ULL;
           PipeMemoryReader_freeBytes((void *)&Pipe, rawPtr, outFreeContext);
+#pragma clang diagnostic pop
 
           // Indirect enum stores the payload as the first field of a closure context
           swift_typeinfo_t TI = swift_reflection_infoForInstance(RC, instance);
@@ -764,10 +772,6 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       exit(status);
     }
     default: { // Parent
-      for (int i = 5; i > 1; i--) {
-	fprintf(stderr, "%d\n", i);
-	sleep(1);
-      }
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
       SwiftReflectionContextRef RC =

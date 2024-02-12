@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 sil_stage canonical
 
@@ -23,7 +23,7 @@ right:
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   br exit(%c2 : $C)
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -45,7 +45,7 @@ right:
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   br exit(%c2 : $C)
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -67,7 +67,7 @@ right:
   %m2 = move_value [lexical] %c2 : $C
   br exit(%m2 : $C)
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -90,7 +90,7 @@ right:
   %m2 = move_value [lexical] %c2 : $C
   br exit(%m2 : $C)
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -128,7 +128,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -167,7 +167,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -206,7 +206,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -245,7 +245,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()
@@ -284,7 +284,7 @@ rb(%cr : @owned $C):
   br exit(%cr : $C)
 
 exit(%cm : @owned $C):
-  test_specification "is-lexical @block.argument"
+  specify_test "is-lexical @block.argument"
   destroy_value %cm : $C
   %retval = tuple ()
   return %retval : $()

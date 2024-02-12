@@ -52,23 +52,56 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
+public var standardError = CFileStream(fp: stderr)
+
+#if os(Android) || canImport(Musl)
+  public typealias FILEPointer = OpaquePointer
+#else
+  public typealias FILEPointer = UnsafeMutablePointer<FILE>
+#endif
+
+public struct CFileStream: TextOutputStream {
+  var fp: FILEPointer
+
+  public func write(_ string: String) {
+    fputs(string, fp)
+  }
+
+  public func flush() {
+    fflush(fp)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: llvm.StringRef
+  let _bridged: BridgedStringRef
 
-  public init(bridged: llvm.StringRef) { self._bridged = bridged }
+  public init(bridged: BridgedStringRef) { self._bridged = bridged }
 
-  public var string: String { _bridged.string }
+  public var string: String { String(_bridged)  }
   public var description: String { string }
-  
+
+  public var count: Int {
+    _bridged.count
+  }
+
+  public subscript(index: Int) -> UInt8 {
+    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: count)
+    return buffer[index]
+  }
+
+  public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
+    let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)
+    if lhsBuffer.count != rhsBuffer.count { return false }
+    return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
+  }
+
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(
-      start: lhs._bridged.__bytes_beginUnsafe(),
-      count: Int(lhs._bridged.__bytes_endUnsafe() - lhs._bridged.__bytes_beginUnsafe()))
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
@@ -76,42 +109,70 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   }
   
   public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+  public static func !=(lhs: StringRef, rhs: StringRef) -> Bool { !(lhs == rhs) }
 
   public static func ~=(pattern: StaticString, value: StringRef) -> Bool { value == pattern }
+}
+
+//===----------------------------------------------------------------------===//
+//                      Single-Element Inline Array
+//===----------------------------------------------------------------------===//
+
+public struct SingleInlineArray<Element>: RandomAccessCollection {
+  private var singleElement: Element? = nil
+  private var multipleElements: [Element] = []
+
+  public init() {}
+
+  public var startIndex: Int { 0 }
+  public var endIndex: Int {
+    singleElement == nil ? 0 : multipleElements.count + 1
+  }
+
+  public subscript(_ index: Int) -> Element {
+    if index == 0 {
+      return singleElement!
+    }
+    return multipleElements[index - 1]
+  }
+
+  public mutating func push(_ element: Element) {
+    guard singleElement != nil else {
+      singleElement = element
+      return
+    }
+    multipleElements.append(element)
+  }
 }
 
 //===----------------------------------------------------------------------===//
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension llvm.StringRef {
-  public var string: String {
-    String(_cxxString: self.str())
-  }
-}
-
 extension String {
-  /// Underscored to avoid name collision with Swift LLVM Bindings.
-  /// To be replaced with a bindings call once bindings are a dependency.
-  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
+  public func _withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
+      return c(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
   }
 
-  /// Underscored to avoid name collision with the std overlay.
-  /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
-  public init(_cxxString s: std.string) {
-    self.init(cString: s.__c_strUnsafe())
-    withExtendedLifetime(s) {}
+  public init(_ s: BridgedStringRef) {
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
+    self.init(decoding: buffer, as: UTF8.self)
+  }
+
+  public init(taking s: BridgedOwnedString) {
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
+    self.init(decoding: buffer, as: UTF8.self)
+    s.destroy()
   }
 }
 
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
     return withUnsafeBytes { buf in
-      return c(BridgedArrayRef(data: buf.baseAddress!, numElements: count))
+      return c(BridgedArrayRef(data: buf.baseAddress!, count: count))
     }
   }
 }
@@ -120,19 +181,19 @@ public typealias SwiftObject = UnsafeMutablePointer<BridgedSwiftObject>
 
 extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
   public init<T: AnyObject>(_ object: T) {
-    let ptr = Unmanaged.passUnretained(object).toOpaque()
+    let ptr = unsafeBitCast(object, to: UnsafeMutableRawPointer.self)
     self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
   }
 
   public func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
-    return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
+    return unsafeBitCast(self, to: T.self)
   }
 }
 
 extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
   public func getAs<T: AnyObject>(_ objectType: T.Type) -> T? {
     if let pointer = self {
-      return Unmanaged<T>.fromOpaque(pointer).takeUnretainedValue()
+      return pointer.getAs(objectType)
     }
     return nil
   }
@@ -140,8 +201,8 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
 
 extension BridgedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    let start = data?.bindMemory(to: ty, capacity: numElements);
-    let buffer = UnsafeBufferPointer(start: start, count: numElements);
+    let start = data?.bindMemory(to: ty, capacity: count)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
   }
 }

@@ -180,29 +180,35 @@ void ClangValueTypePrinter::printValueTypeDecl(
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  Optional<CanGenericSignature> genericSignature;
+  GenericSignature genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignature(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
   };
   auto printGenericParamRefs = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignatureParams(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignatureParams(genericSignature);
   };
   if (typeDecl->isGeneric()) {
-    genericSignature = typeDecl->getGenericSignature().getCanonicalSignature();
+    genericSignature = typeDecl->getGenericSignature();
+
     // FIXME: Support generic requirements.
-    assert(genericSignature->getRequirements().empty());
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+    assert(reqs.empty());
+
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
-
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    assert(typeSizeAlign && "unknown layout for non-resilient type!");
-    if (typeSizeAlign->size == 0) {
+    // typeSizeAlign can be null if this is not a fixed-layout type,
+    // e.g. it has resilient fields.
+    if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       return;
     }
@@ -275,25 +281,26 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "public:\n";
   if (genericSignature)
     ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-        *genericSignature);
+        genericSignature);
 
   // Print out the destructor.
   os << "  ";
   printer.printInlineForThunk();
   os << '~';
   printer.printBaseName(typeDecl);
-  os << "() {\n";
+  os << "() noexcept {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
       os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
+  // copy constructor.
   os << "  ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << "(const ";
   printer.printBaseName(typeDecl);
-  os << " &other) {\n";
+  os << " &other) noexcept {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
       os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   if (isOpaqueLayout) {
@@ -306,13 +313,45 @@ void ClangValueTypePrinter::printValueTypeDecl(
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";
 
+  // copy assignment.
+  os << "  ";
+  printer.printInlineForThunk();
+  printer.printBaseName(typeDecl);
+  os << " &operator =(const ";
+  printer.printBaseName(typeDecl);
+  os << " &other) noexcept {\n";
+  ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+      os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+  os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
+        "*>(other._getOpaquePointer()), metadata._0);\n";
+  os << "  return *this;\n";
+  os << "  }\n";
+
+  // FIXME: implement the move assignment.
+  os << "  ";
+  printer.printInlineForThunk();
+  printer.printBaseName(typeDecl);
+  os << " &operator =(";
+  printer.printBaseName(typeDecl);
+  os << " &&other) = delete;\n";
+
   // FIXME: implement the move constructor.
   os << "  [[noreturn]] ";
-  printer.printInlineForThunk();
+  // NOTE: Do not apply attribute((used))
+  // here to ensure the linker error isn't
+  // forced, so just mark this an inline
+  // helper function instead.
+  printer.printInlineForHelperFunction();
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
-  os << " &&) { abort(); }\n";
+  StringRef moveErrorMessage = "C++ does not support moving a Swift value yet";
+  os << " &&) noexcept {\n  "
+        "swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_"
+        "yet();\n  swift::_impl::_swift_stdlib_reportFatalError(\"swift\", 5, "
+        "\""
+     << moveErrorMessage << "\", " << moveErrorMessage.size()
+     << ", 0);\n  abort();\n  }\n";
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())
@@ -324,21 +363,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
-  // FIXME: make noexcept.
   if (isOpaqueLayout) {
     os << "(";
     printer.printSwiftImplQualifier();
-    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, "
+    os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
+          "_storage(vwTable->size, "
           "vwTable->getAlignment()) {}\n";
   } else {
-    os << "() {}\n";
+    os << "() noexcept {}\n";
   }
   // Print out '_make' function which returns an unitialized instance for
   // passing to Swift.
   os << "  static ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
-  os << " _make() {";
+  os << " _make() noexcept {";
   if (isOpaqueLayout) {
     os << "\n";
     ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
@@ -354,14 +393,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out the private accessors to the underlying Swift value storage.
   os << "  ";
   printer.printInlineForThunk();
-  os << "const char * _Nonnull _getOpaquePointer() const { return "
+  os << "const char * _Nonnull _getOpaquePointer() const noexcept { return "
         "_storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
   os << "  ";
   printer.printInlineForThunk();
-  os << "char * _Nonnull _getOpaquePointer() { return _storage";
+  os << "char * _Nonnull _getOpaquePointer() noexcept { return _storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
@@ -370,7 +409,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isa<EnumDecl>(typeDecl)) {
     os << "  ";
     printer.printInlineForThunk();
-    os << "char * _Nonnull _destructiveProjectEnumData() {\n";
+    os << "char * _Nonnull _destructiveProjectEnumData() noexcept {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
           "metadata._0);\n";
@@ -378,14 +417,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  }\n";
     os << "  ";
     printer.printInlineForThunk();
-    os << "void _destructiveInjectEnumTag(unsigned tag) {\n";
+    os << "void _destructiveInjectEnumTag(unsigned tag) noexcept {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, "
           "metadata._0);\n";
     os << "  }\n";
     os << "  ";
     printer.printInlineForThunk();
-    os << "unsigned _getEnumTag() const {\n";
+    os << "unsigned _getEnumTag() const noexcept {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
@@ -405,6 +444,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printCxxImplClassName(os, typeDecl);
   printGenericParamRefs(os);
   os << ";\n";
+
+  printer.printSwiftMangledNameForDebugger(typeDecl);
+
   os << "};\n";
   os << '\n';
 
@@ -421,7 +463,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "public:\n";
         if (genericSignature)
           ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-              *genericSignature);
+              genericSignature);
 
         os << "  static ";
         ClangSyntaxPrinter(os).printInlineForThunk();
@@ -439,7 +481,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
         os << "  template<class T>\n";
         os << "  static ";
-        ClangSyntaxPrinter(os).printInlineForThunk();
+        ClangSyntaxPrinter(os).printInlineForHelperFunction();
         printCxxTypeName(os, typeDecl, moduleContext);
         printGenericParamRefs(os);
         os << " returnNewValue(T callable) {\n";
@@ -466,16 +508,16 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
-  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
-                         typeMetadataFuncGenericParams,
-                         typeDecl->getModuleContext(), declAndTypePrinter);
+  printTypeGenericTraits(
+      os, typeDecl, typeMetadataFuncName, typeMetadataFuncGenericParams,
+      typeDecl->getModuleContext(), declAndTypePrinter, isOpaqueLayout);
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-    llvm::function_ref<void()> cxxParamPrinter, bool isSelf) {
+    llvm::function_ref<void()> cxxParamPrinter, bool forceSelf) {
   // A Swift value type is passed to its underlying Swift function
-  if (isSelf) {
+  if (forceSelf) {
     os << "_getOpaquePointer()";
   } else {
     // FIXME: can we propagate the _impl request here?
@@ -512,7 +554,8 @@ void ClangValueTypePrinter::printValueTypeReturnScaffold(
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   os << "  return ";
   typePrinter();
-  os << "::returnNewValue([&](char * _Nonnull result) {\n    ";
+  os << "::returnNewValue([&](char * _Nonnull result) "
+        "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
   bodyPrinter("result");
   os << ";\n";
   os << "  });\n";
@@ -540,18 +583,31 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
-  os << "namespace swift {\n";
+  os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (!typeDecl->isGeneric()) {
-    // FIXME: generic type support.
+
+  if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
     os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<";
-    printer.printNominalTypeReference(typeDecl,
-                                      /*moduleContext=*/nullptr);
-    os << "> = true;\n";
-  }
+  os << "static inline const constexpr bool isUsableInGenericContext<";
+  printer.printNominalTypeReference(typeDecl,
+                                    /*moduleContext=*/nullptr);
+  os << "> = ";
+  if (typeDecl->isGeneric()) {
+    auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
+    llvm::interleave(
+        signature.getInnermostGenericParams(), os,
+        [&](const GenericTypeParamType *genericParamType) {
+          os << "isUsableInGenericContext<";
+          printer.printGenericTypeParamTypeName(genericParamType);
+          os << '>';
+        },
+        " && ");
+  } else
+    os << "true";
+  os << ";\n";
+
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
   os << "\n";
@@ -561,12 +617,13 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
-    const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter) {
+    const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter,
+    bool isOpaqueLayout) {
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
-  os << "namespace swift {\n";
+  os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   if (typeDecl->hasClangNode()) {
     /// Print a reference to the type metadata fucntion for a C++ type.
@@ -600,7 +657,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "> {\n";
   os << "  static ";
-  ClangSyntaxPrinter(os).printInlineForThunk();
+  ClangSyntaxPrinter(os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
   if (!typeDecl->hasClangNode()) {
@@ -631,14 +688,16 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     os << "::";
     printer.printBaseName(typeDecl);
     os << "> = true;\n";
-    if (NTD && NTD->isResilient()) {
+  }
+  if (isOpaqueLayout) {
+    assert(NTD && "not a nominal type?");
+    assert(!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode());
+    if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
       os << "template<>\n";
-      os << "static inline const constexpr bool isOpaqueLayout<";
-      printer.printBaseName(typeDecl->getModuleContext());
-      os << "::";
-      printer.printBaseName(typeDecl);
-      os << "> = true;\n";
-    }
+    os << "static inline const constexpr bool isOpaqueLayout<";
+    printer.printNominalTypeReference(NTD,
+                                      /*moduleContext=*/nullptr);
+    os << "> = true;\n";
   }
 
   // FIXME: generic support.

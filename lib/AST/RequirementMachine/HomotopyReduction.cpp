@@ -120,66 +120,6 @@ void RewriteSystem::propagateExplicitBits() {
   }
 }
 
-/// Propagate requirement IDs from redundant rules to their
-/// replacements that appear once in empty context.
-void RewriteSystem::propagateRedundantRequirementIDs() {
-  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-    llvm::dbgs() << "\nPropagating requirement IDs: {";
-  }
-
-  for (const auto &ruleAndReplacement : RedundantRules) {
-    unsigned ruleID = ruleAndReplacement.first;
-    const auto &rewritePath = ruleAndReplacement.second;
-    const auto &rule = Rules[ruleID];
-
-    auto requirementID = rule.getRequirementID();
-    if (!requirementID.has_value()) {
-      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-        llvm::dbgs() << "\n- rule does not have a requirement ID: "
-                     << rule;
-      }
-      continue;
-    }
-
-    MutableTerm lhs(rule.getLHS());
-    for (auto ruleID : rewritePath.findRulesAppearingOnceInEmptyContext(lhs, *this)) {
-      auto &replacement = Rules[ruleID];
-      if (replacement.isPermanent()) {
-        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-          llvm::dbgs() << "\n- skipping permanent rule: " << rule;
-        }
-        continue;
-      }
-
-      // If the replacement rule already has a requirementID, overwrite
-      // it if the existing ID corresponds to an inferred requirement.
-      // This effectively makes the inferred requirement the redundant
-      // one, which makes it easier to suppress redundancy warnings for
-      // inferred requirements later on.
-      auto existingID = replacement.getRequirementID();
-      if (existingID.has_value() && !WrittenRequirements[*existingID].inferred) {
-        if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-          llvm::dbgs() << "\n- rule already has a requirement ID: "
-                       << rule;
-        }
-        continue;
-      }
-
-      if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-        llvm::dbgs() << "\n- propagating ID = " << requirementID
-                     << "\n  from " << rule;
-        llvm::dbgs() << "\n  to " << replacement;
-      }
-
-      replacement.setRequirementID(requirementID);
-    }
-  }
-
-  if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
-    llvm::dbgs() << "\n}\n";
-  }
-}
-
 /// Find concrete type or superclass rules where the right hand side occurs as a
 /// proper prefix of one of its substitutions.
 ///
@@ -229,8 +169,8 @@ void RewriteSystem::computeRecursiveRules() {
 /// 3) Finally, redundant conformance rules are deleted, with
 /// \p redundantConformances equal to the set of conformance rules that are
 ///    not minimal conformances.
-Optional<std::pair<unsigned, unsigned>> RewriteSystem::
-findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
+llvm::Optional<std::pair<unsigned, unsigned>>
+RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
     auto &loop = Loops[loopID];
@@ -255,7 +195,7 @@ findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
     }
   }
 
-  Optional<std::pair<unsigned, unsigned>> found;
+  llvm::Optional<std::pair<unsigned, unsigned>> found;
 
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
     llvm::dbgs() << "\n";
@@ -363,7 +303,7 @@ findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
 
     {
       // Otherwise, perform a shortlex comparison on (LHS, RHS).
-      Optional<int> comparison = rule.compare(otherRule, Context);
+      llvm::Optional<int> comparison = rule.compare(otherRule, Context);
 
       if (!comparison.has_value()) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
@@ -614,7 +554,6 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
     return false;
   });
 
-  propagateRedundantRequirementIDs();
   computeRecursiveRules();
 
   // Check invariants after homotopy reduction.
@@ -646,7 +585,10 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
 }
 
 /// Returns flags indicating if the rewrite system has unresolved or
-/// conflicting rules in our minimization domain.
+/// conflicting rules in our minimization domain. If these flags are
+/// set, we do not install this rewrite system in the rewrite context
+/// after minimization. Instead, we will rebuild a new rewrite system
+/// from the minimized requirements.
 GenericSignatureErrors RewriteSystem::getErrors() const {
   assert(Complete);
   assert(Minimized);
@@ -668,10 +610,19 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (rule.isConflicting() || rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (!rule.isRedundant())
-      if (auto property = rule.isPropertyRule())
+    if (!rule.isRedundant()) {
+      if (auto property = rule.isPropertyRule()) {
         if (property->getKind() == Symbol::Kind::ConcreteConformance)
           result |= GenericSignatureErrorFlags::HasConcreteConformances;
+
+        if (property->hasSubstitutions()) {
+          for (auto t : property->getSubstitutions()) {
+            if (t.containsUnresolvedSymbols())
+              result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+          }
+        }
+      }
+    }
   }
 
   return result;

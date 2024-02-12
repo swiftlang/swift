@@ -5,12 +5,12 @@ func assertTypeWitnessForP2_A<T: P2, U>(in: T.Type, is: U.Type) where T.A == U {
 
 protocol P1 {
   associatedtype A
-  // expected-note@-1 2 {{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
   // expected-note@-2 2 {{multiple matching types named 'A'}}
 }
 protocol P2: P1 {
   associatedtype A
-  // expected-note@-1 2 {{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 2 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
   // expected-note@-2 2 {{multiple matching types named 'A'}}
 }
 

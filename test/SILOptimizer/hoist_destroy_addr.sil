@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
@@ -78,6 +78,9 @@ struct STXXITXXII {
   var txxi_2: TXXI
   var i: I
 }
+
+@_moveOnly struct MoS {}
+@_moveOnly struct MoE {}
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
@@ -1144,4 +1147,55 @@ entry(%addr : $*X):
   destroy_addr %addr : $*X
   %retval = tuple ()
   return %retval : $()
+}
+
+// Even though the apply of %empty is not a deinit barrier (c.f.
+// hoist_over_apply_of_non_barrier_fn), verify that the destroy_addr is not
+// hoisted, because MoS is move-only.
+// CHECK-LABEL: sil [ossa] @dont_move_destroy_addr_of_moveonly_struct : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'dont_move_destroy_addr_of_moveonly_struct'
+sil [ossa] @dont_move_destroy_addr_of_moveonly_struct : $@convention(thin) (@in MoS) -> () {
+entry(%addr : $*MoS):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*MoS
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_destroy_addr_of_moveonly_enum : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'dont_move_destroy_addr_of_moveonly_enum'
+sil [ossa] @dont_move_destroy_addr_of_moveonly_enum : $@convention(thin) (@in MoE) -> () {
+entry(%addr : $*MoE):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*MoE
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil @getPointer : $@convention(thin) () -> Builtin.RawPointer
+
+struct Nontrivial {
+  var guts: Builtin.AnyObject
+}
+
+sil [ossa] @rdar121327964 : $@convention(method) (@owned Nontrivial) -> () {
+bb0(%0 : @owned $Nontrivial):
+  %6 = function_ref @getPointer : $@convention(thin) () -> Builtin.RawPointer
+  %7 = apply %6() : $@convention(thin) () -> Builtin.RawPointer
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Nontrivial
+  %9 = copy_value %0 : $Nontrivial
+  %10 = begin_access [modify] [dynamic] %8 : $*Nontrivial
+  store %9 to [assign] %10 : $*Nontrivial
+  end_access %10 : $*Nontrivial
+  destroy_value %0 : $Nontrivial
+  %14 = tuple ()
+  return %14 : $()
 }

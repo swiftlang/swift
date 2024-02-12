@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -349,6 +349,7 @@ internal func unimplemented_utf8_32bit(
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @frozen
+@_eagerMove
 public struct String {
   public // @SPI(Foundation)
   var _guts: _StringGuts
@@ -492,6 +493,116 @@ extension String {
     self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
   }
 
+  /// Creates a new string by copying and validating the sequence of
+  /// code units passed in, according to the specified encoding.
+  ///
+  /// This initializer does not try to repair ill-formed code unit sequences.
+  /// If any are found, the result of the initializer is `nil`.
+  ///
+  /// The following example calls this initializer with the contents of two
+  /// different arrays---first with a well-formed UTF-8 code unit sequence and
+  /// then with an ill-formed UTF-16 code unit sequence.
+  ///
+  ///     let validUTF8: [UInt8] = [67, 97, 0, 102, 195, 169]
+  ///     let valid = String(validating: validUTF8, as: UTF8.self)
+  ///     print(valid ?? "nil")
+  ///     // Prints "Café"
+  ///
+  ///     let invalidUTF16: [UInt16] = [0x41, 0x42, 0xd801]
+  ///     let invalid = String(validating: invalidUTF16, as: UTF16.self)
+  ///     print(invalid ?? "nil")
+  ///     // Prints "nil"
+  ///
+  /// - Parameters:
+  ///   - codeUnits: A sequence of code units that encode a `String`
+  ///   - encoding: A conformer to `Unicode.Encoding` to be used
+  ///               to decode `codeUnits`.
+  @inlinable
+  @available(SwiftStdlib 5.11, *)
+  public init?<Encoding: Unicode.Encoding>(
+    validating codeUnits: some Sequence<Encoding.CodeUnit>,
+    as encoding: Encoding.Type
+  ) {
+    let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
+      String._validate($0, as: Encoding.self)
+    }
+    if let validationResult = contiguousResult {
+      guard let validatedString = validationResult else {
+        return nil
+      }
+      self = validatedString
+      return
+    }
+
+    // slow-path
+    var transcoded: [UTF8.CodeUnit] = []
+    transcoded.reserveCapacity(codeUnits.underestimatedCount)
+    var isASCII = true
+    let error = transcode(
+      codeUnits.makeIterator(),
+      from: Encoding.self,
+      to: UTF8.self,
+      stoppingOnError: true,
+      into: {
+        uint8 in
+        transcoded.append(uint8)
+        if isASCII && (uint8 & 0x80) == 0x80 { isASCII = false }
+      }
+    )
+    if error { return nil }
+    self = transcoded.withUnsafeBufferPointer{
+      String._uncheckedFromUTF8($0, asciiPreScanResult: isASCII)
+    }
+  }
+
+  /// Creates a new string by copying and validating the sequence of
+  /// code units passed in, according to the specified encoding.
+  ///
+  /// This initializer does not try to repair ill-formed code unit sequences.
+  /// If any are found, the result of the initializer is `nil`.
+  ///
+  /// The following example calls this initializer with the contents of two
+  /// different arrays---first with a well-formed UTF-8 code unit sequence and
+  /// then with an ill-formed ASCII code unit sequence.
+  ///
+  ///     let validUTF8: [Int8] = [67, 97, 0, 102, -61, -87]
+  ///     let valid = String(validating: validUTF8, as: UTF8.self)
+  ///     print(valid ?? "nil")
+  ///     // Prints "Café"
+  ///
+  ///     let invalidASCII: [Int8] = [67, 97, -5]
+  ///     let invalid = String(validating: invalidASCII, as: Unicode.ASCII.self)
+  ///     print(invalid ?? "nil")
+  ///     // Prints "nil"
+  ///
+  /// - Parameters:
+  ///   - codeUnits: A sequence of code units that encode a `String`
+  ///   - encoding: A conformer to `Unicode.Encoding` that can decode
+  ///               `codeUnits` as `UInt8`
+  @inlinable
+  @available(SwiftStdlib 5.11, *)
+  public init?<Encoding>(
+    validating codeUnits: some Sequence<Int8>,
+    as encoding: Encoding.Type
+  ) where Encoding: Unicode.Encoding, Encoding.CodeUnit == UInt8 {
+    let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
+      $0.withMemoryRebound(to: UInt8.self) {
+        String._validate($0, as: Encoding.self)
+      }
+    }
+    if let validationResult = contiguousResult {
+      guard let validatedString = validationResult else {
+        return nil
+      }
+      self = validatedString
+      return
+    }
+
+    // slow-path
+    let uint8s = codeUnits.lazy.map(UInt8.init(bitPattern:))
+    self.init(validating: uint8s, as: Encoding.self)
+  }
+
   /// Creates a new string with the specified capacity in UTF-8 code units, and
   /// then calls the given closure with a buffer covering the string's
   /// uninitialized memory.
@@ -557,7 +668,9 @@ extension String {
     ) throws -> Int
   ) rethrows {
     if _fastPath(capacity <= _SmallString.capacity) {
-      let smol = try _SmallString(initializingUTF8With: initializer)
+      let smol = try _SmallString(initializingUTF8With: {
+        try initializer(.init(start: $0.baseAddress, count: capacity))
+      })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
         self = String(_StringGuts(smol))

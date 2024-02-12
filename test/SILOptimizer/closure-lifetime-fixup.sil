@@ -310,3 +310,74 @@ bb3(%25 : @owned $any Error):
 bb4(%29 : @owned $any Error):
   unreachable
 }
+
+sil @testTrivialBorrowClosure : $@convention(thin) (Int) -> Int
+sil @testTrivialBorrowTakeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+
+// rdar://112795074 (Crash compiling function that has a macro annotation and uses `consuming`)
+//
+// CHECK-LABEL: sil [ossa] @testTrivialBorrow : $@convention(thin) (Int) -> Int {
+// CHECK: [[ARG:%.*]] = moveonlywrapper_to_copyable [guaranteed]
+// CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] %{{.*}}([[ARG]]) : $@convention(thin) (Int) -> Int
+// CHECK-NOT: destroy 
+// CHECK: destroy_value [[PA]] : $@noescape @callee_guaranteed () -> Int
+// CHECK-NOT: destroy
+// CHECK: destroy_addr
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'testTrivialBorrow'
+sil [ossa] @testTrivialBorrow : $@convention(thin) (Int) -> Int {
+bb0(%0 : @noImplicitCopy @_eagerMove $Int):
+  %1 = alloc_stack $@moveOnly Int, var, name "i"
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly Int
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Int
+  store %0 to [trivial] %3 : $*Int
+  %5 = begin_access [read] [static] %2 : $*@moveOnly Int
+  %6 = load_borrow %5 : $*@moveOnly Int
+  %7 = moveonlywrapper_to_copyable [guaranteed] %6 : $@moveOnly Int
+  end_borrow %6 : $@moveOnly Int
+  end_access %5 : $*@moveOnly Int
+  %10 = function_ref @testTrivialBorrowClosure : $@convention(thin) (Int) -> Int
+  %11 = partial_apply [callee_guaranteed] %10(%7) : $@convention(thin) (Int) -> Int
+  %12 = convert_escape_to_noescape [not_guaranteed] %11 : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
+  %13 = function_ref @testTrivialBorrowTakeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  %14 = apply %13(%12) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> Int
+  destroy_value %12 : $@noescape @callee_guaranteed () -> Int
+  destroy_value %11 : $@callee_guaranteed () -> Int
+  destroy_addr %2 : $*@moveOnly Int
+  dealloc_stack %1 : $*@moveOnly Int
+  return %14 : $Int
+}
+
+struct _UnsafeContinuation<T, R> {}
+
+sil @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+sil @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+
+// insertDestroyOfCapturedArguments should not crash on 'undef'
+//
+// CHECK-LABEL: sil hidden [ossa] @testCapturedUndef : $@convention(thin) (Int) -> (Int, @error any Error) {
+// CHECK: partial_apply [callee_guaranteed] [on_stack] %{{.*}}(undef)
+// CHECK-LABEL: } // end sil function 'testCapturedUndef'
+sil hidden [ossa] @testCapturedUndef : $@convention(thin) (Int) -> (Int, @error any Error) {
+bb0(%0 : $Int):
+  %5 = alloc_stack $Int
+  %6 = function_ref @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+  %7 = partial_apply [callee_guaranteed] %6(undef) : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+  %8 = convert_escape_to_noescape [not_guaranteed] %7 : $@callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int> to $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  destroy_value %7 : $@callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+
+  %10 = function_ref @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+  try_apply %10<Int>(%5, %8) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+
+bb1(%12 : $()):
+  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  %15 = load [trivial] %5 : $*Int
+  dealloc_stack %5 : $*Int
+  return %15 : $Int
+
+bb2(%19 : @owned $any Error):
+  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  dealloc_stack %5 : $*Int
+  throw %19 : $any Error
+}

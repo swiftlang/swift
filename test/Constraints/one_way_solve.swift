@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib -debug-constraints > %t.log 2>&1
+// RUN: %target-typecheck-verify-swift -enable-builtin-module -debug-constraints > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
-import Swift
+import Builtin
 
 
 func takeDoubleAndBool(_: Double, _: Bool) { }
@@ -28,19 +28,19 @@ func testTernaryOneWayOverload(b: Bool) {
   // CHECK: 0: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: (attempting type variable binding [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: (attempting type variable binding [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: (attempting type variable binding [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
-  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
-  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
-  // CHECK: (considering -> [[C]] conv Int8
+  // CHECK: (attempting type variable binding [[C]] := Int8
+  // CHECK: (considering: $T{{[0-9]+}} conv [[C]]
+  // CHECK: (considering: $T{{[0-9]+}} conv [[C]]
+  // CHECK: (considering: [[C]] conv Int8
   // CHECK: (found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
 
   // CHECK: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])

@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted -disable-availability-checking
+// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking %s -o /dev/null -verify -emit-sil
+// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil
+// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @available(SwiftStdlib 5.1, *)
 func someAsyncFunc() async -> String { "" }

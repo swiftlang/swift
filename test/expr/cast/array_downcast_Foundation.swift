@@ -35,26 +35,26 @@ func testDowncastNSArrayToArray(nsarray: NSArray) {
 
 // CHECK-LABEL: testDowncastOptionalObject
 func testDowncastOptionalObject(obj: AnyObject?!) -> [String]? {
-  // CHECK: (optional_evaluation_expr implicit type='[String]?'
-  // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
-  // CHECK: (forced_checked_cast_expr type='[String]'{{.*value_cast}}
-  // CHECK: (bind_optional_expr implicit type='AnyObject'
-  // CHECK-NEXT: (force_value_expr implicit type='AnyObject?'
-  // CHECK-NEXT: (declref_expr type='AnyObject??' 
+  // CHECK: (optional_evaluation_expr implicit type="[String]?"
+  // CHECK-NEXT: (inject_into_optional implicit type="[String]?"
+  // CHECK: (forced_checked_cast_expr type="[String]"{{.*value_cast}}
+  // CHECK: (bind_optional_expr implicit type="AnyObject"
+  // CHECK-NEXT: (force_value_expr implicit type="AnyObject?"
+  // CHECK-NEXT: (declref_expr type="AnyObject??" 
   return obj as! [String]?
 }
 
 // CHECK-LABEL: testDowncastOptionalObjectConditional
 func testDowncastOptionalObjectConditional(obj: AnyObject?!) -> [String]?? {
-  // CHECK: (optional_evaluation_expr implicit type='[String]??'
-  // CHECK-NEXT: (inject_into_optional implicit type='[String]??'
-  // CHECK-NEXT: (optional_evaluation_expr implicit type='[String]?'
-  // CHECK-NEXT: (inject_into_optional implicit type='[String]?'
-  // CHECK-NEXT: (bind_optional_expr implicit type='[String]'
-  // CHECK-NEXT: (conditional_checked_cast_expr type='[String]?' {{.*value_cast}} writtenType='[String]?'
-  // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject'
-  // CHECK-NEXT: (bind_optional_expr implicit type='AnyObject?'
-  // CHECK-NEXT: (declref_expr type='AnyObject??'
+  // CHECK: (optional_evaluation_expr implicit type="[String]??"
+  // CHECK-NEXT: (inject_into_optional implicit type="[String]??"
+  // CHECK-NEXT: (optional_evaluation_expr implicit type="[String]?"
+  // CHECK-NEXT: (inject_into_optional implicit type="[String]?"
+  // CHECK-NEXT: (bind_optional_expr implicit type="[String]"
+  // CHECK-NEXT: (conditional_checked_cast_expr type="[String]?" {{.*value_cast}} written_type="[String]?"
+  // CHECK-NEXT: (bind_optional_expr implicit type="AnyObject"
+  // CHECK-NEXT: (bind_optional_expr implicit type="AnyObject?"
+  // CHECK-NEXT: (declref_expr type="AnyObject??"
   return obj as? [String]?
 }
 

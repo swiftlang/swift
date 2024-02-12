@@ -18,16 +18,18 @@
 #ifndef SWIFT_IRGEN_IRGENFUNCTION_H
 #define SWIFT_IRGEN_IRGENFUNCTION_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Type.h"
+#include "DominancePoint.h"
+#include "GenPack.h"
+#include "IRBuilder.h"
+#include "LocalTypeDataKind.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/CallingConv.h"
-#include "IRBuilder.h"
-#include "LocalTypeDataKind.h"
-#include "DominancePoint.h"
 
 namespace llvm {
   class AllocaInst;
@@ -72,6 +74,7 @@ public:
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
+  bool isPerformanceConstraint;
 
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
@@ -80,16 +83,17 @@ public:
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
-                Optional<SILLocation> DbgLoc = None);
+                llvm::Optional<SILLocation> DbgLoc = llvm::None);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync);
+  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -121,14 +125,20 @@ public:
   ///
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
-  Address getCalleeErrorResultSlot(SILType errorType);
-  Address getAsyncCalleeErrorResultSlot(SILType errorType);
+  Address getCalleeErrorResultSlot(SILType errorType,
+                                   bool isTypedError);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
 
   /// Set the error result slot for the current function.
   void setCallerErrorResultSlot(Address address);
+  /// Set the error result slot for a typed throw for the current function.
+  void setCallerTypedErrorResultSlot(Address address);
+
+  Address getCallerTypedErrorResultSlot();
+  Address getCalleeTypedErrorResultSlot(SILType errorType);
+  void setCalleeTypedErrorResultSlot(Address addr);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -197,10 +207,21 @@ private:
   Address CalleeErrorResultSlot;
   Address AsyncCalleeErrorResultSlot;
   Address CallerErrorResultSlot;
+  Address CallerTypedErrorResultSlot;
+  Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
+protected:
+  // Whether pack metadata stack promotion is disabled for this function in
+  // particular.
+  bool packMetadataStackPromotionDisabled = false;
+
+  /// The on-stack pack metadata allocations emitted so far awaiting cleanup.
+  llvm::SmallSetVector<StackPackAlloc, 2> OutstandingStackPackAllocs;
+
+private:
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -228,6 +249,12 @@ public:
   bool optimizeForSize() const {
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
+
+  /// Whether metadata/wtable packs allocated on the stack must be eagerly
+  /// heapified.
+  bool canStackPromotePackMetadata() const;
+
+  bool outliningCanCallValueWitnesses() const;
 
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
@@ -370,6 +397,12 @@ public:
     llvm::Value *wtable);
 
   llvm::Value *emitPackShapeExpression(CanType type);
+
+  void recordStackPackMetadataAlloc(StackAddress addr, llvm::Value *shape);
+  void eraseStackPackMetadataAlloc(StackAddress addr, llvm::Value *shape);
+
+  void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
+  void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
@@ -561,14 +594,6 @@ public:
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
 
-//--- Declaration emission -----------------------------------------------------
-public:
-
-  void bindArchetype(ArchetypeType *type,
-                     llvm::Value *metadata,
-                     MetadataState metadataState,
-                     ArrayRef<llvm::Value*> wtables);
-
 //--- Type emission ------------------------------------------------------------
 public:
   /// Look up a local type metadata reference, returning a null response
@@ -653,7 +678,8 @@ public:
   MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
                                                DynamicMetadataRequest request);
   void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
-  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value,
+                              bool mayEmitDebugInfo = true);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.

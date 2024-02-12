@@ -27,6 +27,8 @@ class LastWords {
 
   @objc var implProperty: Int
   final var object: LastWords
+  final weak var defaultNilProperty: AnyObject?
+  @objc var defaultIntProperty: Int = 17
 
   @objc class func runTests() {
     do {
@@ -35,6 +37,7 @@ class LastWords {
       print("implProperty =", impl.implProperty)
       impl.implProperty = 42
       print("implProperty =", impl.implProperty)
+      print("defaultIntProperty =", impl.defaultIntProperty)
       print("description =", impl.description)
     }
 
@@ -44,12 +47,15 @@ class LastWords {
       print("implProperty =", swiftSub.implProperty)
       swiftSub.implProperty = 42
       print("implProperty =", swiftSub.implProperty)
+      print("defaultIntProperty =", swiftSub.defaultIntProperty)
 
       print("otherProperty =", swiftSub.otherProperty)
       swiftSub.otherProperty = 13
       print("otherProperty =", swiftSub.otherProperty)
       print("implProperty =", swiftSub.implProperty)
     }
+
+    implFunc(2023 - 34)
   }
 
   @objc func someMethod() -> String { "ImplClass.someMethod()" }
@@ -69,19 +75,26 @@ class SwiftSubclass: ImplClass {
   override func someMethod() -> String { "SwiftSubclass.someMethod()" }
 }
 
+@_objcImplementation @_cdecl("implFunc") public func implFunc(_ param: Int32) {
+  print("implFunc(\(param))")
+}
+
 // `#if swift` to ignore the inactive branch's contents
 #if swift(>=5.0) && TOP_LEVEL_CODE
 ImplClass.runTests()
 // CHECK: someMethod = ImplClass.someMethod()
 // CHECK: implProperty = 0
 // CHECK: implProperty = 42
+// CHECK: defaultIntProperty = 17
 // CHECK: description = ImplClass(implProperty: 42, object: main.LastWords)
 // CHECK: ImplClass It's better to burn out than to fade away.
 // CHECK: someMethod = SwiftSubclass.someMethod()
 // CHECK: implProperty = 0
 // CHECK: implProperty = 42
+// CHECK: defaultIntProperty = 17
 // CHECK: otherProperty = 1
 // CHECK: otherProperty = 13
 // CHECK: implProperty = 42
 // CHECK: SwiftSubclass It's better to burn out than to fade away.
+// CHECK: implFunc(1989)
 #endif

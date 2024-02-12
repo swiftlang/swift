@@ -29,6 +29,9 @@ ERROR(not_implemented,none,
 ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(error_closing_output,none,
+      "error closing '%0' for output: %1", (StringRef, StringRef))
+
 ERROR(cannot_find_group_info_file,none,
       "cannot find group info file at path: '%0'", (StringRef))
 
@@ -80,6 +83,9 @@ ERROR(require_const_initializer_for_const,none,
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
+
+ERROR(func_decl_no_body_expected,PointsToFirstBadToken,
+      "unexpected body of function declaration", ())
 
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
@@ -193,10 +199,16 @@ WARNING(cross_imported_by_both_modules, none,
 //------------------------------------------------------------------------------
 
 ERROR(scanner_find_cycle, none,
-      "dependency scanner detected dependency cycle: '%0'", (StringRef))
+      "module dependency cycle: '%0'", (StringRef))
+
+NOTE(scanner_find_cycle_swift_overlay_path, none,
+     "Swift Overlay dependency of '%0' on '%1' via Clang module dependency: '%2'", (StringRef, StringRef, StringRef))
 
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
+
+ERROR(error_scanner_extra, none,
+      "failed inside dependency scanner: '%0'", (StringRef))
 
 WARNING(warn_scanner_deserialize_failed, none,
         "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
@@ -218,9 +230,10 @@ ERROR(unknown_attribute,none,
 // MARK: macro diagnostics
 //------------------------------------------------------------------------------
 NOTE(in_macro_expansion,none,
-     "in expansion of macro %0 here", (DeclName))
+     "in expansion of macro %0%select{| on %kind1}1 here", (DeclName, const Decl *))
 ERROR(macro_experimental,none,
-      "macros are an experimental feature that is not enabled", ())
+      "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
+      (StringRef, StringRef))
 ERROR(ambiguous_macro_reference,none,
       "ambiguous reference to macro %0", (DeclName))
 

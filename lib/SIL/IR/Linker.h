@@ -83,6 +83,8 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   /// Worklist of SILFunctions we are processing.
   llvm::SmallVector<SILFunction *, 128> Worklist;
 
+  llvm::SmallVector<SILFunction *, 32> toVerify;
+
   /// The current linking mode.
   LinkingMode Mode;
 
@@ -127,6 +129,7 @@ public:
   void visitAllocRefInst(AllocRefInst *ARI);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARI);
   void visitMetatypeInst(MetatypeInst *MI);
+  void visitGlobalAddrInst(GlobalAddrInst *i);
 
 private:
   /// Cause a function to be deserialized, and visit all other functions
@@ -142,7 +145,10 @@ private:
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
-  bool isLinkAll() const { return Mode == LinkingMode::LinkAll; }
+  bool isLinkAll() const {
+    return Mode == LinkingMode::LinkAll ||
+           Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  }
 
   void linkInVTable(ClassDecl *D);
 

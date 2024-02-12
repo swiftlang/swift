@@ -134,10 +134,10 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   auto *module = DC->getParentModule();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       module, ED->getExtendedNominal());
-  return TypeChecker::checkGenericArguments(module,
-                                            genericSig.getRequirements(),
-                                            QuerySubstitutionMap{substMap}) ==
-         CheckGenericArgumentsResult::Success;
+  return checkRequirements(module,
+                           genericSig.getRequirements(),
+                           QuerySubstitutionMap{substMap}) ==
+         CheckRequirementsResult::Success;
 }
 
 static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -161,20 +161,34 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
+
+  // The declaration may introduce inner generic parameters and requirements,
+  // or it may be nested in an outer generic context.
   GenericSignature genericSig = genericDecl->getGenericSignature();
   if (!genericSig)
     return true;
 
+  // The context substitution map for the base type fixes the declaration's
+  // outer generic parameters.
   auto *module = DC->getParentModule();
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      module, VD->getDeclContext());
+  auto substMap = BaseTy->getContextSubstitutionMap(
+      module, VD->getDeclContext(), genericDecl->getGenericEnvironment());
 
-  // Note: we treat substitution failure as success, to avoid tripping
-  // up over generic parameters introduced by the declaration itself.
-  return TypeChecker::checkGenericArguments(module,
-                                            genericSig.getRequirements(),
-                                            QuerySubstitutionMap{substMap}) !=
-         CheckGenericArgumentsResult::RequirementFailure;
+  // The innermost generic parameters are mapped to error types.
+  unsigned innerDepth = genericSig.getGenericParams().back()->getDepth();
+  if (!genericDecl->isGeneric())
+    ++innerDepth;
+
+  // We treat substitution failure as success, to ignore requirements
+  // that involve innermost generic parameters.
+  return checkRequirements(module,
+                           genericSig.getRequirements(),
+                           [&](SubstitutableType *type) -> Type {
+                             auto *paramTy = cast<GenericTypeParamType>(type);
+                             if (paramTy->getDepth() == innerDepth)
+                               return ErrorType::get(DC->getASTContext());
+                             return Type(paramTy).subst(substMap);
+                           }) != CheckRequirementsResult::RequirementFailure;
 }
 
 bool
@@ -192,7 +206,7 @@ IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
 bool
 TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
-  Optional<constraints::ConstraintKind> CKind;
+  llvm::Optional<constraints::ConstraintKind> CKind;
   switch (Owner.Relation) {
   case TypeRelation::ConvertTo:
     CKind = constraints::ConstraintKind::Conversion;
@@ -212,7 +226,7 @@ RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
     return TypePair();
 
   const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getType()->getAs<BoundGenericType>();
+  auto keyPathType = param->getTypeInContext()->getAs<BoundGenericType>();
   if (!keyPathType)
     return TypePair();
   auto genericArgs = keyPathType->getGenericArgs();

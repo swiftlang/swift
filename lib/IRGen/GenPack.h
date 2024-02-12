@@ -43,9 +43,8 @@ emitPackArchetypeMetadataRef(IRGenFunction &IGF,
                              CanPackArchetypeType type,
                              DynamicMetadataRequest request);
 
-StackAddress
-emitTypeMetadataPack(IRGenFunction &IGF,
-                     CanPackType packType,
+std::pair<StackAddress, llvm::Value *>
+emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
                      DynamicMetadataRequest request);
 
 MetadataResponse
@@ -53,29 +52,45 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
+/// Given a pointer to a potentially heap-allocated pack of metadata/wtables,
+/// mask off the bit that indicates whether it is heap allocated.
+llvm::Value *maskMetadataPackPointer(IRGenFunction &IGF, llvm::Value *);
+
 void bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
                                         GenericEnvironment *env,
                                         llvm::Value *index);
 
 llvm::Value *
 emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
-                               ArrayRef<ProtocolDecl *> protocols,
+                               ArrayRef<ProtocolConformanceRef> conformances,
                                llvm::Value *index,
                                DynamicMetadataRequest request,
                                llvm::SmallVectorImpl<llvm::Value *> &wtables);
 
-void cleanupTypeMetadataPack(IRGenFunction &IGF,
-                             StackAddress pack,
-                             Optional<unsigned> elementCount);
+void cleanupTypeMetadataPack(IRGenFunction &IGF, StackAddress pack,
+                             llvm::Value *shape);
 
-StackAddress emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
-                                  PackConformance *conformance);
+std::pair<StackAddress, llvm::Value *>
+emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
+                     PackConformance *conformance);
 
 llvm::Value *emitWitnessTablePackRef(IRGenFunction &IGF, CanPackType packType,
                                      PackConformance *conformance);
 
 void cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
-                             Optional<unsigned> elementCount);
+                             llvm::Value *shape);
+
+/// An on-stack pack metadata/wtable allocation.
+///
+/// Includes the stack address, the element count, and the kind of requirement
+/// (a GenericRequirement::Kind represented as a raw uint8_t).
+using StackPackAlloc =
+    std::tuple<StackAddress, /*shape*/ llvm::Value *, /*kind*/ uint8_t>;
+
+/// Emits cleanups for an array of on-stack pack metadata/wtable allocations in
+/// reverse order.
+void cleanupStackAllocPacks(IRGenFunction &IGF,
+                            ArrayRef<StackPackAlloc> allocs);
 
 /// Emit the dynamic index of a particular structural component
 /// of the given pack type.  If the component is a pack expansion, this
@@ -98,6 +113,27 @@ Size getPackElementSize(IRGenModule &, CanSILPackType ty);
 StackAddress allocatePack(IRGenFunction &IGF, CanSILPackType packType);
 
 void deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType packType);
+
+llvm::Optional<StackAddress>
+emitDynamicTupleTypeLabels(IRGenFunction &IGF,
+                           CanTupleType tupleType,
+                           CanPackType packType,
+                           llvm::Value *shapeExpression);
+
+StackAddress
+emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
+                                  AnyFunctionType::CanParamArrayRef params,
+                                  CanPackType packType,
+                                  llvm::Value *shapeExpression);
+
+std::pair<StackAddress, llvm::Value *>
+emitInducedTupleTypeMetadataPack(
+    IRGenFunction &IGF, llvm::Value *tupleMetadata);
+
+MetadataResponse
+emitInducedTupleTypeMetadataPackRef(
+    IRGenFunction &IGF, CanPackType packType,
+    llvm::Value *tupleMetadata);
 
 } // end namespace irgen
 } // end namespace swift

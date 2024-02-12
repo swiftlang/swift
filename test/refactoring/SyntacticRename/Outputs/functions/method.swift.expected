@@ -20,7 +20,7 @@ func /*varargs:def*/aFunc(c: Int...) {}
 /*varargs:call*/aFunc(c: 1, 2, 3, 4)
 
 class AStruct {
-    func /*method:def*/myMethod(_ a: Int, second: Int, do c: Int) -> Int {
+    func /*method:def*/<base>foo</base>(<arglabel index=0>a</arglabel><param index=0></param>: Int, <arglabel index=1>b</arglabel><param index=1></param>: Int, <arglabel index=2>_</arglabel><param index=2> c</param>: Int) -> Int {
         return a + b + c
     }
 
@@ -44,8 +44,8 @@ let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruc
 let _ = /*no-label:call*/aFunc(3)
 /*whitespace-labels:call*/aFunc( a  :  2 ,2,  c:  4 )
 
-let _ = aStruct . /*method:call*/myMethod(2, second: 3, do: 1)
-let _ = AStruct . /*method*/myMethod(aStruct)(a: 1, b: 8, 10)
+let _ = aStruct . /*method:call*/<base>foo</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>2, <callarg index=1>b</callarg><callcolon index=1>: </callcolon>3, <callcombo index=2></callcombo>1)
+let _ = AStruct . /*method*/<base>foo</base>(aStruct)(a: 1, b: 8, 10)
 let _ = aStruct . /*bar:call*/bar(/*no-args:call*/aFunc())(/*no-label:call*/aFunc(2))
 
 var a = /*referenced*/bar

@@ -14,6 +14,4 @@ public enum Endpoint {
     }
   }
 }
-// CHECK: Begin completions
 // CHECK: Decl[LocalVar]/Local/TypeRelation[Convertible]: myInt[#Int#];
-// CHECK: End completions

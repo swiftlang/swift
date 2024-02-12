@@ -82,11 +82,11 @@ namespace swift {
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
   /// The result of performing the check.
-  Optional<bool> result;
+  llvm::Optional<bool> result;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  DeadEndBlocks &deadEndBlocks;
+  DeadEndBlocks *deadEndBlocks = nullptr;
 
   /// The value whose ownership we will check.
   SILValue value;
@@ -106,7 +106,8 @@ class SILValueOwnershipChecker {
   GuaranteedPhiVerifier &guaranteedPhiVerifier;
 
 public:
-  SILValueOwnershipChecker(DeadEndBlocks &deadEndBlocks, SILValue value,
+  /// \p deadEndBlocks is nullptr for complete OSSA lifetimes
+  SILValueOwnershipChecker(DeadEndBlocks *deadEndBlocks, SILValue value,
                            LinearLifetimeChecker::ErrorBuilder &errorBuilder,
                            GuaranteedPhiVerifier &guaranteedPhiVerifier)
       : result(), deadEndBlocks(deadEndBlocks), value(value),
@@ -485,7 +486,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     break;
   }
 
-  if (deadEndBlocks.isDeadEnd(arg->getParent()))
+  if (deadEndBlocks && deadEndBlocks->isDeadEnd(arg->getParent()))
     return true;
 
   return !errorBuilder.handleMalformedSIL([&] {
@@ -503,9 +504,10 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   case OwnershipKind::None:
     return true;
   case OwnershipKind::Owned:
-    if (deadEndBlocks.isDeadEnd(yield->getParent()->getParent()))
+    if (deadEndBlocks
+        && deadEndBlocks->isDeadEnd(yield->getParent()->getParent())) {
       return true;
-
+    }
     return !errorBuilder.handleMalformedSIL([&] {
       llvm::errs() << "Owned yield without life ending uses!\n"
                    << "Value: " << *yield << '\n';
@@ -562,7 +564,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
   // have lifetime ending uses, since our lifetime is guaranteed by our
   // operand, so there is nothing further to do. So just return true.
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    if (isGuaranteedForwarding(value)) {
+    if (value->isGuaranteedForwarding()) {
       return true;
     }
   }
@@ -572,7 +574,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     return true;
 
   if (auto *parentBlock = value->getParentBlock()) {
-    if (deadEndBlocks.isDeadEnd(parentBlock)) {
+    if (deadEndBlocks && deadEndBlocks->isDeadEnd(parentBlock)) {
       LLVM_DEBUG(llvm::dbgs() << "Ignoring transitively unreachable value "
                               << "without users!\n"
                               << "    Value: " << *value << '\n');
@@ -718,7 +720,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // Check if we are an instruction that forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
-  if (isGuaranteedForwarding(value)) {
+  if (value->isGuaranteedForwarding()) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
       return false;
@@ -779,7 +781,7 @@ void SILInstruction::verifyOperandOwnership(
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
-  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  llvm::Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
   if (IsSILOwnershipVerifierTestingEnabled) {
     errorBuilder.emplace(*getFunction(),
                          BehaviorKind::PrintMessageAndReturnFalse);
@@ -833,7 +835,7 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
   if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder,
+  SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder,
                            guaranteedPhiVerifier)
       .check();
 }
@@ -882,9 +884,30 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
       *f, BehaviorKind::PrintMessageAndAssert);
-  GuaranteedPhiVerifier guaranteedPhiVerifier(f, *deadEndBlocks, errorBuilder);
+  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks, errorBuilder);
   verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks,
                        guaranteedPhiVerifier);
+}
+
+void SILModule::verifyOwnership() const {
+  if (DisableOwnershipVerification)
+    return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  if (!getOptions().VerifyAll)
+    return;
+#endif
+
+  for (const SILFunction &function : *this) {
+    std::unique_ptr<DeadEndBlocks> deBlocks;
+    if (!getOptions().OSSACompleteLifetimes) {
+      deBlocks =
+        std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&function));
+    }
+    function.verifyOwnership(deBlocks.get());
+  }
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
@@ -911,7 +934,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   unsigned errorCounter = 0;
-  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  llvm::Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
   if (IsSILOwnershipVerifierTestingEnabled) {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse,
                          &errorCounter);
@@ -919,7 +942,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }
 
-  GuaranteedPhiVerifier guaranteedPhiVerifier(this, *deadEndBlocks,
+  GuaranteedPhiVerifier guaranteedPhiVerifier(this, deadEndBlocks,
                                               *errorBuilder);
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {

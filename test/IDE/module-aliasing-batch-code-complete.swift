@@ -33,7 +33,6 @@ func testModuleNameInBody() {
 // EXPR-DAG: Decl[Protocol]/OtherModule[XLogging]/Flair[RareType]: Logging[#Logging#]; name=Logging
 // EXPR-DAG: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
 // EXPR-DAG: Decl[FreeFunction]/OtherModule[XLogging]: setupLogger()[#Logger?#]; name=setupLogger()
-// EXPR: End completions
  
 // RUN: %empty-directory(%t/Out)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/FileLib2.swift -module-alias XLogging=AppleLogging  -filecheck %raw-FileCheck -completion-output-dir %t/Out -I %t/Modules
@@ -50,7 +49,6 @@ class ModuleNameInClause: #^MODULE^# {
 
 // MODULE-DAG: Decl[Protocol]/OtherModule[XLogging]: Logging[#Logging#]; name=Logging
 // MODULE-DAG: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
-// MODULE: End completions
 
 // RUN: %empty-directory(%t/Out)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/FileLib3.swift -module-alias XLogging=AppleLogging  -filecheck %raw-FileCheck -completion-output-dir %t/Out -I %t/Modules
@@ -66,7 +64,6 @@ func testModuleNameInDecl() -> #^TYPE^# {
 // TYPE-DAG: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
 // TYPE-DAG: Decl[Protocol]/OtherModule[XLogging]: Logging[#Logging#]; name=Logging
 // TYPE-DAG: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
-// TYPE: End completions
 
 // RUN: %empty-directory(%t/Out)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/FileLib4.swift -module-alias XLogging=AppleLogging  -filecheck %raw-FileCheck -completion-output-dir %t/Out -I %t/Modules
@@ -77,4 +74,3 @@ import #^IMPORT^#
 // IMPORT: Begin completion
 // IMPORT-NOT: AppleLogging
 // IMPORT: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
-// IMPORT: End completions

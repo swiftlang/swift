@@ -150,7 +150,7 @@ func throwError(_ b: Bool) throws {
 func catchError(_ b: Bool) -> Int {
   do {
     try throwError(b) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
     return 1          // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   }                   // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   let _ = 1 + 1       // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1

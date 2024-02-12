@@ -53,7 +53,7 @@ protocol GenericCollection : Collection {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach13trivialStructyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%.*]] = begin_borrow [var_decl] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
@@ -66,7 +66,6 @@ protocol GenericCollection : Collection {
 // CHECK:   br [[LOOP_DEST]]
 //
 // CHECK: [[NONE_BB]]:
-// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -107,7 +106,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach26trivialStructContinueBreakyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%.*]] = begin_borrow [var_decl] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<Int>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
@@ -148,7 +147,6 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
-// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -209,7 +207,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@guaranteed Array<any P>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<any P>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<any P>> }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%.*]] = begin_borrow [var_decl] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<any P>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
@@ -259,7 +257,6 @@ func existentialBreak(_ xx: [P]) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
-// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<any P>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -371,7 +368,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF : $@convention(thin) <T> (@guaranteed Array<GenericStruct<T>>) -> () {
 // CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<GenericStruct<T>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0> { var IndexingIterator<Array<GenericStruct<τ_0_0>>> } <T>, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%.*]] = begin_borrow [var_decl] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<GenericStruct<T>>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
@@ -421,7 +418,6 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
-// CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -481,7 +477,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach30genericCollectionContinueBreakyyxSlRzlF : $@convention(thin) <T where T : Collection> (@in_guaranteed T) -> () {
 // CHECK: bb0([[COLLECTION:%.*]] : $*T):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Collection> { var τ_0_0.Iterator } <T>, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
+// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $T, #Sequence.makeIterator :
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<T>([[PROJECT_ITERATOR_BOX]], [[COLLECTION_COPY:%.*]])
@@ -559,18 +555,22 @@ func genericCollectionContinueBreak<T : Collection>(_ xx: T) {
 func tupleElements(_ xx: [(C, C)]) {
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK: destroy_value [[B]]
-  // CHECK: destroy_value [[A]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [lexical] [var_decl] [[A]]
+  // CHECK: [[MOVED_B:%.*]] = move_value [lexical] [var_decl] [[B]]
+  // CHECK: destroy_value [[MOVED_B]]
+  // CHECK: destroy_value [[MOVED_A]]
   for (a, b) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [lexical] [var_decl] [[A]]
   // CHECK: destroy_value [[B]]
-  // CHECK: destroy_value [[A]]
+  // CHECK: destroy_value [[MOVED_A]]
   for (a, _) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: [[MOVED_B:%.*]] = move_value [lexical] [var_decl] [[B]]
   // CHECK: destroy_value [[A]]
-  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[MOVED_B]]
   for (_, b) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]

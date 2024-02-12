@@ -38,8 +38,8 @@ enum SinglePayloadObjCProtocol {
 // CHECK-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-64:   ]
 
-// CHECK-64:     inttoptr i64 %0 to %objc_object*
-// CHECK-64:   inttoptr i64 %1 to i8**
+// CHECK-64:     inttoptr i64 %0 to ptr
+// CHECK-64:   inttoptr i64 %1 to ptr
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i32 %0, i32 %1) {{.*}} {
 // CHECK-32:   switch i32 %0, label {{%.*}} [
@@ -48,8 +48,8 @@ enum SinglePayloadObjCProtocol {
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
 
-// CHECK-32:     inttoptr i32 %0 to %objc_object*
-// CHECK-32:   inttoptr i32 %1 to i8**
+// CHECK-32:     inttoptr i32 %0 to ptr
+// CHECK-32:   inttoptr i32 %1 to ptr
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
 entry(%c : $SinglePayloadClassProtocol):
@@ -76,7 +76,7 @@ end:
 // CHECK-64-simulator-true:     i64 1, label {{%.*}}
 // CHECK-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-64:   ]
-// CHECK-64:     inttoptr i64 %0 to %objc_object*
+// CHECK-64:     inttoptr i64 %0 to ptr
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i32 %0) {{.*}} {
 // CHECK-32:   switch i32 %0, label {{%.*}}
@@ -84,7 +84,7 @@ end:
 // CHECK-32:     i32 1, label {{%.*}}
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
-// CHECK-32:     inttoptr i32 %0 to %objc_object*
+// CHECK-32:     inttoptr i32 %0 to ptr
 
 sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
 entry(%c : $SinglePayloadObjCProtocol):
@@ -109,7 +109,7 @@ struct StructWithWeakVar {
 weak var delegate: delegateProtocol?
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(%T9enum_objc17StructWithWeakVarVSg* noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(ptr noalias dereferenceable({{.*}}) %0)
 sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK:      icmp eq [[WORD:i32|i64]] {{%.*}}, 0

@@ -25,11 +25,15 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -67,6 +71,7 @@ namespace swift {
   class CallExpr;
   class KeyPathExpr;
   class CaptureListExpr;
+  class ThenStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -138,6 +143,7 @@ class alignas(8) Expr : public ASTAllocated<Expr> {
   void operator=(const Expr&) = delete;
 
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Expr, bitmax(NumExprKindBits,8)+1,
@@ -319,9 +325,8 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
     ThrowsIsSet : 1,
-    Throws : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
@@ -364,12 +369,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
-    Discriminator : 16
-  );
-
   } Bits;
+  // clang-format on
 
 private:
   /// Ty - This is the type of the expression.
@@ -441,6 +442,14 @@ public:
   const Expr *getValueProvidingExpr() const {
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
+
+  /// Find the original expression value, looking through various
+  /// implicit conversions.
+  const Expr *findOriginalValue() const;
+
+  /// Find the original type of a value, looking through various implicit
+  /// conversions.
+  Type findOriginalType() const;
 
   /// If this is a reference to an operator written as a member of a type (or
   /// extension thereof), return the underlying operator reference.
@@ -875,12 +884,8 @@ public:
   void setBody(BraceStmt * b) { Body = b; }
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
-  
-  SourceLoc getStartLoc() const {
-    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
-  }
 
-  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1112,6 +1117,9 @@ public:
 #include "swift/AST/TokenKinds.def"
   };
 
+  static StringRef
+  getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind);
+
 private:
   ArgumentList *ArgList;
   SourceLoc PoundLoc;
@@ -1171,6 +1179,11 @@ class DeclRefExpr : public Expr {
   DeclNameLoc Loc;
   ActorIsolation implicitActorHopTarget;
 
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
+
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
@@ -1198,9 +1211,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.DeclRefExpr.IsImplicitlyAsync)
-      return None;
+      return llvm::None;
 
     return implicitActorHopTarget;
   }
@@ -1219,6 +1232,14 @@ public:
   /// implementation itself..
   bool isImplicitlyThrows() const {
     return Bits.DeclRefExpr.IsImplicitlyThrows;
+  }
+
+  /// The error thrown from this access.
+  ThrownErrorDestination throws() const { return ThrowDest; }
+
+  void setThrows(ThrownErrorDestination throws) {
+    assert(!ThrowDest);
+    ThrowDest = throws;
   }
 
   /// Set whether this reference must account for a `throw` occurring for reasons
@@ -1553,6 +1574,11 @@ protected:
     assert(Base);
   }
 
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
+
 public:
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -1581,9 +1607,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.LookupExpr.IsImplicitlyAsync)
-      return None;
+      return llvm::None;
 
     return implicitActorHopTarget;
   }
@@ -1592,6 +1618,14 @@ public:
   void setImplicitlyAsync(ActorIsolation target) {
     Bits.LookupExpr.IsImplicitlyAsync = true;
     implicitActorHopTarget = target;
+  }
+
+  /// The error thrown from this access.
+  ThrownErrorDestination throws() const { return ThrowDest; }
+
+  void setThrows(ThrownErrorDestination throws) {
+    assert(!ThrowDest);
+    ThrowDest = throws;
   }
 
   /// Determine whether this reference needs may implicitly throw.
@@ -1883,6 +1917,7 @@ public:
 /// should dynamically assert if it does.
 class ForceTryExpr final : public AnyTryExpr {
   SourceLoc ExclaimLoc;
+  Type thrownError;
 
 public:
   ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
@@ -1891,6 +1926,15 @@ public:
       ExclaimLoc(exclaimLoc) {}
 
   SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::ForceTry;
@@ -1902,6 +1946,7 @@ public:
 /// Optional. If the code does throw, \c nil is produced.
 class OptionalTryExpr final : public AnyTryExpr {
   SourceLoc QuestionLoc;
+  Type thrownError;
 
 public:
   OptionalTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc questionLoc,
@@ -1910,6 +1955,15 @@ public:
       QuestionLoc(questionLoc) {}
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::OptionalTry;
@@ -2050,31 +2104,61 @@ public:
   }
 };
 
-/// MoveExpr - A 'move' surrounding an lvalue expression marking the lvalue as
-/// needing to be moved.
-///
-/// getSemanticsProvidingExpr() looks through this because it doesn't
-/// provide the value and only very specific clients care where the
-/// 'move' was written.
-class MoveExpr final : public IdentityExpr {
-  SourceLoc MoveLoc;
+/// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
+/// lvalue as needing to be moved.
+class ConsumeExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc ConsumeLoc;
 
 public:
-  MoveExpr(SourceLoc moveLoc, Expr *sub, Type type = Type(),
-           bool implicit = false)
-      : IdentityExpr(ExprKind::Move, sub, type, implicit), MoveLoc(moveLoc) {}
+  ConsumeExpr(SourceLoc consumeLoc, Expr *sub, Type type = Type(),
+              bool implicit = false)
+      : Expr(ExprKind::Consume, implicit, type), SubExpr(sub),
+        ConsumeLoc(consumeLoc) {}
 
-  static MoveExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc, Expr *sub,
-                                  Type type = Type()) {
-    return new (ctx) MoveExpr(moveLoc, sub, type, /*implicit=*/true);
+  static ConsumeExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc,
+                                     Expr *sub, Type type = Type()) {
+    return new (ctx) ConsumeExpr(moveLoc, sub, type, /*implicit=*/true);
   }
 
-  SourceLoc getLoc() const { return MoveLoc; }
+  SourceLoc getLoc() const { return ConsumeLoc; }
 
-  SourceLoc getStartLoc() const { return MoveLoc; }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return getLoc(); }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
-  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Consume;
+  }
+};
+
+/// CopyExpr - A 'copy' surrounding an lvalue expression marking the lvalue as
+/// needing a semantic copy. Used to force a copy of a no implicit copy type.
+class CopyExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc CopyLoc;
+
+public:
+  CopyExpr(SourceLoc copyLoc, Expr *sub, Type type = Type(),
+           bool implicit = false)
+      : Expr(ExprKind::Copy, implicit, type), SubExpr(sub), CopyLoc(copyLoc) {}
+
+  static CopyExpr *createImplicit(ASTContext &ctx, SourceLoc copyLoc, Expr *sub,
+                                  Type type = Type()) {
+    return new (ctx) CopyExpr(copyLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return CopyLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return CopyLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Copy; }
 };
 
 /// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
@@ -3304,6 +3388,10 @@ class ErasureExpr final : public ImplicitConversionExpr,
     Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
     std::uninitialized_copy(argConversions.begin(), argConversions.end(),
                             getTrailingObjects<ConversionPair>());
+
+    assert(llvm::all_of(conformances, [](ProtocolConformanceRef ref) {
+      return !ref.isInvalid();
+    }));
   }
 
 public:
@@ -3431,6 +3519,19 @@ public:
   }
 };
 
+/// ActorIsolationErasureExpr - A special kind of function conversion that
+/// drops actor isolation.
+class ActorIsolationErasureExpr : public ImplicitConversionExpr {
+public:
+  ActorIsolationErasureExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::ActorIsolationErasure, subExpr, type) {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ActorIsolationErasure;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -3500,6 +3601,22 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArchetypeToSuper;
+  }
+};
+
+/// An expression that models an implicit conversion from an uninhabited value
+/// to any type. It cannot be evaluated.
+class UnreachableExpr : public ImplicitConversionExpr {
+  UnreachableExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::Unreachable, subExpr, ty) {}
+
+public:
+  static UnreachableExpr *create(ASTContext &ctx, Expr *subExpr, Type ty) {
+    return new (ctx) UnreachableExpr(subExpr, ty);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Unreachable;
   }
 };
 
@@ -3627,8 +3744,6 @@ public:
     PatternExpr = patternExpr;
   }
 
-  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
-
   GenericEnvironment *getGenericEnvironment() {
     return Environment;
   }
@@ -3647,6 +3762,47 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::PackExpansion;
+  }
+};
+
+/// An expression to materialize a pack from a tuple containing a pack
+/// expansion.
+///
+/// These nodes are created by CSApply and should only appear in a
+/// type-checked AST in the context of a \c PackExpansionExpr .
+class MaterializePackExpr final : public Expr {
+  /// The expression from which to materialize a pack.
+  Expr *FromExpr;
+
+  /// The source location of (deprecated) \c .element
+  SourceLoc ElementLoc;
+
+  MaterializePackExpr(Expr *fromExpr, SourceLoc elementLoc,
+                      Type type, bool implicit)
+      : Expr(ExprKind::MaterializePack, implicit, type),
+        FromExpr(fromExpr), ElementLoc(elementLoc) {}
+
+public:
+  static MaterializePackExpr *create(ASTContext &ctx, Expr *fromExpr,
+                                     SourceLoc elementLoc, Type type,
+                                     bool implicit = false);
+
+  Expr *getFromExpr() const { return FromExpr; }
+
+  void setFromExpr(Expr *fromExpr) {
+    FromExpr = fromExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return FromExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return ElementLoc.isValid() ? ElementLoc : FromExpr->getEndLoc();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MaterializePack;
   }
 };
 
@@ -3699,92 +3855,6 @@ public:
   }
 };
 
-/// Actor isolation for a closure.
-class ClosureActorIsolation {
-public:
-  enum Kind {
-    /// The closure is independent of any actor.
-    Independent,
-
-    /// The closure is tied to the actor instance described by the given
-    /// \c VarDecl*, which is the (captured) `self` of an actor.
-    ActorInstance,
-
-    /// The closure is tied to the global actor described by the given type.
-    GlobalActor,
-  };
-
-private:
-    /// The actor to which this closure is isolated, plus a bit indicating
-    /// whether the isolation was imposed by a preconcurrency declaration.
-    ///
-    /// There are three possible states for the pointer:
-    ///   - NULL: The closure is independent of any actor.
-    ///   - VarDecl*: The 'self' variable for the actor instance to which
-    ///     this closure is isolated. It will always have a type that conforms
-    ///     to the \c Actor protocol.
-    ///   - Type: The type of the global actor on which
-  llvm::PointerIntPair<llvm::PointerUnion<VarDecl *, Type>, 1, bool> storage;
-
-  ClosureActorIsolation(VarDecl *selfDecl, bool preconcurrency)
-      : storage(selfDecl, preconcurrency) { }
-  ClosureActorIsolation(Type globalActorType, bool preconcurrency)
-      : storage(globalActorType, preconcurrency) { }
-
-public:
-  ClosureActorIsolation(bool preconcurrency = false)
-      : storage(nullptr, preconcurrency) { }
-
-  static ClosureActorIsolation forIndependent(bool preconcurrency) {
-    return ClosureActorIsolation(preconcurrency);
-  }
-
-  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl,
-                                                bool preconcurrency) {
-    return ClosureActorIsolation(selfDecl, preconcurrency);
-  }
-
-  static ClosureActorIsolation forGlobalActor(Type globalActorType,
-                                              bool preconcurrency) {
-    return ClosureActorIsolation(globalActorType, preconcurrency);
-  }
-
-  /// Determine the kind of isolation.
-  Kind getKind() const {
-    if (storage.getPointer().isNull())
-      return Kind::Independent;
-
-    if (storage.getPointer().is<VarDecl *>())
-      return Kind::ActorInstance;
-
-    return Kind::GlobalActor;
-  }
-
-  /// Whether the closure is isolated at all.
-  explicit operator bool() const {
-    return getKind() != Kind::Independent;
-  }
-
-  /// Whether the closure is isolated at all.
-  operator Kind() const {
-    return getKind();
-  }
-
-  VarDecl *getActorInstance() const {
-    return storage.getPointer().dyn_cast<VarDecl *>();
-  }
-
-  Type getGlobalActor() const {
-    return storage.getPointer().dyn_cast<Type>();
-  }
-
-  bool preconcurrency() const {
-    return storage.getInt();
-  }
-
-  ActorIsolation getActorIsolation() const;
-};
-
 /// A base class for closure expressions.
 class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
@@ -3793,16 +3863,31 @@ class AbstractClosureExpr : public DeclContext, public Expr {
   ParameterList *parameterList;
 
   /// Actor isolation of the closure.
-  ClosureActorIsolation actorIsolation;
+  ActorIsolation actorIsolation;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
-        parameterList(nullptr) {
+        parameterList(nullptr),
+        actorIsolation(ActorIsolation::forUnspecified()) {
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
+
+  /// If we find that a capture x of this AbstractClosureExpr belongs to a
+  /// different isolation domain than the closure, add an ApplyIsolationCrossing
+  /// to foundIsolationCrossing.
+  ///
+  /// \p foundIsolationCrossings an out parameter that contains the
+  /// ApplyIsolationCrossing if any of the captures are isolation crossing and
+  /// the index of the capture in the capture array. We return the index since
+  /// all captures may not cross isolation boundaries and we may need to be able
+  /// to look up the corresponding capture at the SIL level by index.
+  void getIsolationCrossing(
+      SmallVectorImpl<
+          std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
+          &foundIsolationCrossings);
 
   CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
@@ -3854,6 +3939,13 @@ public:
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
 
+  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// this closure cannot throw.
+  ///
+  /// Closures with untyped throws will produce "any Error", functions that
+  /// cannot throw or are specified to throw "Never" will return llvm::None.
+  llvm::Optional<Type> getEffectiveThrownType() const;
+
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
 
@@ -3864,18 +3956,18 @@ public:
   bool hasSingleExpressionBody() const;
 
   /// Retrieve the body for closure that has a single expression for
-  /// its body.
-  ///
-  /// Only valid when \c hasSingleExpressionBody() is true.
+  /// its body, or \c nullptr if there is no single expression body.
   Expr *getSingleExpressionBody() const;
 
   /// Returns the body of closures that have a body
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
-  ClosureActorIsolation getActorIsolation() const { return actorIsolation; }
+  ActorIsolation getActorIsolation() const {
+    return actorIsolation;
+  }
 
-  void setActorIsolation(ClosureActorIsolation actorIsolation) {
+  void setActorIsolation(ActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;
   }
 
@@ -3896,7 +3988,7 @@ public:
 /// SerializedAbstractClosureExpr - This represents what was originally an
 /// AbstractClosureExpr during serialization. It is preserved only to maintain
 /// the correct AST structure and remangling after deserialization.
-class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
+class SerializedAbstractClosureExpr : public DeclContext {
   const Type Ty;
   llvm::PointerIntPair<Type, 1> TypeAndImplicit;
   const unsigned Discriminator;
@@ -3904,8 +3996,7 @@ class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
 public:
   SerializedAbstractClosureExpr(Type Ty, bool Implicit, unsigned Discriminator,
                                 DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::AbstractClosure,
-                                 Parent),
+    : DeclContext(DeclContextKind::SerializedAbstractClosure, Parent),
       TypeAndImplicit(llvm::PointerIntPair<Type, 1>(Ty, Implicit)),
       Discriminator(Discriminator) {}
 
@@ -3922,10 +4013,7 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::AbstractClosure;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedAbstractClosure;
   }
 };
 
@@ -3939,6 +4027,8 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+  friend class ExplicitCaughtTypeRequest;
+
 public:
   enum class BodyState {
     /// The body was parsed, but not ready for type checking because
@@ -3986,24 +4076,27 @@ private:
   /// The location of the "in", if present.
   SourceLoc InLoc;
 
+  /// The explicitly-specified thrown type.
+  TypeExpr *ThrownType;
+
   /// The explicitly-specified result type.
   llvm::PointerIntPair<TypeExpr *, 2, BodyState> ExplicitResultTypeAndBodyState;
 
-  /// The body of the closure, along with a bit indicating whether it
-  /// was originally just a single expression.
-  llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
+  /// The body of the closure.
+  BraceStmt *Body;
+
 public:
   ClosureExpr(const DeclAttributes &attributes,
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
-              SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              DeclContext *parent)
+              TypeExpr *thrownType, SourceLoc arrowLoc, SourceLoc inLoc,
+              TypeExpr *explicitResultType, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
-      InLoc(inLoc),
+      InLoc(inLoc), ThrownType(thrownType),
       ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
       Body(nullptr) {
     setParameterList(params);
@@ -4017,11 +4110,8 @@ public:
   SourceLoc getEndLoc() const;
   SourceLoc getLoc() const;
 
-  BraceStmt *getBody() const { return Body.getPointer(); }
-  void setBody(BraceStmt *S, bool isSingleExpression) {
-    Body.setPointer(S);
-    Body.setInt(isSingleExpression);
-  }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *S) { Body = S; }
 
   DeclAttributes &getAttrs() { return Attributes; }
   const DeclAttributes &getAttrs() const { return Attributes; }
@@ -4097,6 +4187,17 @@ public:
     return ThrowsLoc;
   }
 
+  /// Retrieve the explicitly-thrown type.
+  Type getExplicitThrownType() const;
+
+  /// Retrieve the explicitly-thrown type representation.
+  TypeRepr *getExplicitThrownTypeRepr() const {
+    if (ThrownType)
+      return ThrownType->getTypeRepr();
+
+    return nullptr;
+  }
+
   Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultTypeAndBodyState.getPointer()->getInstanceType();
@@ -4125,13 +4226,11 @@ public:
   /// ... even if the closure has been coerced to return Void by the type
   /// checker. This function does not return true for empty closures.
   bool hasSingleExpressionBody() const {
-    return Body.getInt();
+    return getSingleExpressionBody();
   }
 
   /// Retrieve the body for closure that has a single expression for
-  /// its body.
-  ///
-  /// Only valid when \c hasSingleExpressionBody() is true.
+  /// its body, or \c nullptr if there is no single expression body.
   Expr *getSingleExpressionBody() const;
 
   /// Is this a completely empty closure?
@@ -4517,6 +4616,10 @@ class DefaultArgumentExpr final : public Expr {
   /// default expression.
   PointerUnion<DeclContext *, Expr *> ContextOrCallerSideExpr;
 
+  /// Whether this default argument is evaluated asynchronously because
+  /// it's isolated to the callee's isolation domain.
+  bool implicitlyAsync = false;
+
 public:
   explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner,
                                unsigned paramIndex, SourceLoc loc, Type Ty,
@@ -4546,6 +4649,21 @@ public:
   /// expression within the context of the call site.
   Expr *getCallerSideDefaultExpr() const;
 
+  /// Get the required actor isolation for evaluating this default argument
+  /// synchronously. If the caller does not meet the required isolation, the
+  /// argument must be written explicitly at the call-site.
+  ActorIsolation getRequiredIsolation() const;
+
+  /// Whether this default argument is evaluated asynchronously because
+  /// it's isolated to the callee's isolation domain.
+  bool isImplicitlyAsync() const {
+    return implicitlyAsync;
+  }
+
+  void setImplicitlyAsync() {
+    implicitlyAsync = true;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;
   }
@@ -4560,13 +4678,19 @@ class ApplyExpr : public Expr {
   /// The list of arguments to call the function with.
   ArgumentList *ArgList;
 
-  ActorIsolation implicitActorHopTarget;
+  // If this apply crosses isolation boundaries, record the callee and caller
+  // isolations in this struct.
+  llvm::Optional<ApplyIsolationCrossing> IsolationCrossing;
+
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
 
 protected:
   ApplyExpr(ExprKind kind, Expr *fn, ArgumentList *argList, bool implicit,
             Type ty = Type())
-      : Expr(kind, implicit, ty), Fn(fn), ArgList(argList),
-        implicitActorHopTarget(ActorIsolation::forUnspecified()) {
+      : Expr(kind, implicit, ty), Fn(fn), ArgList(argList) {
     assert(ArgList);
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
     Bits.ApplyExpr.ThrowsIsSet = false;
@@ -4592,16 +4716,18 @@ public:
   /// Does this application throw?  This is only meaningful after
   /// complete type-checking.
   ///
-  /// If true, the function expression must have a throwing function
-  /// type.  The converse is not true because of 'rethrows' functions.
-  bool throws() const {
+  /// Returns the thrown error destination, which includes both the type
+  /// thrown from this application as well as the the context's error type,
+  /// which may be different.
+  ThrownErrorDestination throws() const {
     assert(Bits.ApplyExpr.ThrowsIsSet);
-    return Bits.ApplyExpr.Throws;
+    return ThrowDest;
   }
-  void setThrows(bool throws) {
+
+  void setThrows(ThrownErrorDestination throws) {
     assert(!Bits.ApplyExpr.ThrowsIsSet);
     Bits.ApplyExpr.ThrowsIsSet = true;
-    Bits.ApplyExpr.Throws = throws;
+    ThrowDest = throws;
   }
 
   /// Is this a 'rethrows' function that is known not to throw?
@@ -4611,6 +4737,21 @@ public:
   bool isNoAsync() const { return Bits.ApplyExpr.NoAsync; }
   void setNoAsync(bool noAsync) {
     Bits.ApplyExpr.NoAsync = noAsync;
+  }
+
+  // Return the optionally stored ApplyIsolationCrossing instance - set iff this
+  // ApplyExpr crosses isolation domains
+  const llvm::Optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+    return IsolationCrossing;
+  }
+
+  // Record that this apply crosses isolation domains, noting the isolation of
+  // the caller and callee by storing them into the IsolationCrossing field
+  void setIsolationCrossing(
+      ActorIsolation callerIsolation, ActorIsolation calleeIsolation) {
+    assert(!IsolationCrossing.has_value()
+             && "IsolationCrossing should not be set twice");
+    IsolationCrossing = {callerIsolation, calleeIsolation};
   }
 
   /// Is this application _implicitly_ required to be an async call?
@@ -4632,17 +4773,24 @@ public:
   ///
   /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
-  Optional<ActorIsolation> isImplicitlyAsync() const {
+  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
-      return None;
+      return llvm::None;
 
-    return implicitActorHopTarget;
+    auto isolationCrossing = getIsolationCrossing();
+    assert(isolationCrossing.has_value()
+           && "Implicitly async ApplyExprs should always "
+              "have had IsolationCrossing set");
+
+    return isolationCrossing.value().CalleeIsolation;
   }
 
   /// Note that this application is implicitly async and set the target.
   void setImplicitlyAsync(ActorIsolation target) {
+    assert(getIsolationCrossing().has_value()
+           && "ApplyExprs should always call setIsolationCrossing"
+              " before setImplicitlyAsync");
     Bits.ApplyExpr.ImplicitlyAsync = true;
-    implicitActorHopTarget = target;
   }
 
   /// Is this application _implicitly_ required to be a throwing call?
@@ -5124,24 +5272,30 @@ class ArrowExpr : public Expr {
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
+  Expr *ThrownType;
+
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            SourceLoc ArrowLoc, Expr *Result)
+            Expr *ThrownType, SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
       AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result)
+      Result(Result), ThrownType(ThrownType)
   { }
 
-  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, Expr *ThrownType,
+            SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
       AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
-      Args(nullptr), Result(nullptr)
+      Args(nullptr), Result(nullptr), ThrownType(ThrownType)
   { }
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
+  Expr *getThrownTypeExpr() const { return ThrownType; }
+  void setThrownTypeExpr(Expr *E) { ThrownType = E; }
+
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
@@ -5910,7 +6064,7 @@ public:
   /// If the provided expression appears as an argument to a subscript component
   /// of the key path, returns the index of that component. Otherwise, returns
   /// \c None.
-  Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
+  llvm::Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
 
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
@@ -5942,11 +6096,11 @@ public:
     ParsedPath = path;
   }
 
-  TypeRepr *getRootType() const {
+  TypeRepr *getExplicitRootType() const {
     assert(!isObjC() && "cannot get root type of ObjC keypath");
     return RootType;
   }
-  void setRootType(TypeRepr *rootType) {
+  void setExplicitRootType(TypeRepr *rootType) {
     assert(!isObjC() && "cannot set root type of ObjC keypath");
     RootType = rootType;
   }
@@ -5957,8 +6111,46 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
+  BoundGenericType *getKeyPathType() const;
+
+  Type getRootType() const;
+  Type getValueType() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;
+  }
+};
+
+/// Provides a value of type `(any Actor)?` that represents the actor
+/// isolation of the current context, or `nil` if this is non-isolated
+/// code.
+///
+/// This expression node is implicitly created by the type checker, and
+/// has no in-source spelling.
+class CurrentContextIsolationExpr : public Expr {
+  Expr *actorExpr = nullptr;
+  SourceLoc implicitLoc;
+
+public:
+  CurrentContextIsolationExpr(SourceLoc implicitLoc, Type type)
+      : Expr(ExprKind::CurrentContextIsolation, /*isImplicit=*/true, type),
+        implicitLoc(implicitLoc) {}
+
+  /// The expression that produces the actor isolation value.
+  Expr *getActor() const { return actorExpr; }
+
+  void setActor(Expr *expr) {
+    actorExpr = expr;
+  }
+
+  SourceLoc getLoc() const { return implicitLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(implicitLoc, implicitLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CurrentContextIsolation;
   }
 };
 
@@ -5983,7 +6175,7 @@ public:
 class SingleValueStmtExpr : public Expr {
 public:
   enum class Kind {
-    If, Switch
+    If, Switch, Do, DoCatch
   };
 
 private:
@@ -5993,10 +6185,10 @@ private:
   SingleValueStmtExpr(Stmt *S, DeclContext *DC)
       : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
 
-public:
   /// Creates a new SingleValueStmtExpr wrapping a statement.
   static SingleValueStmtExpr *create(ASTContext &ctx, Stmt *S, DeclContext *DC);
 
+public:
   /// Creates a new SingleValueStmtExpr wrapping a statement, and recursively
   /// attempts to wrap any branches of that statement that can become single
   /// value statement expressions.
@@ -6012,6 +6204,23 @@ public:
   /// SingleValueStmtExpr.
   static SingleValueStmtExpr *tryDigOutSingleValueStmtExpr(Expr *E);
 
+  /// Whether the last ASTNode in the given BraceStmt can potentially be used as
+  /// the implicit result for a SingleValueStmtExpr. If \p mustBeSingleValueStmt
+  /// is \c true, a result will be considered even if it may not be valid.
+  static bool isLastElementImplicitResult(BraceStmt *BS, ASTContext &ctx,
+                                          bool mustBeSingleValueStmt);
+
+  /// Retrieves a resulting ThenStmt from the given BraceStmt, or \c nullptr if
+  /// the brace does not have a resulting ThenStmt.
+  static ThenStmt *getThenStmtFrom(BraceStmt *BS);
+
+  /// Whether the given BraceStmt has a result to be produced from a parent
+  /// SingleValueStmtExpr. Note this does not consider elements that may
+  /// implicitly become results, check \c isLastElementImplicitResult for that.
+  static bool hasResult(BraceStmt *BS) {
+    return getThenStmtFrom(BS);
+  }
+
   /// Retrieve the wrapped statement.
   Stmt *getStmt() const { return S; }
   void setStmt(Stmt *newS) { S = newS; }
@@ -6022,10 +6231,15 @@ public:
   /// Retrieve the complete set of branches for the underlying statement.
   ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
 
-  /// Retrieve the single expression branches of the statement, excluding
-  /// branches that either have multiple expressions, or have statements.
+  /// Retrieve the resulting ThenStmts from each branch of the
+  /// SingleValueStmtExpr.
+  ArrayRef<ThenStmt *>
+  getThenStmts(SmallVectorImpl<ThenStmt *> &scratch) const;
+
+  /// Retrieve the result expressions from each branch of the
+  /// SingleValueStmtExpr.
   ArrayRef<Expr *>
-  getSingleExprBranches(SmallVectorImpl<Expr *> &scratch) const;
+  getResultExprs(SmallVectorImpl<Expr *> &scratch) const;
 
   DeclContext *getDeclContext() const { return DC; }
 
@@ -6145,98 +6359,58 @@ public:
 
 /// An invocation of a macro expansion, spelled with `#` for freestanding
 /// macros or `@` for attached macros.
-class MacroExpansionExpr final : public Expr {
+class MacroExpansionExpr final : public Expr,
+                                 public FreestandingMacroExpansion {
 private:
   DeclContext *DC;
-  SourceLoc SigilLoc;
-  DeclNameRef MacroName;
-  DeclNameLoc MacroNameLoc;
-  SourceLoc LeftAngleLoc, RightAngleLoc;
-  ArrayRef<TypeRepr *> GenericArgs;
-  ArgumentList *ArgList;
   Expr *Rewritten;
   MacroRoles Roles;
-
-  /// The referenced macro.
-  ConcreteDeclRef macroRef;
+  MacroExpansionDecl *SubstituteDecl;
 
 public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
-  explicit MacroExpansionExpr(DeclContext *dc,
-                              SourceLoc sigilLoc, DeclNameRef macroName,
-                              DeclNameLoc macroNameLoc,
-                              SourceLoc leftAngleLoc,
-                              ArrayRef<TypeRepr *> genericArgs,
-                              SourceLoc rightAngleLoc,
-                              ArgumentList *argList,
-                              MacroRoles roles,
-                              bool isImplicit = false,
+  explicit MacroExpansionExpr(DeclContext *dc, MacroExpansionInfo *info,
+                              MacroRoles roles, bool isImplicit = false,
                               Type ty = Type())
       : Expr(ExprKind::MacroExpansion, isImplicit, ty),
-        DC(dc), SigilLoc(sigilLoc),
-        MacroName(macroName), MacroNameLoc(macroNameLoc),
-        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs),
-        Rewritten(nullptr), Roles(roles) {
-    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
-
-    // Macro expansions always have an argument list. If one is not provided, create
-    // an implicit one.
-    if (argList) {
-      ArgList = argList;
-    } else {
-      ArgList = ArgumentList::createImplicit(dc->getASTContext(), {});
-    }
+        FreestandingMacroExpansion(FreestandingMacroKind::Expr, info), DC(dc),
+        Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
   }
 
-  DeclNameRef getMacroName() const { return MacroName; }
-  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+  static MacroExpansionExpr *
+  create(DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
+         DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+         ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
+         ArgumentList *argList, MacroRoles roles, bool isImplicit = false,
+         Type ty = Type());
 
   Expr *getRewritten() const { return Rewritten; }
   void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
 
-  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
-
-  SourceRange getGenericArgsRange() const {
-    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  ArgumentList *getArgs() const {
+    return FreestandingMacroExpansion::getArgs();
   }
-
-  ArgumentList *getArgs() const { return ArgList; }
-  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
   MacroRoles getMacroRoles() const { return Roles; }
 
-  SourceLoc getLoc() const { return SigilLoc; }
-
-  ConcreteDeclRef getMacroRef() const { return macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+  SourceLoc getLoc() const { return getPoundLoc(); }
 
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *dc) { DC = dc; }
 
-  /// Returns a discriminator which determines this macro expansion's index
-  /// in the sequence of macro expansions within the current function.
-  unsigned getDiscriminator() const;
-
-  /// Retrieve the raw discriminator, which may not have been computed yet.
-  ///
-  /// Only use this for queries that are checking for (e.g.) reentrancy or
-  /// intentionally do not want to initiate verification.
-  unsigned getRawDiscriminator() const {
-    return Bits.MacroExpansionExpr.Discriminator;
+  SourceRange getSourceRange() const {
+    return getExpansionInfo()->getSourceRange();
   }
 
-  void setDiscriminator(unsigned discriminator) {
-    assert(getRawDiscriminator() == InvalidDiscriminator);
-    assert(discriminator != InvalidDiscriminator);
-    Bits.MacroExpansionExpr.Discriminator = discriminator;
-  }
-
-  SourceRange getSourceRange() const;
+  MacroExpansionDecl *createSubstituteDecl();
+  MacroExpansionDecl *getSubstituteDecl() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MacroExpansion;
+  }
+  static bool classof(const FreestandingMacroExpansion *expansion) {
+    return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Expr;
   }
 };
 
@@ -6268,6 +6442,8 @@ void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
 SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
+SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
+SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 
 } // end namespace swift
 

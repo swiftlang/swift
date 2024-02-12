@@ -52,14 +52,12 @@ func testStructDefaultInit() {
   Point(#^POINT_PAREN^#
 // POINT_PAREN: Begin completions, 1 items
 // POINT_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: Int#}, {#y: Int#}[')'][#Point#];
-// POINT_PAREN: End completions
   func sync() {}
   Point.#^POINT_DOT^#
 // POINT_DOT: Begin completions, 3 items
 // POINT_DOT-DAG: Keyword[self]/CurrNominal:          self[#Point.Type#];
 // POINT_DOT-DAG: Keyword/CurrNominal:                Type[#Point.Type#];
 // POINT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#}, {#y: Int#})[#Point#];
-// POINT_DOT: End completions
 }
 
 func testDynamicMemberLookup(lens: Lens<Point>) {
@@ -69,7 +67,6 @@ func testDynamicMemberLookup(lens: Lens<Point>) {
 // LENS_DOT-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
 // LENS_DOT-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
 // LENS_DOT-DAG: Decl[InstanceVar]/CurrNominal:      obj[#Point#];
-// LENS_DOT: End completions
 }
 func testRawRepresentable() {
   MyEnum.#^MYENUM_DOT^#
@@ -83,7 +80,6 @@ func testRawRepresentable() {
 // MYENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal:        AllCases[#[MyEnum]#];
 // MYENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:        allCases[#[MyEnum]#];
 // MYENUM_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
-// MYENUM_DOT: End completions
 }
 func testRawRepesentableInstance(value: MyEnum) {
   value.#^MYENUM_INSTANCE_DOT^#
@@ -92,7 +88,6 @@ func testRawRepesentableInstance(value: MyEnum) {
 // MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/CurrNominal:      rawValue[#String#];
 // MYENUM_INSTANCE_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:   hashValue[#Int#];
 // MYENUM_INSTANCE_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem: hash({#into: &Hasher#})[#Void#];
-// MYENUM_INSTANCE_DOT: End completions
 }
 func testHasWrappedValue(value: HasWrapped) {
   value.#^HASWRAPPED_DOT^#
@@ -100,5 +95,4 @@ func testHasWrappedValue(value: HasWrapped) {
 // HASWRAPPED_DOT: Keyword[self]/CurrNominal:          self[#HasWrapped#];
 // HASWRAPPED_DOT: Decl[InstanceVar]/CurrNominal:      wrapped[#Int#];
 // HASWRAPPED_DOT: Decl[InstanceVar]/CurrNominal:      $wrapped[#Wrap<Int>#];
-// HASWRAPPED_DOT: End completions
 }

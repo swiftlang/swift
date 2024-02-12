@@ -132,11 +132,33 @@ void swift::swift_task_enqueueGlobalWithDeadline(
     swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
 }
 
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" SWIFT_CC(swift)
+SerialExecutorRef _task_serialExecutor_getExecutorRef(
+        HeapObject *executor, const Metadata *selfType,
+        const SerialExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
+
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _task_executor_getTaskExecutorRef(
+    HeapObject *executor, const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
+
 SWIFT_CC(swift)
 static bool swift_task_isOnExecutorImpl(HeapObject *executor,
                                         const Metadata *selfType,
                                         const SerialExecutorWitnessTable *wtable) {
-  auto executorRef = ExecutorRef::forOrdinary(executor, wtable);
+  auto executorRef = _task_serialExecutor_getExecutorRef(executor, selfType, wtable);
   return swift_task_isCurrentExecutor(executorRef);
 }
 
@@ -148,6 +170,21 @@ bool swift::swift_task_isOnExecutor(HeapObject *executor,
         executor, selfType, wtable, swift_task_isOnExecutorImpl);
   else
     return swift_task_isOnExecutorImpl(executor, selfType, wtable);
+}
+
+bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
+  return ref.isComplexEquality();
+}
+
+uint64_t swift::swift_task_getJobTaskId(Job *job) {
+  if (auto task = dyn_cast<AsyncTask>(job)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else {
+    return job->getJobId();
+  }
 }
 
 /*****************************************************************************/
@@ -163,18 +200,18 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
     swift_task_enqueueMainExecutorImpl(job);
 }
 
-ExecutorRef swift::swift_task_getMainExecutor() {
+SerialExecutorRef swift::swift_task_getMainExecutor() {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: this isn't right for the non-cooperative environment
-  return ExecutorRef::generic();
+  return SerialExecutorRef::generic();
 #else
-  return ExecutorRef::forOrdinary(
+  return SerialExecutorRef::forOrdinary(
            reinterpret_cast<HeapObject*>(&_dispatch_main_q),
            _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 #endif
 }
 
-bool ExecutorRef::isMainExecutor() const {
+bool SerialExecutorRef::isMainExecutor() const {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: this isn't right for the non-cooperative environment
   return isGeneric();

@@ -19,6 +19,19 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
+option(SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE
+       "On Darwin platforms, link the standard library in a way that
+       allows inclusion in the dyld shared cache"
+       FALSE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+   LLVM_LINKER_IS_APPLE AND
+   NOT SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE)
+  set(shared_cache_link_flags "LINKER:-not_for_dyld_shared_cache")
+  list(APPEND SWIFT_RUNTIME_LINK_FLAGS ${shared_cache_link_flags})
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -35,6 +48,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-xc++")
 endif()
+
+# Use the new diagnostic formatter.
+list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-diagnostic-style" "swift")
 
 # We should avoid non-literals in format strings, or appropriately mark
 # functions.
@@ -62,11 +78,20 @@ endif()
 
 add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
-add_subdirectory(Cxx)
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  add_subdirectory(Cxx)
+else()
+  # SwiftCompilerSources rely on C++ interop, specifically on being able to
+  # import the C++ standard library into Swift. On Linux, this is only possible
+  # when using the modulemap that Swift provides for libstdc++. Make sure we
+  # include the libstdc++ modulemap into the build even when not building
+  # C++ interop modules.
+  add_subdirectory(Cxx/libstdcxx)
+endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR OR SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
@@ -122,6 +147,96 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     INSTALL_IN_COMPONENT never_install)
 endif()
 
+option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
+      "Enable build of the embedded Swift standard library and runtime"
+      TRUE)
+
+# Temporarily, by default only build embedded stdlib when building the compiler, to
+# unblock CI jobs that run against old(er) toolchains.
+option(SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER
+       "Build embedded Swift standard library and runtime even
+       if we are not building our own compiler"
+       FALSE)
+
+if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux"))
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+elseif(NOT SWIFT_INCLUDE_TOOLS)
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER})
+elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES)
+  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      # arch    module_name               target triple
+      "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
+      "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
+      "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+      "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+    )
+  endif()
+  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+    )
+  endif()
+
+  # the following are all ELF targets
+  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
+      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+      "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
+      "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+    )
+  endif()
+  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+    )
+  endif()
+  if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
+      "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+    )
+  endif()
+  if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "i686    i686-unknown-none-elf       i686-unknown-none-elf"
+      "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      # Without specifying the `windows` component LLVM refuses to
+      # generate valid COFF object files.
+      "i686    i686-unknown-windows-coff   i686-unknown-windows-coff"
+      "x86_64  x86_64-unknown-windows-coff x86_64-unknown-windows-coff"
+    )
+  endif()
+
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+    )
+  endif()
+
+  if (SWIFT_HOST_VARIANT STREQUAL "linux")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
+      # In practice this expands to either:
+      # "x86_64   x86_64-unknown-linux-gnu  x86_64-unknown-linux-gnu"
+      # "aarch64  aarch64-unknown-linux-gnu aarch64-unknown-linux-gnu"
+      )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
+      "arm64    arm64-apple-macos         arm64-apple-macos10.13"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+      )
+  endif()
+endif()
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
@@ -129,7 +244,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+endif()
 
+if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
+  # In some internal Apple configurations we have the need
+  # to build Core and Onone separately from the rest
+  # of the stdlib
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(Differentiation)
   endif()
@@ -148,12 +268,20 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(RegexBuilder)
   endif()
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-    add_subdirectory(Reflection)
+  if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+    add_subdirectory(Observation)
+  endif()
+
+  if(SWIFT_ENABLE_BACKTRACING)
+    add_subdirectory(Backtracing)
+  endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    add_subdirectory(Synchronization)
   endif()
 endif()
 
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
+if(SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(RemoteInspection)
   add_subdirectory(SwiftRemoteMirror)
 endif()
@@ -170,3 +298,8 @@ if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(Windows)
   endif()
 endif()
+
+if(SWIFT_BUILD_LIBEXEC)
+add_subdirectory(libexec)
+endif()
+

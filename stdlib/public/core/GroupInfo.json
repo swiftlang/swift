@@ -76,6 +76,8 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
@@ -102,6 +104,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
@@ -243,7 +246,10 @@
     "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
-    "Instant.swift"
+    "Instant.swift",
+    "EmbeddedRuntime.swift",
+    "EmbeddedStubs.swift",
+    "EmbeddedPrint.swift"
   ],
   "Result": [
     "Result.swift"

@@ -12,13 +12,25 @@
 
 #include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/SyntacticElementTarget.h"
 
 using namespace swift;
+using namespace constraints;
 using Fallback = CompletionContextFinder::Fallback;
+
+CompletionContextFinder::CompletionContextFinder(
+    SyntacticElementTarget target, DeclContext *DC)
+    : InitialExpr(target.getAsExpr()), InitialDC(DC) {
+  assert(DC);
+  target.walk(*this);
+}
 
 ASTWalker::PreWalkResult<Expr *>
 CompletionContextFinder::walkToExprPre(Expr *E) {
   if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+    // NOTE: We're querying hasSingleExpressionBody before the single-expression
+    // body transform has happened, so this won't take e.g SingleValueStmtExprs
+    // into account.
     Contexts.push_back({closure->hasSingleExpressionBody()
                             ? ContextKind::SingleStmtClosure
                             : ContextKind::MultiStmtClosure,
@@ -56,7 +68,7 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     }
     // Code completion in key paths is modelled by a code completion component
     // Don't walk the key path's parsed expressions.
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   return Action::Continue(E);
@@ -88,14 +100,15 @@ size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
   return ComponentIndex;
 }
 
-Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
+llvm::Optional<Fallback>
+CompletionContextFinder::getFallbackCompletionExpr() const {
   if (!hasCompletionExpr()) {
     // Creating a fallback expression only makes sense if we are completing in
     // an expression, not when we're completing in a key path.
-    return None;
+    return llvm::None;
   }
 
-  Optional<Fallback> fallback;
+  llvm::Optional<Fallback> fallback;
   bool separatePrecheck = false;
   DeclContext *fallbackDC = InitialDC;
 
@@ -120,7 +133,7 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
       fallbackDC = cast<AbstractClosureExpr>(context.E);
       LLVM_FALLTHROUGH;
     case ContextKind::ErrorExpression:;
-      fallback = None;
+      fallback = llvm::None;
       separatePrecheck = true;
       continue;
     }
@@ -131,7 +144,7 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
 
   if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
-  return None;
+  return llvm::None;
 }
 
 bool swift::containsIDEInspectionTarget(SourceRange range,

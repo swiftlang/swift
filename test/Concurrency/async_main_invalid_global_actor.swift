@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @globalActor
 actor Kat {

@@ -36,6 +36,21 @@ class Controller {
     0
   }
   
+  subscript<T>(array: [T]) -> T? {
+    array.first
+  }
+
+  subscript<T, U>(array: [T], array2: [U]) -> T? {
+    array.first
+  }
+
+  subscript<T>(array array: [T]) -> T? {
+    array.first
+  }
+
+  subscript<T, U>(array array: [T], array2 array2: [U]) -> T? {
+    array.first
+  }
 }
 
 struct S {
@@ -95,3 +110,41 @@ print(\Controller.thirdLabel)
 print(\Controller.[])
 // CHECK: \Controller.self
 print(\Controller.self)
+
+// Subscripts with dependent generic types don't produce good output currently,
+// so we're just checking to make sure they don't crash.
+// CHECK: \Controller.
+print(\Controller[[42]])
+// CHECK: Controller.
+print(\Controller[[42], [42]])
+// CHECK: \Controller.
+print(\Controller[array: [42]])
+// CHECK: \Controller.
+print(\Controller[array: [42], array2: [42]])
+
+do {
+  struct S {
+    var i: Int
+  }
+
+  func test<T, U>(v: T, _ kp: any KeyPath<T, U> & Sendable) {
+    print(v[keyPath: kp])
+  }
+
+  // CHECK: 42
+  test(v: S(i: 42), \.i)
+}
+
+do {
+  @dynamicMemberLookup
+  struct Test<T> {
+    var obj: T
+
+    subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U {
+      get { obj[keyPath: member] }
+    }
+  }
+
+  // CHECK: 5
+  print(Test(obj: "Hello").utf8.count)
+}

@@ -4,6 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_in_compiler
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
@@ -39,7 +40,7 @@ distributed actor Greeter {
 // CHECK: [[TYPE:%[0-9]+]] = metatype $@thick Greeter.Type
 
 // CHECK: [[INSTANCE:%[0-9]+]] = builtin "initializeDistributedRemoteActor"([[TYPE]] : $@thick Greeter.Type) : $Greeter
-// CHECK: [[ID_PROPERTY:%[0-9]+]] = ref_element_addr [[INSTANCE]] : $Greeter, #Greeter.id
+// CHECK: [[ID_PROPERTY:%[0-9]+]] = ref_element_addr [immutable] [[INSTANCE]] : $Greeter, #Greeter.id
 // Note specifically that we don't [take] in the below copy_addr:
 // CHECK: copy_addr [[ADDRESS_ARG]] to [init] [[ID_PROPERTY]] : $*NotLoadableActorAddress
 

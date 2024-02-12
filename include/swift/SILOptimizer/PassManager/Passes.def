@@ -122,10 +122,14 @@ PASS(ArrayElementPropagation, "array-element-propagation",
      "Array Element Propagation")
 SWIFT_FUNCTION_PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
+SWIFT_MODULE_PASS(AsyncDemotion, "async-demotion",
+     "Convert async functions to be synchronous")
 PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
      "Print SIL Instruction MemBehavior and ReleaseBehavior Information")
 PASS(BasicCalleePrinter, "basic-callee-printer",
      "Print Basic Callee Analysis for Testing")
+SWIFT_FUNCTION_PASS(BooleanLiteralFolding, "boolean-literal-folding",
+     "Constant folds initializers of boolean literals")
 PASS(CFGPrinter, "view-cfg",
      "View Function CFGs")
 PASS(COWArrayOpts, "cowarray-opt",
@@ -182,7 +186,7 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoisting of value destroys")
-PASS(SSADestroyHoisting, "ssa-destroy-hoisting",
+PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
@@ -207,7 +211,7 @@ PASS(OnonePrespecializations, "onone-prespecializer",
      "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
-PASS(EarlyInliner, "early-inline",
+PASS(EarlyPerfInliner, "early-inline",
      "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
@@ -225,6 +229,8 @@ SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
 SWIFT_FUNCTION_PASS(TestInstructionIteration, "test-instruction-iteration",
      "Tests instruction iteration")
+SWIFT_FUNCTION_PASS(InitializeStaticGlobals, "initialize-static-globals",
+     "Initializes static global variables")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
@@ -237,23 +243,21 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
-PASS(EarlyRedundantLoadElimination, "early-redundant-load-elim",
+SWIFT_FUNCTION_PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
-PASS(RedundantLoadElimination, "redundant-load-elim",
+SWIFT_FUNCTION_PASS(RedundantLoadElimination, "redundant-load-elimination",
      "Redundant Load Elimination")
-PASS(DeadStoreElimination, "dead-store-elim",
+SWIFT_FUNCTION_PASS(DeadStoreElimination, "dead-store-elimination",
      "Dead Store Elimination")
-PASS(MandatoryGenericSpecializer, "mandatory-generic-specializer",
-     "Mandatory Generic Function Specialization on Static Types")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
+PASS(VTableSpecializer, "vtable-specializer",
+     "Generic Specialization on VTables")
 PASS(ExistentialSpecializer, "existential-specializer",
      "Existential Specializer")
 PASS(SILSkippingChecker, "check-sil-skipping",
      "Utility pass to ensure -experimental-skip-*-function-bodies skip "
      "SIL generation of not-to-be-serialized functions entirely")
-PASS(GlobalOpt, "global-opt",
-     "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Global Property Optimization")
 PASS(MandatoryARCOpts, "mandatory-arc-opts",
@@ -280,8 +284,9 @@ PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
      "Late Dead Function and Global Elimination")
-PASS(LateInliner, "late-inline",
-     "Late Function Inlining")
+SWIFT_FUNCTION_PASS(LifetimeDependenceDiagnostics,
+      "lifetime-dependence-diagnostics",
+      "Diagnose Lifetime Dependence")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
@@ -300,10 +305,8 @@ PASS(MandatoryInlining, "mandatory-inlining",
      "Mandatory Inlining of Transparent Functions")
 PASS(Mem2Reg, "mem2reg",
      "Memory to SSA Value Conversion to Remove Stack Allocation")
-PASS(MemBehaviorDumper, "mem-behavior-dump",
+SWIFT_FUNCTION_PASS(MemBehaviorDumper, "dump-mem-behavior",
      "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
-PASS(LSLocationPrinter, "lslocation-dump",
-     "Print Load-Store Location Results Covering all Accesses")
 SWIFT_FUNCTION_PASS(MergeCondFails, "merge-cond_fails",
      "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
@@ -312,7 +315,7 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 SWIFT_FUNCTION_PASS(ObjCBridgingOptimization, "objc-bridging-opt",
      "Optimize ObjectiveC briging operations")
-PASS(ObjectOutliner, "object-outliner",
+SWIFT_FUNCTION_PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
@@ -343,6 +346,8 @@ PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
 PASS(PhiExpansion, "phi-expansion",
      "Replace Phi arguments by their only used field")
+SWIFT_FUNCTION_PASS(DeinitDevirtualizer, "deinit-devirtualizer",
+     "Devirtualizes destroys of non-copyable values")
 SWIFT_FUNCTION_PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -351,14 +356,16 @@ PASS(ReleaseHoisting, "release-hoisting",
      "SIL release Hoisting")
 PASS(LateReleaseHoisting, "late-release-hoisting",
      "Late SIL release Hoisting Preserving Epilogues")
-PASS(TargetConstantFolding, "target-constant-folding",
-     "Target specific constant folding")
 IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
 PASS(MandatorySILLinker, "mandatory-linker",
      "Deserialize all referenced SIL functions that are shared or transparent")
+IRGEN_PASS(PackMetadataMarkerInserter, "pack-metadata-marker-inserter",
+     "Insert markers where pack metadata might be de/allocated.")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
+SWIFT_FUNCTION_PASS(LetPropertyLowering, "let-property-lowering",
+     "Lowers accesses to let properties of classes")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
 PASS(TempLValueOpt, "temp-lvalue-opt",
@@ -367,6 +374,10 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
+PASS(TransferNonSendable, "transfer-non-sendable",
+     "Checks calls that send non-sendable values between isolation domains")
+PASS(LowerTupleAddrConstructor, "lower-tuple-addr-constructor",
+     "Lower tuple addr constructor to tuple_element_addr+copy_addr")
 PASS(SILGenCleanup, "silgen-cleanup",
      "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
@@ -381,6 +392,10 @@ SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
 SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
+SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
+     "Performs optimizations for performance-annotated functions")
+SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
+     "Converts read-only var-globals to let-globals")
 SWIFT_MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 SWIFT_FUNCTION_PASS(FunctionStackProtection, "function-stack-protection",
@@ -397,6 +412,12 @@ SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
+SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimization",
+    "Optimize copies to an indirect return value")
+SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
+    "Sets the bare flag on objects which don't need their headers")
+SWIFT_FUNCTION_PASS(AllocVectorLowering, "alloc-vector-lowering",
+     "lowering of allocVector builtins")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
@@ -427,7 +448,7 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
-PASS(UnitTestRunner, "unit-test-runner",
+PASS(UnitTestRunner, "test-runner",
      "Utility pass.  Parses arguments and runs code with them.")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
@@ -444,6 +465,8 @@ PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
      "Utility pass that enforces move only invariants on raw SIL for addresses for testing purposes")
 PASS(MoveOnlyChecker, "sil-move-only-checker",
      "Pass that enforces move only invariants on raw SIL for addresses and objects")
+PASS(MoveOnlyTempAllocationFromLetTester, "sil-move-only-temp-allocation-from-let-tester",
+     "Pass that allows us to run separately SIL test cases for the eliminateTemporaryAllocationsFromLet utility")
 PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
      "Pass that performs checking of the consume operator for copyable values")
 PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
@@ -458,16 +481,18 @@ PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
+PASS(RegionAnalysisInvalidationTransform, "region-analysis-invalidation-transform",
+     "Delete the analysis state associated with region analysis")
 PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
-PASS(MoveOnlyDeinitInsertion, "sil-move-only-deinit-insertion",
-     "After running move only checking, convert last destroy_values to deinit calls")
 PASS(MoveOnlyBorrowToDestructureTransform,
      "sil-move-only-borrow-to-destructure",
      "Pass that is phased ordered before move only object checking that is "
      "used to convert borrow+projection to destructures. Once this has run, the move "
      "only object checker runs and ensures that the destructures do not create "
      "any move only errors with respect to non-borrow+projection uses")
+PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
+     "Check/transform reference bindings")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
@@ -476,6 +501,11 @@ SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
 SWIFT_SILCOMBINE_PASS(StrongRetainInst)
 SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
+SWIFT_SILCOMBINE_PASS(RetainValueInst)
+SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
+SWIFT_SILCOMBINE_PASS(LoadInst)
+SWIFT_SILCOMBINE_PASS(CopyValueInst)
+SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

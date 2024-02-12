@@ -27,7 +27,6 @@
 #include "llvm/Support/Process.h"
 
 namespace swift {
-class AnnotatedSourceSnippet;
 
 /// Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
@@ -38,10 +37,6 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   bool DidErrorOccur = false;
   DiagnosticOptions::FormattingStyle FormattingStyle =
       DiagnosticOptions::FormattingStyle::LLVM;
-  // The current snippet used to display an error/warning/remark and the notes
-  // implicitly associated with it. Uses `std::unique_ptr` so that
-  // `AnnotatedSourceSnippet` can be forward declared.
-  std::unique_ptr<AnnotatedSourceSnippet> currentSnippet;
   // Educational notes which are buffered until the consumer is finished
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
@@ -55,7 +50,6 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   /// The queued diagnostics structure.
   void *queuedDiagnostics = nullptr;
   llvm::DenseMap<unsigned, QueuedBuffer> queuedBuffers;
-  unsigned queuedDiagnosticsOutermostBufferID;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());

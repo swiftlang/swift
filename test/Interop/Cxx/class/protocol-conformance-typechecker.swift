@@ -28,13 +28,13 @@ protocol HasReturnNonNull {
 extension ReturnsNonNullValue: HasReturnNonNull {}
 
 
-protocol Invertable {
+protocol Invertible {
   static prefix func !(obj: Self) -> Self
 }
 
-extension HasOperatorExclaim: Invertable {}
+extension HasOperatorExclaim: Invertible {}
 
-extension HasOperatorEqualEqual: Equatable {}
+extension HasOperatorEqualEqual: @retroactive Equatable {}
 
 
 protocol HasOperatorPlusEqualProtocol {

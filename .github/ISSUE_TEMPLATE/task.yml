@@ -1,0 +1,37 @@
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2023 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+name: ⚙️ Track a task
+description: >
+  Tasks can be used to track internal work, extract individual subtasks from a
+  larger issue, and can serve as umbrella issues themselves.
+labels: [task, triage needed]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        This repository hosts the Swift compiler, the Swift standard library,
+        the Swift runtime, SourceKit, and IDE support for the Swift language.
+        It does *not* track feedback on Xcode and other closed source Apple
+        deeloper software such as SwiftUI and UIKit; please direct it to
+        [Feedback Assistant](https://developer.apple.com/bug-reporting)
+        instead.
+  - type: textarea
+    attributes:
+      label: Description
+      description: >
+        A comprehensive description of the task, in human language.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: >
+        Any complementary information that could be valuable to an implementor.
+    validations:
+      required: false

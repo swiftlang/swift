@@ -30,10 +30,6 @@
 #include <memory>
 #include <string>
 
-namespace llvm {
-  class raw_ostream;
-}
-
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
@@ -143,15 +139,23 @@ enum class MangledDifferentiabilityKind : char {
 /// that two passes that generate similar changes do not yield the same
 /// mangling. This currently cannot happen, so this is just a safety measure
 /// that creates separate name spaces.
+///
+/// The number of entries is limited! See `Demangler::demangleSpecAttributes`.
+/// If you exceed the max, you'll need to upgrade the mangling.
 enum class SpecializationPass : uint8_t {
-  AllocBoxToStack,
+  AllocBoxToStack = 0,
   ClosureSpecializer,
   CapturePromotion,
   CapturePropagation,
   FunctionSignatureOpts,
   GenericSpecializer,
   MoveDiagnosticInOutToOut,
+  AsyncDemotion,
+  LAST = AsyncDemotion
 };
+
+constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;
+static_assert((uint8_t)SpecializationPass::LAST < MAX_SPECIALIZATION_PASS);
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
   return char(uint8_t(Pass)) + '0';
@@ -259,6 +263,8 @@ public:
   void addChild(NodePointer Child, NodeFactory &Factory);
   // Only to be used by the demangler parsers.
   void removeChildAt(unsigned Pos);
+
+  void replaceChild(unsigned Pos, NodePointer Child);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -526,7 +532,7 @@ enum class OperatorKind {
 };
 
 /// A mangling error, which consists of an error code and a Node pointer
-struct LLVM_NODISCARD ManglingError {
+struct [[nodiscard]] ManglingError {
   enum Code {
     Success = 0,
     AssertionFailed,
@@ -568,7 +574,7 @@ struct LLVM_NODISCARD ManglingError {
 
 /// Used as a return type for mangling functions that may fail
 template <typename T>
-class LLVM_NODISCARD ManglingErrorOr {
+class [[nodiscard]] ManglingErrorOr {
 private:
   ManglingError err_;
   T             value_;
@@ -728,6 +734,12 @@ bool isFunctionAttr(Node::Kind kind);
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.
 llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
+
+/// Produce the mangled name for the nominal type descriptor of a type
+/// referenced by its module and type name.
+std::string mangledNameForTypeMetadataAccessor(llvm::StringRef moduleName,
+                                               llvm::StringRef typeName,
+                                               Node::Kind typeKind);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

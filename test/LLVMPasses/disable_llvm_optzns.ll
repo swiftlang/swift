@@ -6,29 +6,29 @@
 target datalayout = "e-p:64:64:64-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
 target triple = "x86_64-apple-macosx10.9"
 
-%swift.refcounted = type { %swift.heapmetadata*, i64 }
-%swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
+%swift.refcounted = type { ptr, i64 }
+%swift.heapmetadata = type { ptr, ptr }
 %objc_object = type opaque
 %swift.bridge = type opaque
 
-declare %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* returned)
-declare void @swift_unknownObjectRelease(%swift.refcounted*)
-declare i8* @llvm.objc.retain(i8*)
-declare void @llvm.objc.release(i8*)
-declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
-declare void @swift_release(%swift.refcounted* nocapture)
-declare %swift.refcounted* @swift_retain(%swift.refcounted* returned) nounwind
-declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
-declare void @swift_bridgeObjectRelease(%swift.bridge*)
-declare %swift.refcounted* @swift_retainUnowned(%swift.refcounted* returned)
+declare ptr @swift_unknownObjectRetain(ptr returned)
+declare void @swift_unknownObjectRelease(ptr)
+declare ptr @llvm.objc.retain(ptr)
+declare void @llvm.objc.release(ptr)
+declare ptr @swift_allocObject(ptr , i64, i64) nounwind
+declare void @swift_release(ptr nocapture)
+declare ptr @swift_retain(ptr returned) nounwind
+declare ptr @swift_bridgeObjectRetain(ptr)
+declare void @swift_bridgeObjectRelease(ptr)
+declare ptr @swift_retainUnowned(ptr returned)
 
-declare void @user(%swift.refcounted *) nounwind
-declare void @user_objc(i8*) nounwind
+declare void @user(ptr) nounwind
+declare void @user_objc(ptr) nounwind
 declare void @unknown_func()
 
 ; CHECK-LABEL: @trivial_retain_release(
 ; CHECK-NEXT: entry:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
+; CHECK-NEXT: call ptr @swift_retain(ptr %P)
 ; CHECK-NEXT: call void @swift_release(
 ; CHECK-NEXT: call void @user(
 ; CHECK-NEXT: ret void
@@ -37,11 +37,11 @@ declare void @unknown_func()
 ; NEGATIVE-NEXT: entry:
 ; NEGATIVE-NEXT: call void @user(
 ; NEGATIVE-NEXT: ret void
-define void @trivial_retain_release(%swift.refcounted* %P, i8* %O, %swift.bridge * %B) {
+define void @trivial_retain_release(ptr %P, ptr %O, ptr %B) {
 entry:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
-  call void @swift_release(%swift.refcounted* %P) nounwind
-  call void @user(%swift.refcounted* %P) nounwind
+  call ptr @swift_retain(ptr %P)
+  call void @swift_release(ptr %P) nounwind
+  call void @user(ptr %P) nounwind
   ret void
 }
 

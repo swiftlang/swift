@@ -1,15 +1,16 @@
 // Checks for SPI declarations and limited exportability.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5 -package-name myPkg
 
 // Without -enable-library-evolution the exportability check looks at struct internal properties.
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5 -package-name myPkg
 
 // SPI declarations
 @_spi(MySPI) public func spiFunc() {}
 @_spi(+) public func invalidSPIName() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
-@_spi(🤔) public func emojiNamedSPI() {}
+@_spi(🤔) public func emojiNamedSPI() {} // OK
+@_spi(_) public func underscoreNamedSPI() {} // OK
 @_spi() public func emptyParensSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(set) public func keywordSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 
@@ -26,11 +27,18 @@ public func useOfSPITypeInvalid() -> SPIClass { fatalError() } // expected-error
 @_spi(S) public func spiUseOfInternalType() -> InternalClass { fatalError() } // expected-error{{function cannot be declared public because its result uses an internal type}}
 @_spi(S) public func spiUseOfPrivateType(_ a: PrivateClass)  { fatalError() } // expected-error{{function cannot be declared public because its parameter uses a private type}}
 
+public var globalArrayWithSPISetter: [Int] {
+  get { fatalError() }
+  @_spi(S) set {}
+}
+
 @inlinable
 func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
   spiFunc() // expected-error {{global function 'spiFunc()' cannot be used in an '@inlinable' function because it is SPI}}
   _ = SPIClass() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
   // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because it is SPI}}
+  globalArrayWithSPISetter = [] // expected-error {{setter for var 'globalArrayWithSPISetter' cannot be used in an '@inlinable' function because it is SPI}}
+  globalArrayWithSPISetter.append(0) // expected-error {{setter for var 'globalArrayWithSPISetter' cannot be used in an '@inlinable' function because it is SPI}}
 }
 
 @_spi(S) public struct SPIStruct {
@@ -120,3 +128,7 @@ public func inlinableSPI() {
   spiFunc()
   let _ = SPIClass()
 }
+
+@_spi(S) func internalFunc() {} // expected-error {{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
+
+@_spi(S) package func packageFunc() {} // expected-error {{package global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}

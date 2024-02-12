@@ -5,7 +5,6 @@ add_swift_host_library(swiftIDE STATIC
   ArgumentCompletion.cpp
   CodeCompletion.cpp
   CodeCompletionCache.cpp
-  CodeCompletionConsumer.cpp
   CodeCompletionContext.cpp
   CodeCompletionDiagnostics.cpp
   CodeCompletionResult.cpp
@@ -23,6 +22,7 @@ add_swift_host_library(swiftIDE STATIC
   ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
+  IDEBridging.cpp
   IDERequests.cpp
   IDETypeChecking.cpp
   ImportDepth.cpp
@@ -45,5 +45,11 @@ target_link_libraries(swiftIDE PRIVATE
   swiftDriver
   swiftParse
   swiftSema)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftIDE PRIVATE
+    swiftIDEUtilsBridging
+  )
+endif()
 
 set_swift_llvm_is_available(swiftIDE)

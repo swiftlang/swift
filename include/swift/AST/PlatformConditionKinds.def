@@ -31,6 +31,9 @@ PLATFORM_CONDITION(Arch, "arch")
 /// The active endianness target (big or little)
 PLATFORM_CONDITION_(Endianness, "endian")
 
+/// The active arch target pointer bit width (_32 or _64)
+PLATFORM_CONDITION_(PointerBitWidth, "pointerBitWidth")
+
 /// Runtime support (_ObjC or _Native)
 PLATFORM_CONDITION_(Runtime, "runtime")
 
@@ -42,6 +45,9 @@ PLATFORM_CONDITION(TargetEnvironment, "targetEnvironment")
 
 /// Pointer authentication enabled
 PLATFORM_CONDITION_(PtrAuth, "ptrauth")
+
+/// The active arch target's max atomic bit width.
+PLATFORM_CONDITION_(HasAtomicBitWidth, "hasAtomicBitWidth")
 
 #undef PLATFORM_CONDITION
 #undef PLATFORM_CONDITION_

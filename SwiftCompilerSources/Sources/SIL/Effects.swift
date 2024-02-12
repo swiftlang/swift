@@ -71,7 +71,7 @@ extension Function {
       var effects = definedGlobalEffects
 
       // Even a `[readnone]` function can read from indirect arguments.
-      if (0..<numArguments).contains(where: {getArgumentConvention(for: $0).isIndirectIn}) {
+      if (0..<numArguments).contains(where: {argumentConventions[$0].isIndirectIn}) {
         effects.memory.read = true
       }
       // Even `[readnone]` and `[readonly]` functions write to indirect results.
@@ -143,7 +143,7 @@ extension Function {
       if convention.isIndirectIn {
         // Even a `[readnone]` function can read from an indirect argument.
         result.memory.read = true
-      } else if convention == .indirectOut {
+      } else if convention.isIndirectOut {
         // Even `[readnone]` and `[readonly]` functions write to indirect results.
         result.memory.write = true
       }
@@ -541,12 +541,12 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         result.ownership = SideEffects.Ownership()
       }
       switch convention {
-      case .indirectIn:
+      case .indirectIn, .packOwned:
         result.memory.write = false
-      case .indirectInGuaranteed:
+      case .indirectInGuaranteed, .packGuaranteed:
         result.memory.write = false
         result.ownership.destroy = false
-      case .indirectOut:
+      case .indirectOut, .packOut, .packInout:
         result.memory.read = false
         result.ownership.copy = false
         result.ownership.destroy = false

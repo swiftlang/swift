@@ -16,6 +16,7 @@
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/Concurrency.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Mutex.h"
@@ -49,8 +50,9 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings update(Optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-                  Optional<unsigned> IDEInspectionCheckDependencyInterval);
+  Settings
+  update(llvm::Optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+         llvm::Optional<unsigned> IDEInspectionCheckDependencyInterval);
   Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 
@@ -90,16 +92,6 @@ class RequestTracker {
   }
 
 public:
-  /// Returns \c true if the request with the given \p CancellationToken has
-  /// already been cancelled.
-  bool isCancelled(SourceKitCancellationToken CancellationToken) {
-    if (!CancellationToken) {
-      return false;
-    }
-    llvm::sys::ScopedLock L(RequestsMtx);
-    return isCancelledImpl(CancellationToken);
-  }
-
   /// Adds a \p CancellationHandler that will be called when the request
   /// associated with the \p CancellationToken is cancelled.
   /// If that request has already been cancelled when this method is called,

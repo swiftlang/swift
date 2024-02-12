@@ -21,8 +21,13 @@ using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
   ASTMangler::beginManglingWithoutPrefix();
+
   if (Serialized)
     ArgOpBuffer << 'q';
+
+  if (RemovedEffects.contains(EffectKind::Async))
+    ArgOpBuffer << 'a';
+
   ArgOpBuffer << char(uint8_t(Pass) + '0');
 }
 
@@ -100,10 +105,15 @@ manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
 }
                                   
 std::string GenericSpecializationMangler::
-mangleNotReabstracted(SubstitutionMap subs) {
+mangleNotReabstracted(SubstitutionMap subs,
+                      bool metatyeParamsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  appendSpecializationOperator("TG");
+  if (metatyeParamsRemoved) {
+    appendSpecializationOperator("TGm");
+  } else {
+    appendSpecializationOperator("TG");
+  }
   return finalize();
 }
                                   

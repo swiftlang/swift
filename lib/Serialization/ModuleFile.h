@@ -74,6 +74,11 @@ class ModuleFile
   /// The module that this module is an overlay of, if any.
   ModuleDecl *UnderlyingModule = nullptr;
 
+  /// Once this module file has been associated with the AST node representing
+  /// it, resolve the potentially-SDK-relative module-defining `.swiftinterface`
+  /// path to an absolute path.
+  llvm::Optional<std::string> ResolvedModuleDefiningFilename;
+
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
@@ -106,6 +111,12 @@ public:
     }
     bool isImplementationOnly() const {
       return Core.isImplementationOnly();
+    }
+    bool isInternalOrBelow() const {
+      return Core.isInternalOrBelow();
+    }
+    bool isPackageOnly() const {
+      return Core.isPackageOnly();
     }
 
     bool isHeader() const { return Core.isHeader(); }
@@ -248,6 +259,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Pack conformances referenced by this module.
+  MutableArrayRef<Serialized<PackConformance *>> PackConformances;
+
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
@@ -270,6 +284,10 @@ private:
   createLazyConformanceLoaderToken(ArrayRef<uint64_t> ids);
   ArrayRef<ProtocolConformanceID>
   claimLazyConformanceLoaderToken(uint64_t token);
+
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the context's SDK.
+  std::string resolveModuleDefiningFilename(const ASTContext &ctx);
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -295,8 +313,8 @@ private:
   llvm::DenseMap<uint32_t,
            std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
-  llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
-  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
+  llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -335,6 +353,15 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
+  Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const;
+
+  Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
+                                          Decl *container,
+                                          llvm::Error &&error) const;
+  Decl *handleErrorAndSupplyMissingClassMember(
+      ASTContext &context, llvm::Error &&error,
+      ClassDecl *containingClass) const;
+
 public:
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -346,7 +373,11 @@ public:
   }
 
   /// Enrich \c error with contextual information, emits a fatal diagnostic in
-  ///  the ASTContext's DignosticsEngine, and return the augmented error.
+  /// the ASTContext's DiagnosticsEngine, and return the augmented error.
+  ///
+  /// The `diagnoseFatal` methods return only in LLDB where high error
+  /// tolerance is expected, or when hitting a project error. During normal
+  /// compilation, most calls won't return and lead to a compiler crash.
   llvm::Error diagnoseFatal(llvm::Error error) const;
 
   /// Emit a generic deserialization error via \c diagnoseFatal().
@@ -394,6 +425,23 @@ public:
     return llvm::consumeError(diagnoseFatal(msg));
   }
 
+  /// Consume errors that are usually safe to ignore because they
+  /// are expected to support language features or caused by project
+  /// misconfigurations.
+  ///
+  /// If the error is handled, success is returned, otherwise the original
+  /// error is returned.
+  llvm::Error consumeExpectedError(llvm::Error &&error);
+
+  /// Report project errors as remarks if desired, otherwise drop the error
+  /// silently.
+  void diagnoseAndConsumeError(llvm::Error error) const;
+
+  /// Report modularization error, either directly or indirectly if it
+  /// caused a \c TypeError or \c ExtensionError. Returns any unhandled errors.
+  llvm::Error
+  diagnoseModularizationError(llvm::Error error,
+                   DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
 
   /// Report an unexpected format error that could happen only from a
   /// memory-level inconsistency. Please prefer passing an error to
@@ -585,6 +633,16 @@ public:
     return Core->Bits.HasHermeticSealAtLink;
   }
 
+  /// Whether this module was built using embedded Swift.
+  bool isEmbeddedSwiftModule() const {
+    return Core->Bits.IsEmbeddedSwiftModule;
+  }
+
+  /// Whether this module was built with C++ interoperability enabled.
+  bool hasCxxInteroperability() const {
+    return Core->Bits.HasCxxInteroperability;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -642,6 +700,27 @@ public:
   /// compiled for a different OS.
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool recoverFromIncompatibility);
+
+  /// Load dependencies of this module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  ///
+  /// \returns any error that occurred during loading dependencies.
+  Status
+  loadDependenciesForFileContext(const FileUnit *file, SourceLoc diagLoc,
+                               bool forTestable);
+
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ModuleLoadingBehavior
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool forTestable) const;
+
+  /// Generate a \c SourceLoc pointing at the loaded swiftmodule file.
+  SourceLoc getSourceLoc() const;
 
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate
@@ -779,6 +858,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false);
 
   StringRef getModuleFilename() const {
+    if (ResolvedModuleDefiningFilename)
+      return ResolvedModuleDefiningFilename.value();
     if (!Core->ModuleInterfacePath.empty())
       return Core->ModuleInterfacePath;
     return getModuleLoadedFilename();
@@ -849,19 +930,21 @@ public:
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  Optional<StringRef> getGroupNameById(unsigned Id) const;
-  Optional<StringRef> getSourceFileNameById(unsigned Id) const;
-  Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
-  Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
-  Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  llvm::Optional<StringRef> getGroupNameById(unsigned Id) const;
+  llvm::Optional<StringRef> getSourceFileNameById(unsigned Id) const;
+  llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  llvm::Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
-  Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
-  Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
-  Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-  Optional<ExternalSourceLocs::RawLocs>
+  llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  bool hasLoadedSwiftDoc() const;
+  llvm::Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
+  llvm::Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
-  Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D);
+  llvm::Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
   void collectSerializedSearchPath(
@@ -962,28 +1045,30 @@ public:
 
   /// Returns the protocol conformance for the given ID.
   ProtocolConformanceRef
-  getConformance(serialization::ProtocolConformanceID id,
-                 GenericEnvironment *genericEnv = nullptr);
+  getConformance(serialization::ProtocolConformanceID id);
 
   /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  getConformanceChecked(serialization::ProtocolConformanceID id,
-                        GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Reads a foreign error convention from \c DeclTypeCursor, if present.
-  Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+  llvm::Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
 
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
-  Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
+  llvm::Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
+
+  bool maybeReadLifetimeDependence(
+      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
+      unsigned numParams);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
-  Optional<StringRef> maybeReadInlinableBodyText();
+  llvm::Optional<StringRef> maybeReadInlinableBodyText();
 
   /// Reads pattern initializer text from \c DeclTypeCursor, if present.
-  Optional<StringRef> maybeReadPatternInitializerText();
+  llvm::Optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>

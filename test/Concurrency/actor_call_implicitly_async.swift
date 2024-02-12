@@ -1,6 +1,8 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency -parse-as-library
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
+// REQUIRES: concurrency
+// REQUIRES: asserts
 
 // some utilities
 func thrower() throws {}
@@ -244,7 +246,7 @@ func regularFunc() {
 
   _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can not be partially applied}}
 
-  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can not be referenced from a non-isolated context}}
+  _ = a.deposit(1)  // expected-error{{call to actor-isolated instance method 'deposit' in a synchronous nonisolated context}}
 }
 
 
@@ -289,30 +291,35 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-complete-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await wisk(1)
-  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
-  // expected-warning@-1 3{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   blender((peelBanana))
-  // expected-warning@-1 2{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  // expected-warning@-1 {{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
 
   await wisk(peelBanana)
-  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-complete-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   await wisk(wisk)
-  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-complete-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   await (((wisk)))(((wisk)))
-  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // expected-complete-warning@-1{{passing argument of non-sendable type '(Any) -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
+  // expected-complete-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await {wisk}()(1)
 
-  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
+  // FIXME: Poor diagnostic. The issue is that the invalid function conversion
+  // to remove '@BananaActor' on 'wisk' cannot influence which solution is chosen.
+  // So, the constraint system cannot determine whether the type of this expression
+  // is '(Any) -> Void' or '@BananaActor (Any) -> Void'.
   await (true ? wisk : {n in return})(1)
+  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
 }
 
 actor Chain {
@@ -368,14 +375,14 @@ actor Calculator {
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to actor-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }

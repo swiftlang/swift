@@ -333,6 +333,11 @@ func customAccessors(_ hive: Hive, bee: Bee) {
   hive.`guard` = bee // no-warning
 }
 
+// Properties with bool don't use the getter.
+func boolProperties(_ hive: Hive) {
+  markUsed(hive.empty)
+}
+
 // instancetype/Dynamic Self invocation.
 func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   var hive = Hive()

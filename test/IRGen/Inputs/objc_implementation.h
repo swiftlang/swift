@@ -1,6 +1,6 @@
 #import <Foundation/Foundation.h>
 
-@interface ImplClass: NSObject
+@interface ImplClass: NSObject <NSCopying>
 
 - (nonnull instancetype)init;
 
@@ -23,6 +23,9 @@
 - (void)category2Method:(int)param;
 
 @end
+
+extern void implFunc(int param);
+extern void implFuncCName(int param) __asm__("_implFuncAsmName");
 
 
 @interface NoImplClass

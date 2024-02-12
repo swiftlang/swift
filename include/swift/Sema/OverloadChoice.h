@@ -54,6 +54,8 @@ enum class OverloadChoiceKind : int {
   /// The overload choice selects a particular declaration that
   /// was found by unwrapping an optional context type.
   DeclViaUnwrappedOptional,
+  /// The overload choice materializes a pack from a tuple.
+  MaterializePack,
   /// The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
@@ -270,7 +272,7 @@ public:
 
   /// Retrieve the type of implicitly unwrapped optional for a reference to this
   /// overload choice, or \c None if the choice is not for an IUO decl.
-  Optional<IUOReferenceKind>
+  llvm::Optional<IUOReferenceKind>
   getIUOReferenceKind(ConstraintSystem &cs,
                       bool forSecondApplication = false) const;
 

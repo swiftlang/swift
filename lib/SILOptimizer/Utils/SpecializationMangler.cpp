@@ -124,6 +124,13 @@ setReturnValueOwnedToUnowned() {
 }
 
 void
+FunctionSignatureSpecializationMangler::
+setRemovedEffect(EffectKind effect) {
+  assert(effect == EffectKind::Async && "unimplemented effect kind!");
+  RemovedEffects |= effect;
+}
+
+void
 FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *constInst) {
   // Append the prefix for constant propagation 'p'.
   ArgOpBuffer << 'p';
@@ -173,6 +180,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
     switch (SLI->getEncoding()) {
       case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
+      case StringLiteralInst::Encoding::UTF8_OSLOG: ArgOpBuffer << 'o'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
     }
     break;

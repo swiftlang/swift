@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation -enable-lexical-borrow-scopes=false | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation -enable-lexical-borrow-scopes=false | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 import Foundation
 

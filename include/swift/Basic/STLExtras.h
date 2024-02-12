@@ -14,10 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_INTERLEAVE_H
-#define SWIFT_BASIC_INTERLEAVE_H
+#ifndef SWIFT_BASIC_STLEXTRAS_H
+#define SWIFT_BASIC_STLEXTRAS_H
 
-#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -28,6 +28,7 @@
 #include <numeric>
 #include <type_traits>
 #include <unordered_set>
+#include <optional>
 
 namespace swift {
 
@@ -405,7 +406,7 @@ class OptionalTransformIterator {
       typename std::iterator_traits<Iterator>::reference;
 
   using ResultReference =
-      typename std::result_of<OptionalTransform(UnderlyingReference)>::type;
+      typename std::invoke_result<OptionalTransform, UnderlyingReference>::type;
 
 public:
   /// Used to indicate when the current iterator has already been
@@ -531,7 +532,7 @@ struct DowncastAsOptional {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return None;
+    return llvm::None;
   }
 
   template <typename Superclass>
@@ -540,7 +541,7 @@ struct DowncastAsOptional {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return None;
+    return llvm::None;
   }
 };
 
@@ -783,6 +784,17 @@ void emplace_back_all(VectorType &vector, ValueType &&value,
 template <class VectorType>
 void emplace_back_all(VectorType &vector) {}
 
+/// Apply a function to the value if present; otherwise return None.
+template <typename OptionalElement, typename Function>
+auto transform(const llvm::Optional<OptionalElement> &value,
+               const Function &operation)
+    -> llvm::Optional<decltype(operation(*value))> {
+
+  if (value) {
+    return operation(*value);
+  }
+  return llvm::None;
+}
 } // end namespace swift
 
-#endif // SWIFT_BASIC_INTERLEAVE_H
+#endif // SWIFT_BASIC_STLEXTRAS_H

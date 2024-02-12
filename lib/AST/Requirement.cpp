@@ -14,8 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -76,45 +78,99 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
   return getSecondType()->castTo<ProtocolType>()->getDecl();
 }
 
-bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                         bool allowMissing) const {
+CheckRequirementResult Requirement::checkRequirement(
+    SmallVectorImpl<Requirement> &subReqs,
+    bool allowMissing) const {
+  if (hasError())
+    return CheckRequirementResult::SubstitutionFailure;
+
+  auto firstType = getFirstType();
+
+  auto expandPackRequirement = [&](PackType *packType) {
+    for (auto eltType : packType->getElementTypes()) {
+      // FIXME: Doesn't seem right
+      if (auto *expansionType = eltType->getAs<PackExpansionType>())
+        eltType = expansionType->getPatternType();
+
+      auto kind = getKind();
+      if (kind == RequirementKind::Layout) {
+        subReqs.emplace_back(kind, eltType,
+                             getLayoutConstraint());
+      } else {
+        subReqs.emplace_back(kind, eltType,
+                             getSecondType());
+      }
+    }
+    return CheckRequirementResult::PackRequirement;
+  };
+
   switch (getKind()) {
   case RequirementKind::Conformance: {
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
     auto conformance = module->lookupConformance(
-        getFirstType(), proto, allowMissing);
+        firstType, proto, allowMissing);
     if (!conformance)
-      return false;
+      return CheckRequirementResult::RequirementFailure;
 
-    conditionalRequirements = conformance.getConditionalRequirements();
-    return true;
+    auto condReqs = conformance.getConditionalRequirements();
+    if (condReqs.empty())
+      return CheckRequirementResult::Success;
+    subReqs.append(condReqs.begin(), condReqs.end());
+    return CheckRequirementResult::ConditionalConformance;
   }
 
   case RequirementKind::Layout: {
-    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
-      auto layout = archetypeType->getLayoutConstraint();
-      return (layout && layout.merge(getLayoutConstraint()));
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
     }
 
-    if (getLayoutConstraint()->isClass())
-      return getFirstType()->satisfiesClassConstraint();
+    if (auto *archetypeType = firstType->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      if (layout && layout.merge(getLayoutConstraint()))
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
+    }
+
+    if (getLayoutConstraint()->isClass()) {
+      if (firstType->satisfiesClassConstraint())
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
+    }
 
     // TODO: Statically check other layout constraints, once they can
     // be spelled in Swift.
-    return true;
+    return CheckRequirementResult::Success;
   }
 
   case RequirementKind::Superclass:
-    return getSecondType()->isExactSuperclassOf(getFirstType());
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
+    if (getSecondType()->isExactSuperclassOf(firstType))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameType:
-    return getFirstType()->isEqual(getSecondType());
+    if (firstType->isEqual(getSecondType()))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameShape:
-    return (getFirstType()->getReducedShape() ==
-            getSecondType()->getReducedShape());
+    if (firstType->getReducedShape() ==
+        getSecondType()->getReducedShape())
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
   }
 
   llvm_unreachable("Bad requirement kind");
@@ -188,4 +244,162 @@ int Requirement::compare(const Requirement &other) const {
   assert(compareProtos != 0 && "Duplicate conformance requirements");
 
   return compareProtos;
+}
+
+CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requirements) {
+  SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
+
+  bool hadSubstFailure = false;
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+
+  // Check preconditions.
+#ifndef NDEBUG
+  {
+    auto firstType = req.getFirstType();
+    assert(!firstType->hasTypeParameter());
+    assert(!firstType->hasTypeVariable());
+
+    if (req.getKind() != RequirementKind::Layout) {
+      auto secondType = req.getSecondType();
+      assert(!secondType->hasTypeParameter());
+      assert(!secondType->hasTypeVariable());
+    }
+  }
+#endif
+
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
+      return CheckRequirementsResult::RequirementFailure;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
+  }
+
+  if (hadSubstFailure)
+    return CheckRequirementsResult::SubstitutionFailure;
+
+  return CheckRequirementsResult::Success;
+}
+
+CheckRequirementsResult swift::checkRequirements(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options) {
+  SmallVector<Requirement, 4> substReqs;
+  for (auto req : requirements) {
+    substReqs.push_back(req.subst(substitutions,
+                              LookUpConformanceInModule(module), options));
+  }
+
+  return checkRequirements(substReqs);
+}
+
+InverseRequirement::InverseRequirement(Type subject,
+                                       ProtocolDecl *protocol,
+                                       SourceLoc loc)
+    : subject(subject), protocol(protocol), loc(loc) {
+  // Ensure it's an invertible protocol.
+  assert(protocol);
+  assert(protocol->getKnownProtocolKind());
+  assert(getInvertibleProtocolKind(*(protocol->getKnownProtocolKind())));
+}
+
+InvertibleProtocolKind InverseRequirement::getKind() const {
+  return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
+}
+
+void InverseRequirement::enumerateDefaultedParams(
+    GenericContext *genericContext,
+    SmallVectorImpl<Type> &result) {
+
+  auto add = [&](Type t) {
+    assert(t->isTypeParameter());
+    result.push_back(t);
+  };
+
+  // Nothing to enumerate if it's not generic.
+  if (!genericContext->isGeneric())
+    return;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
+    add(proto->getSelfInterfaceType());
+
+    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
+      add(assocTypeDecl->getDeclaredInterfaceType());
+
+    return;
+  }
+
+  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
+    add(gtpd->getDeclaredInterfaceType());
+}
+
+void InverseRequirement::expandDefaults(
+    ASTContext &ctx,
+    ArrayRef<Type> gps,
+    SmallVectorImpl<StructuralRequirement> &result) {
+
+  SmallVector<ProtocolDecl*, NumInvertibleProtocols> defaults;
+  expandDefaults(ctx, /*inverses=*/{}, defaults);
+
+  // Fast-path.
+  if (defaults.empty())
+    return;
+
+  for (auto gp : gps) {
+    for (auto *proto : defaults) {
+      auto protoTy = proto->getDeclaredInterfaceType();
+      result.push_back({{RequirementKind::Conformance, gp, protoTy},
+                        SourceLoc()});
+    }
+  }
+}
+
+void InverseRequirement::expandDefaults(
+    ASTContext &ctx,
+    InvertibleProtocolSet inverses,
+    SmallVectorImpl<ProtocolDecl*> &protocols) {
+
+  // Skip unless noncopyable generics is enabled
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
+    return;
+
+  // Try to add all invertible protocols, unless:
+  //  - an inverse was provided
+  //  - an existing protocol already requires it
+  for (auto ip : InvertibleProtocolSet::full()) {
+    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
+    bool alreadyRequired = false;
+    for (auto proto : protocols) {
+      if (proto->isSpecificProtocol(getKnownProtocolKind(ip))
+          || proto->requiresInvertible(ip)) {
+        alreadyRequired = true;
+        break;
+      }
+    }
+
+    // If some protocol member already implies P, then we don't need to
+    // add a requirement for P.
+    if (alreadyRequired) {
+      assert(!inverses.contains(ip) && "cannot require P and ~P");
+      continue;
+    }
+
+    // Nothing implies P, so unless there's an inverse ~P, add the requirement.
+    if (inverses.contains(ip))
+      continue;
+
+    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    assert(proto && "missing Copyable/Escapable from stdlib!");
+
+    protocols.push_back(proto);
+  }
 }

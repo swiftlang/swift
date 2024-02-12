@@ -21,6 +21,7 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -50,8 +51,9 @@ struct ModuleInterfaceOptions {
   /// ignored by the earlier version of the compiler.
   std::string IgnorableFlags;
 
-  /// Print for a private swiftinterface file, SPI decls and attributes.
-  bool PrintPrivateInterfaceContent = false;
+  /// Ignorable flags that should only be printed in .private.swiftinterface file;
+  /// e.g. -package-name PACKAGE_ID
+  std::string IgnorablePrivateFlags;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.
@@ -65,13 +67,43 @@ struct ModuleInterfaceOptions {
 
   /// A list of modules we shouldn't import in the public interfaces.
   std::vector<std::string> ModulesToSkipInPublicInterface;
+
+  /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
+  PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;
+  bool printPublicInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Public;
+  }
+  bool printPackageInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Package;
+  }
+  void setInterfaceMode(PrintOptions::InterfaceMode mode) {
+    InterfaceContentMode = mode;
+  }
 };
 
 extern version::Version InterfaceFormatVersion;
 std::string getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx);
 
+/// A regex that matches lines like this:
+///
+///     // swift-interface-format-version: 1.0
+///
+/// and extracts "1.0".
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
+
+/// A regex that matches lines like this:
+///
+///     // swift-compiler-version: Apple Swift version 5.8 (swiftlang-5.8.0.117.59)
+///
+/// and extracts "Apple Swift version 5.8 (swiftlang-5.8.0.117.59)".
 llvm::Regex getSwiftInterfaceCompilerVersionRegex();
+
+/// A regex that matches strings like this:
+///
+///     Apple Swift version 5.8
+///
+/// and extracts "5.8".
+llvm::Regex getSwiftInterfaceCompilerToolsVersionRegex();
 
 /// Emit a stable module interface for \p M, which can be used by a client
 /// source file to import this module, subject to options given by \p Opts.

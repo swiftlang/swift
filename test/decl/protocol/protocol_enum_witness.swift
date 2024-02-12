@@ -5,7 +5,7 @@
 // Requirement is settable, so witness cannot satisfy it //
 
 protocol Foo1 {
-  static var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar1'; do you want to add a stub?}}
+  static var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar1'; add a stub for conformance}}
 }
 
 enum Bar1: Foo1 { // expected-error {{type 'Bar1' does not conform to protocol 'Foo1'}}
@@ -15,7 +15,7 @@ enum Bar1: Foo1 { // expected-error {{type 'Bar1' does not conform to protocol '
 // Witness has associated values, which is unsupported //
 
 protocol Foo2 {
-  static var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar2'; do you want to add a stub?}}
+  static var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar2'; add a stub for conformance}}
 }
 
 enum Bar2: Foo2 { // expected-error {{type 'Bar2' does not conform to protocol 'Foo2'}}
@@ -23,7 +23,7 @@ enum Bar2: Foo2 { // expected-error {{type 'Bar2' does not conform to protocol '
 }
 
 protocol Foo3 {
-  static var bar: Self { get } // expected-note {{protocol requires property 'bar' with type 'Bar3'; do you want to add a stub?}}
+  static var bar: Self { get } // expected-note {{protocol requires property 'bar' with type 'Bar3'; add a stub for conformance}}
 }
 
 enum Bar3: Foo3 { // expected-error {{type 'Bar3' does not conform to protocol 'Foo3'}}
@@ -33,7 +33,7 @@ enum Bar3: Foo3 { // expected-error {{type 'Bar3' does not conform to protocol '
 // Requirement is not static, so it cannot be witnessed by the enum case //
 
 protocol Foo4 {
-  var bar: Self { get } // expected-note {{protocol requires property 'bar' with type 'Bar4'; do you want to add a stub?}}
+  var bar: Self { get } // expected-note {{protocol requires property 'bar' with type 'Bar4'; add a stub for conformance}}
 }
 
 enum Bar4: Foo4 { // expected-error {{type 'Bar4' does not conform to protocol 'Foo4'}}
@@ -41,7 +41,7 @@ enum Bar4: Foo4 { // expected-error {{type 'Bar4' does not conform to protocol '
 }
 
 protocol Foo5 {
-  var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar5'; do you want to add a stub?}}
+  var bar: Self { get set } // expected-note {{protocol requires property 'bar' with type 'Bar5'; add a stub for conformance}}
 }
 
 enum Bar5: Foo5 { // expected-error {{type 'Bar5' does not conform to protocol 'Foo5'}}
@@ -51,7 +51,7 @@ enum Bar5: Foo5 { // expected-error {{type 'Bar5' does not conform to protocol '
 // Requirement does not have Self type, so it cannot be witnessed by the enum case //
 
 protocol Foo6 {
-  static var bar: Int { get } // expected-note {{protocol requires property 'bar' with type 'Int'; do you want to add a stub?}}
+  static var bar: Int { get } // expected-note {{protocol requires property 'bar' with type 'Int'; add a stub for conformance}}
 }
 
 enum Bar6: Foo6 { // expected-error {{type 'Bar6' does not conform to protocol 'Foo6'}}
@@ -101,7 +101,7 @@ enum Bar10: Foo10 {
 // Witness does not have a payload, but requirement is a function
 
 protocol Foo11 {
-  static func bar(h: Int) -> Self // expected-note {{protocol requires function 'bar(h:)' with type '(Int) -> Bar11'; do you want to add a stub?}}
+  static func bar(h: Int) -> Self // expected-note {{protocol requires function 'bar(h:)' with type '(Int) -> Bar11'; add a stub for conformance}}
 }
 
 enum Bar11: Foo11 { // expected-error {{type 'Bar11' does not conform to protocol 'Foo11'}}
@@ -111,7 +111,7 @@ enum Bar11: Foo11 { // expected-error {{type 'Bar11' does not conform to protoco
 // Witness is static, but requirement is not
 
 protocol Foo12 {
-  func bar(i: Int) -> Self // expected-note {{protocol requires function 'bar(i:)' with type '(Int) -> Bar12'; do you want to add a stub?}}
+  func bar(i: Int) -> Self // expected-note {{protocol requires function 'bar(i:)' with type '(Int) -> Bar12'; add a stub for conformance}}
 }
 
 enum Bar12: Foo12 { // expected-error {{type 'Bar12' does not conform to protocol 'Foo12'}}

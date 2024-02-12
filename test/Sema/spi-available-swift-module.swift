@@ -1,28 +1,26 @@
-// REQUIRES: OS=ios
-// REQUIRES: rdar91325474
+// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
-// RUN: %empty-directory(%t/macos)
-// RUN: %empty-directory(%t/ios)
+// RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -target x86_64-apple-macosx11.9 -parse-as-library %s -emit-module -library-level=api -emit-module-path %t/macos/Foo.swiftmodule -module-name Foo -DFoo
-// RUN: %target-swift-frontend -target arm64-apple-ios13.0 -parse-as-library %s -emit-module -library-level=api -emit-module-path %t/ios/Foo.swiftmodule -module-name Foo -DFoo
+// RUN: %target-swift-frontend -parse-as-library %t/Foo.swift -emit-module -library-level api -emit-module-path %t/Foo.swiftmodule -module-name Foo
+// RUN: %target-swift-frontend-typecheck -parse-as-library %t/Client.swift -verify -library-level api -I %t
 
-// RUN: not %target-swift-frontend -target x86_64-apple-macosx11.9 -parse-as-library %s -typecheck -library-level=api -I %t/macos >& %t/macos.txt
-// RUN: %FileCheck %s < %t/macos.txt
-
-// RUN: %target-swift-frontend -target arm64-apple-ios13.0 -parse-as-library %s -typecheck -library-level=api -I %t/ios
-
-#if Foo
+//--- Foo.swift
 
 @_spi_available(macOS 10.10, *)
 @available(iOS 8.0, *)
-public class SPIClass {}
+public class MacOSSPIClass {}
 
-#else
+@_spi_available(iOS 8.0, *)
+@available(macOS 10.10, *)
+public class iOSSPIClass {}
+
+//--- Client.swift
 
 import Foo
-public func foo(_ c: SPIClass) {}
 
-#endif
-
-// CHECK: cannot use class 'SPIClass' here; it is an SPI imported from 'Foo'
+@available(macOS 10.10, iOS 8.0, *)
+public struct Foo {
+  public var macos: MacOSSPIClass // expected-error {{cannot use class 'MacOSSPIClass' here; it is an SPI imported from 'Foo'}}
+  public var ios: iOSSPIClass
+}

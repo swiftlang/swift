@@ -1,4 +1,4 @@
-//===--- OptUtils.swift - Utilities for optimizations ----------------------===//
+//===--- OptUtils.swift - Utilities for optimizations ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,158 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import SIL
+import OptimizerBridging
 
 extension Value {
-  var nonDebugUses: LazyFilterSequence<UseList> {
-    uses.lazy.filter { !($0.instruction is DebugValueInst) }
+  var lookThroughBorrow: Value {
+    if let beginBorrow = self as? BeginBorrowInst {
+      return beginBorrow.borrowedValue.lookThroughBorrow
+    }
+    return self
+  }
+
+  var lookThroughCopy: Value {
+    if let copy = self as? CopyValueInst {
+      return copy.fromValue.lookThroughCopy
+    }
+    return self
+  }
+
+  var lookThoughOwnershipInstructions: Value {
+    switch self {
+    case let beginBorrow as BeginBorrowInst:
+      return beginBorrow.borrowedValue.lookThoughOwnershipInstructions
+    case let copy as CopyValueInst:
+      return copy.fromValue.lookThoughOwnershipInstructions
+    case let move as MoveValueInst:
+      return move.fromValue.lookThoughOwnershipInstructions
+    default:
+      return self
+    }
+  }
+
+  /// Walks over all fields of an aggregate and checks if a reference count
+  /// operation for this value is required. This differs from a simple `Type.isTrivial`
+  /// check, because it treats a value_to_bridge_object instruction as "trivial".
+  /// It can also handle non-trivial enums with trivial cases.
+  func isTrivial(_ context: some Context) -> Bool {
+    if self is Undef {
+      return true
+    }
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      if v.type.isTrivial(in: parentFunction) {
+        continue
+      }
+      if v.type.isValueTypeWithDeinit {
+        return false
+      }
+      switch v {
+      case is ValueToBridgeObjectInst:
+        break
+      case is StructInst, is TupleInst:
+        let inst = (v as! SingleValueInstruction)
+        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let en as EnumInst:
+        if let payload = en.payload,
+           !(payload is Undef) {
+          worklist.pushIfNotVisited(payload)
+        }
+      default:
+        return false
+      }
+    }
+    return true
+  }
+
+  func createProjection(path: SmallProjectionPath, builder: Builder) -> Value {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return self
+    case .structField:
+      let structExtract = builder.createStructExtract(struct: self, fieldIndex: index)
+      return structExtract.createProjection(path: subPath, builder: builder)
+    case .tupleField:
+      let tupleExtract = builder.createTupleExtract(tuple: self, elementIndex: index)
+      return tupleExtract.createProjection(path: subPath, builder: builder)
+    default:
+      fatalError("path is not materializable")
+    }
+  }
+
+  func createAddressProjection(path: SmallProjectionPath, builder: Builder) -> Value {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return self
+    case .structField:
+      let structExtract = builder.createStructElementAddr(structAddress: self, fieldIndex: index)
+      return structExtract.createAddressProjection(path: subPath, builder: builder)
+    case .tupleField:
+      let tupleExtract = builder.createTupleElementAddr(tupleAddress: self, elementIndex: index)
+      return tupleExtract.createAddressProjection(path: subPath, builder: builder)
+    default:
+      fatalError("path is not materializable")
+    }
+  }
+
+  func createProjectionAndCopy(path: SmallProjectionPath, builder: Builder) -> Value {
+    if path.isEmpty {
+      return self.copyIfNotTrivial(builder)
+    }
+    if self.ownership == .owned {
+      let borrow = builder.createBeginBorrow(of: self)
+      let projectedValue = borrow.createProjection(path: path, builder: builder)
+      let result = projectedValue.copyIfNotTrivial(builder)
+      builder.createEndBorrow(of: borrow)
+      return result
+    }
+    let projectedValue = self.createProjection(path: path, builder: builder)
+    return projectedValue.copyIfNotTrivial(builder)
+  }
+
+  func copyIfNotTrivial(_ builder: Builder) -> Value {
+    if type.isTrivial(in: parentFunction) {
+      return self
+    }
+    return builder.createCopyValue(operand: self)
+  }
+
+  /// True if this value is a valid in a static initializer, including all its operands.
+  var isValidGlobalInitValue: Bool {
+    guard let svi = self as? SingleValueInstruction else {
+      return false
+    }
+    if let beginAccess = svi as? BeginAccessInst {
+      return beginAccess.address.isValidGlobalInitValue
+    }
+    if !svi.isValidInStaticInitializerOfGlobal {
+      return false
+    }
+    for op in svi.operands {
+      if !op.value.isValidGlobalInitValue {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+extension FullApplySite {
+  func isSemanticCall(_ name: StaticString, withArgumentCount: Int) -> Bool {
+    if arguments.count == withArgumentCount,
+       let callee = referencedFunction,
+       callee.hasSemanticsAttribute(name)
+    {
+      return true
+    }
+    return false
   }
 }
 
@@ -78,7 +225,7 @@ extension Value {
   }
 }
 
-private extension Instruction {
+extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
       return false
@@ -87,7 +234,7 @@ private extension Instruction {
   }
 
   var isTriviallyDeadIgnoringDebugUses: Bool {
-    if results.contains(where: { !$0.uses.isEmptyIgnoringDebugUses }) {
+    if results.contains(where: { !$0.uses.ignoreDebugUses.isEmpty }) {
       return false
     }
     return self.canBeRemovedIfNotUsed
@@ -109,28 +256,101 @@ private extension Instruction {
   }
 }
 
-extension UseList {
-  var singleNonDebugUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      if use.instruction is DebugValueInst {
-        continue
+extension StoreInst {
+  func trySplit(_ context: FunctionPassContext) {
+    let builder = Builder(after: self, context)
+    let type = source.type
+    if type.isStruct {
+      if type.nominal.isStructWithUnreferenceableStorage {
+        return
       }
-      if singleUse != nil {
-        return nil
+      if parentFunction.hasOwnership && source.ownership != .none {
+        let destructure = builder.createDestructureStruct(struct: source)
+        for (fieldIdx, fieldValue) in destructure.results.enumerated() {
+          let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
+          builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
+        }
+      } else {
+        guard let fields = type.getNominalFields(in: parentFunction) else {
+          return
+        }
+        for idx in 0..<fields.count {
+          let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
+          let fieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
+          builder.createStore(source: srcField, destination: fieldAddr, ownership: splitOwnership(for: srcField))
+        }
       }
-      singleUse = use
+    } else if type.isTuple {
+      if parentFunction.hasOwnership && source.ownership != .none {
+        let destructure = builder.createDestructureTuple(tuple: source)
+        for (elementIdx, elementValue) in destructure.results.enumerated() {
+          let elementAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: elementIdx)
+          builder.createStore(source: elementValue, destination: elementAddr, ownership: splitOwnership(for: elementValue))
+        }
+      } else {
+        for idx in 0..<type.tupleElements.count {
+          let srcField = builder.createTupleExtract(tuple: source, elementIndex: idx)
+          let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
+          builder.createStore(source: srcField, destination: destFieldAddr, ownership: splitOwnership(for: srcField))
+        }
+      }
+    } else {
+      return
     }
-    return singleUse
+    context.erase(instruction: self)
   }
 
-  var isEmptyIgnoringDebugUses: Bool {
-    for use in self {
-      if !(use.instruction is DebugValueInst) {
-        return false
-      }
+  private func splitOwnership(for fieldValue: Value) -> StoreOwnership {
+    switch self.storeOwnership {
+    case .trivial, .unqualified:
+      return self.storeOwnership
+    case .assign, .initialize:
+      return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.storeOwnership
     }
-    return true
+  }
+}
+
+extension LoadInst {
+  func trySplit(_ context: FunctionPassContext) {
+    var elements = [Value]()
+    let builder = Builder(before: self, context)
+    if type.isStruct {
+      if type.nominal.isStructWithUnreferenceableStorage {
+        return
+      }
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return
+      }
+      for idx in 0..<fields.count {
+        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newStruct = builder.createStruct(type: self.type, elements: elements)
+      self.uses.replaceAll(with: newStruct, context)
+    } else if type.isTuple {
+      var elements = [Value]()
+      let builder = Builder(before: self, context)
+      for idx in 0..<type.tupleElements.count {
+        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+        elements.append(splitLoad)
+      }
+      let newTuple = builder.createTuple(type: self.type, elements: elements)
+      self.uses.replaceAll(with: newTuple, context)
+    } else {
+      return
+    }
+    context.erase(instruction: self)
+  }
+
+  private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
+    switch self.loadOwnership {
+    case .trivial, .unqualified:
+      return self.loadOwnership
+    case .copy, .take:
+      return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
+    }
   }
 }
 
@@ -193,7 +413,7 @@ extension SimplifyContext {
   /// The operation is not done if it would require to insert a copy due to keep ownership correct.
   func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
                                           with replacement: Value) {
-    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
+    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
     if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
@@ -252,4 +472,186 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 
   var followTrivialTypes: Bool { true }
   var followLoads: Bool { false }
+}
+
+extension Function {
+  var globalOfGlobalInitFunction: GlobalVariable? {
+    if isGlobalInitFunction,
+       let ret = returnInstruction,
+       let atp = ret.returnedValue as? AddressToPointerInst,
+       let ga = atp.address as? GlobalAddrInst {
+      return ga.global
+    }
+    return nil
+  }
+
+  var initializedGlobal: GlobalVariable? {
+    if !isGlobalInitOnceFunction {
+      return nil
+    }
+    for inst in entryBlock.instructions {
+      if let allocGlobal = inst as? AllocGlobalInst {
+        return allocGlobal.global
+      }
+    }
+    return nil
+  }
+}
+
+extension FullApplySite {
+  var canInline: Bool {
+    // Some checks which are implemented in C++
+    if !FullApplySite_canInline(bridged) {
+      return false
+    }
+    // Cannot inline a non-inlinable function it an inlinable function.
+    if parentFunction.isSerialized,
+       let calleeFunction = referencedFunction,
+       !calleeFunction.isSerialized {
+      return false
+    }
+
+    // Cannot inline a non-ossa function into an ossa function
+    if parentFunction.hasOwnership,
+      let calleeFunction = referencedFunction,
+      !calleeFunction.hasOwnership {
+      return false
+    }
+
+    return true
+  }
+
+  var inliningCanInvalidateStackNesting: Bool {
+    guard let calleeFunction = referencedFunction else {
+      return false
+    }
+
+    // In OSSA `partial_apply [on_stack]`s are represented as owned values rather than stack locations.
+    // It is possible for their destroys to violate stack discipline.
+    // When inlining into non-OSSA, those destroys are lowered to dealloc_stacks.
+    // This can result in invalid stack nesting.
+    if calleeFunction.hasOwnership && !parentFunction.hasOwnership {
+      return true
+    }
+    // Inlining of coroutines can result in improperly nested stack allocations.
+    if self is BeginApplyInst {
+      return true
+    }
+    return false
+  }
+}
+
+extension GlobalVariable {
+  /// Removes all `begin_access` and `end_access` instructions from the initializer.
+  ///
+  /// Access instructions are not allowed in the initializer, because the initializer must not contain
+  /// instructions with side effects (initializer instructions are not executed).
+  /// Exclusivity checking does not make sense in the initializer.
+  ///
+  /// The initializer functions of globals, which reference other globals by address, contain access
+  /// instructions. After the initializing code is copied to the global's initializer, those access
+  /// instructions must be stripped.
+  func stripAccessInstructionFromInitializer(_ context: FunctionPassContext) {
+    guard let initInsts = staticInitializerInstructions else {
+      return
+    }
+    for initInst in initInsts {
+      switch initInst {
+      case let beginAccess as BeginAccessInst:
+        beginAccess.uses.replaceAll(with: beginAccess.address, context)
+        context.erase(instruction: beginAccess)
+      case let endAccess as EndAccessInst:
+        context.erase(instruction: endAccess)
+      default:
+        break
+      }
+    }
+  }
+}
+
+extension InstructionRange {
+  /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
+  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(borrow)
+    while let value = worklist.pop() {
+      for use in value.uses {
+        switch use.instruction {
+        case let endBorrow as EndBorrowInst:
+          self.insert(endBorrow)
+        case let branch as BranchInst:
+          worklist.pushIfNotVisited(branch.getArgument(for: use))
+        default:
+          break
+        }
+      }
+    }
+  }
+}
+
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+/// Returns nil if `function` has any side-effects beside initializing the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+func getGlobalInitialization(
+  of function: Function,
+  allowGlobalValue: Bool
+) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+  guard let block = function.blocks.singleElement else {
+    return nil
+  }
+
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
+      break
+    case let agi as AllocGlobalInst:
+      if allocInst != nil {
+        return nil
+      }
+      allocInst = agi
+    case let ga as GlobalAddrInst:
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
+      }
+    case let si as StoreInst:
+      if store != nil {
+        return nil
+      }
+      guard let ga = globalAddr else {
+        return nil
+      }
+      if si.destination != ga {
+        return nil
+      }
+      store = si
+    case is GlobalValueInst where allowGlobalValue:
+      break
+    default:
+      if !inst.isValidInStaticInitializerOfGlobal {
+        return nil
+      }
+    }
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
 }

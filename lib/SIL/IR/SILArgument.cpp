@@ -27,10 +27,13 @@ using namespace swift;
 SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
-                         const ValueDecl *inputDecl)
-    : ValueBase(subClassKind, type),
-      parentBlock(inputParentBlock), decl(inputDecl) {
+                         const ValueDecl *inputDecl, bool reborrow,
+                         bool pointerEscape)
+    : ValueBase(subClassKind, type), parentBlock(inputParentBlock),
+      decl(inputDecl) {
   sharedUInt8().SILArgument.valueOwnershipKind = uint8_t(ownershipKind);
+  sharedUInt8().SILArgument.reborrow = reborrow;
+  sharedUInt8().SILArgument.pointerEscape = pointerEscape;
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
 }
 
@@ -61,6 +64,15 @@ bool SILFunctionArgument::isIndirectResult() const {
   return getIndex() < numIndirectResults;
 }
 
+bool SILFunctionArgument::isIndirectErrorResult() const {
+  auto numIndirectResults =
+      getFunction()->getConventions().getNumIndirectSILResults();
+  auto numIndirectErrorResults =
+      getFunction()->getConventions().getNumIndirectSILErrorResults();
+  return ((getIndex() >= numIndirectResults) &&
+          (getIndex() < numIndirectResults + numIndirectErrorResults));
+}
+
 SILArgumentConvention SILFunctionArgument::getArgumentConvention() const {
   return getFunction()->getConventions().getSILArgumentConvention(getIndex());
 }
@@ -72,6 +84,46 @@ SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
   return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
 }
 
+SILArgumentConvention
+SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
+  assert(index < getNumSILArguments());
+
+  auto numIndirectResults = getNumIndirectSILResults()
+    + getNumIndirectSILErrorResults();
+
+  // If the argument is a parameter, index into the parameters.
+  if (index >= numIndirectResults) {
+    auto param = funcTy->getParameters()[index - numIndirectResults];
+    return SILArgumentConvention(param.getConvention());
+  }
+
+  // If it's an indirect result, it could be either Pack_Out or
+  // Indirect_Out.
+
+  // Handle the common case of a function with no pack results.
+  if (funcTy->getNumPackResults() == 0) {
+    assert(silConv.loweredAddresses);
+    return SILArgumentConvention::Indirect_Out;
+  }
+
+  // Otherwise, we need to index into the indirect results to figure out
+  // whether the result is a pack or not, and unfortunately that is not a
+  // linear algorithm.
+  for (auto result : getIndirectSILResults()) {
+    if (index == 0) {
+      if (result.getConvention() == ResultConvention::Indirect) {
+        assert(silConv.loweredAddresses);
+        return SILArgumentConvention::Indirect_Out;
+      } else {
+        assert(result.getConvention() == ResultConvention::Pack);
+        return SILArgumentConvention::Pack_Out;
+      }
+    }
+    index--;
+  }
+  assert(hasIndirectSILErrorResults());
+  return SILArgumentConvention::Indirect_Out;
+}
 
 //===----------------------------------------------------------------------===//
 //                              SILBlockArgument
@@ -260,6 +312,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     llvm_unreachable("Have terminator that implies no successors?!");
   case TermKind::TryApplyInst:

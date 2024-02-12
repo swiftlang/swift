@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/Once.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
 namespace runtime {
@@ -23,6 +24,10 @@ namespace environment {
 void initialize(void *);
 
 extern swift::once_t initializeToken;
+
+// Define a typedef "string" in swift::runtime::environment to make string
+// environment variables work
+using string = const char *;
 
 // Declare backing variables.
 #define VARIABLE(name, type, defaultValue, help) extern type name ## _variable;
@@ -50,4 +55,4 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 
 } // end namespace environment
 } // end namespace runtime
-} // end namespace Swift
+} // end namespace swift

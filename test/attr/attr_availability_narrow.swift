@@ -9,13 +9,13 @@ func foo() { }
 
 func useFoo() {
   if #available(macOS 10.50.1, *) {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{23-30=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-1:23-30=10.50.2}}
   }
 }
 
 func useFooDifferentSpelling() {
   if #available(OSX 10.50.1, *) {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{21-28=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-1:21-28=10.50.2}}
   }
 }
 
@@ -27,7 +27,7 @@ func useFooAlreadyOkRange() {
 
 func useFooUnaffectedSimilarText() {
   if #available(iOS 10.50.10, OSX 10.50.1, *) {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{35-42=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-1:35-42=10.50.2}}
   }
 }
 
@@ -42,14 +42,14 @@ func useFooWayOff() {
 @available(OSX 10.50, *)
 class FooUser {
   func useFoo() {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{16-21=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-3:16-21=10.50.2}}
   }
 }
 
 @available(OSX, introduced: 10.50, obsoleted: 10.50.4)
 class FooUser2 {
   func useFoo() {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{29-34=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-3:29-34=10.50.2}}
   }
 }
 
@@ -57,7 +57,7 @@ class FooUser2 {
 @objc
 class FooUser3 : NSObject {
   func useFoo() {
-    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{29-34=10.50.2}}
+    foo() // expected-error {{'foo()' is only available in macOS 10.50.2 or newer}} {{-4:29-34=10.50.2}}
   }
 }
 

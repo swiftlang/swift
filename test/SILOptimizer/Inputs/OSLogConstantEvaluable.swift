@@ -50,3 +50,19 @@ func intValueWithPrecisionTest() -> OSLogMessage {
 func intValueWithPrivacyTest() -> OSLogMessage {
     return "An integer value \(10, privacy: .private(mask: .hash))"
 }
+
+// Test OSLogMessage with SIMD interpolations
+struct FloatVector {
+    let zero = SIMD4<Float>()
+    var pair: (SIMD4<Float>, SIMD4<Float>)
+
+    init() {
+        pair = (zero, zero)
+    }
+}
+
+@_semantics("test_driver")
+func testOSLogMessageSIMDInterpolation() -> OSLogMessage {
+    let vector = FloatVector()
+    return "\(vector.pair.0.x)"
+}

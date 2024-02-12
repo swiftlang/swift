@@ -33,8 +33,6 @@ class ValueDecl;
 class VarDecl;
 class InFlightDiagnostic;
 
-using llvm::Optional;
-
 /// Describes the reason why are we trying to apply @objc to a declaration.
 ///
 /// Should only affect diagnostics. If you change this enum, also change
@@ -73,6 +71,8 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+    /// Is it a member of an \@\_objcImplementation extension.
+    MemberOfObjCImplementationExtension,
     /// Has an explicit '@objc' attribute added by an access note, rather than
     /// written in source code.
     ExplicitlyObjCByAccessNote,
@@ -110,6 +110,7 @@ private:
     case ExplicitlyNSManaged:
     case ExplicitlyIBInspectable:
     case ExplicitlyGKInspectable:
+    case MemberOfObjCImplementationExtension:
     case ExplicitlyObjCByAccessNote:
       return true;
 
@@ -182,10 +183,10 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 
 /// Determine whether the given function can be represented in Objective-C,
 /// and figure out its foreign error convention (if any).
-bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                           ObjCReason Reason,
-                           Optional<ForeignAsyncConvention> &asyncConvention,
-                           Optional<ForeignErrorConvention> &errorConvention);
+bool isRepresentableInObjC(
+    const AbstractFunctionDecl *AFD, ObjCReason Reason,
+    llvm::Optional<ForeignAsyncConvention> &asyncConvention,
+    llvm::Optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.
 bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
@@ -212,8 +213,8 @@ bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 /// For properties, the selector should be a zero-parameter selector of the
 /// given property's name.
 bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
-                            Optional<ObjCSelector> nameOpt,
-                            Optional<ObjCSelector> targetNameOpt,
+                            llvm::Optional<ObjCSelector> nameOpt,
+                            llvm::Optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
 
 } // end namespace swift

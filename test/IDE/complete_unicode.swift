@@ -14,13 +14,12 @@ struct Unicode1 {
 func unicode_test_1() {
   Unicode1().#^UNICODE_1^#
 }
-// UNICODE_1: Begin completions
-// UNICODE_1-NEXT: Keyword[self]/CurrNominal: self[#Unicode1#]; name=self
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Идентификаторы_с_кириллицей_допустимы()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Ідентіфікатори_українською_також_працюють()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 識別子は()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: ひらがなでも()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: カタカナでも()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 漢字でも()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: いいです()[#Void#]{{; name=.+$}}
-// UNICODE_1-NEXT: End completions
+// UNICODE_1: Begin completions, 8 items
+// UNICODE_1-DAG: Keyword[self]/CurrNominal: self[#Unicode1#]; name=self
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: Идентификаторы_с_кириллицей_допустимы()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: Ідентіфікатори_українською_також_працюють()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: 識別子は()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: ひらがなでも()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: カタカナでも()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: 漢字でも()[#Void#]{{; name=.+$}}
+// UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: いいです()[#Void#]{{; name=.+$}}

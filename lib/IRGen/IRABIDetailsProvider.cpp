@@ -41,8 +41,8 @@
 using namespace swift;
 using namespace irgen;
 
-static Optional<Type> getPrimitiveTypeFromLLVMType(ASTContext &ctx,
-                                                   const llvm::Type *type) {
+static llvm::Optional<Type>
+getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
   if (const auto *intType = dyn_cast<llvm::IntegerType>(type)) {
     switch (intType->getBitWidth()) {
     case 1:
@@ -56,7 +56,7 @@ static Optional<Type> getPrimitiveTypeFromLLVMType(ASTContext &ctx,
     case 64:
       return ctx.getUInt64Type();
     default:
-      return None;
+      return llvm::None;
     }
   } else if (type->isFloatTy()) {
     return ctx.getFloatType();
@@ -66,7 +66,7 @@ static Optional<Type> getPrimitiveTypeFromLLVMType(ASTContext &ctx,
     return ctx.getOpaquePointerType();
   }
   // FIXME: Handle vector type.
-  return None;
+  return llvm::None;
 }
 
 namespace swift {
@@ -83,7 +83,7 @@ public:
     auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
     auto *fixedTI = dyn_cast<FixedTypeInfo>(TI);
     if (!fixedTI)
-      return None;
+      return llvm::None;
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
@@ -141,17 +141,17 @@ public:
     auto silFuncType = function->getLoweredFunctionType();
     // FIXME: Async function support.
     if (silFuncType->isAsync())
-      return None;
+      return llvm::None;
     if (silFuncType->getLanguage() != SILFunctionLanguage::Swift)
-      return None;
+      return llvm::None;
 
     // FIXME: Tuple parameter mapping support.
     llvm::SmallVector<const ParamDecl *, 8> silParamMapping;
     for (auto param : *fd->getParameters()) {
       if (auto *tuple =
-              param->getType()->getDesugaredType()->getAs<TupleType>()) {
+              param->getInterfaceType()->getAs<TupleType>()) {
         if (tuple->getNumElements() > 0)
-          return None;
+          return llvm::None;
       }
     }
 
@@ -200,29 +200,29 @@ public:
     // Return nothing if we were unable to represent the exact signature
     // parameters.
     if (signatureParamCount != abiDetails->numParamIRTypesInSignature)
-      return None;
+      return llvm::None;
 
     return result;
   }
 
   using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
 
-  Optional<MethodDispatchInfo::PointerAuthDiscriminator>
+  llvm::Optional<MethodDispatchInfo::PointerAuthDiscriminator>
   getMethodPointerAuthInfo(const AbstractFunctionDecl *funcDecl,
                            SILDeclRef method) {
     // FIXME: Async support.
     if (funcDecl->hasAsync())
-      return None;
+      return llvm::None;
     const auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
     if (!schema)
-      return None;
+      return llvm::None;
     auto discriminator =
         PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
     return MethodDispatchInfo::PointerAuthDiscriminator{
         discriminator->getZExtValue()};
   }
 
-  Optional<MethodDispatchInfo>
+  llvm::Optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
     if (funcDecl->isSemanticallyFinal())
       return MethodDispatchInfo::direct();
@@ -313,12 +313,13 @@ bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
 
 LoweredFunctionSignature::DirectParameter::DirectParameter(
     IRABIDetailsProviderImpl &owner, const irgen::TypeInfo &typeDetails,
-    const ParamDecl &paramDecl)
-    : owner(owner), typeDetails(typeDetails), paramDecl(paramDecl) {}
+    const ParamDecl &paramDecl, ParameterConvention convention)
+    : owner(owner), typeDetails(typeDetails), paramDecl(paramDecl),
+      convention(convention) {}
 
 LoweredFunctionSignature::IndirectParameter::IndirectParameter(
-    const ParamDecl &paramDecl)
-    : paramDecl(paramDecl) {}
+    const ParamDecl &paramDecl, ParameterConvention convention)
+    : paramDecl(paramDecl), convention(convention) {}
 
 bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
     llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
@@ -350,7 +351,7 @@ LoweredFunctionSignature::MetadataSourceParameter::MetadataSourceParameter(
 llvm::Optional<LoweredFunctionSignature::DirectResultType>
 LoweredFunctionSignature::getDirectResultType() const {
   if (!abiDetails.directResult)
-    return None;
+    return llvm::None;
   return DirectResultType(owner, abiDetails.directResult->typeInfo);
 }
 
@@ -390,8 +391,10 @@ void LoweredFunctionSignature::visitParameterList(
       if (!schema.requiresIndirect()) {
         // Skip ABI parameters with empty native representation, as they're not
         // emitted in the LLVM IR signature.
-        if (schema.empty())
+        if (schema.empty()) {
+          ++currentSilParam;
           continue;
+        }
         isIndirect = false;
       }
     }
@@ -401,10 +404,11 @@ void LoweredFunctionSignature::visitParameterList(
                                      : silParamMapping[currentSilParam];
     ++currentSilParam;
     if (!isIndirect) {
-      DirectParameter param(owner, abiParam.typeInfo, *paramDecl);
+      DirectParameter param(owner, abiParam.typeInfo, *paramDecl,
+                            abiParam.convention);
       directParamVisitor(param);
     } else {
-      IndirectParameter param(*paramDecl);
+      IndirectParameter param(*paramDecl, abiParam.convention);
       indirectParamVisitor(param);
     }
   }
@@ -432,8 +436,11 @@ void LoweredFunctionSignature::visitParameterList(
 
   if (abiDetails.hasTrailingSelfParam) {
     assert(!abiDetails.hasContextParam);
-    assert(FD->hasImplicitSelfDecl());
-    indirectParamVisitor(IndirectParameter(*FD->getImplicitSelfDecl()));
+    indirectParamVisitor(IndirectParameter(
+        *FD->getImplicitSelfDecl(),
+        FD->getImplicitSelfDecl()->getValueOwnership() == ValueOwnership::Owned
+            ? ParameterConvention::Direct_Owned
+            : ParameterConvention::Direct_Guaranteed));
   } else if (abiDetails.hasContextParam) {
     contextParamVisitor(ContextParameter());
   }
@@ -475,7 +482,7 @@ IRABIDetailsProvider::getEnumTagMapping(const EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
 }
 
-Optional<IRABIDetailsProvider::MethodDispatchInfo>
+llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo>
 IRABIDetailsProvider::getMethodDispatchInfo(
     const AbstractFunctionDecl *funcDecl) {
   return impl->getMethodDispatchInfo(funcDecl);

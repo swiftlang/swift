@@ -18,6 +18,7 @@
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang {
   class NamedDecl;
@@ -28,6 +29,19 @@ namespace swift {
 class PrimitiveTypeMapping;
 class ValueDecl;
 class SwiftToClangInteropContext;
+
+/// Tracks which C++ declarations have been emitted in a lexical
+/// C++ scope.
+struct CxxDeclEmissionScope {
+  /// Additional Swift declarations that are unrepresentable in C++.
+  std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
+  /// Records the C++ declaration names already emitted in this lexical scope.
+  llvm::StringSet<> emittedDeclarationNames;
+  /// Records the names of the function overloads already emitted in this
+  /// lexical scope.
+  llvm::StringMap<llvm::SmallVector<const AbstractFunctionDecl *, 2>>
+      emittedFunctionOverloads;
+};
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
@@ -43,11 +57,13 @@ private:
   raw_ostream &os;
   raw_ostream &prologueOS;
   raw_ostream &outOfLineDefinitionsOS;
-  const DelayedMemberSet &delayedMembers;
+  const DelayedMemberSet &objcDelayedMembers;
+  CxxDeclEmissionScope *cxxDeclEmissionScope;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
   bool requiresExposedAttribute;
+  llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
 
   /// The name 'CFTypeRef'.
@@ -61,22 +77,39 @@ public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      raw_ostream &outOfLineDefinitionsOS,
                      DelayedMemberSet &delayed,
+                     CxxDeclEmissionScope &topLevelEmissionScope,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
                      AccessLevel access, bool requiresExposedAttribute,
+                     llvm::StringSet<> &exposedModules,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
-        outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
-        typeMapping(typeMapping), interopContext(interopContext),
-        minRequiredAccess(access),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS),
+        objcDelayedMembers(delayed),
+        cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
+        interopContext(interopContext), minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),
-        outputLang(outputLang) {}
+        exposedModules(exposedModules), outputLang(outputLang) {}
+
+  PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
 
   SwiftToClangInteropContext &getInteropContext() { return interopContext; }
+
+  CxxDeclEmissionScope &getCxxDeclEmissionScope() {
+    return *cxxDeclEmissionScope;
+  }
+
+  void setCxxDeclEmissionScope(CxxDeclEmissionScope &scope) {
+    cxxDeclEmissionScope = &scope;
+  }
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);
+
+  /// Returns true if \p vd is visible given the current access level and thus
+  /// can be included in the generated header.
+  bool isVisible(const ValueDecl *vd) const;
 
   void print(const Decl *D);
   void print(Type ty);

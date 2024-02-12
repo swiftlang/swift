@@ -44,44 +44,48 @@ struct OSSACanonicalizer {
   /// A list of non-consuming boundary uses.
   SmallVector<SILInstruction *, 32> nonConsumingBoundaryUsers;
 
-  /// The actual canonicalizer that we use.
-  ///
-  /// We mark this Optional to avoid UB behavior caused by us needing to
-  /// initialize CanonicalizeOSSALifetime with parts of OSSACanoncializer
-  /// (specifically with state in our arrays) before the actual constructor has
-  /// run. Specifically this avoids:
-  ///
-  /// 11.9.5p1 class.cdtor: For an object with a non-trivial constructor,
-  /// referring to any non-static member or base class of the object before the
-  /// constructor begins execution results in undefined behavior.
-  Optional<CanonicalizeOSSALifetime> canonicalizer;
+  CanonicalizeOSSALifetime canonicalizer;
 
-  OSSACanonicalizer() {}
-
-  void init(SILFunction *fn, DominanceInfo *domTree,
-            InstructionDeleter &deleter) {
-    canonicalizer.emplace(false /*pruneDebugMode*/,
-                          !fn->shouldOptimize() /*maximizeLifetime*/,
-                          nullptr /*accessBlockAnalysis*/, domTree, deleter);
-  }
+  OSSACanonicalizer(SILFunction *fn, DominanceInfo *domTree,
+                    InstructionDeleter &deleter)
+      : canonicalizer(false /*pruneDebugMode*/,
+                      !fn->shouldOptimize() /*maximizeLifetime*/, fn,
+                      nullptr /*accessBlockAnalysis*/, domTree,
+                      nullptr /*calleeAnalysis*/, deleter) {}
 
   void clear() {
     consumingUsesNeedingCopy.clear();
     consumingBoundaryUsers.clear();
+    nonConsumingBoundaryUsers.clear();
   }
 
-  bool canonicalize(SILValue value);
+  struct LivenessState {
+    OSSACanonicalizer &parent;
+    CanonicalizeOSSALifetime::LivenessState canonicalizerState;
 
-  bool computeLiveness(SILValue value) {
-    return canonicalizer->computeLiveness(value);
-  }
+    LivenessState(OSSACanonicalizer &parent, SILValue def)
+        : parent(parent), canonicalizerState(parent.canonicalizer, def) {}
+
+    ~LivenessState() { parent.clear(); }
+  };
+
+  /// MARK: The following APIs require an active on-stack instance of
+  /// LivenessState:
+  ///
+  ///     OSSACanonicalizer::LivenessState livenessState(canonicalizer, value);
+
+  /// Perform computeLiveness, computeBoundaryData, and rewriteLifetimes in one
+  /// fell swoop.
+  bool canonicalize();
+
+  bool computeLiveness() { return canonicalizer.computeLiveness(); }
 
   void computeBoundaryData(SILValue value);
 
-  void rewriteLifetimes() { canonicalizer->rewriteLifetimes(); }
+  void rewriteLifetimes() { canonicalizer.rewriteLifetimes(); }
 
   void findOriginalBoundary(PrunedLivenessBoundary &resultingFoundBoundary) {
-    canonicalizer->findOriginalBoundary(resultingFoundBoundary);
+    canonicalizer.findOriginalBoundary(resultingFoundBoundary);
   }
 
   bool foundAnyConsumingUses() const {
@@ -94,43 +98,79 @@ struct OSSACanonicalizer {
 
   bool foundFinalConsumingUses() const { return consumingBoundaryUsers.size(); }
 
+  /// Helper method for hasPartialApplyConsumingUse and
+  /// hasNonPartialApplyConsumingUse.
+  static bool isPartialApplyUser(SILInstruction *user) {
+    // If our user is an owned moveonlywrapper to copyable value inst, search
+    // through it for a partial_apply user.
+    if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (mtci->hasOwnedInitialKind()) {
+        return llvm::any_of(mtci->getUses(), [](Operand *use) {
+          return isa<PartialApplyInst>(use->getUser());
+        });
+      }
+    }
+    return isa<PartialApplyInst>(user);
+  }
+
+  static bool isNotPartialApplyUser(SILInstruction *user) {
+    // If our user is an owned moveonlywrapper to copyable value inst, search
+    // through it for a partial_apply user.
+    if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+      if (mtci->hasOwnedInitialKind()) {
+        return llvm::any_of(mtci->getUses(), [](Operand *use) {
+          return !isa<PartialApplyInst>(use->getUser());
+        });
+      }
+    }
+    return !isa<PartialApplyInst>(user);
+  }
+
   bool hasPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](SILInstruction *user) {
-                          return isa<PartialApplyInst>(user);
-                        }) ||
-           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
-             return isa<PartialApplyInst>(user);
-           });
+    auto test = OSSACanonicalizer::isPartialApplyUser;
+    return llvm::any_of(consumingUsesNeedingCopy, test) ||
+           llvm::any_of(consumingBoundaryUsers, test);
   }
 
   bool hasNonPartialApplyConsumingUse() const {
-    return llvm::any_of(consumingUsesNeedingCopy,
-                        [](SILInstruction *user) {
-                          return !isa<PartialApplyInst>(user);
-                        }) ||
-           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
-             return !isa<PartialApplyInst>(user);
-           });
+    auto test = OSSACanonicalizer::isNotPartialApplyUser;
+    return llvm::any_of(consumingUsesNeedingCopy, test) ||
+           llvm::any_of(consumingBoundaryUsers, test);
+  }
+
+  struct DropDeinitFilter {
+    bool operator()(SILInstruction *inst) const {
+      return isa<DropDeinitInst>(inst);
+    }
+  };
+  using DropDeinitIter =
+      llvm::filter_iterator<SILInstruction *const *, DropDeinitFilter>;
+  using DropDeinitRange = iterator_range<DropDeinitIter>;
+
+  /// Returns a range of final uses of the mark_unresolved_non_copyable_value
+  /// that are drop_deinit
+  DropDeinitRange getDropDeinitUses() const {
+    return llvm::make_filter_range(consumingBoundaryUsers, DropDeinitFilter());
   }
 };
 
-/// Search for candidate object mark_must_checks. If we find one that does not
-/// fit a pattern that we understand, emit an error diagnostic telling the
-/// programmer that the move checker did not know how to recognize this code
-/// pattern.
+/// Search for candidate object mark_unresolved_non_copyable_values. If we find
+/// one that does not fit a pattern that we understand, emit an error diagnostic
+/// telling the programmer that the move checker did not know how to recognize
+/// this code pattern.
 ///
-/// \returns true if we deleted a mark_must_check inst that we didn't recognize
-/// after emitting the diagnostic.
+/// \returns true if we deleted a mark_unresolved_non_copyable_value inst that
+/// we didn't recognize after emitting the diagnostic.
 ///
 /// To check if an error was emitted call \p
 /// diagnosticEmitter.getDiagnosticCount().
 ///
 /// NOTE: This is the routine used by the move only object checker to find mark
 /// must checks to process.
-bool searchForCandidateObjectMarkMustChecks(
+bool searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
     SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 
 struct MoveOnlyObjectChecker {
@@ -141,7 +181,8 @@ struct MoveOnlyObjectChecker {
 
   /// Returns true if we changed the IR in any way. Check with \p
   /// diagnosticEmitter to see if we emitted any diagnostics.
-  bool check(llvm::SmallSetVector<MarkMustCheckInst *, 32> &instsToCheck);
+  bool check(llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+                 &instsToCheck);
 };
 
 } // namespace siloptimizer

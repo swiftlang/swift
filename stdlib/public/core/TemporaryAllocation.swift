@@ -88,6 +88,7 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return true
   }
 
+#if !$Embedded
   // Finally, take a slow path through the standard library to see if the
   // current environment can accept a larger stack allocation.
   guard #available(macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4, *) //SwiftStdlib 5.6
@@ -95,6 +96,10 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return false
   }
   return swift_stdlib_isStackAllocationSafe(byteCount, alignment)
+#else
+  return false
+#endif
+
 #else
   fatalError("unsupported compiler")
 #endif
@@ -161,7 +166,6 @@ internal func _withUnsafeTemporaryAllocation<T, R>(
 #endif
 }
 
-#if $BuiltinUnprotectedStackAlloc
 @_alwaysEmitIntoClient @_transparent
 internal func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
   of type: T.Type,
@@ -181,11 +185,19 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
   // notice and complain.)
   let result: R
 
+#if $BuiltinUnprotectedStackAlloc
   let stackAddress = Builtin.unprotectedStackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
+#else
+  let stackAddress = Builtin.stackAlloc(
+    capacity._builtinWordValue,
+    MemoryLayout<T>.stride._builtinWordValue,
+    alignment._builtinWordValue
+  )
+#endif
 
   // The multiple calls to Builtin.stackDealloc() are because defer { } produces
   // a child function at the SIL layer and that conflicts with the verifier's
@@ -200,7 +212,6 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
     throw error
   }
 }
-#endif
 
 @_alwaysEmitIntoClient @_transparent
 internal func _fallBackToHeapAllocation<R>(
@@ -281,20 +292,16 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R>(
   alignment: Int,
   _ body: (UnsafeMutableRawBufferPointer) throws -> R
 ) rethrows -> R {
-  return try _withUnsafeTemporaryAllocation(
+  return try _withUnprotectedUnsafeTemporaryAllocation(
     of: Int8.self,
     capacity: byteCount,
     alignment: alignment
   ) { pointer in
-#if $BuiltinUnprotectedStackAlloc
     let buffer = UnsafeMutableRawBufferPointer(
       start: .init(pointer),
       count: byteCount
     )
     return try body(buffer)
-#else
-    return try withUnsafeTemporaryAllocation(byteCount: byteCount, alignment: alignment, body)
-#endif
   }
 }
 
@@ -365,15 +372,11 @@ public func _withUnprotectedUnsafeTemporaryAllocation<T, R>(
     capacity: capacity,
     alignment: MemoryLayout<T>.alignment
   ) { pointer in
-#if $BuiltinUnprotectedStackAlloc
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
     let buffer = UnsafeMutableBufferPointer<T>(
       start: .init(pointer),
       count: capacity
     )
     return try body(buffer)
-#else
-    return try withUnsafeTemporaryAllocation(of: type, capacity: capacity, body)
-#endif
   }
 }

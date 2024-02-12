@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -package-name myPkg
 
 // A top-level CodingKeys type to fall back to in lookups below.
 public enum CodingKeys : String, CodingKey {
@@ -17,6 +17,7 @@ struct SynthesizedClass : Codable {
 
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  package func qualifiedPkg(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared package because its parameter uses a private type}}
   internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
   fileprivate func qualifiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
   private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
@@ -24,6 +25,10 @@ struct SynthesizedClass : Codable {
   // Unqualified lookups should find the synthesized CodingKeys type instead
   // of the top-level type above.
   public func unqualifiedFoo(_ key: CodingKeys) { // expected-error {{method cannot be declared public because its parameter uses a private type}}
+    print(CodingKeys.value) // Not found on top-level.
+  }
+
+  package func unqualifiedPkg(_ key: CodingKeys) { // expected-error {{method cannot be declared package because its parameter uses a private type}}
     print(CodingKeys.value) // Not found on top-level.
   }
 
@@ -51,6 +56,19 @@ struct SynthesizedClass : Codable {
     }
 
     foo(CodingKeys.nested)
+  }
+
+  package func nestedUnqualifiedPkg(_ key: CodingKeys) { // expected-error {{method cannot be declared package because its parameter uses a private type}}
+    enum CodingKeys : String, CodingKey {
+      case nested
+    }
+
+    // CodingKeys should refer to the local unqualified enum.
+    func pkg(_ key: CodingKeys) {
+      print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+    }
+
+    pkg(CodingKeys.nested)
   }
 
   internal func nestedUnqualifiedBar(_ key: CodingKeys) { // expected-error {{method cannot be declared internal because its parameter uses a private type}}
@@ -96,6 +114,7 @@ struct SynthesizedClass : Codable {
   struct Nested {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
+    package func qualifiedPkg(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared package because its parameter uses a private type}}
     internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
     fileprivate func qualifiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
@@ -103,6 +122,10 @@ struct SynthesizedClass : Codable {
     // Unqualified lookups should find the SynthesizedClass's synthesized
     // CodingKeys type instead of the top-level type above.
     public func unqualifiedFoo(_ key: CodingKeys) { // expected-error {{method cannot be declared public because its parameter uses a private type}}
+      print(CodingKeys.value) // Not found on top-level.
+    }
+
+    package func unqualifiedPkg(_ key: CodingKeys) { // expected-error {{method cannot be declared package because its parameter uses a private type}}
       print(CodingKeys.value) // Not found on top-level.
     }
 
@@ -130,6 +153,19 @@ struct SynthesizedClass : Codable {
       }
 
       foo(CodingKeys.nested)
+    }
+
+    package func nestedUnqualifiedPkg(_ key: CodingKeys) { // expected-error {{method cannot be declared package because its parameter uses a private type}}
+      enum CodingKeys : String, CodingKey {
+        case nested
+      }
+
+      // CodingKeys should refer to the local unqualified enum.
+      func pkg(_ key: CodingKeys) {
+        print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+      }
+
+      pkg(CodingKeys.nested)
     }
 
     internal func nestedUnqualifiedBar(_ key: CodingKeys) { // expected-error {{method cannot be declared internal because its parameter uses a private type}}
@@ -177,7 +213,7 @@ struct SynthesizedClass : Codable {
 
 // Classes which don't get synthesized Codable implementations should expose the
 // appropriate CodingKeys type.
-struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass' declared here}}
+struct NonSynthesizedClass : Codable { // expected-note * {{'NonSynthesizedClass' declared here}}
   // No synthesized type since we implemented both methods.
   init(from decoder: Decoder) throws {}
   func encode(to encoder: Encoder) throws {}
@@ -185,12 +221,14 @@ struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass
   // Qualified type lookup should clearly fail -- we shouldn't get a synthesized
   // type here.
   public func qualifiedFoo(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
+  package func qualifiedPkg(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
   internal func qualifiedBar(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
   fileprivate func qualifiedBaz(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
   private func qualifiedQux(_ key: NonSynthesizedClass.CodingKeys) {} // expected-error {{'CodingKeys' is not a member type of struct 'class_codable_member_type_lookup.NonSynthesizedClass'}}
 
   // Unqualified lookups should find the public top-level CodingKeys type.
   public func unqualifiedFoo(_ key: CodingKeys) { print(CodingKeys.topLevel) }
+  package func unqualifiedPkg(_ key: CodingKeys) { print(CodingKeys.topLevel) }
   internal func unqualifiedBar(_ key: CodingKeys) { print(CodingKeys.topLevel) }
   fileprivate func unqualifiedBaz(_ key: CodingKeys) { print(CodingKeys.topLevel) }
   private func unqualifiedQux(_ key: CodingKeys) { print(CodingKeys.topLevel) }
@@ -207,6 +245,19 @@ struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass
     }
 
     foo(CodingKeys.nested)
+  }
+
+  package func nestedUnqualifiedPkg(_ key: CodingKeys) {
+    enum CodingKeys : String, CodingKey {
+      case nested
+    }
+
+    // CodingKeys should refer to the local unqualified enum.
+    func pkg(_ key: CodingKeys) {
+      print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+    }
+
+    pkg(CodingKeys.nested)
   }
 
   internal func nestedUnqualifiedBar(_ key: CodingKeys) {
@@ -267,6 +318,7 @@ struct ExplicitClass : Codable {
 
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: ExplicitClass.CodingKeys) {}
+  package func qualifiedPkg(_ key: ExplicitClass.CodingKeys) {}
   internal func qualifiedBar(_ key: ExplicitClass.CodingKeys) {}
   fileprivate func qualifiedBaz(_ key: ExplicitClass.CodingKeys) {}
   private func qualifiedQux(_ key: ExplicitClass.CodingKeys) {}
@@ -274,6 +326,10 @@ struct ExplicitClass : Codable {
   // Unqualified lookups should find the synthesized CodingKeys type instead
   // of the top-level type above.
   public func unqualifiedFoo(_ key: CodingKeys) {
+    print(CodingKeys.a) // Not found on top-level.
+  }
+
+  package func unqualifiedPkg(_ key: CodingKeys) {
     print(CodingKeys.a) // Not found on top-level.
   }
 
@@ -302,7 +358,18 @@ struct ExplicitClass : Codable {
 
     foo(CodingKeys.nested)
   }
+  package func nestedUnqualifiedPkg(_ key: CodingKeys) {
+    enum CodingKeys : String, CodingKey {
+      case nested
+    }
 
+    // CodingKeys should refer to the local unqualified enum.
+    func pkg(_ key: CodingKeys) {
+      print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+    }
+
+    pkg(CodingKeys.nested)
+  }
   internal func nestedUnqualifiedBar(_ key: CodingKeys) {
     enum CodingKeys : String, CodingKey {
       case nested
@@ -346,6 +413,7 @@ struct ExplicitClass : Codable {
   struct Nested {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: ExplicitClass.CodingKeys) {}
+    package func qualifiedPkg(_ key: ExplicitClass.CodingKeys) {}
     internal func qualifiedBar(_ key: ExplicitClass.CodingKeys) {}
     fileprivate func qualifiedBaz(_ key: ExplicitClass.CodingKeys) {}
     private func qualifiedQux(_ key: ExplicitClass.CodingKeys) {}
@@ -353,6 +421,10 @@ struct ExplicitClass : Codable {
     // Unqualified lookups should find the ExplicitClass's synthesized
     // CodingKeys type instead of the top-level type above.
     public func unqualifiedFoo(_ key: CodingKeys) {
+      print(CodingKeys.a) // Not found on top-level.
+    }
+
+    package func unqualifiedPkg(_ key: CodingKeys) {
       print(CodingKeys.a) // Not found on top-level.
     }
 
@@ -381,7 +453,18 @@ struct ExplicitClass : Codable {
 
       foo(CodingKeys.nested)
     }
+    package func nestedUnqualifiedPkg(_ key: CodingKeys) {
+      enum CodingKeys : String, CodingKey {
+        case nested
+      }
 
+      // CodingKeys should refer to the local unqualified enum.
+      func pkg(_ key: CodingKeys) {
+        print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+      }
+
+      pkg(CodingKeys.nested)
+    }
     internal func nestedUnqualifiedBar(_ key: CodingKeys) {
       enum CodingKeys : String, CodingKey {
         case nested
@@ -436,6 +519,7 @@ struct ExtendedClass : Codable {
 
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: ExtendedClass.CodingKeys) {}
+  package func qualifiedPkg(_ key: ExtendedClass.CodingKeys) {}
   internal func qualifiedBar(_ key: ExtendedClass.CodingKeys) {}
   fileprivate func qualifiedBaz(_ key: ExtendedClass.CodingKeys) {}
   private func qualifiedQux(_ key: ExtendedClass.CodingKeys) {}
@@ -443,6 +527,10 @@ struct ExtendedClass : Codable {
   // Unqualified lookups should find the synthesized CodingKeys type instead
   // of the top-level type above.
   public func unqualifiedFoo(_ key: CodingKeys) {
+    print(CodingKeys.a) // Not found on top-level.
+  }
+
+  package func unqualifiedPkg(_ key: CodingKeys) {
     print(CodingKeys.a) // Not found on top-level.
   }
 
@@ -471,7 +559,18 @@ struct ExtendedClass : Codable {
 
     foo(CodingKeys.nested)
   }
+  package func nestedUnqualifiedPkg(_ key: CodingKeys) {
+    enum CodingKeys : String, CodingKey {
+      case nested
+    }
 
+    // CodingKeys should refer to the local unqualified enum.
+    func pkg(_ key: CodingKeys) {
+      print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+    }
+
+    pkg(CodingKeys.nested)
+  }
   internal func nestedUnqualifiedBar(_ key: CodingKeys) {
     enum CodingKeys : String, CodingKey {
       case nested
@@ -515,6 +614,7 @@ struct ExtendedClass : Codable {
   struct Nested {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: ExtendedClass.CodingKeys) {}
+    package func qualifiedPkg(_ key: ExtendedClass.CodingKeys) {}
     internal func qualifiedBar(_ key: ExtendedClass.CodingKeys) {}
     fileprivate func qualifiedBaz(_ key: ExtendedClass.CodingKeys) {}
     private func qualifiedQux(_ key: ExtendedClass.CodingKeys) {}
@@ -522,6 +622,10 @@ struct ExtendedClass : Codable {
     // Unqualified lookups should find the ExtendedClass's synthesized
     // CodingKeys type instead of the top-level type above.
     public func unqualifiedFoo(_ key: CodingKeys) {
+      print(CodingKeys.a) // Not found on top-level.
+    }
+
+    package func unqualifiedPkg(_ key: CodingKeys) {
       print(CodingKeys.a) // Not found on top-level.
     }
 
@@ -550,7 +654,18 @@ struct ExtendedClass : Codable {
 
       foo(CodingKeys.nested)
     }
+    package func nestedUnqualifiedPkg(_ key: CodingKeys) {
+      enum CodingKeys : String, CodingKey {
+        case nested
+      }
 
+      // CodingKeys should refer to the local unqualified enum.
+      func pkg(_ key: CodingKeys) {
+        print(CodingKeys.nested) // Not found on synthesized type or top-level type.
+      }
+
+      pkg(CodingKeys.nested)
+    }
     internal func nestedUnqualifiedBar(_ key: CodingKeys) {
       enum CodingKeys : String, CodingKey {
         case nested

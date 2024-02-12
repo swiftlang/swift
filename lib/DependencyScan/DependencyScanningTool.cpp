@@ -20,14 +20,20 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 
 #include <sstream>
 
 namespace swift {
 namespace dependencies {
 
+// Global mutex for target info queries since they are executed separately .
+llvm::sys::SmartMutex<true> TargetInfoMutex;
+
 llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command,
                                                     const char *main_executable_path) {
+  llvm::sys::SmartScopedLock<true> Lock(TargetInfoMutex);
+
   // We must reset option occurrences because we are handling an unrelated
   // command-line to those possibly parsed before using the same tool.
   // We must do so because LLVM options parsing is done using a managed
@@ -125,9 +131,10 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*ScanningService,
-                                Instance->getMainModule()->getNameStr().str(),
-                                Instance->getInvocation().getModuleScanningHash());
+  ModuleDependenciesCache cache(
+      *ScanningService, Instance->getMainModule()->getNameStr().str(),
+      Instance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      Instance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
@@ -145,8 +152,12 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
     return EC;
   auto Instance = std::move(*InstanceOrErr);
 
-  // Execute the scanning action, retrieving the in-memory result
-  auto DependenciesOrErr = performModulePrescan(*Instance.get());
+  // Local scan cache instance, wrapping the shared global cache.
+  ModuleDependenciesCache cache(
+      *ScanningService, Instance->getMainModule()->getNameStr().str(),
+      Instance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      Instance->getInvocation().getModuleScanningHash());
+  auto DependenciesOrErr = performModulePrescan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
     return std::make_error_code(std::errc::not_supported);
   auto Dependencies = std::move(*DependenciesOrErr);
@@ -167,9 +178,10 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*ScanningService,
-                                Instance->getMainModule()->getNameStr().str(),
-                                Instance->getInvocation().getModuleScanningHash());
+  ModuleDependenciesCache cache(
+      *ScanningService, Instance->getMainModule()->getNameStr().str(),
+      Instance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      Instance->getInvocation().getModuleScanningHash());
   auto BatchScanResults = performBatchModuleScan(
       *Instance.get(), cache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
@@ -178,14 +190,17 @@ DependencyScanningTool::getDependencies(
 }
 
 void DependencyScanningTool::serializeCache(llvm::StringRef path) {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
+  llvm::vfs::OnDiskOutputBackend Backend;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, path, *ScanningService);
+      Diags, Backend, path, *ScanningService);
 }
 
 bool DependencyScanningTool::loadCache(llvm::StringRef path) {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
@@ -200,16 +215,22 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 }
 
 void DependencyScanningTool::resetCache() {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   ScanningService.reset(new SwiftDependencyScanningService());
 }
 
 void DependencyScanningTool::resetDiagnostics() {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   CDC.reset();
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
 DependencyScanningTool::initScannerForAction(
     ArrayRef<const char *> Command) {
+  // The remainder of this method operates on shared state in the
+  // scanning service and global LLVM state with:
+  // llvm::cl::ResetAllOptionOccurrences
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   auto instanceOrErr = initCompilerInstanceForScan(Command);
   if (instanceOrErr.getError())
     return instanceOrErr;
@@ -222,9 +243,6 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&CDC);
-
-  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
-  ScanningService->overlaySharedFilesystemCacheForCompilation(*Instance);
 
   // Basic error checking on the arguments
   if (CommandArgs.empty()) {
@@ -241,7 +259,23 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();
-  if (Invocation.parseArgs(CommandArgs, Instance->getDiags(),
+  // Parse/tokenize arguments.
+  std::string CommandString;
+  for (const auto *c : CommandArgs) {
+    CommandString.append(c);
+    CommandString.append(" ");
+  }
+  SmallVector<const char *, 4> Args;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  // Ensure that we use the Windows command line parsing on Windows as we need
+  // to ensure that we properly handle paths.
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
+    llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
+  else
+    llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+
+  if (Invocation.parseArgs(Args, Instance->getDiags(),
                            nullptr, WorkingDirectory, "/tmp/foo")) {
     return std::make_error_code(std::errc::invalid_argument);
   }
@@ -251,6 +285,11 @@ DependencyScanningTool::initCompilerInstanceForScan(
   if (Instance->setup(Invocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
+  // Setup the caching service after the instance finishes setup.
+  if (ScanningService->setupCachingDependencyScanningService(*Instance))
+    return std::make_error_code(std::errc::invalid_argument);
+
   (void)Instance->getMainModule();
 
   return Instance;

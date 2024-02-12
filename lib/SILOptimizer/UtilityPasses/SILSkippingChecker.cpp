@@ -66,9 +66,12 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func))
     return false;
 
-  // See DeclChecker::shouldSkipBodyTypechecking. Can't skip didSet for now.
+  // Some AccessorDecls can't be skipped (see IsFunctionBodySkippedRequest).
   if (auto *AD = dyn_cast<AccessorDecl>(func)) {
     if (AD->getAccessorKind() == AccessorKind::DidSet)
+      return false;
+
+    if (AD->hasForcedStaticDispatch())
       return false;
   }
 

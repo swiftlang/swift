@@ -9,12 +9,12 @@ struct Notification {}
 
 struct MyApp: AmbiguousFuncProtocol {
 // expected-error@-1 {{type 'MyApp' does not conform to protocol 'AmbiguousFuncProtocol'}}
-// expected-note@-2 {{do you want to add protocol stubs?}} {{38-38=\n    func application(received: Ambiguous.Notification) {\n        <#code#>\n    \}\n}}
+// expected-note@-2 {{add stubs for conformance}} {{38-38=\n    func application(received: Ambiguous.Notification) {\n        <#code#>\n    \}\n}}
 }
 
 extension MyApp: AmbiguousVarProtocol {
 // expected-error@-1 {{type 'MyApp' does not conform to protocol 'AmbiguousVarProtocol'}}
-// expected-note@-2 {{do you want to add protocol stubs?}} {{40-40=\n    var notification: Ambiguous.Notification? {\n        <#code#>\n    \}\n}}
+// expected-note@-2 {{add stubs for conformance}} {{40-40=\n    var notification: Ambiguous.Notification? {\n        <#code#>\n    \}\n}}
 }
 
 // FIXME: There's a remaining common ambiguity that occurs with nested types

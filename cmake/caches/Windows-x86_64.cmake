@@ -6,7 +6,6 @@ set(LLVM_ENABLE_PROJECTS
     CACHE STRING "")
 
 set(LLVM_EXTERNAL_PROJECTS
-      cmark
       swift
     CACHE STRING "")
 
@@ -39,6 +38,7 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
@@ -72,6 +72,8 @@ set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")
 set(SWIFT_BUILD_ENABLE_PARSER_LIB YES CACHE BOOL "")
+set(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT NO CACHE BOOL "")
+set(SWIFT_BUILD_STDLIB_CXX_MODULE NO CACHE BOOL "")
 # static linking is not supported on Windows yet
 set(SWIFT_BUILD_STATIC_STDLIB NO CACHE BOOL "")
 set(SWIFT_BUILD_STATIC_SDK_OVERLAY NO CACHE BOOL "")
@@ -121,8 +123,10 @@ set(LLVM_TOOLCHAIN_TOOLS
 set(CLANG_TOOLS
       clang
       clangd
+      clang-deps-launcher
       clang-format
       clang-resource-headers
+      clang-scan-deps
       clang-tidy
     CACHE STRING "")
 
@@ -136,7 +140,7 @@ set(LLDB_TOOLS
       lldb-argdumper
       lldb-python-scripts
       lldb-server
-      lldb-vscode
+      lldb-dap
       repl_swift
     CACHE STRING "")
 
@@ -147,8 +151,10 @@ set(SWIFT_INSTALL_COMPONENTS
       editor-integration
       tools
       sourcekit-inproc
+      static-mirror-lib
       swift-remote-mirror
       swift-remote-mirror-headers
+      swift-syntax-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS

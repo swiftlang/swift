@@ -435,8 +435,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
-  // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
 }
 
 /// https://github.com/apple/swift/issues/54739
@@ -592,8 +591,8 @@ do {
 
 // Diagnose extraneous force unwrap in ambiguous context
 do {
-  func test(_: Int) {} // expected-note {{found this candidate}}
-  func test(_: String) {} // expected-note {{found this candidate}}
+  func test(_: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
 
   var x: Double = 42
   test(x!) // expected-error {{no exact matches in call to local function 'test'}}

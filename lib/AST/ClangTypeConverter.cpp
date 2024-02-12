@@ -74,6 +74,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/RISCVVTypes.def"
+#define WASM_REF_TYPE(Name, MangedNameBase, Id, SingletonId, AS)               \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -152,9 +156,10 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   llvm_unreachable("invalid representation");
 }
 
-const clang::Type *ClangTypeConverter::getFunctionType(
-    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
-    SILFunctionType::Representation repr) {
+const clang::Type *
+ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
+                                    llvm::Optional<SILResultInfo> result,
+                                    SILFunctionType::Representation repr) {
 
   // Using the interface type is sufficient as type parameters get mapped to
   // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)
@@ -200,6 +205,10 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::Closure:
+  case SILFunctionType::Representation::KeyPathAccessorGetter:
+  case SILFunctionType::Representation::KeyPathAccessorSetter:
+  case SILFunctionType::Representation::KeyPathAccessorEquals:
+  case SILFunctionType::Representation::KeyPathAccessorHash:
     llvm_unreachable("Expected a C-compatible representation.");
   }
   llvm_unreachable("unhandled representation!");
@@ -248,7 +257,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
   CHECK_NAMED_TYPE("OpaquePointer", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
   CHECK_NAMED_TYPE("DarwinBoolean", ctx.UnsignedCharTy);
-  CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
+  CHECK_NAMED_TYPE(swift::getSwiftName(
                      KnownFoundationEntity::NSZone),
                    ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("WindowsBool", ctx.IntTy);
@@ -664,8 +673,9 @@ clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) 
                         ? SILFunctionTypeRepresentation::Block
                         : repr);
     auto results = type->getResults();
-    auto optionalResult =
-        results.empty() ? None : llvm::Optional<SILResultInfo>(results[0]);
+    auto optionalResult = results.empty()
+                              ? llvm::None
+                              : llvm::Optional<SILResultInfo>(results[0]);
     clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr);
   }
   return clang::QualType(clangTy, 0);

@@ -192,26 +192,26 @@ extension MMExplicit1 : MMP1 { } // expected-warning{{conformance of 'MMExplicit
 extension MMExplicit1 : MMP2a { } // expected-warning{{MMExplicit1' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A}}
 extension MMExplicit1 : MMP3a { } // expected-warning{{conformance of 'MMExplicit1' to protocol 'MMP3a' was already stated in the type's module 'placement_module_A'}}
 
-extension MMExplicit1 : MMP3b { } // okay
+extension MMExplicit1 : @retroactive MMP3b { } // okay
 
 extension MMSuper1 : MMP1 { } // expected-warning{{conformance of 'MMSuper1' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
 extension MMSuper1 : MMP2a { } // expected-warning{{conformance of 'MMSuper1' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
-extension MMSuper1 : MMP3b { } // okay
+extension MMSuper1 : @retroactive MMP3b { } // okay
 
 extension MMSub1 : AnyObject { } // expected-error{{only protocols can inherit from 'AnyObject'}}
 
 extension MMSub2 : MMP1 { } // expected-warning{{conformance of 'MMSub2' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
 extension MMSub2 : MMP2a { } // expected-warning{{conformance of 'MMSub2' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
-extension MMSub2 : MMP3b { } // okay
+extension MMSub2 : @retroactive MMP3b { } // okay
 
-extension MMSub2 : MMAnyObjectRefinement { } // okay
+extension MMSub2 : @retroactive MMAnyObjectRefinement { } // okay
 
 extension MMSub3 : MMP1 { } // expected-warning{{conformance of 'MMSub3' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
 extension MMSub3 : MMP2a { } // expected-warning{{conformance of 'MMSub3' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
-extension MMSub3 : MMP3b { } // okay
+extension MMSub3 : @retroactive MMP3b { } // okay
 extension MMSub3 : AnyObject { } // expected-error{{only protocols can inherit from 'AnyObject'}}
 
 extension MMSub4 : MMP1 { } // expected-warning{{conformance of 'MMSub4' to protocol 'MMP1' was already stated in the type's module 'placement_module_B'}}
 extension MMSub4 : MMP2a { } // expected-warning{{conformance of 'MMSub4' to protocol 'MMP2a' was already stated in the type's module 'placement_module_B'}}
-extension MMSub4 : MMP3b { } // okay
+extension MMSub4 : @retroactive MMP3b { } // okay
 extension MMSub4 : AnyObjectRefinement { } // okay

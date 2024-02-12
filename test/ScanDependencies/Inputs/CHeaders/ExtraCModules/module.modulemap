@@ -1,0 +1,8 @@
+module SubE {
+  header "SubE.h"
+  export *
+}
+module CrossImportTestModule {
+  header "CrossImportTestModule.h"
+  export *
+}

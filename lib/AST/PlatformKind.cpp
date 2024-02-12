@@ -47,22 +47,23 @@ StringRef swift::prettyPlatformString(PlatformKind platform) {
   llvm_unreachable("bad PlatformKind");
 }
 
-Optional<PlatformKind> swift::platformFromString(StringRef Name) {
+llvm::Optional<PlatformKind> swift::platformFromString(StringRef Name) {
   if (Name == "*")
     return PlatformKind::none;
-  return llvm::StringSwitch<Optional<PlatformKind>>(Name)
+  return llvm::StringSwitch<llvm::Optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
       .Case("OSX", PlatformKind::macOS)
       .Case("OSXApplicationExtension", PlatformKind::macOSApplicationExtension)
-      .Default(Optional<PlatformKind>());
+      .Default(llvm::Optional<PlatformKind>());
 }
 
-Optional<StringRef> swift::closestCorrectedPlatformString(StringRef candidate) {
+llvm::Optional<StringRef>
+swift::closestCorrectedPlatformString(StringRef candidate) {
   auto lowerCasedCandidate = candidate.lower();
   auto lowerCasedCandidateRef = StringRef(lowerCasedCandidate);
   auto minDistance = std::numeric_limits<unsigned int>::max();
-  Optional<StringRef> result = None;
+  llvm::Optional<StringRef> result = llvm::None;
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   {                                                                            \
     auto platform = StringRef(#X);                                             \
@@ -79,17 +80,22 @@ Optional<StringRef> swift::closestCorrectedPlatformString(StringRef candidate) {
   // If the most similar platform distance is greater than this threshold,
   // it's not similar enough to be suggested as correction.
   const unsigned int distanceThreshold = 5;
-  return (minDistance < distanceThreshold) ? result : None;
+  return (minDistance < distanceThreshold) ? result : llvm::None;
 }
 
-static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+llvm::Optional<PlatformKind>
+swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   switch (Platform) {
   case PlatformKind::macOSApplicationExtension:
+    return PlatformKind::macOS;
   case PlatformKind::iOSApplicationExtension:
+    return PlatformKind::iOS;
   case PlatformKind::macCatalystApplicationExtension:
+    return PlatformKind::macCatalyst;
   case PlatformKind::tvOSApplicationExtension:
+    return PlatformKind::tvOS;
   case PlatformKind::watchOSApplicationExtension:
-    return true;
+    return PlatformKind::watchOS;
   case PlatformKind::macOS:
   case PlatformKind::iOS:
   case PlatformKind::macCatalyst:
@@ -98,9 +104,13 @@ static bool isApplicationExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
-    return false;
+    return llvm::None;
   }
   llvm_unreachable("bad PlatformKind");
+}
+
+static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+  return basePlatformForExtensionPlatform(Platform).has_value();
 }
 
 static bool isPlatformActiveForTarget(PlatformKind Platform,
@@ -142,14 +152,13 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
 
 bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                              bool ForTargetVariant) {
-  llvm::Triple TT = LangOpts.Target;
-
   if (ForTargetVariant) {
     assert(LangOpts.TargetVariant && "Must have target variant triple");
-    TT = *LangOpts.TargetVariant;
+    return isPlatformActiveForTarget(Platform, *LangOpts.TargetVariant,
+                                     LangOpts.EnableAppExtensionRestrictions);
   }
 
-  return isPlatformActiveForTarget(Platform, TT,
+  return isPlatformActiveForTarget(Platform, LangOpts.Target,
                                    LangOpts.EnableAppExtensionRestrictions);
 }
 
@@ -187,19 +196,20 @@ PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
 
 bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
                                              PlatformKind Parent) {
+  if (auto ChildPlatformBase = basePlatformForExtensionPlatform(Child)) {
+    if (Parent == ChildPlatformBase)
+      return true;
+  }
+
   if (Child == PlatformKind::macCatalyst && Parent == PlatformKind::iOS)
     return true;
 
   if (Child == PlatformKind::macCatalystApplicationExtension) {
     if (Parent == PlatformKind::iOS ||
-        Parent == PlatformKind::iOSApplicationExtension ||
-        Parent == PlatformKind::macCatalyst) {
+        Parent == PlatformKind::iOSApplicationExtension) {
       return true;
     }
   }
-
-  // Ideally we would have all ApplicationExtension platforms
-  // inherit from their non-extension platform.
 
   return false;
 }

@@ -21,6 +21,12 @@
 #include <os/lock.h>
 #include <pthread.h>
 
+#if __has_include(<sys/errno.h>)
+#include <sys/errno.h>
+#else
+#include <errno.h>
+#endif
+
 #include "chrono_utils.h"
 
 #include "llvm/ADT/Optional.h"
@@ -102,9 +108,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = ::os_unfair_lock;
 
 // We don't need to be lazy here because Darwin has OS_UNFAIR_LOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return OS_UNFAIR_LOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER OS_UNFAIR_LOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
@@ -238,6 +243,8 @@ inline tls_key_t tls_get_key(tls_key k) {
     return __PTK_FRAMEWORK_SWIFT_KEY4;
   case tls_key::concurrency_fallback:
     return __PTK_FRAMEWORK_SWIFT_KEY5;
+  case tls_key::observation_transaction:
+    return __PTK_FRAMEWORK_SWIFT_KEY6;
   }
 }
 

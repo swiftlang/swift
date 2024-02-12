@@ -49,12 +49,12 @@ func foo() {
   // NOTE: The point of this test is to trigger IRGenSIL::emitShadowCopy()
   //       and IRGenSIL::emitShadowCopyIfNeeded(). It may be worthwhile to
   //       simplify this testcase.
-  // CHECK: store float %0, float* %myArg.debug, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
-  // CHECK: store float {{.*}}, float* %self.debug.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
+  // CHECK: store float %0, ptr %myArg.debug, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
+  // CHECK: store float {{.*}}, ptr %self.debug.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
-  // CHECK: call void @llvm.dbg.declare(metadata i64* %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
+  // CHECK: call void @llvm.dbg.declare(metadata ptr %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
   // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
@@ -70,10 +70,10 @@ func foo() {
 // func foo()
   // CHECK: define {{.*}} @"$s4main3fooyyF"
   // CHECK: %[[MYARRAY:.*]] = alloca
-  // CHECK: call void @llvm.dbg.declare(metadata %TSa* %[[MYARRAY]],
+  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[MYARRAY]],
   // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
   // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
-  // CHECK-SAME: !dbg ![[ARRAY]]
+  // CHECK-SAME: !dbg ![[ARRAY_ALLOC:[0-9]+]]
   // CHECK: ret void
 
 // CHECK-DAG: ![[ADD]] = !DILocation(line: 6, scope:
@@ -94,3 +94,4 @@ func foo() {
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:
 // CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 27, scope:
 // CHECK-DAG: ![[ARRAY]] = !DILocation(line: 31, scope:
+// CHECK-DAG: ![[ARRAY_ALLOC]] = !DILocation(line: 31, scope:

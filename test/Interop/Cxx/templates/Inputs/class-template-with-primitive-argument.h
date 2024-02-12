@@ -8,5 +8,8 @@ struct MagicWrapper {
 };
 
 typedef MagicWrapper<int> WrappedMagicInt;
+typedef MagicWrapper<int*> WrappedMagicIntPtr;
+typedef MagicWrapper<const int*> WrappedMagicIntConstPtr;
+typedef MagicWrapper<int**> WrappedMagicIntPtrPtr;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_WITH_PRIMITIVE_ARGUMENT_H

@@ -175,8 +175,9 @@ class WeakReference {
   HeapObject *nativeTakeStrongFromBits(WeakReferenceBits bits) {
     auto side = bits.getNativeOrNull();
     if (side) {
+      auto obj = side->tryRetain();
       side->decrementWeak();
-      return side->tryRetain();
+      return obj;
     } else {
       return nullptr;
     }

@@ -57,7 +57,7 @@ class SillyClass {}
 
 protocol HasDefault {
   func foo()
-  // expected-note@-1 {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'foo()' with type '() -> ()'; add a stub for conformance}}
 }
 
 extension HasDefault where Self == SillyClass {

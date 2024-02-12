@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,7 +24,7 @@ __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
   swift::swift_abortDisabledUnicodeSupport();
 #else
   auto low = 0;
-  auto high = 1086 - 1;
+  auto high = WORD_BREAK_DATA_COUNT - 1;
   
   while (high >= low) {
     auto idx = low + (high - low) / 2;
@@ -52,8 +52,8 @@ __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
     }
   }
   
-  // If we made it out here, then our scalar was not found in the grapheme
-  // array (this occurs when a scalar doesn't map to any grapheme break
+  // If we made it out here, then our scalar was not found in the word
+  // array (this occurs when a scalar doesn't map to any word break
   // property). Return the max value here to indicate .any.
   return std::numeric_limits<__swift_uint8_t>::max();
 #endif

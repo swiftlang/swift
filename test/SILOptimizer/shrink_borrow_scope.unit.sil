@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
 import Swift
@@ -14,7 +14,7 @@ sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on nohoist_over_rewritten_copy
 sil [ossa] @nohoist_over_rewritten_copy : $@convention(thin) () -> (@owned C, @owned C) {
 entry:
-  test_specification "shrink-borrow-scope @trace true @trace[1]"
+  specify_test "shrink-borrow-scope @trace true @trace[1]"
   %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
   %instance = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C

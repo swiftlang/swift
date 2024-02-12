@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -432,44 +433,27 @@ public:
                               X->getType());
   }
 
-  hash_code visitSelectEnumInstBase(SelectEnumInstBase *X) {
+  hash_code visitSelectEnumOperation(SelectEnumOperation X) {
     auto hash = llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getEnumOperandRef()),
-        X->getType(), X->hasDefault());
+        X->getKind(), tryLookThroughOwnershipInsts(&X.getEnumOperandRef()),
+        X->getType(), X.hasDefault());
 
-    for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
-      hash = llvm::hash_combine(hash, X->getCase(i).first,
-                                X->getCase(i).second);
+    for (unsigned i = 0, e = X.getNumCases(); i < e; ++i) {
+      hash = llvm::hash_combine(hash, X.getCase(i).first, X.getCase(i).second);
     }
-    
-    if (X->hasDefault())
-      hash = llvm::hash_combine(hash, X->getDefaultResult());
-    
+
+    if (X.hasDefault())
+      hash = llvm::hash_combine(hash, X.getDefaultResult());
+
     return hash;
   }
 
   hash_code visitSelectEnumInst(SelectEnumInst *X) {
-    return visitSelectEnumInstBase(X);
+    return visitSelectEnumOperation(X);
   }
 
   hash_code visitSelectEnumAddrInst(SelectEnumAddrInst *X) {
-    return visitSelectEnumInstBase(X);
-  }
-
-  hash_code visitSelectValueInst(SelectValueInst *X) {
-    auto hash = llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getAllOperands()[0]),
-        X->getType(), X->hasDefault());
-
-    for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
-      hash = llvm::hash_combine(hash, X->getCase(i).first,
-                                X->getCase(i).second);
-    }
-
-    if (X->hasDefault())
-      hash = llvm::hash_combine(hash, X->getDefaultResult());
-
-    return hash;
+    return visitSelectEnumOperation(X);
   }
 
   hash_code visitWitnessMethodInst(WitnessMethodInst *X) {
@@ -513,6 +497,25 @@ public:
     return llvm::hash_combine(
         X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()),
         llvm::hash_combine_range(ConformsTo.begin(), ConformsTo.end()));
+  }
+
+  hash_code visitScalarPackIndexInst(ScalarPackIndexInst *X) {
+    return llvm::hash_combine(
+        X->getKind(), X->getIndexedPackType(), X->getComponentIndex());
+  }
+
+  hash_code visitDynamicPackIndexInst(DynamicPackIndexInst *X) {
+    return llvm::hash_combine(
+        X->getKind(), X->getIndexedPackType(),
+        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+  }
+
+  hash_code visitTuplePackElementAddrInst(TuplePackElementAddrInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()),
+        X->getElementType());
   }
 };
 } // end anonymous namespace
@@ -566,7 +569,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   };
   bool isEqual =
       LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
-#ifdef NDEBUG
+#ifndef NDEBUG
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
     LHSI->dump();
@@ -665,7 +668,7 @@ public:
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
-  bool processLazyPropertyGetters();
+  bool processLazyPropertyGetters(SILFunction &F);
 
   bool canHandle(SILInstruction *Inst);
 
@@ -779,8 +782,9 @@ bool CSE::processFunction(SILFunction &Fm, DominanceInfo *DT) {
 
 /// Replace lazy property getters (which are dominated by the same getter)
 /// by a direct load of the value.
-bool CSE::processLazyPropertyGetters() {
+bool CSE::processLazyPropertyGetters(SILFunction &F) {
   bool changed = false;
+  bool invalidatedStackNesting = false;
   for (ApplyInst *ai : lazyPropertyGetters) {
     SILFunction *getter = ai->getReferencedFunctionOrNull();
     assert(getter && getter->isLazyPropertyGetter());
@@ -807,8 +811,18 @@ bool CSE::processLazyPropertyGetters() {
         builder.createUncheckedEnumData(sei->getLoc(), enumVal, someDecl, ty);
     builder.createBranch(sei->getLoc(), someDest, { ued });
     sei->eraseFromParent();
+    // When inlining an OSSA function into a non-OSSA function, ownership of
+    // nonescaping closures is lowered.  At that point, they are recognized as
+    // stack users.  Since they weren't recognized as such before, they may not
+    // satisfy stack discipline.  Fix that up now.
+    if (getter->hasOwnership() && !ai->getFunction()->hasOwnership()) {
+      invalidatedStackNesting = true;
+    }
     changed = true;
     ++NumCSE;
+  }
+  if (invalidatedStackNesting) {
+    StackNesting::fixNesting(&F);
   }
   return changed;
 }
@@ -880,23 +894,9 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
           return false;
         }
       }
-      Candidates.insert(User);
     }
-    if (!isa<TermInst>(User))
-      continue;
-    // The current use of the opened archetype is a terminator instruction.
-    // Check if any of the successor BBs uses this opened archetype in the
-    // types of its basic block arguments. If this is the case, replace
-    // those uses by the new opened archetype.
-    auto Successors = User->getParent()->getSuccessorBlocks();
-    for (auto Successor : Successors) {
-      if (Successor->args_empty())
-        continue;
-      // If a BB has any arguments, update their types if necessary.
-      updateBasicBlockArgTypes(Successor,
-                               OldOpenedArchetype,
-                               NewOpenedArchetype);
-    }
+
+    Candidates.insert(User);
   }
 
   // Now process candidates.
@@ -914,6 +914,21 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
     auto Candidate = Candidates.pop_back_val();
     if (Processed.contains(Candidate))
       continue;
+
+    if (isa<TermInst>(Candidate)) {
+      // The current use of the opened archetype is a terminator instruction.
+      // Check if any of the successor BBs uses this opened archetype in the
+      // types of its basic block arguments. If this is the case, replace
+      // those uses by the new opened archetype.
+      // FIXME: What about uses of those arguments?
+      for (auto *Successor : Candidate->getParent()->getSuccessorBlocks()) {
+        if (Successor->args_empty())
+          continue;
+        // If a BB has any arguments, update their types if necessary.
+        updateBasicBlockArgTypes(Successor, OldOpenedArchetype,
+                                 NewOpenedArchetype);
+      }
+    }
 
     // Compute if a candidate depends on the old opened archetype.
     // It always does if it has any type-dependent operands.
@@ -935,7 +950,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
 
       // If it does, the candidate depends on the opened existential.
       if (ResultDependsOnOldOpenedArchetype) {
-        DependsOnOldOpenedArchetype |= ResultDependsOnOldOpenedArchetype;
+        DependsOnOldOpenedArchetype = true;
 
         // The users of this candidate are new candidates.
         for (auto Use : CandidateResult->getUses()) {
@@ -1141,7 +1156,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
     auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
-    if (MB == SILInstruction::MemoryBehavior::None)
+    if (MB == MemoryBehavior::None)
       return true;
     
     if (isLazyPropertyGetter(AI))
@@ -1155,11 +1170,17 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-    // Although the onFastPath builtin has no side-effects we don't want to
-    // (re-)move it.
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+    switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::OnFastPath:
+      // Although the onFastPath builtin has no side-effects we don't want to
+      // (re-)move it.
       return false;
-    return !BI->mayReadOrWriteMemory();
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+      return true;
+    default:
+      return !BI->mayReadOrWriteMemory();
+    }
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
     return !EMI->getOperand()->getType().isAddress();
@@ -1203,7 +1224,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
@@ -1212,6 +1232,9 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::TuplePackElementAddrInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \
@@ -1475,7 +1498,7 @@ class SILCSE : public SILFunctionTransform {
 
     // Handle calls to lazy property getters, which are collected in
     // processFunction().
-    if (C.processLazyPropertyGetters()) {
+    if (C.processLazyPropertyGetters(*Fn)) {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

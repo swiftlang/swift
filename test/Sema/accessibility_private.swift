@@ -114,7 +114,7 @@ class Sub : Container {
 
 protocol VeryImportantProto {
   associatedtype Assoc
-  var value: Int { get set } // expected-note {{protocol requires property 'value' with type 'Int'; do you want to add a stub?}}
+  var value: Int { get set } // expected-note {{protocol requires property 'value' with type 'Int'; add a stub for conformance}}
 }
 
 private struct VIPPrivateType : VeryImportantProto {

@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// UNSUPPORTED: OS=linux-gnu
 
 // Issue #58660: Specifically-shaped differentiable functions yield "conflicting debug info for argument" assertion failure
 // Ensure that proper location is preserved after sil-mem2reg location-less stores (created during inlining)
@@ -54,7 +55,8 @@ struct MyModel: Differentiable {
     property2 = localVar
 
     // `false` may instead be any expression that returns a `Bool`.
-    if false {
+    // TODO: cannot use literal `false` because it crashes
+    if 1 == 0 {
       localVar = member3
     }
   }

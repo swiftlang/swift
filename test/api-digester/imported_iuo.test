@@ -1,0 +1,11 @@
+RUN: %empty-directory(%t)
+RUN: %api-digester -dump-sdk -module ImportedIUO -o %t/digest.json -module-cache-path %t/module-cache %clang-importer-sdk-nosource -I %S/Inputs/ImportedIUO -avoid-location
+RUN: %FileCheck --input-file %t/digest.json %s
+
+CHECK:        "name": "ImportedIUOVar",
+CHECK-NEXT:        "printedName": "ImportedIUOVar",
+CHECK-NEXT:        "children": [
+CHECK-NEXT:          {
+CHECK-NEXT:            "kind": "TypeNominal",
+CHECK-NEXT:            "name": "ImplicitlyUnwrappedOptional",
+CHECK-NEXT:            "printedName": "Swift.UnsafeMutableRawPointer!",

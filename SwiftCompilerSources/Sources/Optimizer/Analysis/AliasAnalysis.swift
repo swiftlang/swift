@@ -16,34 +16,6 @@ import SIL
 struct AliasAnalysis {
   let bridged: BridgedAliasAnalysis
 
-  func mayRead(_ inst: Instruction, fromAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, fromAddress.bridged) {
-      case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
-        return true
-      default:
-        return false
-    }
-  }
-
-  func mayWrite(_ inst: Instruction, toAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, toAddress.bridged) {
-      case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
-        return true
-      default:
-        return false
-    }
-  }
-
-  func mayReadOrWrite(_ inst: Instruction, address: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, address.bridged) {
-      case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
-           MayHaveSideEffectsBehavior:
-        return true
-      default:
-        return false
-    }
-  }
-
   /// Returns the correct path for address-alias functions.
   static func getPtrOrAddressPath(for value: Value) -> SmallProjectionPath {
     let ty = value.type
@@ -62,39 +34,42 @@ struct AliasAnalysis {
   }
   
   static func register() {
-    AliasAnalysis_register(
+    BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
+      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> BridgedMemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
         let path = AliasAnalysis.getPtrOrAddressPath(for: val)
-        if let apply = inst as? ApplySite {
-          let effect = getMemoryEffect(of: apply, for: val, path: path, context)
-          switch (effect.read, effect.write) {
-            case (false, false): return NoneBehavior
-            case (true, false):  return MayReadBehavior
-            case (false, true):  return MayWriteBehavior
-            case (true, true):   return MayReadWriteBehavior
+        switch inst {
+        case let apply as ApplySite:
+          return getMemoryEffect(ofApply: apply, for: val, path: path, context).bridged
+        case let builtin as BuiltinInst:
+          return getMemoryEffect(ofBuiltin: builtin, for: val, path: path, context).bridged
+        default:
+          if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true),
+                                     complexityBudget: complexityBudget, context) {
+            return .MayReadWrite
           }
+          return .None
         }
-        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true), context) {
-          return MayReadWriteBehavior
-        }
-        return NoneBehavior
       },
 
       // isObjReleasedFn
-      { (bridgedCtxt: BridgedPassContext, bridgedObj: BridgedValue, bridgedInst: BridgedInstruction) -> Bool in
+      { (bridgedCtxt: BridgedPassContext, bridgedObj: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let obj = bridgedObj.value
         let path = SmallProjectionPath(.anyValueFields)
         if let apply = inst as? ApplySite {
-          let effect = getOwnershipEffect(of: apply, for: obj, path: path, context)
+          // Workaround for quadratic complexity in ARCSequenceOpts.
+          // We need to use an ever lower budget to not get into noticable compile time troubles.
+          let budget = complexityBudget / 10
+          let effect = getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget, context)
           return effect.destroy
         }
-        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false), context)
+        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false),
+                                       complexityBudget: complexityBudget, context)
       },
 
       // isAddrVisibleFromObj
@@ -122,7 +97,36 @@ struct AliasAnalysis {
   }
 }
 
-private func getMemoryEffect(of apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
+extension Instruction {
+  func mayRead(fromAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    switch aliasAnalysis.bridged.getMemBehavior(bridged, fromAddress.bridged) {
+      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
+        return true
+      default:
+        return false
+    }
+  }
+
+  func mayWrite(toAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    switch aliasAnalysis.bridged.getMemBehavior(bridged, toAddress.bridged) {
+      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
+        return true
+      default:
+        return false
+    }
+  }
+
+  func mayReadOrWrite(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    switch aliasAnalysis.bridged.getMemBehavior(bridged, address.bridged) {
+      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
+        return true
+      default:
+        return false
+    }
+  }
+}
+
+private func getMemoryEffect(ofApply apply: ApplySite, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
   let calleeAnalysis = context.calleeAnalysis
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: calleeAnalysis, isAddress: true)
   let memoryEffects: SideEffects.Memory
@@ -133,7 +137,7 @@ private func getMemoryEffect(of apply: ApplySite, for address: Value, path: Smal
     memoryEffects = result.memory
   } else {
     // `address` has unknown escapes. So we have to take the global effects of the called function(s).
-    memoryEffects = calleeAnalysis.getSideEffects(of: apply).memory
+    memoryEffects = calleeAnalysis.getSideEffects(ofApply: apply).memory
   }
   // Do some magic for `let` variables. Function calls cannot modify let variables.
   // The only exception is that the let variable is directly passed to an indirect out of the
@@ -145,14 +149,32 @@ private func getMemoryEffect(of apply: ApplySite, for address: Value, path: Smal
   return memoryEffects
 }
 
-private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Ownership {
+private func getMemoryEffect(ofBuiltin builtin: BuiltinInst, for address: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Memory {
+
+  switch builtin.id {
+  case .Once, .OnceWithContext:
+    if !address.at(path).isEscaping(using: AddressVisibleByBuiltinOnceVisitor(), context) {
+      return SideEffects.Memory()
+    }
+    let callee = builtin.operands[1].value
+    return context.calleeAnalysis.getSideEffects(ofCallee: callee).memory
+  default:
+    if address.at(path).isEscaping(using: EscapesToInstructionVisitor(target: builtin, isAddress: true), context) {
+      return builtin.memoryEffects
+    }
+    return SideEffects.Memory()
+  }
+}
+
+private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath,
+                                complexityBudget: Int, _ context: FunctionPassContext) -> SideEffects.Ownership {
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
-  if let result = value.at(path).visit(using: visitor, context) {
+  if let result = value.at(path).visit(using: visitor, complexityBudget: complexityBudget, context) {
     // The resulting effects are the argument effects to which `value` escapes to.
     return result.ownership
   } else {
     // `value` has unknown escapes. So we have to take the global effects of the called function(s).
-    return visitor.calleeAnalysis.getSideEffects(of: apply).ownership
+    return visitor.calleeAnalysis.getSideEffects(ofApply: apply).ownership
   }
 }
 
@@ -169,16 +191,19 @@ private struct SideEffectsVisitor : EscapeVisitorWithResult {
       return .ignore
     }
     if user == apply {
-      if let argIdx = apply.argumentIndex(of: operand) {
-        let e = calleeAnalysis.getSideEffects(of: apply, forArgument: argIdx, path: path.projectionPath)
-        result.merge(with: e)
-      }
+      let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
+      result.merge(with: e)
     }
     return .continueWalk
   }
 
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
+}
+
+private struct AddressVisibleByBuiltinOnceVisitor : EscapeVisitor {
+  var followTrivialTypes: Bool { true }
+  var followLoads: Bool { false }
 }
 
 /// Lets `ProjectedValue.isEscaping` return true if the value is "escaping" to the `target` instruction.
@@ -222,7 +247,7 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     if address.instruction == apply,
-       let argIdx = apply.argumentIndex(of: address),
+       let argIdx = apply.calleeArgumentIndex(of: address),
        argIdx < apply.numIndirectResultArguments {
       return .abortWalk
     }
@@ -230,3 +255,13 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
   }
 }
 
+private extension SideEffects.Memory {
+  var bridged: BridgedMemoryBehavior {
+    switch (read, write) {
+      case (false, false): return .None
+      case (true, false):  return .MayRead
+      case (false, true):  return .MayWrite
+      case (true, true):   return .MayReadWrite
+    }
+  }
+}

@@ -37,6 +37,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfGenericRef
     single-source/ArrayOfPOD
     single-source/ArrayOfRef
+    single-source/ArrayRemoveAll
     single-source/ArraySetElement
     single-source/ArraySubscript
     single-source/BinaryFloatingPointConversionFromBinaryInteger
@@ -121,6 +122,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSDictionaryCastToSwift
     single-source/NSErrorTest
     single-source/NSStringConversion
+    single-source/NaiveRangeReplaceableCollectionConformance
     single-source/NibbleSort
     single-source/NIOChannelPipeline
     single-source/NopDeinit
@@ -187,6 +189,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringRemoveDupes
+    single-source/StringRepeating
     single-source/StringReplaceSubrange
     single-source/StringSplitting
     single-source/StringSwitch

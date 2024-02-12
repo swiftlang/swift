@@ -18,6 +18,9 @@
 
 namespace llvm {
 class MemoryBuffer;
+namespace vfs{
+class OutputBackend;
+}
 }
 
 namespace swift {
@@ -36,9 +39,9 @@ using llvm::BCVBR;
 
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 4;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 5; // optionalModuleImports
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -121,7 +124,8 @@ using ModuleInfoLayout =
                    IdentifierIDField,            // moduleName
                    ContextHashIDField,           // contextHash
                    ImportArrayIDField,           // moduleImports
-                   DependencyIDArrayIDField      // resolvedModuleDependencies
+                   ImportArrayIDField,           // optionalModuleImports
+                   DependencyIDArrayIDField      // resolvedDirectModuleDependencies
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =
@@ -136,7 +140,11 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDField,                         // bridgingHeaderFile
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
-                   FileIDArrayIDField                   // bridgingModuleDependencies
+                   FileIDArrayIDField,                  // bridgingModuleDependencies
+                   DependencyIDArrayIDField,            // swiftOverlayDependencies
+                   IdentifierIDField,                   // CASFileSystemRootID
+                   IdentifierIDField,                   // bridgingHeaderIncludeTree
+                   IdentifierIDField                    // moduleCacheKey
                    >;
 
 using SwiftSourceModuleDetailsLayout =
@@ -145,7 +153,12 @@ using SwiftSourceModuleDetailsLayout =
                    FileIDField,                      // bridgingHeaderFile
                    FileIDArrayIDField,               // sourceFiles
                    FileIDArrayIDField,               // bridgingSourceFiles
-                   FileIDArrayIDField                // bridgingModuleDependencies
+                   FileIDArrayIDField,               // bridgingModuleDependencies
+                   DependencyIDArrayIDField,         // swiftOverlayDependencies
+                   IdentifierIDField,                // CASFileSystemRootID
+                   IdentifierIDField,                // bridgingHeaderIncludeTree
+                   FlagIDArrayIDField,               // buildCommandLine
+                   FlagIDArrayIDField                // bridgingHeaderBuildCommandLine
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
@@ -153,7 +166,10 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // compiledModulePath
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
-                   IsFrameworkField                  // isFramework
+                   DependencyIDArrayIDField,         // swiftOverlayDependencies
+                   ImportArrayIDField,               // headerImports
+                   IsFrameworkField,                 // isFramework
+                   IdentifierIDField                 // moduleCacheKey
                    >;
 
 using SwiftPlaceholderModuleDetailsLayout =
@@ -170,7 +186,10 @@ using ClangModuleDetailsLayout =
                    ContextHashIDField,        // contextHash
                    FlagIDArrayIDField,        // commandLine
                    FileIDArrayIDField,        // fileDependencies
-                   FlagIDArrayIDField         // capturedPCMArgs
+                   FlagIDArrayIDField,        // capturedPCMArgs
+                   IdentifierIDField,         // CASFileSystemRootID
+                   IdentifierIDField,         // clangIncludeTreeRoot
+                   IdentifierIDField          // moduleCacheKey
                    >;
 } // namespace graph_block
 
@@ -187,6 +206,7 @@ bool readInterModuleDependenciesCache(llvm::StringRef path,
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
 bool writeInterModuleDependenciesCache(DiagnosticEngine &diags,
+                                       llvm::vfs::OutputBackend &backend,
                                        llvm::StringRef path,
                                        const SwiftDependencyScanningService &cache);
 

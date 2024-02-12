@@ -149,14 +149,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// For example, in the code below,
 /// nothing is canceled and the group doesn't throw an error:
 ///
-///     try await withThrowingTaskGroup { group in
+///     try await withThrowingTaskGroup(of: Void.self) { group in
 ///         group.addTask { throw SomeError() }
 ///     }
 ///
 /// In contrast, this example throws `SomeError`
 /// and cancels all of the tasks in the group:
 ///
-///     try await withThrowingTaskGroup { group in
+///     try await withThrowingTaskGroup(of: Void.self) { group in
 ///         group.addTask { throw SomeError() }
 ///         try await group.next()
 ///     }
@@ -272,14 +272,15 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
-    )
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false)
 #endif
 
     // Create the task in this group.
@@ -314,14 +315,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false
-    )
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
-    )
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
 #endif
 
     // Create the task in this group.
@@ -354,8 +355,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
-    )
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -394,8 +395,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
-    )
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -632,6 +633,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     } catch {
   ///         // other errors though we print and cancel the group,
   ///         // and all of the remaining child tasks within it.
+  ///         print("Error: \(error)")
   ///         group.cancelAll()
   ///     }
   /// }
@@ -681,7 +683,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false
     )
 
     // Create the task in this group.
@@ -719,8 +722,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
-    )
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -755,8 +758,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true
-    )
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -798,8 +801,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false
-    )
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -1138,6 +1141,36 @@ extension ThrowingTaskGroup: AsyncSequence {
       }
     }
 
+    /// Advances to and returns the result of the next child task.
+    ///
+    /// The elements returned from this method
+    /// appear in the order that the tasks *completed*,
+    /// not in the order that those tasks were added to the task group.
+    /// After this method returns `nil`,
+    /// this iterator is guaranteed to never produce more values.
+    ///
+    /// For more information about the iteration order and semantics,
+    /// see `ThrowingTaskGroup.next()`
+    ///
+    /// - Throws: The error thrown by the next child task that completes.
+    ///
+    /// - Returns: The value returned by the next child task that completes,
+    ///   or `nil` if there are no remaining child tasks,
+    @available(SwiftStdlib 5.11, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
+      guard !finished else { return nil }
+      do {
+        guard let element = try await group.next() else {
+          finished = true
+          return nil
+        }
+        return element
+      } catch {
+        finished = true
+        throw error as! Failure
+      }
+    }
+    
     public mutating func cancel() {
       finished = true
       group.cancelAll()
@@ -1177,6 +1210,10 @@ func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
 func _taskHasTaskGroupStatusRecord() -> Bool
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_hasTaskExecutorStatusRecord")
+func _taskHasTaskExecutorStatusRecord() -> Bool
 
 @available(SwiftStdlib 5.1, *)
 enum PollStatus: Int {

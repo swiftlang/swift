@@ -17,6 +17,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Version.h"
 
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -65,6 +66,7 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
   /// Look up a local type declaration by its mangled name.
@@ -121,7 +123,7 @@ public:
   /// collecting the identifiers in \p spiGroups.
   virtual void lookupImportedSPIGroups(
                             const ModuleDecl *importedModule,
-                            SmallSetVector<Identifier, 4> &spiGroups) const {};
+                            llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
   /// Checks whether this file imports \c module as \c @_weakLinked.
   virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {
@@ -134,8 +136,10 @@ public:
     return false;
   }
 
-  virtual Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) const { return None; }
+  virtual llvm::Optional<Fingerprint>
+  loadFingerprint(const IterableDeclContext *IDC) const {
+    return llvm::None;
+  }
 
 protected:
   /// Look up an operator declaration. Do not call directly, use
@@ -160,35 +164,35 @@ public:
   ///
   /// This function is an implementation detail for comment serialization.
   /// If you just want to get a comment attached to a decl, use
-  /// \c Decl::getRawComment() or \c Decl::getBriefComment().
-  virtual Optional<CommentInfo>
-  getCommentForDecl(const Decl *D) const {
-    return None;
+  /// \c Decl::getRawComment() or \c Decl::getSemanticBriefComment().
+  virtual llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const {
+    return llvm::None;
   }
 
-  virtual Optional<StringRef>
-  getGroupNameForDecl(const Decl *D) const {
-    return None;
+  /// For a serialized AST file, returns \c true if an adjacent swiftdoc has been
+  /// loaded. Otherwise, returns \c false.
+  virtual bool hasLoadedSwiftDoc() const { return false; }
+
+  virtual llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const {
+    return llvm::None;
   }
 
-  virtual Optional<StringRef>
+  virtual llvm::Optional<StringRef>
   getSourceFileNameForDecl(const Decl *D) const {
-    return None;
+    return llvm::None;
   }
 
-  virtual Optional<unsigned>
-  getSourceOrderForDecl(const Decl *D) const {
-    return None;
+  virtual llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const {
+    return llvm::None;
   }
 
-  virtual Optional<StringRef>
-  getGroupNameByUSR(StringRef USR) const {
-    return None;
+  virtual llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const {
+    return llvm::None;
   }
 
-  virtual Optional<ExternalSourceLocs::RawLocs>
+  virtual llvm::Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const {
-    return None;
+    return llvm::None;
   }
 
   virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}
@@ -200,7 +204,7 @@ public:
   /// Since this value is used in name mangling, it should be a valid ASCII-only
   /// identifier.
   virtual Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
+  getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
 
   virtual bool shouldCollectDisplayDecls() const { return true; }
 
@@ -209,6 +213,14 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
+
+  /// Finds all top-level decls in this file with their auxiliary decls such as
+  /// macro expansions.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getTopLevelDeclsWithAuxiliaryDecls(
+      SmallVectorImpl<Decl*> &results) const;
 
   virtual void
   getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
@@ -285,6 +297,9 @@ public:
   /// imports.
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
+
+  /// Load extra dependencies of this module to satisfy a testable import.
+  virtual void loadDependenciesForTestable(SourceLoc diagLoc) const {}
 
   /// Returns the path of the file or directory that defines the module
   /// represented by this \c FileUnit, or empty string if there is none.
@@ -370,6 +385,7 @@ public:
   explicit BuiltinUnit(ModuleDecl &M);
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   /// Find all Objective-C methods with the given selector.
@@ -378,7 +394,7 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
+  getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private values in the Builtin module");
   }
 
@@ -402,6 +418,10 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 public:
+  /// Returns the language version that was used to compile the contents of this
+  /// file. An empty `Version` is returned if the information is not available.
+  virtual version::Version getLanguageVersionBuiltWith() const = 0;
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
@@ -420,7 +440,7 @@ public:
     return getModuleDefiningPath();
   }
 
-  virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
+  virtual StringRef getFilenameForPrivateDecl(const Decl *decl) const {
     return StringRef();
   }
 

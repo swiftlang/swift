@@ -1,4 +1,5 @@
-// RUN: %target-build-swift -target %sanitizers-target-triple -sanitize=thread %s -o %t_binary
+// RUN: %target-build-swift -sanitize=thread %s -o %t_binary
+// RUN: %target-codesign %t_binary
 // RUN: %env-TSAN_OPTIONS=halt_on_error=1 %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test

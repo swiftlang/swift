@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol NeedsF0 {
-  func f0() // expected-note {{protocol requires function 'f0()' with type '() -> ()'; do you want to add a stub?}}
+  func f0() // expected-note {{protocol requires function 'f0()' with type '() -> ()'; add a stub for conformance}}
 }
 
 struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protocol 'NeedsF0'}}

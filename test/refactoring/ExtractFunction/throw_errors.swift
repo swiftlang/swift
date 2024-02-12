@@ -26,3 +26,4 @@ func foo2() throws {
 // RUN: diff -u %S/Outputs/throw_errors/L10-12.swift.expected %t.result/L10-12.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=13:1 -end-pos=17:4 >> %t.result/L13-17.swift
 // RUN: diff -u %S/Outputs/throw_errors/L13-17.swift.expected %t.result/L13-17.swift
+// REQUIRES: swift_swift_parser

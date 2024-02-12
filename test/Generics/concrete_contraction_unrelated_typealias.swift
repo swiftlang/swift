@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // Another GenericSignatureBuilder oddity, reduced from RxSwift.
 //
@@ -27,8 +27,8 @@ class GenericDelegateProxy<P : AnyObject, D> {
   // CHECK-NEXT: <P, D, Proxy where P == Proxy.[DelegateProxyType]Parent, D == Proxy.[DelegateProxyType]Delegate, Proxy : GenericDelegateProxy<P, D>, Proxy : DelegateProxyType>
   init<Proxy: DelegateProxyType>(_: Proxy.Type)
     where Proxy: GenericDelegateProxy<P, D>,
-          Proxy.Parent == P, // expected-warning {{redundant same-type constraint 'GenericDelegateProxy<P, D>.Parent' (aka 'P') == 'P'}}
-          Proxy.Delegate == D {} // expected-warning {{redundant same-type constraint 'GenericDelegateProxy<P, D>.Delegate' (aka 'D') == 'D'}}
+          Proxy.Parent == P,
+          Proxy.Delegate == D {}
 }
 
 class SomeClass {}

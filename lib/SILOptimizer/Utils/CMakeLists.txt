@@ -20,10 +20,10 @@ target_sources(swiftSILOptimizer PRIVATE
   KeyPathProjector.cpp
   LexicalDestroyFolding.cpp
   LexicalDestroyHoisting.cpp
-  LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
   PartialApplyCombiner.cpp
+  PartitionUtils.cpp
   PerformanceInlinerUtils.cpp
   ShrinkBorrowScope.cpp
   SILInliner.cpp
@@ -31,4 +31,5 @@ target_sources(swiftSILOptimizer PRIVATE
   SpecializationMangler.cpp
   StackNesting.cpp
   ValueLifetime.cpp
+  VariableNameUtils.cpp
   OwnershipOptUtils.cpp)

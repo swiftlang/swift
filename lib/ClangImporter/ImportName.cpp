@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
+#include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Parser.h"
@@ -45,6 +47,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Import Name"
@@ -188,7 +191,7 @@ static bool isIntegerType(clang::QualType clangType) {
   return false;
 }
 
-static Optional<ForeignErrorConvention::Kind>
+static llvm::Optional<ForeignErrorConvention::Kind>
 classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
                             OptionalTypeKind resultOptionality) {
   // TODO: opt out any non-standard methods here?
@@ -198,7 +201,7 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
   if (auto attr = clangDecl->getAttr<clang::SwiftErrorAttr>()) {
     switch (attr->getConvention()) {
     case clang::SwiftErrorAttr::None:
-      return None;
+      return llvm::None;
 
     case clang::SwiftErrorAttr::NonNullError:
       return ForeignErrorConvention::NonNilError;
@@ -210,7 +213,7 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
           swift::canImportAsOptional(
             clangDecl->getReturnType().getTypePtrOrNull()))
         return ForeignErrorConvention::NilResult;
-      return None;
+      return llvm::None;
 
     // Preserve the original result type on a zero_result unless we
     // imported it as Bool.
@@ -220,14 +223,14 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
       } else if (isIntegerType(clangDecl->getReturnType())) {
         return ForeignErrorConvention::ZeroPreservedResult;
       }
-      return None;
+      return llvm::None;
 
     // There's no reason to do the same for nonzero_result because the
     // only meaningful value remaining would be zero.
     case clang::SwiftErrorAttr::NonZeroResult:
       if (isIntegerType(clangDecl->getReturnType()))
         return ForeignErrorConvention::NonZeroResult;
-      return None;
+      return llvm::None;
     }
     llvm_unreachable("bad swift_error kind");
   }
@@ -246,7 +249,7 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
     return ForeignErrorConvention::NilResult;
   }
 
-  return None;
+  return llvm::None;
 }
 
 static const char ErrorSuffix[] = "AndReturnError";
@@ -257,10 +260,8 @@ static const char AltErrorSuffix[] = "WithError";
 /// \param method The Clang method.
 static OptionalTypeKind getResultOptionality(
                           const clang::ObjCMethodDecl *method) {
-  auto &clangCtx = method->getASTContext();
-
   // If nullability is available on the type, use it.
-  if (auto nullability = method->getReturnType()->getNullability(clangCtx)) {
+  if (auto nullability = method->getReturnType()->getNullability()) {
     return translateNullability(*nullability);
   }
 
@@ -334,6 +335,8 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
   bool isSetter = false;
   switch (name.getAccessorKind()) {
   case ImportedAccessorKind::None:
+  case ImportedAccessorKind::DereferenceGetter:
+  case ImportedAccessorKind::DereferenceSetter:
     break;
 
   case ImportedAccessorKind::PropertyGetter:
@@ -469,29 +472,31 @@ StringRef importer::stripNotification(StringRef name) {
 /// Match the name of the given Objective-C method to its enclosing class name
 /// to determine the name prefix that would be stripped if the class method
 /// were treated as an initializer.
-static Optional<unsigned>
+static llvm::Optional<unsigned>
 matchFactoryAsInitName(const clang::ObjCMethodDecl *method) {
   // Only class methods can be mapped to initializers in this way.
-  if (!method->isClassMethod()) return None;
+  if (!method->isClassMethod())
+    return llvm::None;
 
   // Said class methods must be in an actual class.
   auto objcClass = method->getClassInterface();
-  if (!objcClass) return None;
+  if (!objcClass)
+    return llvm::None;
 
   // See if we can match the class name to the beginning of the first
   // selector piece.
   auto firstPiece = method->getSelector().getNameForSlot(0);
   if (firstPiece.empty())
-    return None;
+    return llvm::None;
   StringRef firstArgLabel = matchLeadingTypeName(firstPiece,
                                                  objcClass->getName());
   if (firstArgLabel.size() == firstPiece.size())
-    return None;
+    return llvm::None;
 
   // FIXME: Factory methods cannot have dummy parameters added for
   // historical reasons.
   if (!firstArgLabel.empty() && method->getSelector().getNumArgs() == 0)
-    return None;
+    return llvm::None;
 
   // Return the prefix length.
   return firstPiece.size() - firstArgLabel.size();
@@ -499,7 +504,7 @@ matchFactoryAsInitName(const clang::ObjCMethodDecl *method) {
 
 /// Determine the kind of initializer the given factory method could be mapped
 /// to, or produce \c None.
-static Optional<CtorInitializerKind>
+static llvm::Optional<CtorInitializerKind>
 determineFactoryInitializerKind(const clang::ObjCMethodDecl *method) {
   // Determine whether we have a suitable return type.
   if (method->hasRelatedResultType()) {
@@ -511,12 +516,13 @@ determineFactoryInitializerKind(const clang::ObjCMethodDecl *method) {
   if (auto objcPtr = method->getReturnType()
                        ->getAs<clang::ObjCObjectPointerType>()) {
     auto objcClass = method->getClassInterface();
-    if (!objcClass) return None;
+    if (!objcClass)
+      return llvm::None;
 
     if (objcPtr->getInterfaceDecl() != objcClass) {
       // FIXME: Could allow a subclass here, but the rest of the compiler
       // isn't prepared for that yet.
-      return None;
+      return llvm::None;
     }
 
     // Factory initializer.
@@ -524,7 +530,7 @@ determineFactoryInitializerKind(const clang::ObjCMethodDecl *method) {
   }
 
   // Not imported as an initializer.
-  return None;
+  return llvm::None;
 }
 
 namespace {
@@ -547,7 +553,7 @@ struct AnySwiftNameAttr {
 ///
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
 struct VersionedSwiftNameInfo {
-  Optional<AnySwiftNameAttr> Attr;
+  llvm::Optional<AnySwiftNameAttr> Attr;
   llvm::VersionTuple Version;
   bool IsReplacedByActive;
 };
@@ -597,22 +603,23 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
   return VersionedSwiftNameAction::Use;
 }
 
-static Optional<AnySwiftNameAttr>
+static llvm::Optional<AnySwiftNameAttr>
 findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 #ifndef NDEBUG
-  if (Optional<const clang::Decl *> def = getDefinitionForClangTypeDecl(decl)) {
+  if (llvm::Optional<const clang::Decl *> def =
+          getDefinitionForClangTypeDecl(decl)) {
     assert((*def == nullptr || *def == decl) &&
            "swift_name should only appear on the definition");
   }
 #endif
 
   if (version == ImportNameVersion::raw())
-    return None;
+    return llvm::None;
 
   /// Decode the given Clang attribute to try to determine whether it is
   /// a Swift name attribute.
   auto decodeAttr =
-      [&](const clang::Attr *attr) -> Optional<AnySwiftNameAttr> {
+      [&](const clang::Attr *attr) -> llvm::Optional<AnySwiftNameAttr> {
     if (version.supportsConcurrency()) {
       if (auto asyncAttr = dyn_cast<clang::SwiftAsyncNameAttr>(attr)) {
         return AnySwiftNameAttr { asyncAttr->getName(), /*isAsync=*/true };
@@ -623,7 +630,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
       return AnySwiftNameAttr { nameAttr->getName(), /*isAsync=*/false };
     }
 
-    return None;
+    return llvm::None;
   };
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
@@ -635,7 +642,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
         version = ImportNameVersion::swift4_2();
 
     // Dig out the attribute that specifies the Swift name.
-    Optional<AnySwiftNameAttr> activeAttr;
+    llvm::Optional<AnySwiftNameAttr> activeAttr;
     if (auto asyncAttr = decl->getAttr<clang::SwiftAsyncNameAttr>())
       activeAttr = decodeAttr(asyncAttr);
     if (!activeAttr) {
@@ -659,7 +666,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
       }
     }
 
-    Optional<AnySwiftNameAttr> result = activeAttr;
+    llvm::Optional<AnySwiftNameAttr> result = activeAttr;
     llvm::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
@@ -676,7 +683,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
                    dyn_cast<clang::SwiftVersionedRemovalAttr>(attr)) {
         if (removeAttr->getAttrKindToRemove() != clang::attr::SwiftName)
           continue;
-        info = {None, removeAttr->getVersion(),
+        info = {llvm::None, removeAttr->getVersion(),
                 removeAttr->getIsReplacedByActive()};
 
       } else {
@@ -715,11 +722,13 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   // The remainder of this function emulates the limited form of swift_name
   // supported in Swift 2.
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
-  if (!attr) return None;
+  if (!attr)
+    return llvm::None;
 
   // API notes produce attributes with no source location; ignore them because
   // they weren't used for naming in Swift 2.
-  if (attr->getLocation().isInvalid()) return None;
+  if (attr->getLocation().isInvalid())
+    return llvm::None;
 
   // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
@@ -729,7 +738,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     // Foundation's NSXMLDTDKind had an explicit swift_name attribute in
     // Swift 2. Honor it.
     if (enumerator->getName() == "NSXMLDTDKind") return decodeAttr(attr);
-    return None;
+    return llvm::None;
   }
 
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
@@ -739,17 +748,17 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
       // method into an initializer.
       if (method->isClassMethod()) return decodeAttr(attr);
 
-      return None;
+      return llvm::None;
     }
 
     // Special case: preventing a mapping to an initializer.
     if (matchFactoryAsInitName(method) && determineFactoryInitializerKind(method))
       return decodeAttr(attr);
 
-    return None;
+    return llvm::None;
   }
 
-  return None;
+  return llvm::None;
 }
 
 /// Determine whether the given class method should be imported as
@@ -768,8 +777,8 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
   return FactoryAsInitKind::Infer;
 }
 
-Optional<CtorInitializerKind> determineCtorInitializerKind(
-    const clang::ObjCMethodDecl *method) {
+llvm::Optional<CtorInitializerKind>
+determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   const clang::ObjCInterfaceDecl *interface = method->getClassInterface();
 
   if (isInitMethod(method)) {
@@ -786,7 +795,7 @@ Optional<CtorInitializerKind> determineCtorInitializerKind(
   if (method->isClassMethod())
     return determineFactoryInitializerKind(method);
 
-  return None;
+  return llvm::None;
 }
 
 /// Determine whether this Objective-C method should be imported as
@@ -845,9 +854,10 @@ static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
-    Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    Optional<unsigned> completionHandlerIndex,
-    Optional<StringRef> completionHandlerName, NameImporter &nameImporter) {
+    llvm::Optional<unsigned> errorParamIndex, bool returnsSelf,
+    bool isInstanceMethod, llvm::Optional<unsigned> completionHandlerIndex,
+    llvm::Optional<StringRef> completionHandlerName,
+    NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
@@ -1106,18 +1116,19 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   return false;
 }
 
-Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
-    const clang::ObjCMethodDecl *clangDecl, StringRef &baseName,
-    SmallVectorImpl<StringRef> &paramNames,
-    ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
-    bool hasCustomName) {
+llvm::Optional<ForeignErrorConvention::Info>
+NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
+                                  StringRef &baseName,
+                                  SmallVectorImpl<StringRef> &paramNames,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isInitializer, bool hasCustomName) {
   // If the declaration name isn't parallel to the actual parameter
   // list (e.g. if the method has C-style parameter declarations),
   // don't try to apply error conventions.
   bool expectsToRemoveError =
       hasCustomName && paramNames.size() + 1 == params.size();
   if (!expectsToRemoveError && paramNames.size() != params.size())
-    return None;
+    return llvm::None;
 
   for (unsigned index = params.size(); index-- != 0; ) {
     // Allow an arbitrary number of trailing blocks.
@@ -1132,7 +1143,8 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
     auto errorKind =
       classifyMethodErrorHandling(clangDecl,
                                   getResultOptionality(clangDecl));
-    if (!errorKind) return None;
+    if (!errorKind)
+      return llvm::None;
 
     // Consider adjusting the imported declaration name to remove the
     // parameter.
@@ -1173,11 +1185,11 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
       if (index == 0 && suffixToStrip.empty()) {
-        return None;
+        return llvm::None;
 
-      // If there was a conflict stripping an error suffix, adjust the
-      // name but don't change the base name.  This avoids creating a
-      // spurious _: () argument.
+        // If there was a conflict stripping an error suffix, adjust the
+        // name but don't change the base name.  This avoids creating a
+        // spurious _: () argument.
       } else if (index == 0 && !suffixToStrip.empty()) {
         suffixToStrip = {};
         baseName = origBaseName;
@@ -1202,7 +1214,7 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
   }
 
   // Didn't find an error parameter.
-  return None;
+  return llvm::None;
 }
 
 bool swift::isCompletionHandlerParamName(StringRef paramName) {
@@ -1215,8 +1227,7 @@ bool swift::isCompletionHandlerParamName(StringRef paramName) {
 }
 
 // Determine whether the given type is a nullable NSError type.
-static bool isNullableNSErrorType(
-    clang::ASTContext &clangCtx, clang::QualType type) {
+static bool isNullableNSErrorType(clang::QualType type) {
   auto objcPtrType = type->getAs<clang::ObjCObjectPointerType>();
   if (!objcPtrType)
     return false;
@@ -1226,7 +1237,7 @@ static bool isNullableNSErrorType(
     return false;
 
   // If nullability is specified, check it.
-  if (auto nullability = type->getNullability(clangCtx)) {
+  if (auto nullability = type->getNullability()) {
     switch (translateNullability(*nullability)) {
     case OTK_None:
       return false;
@@ -1241,22 +1252,19 @@ static bool isNullableNSErrorType(
   return true;
 }
 
-Optional<ForeignAsyncConvention::Info>
-NameImporter::considerAsyncImport(
-    const clang::ObjCMethodDecl *clangDecl,
-    StringRef baseName,
+llvm::Optional<ForeignAsyncConvention::Info> NameImporter::considerAsyncImport(
+    const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
     SmallVectorImpl<StringRef> &paramNames,
-    ArrayRef<const clang::ParmVarDecl *> params,
-    bool isInitializer,
-    Optional<unsigned> explicitCompletionHandlerParamIndex,
+    ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
+    llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
     CustomAsyncName customName,
-    Optional<unsigned> completionHandlerFlagParamIndex,
+    llvm::Optional<unsigned> completionHandlerFlagParamIndex,
     bool completionHandlerFlagIsZeroOnError,
-    Optional<ForeignErrorConvention::Info> errorInfo) {
+    llvm::Optional<ForeignErrorConvention::Info> errorInfo) {
   // If there are no unclaimed parameters, there's no .
   unsigned errorParamAdjust = errorInfo ? 1 : 0;
   if (params.size() - errorParamAdjust == 0)
-    return None;
+    return llvm::None;
 
   // When there is a custom async name, it will have removed the completion
   // handler parameter already.
@@ -1268,7 +1276,7 @@ NameImporter::considerAsyncImport(
   // was incorrect.
   if (params.size() !=
           paramNames.size() + errorParamAdjust + customAsyncNameAdjust)
-    return None;
+    return llvm::None;
 
   // If we don't already know the completion handler parameter index, go
   // try to figure it out.
@@ -1305,7 +1313,7 @@ NameImporter::considerAsyncImport(
               params[completionHandlerParamIndex]->getName()))
         break;
 
-      return None;
+      return llvm::None;
 
     case CustomAsyncName::SwiftAsyncName:
       // Having a custom async name implies that this is a completion handler.
@@ -1319,14 +1327,14 @@ NameImporter::considerAsyncImport(
   // Used for returns once we've determined that the method cannot be
   // imported as async, even though it has what looks like a completion handler
   // parameter.
-  auto notAsync = [&](const char *reason) ->
-      Optional<ForeignAsyncConvention::Info> {
+  auto notAsync =
+      [&](const char *reason) -> llvm::Optional<ForeignAsyncConvention::Info> {
 #ifdef ASYNC_IMPORT_DEBUG
     llvm::errs() << "*** failed async import: " << reason << "\n";
     clangDecl->dump(llvm::errs());
 #endif
 
-    return None;
+    return llvm::None;
   };
 
   // Initializers cannot be 'async'.
@@ -1372,7 +1380,7 @@ NameImporter::considerAsyncImport(
   // Scan the parameters of the block type to look for a parameter of a
   // nullable NSError type, which would indicate that the async method could
   // throw.
-  Optional<unsigned> completionHandlerErrorParamIndex;
+  llvm::Optional<unsigned> completionHandlerErrorParamIndex;
 
   ArrayRef<clang::QualType> completionHandlerParamTypes;
   if (auto prototype = completionHandlerFunctionType
@@ -1380,12 +1388,11 @@ NameImporter::considerAsyncImport(
     completionHandlerParamTypes = prototype->getParamTypes();
   }
 
-  auto &clangCtx = clangDecl->getASTContext();
   for (unsigned paramIdx : indices(completionHandlerParamTypes)) {
     auto paramType = completionHandlerParamTypes[paramIdx];
 
     // We are only interested in nullable NSError parameters.
-    if (!isNullableNSErrorType(clangCtx, paramType))
+    if (!isNullableNSErrorType(paramType))
       continue;
 
     // If this is the first nullable error parameter, note that.
@@ -1395,7 +1402,7 @@ NameImporter::considerAsyncImport(
     }
 
     // More than one nullable NSError parameter. Don't import as throwing.
-    completionHandlerErrorParamIndex = None;
+    completionHandlerErrorParamIndex = llvm::None;
     break;
   }
 
@@ -1515,10 +1522,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+  // If this is a using declaration, import the name of the shadowed decl and
+  // adjust the context.
+  if (auto usingShadowDecl = dyn_cast<clang::UsingShadowDecl>(D)) {
+    auto targetDecl = usingShadowDecl->getTargetDecl();
+    if (isa<clang::CXXMethodDecl>(targetDecl)) {
+      ImportedName baseName = importName(targetDecl, version, givenName);
+      baseName.effectiveContext = effectiveCtx;
+      return baseName;
+    }
+  }
+
   // Gather information from the swift_async attribute, if there is one.
-  Optional<unsigned> completionHandlerParamIndex;
+  llvm::Optional<unsigned> completionHandlerParamIndex;
   bool completionHandlerFlagIsZeroOnError = false;
-  Optional<unsigned> completionHandlerFlagParamIndex;
+  llvm::Optional<unsigned> completionHandlerFlagParamIndex;
   if (version.supportsConcurrency()) {
     if (const auto *swiftAsyncAttr = D->getAttr<clang::SwiftAsyncAttr>()) {
       // If this is swift_async(none), don't import as async at all.
@@ -1848,7 +1866,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName:
+  case clang::DeclarationName::CXXConversionFunctionName: {
+    auto conversionDecl = dyn_cast<clang::CXXConversionDecl>(D);
+    if (!conversionDecl)
+      return ImportedName();
+    auto toType = conversionDecl->getConversionType();
+    // Only import `operator bool()` for now.
+    if (toType->isBooleanType()) {
+      isFunction = true;
+      baseName = "__convertToBool";
+      addEmptyArgNamesForClangFunction(conversionDecl, argumentNames);
+      break;
+    }
+    return ImportedName();
+  }
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
@@ -1897,6 +1928,19 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       baseName = swiftCtx.getIdentifier(operatorName).str();
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
+        if (op == clang::OverloadedOperatorKind::OO_Star &&
+            cxxMethod->param_empty()) {
+          auto returnType = functionDecl->getReturnType();
+          if ((!returnType->isReferenceType() &&
+               !returnType->isAnyPointerType()) ||
+              returnType->isAnyPointerType() ||
+              returnType->getPointeeType().isConstQualified())
+            result.info.accessorKind = ImportedAccessorKind::DereferenceGetter;
+          else
+            result.info.accessorKind = ImportedAccessorKind::DereferenceSetter;
+        }
+      }
       break;
     }
     case clang::OverloadedOperatorKind::OO_Call:
@@ -2182,58 +2226,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
                             version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
-      // When constructing the name of a C++ template, don't expand all the
-      // template, only expand one layer. Here we want to prioritize
-      // readability over total completeness.
-      llvm::SmallString<128> storage;
-      llvm::raw_svector_ostream buffer(storage);
-      D->printName(buffer);
-      buffer << "<";
-      llvm::interleaveComma(classTemplateSpecDecl->getTemplateArgs().asArray(),
-                            buffer,
-                            [&buffer, this, version](const clang::TemplateArgument& arg) {
-        // Use import name here so builtin types such as "int" map to their
-        // Swift equivalent ("Int32").
-        if (arg.getKind() == clang::TemplateArgument::Type) {
-          auto ty = arg.getAsType().getTypePtr();
-          if (auto builtin = dyn_cast<clang::BuiltinType>(ty)) {
-            auto &ctx = swiftCtx;
-            Type swiftType = nullptr;
-            switch (builtin->getKind()) {
-            case clang::BuiltinType::Void:
-              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(), "Void");
-              break;
-      #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
-            case clang::BuiltinType::CLANG_BUILTIN_KIND:                       \
-              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(),         \
-                                                #SWIFT_TYPE_NAME);             \
-              break;
-      #define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)      \
-            case clang::BuiltinType::CLANG_BUILTIN_KIND:                       \
-              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(),         \
-                                                #SWIFT_TYPE_NAME);             \
-              break;
-      #include "swift/ClangImporter/BuiltinMappedTypes.def"
-              default:
-                break;
-            }
-            
-            if (swiftType) {
-              if (auto nominal = dyn_cast<NominalType>(swiftType->getCanonicalType())) {
-                buffer << nominal->getDecl()->getNameStr();
-                return;
-              }
-            }
-          } else if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(ty->getAsTagDecl())) {
-            importNameImpl(namedArg, version, clang::DeclarationName()).getDeclName().print(buffer);
-            return;
-          }
-        }
-        buffer << "_";
-      });
-      buffer << ">";
-
-      baseName = swiftCtx.getIdentifier(buffer.str()).get();
+      auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
+                                                       swiftCtx, this, version);
+      baseName = swiftCtx.getIdentifier(name).get();
     }
   }
 
@@ -2295,7 +2290,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                None, None, scratch);
+                                llvm::None, llvm::None, scratch);
       }
     }
 
@@ -2305,18 +2300,19 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
-              ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
-              : None,
+              ? llvm::Optional<unsigned>(
+                    static_cast<unsigned int>(result.getErrorInfo()->ErrorParameterIndex))
+              : llvm::None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().transform(
-            [](const ForeignAsyncConvention::Info &info) {
-              return info.completionHandlerParamIndex();
-            }),
-          result.getAsyncInfo().transform(
-            [&](const ForeignAsyncConvention::Info &info) {
-              return method->getDeclName().getObjCSelector().getNameForSlot(
-                                            info.completionHandlerParamIndex());
-            }),
+          swift::transform(result.getAsyncInfo(),
+              [](const ForeignAsyncConvention::Info &info) {
+                return info.completionHandlerParamIndex();
+              }),
+          swift::transform(result.getAsyncInfo(),
+              [&](const ForeignAsyncConvention::Info &info) {
+                return method->getDeclName().getObjCSelector().getNameForSlot(
+                    info.completionHandlerParamIndex());
+              }),
           *this);
     }
 
@@ -2395,6 +2391,14 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,
                                       const clang::MacroInfo *Macro) {
   return ::shouldIgnoreMacro(Name, Macro, Impl.getClangPreprocessor());
+}
+
+Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
+  auto baseName = declName.getBaseName();
+  if (!baseName.isSpecial())
+    return baseName.getIdentifier();
+
+  return ctx.getIdentifier(baseName.userFacingName());
 }
 
 Identifier

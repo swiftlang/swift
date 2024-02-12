@@ -30,11 +30,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${EXECINFO_LIBRARY}
       )
-  elseif(SWIFT_HOST_VARIANT STREQUAL windows)
+  elseif(SWIFT_HOST_VARIANT STREQUAL "windows")
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp;Synchronization)
   endif()
 
-  add_swift_unittest(SwiftRuntimeLongTests
+  add_swift_unittest(SwiftRuntimeLongTests IS_TARGET_TEST
     LongRefcounting.cpp
     ../Stdlib.cpp
     ${PLATFORM_SOURCES}

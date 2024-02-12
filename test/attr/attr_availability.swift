@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -module-name Test
 
 @available(*, unavailable)
 func unavailable_func() {}
@@ -203,6 +203,9 @@ struct DeprecatedTypeWithRename { }
 func use_deprecated_with_renamed() {
   deprecated_func_with_renamed() // expected-warning{{'deprecated_func_with_renamed()' is deprecated: renamed to 'blarg'}}
   // expected-note@-1{{use 'blarg'}}{{3-31=blarg}}
+
+  Test.deprecated_func_with_renamed() // expected-warning{{'deprecated_func_with_renamed()' is deprecated: renamed to 'blarg'}}
+  // expected-note@-1{{use 'blarg' instead}}
 
   deprecated_func_with_message_renamed() //expected-warning{{'deprecated_func_with_message_renamed()' is deprecated: blarg is your friend}}
   // expected-note@-1{{use 'blarg'}}{{3-39=blarg}}
@@ -1192,17 +1195,6 @@ func testBadRename() {
 
 struct AvailableGenericParam<@available(*, deprecated) T> {}
 // expected-error@-1 {{'@available' attribute cannot be applied to this declaration}}
-
-class UnavailableNoArgsSuperclassInit {
-  @available(*, unavailable)
-  init() {} // expected-note {{'init()' has been explicitly marked unavailable here}}
-}
-
-class UnavailableNoArgsSubclassInit: UnavailableNoArgsSuperclassInit {
-  init(marker: ()) {}
-  // expected-error@-1 {{'init()' is unavailable}}
-  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'UnavailableNoArgsSuperclassInit' occurs implicitly at the end of this initializer}}
-}
 
 struct TypeWithTrailingClosures {
   func twoTrailingClosures(a: () -> Void, b: () -> Void) {}

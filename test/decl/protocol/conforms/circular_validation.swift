@@ -4,7 +4,7 @@
 // not crash.
 
 protocol P {
-  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'; do you want to add a stub?}}
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'; add a stub for conformance}}
 }
 
 struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}

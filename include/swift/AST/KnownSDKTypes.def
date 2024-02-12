@@ -37,8 +37,15 @@ KNOWN_SDK_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl, 0)
 
 // TODO(async): These might move to the stdlib module when concurrency is
 // standardized
+KNOWN_SDK_TYPE_DECL(Concurrency, CheckedContinuation, NominalTypeDecl, 2)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 2)
 KNOWN_SDK_TYPE_DECL(Concurrency, MainActor, NominalTypeDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, Job, StructDecl, 0) // legacy type; prefer ExecutorJob
+KNOWN_SDK_TYPE_DECL(Concurrency, ExecutorJob, StructDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, UnownedJob, StructDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, Executor, NominalTypeDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, TaskExecutor, NominalTypeDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, SerialExecutor, NominalTypeDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnownedSerialExecutor, NominalTypeDecl, 0)
 
 KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)

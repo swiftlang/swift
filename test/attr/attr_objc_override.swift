@@ -15,11 +15,11 @@ class A {
     get { return ObjCClass() }  // expected-note{{subscript getter declared here}}
   }
 
-  func bar() { } // expected-note{{add '@objc' to make this declaration overridable}}{{3-3=@objc }}
+  func bar() { } // expected-note{{add '@objc' to make this declaration overridable}}{{38:3-3=@objc }}
 }
 
 extension A {
-  func foo() { } // expected-note{{add '@objc' to make this declaration overridable}}{{3-3=@objc }}
+  func foo() { } // expected-note{{add '@objc' to make this declaration overridable}}{{32:3-3=@objc }}
   func wibble(_: SwiftStruct) { } // expected-note{{overridden declaration is here}}
 }
 

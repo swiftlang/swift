@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
 
 // ---------------------------------------------------------------------------
 // Property wrapper type definitions
@@ -253,6 +253,9 @@ struct MultipleWrappers {
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
+
+  @Clamping(min: 0, max: 255) // expected-error 2{{property wrapper can only apply to a single variable}}
+  var a = 0, b = 0
 }
 
 // ---------------------------------------------------------------------------
@@ -617,6 +620,21 @@ public struct HasUsableFromInlineWrapper<T> {
   @InternalWrapper
   @usableFromInline
   var y: [T] = []
+  // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+}
+
+public struct HasUsableFromInlinePackageWrapper<T> {
+  @propertyWrapper
+  package struct PackageWrapper<U> { // expected-note{{type declared here}}
+    package var wrappedValue: U
+    package init(wrappedValue initialValue: U) {
+      self.wrappedValue = initialValue
+    }
+  }
+
+  @PackageWrapper
+  @usableFromInline
+  package var y: [T] = []
   // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
@@ -1323,7 +1341,7 @@ struct MissingPropertyWrapperUnwrap {
 
 struct InvalidPropertyDelegateUse {
   // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
-  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
+  @Foo var x: Int = 42 // expected-error@:21 {{extra argument 'wrappedValue' in call}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}

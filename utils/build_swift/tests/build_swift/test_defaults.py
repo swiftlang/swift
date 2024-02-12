@@ -36,7 +36,7 @@ except ImportError:
 _SYSCTL_HW_MEMSIZE = 17179869184
 _SYSCTL_HW_MEMSIZE_OUTPUT = 'hw.memsize: {}'.format(_SYSCTL_HW_MEMSIZE)
 
-# Safe upper bound to sanity check the LTO link job heuristics.
+# Safe upper bound to soundness check the LTO link job heuristics.
 _LTO_LINK_JOBS_UPPER_BOUND = 100
 
 

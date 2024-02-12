@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
@@ -530,6 +531,18 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   return B.createTupleExtract(Loc, AI, 0);
 }
 
+static SILValue getAdd(SILLocation Loc, SILValue Val, unsigned AddVal,
+                       SILBuilder &B) {
+  SmallVector<SILValue, 4> Args(1, Val);
+  Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), AddVal));
+  Args.push_back(B.createIntegerLiteral(
+      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
+
+  auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
+      Loc, "sadd_with_overflow", Args);
+  return B.createTupleExtract(Loc, AI, 0);
+}
+
 /// A canonical induction variable incremented by one from Start to End-1.
 struct InductionInfo {
   SILArgument *HeaderVal;
@@ -552,12 +565,12 @@ struct InductionInfo {
 
   SILInstruction *getInstruction() { return Inc; }
 
-  SILValue getFirstValue() {
-    return Start;
+  SILValue getFirstValue(SILLocation &Loc, SILBuilder &B, unsigned AddVal) {
+    return AddVal != 0 ? getAdd(Loc, Start, AddVal, B) : Start;
   }
 
-  SILValue getLastValue(SILLocation &Loc, SILBuilder &B) {
-    return getSub(Loc, End, 1, B);
+  SILValue getLastValue(SILLocation &Loc, SILBuilder &B, unsigned SubVal) {
+    return SubVal != 0 ? getSub(Loc, End, SubVal, B) : End;
   }
 
   /// If necessary insert an overflow for this induction variable.
@@ -718,8 +731,11 @@ static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
 /// induction variable.
 class AccessFunction {
   InductionInfo *Ind;
+  bool preIncrement;
 
-  AccessFunction(InductionInfo *I) { Ind = I; }
+  AccessFunction(InductionInfo *I, bool isPreIncrement = false)
+      : Ind(I), preIncrement(isPreIncrement) {}
+
 public:
 
   operator bool() { return Ind != nullptr; }
@@ -727,19 +743,52 @@ public:
   static AccessFunction getLinearFunction(SILValue Idx,
                                           InductionAnalysis &IndVars) {
     // Match the actual induction variable buried in the integer struct.
-    // %2 = struct $Int(%1 : $Builtin.Word)
-    //    = apply %check_bounds(%array, %2) : $@convention(thin) (Int, ArrayInt) -> ()
+    // bb(%ivar)
+    // %2 = struct $Int(%ivar : $Builtin.Word)
+    //    = apply %check_bounds(%array, %2) :
+    // or
+    // bb(%ivar1)
+    // %ivar2 = builtin "sadd_with_overflow_Int64"(%ivar1,...)
+    // %t = tuple_extract %ivar2
+    // %s = struct $Int(%t : $Builtin.Word)
+    //    = apply %check_bounds(%array, %s) :
+
+    bool preIncrement = false;
+
     auto ArrayIndexStruct = dyn_cast<StructInst>(Idx);
     if (!ArrayIndexStruct)
       return nullptr;
 
     auto AsArg =
         dyn_cast<SILArgument>(ArrayIndexStruct->getElements()[0]);
-    if (!AsArg)
-      return nullptr;
+
+    if (!AsArg) {
+      auto *TupleExtract =
+          dyn_cast<TupleExtractInst>(ArrayIndexStruct->getElements()[0]);
+
+      if (!TupleExtract) {
+        return nullptr;
+      }
+
+      auto *Builtin = dyn_cast<BuiltinInst>(TupleExtract->getOperand());
+      if (!Builtin || Builtin->getBuiltinKind() != BuiltinValueKind::SAddOver) {
+        return nullptr;
+      }
+
+      AsArg = dyn_cast<SILArgument>(Builtin->getArguments()[0]);
+      if (!AsArg) {
+        return nullptr;
+      }
+
+      auto *incrVal = dyn_cast<IntegerLiteralInst>(Builtin->getArguments()[1]);
+      if (!incrVal || incrVal->getValue() != 1)
+        return nullptr;
+
+      preIncrement = true;
+    }
 
     if (auto *Ind = IndVars[AsArg])
-      return AccessFunction(Ind);
+      return AccessFunction(Ind, preIncrement);
 
     return nullptr;
   }
@@ -759,7 +808,7 @@ public:
     SILBuilderWithScope Builder(Preheader->getTerminator(), AI);
 
     // Get the first induction value.
-    auto FirstVal = Ind->getFirstValue();
+    auto FirstVal = Ind->getFirstValue(Loc, Builder, preIncrement ? 1 : 0);
     // Clone the struct for the start index.
     auto Start = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                      ->clone(Preheader->getTerminator());
@@ -771,7 +820,7 @@ public:
     NewCheck->setOperand(1, Start);
 
     // Get the last induction value.
-    auto LastVal = Ind->getLastValue(Loc, Builder);
+    auto LastVal = Ind->getLastValue(Loc, Builder, preIncrement ? 0 : 1);
     // Clone the struct for the end index.
     auto End = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                    ->clone(Preheader->getTerminator());
@@ -1271,7 +1320,7 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
   Changed |= hoistChecksInLoop(DT->getNode(Header), ABC, IndVars, Preheader,
                                Header, SingleExitingBlk, /*recursionDepth*/ 0);
   if (Changed) {
-    Preheader->getParent()->verify();
+    Preheader->getParent()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
   }
   return Changed;
 }

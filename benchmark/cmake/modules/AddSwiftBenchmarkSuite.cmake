@@ -21,7 +21,7 @@ macro(configure_build)
     # thus allowing the --host-cc build-script argument to work here.
     get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
 
-    if(${c_compiler} STREQUAL "clang")
+    if(c_compiler STREQUAL "clang")
       set(CLANG_EXEC ${CMAKE_C_COMPILER})
     else()
       if(NOT SWIFT_DARWIN_XCRUN_TOOLCHAIN)
@@ -110,10 +110,10 @@ macro(configure_sdks_darwin)
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k" "arm64_32")
 
-  set(macosx_ver "10.9")
-  set(iphoneos_ver "8.0")
-  set(appletvos_ver "9.1")
-  set(watchos_ver "2.0")
+  set(macosx_ver "10.13")
+  set(iphoneos_ver "11.0")
+  set(appletvos_ver "11.0")
+  set(watchos_ver "4.0")
 
   set(macosx_vendor "apple")
   set(iphoneos_vendor "apple")
@@ -354,6 +354,7 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
+      "-module-cache-path" "${CMAKE_CURRENT_BINARY_DIR}/modulecache"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
       #"-Xfrontend" "-enable-experimental-feature"
       #"-Xfrontend" "LayoutPrespecialization")
@@ -713,7 +714,7 @@ function(swift_benchmark_compile)
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
     set(stdlib_dependencies "swift-frontend" "swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-    if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
       list(APPEND stdlib_dependencies "swiftDarwin-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
@@ -750,6 +751,26 @@ function(swift_benchmark_compile)
         DEPENDS ${platform_executables})
 
     if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE AND "${SWIFT_BENCHMARK_COMPILE_PLATFORM}" STREQUAL "macosx")
+      set(SWIFT_BENCHMARK_ARGS)
+      list(APPEND SWIFT_BENCHMARK_ARGS "--output-dir")
+      list(APPEND SWIFT_BENCHMARK_ARGS "${CMAKE_CURRENT_BINARY_DIR}/logs")
+      list(APPEND SWIFT_BENCHMARK_ARGS "--swift-repo")
+      list(APPEND SWIFT_BENCHMARK_ARGS "${SWIFT_SOURCE_DIR}")
+      list(APPEND SWIFT_BENCHMARK_ARGS "--architecture")
+      list(APPEND SWIFT_BENCHMARK_ARGS "${arch}")
+
+      set(SWIFT_O_BENCHMARK_ARGS)
+      if(DEFINED SWIFT_BENCHMARK_NUM_O_ITERATIONS)
+        list(APPEND SWIFT_O_BENCHMARK_ARGS "--independent-samples")
+        list(APPEND SWIFT_O_BENCHMARK_ARGS "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}")
+      endif()
+
+      set(SWIFT_ONONE_BENCHMARK_ARGS)
+      if(DEFINED SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS)
+        list(APPEND SWIFT_O_BENCHMARK_ARGS "--independent-samples")
+        list(APPEND SWIFT_O_BENCHMARK_ARGS "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}")
+      endif()
+
       add_custom_command(
           TARGET "${executable_target}"
           POST_BUILD
@@ -758,15 +779,13 @@ function(swift_benchmark_compile)
 
       add_custom_target("check-${executable_target}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
-                  "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
-                  "--architecture" "${arch}"
-                  "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--independent-samples" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
+                  "-o" "O"
+		  ${SWIFT_BENCHMARK_ARGS}
+		  ${SWIFT_O_BENCHMARK_ARGS}
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
-                  "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
-                  "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--architecture" "${arch}"
-                  "--independent-samples" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
+                  "-o" "Onone"
+		  ${SWIFT_BENCHMARK_ARGS}
+		  ${SWIFT_ONONE_BENCHMARK_ARGS}
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
                   "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"

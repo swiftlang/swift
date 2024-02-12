@@ -28,6 +28,7 @@ namespace swift {
   class ApplyExpr;
   class CallExpr;
   class ClosureExpr;
+  enum ContextualTypePurpose : uint8_t;
   class DeclContext;
   class Decl;
   class Expr;
@@ -37,10 +38,22 @@ namespace swift {
   class ValueDecl;
   class ForEachStmt;
 
+/// Diagnose any expressions that appear in an unsupported position. If visiting
+/// an expression directly, its \p contextualPurpose should be provided to
+/// evaluate its position.
+void diagnoseOutOfPlaceExprs(
+    ASTContext &ctx, ASTNode root,
+    llvm::Optional<ContextualTypePurpose> contextualPurpose);
+
 /// Emit diagnostics for syntactic restrictions on a given expression.
+///
+/// Note: \p contextualPurpose must be non-nil, unless
+/// \p disableOutOfPlaceExprChecking is set to \c true.
 void performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
-    bool isExprStmt, bool disableExprAvailabilityChecking = false);
+    llvm::Optional<ContextualTypePurpose> contextualPurpose,
+    bool isExprStmt, bool disableExprAvailabilityChecking = false,
+    bool disableOutOfPlaceExprChecking = false);
 
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -112,7 +125,7 @@ void diagnoseConstantArgumentRequirement(const Expr *expr,
 /// \returns true iff any fix-its were attached to \p diag.
 bool computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
-    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
+    llvm::function_ref<llvm::Optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
 void fixItEncloseTrailingClosure(ASTContext &ctx,
@@ -138,6 +151,11 @@ class BaseDiagnosticWalker : public ASTWalker {
 
   bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
     return false;
+  }
+
+  // Only emit diagnostics in the expansion of macros.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
 
 private:

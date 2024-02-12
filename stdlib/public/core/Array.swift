@@ -297,6 +297,7 @@
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
 @frozen
+@_eagerMove
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline
@@ -474,6 +475,10 @@ extension Array: _ArrayProtocol {
   public var capacity: Int {
     return _getCapacity()
   }
+
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
 
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
@@ -801,6 +806,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   
   /// The number of elements in the array.
   @inlinable
+  @_semantics("array.get_count")
   public var count: Int {
     return _getCount()
   }
@@ -1248,6 +1254,7 @@ extension Array: RangeReplaceableCollection {
 
     if _slowPath(writtenUpTo == buf.endIndex) {
 
+#if !$Embedded
       // A shortcut for appending an Array: If newElements is an Array then it's
       // guaranteed that buf.initialize(from: newElements) already appended all
       // elements. It reduces code size, because the following code
@@ -1257,6 +1264,7 @@ extension Array: RangeReplaceableCollection {
         _internalInvariant(remainder.next() == nil)
         return
       }
+#endif
 
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
@@ -1377,8 +1385,15 @@ extension Array: RangeReplaceableCollection {
     if !keepCapacity {
       _buffer = _Buffer()
     }
-    else {
+    else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
+    }
+    else {
+      let buffer = _ContiguousArrayBuffer<Element>(
+        _uninitializedCount: 0,
+        minimumCapacity: capacity
+      )
+      _buffer = _Buffer(_buffer: buffer, shiftedToStartIndex: startIndex)
     }
   }
 
@@ -1455,6 +1470,7 @@ extension Array: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
@@ -1949,6 +1965,7 @@ extension Array {
 }
 #endif
 
+@_unavailableInEmbedded
 extension Array: _HasCustomAnyHashableRepresentation
   where Element: Hashable {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
@@ -1956,11 +1973,13 @@ extension Array: _HasCustomAnyHashableRepresentation
   }
 }
 
+@_unavailableInEmbedded
 internal protocol _ArrayAnyHashableProtocol: _AnyHashableBox {
   var count: Int { get }
   subscript(index: Int) -> AnyHashable { get }
 }
 
+@_unavailableInEmbedded
 internal struct _ArrayAnyHashableBox<Element: Hashable>
   : _ArrayAnyHashableProtocol {
   internal let _value: [Element]

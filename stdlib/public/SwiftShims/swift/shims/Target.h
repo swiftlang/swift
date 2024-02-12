@@ -31,4 +31,15 @@
 # endif
 #endif
 
+// Is the target platform Darwin?
+#if __has_builtin(__is_target_os)
+# if __is_target_os(darwin)
+#   define SWIFT_TARGET_OS_DARWIN 1
+# else
+#   define SWIFT_TARGET_OS_DARWIN 0
+# endif
+#else
+# define SWIFT_TARGET_OS_DARWIN 0
+#endif
+
 #endif // SWIFT_STDLIB_SHIMS_ABI_TARGET_H

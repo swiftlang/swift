@@ -202,20 +202,20 @@ CanType TypeJoin::visitBoundGenericClassType(CanType second) {
 /// The subtype relationship of Optionals is as follows:
 ///   S  <: S?
 ///   S? <: T? if S <: T (covariant)
-static Optional<CanType> joinOptional(CanType first, CanType second) {
+static llvm::Optional<CanType> joinOptional(CanType first, CanType second) {
   auto firstObject = first.getOptionalObjectType();
   auto secondObject = second.getOptionalObjectType();
 
   // If neither is any kind of Optional, we're done.
   if (!firstObject && !secondObject)
-    return None;
+    return llvm::None;
 
   first = (firstObject ? firstObject : first);
   second = (secondObject ? secondObject : second);
 
   auto join = TypeJoin::join(first, second);
   if (!join)
-    return None;
+    return llvm::None;
 
   return OptionalType::get(join)->getCanonicalType();
 }
@@ -404,7 +404,8 @@ CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
     return TheAnyType;
 
   auto &ctx = result[0]->getASTContext();
-  return ProtocolCompositionType::get(ctx, result, false)->getCanonicalType();
+  return ProtocolCompositionType::get(ctx, result, /*inverses=*/{},
+                                      false)->getCanonicalType();
 }
 
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
@@ -431,8 +432,12 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
     protocolType.push_back(First);
     firstMembers = protocolType;
   } else {
+    assert(cast<ProtocolCompositionType>(First)->getInverses().empty() &&
+           "FIXME: move-only generics");
     firstMembers = cast<ProtocolCompositionType>(First)->getMembers();
   }
+  assert(cast<ProtocolCompositionType>(second)->getInverses().empty() &&
+         "FIXME: move-only generics");
   auto secondMembers = cast<ProtocolCompositionType>(second)->getMembers();
 
   return computeProtocolCompositionJoin(firstMembers, secondMembers);
@@ -491,16 +496,16 @@ CanType TypeJoin::visitBuiltinType(CanType second) {
 
 } // namespace
 
-Optional<Type> Type::join(Type first, Type second) {
+llvm::Optional<Type> Type::join(Type first, Type second) {
   assert(first && second && "Unexpected null type!");
 
   if (!first || !second)
-    return None;
+    return llvm::None;
 
   auto join =
       TypeJoin::join(first->getCanonicalType(), second->getCanonicalType());
   if (!join)
-    return None;
+    return llvm::None;
 
   return join;
 }
