@@ -32,8 +32,8 @@ The debug information format for C/C++ code: dwarf or codeview.
 .PARAMETER SwiftDebugFormat
 The debug information format for Swift code: dwarf or codeview.
 
-.PARAMETER SDKs
-An array of architectures for which the Swift SDK should be built.
+.PARAMETER WindowsSDKs
+An array of architectures for which the Windows Swift SDK should be built.
 
 .PARAMETER ProductVersion
 The product version to be used when building the installer.
@@ -84,7 +84,7 @@ in batch file format instead of executing them.
 PS> .\Build.ps1
 
 .EXAMPLE
-PS> .\Build.ps1 -SDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
+PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -93,7 +93,7 @@ param(
   [string] $ImageRoot = "S:",
   [string] $CDebugFormat = "dwarf",
   [string] $SwiftDebugFormat = "dwarf",
-  [string[]] $SDKs = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $PinnedBuild = "https://download.swift.org/swift-5.9-release/windows10/swift-5.9-RELEASE/swift-5.9-RELEASE-windows10.exe",
   [string] $PinnedSHA256 = "EAB668ABFF903B4B8111FD27F49BAD470044B6403C6FA9CCD357AE831909856D",
@@ -146,7 +146,7 @@ if (-not (Test-Path $python)) {
 }
 
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
-if ($SDKs.Length -eq 1) { $SDKs = $SDKs[0].Split(",") }
+if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
 if ($Test -contains "*") {
@@ -237,7 +237,7 @@ $SDKInstallRoot = "$PlatformInstallRoot\Developer\SDKs\Windows.sdk"
 $HostArch.ToolchainInstallRoot = $ToolchainInstallRoot
 
 # Resolve the architectures received as argument
-$SDKArchs = @($SDKs | ForEach-Object {
+$WindowsSDKArchs = @($WindowsSDKs | ForEach-Object {
   switch ($_) {
     "X64" { $ArchX64 }
     "X86" { $ArchX86 }
@@ -449,6 +449,7 @@ function Fetch-Dependencies {
   $ProgressPreference = "SilentlyContinue"
 
   $WebClient = New-Object Net.WebClient
+
   $WiXVersion = "4.0.4"
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
   $WiXHash = "A9CA12214E61BB49430A8C6E5E48AC5AE6F27DC82573B5306955C4D35F2D34E2"
@@ -511,7 +512,7 @@ function Fetch-Dependencies {
       $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
 
       # Install each required architecture package and move files under the base /lib directory.
-      $WinSDKArchs = $SDKArchs.Clone()
+      $WinSDKArchs = $WindowsSDKArchs.Clone()
       if (-not ($HostArch -in $WinSDKArchs)) {
         $WinSDKArch += $HostArch
       }
@@ -1840,7 +1841,7 @@ function Build-Installer($Arch) {
     }
   }
 
-  foreach ($SDK in $SDKArchs) {
+  foreach ($SDK in $WindowsSDKArchs) {
     $Properties["INCLUDE_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
     $Properties["PLATFORM_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
@@ -1854,7 +1855,7 @@ function Stage-BuildArtifacts($Arch) {
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.msi" "$Stage\"
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.cab" "$Stage\"
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.msi" "$Stage\"
-  foreach ($SDK in $SDKArchs) {
+  foreach ($SDK in $WindowsSDKArchs) {
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).cab" "$Stage\"
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).msi" "$Stage\"
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\rtl.$($SDK.VSName).msm" "$Stage\"
@@ -1884,12 +1885,12 @@ if (-not $SkipBuild) {
 
 if ($Clean) {
   2..16 | % { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
-  foreach ($Arch in $SDKArchs) {
+  foreach ($Arch in $WindowsSDKArchs) {
     0..3 | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildiD + $_)" -ErrorAction Ignore }
   }
 }
 
-foreach ($Arch in $SDKArchs) {
+foreach ($Arch in $WindowsSDKArchs) {
   if (-not $SkipBuild) {
     Invoke-BuildStep Build-ZLib $Arch
     Invoke-BuildStep Build-XML2 $Arch
@@ -1906,13 +1907,13 @@ foreach ($Arch in $SDKArchs) {
 }
 
 if (-not $ToBatch) {
-  if ($HostArch -in $SDKArchs) {
+  if ($HostArch -in $WindowsSDKArchs) {
     Remove-Item -Force -Recurse $RuntimeInstallRoot -ErrorAction Ignore
     Copy-Directory "$($HostArch.SDKInstallRoot)\usr\bin" "$RuntimeInstallRoot\usr"
   }
 
   Remove-Item -Force -Recurse $PlatformInstallRoot -ErrorAction Ignore
-  foreach ($Arch in $SDKArchs) {
+  foreach ($Arch in $WindowsSDKArchs) {
     Install-Platform $Arch
   }
 }
