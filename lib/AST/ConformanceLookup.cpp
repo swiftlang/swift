@@ -472,6 +472,9 @@ LookupConformanceInModuleRequest::evaluate(
   auto *protocol = desc.PD;
   ASTContext &ctx = mod->getASTContext();
 
+  // Remove SIL reference ownership wrapper, if present.
+  type = type->getReferenceStorageReferent();
+
   // A dynamic Self type conforms to whatever its underlying type
   // conforms to.
   if (auto selfType = type->getAs<DynamicSelfType>())

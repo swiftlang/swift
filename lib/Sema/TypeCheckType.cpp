@@ -1083,14 +1083,6 @@ Type TypeResolution::applyUnboundGenericArguments(
   if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs, dc))
     return ErrorType::get(ctx);
 
-  if (options.contains(TypeResolutionFlags::SILType)) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nominal->isOptionalDecl()) {
-        skipRequirementsCheck = true;
-      }
-    }
-  }
-
   // Get the substitutions for outer generic parameters from the parent
   // type.
   if (parentTy) {
