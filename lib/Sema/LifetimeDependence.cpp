@@ -49,9 +49,15 @@ std::string LifetimeDependenceInfo::getString() const {
 
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   if (inheritLifetimeParamIndices) {
+    // Copy and Consume are the same, can be unified if we converge on dependsOn
+    // syntax
+    ID.AddInteger((uint8_t)LifetimeDependenceKind::Copy);
     inheritLifetimeParamIndices->Profile(ID);
   }
   if (scopeLifetimeParamIndices) {
+    // Borrow and Mutate are the same, can be unified if we converge on
+    // dependsOn syntax
+    ID.AddInteger((uint8_t)LifetimeDependenceKind::Borrow);
     scopeLifetimeParamIndices->Profile(ID);
   }
 }

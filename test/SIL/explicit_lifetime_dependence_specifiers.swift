@@ -102,3 +102,21 @@ struct Wrapper : ~Escapable {
     return view
   }
 }
+
+struct Container {
+ let ptr: UnsafeRawBufferPointer
+ init(_ ptr: UnsafeRawBufferPointer) {
+   self.ptr = ptr
+ }
+}
+
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnF : $@convention(thin) (Container) -> _inherit(1) @owned BufferView {
+func getConsumingView(_ x: consuming Container) -> _consume(x) BufferView {
+  return BufferView(x.ptr)
+}
+
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVF : $@convention(thin) (Container) -> _scope(1) @owned BufferView {
+func getBorrowingView(_ x: borrowing Container) -> _borrow(x) BufferView {
+  return BufferView(x.ptr)
+}
+
