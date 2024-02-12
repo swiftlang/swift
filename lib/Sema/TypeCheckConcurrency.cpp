@@ -2145,11 +2145,13 @@ namespace {
         DiagnosticList errors = list.getSecond();
         ActorIsolation isolation = key.second;
 
-        auto behavior = DiagnosticBehavior::Error;
-
-        // Limit behavior if @preconcurrency detected
-        if (errors.front().preconcurrency)
-          behavior = DiagnosticBehavior::Warning;
+        auto behavior = DiagnosticBehavior::Warning;
+        // Upgrade behavior if @preconcurrency not detected
+        if (llvm::any_of(errors, [&](IsolationError error) {
+          return !error.preconcurrency;
+        })) {
+          behavior = DiagnosticBehavior::Error;
+        }
 
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
@@ -2174,11 +2176,14 @@ namespace {
         DiagnosticList errors = list.getSecond();
         ActorIsolation isolation = key.first;
 
-        auto behavior = DiagnosticBehavior::Error;
+        auto behavior = DiagnosticBehavior::Warning;
+        // Upgrade behavior if @preconcurrency not detected
+        if (llvm::any_of(errors, [&](IsolationError error) {
+          return !error.preconcurrency;
+        })) {
+          behavior = DiagnosticBehavior::Error;
+        }
 
-        // Limit behavior if @preconcurrency detected
-        if (errors.front().preconcurrency)
-          behavior = DiagnosticBehavior::Warning;
 
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
@@ -2194,7 +2199,7 @@ namespace {
           // Diagnose actor_isolated_call as note if
           // if there are multiple actor-isolated function calls
           // from outside the actor
-            ctx.Diags.diagnose(error.loc, error.diag)
+          ctx.Diags.diagnose(error.loc, error.diag)
             .limitBehaviorUntilSwiftVersion(behavior, 6);
         }
       }
@@ -3458,7 +3463,8 @@ namespace {
 
           IsolationError mismatch([calleeDecl, apply, unsatisfiedIsolation, getContextIsolation]() {
             if (calleeDecl) {
-              auto preconcurrency = getContextIsolation().preconcurrency() || getActorIsolation(calleeDecl).preconcurrency();
+              auto preconcurrency = getContextIsolation().preconcurrency() || 
+                getActorIsolation(calleeDecl).preconcurrency();
 
               return IsolationError(
                              apply->getLoc(),
@@ -3488,7 +3494,8 @@ namespace {
           }
         } else {
           if (calleeDecl) {
-            auto preconcurrency = getContextIsolation().preconcurrency() || getActorIsolation(calleeDecl).preconcurrency();
+            auto preconcurrency = getContextIsolation().preconcurrency() ||
+              getActorIsolation(calleeDecl).preconcurrency();
 
             ctx.Diags.diagnose(
                                apply->getLoc(), diag::actor_isolated_call_decl,

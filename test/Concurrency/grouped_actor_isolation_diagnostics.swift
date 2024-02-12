@@ -1,8 +1,14 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors  -strict-concurrency=complete
 // REQUIRES: concurrency
 
 @MainActor
 protocol P {
+  func f()
+  nonisolated func g()
+}
+
+@preconcurrency @MainActor
+protocol Q {
   func f()
   nonisolated func g()
 }
@@ -12,14 +18,14 @@ struct S: P {
   func g() { }
 }
 
-@preconcurrency struct NonConcurrentS: P {
+@preconcurrency
+struct NonConcurrentS: Q {
   func f() { }
   func g() { }
 }
 
 // expected-note@+1{{add '@MainActor' to make global function 'testP(s:p:)' part of global actor 'MainActor'}}
 func testP(s: S, p: P) { // expected-error {{calls to '@MainActor'-isolated' code in global function 'testP(s:p:)'}}
-
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
@@ -29,8 +35,20 @@ func testP(s: S, p: P) { // expected-error {{calls to '@MainActor'-isolated' cod
   s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   s.g() // OKAY
 }
-// expected-note @+1{{add '@MainActor' to make global function 'testPreconcurrencyP(ncs:)' part of global actor 'MainActor'}}
-func testPreconcurrencyP(ncs: NonConcurrentS) { // expected-error {{calls to '@MainActor'-isolated' code in global function 'testPreconcurrencyP(ncs:)'}}
+// expected-note @+1{{add '@MainActor' to make global function 'testPreconcurrency(ncs:s:)' part of global actor 'MainActor'}}
+func testPreconcurrency(ncs: NonConcurrentS, s:S ) { // expected-error {{calls to '@MainActor'-isolated' code in global function 'testPreconcurrency(ncs:s:)'}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  ncs.g() // OKAY
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  s.g() // OKAY
+}
+
+// expected-note @+1{{add '@MainActor' to make global function 'testOnlyPreconcurrency(ncs:)' part of global actor 'MainActor'}}
+func testOnlyPreconcurrency(ncs: NonConcurrentS) { // expected-warning {{calls to '@MainActor'-isolated' code in global function 'testOnlyPreconcurrency(ncs:)'}}
   ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   ncs.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
