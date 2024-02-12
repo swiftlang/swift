@@ -161,9 +161,8 @@ public enum Result<Success, Failure: Error> {
   ///
   /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
-  @_alwaysEmitIntoClient
   @inlinable
-  public func get() throws(Failure) -> Success {
+  public func get() throws -> Success {
     switch self {
     case let .success(success):
       return success
@@ -171,44 +170,15 @@ public enum Result<Success, Failure: Error> {
       throw failure
     }
   }
-}
-
-extension Result {
-  /// Creates a new result by evaluating a throwing closure, capturing the
-  /// returned value as a success, or any thrown error as a failure.
-  ///
-  /// - Parameter body: A potentially throwing closure to evaluate.
-  @_alwaysEmitIntoClient
-  @inlinable
-  public init(catching body: () throws(Failure) -> Success) {
-    do {
-      self = .success(try body())
-    } catch {
-      self = .failure(error)
-    }
-  }
-}
-
-extension Result {
-  /// ABI: Historical get() throws
-  @_silgen_name("$ss6ResultO3getxyKF")
-  @usableFromInline
-  func __abi_get() throws -> Success {
-    switch self {
-    case let .success(success):
-      return success
-    case let .failure(failure):
-      throw failure
-    }
-  }
-
 }
 
 extension Result where Failure == Swift.Error {
-  /// ABI: Historical init(catching:)
-  @_silgen_name("$ss6ResultOss5Error_pRs_rlE8catchingAByxsAC_pGxyKXE_tcfCa")
-  @usableFromInline
-  init(__abi_catching body: () throws(Failure) -> Success) {
+  /// Creates a new result by evaluating a throwing closure, capturing the
+  /// returned value as a success, or any thrown error as a failure.
+  ///
+  /// - Parameter body: A throwing closure to evaluate.
+  @_transparent
+  public init(catching body: () throws -> Success) {
     do {
       self = .success(try body())
     } catch {

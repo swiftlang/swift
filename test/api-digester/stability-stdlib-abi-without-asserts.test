@@ -75,8 +75,6 @@ Constructor _SmallString.init(taggedCocoa:) has return type change from Swift._S
 Enum Never has added a conformance to an existing protocol Decodable
 Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
-
-// These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
 Func AnyBidirectionalCollection.map(_:) has been renamed to Func __rethrows_map(_:)
 Func AnyBidirectionalCollection.map(_:) has mangled name changing from 'Swift.AnyBidirectionalCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyBidirectionalCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
 Func AnyBidirectionalCollection.map(_:) is now without @rethrows
@@ -89,16 +87,14 @@ Func AnyRandomAccessCollection.map(_:) is now without @rethrows
 Func AnySequence.map(_:) has been renamed to Func __rethrows_map(_:)
 Func AnySequence.map(_:) has mangled name changing from 'Swift.AnySequence.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnySequence.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
 Func AnySequence.map(_:) is now without @rethrows
+
+// These are using
 Func Sequence.map(_:) has been renamed to Func __rethrows_map(_:)
 Func Sequence.map(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Sequence.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
 Func Sequence.map(_:) is now without @rethrows
 Func Collection.map(_:) has been renamed to Func __rethrows_map(_:)
 Func Collection.map(_:) has mangled name changing from '(extension in Swift):Swift.Collection.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Collection.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
 Func Collection.map(_:) is now without @rethrows
-Constructor Result.init(__abi_catching:) is a new API without @available attribute
-Constructor Result.init(catching:) has been removed
-Func Result.get() has been renamed to Func __abi_get()
-Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A' to 'Swift.Result.__abi_get() throws -> A'
 Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
 Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
 Func withUnsafePointer(to:_:) is now without @rethrows
