@@ -1118,6 +1118,10 @@ BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_de
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }
 
+void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
+  getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
+}
+
 BridgedInstruction::AccessKind BridgedInstruction::BeginAccessInst_getAccessKind() const {
   return (AccessKind)getAs<swift::BeginAccessInst>()->getAccessKind();
 }

@@ -937,6 +937,10 @@ class MarkDependenceInst : SingleValueInstruction, ForwardingInstruction {
   }
   public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
   public var isUnresolved: Bool { dependenceKind == .Unresolved }
+
+  public func resolveToNonEscaping() {
+    bridged.MarkDependenceInst_resolveToNonEscaping()
+  }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingInstruction {
