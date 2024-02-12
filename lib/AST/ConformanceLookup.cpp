@@ -178,7 +178,6 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request)) {
-        assert(!getInvertibleProtocolKind(*kp));
         return ProtocolConformanceRef::forInvalid();
       }
     }
@@ -205,6 +204,9 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
   ASTContext &ctx = protocol->getASTContext();
 
   auto *tupleDecl = ctx.getBuiltinTupleDecl();
+
+  // Ignore @lvalue's within the tuple.
+  type = type->getRValueType();
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
@@ -563,13 +565,16 @@ LookupConformanceInModuleRequest::evaluate(
 #ifndef NDEBUG
   // Ensure we haven't missed queries for the specialty SIL types
   // in the AST in conformance to one of the invertible protocols.
-  if (auto kp = protocol->getKnownProtocolKind())
-    if (getInvertibleProtocolKind(*kp))
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    if (getInvertibleProtocolKind(*kp)) {
       assert(!(type->is<SILFunctionType,
                         SILBoxType,
                         SILMoveOnlyWrappedType,
                         SILPackType,
                         SILTokenType>()));
+      assert(!type->is<ReferenceStorageType>());
+    }
+  }
 #endif
 
   auto nominal = type->getAnyNominal();
