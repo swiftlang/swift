@@ -78,11 +78,38 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 }
 
 //===----------------------------------------------------------------------===//
+//                       BridgedLifetimeDependenceInfo
+//===----------------------------------------------------------------------===//
+
+bool BridgedLifetimeDependenceInfo::empty() const {
+  return info == nullptr || info->empty();
+}
+
+bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
+  assert(info);
+  return info->checkInherit(index);
+}
+
+bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
+  assert(info);
+  return info->checkScope(index);
+}
+
+BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
+  assert(info);
+  return BridgedOwnedString(info->getString());
+}
+
+//===----------------------------------------------------------------------===//
 //                               BridgedASTType
 //===----------------------------------------------------------------------===//
 
 BridgedOwnedString BridgedASTType::getDebugDescription() const {
   return BridgedOwnedString(unbridged().getString());
+}
+
+bool BridgedASTType::hasTypeParameter() const {
+  return unbridged()->hasTypeParameter();
 }
 
 bool BridgedASTType::isOpenedExistentialWithError() const {
@@ -91,6 +118,10 @@ bool BridgedASTType::isOpenedExistentialWithError() const {
 
 bool BridgedASTType::isEscapable() const {
   return unbridged()->isEscapable();
+}
+
+bool BridgedASTType::isNoEscape() const {
+  return unbridged()->isNoEscape();
 }
 
 BridgedResultInfoArray
@@ -124,6 +155,11 @@ bool BridgedASTType::SILFunctionType_hasSelfParam() const {
 
 BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getYields();
+}
+
+BridgedLifetimeDependenceInfo BridgedASTType::SILFunctionType_getLifetimeDependenceInfo() const {
+  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+  return {fnTy->getLifetimeDependenceInfoOrNull()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -224,6 +260,10 @@ bool BridgedType::isNoEscapeFunction() const {
 
 bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
+}
+
+bool BridgedType::isEmpty(BridgedFunction f) const {
+  return unbridged().isEmpty(*f.getFunction());
 }
 
 BridgedType::TraitResult BridgedType::canBeClass() const {
@@ -454,16 +494,6 @@ BridgedBasicBlock BridgedArgument::getParent() const {
   return {getArgument()->getParent()};
 }
 
-BridgedArgumentConvention BridgedArgument::getConvention() const {
-  auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
-  return castToArgumentConvention(fArg->getArgumentConvention());
-}
-
-bool BridgedArgument::isSelf() const {
-  auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
-  return fArg->isSelf();
-}
-
 bool BridgedArgument::hasResultDependsOn() const {
   auto *fArg = static_cast<swift::SILFunctionArgument*>(getArgument());
   return fArg->hasResultDependsOn();
@@ -553,18 +583,6 @@ SwiftInt BridgedFunction::getNumIndirectFormalResults() const {
 
 bool BridgedFunction::hasIndirectErrorResult() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
-}
-
-SwiftInt BridgedFunction::getNumParameters() const {
-  return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumParameters();
-}
-
-SwiftInt BridgedFunction::getSelfArgumentIndex() const {
-  swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
-  swift::CanSILFunctionType fTy = getFunction()->getLoweredFunctionType();
-  if (!fTy->hasSelfParam())
-    return -1;
-  return conv.getNumParameters() + conv.getNumIndirectSILResults() - 1;
 }
 
 SwiftInt BridgedFunction::getNumSILArguments() const {
@@ -691,6 +709,10 @@ BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
 
 swift::SILGlobalVariable * _Nonnull BridgedGlobalVar::getGlobal() const {
   return static_cast<swift::SILGlobalVariable *>(obj);
+}
+
+BridgedNullableVarDecl BridgedGlobalVar::getDecl() const {
+  return getGlobal()->getDecl();
 }
 
 BridgedStringRef BridgedGlobalVar::getName() const {
@@ -1100,6 +1122,10 @@ SwiftInt BridgedInstruction::AssignInst_getAssignOwnership() const {
 
 BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_dependenceKind() const {
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
+}
+
+void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
+  getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
 }
 
 BridgedInstruction::AccessKind BridgedInstruction::BeginAccessInst_getAccessKind() const {

@@ -14,6 +14,10 @@ import Basic
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.getDecl())
+  }
+
   public var name: StringRef {
     return StringRef(bridged: bridged.getName())
   }

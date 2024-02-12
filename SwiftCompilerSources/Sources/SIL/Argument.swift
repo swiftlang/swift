@@ -31,9 +31,9 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
-  public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.getVarDecl())
-  }
+  public var varDecl: VarDecl? { VarDecl(bridged: bridged.getVarDecl()) }
+
+  public var sourceLoc: SourceLoc? { varDecl?.sourceLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -46,13 +46,16 @@ public class Argument : Value, Hashable {
 
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
-    bridged.getConvention().convention
+    parentFunction.argumentConventions[index]
   }
 
   public var isSelf: Bool {
-    return bridged.isSelf()
+    parentFunction.argumentConventions.selfIndex == index
   }
 
+  // FIXME: This is incorrect in two cases: it does not include the
+  // indirect error result, and, prior to address lowering, does not
+  // include pack results.
   public var isIndirectResult: Bool {
     return index < parentFunction.numIndirectResultArguments
   }
@@ -60,12 +63,20 @@ final public class FunctionArgument : Argument {
   public var hasResultDependsOn : Bool {
     return bridged.hasResultDependsOn()
   }
+
+  /// If the function's result depends on this argument, return the
+  /// kind of dependence.
+  public var resultDependence: LifetimeDependenceConvention? {
+    parentFunction.argumentConventions[resultDependsOn: index]
+  }
 }
 
 public struct Phi {
   public let value: Argument
 
-  // TODO: Remove the CondBr case. All passes avoid critical edges. It is only included here for compatibility with .sil tests that have not been migrated.
+  // TODO: Remove the CondBr case. All passes avoid critical edges. It
+  // is only included here for compatibility with .sil tests that have
+  // not been migrated.
   public init?(_ value: Value) {
     guard let argument = value as? Argument else { return nil }
     var preds = argument.parentBlock.predecessors
@@ -172,86 +183,102 @@ public struct TerminatorResult {
 }
 
 /// ArgumentConventions indexed on a SIL function's argument index.
-/// When derived from an ApplySite, this corresponds to the callee index.
+/// When derived from an ApplySite, this corresponds to the callee
+/// function's argument index.
+///
+/// When derived from an ApplySite, `convention` is the substituted
+/// convention. Substitution only affects the type inside ResultInfo
+/// and ParameterInfo. It does not change the resulting
+/// ArgumentConvention, ResultConvention, or LifetimeDependenceInfo.
 public struct ArgumentConventions : Collection, CustomStringConvertible {
-  public let originalFunctionConvention: FunctionConvention
-  public let substitutedFunctionConvention: FunctionConvention?
-
-  /// Indirect results including the error result. Apply type
-  /// substitution if it is available.
-  public var indirectSILResults: LazyFilterSequence<FunctionConvention.Results> {
-    if let substitutedFunctionConvention {
-      return substitutedFunctionConvention.indirectSILResults
-    }
-    return originalFunctionConvention.indirectSILResults
-  }
-
-  /// Number of SIL arguments for the function type's results
-  /// including the error result. Use this to avoid lazy iteration.
-  var indirectSILResultCount: Int {
-    originalFunctionConvention.indirectSILResultCount
-  }
-
-  public var originalParameters: FunctionConvention.Parameters {
-    originalFunctionConvention.parameters
-  }
-
-  public var parameters: FunctionConvention.Parameters {
-    if let substitutedFunctionConvention {
-      return substitutedFunctionConvention.parameters
-    }
-    return originalFunctionConvention.parameters
-  }
+  public let convention: FunctionConvention
 
   public var startIndex: Int { 0 }
 
-  public var endIndex: Int { firstParameterIndex + parameters.count }
+  public var endIndex: Int {
+    firstParameterIndex + convention.parameters.count
+  }
 
   public func index(after index: Int) -> Int {
     return index + 1
   }
 
-  public subscript(_ index: Int) -> ArgumentConvention {
-    if index >= firstParameterIndex {
-      return parameters[index - indirectSILResultCount].convention
+  public subscript(_ argumentIndex: Int) -> ArgumentConvention {
+    if let paramIdx = parameterIndex(for: argumentIndex) {
+      return convention.parameters[paramIdx].convention
     }
-    return ArgumentConvention(result: indirectSILResults[index].convention)
+    let resultInfo = convention.indirectSILResults[argumentIndex]
+    return ArgumentConvention(result: resultInfo.convention)
+  }
+
+  public subscript(result argumentIndex: Int) -> ResultInfo? {
+    if parameterIndex(for: argumentIndex) != nil {
+      return nil
+    }
+    return convention.indirectSILResults[argumentIndex]
+  }
+
+  public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
+    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+      return nil
+    }
+    return convention.parameters[paramIdx]
+  }
+
+  /// Return a dependence of the function results on the indexed parameter.
+  public subscript(resultDependsOn argumentIndex: Int)
+    -> LifetimeDependenceConvention? {
+    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+      return nil
+    }
+    return convention.resultDependencies?[paramIdx]
+  }
+
+  /// Number of SIL arguments for the function type's results
+  /// including the error result. Use this to avoid lazy iteration
+  /// over indirectSILResults to find the count.
+  var indirectSILResultCount: Int {
+    convention.indirectSILResultCount
   }
 
   /// The SIL argument index of the function type's first parameter.
-  var firstParameterIndex: Int { indirectSILResultCount }
+  public var firstParameterIndex: Int { indirectSILResultCount }
 
   /// The SIL argument index of the 'self' paramter.
   var selfIndex: Int? {
-    guard originalFunctionConvention.hasSelfParameter else { return nil }
+    guard convention.hasSelfParameter else { return nil }
     // self is the last parameter
     return endIndex - 1
   }
 
   public var description: String {
-    var str = String(taking: originalFunctionConvention.bridgedFunctionType.getDebugDescription())
-    if let substitutedFunctionConvention {
-      str += "\n" + String(taking: substitutedFunctionConvention.bridgedFunctionType.getDebugDescription())
+    let origTy = convention.bridgedFunctionType
+    var str = String(taking: origTy.getDebugDescription())
+    for idx in startIndex..<indirectSILResultCount {
+      str += "\n[\(idx)]  indirect result: " + self[idx].description
     }
-    indirectSILResults.forEach {
-      str += "\nindirect result: " + $0.description
-    }
-    parameters.forEach {
-      str += "\n      parameter: " + $0.description
+    for idx in indirectSILResultCount..<endIndex {
+      str += "\n[\(idx)]        parameter: " + self[idx].description
+      if let dep = self[resultDependsOn: idx] {
+        str += "resultDependsOn: " + dep.description
+      }
     }
     return str
   }
 }
 
+extension ArgumentConventions {
+  private func parameterIndex(for argIdx: Int) -> Int? {
+    let firstParamIdx = firstParameterIndex  // bridging call
+    return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
+  }
+}
+
 public struct YieldConventions : Collection, CustomStringConvertible {
-  public let originalFunctionConvention: FunctionConvention
-  public let substitutedFunctionConvention: FunctionConvention?
+  public let convention: FunctionConvention
 
   public var yields: FunctionConvention.Yields {
-    if let substitutedFunctionConvention {
-      return substitutedFunctionConvention.yields
-    }
-    return originalFunctionConvention.yields
+    return convention.yields
   }
 
   public var startIndex: Int { 0 }
@@ -267,10 +294,8 @@ public struct YieldConventions : Collection, CustomStringConvertible {
   }
 
   public var description: String {
-    var str = String(taking: originalFunctionConvention.bridgedFunctionType.getDebugDescription())
-    if let substitutedFunctionConvention {
-      str += "\n" + String(taking: substitutedFunctionConvention.bridgedFunctionType.getDebugDescription())
-    }
+    var str = String(
+      taking: convention.bridgedFunctionType.getDebugDescription())
     yields.forEach {
       str += "\n      yield: " + $0.description
     }

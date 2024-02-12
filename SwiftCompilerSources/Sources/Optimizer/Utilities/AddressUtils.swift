@@ -37,8 +37,8 @@ protocol AddressUseVisitor {
   /// end_access, end_apply, abort_apply, end_borrow.
   mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult
 
-  /// A address leaf use cannot propagate the address bits beyond the
-  /// instruction.
+  /// An address leaf use propagates neither the address bits, nor the
+  /// in-memory value beyond the instruction.
   ///
   /// StoringInstructions are leaf uses.
   mutating func leafAddressUse(of operand: Operand) -> WalkResult
@@ -184,5 +184,146 @@ extension AddressUseVisitor {
       // Unkown instruction.
       return unknownAddressUse(of: operand)
     }
+  }
+}
+
+extension AccessBase {
+  /// If this access base has a single initializer, return it, along
+  /// with the initialized address. This does not guarantee that all
+  /// uses of that address are dominated by the store or even that the
+  /// store is a direct use of `address`.
+  func findSingleInitializer(_ context: some Context)
+    -> (initialAddress: Value, initializingStore: Instruction)? {
+    let baseAddr: Value
+    switch self {
+    case let .stack(allocStack):
+      baseAddr = allocStack
+    case let .argument(arg):
+      baseAddr = arg
+    default:
+      return nil
+    }
+    var walker = AddressInitializationWalker(context: context)
+    if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath())
+         == .abortWalk {
+      return nil
+    }
+    return (initialAddress: baseAddr, initializingStore: walker.initializer!)
+  }
+}
+
+// Walk the address def-use paths to find a single initialization.
+//
+// Implements AddressUseVisitor to guarantee that we can't miss any
+// stores. This separates escapingAddressUse from leafAddressUse.
+//
+// TODO: Make AddressDefUseWalker always conform to AddressUseVisitor once we're
+// ready to debug changes to escape analysis etc...
+//
+// Future:
+// AddressUseVisitor
+//    (how to transitively follow uses, complete classification)
+// -> AddressPathDefUseWalker
+//    (follow projections and track Path,
+//     client handles all other uses, such as access scopes)
+// -> AddressProjectionDefUseWalker
+//    (follow projections, track Path, ignore access scopes,
+//     merge all other callbacks into only two:
+//     instantaneousAddressUse vs. escapingAddressUse)
+//
+// FIXME: This currently assumes that isAddressInitialization catches
+// writes to the memory address. We need a complete abstraction that
+// distinguishes between `mayWriteToMemory` for dependence vs. actual
+// modification of memory.
+struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
+  let context: any Context
+
+  var walkDownCache = WalkerCache<SmallProjectionPath>()
+
+  var isProjected = false
+  var initializer: Instruction?
+
+  private mutating func setInitializer(instruction: Instruction) -> WalkResult {
+    // An initializer must be unique and store the full value.
+    if initializer != nil || isProjected {
+      initializer = nil
+      return .abortWalk
+    }
+    initializer = instruction
+    return .continueWalk
+  }
+}
+
+// Implement AddressDefUseWalker
+extension AddressInitializationWalker {
+  mutating func leafUse(address: Operand, path: SmallProjectionPath)
+    -> WalkResult {
+    isProjected = !path.isEmpty
+    return classifyAddress(operand: address)
+  }
+}
+
+// Implement AddresUseVisitor
+extension AddressInitializationWalker {
+  /// An address projection produces a single address result and does not
+  /// escape its address operand in any other way.
+  mutating func projectedAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    // AddressDefUseWalker should catch most of these.
+    return .abortWalk
+  }
+
+  mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
+    // AddressDefUseWalker currently skips most of these.
+    return .abortWalk
+  }
+
+  mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult {
+    // AddressDefUseWalker currently skips most of these.
+    return .continueWalk
+  }
+
+  mutating func leafAddressUse(of operand: Operand) -> WalkResult {
+    if operand.isAddressInitialization {
+      return setInitializer(instruction: operand.instruction)
+    }
+    // FIXME: check mayWriteToMemory but ignore non-stores. Currently,
+    // stores should all be checked my isAddressInitialization, but
+    // this is not robust.
+    return .continueWalk
+  }
+
+  mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite)
+    -> WalkResult {
+    if operand.isAddressInitialization {
+      return setInitializer(instruction: operand.instruction)
+    }
+    guard let convention = apply.convention(of: operand) else {
+      return .continueWalk
+    }
+    return convention.isIndirectIn ? .continueWalk : .abortWalk
+  }
+
+  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+    -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func dependentAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
+    return .abortWalk
+  }
+
+  mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
+    return .abortWalk
   }
 }

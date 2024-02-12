@@ -91,7 +91,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
   if (hasInheritLifetimeParamIndices()) {
     pushData(inheritLifetimeParamIndices);
   }
-  if (hasBorrowLifetimeParamIndices()) {
+  if (hasScopeLifetimeParamIndices()) {
     pushData(scopeLifetimeParamIndices);
   }
 }

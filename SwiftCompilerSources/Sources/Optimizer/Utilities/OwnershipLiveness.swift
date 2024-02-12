@@ -307,8 +307,8 @@ extension OwnershipUseVisitor {
     }
     // Otherwise, directly visit the scope ending uses.
     //
-    // TODO: change visitScopeEndingOperands to take a non-escaping
-    // closure and call ownershipLeafUse directly.
+    // TODO: remove this stack by changign visitScopeEndingOperands to
+    // take a non-escaping closure that can call ownershipLeafUse.
     var stack = Stack<Operand>(context)
     defer { stack.deinitialize() }
     _ = borrowInst.visitScopeEndingOperands(context) {
@@ -448,9 +448,6 @@ extension OwnershipUseVisitor {
 /// MoveValueInst, and Allocation. Then this visitor should assert
 /// that the forward-extended lifetime introducer has no pointer
 /// escaping uses.
-///
-/// TODO: Change the operandOwnership of MarkDependenceInst base operand.
-/// It should be a borrowing operand, not a pointer escape.
 struct InteriorUseWalker {
   let functionContext: FunctionPassContext
   var context: Context { functionContext }

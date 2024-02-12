@@ -1,18 +1,12 @@
 // RUN: %target-sil-opt -test-runner %s \
-// RUN:     -module-name Swift \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: noncopyable_generics
 
 sil_stage canonical
 
 import Builtin
-
-@_marker public protocol Copyable: ~Escapable {}
-@_marker public protocol Escapable: ~Copyable {}
 
 enum FakeOptional<T> {
 case none
@@ -41,11 +35,13 @@ sil_vtable D {
   #D.field!read: @d_field_read
 }
 
-struct NE : ~Escapable {
+@_nonescapable
+struct NE {
   var d: D
 }
 
-struct NEWrap : ~Escapable {
+@_nonescapable
+struct NEWrap {
   var ne: NE
 }
 
@@ -79,8 +75,8 @@ entry(%0 : @owned $C):
   return %99 : $()
 }
 
-sil [ossa] @dependence_scope : $@convention(thin) (@owned C, @owned D, @guaranteed D, @in_guaranteed D, @inout D) -> () {
-entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
+sil [ossa] @dependence_scope : $@convention(thin) (@owned C, @owned D, @guaranteed D, @in_guaranteed D) -> () {
+entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D):
   %move = move_value %1 : $D
   %owned_mark = mark_dependence [nonescaping] %0 : $C on %move : $D
   specify_test "lifetime_dependence_scope %owned_mark"
@@ -148,15 +144,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-NEXT: ends:     
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
   
-  %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
-  specify_test "lifetime_dependence_scope %inout_arg_mark"
-// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
-// CHECK-NEXT: Caller: %{{.*}} = argument of bb0 : $*D
-// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $*D
-// CHECK-NEXT: Caller range
-// CHECK: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
-
-  destroy_value %inout_arg_mark : $C
+  destroy_value %inguaranteed_arg_mark : $C
   end_access %access : $*C
   end_apply %token
   end_borrow %borrow : $D

@@ -1,29 +1,38 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
+// RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-builtin-module \
+// RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: noncopyable_generics
 
-import Builtin
-
-struct BV : ~Escapable {
+@_nonescapable
+struct BV {
   let p: UnsafeRawPointer
-  let c: Int
+  let i: Int
+
   @_unsafeNonescapableResult
-  init(_ p: UnsafeRawPointer, _ c: Int) {
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
-    self.c = c
+    self.i = i
   }
 
-  public var isEmpty: Bool { c == 0 }
+  // Test borrowing `self`
+  public var isEmpty: Bool { i == 0 }
+
+  // Test consuming `self`
+  consuming func derive() -> _consume(self) BV {
+    // Technically, this "new" view does not depend on the 'view' argument.
+    // This unsafely creates a new view with no dependence.
+    return BV(self.p, self.i)
+  }
 }
 
-struct NE : ~Escapable {
+@_nonescapable
+struct NE {
   var bv: BV
 
   @_unsafeNonescapableResult
@@ -34,11 +43,11 @@ struct NE : ~Escapable {
 
 struct NC : ~Copyable {
   let p: UnsafeRawPointer
-  let c: Int
+  let i: Int
 
-  func withBufferView<ResultType>(_ body: (BV) throws -> ResultType) rethrows
+  func withBV<ResultType>(_ body: (BV) throws -> ResultType) rethrows
     -> ResultType {
-    try body(BV(p, c))
+    try body(BV(p, i))
   }
 }
 
@@ -52,8 +61,8 @@ func bv_argument(bv: BV) -> UnsafeRawPointer {
   return bv_extract_pointer(bv)
 }
 
-func bv_capture_noescape(bv: BV) ->Int {
-  return takeNoescapeInt { bv.c } 
+func bv_capture_noescape(bv: BV) -> Int {
+  return takeNoescapeInt { bv.i }
 }
 
 func bv_assign_let(_ bv: BV) -> UnsafeRawPointer {

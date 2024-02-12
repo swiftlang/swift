@@ -381,6 +381,8 @@ enum BeginBorrowValue {
 /// or introduces a borrow scope, then `value` is the single
 /// introducer for itself.
 ///
+/// If `value` is an address or any trivial type, then it has no introducers.
+///
 /// Example:                                       // introducers:
 ///                                                // ~~~~~~~~~~~~
 ///   bb0(%0 : @owned $Class,                      // %0

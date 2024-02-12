@@ -139,14 +139,6 @@ static FunctionTest DumpFunctionTest("dump-function",
                                        function.print(llvm::outs());
                                      });
 
-// Arguments: NONE
-// Dumps: the index of the self argument of the current function
-static FunctionTest FunctionGetSelfArgumentIndex(
-    "function-get-self-argument-index", [](auto &function, auto &, auto &) {
-      auto index = BridgedFunction{&function}.getSelfArgumentIndex();
-      llvm::outs() << "self argument index = " << index << "\n";
-    });
-
 } // namespace swift::test
 
 //===----------------------------------------------------------------------===//

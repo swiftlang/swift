@@ -8440,6 +8440,11 @@ public:
     return dependenceKind() == MarkDependenceKind::Unresolved;
   }
 
+  void resolveToNonEscaping() {
+    sharedUInt8().MarkDependenceInst.dependenceKind =
+      uint8_t(MarkDependenceKind::NonEscaping);
+  }
+
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
   bool visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand*)> func)
     const;

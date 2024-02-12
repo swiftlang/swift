@@ -19,6 +19,7 @@ swift_compiler_sources(Optimizer
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift
+  LifetimeDependenceInsertion.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift

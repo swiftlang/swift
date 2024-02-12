@@ -923,15 +923,24 @@ class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class MarkDependenceInst : SingleValueInstruction, ForwardingInstruction {
-  public typealias Kind = BridgedInstruction.MarkDependenceKind
-
+  public enum DependenceKind: Int32 {
+    case Unresolved = 0
+    case Escaping = 1
+    case NonEscaping = 2
+  }
   public var valueOperand: Operand { operands[0] }
   public var baseOperand: Operand { operands[1] }
   public var value: Value { return valueOperand.value }
   public var base: Value { return baseOperand.value }
-  public var dependenceKind: Kind { bridged.MarkDependenceInst_dependenceKind() }
+  public var dependenceKind: DependenceKind {
+    DependenceKind(rawValue: bridged.MarkDependenceInst_dependenceKind().rawValue)!
+  }
   public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
   public var isUnresolved: Bool { dependenceKind == .Unresolved }
+
+  public func resolveToNonEscaping() {
+    bridged.MarkDependenceInst_resolveToNonEscaping()
+  }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingInstruction {

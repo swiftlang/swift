@@ -4178,14 +4178,15 @@ ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   return *info;
 }
 
-LifetimeDependenceInfo SILFunctionType::getLifetimeDependenceInfo() const {
+const LifetimeDependenceInfo *SILFunctionType::
+getLifetimeDependenceInfoOrNull() const {
   if (!Bits.SILFunctionType.HasLifetimeDependenceInfo)
-    return LifetimeDependenceInfo();
+    return nullptr;
   auto *info = getTrailingObjects<LifetimeDependenceInfo>();
   assert(
       !info->empty() &&
       "If the LifetimeDependenceInfo was empty, we shouldn't have stored it.");
-  return *info;
+  return info;
 }
 
 bool SILFunctionType::hasNonDerivableClangType() {

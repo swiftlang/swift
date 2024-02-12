@@ -1053,7 +1053,8 @@ bool SILType::isEscapable() const {
     ty = refStorage->getReferentType()->getCanonicalType();
 
   if (auto fnTy = getAs<SILFunctionType>()) {
-    return !fnTy->isNoEscape();
+    // Use isNoEscape instead to determine whether a function type may escape.
+    return true;
   }
   if (auto boxTy = getAs<SILBoxType>()) {
     auto fields = boxTy->getLayout()->getFields();

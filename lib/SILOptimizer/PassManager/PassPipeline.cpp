@@ -291,7 +291,9 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
-
+  if (EnableLifetimeDependenceDiagnostics) {
+    P.addLifetimeDependenceInsertion();
+  }
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
   }

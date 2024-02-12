@@ -958,9 +958,6 @@ NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
 ERROR(deinit_not_visible, none,
       "deinit of non-copyable type not visible in the current module", ())
 
-ERROR(lifetime_value_outside_scope, none,
-      "lifetime-dependent value escapes its scope", ())
-
 ERROR(vector_capacity_not_constant, none,
       "vector capacity needs to be constant", ())
 
@@ -969,7 +966,15 @@ ERROR(fixed_arrays_not_available, none,
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
-NOTE(lifetime_outside_scope_parent, none,
+ERROR(lifetime_value_outside_scope, none,
+      "lifetime-dependent value escapes its scope", ())
+NOTE(lifetime_outside_scope_argument, none,
+     "it depends on the lifetime of argument '%0'", (Identifier))
+NOTE(lifetime_outside_scope_access, none,
+     "it depends on this scoped access to variable '%0'", (Identifier))
+NOTE(lifetime_outside_scope_variable, none,
+     "it depends on the lifetime of variable '%0'", (Identifier))
+NOTE(lifetime_outside_scope_value, none,
      "it depends on the lifetime of this parent value", ())
 NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())

@@ -176,6 +176,8 @@ extension Operand {
     case let srcDestInst as SourceDestAddrInstruction
            where srcDestInst.destinationOperand == self:
       return true
+    case let apply as FullApplySite:
+      return apply.isIndirectResult(operand: self)
     default:
       return false
     }
