@@ -78,7 +78,7 @@ EnableLifetimeDependenceInsertion(
 // Temporary flag until the stdlib builds with ~Escapable
 llvm::cl::opt<bool>
 EnableLifetimeDependenceDiagnostics(
-  "enable-lifetime-dependence-diagnostics", llvm::cl::init(false),
+  "enable-lifetime-dependence-diagnostics", llvm::cl::init(true),
   llvm::cl::desc("Enable lifetime dependence diagnostics."));
 
 //===----------------------------------------------------------------------===//
