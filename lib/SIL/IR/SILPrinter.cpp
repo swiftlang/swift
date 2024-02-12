@@ -2533,10 +2533,12 @@ public:
     switch (MDI->dependenceKind()) {
     case MarkDependenceKind::Unresolved:
       *this << "[unresolved] ";
+      break;
     case MarkDependenceKind::Escaping:
       break;
     case MarkDependenceKind::NonEscaping:
       *this << "[nonescaping] ";
+      break;
     }
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());

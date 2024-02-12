@@ -4995,8 +4995,6 @@ void IRGenFunction::emitEpilogue() {
     CurFn->addFnAttr(llvm::Attribute::getWithUWTableKind(
         *IGM.LLVMContext, llvm::UWTableKind::Default));
 
-    auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGM.Context);
     llvm::Constant *personality;
 
     if (IGM.isSwiftExceptionPersonalityFeatureAvailable()) {
