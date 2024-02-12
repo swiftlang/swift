@@ -3394,12 +3394,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "\"] ";
   }
 
-  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
-    OS << "[ref_adhoc_requirement_witness \"";
-    OS << usedFunc->getName();
-    OS << "\"] ";
-  }
-
   if (hasObjCReplacement()) {
     OS << "[objc_replacement_for \"";
     OS << getObjCReplacement().str();

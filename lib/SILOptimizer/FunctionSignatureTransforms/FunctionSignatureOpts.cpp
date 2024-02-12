@@ -668,7 +668,6 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
-                     F->getReferencedAdHocRequirementWitnessFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;

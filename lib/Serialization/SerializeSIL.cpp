@@ -483,12 +483,6 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
 
-  IdentifierID usedAdHocWitnessFunctionID = 0;
-  if (auto *fun = F.getReferencedAdHocRequirementWitnessFunction()) {
-    addReferencedSILFunction(fun, true);
-    usedAdHocWitnessFunctionID = S.addUniquedStringRef(fun->getName());
-  }
-
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
@@ -522,7 +516,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
       (unsigned)F.forceEnableLexicalLifetimes(), FnID, replacedFunctionID,
-      usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
+      genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
