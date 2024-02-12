@@ -178,7 +178,6 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request)) {
-        assert(!getInvertibleProtocolKind(*kp));
         return ProtocolConformanceRef::forInvalid();
       }
     }
