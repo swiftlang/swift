@@ -30,6 +30,7 @@ sil @single_indirect_arg_coroutine : $@yield_once @convention(thin) (@in Int32) 
 sil @indirect_arg_and_ptr : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 sil @single_reference : $@convention(thin) (@guaranteed X) -> Int32
 sil @nouser_func : $@convention(thin) () -> ()
+sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
 
 sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 [%1: write v**]
@@ -1097,4 +1098,23 @@ bb0:
   dealloc_stack %0 : $*C
   %4 = tuple ()
   return %4 : $()
+}
+
+// CHECK-LABEL: @test_stored_pointer
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+// CHECK-NEXT:      %0 = alloc_stack $Int                           // users: %7, %1
+// CHECK-NEXT:    r=1,w=1
+sil @test_stored_pointer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = alloc_stack $Builtin.RawPointer
+  store %1 to %2 : $*Builtin.RawPointer
+  %4 = function_ref @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  dealloc_stack %2 : $*Builtin.RawPointer
+  dealloc_stack %0 : $*Int
+  %8 = tuple ()
+  return %8 : $()
 }
