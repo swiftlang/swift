@@ -253,41 +253,31 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
 
 ### The actual build
 
-1. Build the toolchain with optimizations, debuginfo, and assertions, using
-   Ninja.
-   - macOS:
-     ```sh
-     utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping
-     ```
-   - Linux:
-     ```sh
-     utils/build-script --release-debuginfo
-     ```
-     If you installed and want to use Sccache, include the `--sccache` option in
-     the invocation as well.
-   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
-   <br />
+Build the toolchain with optimizations, debuginfo, and assertions, using Ninja:
 
-   > **Note**  
-   > If you are planning to work on the compiler on macOS, but not the parts that are
-   > written in Swift, pass `--bootstrapping=hosttools` to speed up local
-   > development.
+- macOS:
+  ```sh
+  utils/build-script --skip-build-benchmarks \
+    --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+    --sccache --release-debuginfo --swift-disable-dead-stripping \
+    --bootstrapping=hosttools
+  ```
+- Linux:
+  ```sh
+  utils/build-script --release-debuginfo
+  ```
+  - If you want to additionally build the Swift core libraries, i.e.,
+    swift-corelibs-libdispatch, swift-corelibs-foundation, and
+    swift-corelibs-xctest, add `--xctest` to the invocation.
 
-   This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
-   containing the Swift compiler and standard library and clang/LLVM build artifacts.
-   If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
+- If you installed and want to use Sccache, add `--sccache` to the invocation.
+- If you want to use a debugger such as LLDB on compiler sources, add
+  `--debug-swift` to the invocation: a fruitful debugging experience warrants
+  non-optimized code besides debug information.
 
-   > **Note**  
-   > `--release-debuginfo` means that although debug information will be produced, all targets will
-   > be compiled in release mode, meaning optimized code, which can affect your debugging experience.
-   > Consider [`--debug-swift` to build a debug variant of the compiler](#debugging-issues) and have
-   > the swift targets (including `swift-frontend`) built in debug mode.
-
-   On Linux, if you would like to additionally build the Swift corelibs,
-   ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
-   add the `--xctest` flag to `build-script`.
+This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
+containing the Swift compiler and standard library and clang/LLVM build artifacts.
+If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
 
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
