@@ -23,7 +23,7 @@ public struct TestError: Error {
 
 @inline(never)
 @_optimize(none)
-internal func internalImplementation(somethingGood: Bool) -> Result<Int, any Error> {
+internal func internalImplementation(somethingGood: Bool) -> Result<Int, TestError> {
   return somethingGood ? .success(27) : .failure(TestError(errno:123))
 }
 
@@ -32,11 +32,12 @@ public func publicWrapper(somethingGood: Bool) throws -> Int {
 }
 
 // CHECK-LABEL: sil [noinline] @$s4test0A13WithForceCast13somethingGoodSiSb_tF
-// CHECK:       [[F:%[0-9]+]] = function_ref @$s4test22internalImplementation13somethingGoods6ResultOySis5Error_pGSb_tF
+// CHECK:       [[F:%[0-9]+]] = function_ref @$s4test22internalImplementation13somethingGoods6ResultOySiAA9TestErrorVGSb_tF
 // CHECK:       apply [[F]]
 // CHECK:       switch_enum
 // CHECK:     bb1:
 // CHECK-NOT:   alloc_existential_box
+// CHECK-NOT:   apply
 // CHECK: } // end sil function '$s4test0A13WithForceCast13somethingGoodSiSb_tF'
 @inline(never)
 public func testWithForceCast(somethingGood: Bool) -> Int {
@@ -48,11 +49,12 @@ public func testWithForceCast(somethingGood: Bool) -> Int {
 }
 
 // CHECK-LABEL: sil [noinline] @$s4test0A19WithMultipleCatches13somethingGoodSiSb_tF
-// CHECK:       [[F:%[0-9]+]] = function_ref @$s4test22internalImplementation13somethingGoods6ResultOySis5Error_pGSb_tF
+// CHECK:       [[F:%[0-9]+]] = function_ref @$s4test22internalImplementation13somethingGoods6ResultOySiAA9TestErrorVGSb_tF
 // CHECK:       apply [[F]]
 // CHECK:       switch_enum
 // CHECK:     bb1:
 // CHECK-NOT:   alloc_existential_box
+// CHECK-NOT:   apply
 // CHECK: } // end sil function '$s4test0A19WithMultipleCatches13somethingGoodSiSb_tF'
 @inline(never)
 public func testWithMultipleCatches(somethingGood: Bool) -> Int {
