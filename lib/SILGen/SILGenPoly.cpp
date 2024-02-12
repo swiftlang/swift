@@ -4495,7 +4495,6 @@ void ResultPlanner::planExpandedIntoDirect(AbstractionPattern innerOrigType,
       assert(outerSubstType->isAny());
 
       auto *module = SGF.getModule().getSwiftModule();
-      auto &ctx = SGF.getASTContext();
 
       auto opaque = AbstractionPattern::getOpaque();
       auto anyType = SGF.getLoweredType(opaque, outerSubstType);
