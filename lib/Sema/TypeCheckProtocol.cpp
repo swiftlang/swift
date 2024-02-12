@@ -1237,20 +1237,13 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
     bool requiresNonSendable = false;
     if (!solution || solution->Fixes.size()) {
-      auto isMatchedAllowed = [&](const constraints::Solution &solution) {
-        /// If the *only* problems are that `@Sendable` attributes are missing,
-        /// allow the match in some circumstances.
-        if (llvm::all_of(solution.Fixes, [](constraints::ConstraintFix *fix) {
-              return fix->getKind() ==
-                     constraints::FixKind::AddSendableAttribute;
-            }))
-          return true;
-
-        // In all other cases - disallow the match.
-        return false;
-      };
-
-      if (!solution || !isMatchedAllowed(*solution))
+      /// If the *only* problems are that `@Sendable` attributes are missing,
+      /// allow the match in some circumstances.
+      requiresNonSendable = solution
+        && llvm::all_of(solution->Fixes, [](constraints::ConstraintFix *fix) {
+          return fix->getKind() == constraints::FixKind::AddSendableAttribute;
+        });
+      if (!requiresNonSendable)
         return RequirementMatch(witness, MatchKind::TypeConflict,
                                 witnessType);
     }
