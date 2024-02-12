@@ -679,18 +679,18 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
   }
 }
 
-/// Instantiate the specified empty type by recursively tupling and structing
-/// the empty types aggregated together at each level.
-static SILValue createValueForEmptyType(SILType ty,
-                                        SILInstruction *insertionPoint,
-                                        SILBuilderContext &ctx) {
+/// Instantiate the specified type by recursively tupling and structing the
+/// unique instances of the empty types and undef "instances" of the non-empty
+/// types aggregated together at each level.
+static SILValue createEmptyAndUndefValue(SILType ty,
+                                         SILInstruction *insertionPoint,
+                                         SILBuilderContext &ctx) {
   auto *function = insertionPoint->getFunction();
-  assert(ty.isEmpty(*function));
   if (auto tupleTy = ty.getAs<TupleType>()) {
     SmallVector<SILValue, 4> elements;
     for (unsigned idx : range(tupleTy->getNumElements())) {
       SILType elementTy = ty.getTupleElementType(idx);
-      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
+      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
       elements.push_back(element);
     }
     SILBuilderWithScope builder(insertionPoint, ctx);
@@ -707,15 +707,14 @@ static SILValue createValueForEmptyType(SILType ty,
     SmallVector<SILValue, 4> elements;
     for (auto *field : decl->getStoredProperties()) {
       auto elementTy = ty.getFieldType(field, module, tec);
-      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
+      auto element = createEmptyAndUndefValue(elementTy, insertionPoint, ctx);
       elements.push_back(element);
     }
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createStruct(insertionPoint->getLoc(), ty, elements);
+  } else {
+    return SILUndef::get(ty, *insertionPoint->getFunction());
   }
-  llvm::errs() << "Attempting to create value for illegal empty type:\n";
-  ty.print(llvm::errs());
-  llvm::report_fatal_error("illegal empty type: neither tuple nor struct.");
 }
 
 /// Whether lexical lifetimes should be added for the values stored into the
@@ -1982,7 +1981,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         // empty--an aggregate of types without storage.
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createValueForEmptyType(
+                                  /*replacement=*/createEmptyAndUndefValue(
                                       asi->getElementType(), inst, ctx)),
             /*isStorageValid=*/true};
       }
