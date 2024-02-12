@@ -206,7 +206,7 @@ extension Result {
 
 extension Result where Failure == Swift.Error {
   /// ABI: Historical init(catching:)
-  @_silgen_name("$ss6ResultOss5Error_pRs_rlE8catchingAByxsAC_pGxyKXE_tcfC")
+  @_silgen_name("$ss6ResultOss5Error_pRs_rlE8catchingAByxsAC_pGxyKXE_tcfCa")
   @usableFromInline
   init(__abi_catching body: () throws(Failure) -> Success) {
     do {
