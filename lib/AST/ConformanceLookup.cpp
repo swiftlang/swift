@@ -205,6 +205,9 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
 
   auto *tupleDecl = ctx.getBuiltinTupleDecl();
 
+  // Ignore @lvalue's within the tuple.
+  type = type->getRValueType();
+
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (tupleDecl->lookupConformance(protocol, conformances)) {
