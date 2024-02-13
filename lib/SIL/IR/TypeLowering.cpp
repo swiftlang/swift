@@ -3246,6 +3246,13 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
       AnyFunctionType::ExtInfo baseExtInfo;
       if (auto origFnType = origType.getAs<AnyFunctionType>()) {
         baseExtInfo = origFnType->getExtInfo();
+
+        if (baseExtInfo.getThrownError()) {
+          if (auto substThrownError = substFnType->getEffectiveThrownErrorType())
+            baseExtInfo = baseExtInfo.withThrows(true, *substThrownError);
+          else
+            baseExtInfo = baseExtInfo.withThrows(false, Type());
+        }
       } else {
         baseExtInfo = substFnType->getExtInfo();
       }
