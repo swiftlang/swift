@@ -7845,5 +7845,11 @@ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
 ERROR(transferring_unsupported_param_specifier, none,
       "'%0' cannot be applied to a 'transferring' parameter", (StringRef))
 
+ERROR(transferring_only_on_parameters_and_results, none,
+      "'transferring' may only be used on parameters and results", ())
+ERROR(transferring_cannot_be_applied_to_tuple_elt, none,
+      "'transferring' cannot be applied to tuple elements", ())
+
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

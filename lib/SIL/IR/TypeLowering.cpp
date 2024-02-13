@@ -3726,6 +3726,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
+          .withTransferringResult(funcType->hasTransferringResult())
           .build();
 
   return CanAnyFunctionType::get(

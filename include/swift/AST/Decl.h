@@ -507,7 +507,7 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
-                        1+1+2+1+1+NumSelfAccessKindBits+1,
+                        1+1+2+1+1+NumSelfAccessKindBits+1+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -529,7 +529,10 @@ protected:
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
     /// analysis.
-    HasTopLevelLocalContextCaptures : 1
+    HasTopLevelLocalContextCaptures : 1,
+
+    /// Set to true if this FuncDecl has a transferring result.
+    HasTransferringResult : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
@@ -7787,6 +7790,7 @@ protected:
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
+    Bits.FuncDecl.HasTransferringResult = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -7941,6 +7945,16 @@ public:
   }
   void setForcedStaticDispatch(bool flag) {
     Bits.FuncDecl.ForcedStaticDispatch = flag;
+  }
+
+  /// Returns true if this FuncDecl has a transferring result... returns false
+  /// otherwise.
+  bool hasTransferringResult() const {
+    return Bits.FuncDecl.HasTransferringResult;
+  }
+
+  void setTransferringResult(bool newValue = true) {
+    Bits.FuncDecl.HasTransferringResult = newValue;
   }
 
   static bool classof(const Decl *D) {

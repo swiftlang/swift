@@ -2765,8 +2765,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // 'throws' only applies to the innermost function.
       infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.
-      if (auto fd = dyn_cast<FuncDecl>(D))
+      if (auto fd = dyn_cast<FuncDecl>(D)) {
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+        if (fd->hasTransferringResult())
+          infoBuilder = infoBuilder.withTransferringResult();
+      }
 
       lifetimeDependenceInfo = LifetimeDependenceInfo::get(AFD, resultTy);
       if (lifetimeDependenceInfo.has_value()) {
@@ -2793,6 +2796,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
       }
+
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {

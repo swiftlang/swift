@@ -469,14 +469,13 @@ Type ASTBuilder::createFunctionType(
                                                  representation);
 
   // TODO: Handle LifetimeDependenceInfo here.
-  auto einfo =
-      FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   thrownError, resultDiffKind,
-                                   clangFunctionType, isolation,
-                                   LifetimeDependenceInfo())
-          .withAsync(flags.isAsync())
-          .withConcurrent(flags.isSendable())
-          .build();
+  auto einfo = FunctionType::ExtInfoBuilder(
+                   representation, noescape, flags.isThrowing(), thrownError,
+                   resultDiffKind, clangFunctionType, isolation,
+                   LifetimeDependenceInfo(), false /*is transferring*/)
+                   .withAsync(flags.isAsync())
+                   .withConcurrent(flags.isSendable())
+                   .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -659,7 +658,8 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), unimplementable,
-                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
+                   isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
+                   false /*has transferring result*/)
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,

@@ -10062,6 +10062,8 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
+  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR))
+    FD->setTransferringResult();
   return FD;
 }
 

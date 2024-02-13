@@ -4072,6 +4072,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  bool hasTransferringResult =
+      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
+
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
@@ -4079,7 +4082,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo());
+      LifetimeDependenceInfo(), hasTransferringResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4286,10 +4289,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  bool hasTransferringResult =
+      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
+
   // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
+      isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
+      hasTransferringResult);
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4965,11 +4972,17 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveTransferringTypeRepr(TransferringTypeRepr *repr,
                                           TypeResolutionOptions options) {
-  // Transferring is only value for non-EnumCaseDecl parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+  if (options.is(TypeResolverContext::TupleElement)) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
-                    diag::attr_only_on_parameters, "transferring");
+                    diag::transferring_cannot_be_applied_to_tuple_elt);
+    return ErrorType::get(getASTContext());
+  }
+
+  if (!options.is(TypeResolverContext::FunctionResult) &&
+      (!options.is(TypeResolverContext::FunctionInput) ||
+       options.hasBase(TypeResolverContext::EnumElementDecl))) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::transferring_only_on_parameters_and_results);
     return ErrorType::get(getASTContext());
   }
 

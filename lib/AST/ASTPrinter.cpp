@@ -5006,6 +5006,21 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
+      {
+        auto fnTy = decl->getInterfaceType();
+        bool hasTransferring = false;
+        if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
+          if (ft->hasExtInfo())
+            hasTransferring = ft->hasTransferringResult();
+        } else if (auto *ft =
+                       llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
+          if (ft->hasExtInfo())
+            hasTransferring = ft->hasTransferringResult();
+        }
+        if (hasTransferring)
+          Printer << "transferring ";
+      }
+
       // HACK: When printing result types for funcs with opaque result types,
       //       always print them using the `some` keyword instead of printing
       //       the full stable reference.
@@ -7448,6 +7463,10 @@ public:
 
     Printer << " -> ";
 
+    if (T->hasExtInfo() && T->hasTransferringResult()) {
+      Printer.printKeyword("transferring", Options);
+    }
+
     if (T->hasLifetimeDependenceInfo()) {
       auto lifetimeDependenceInfo = T->getExtInfo().getLifetimeDependenceInfo();
       assert(!lifetimeDependenceInfo.empty());
@@ -7606,6 +7625,10 @@ public:
         param.print(sub->Printer, subOptions);
       }
       sub->Printer << ") -> ";
+
+      if (T->hasTransferringResult()) {
+        sub->Printer << "transferring ";
+      }
 
       auto lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
       if (!lifetimeDependenceInfo.empty()) {

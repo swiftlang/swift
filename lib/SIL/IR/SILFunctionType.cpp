@@ -2185,6 +2185,9 @@ static CanSILFunctionType getSILFunctionType(
     isAsync = true;
   }
 
+  bool hasTransferringResult =
+      substFnInterfaceType->getExtInfo().hasTransferringResult();
+
   // Get the yield type for an accessor coroutine.
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();
@@ -2383,6 +2386,7 @@ static CanSILFunctionType getSILFunctionType(
                         .withUnimplementable(unimplementable)
                         .withLifetimeDependenceInfo(
                             extInfoBuilder.getLifetimeDependenceInfo())
+                        .withTransferringResult(hasTransferringResult)
                         .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,

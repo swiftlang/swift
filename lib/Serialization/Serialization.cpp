@@ -76,6 +76,8 @@
 
 #define DEBUG_TYPE "Serialization"
 
+#pragma clang optimize off
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
@@ -4460,7 +4462,6 @@ public:
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
-
     FuncLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                            contextID.getOpaqueValue(),
                            fn->isImplicit(),
@@ -4488,6 +4489,7 @@ public:
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
+                           fn->hasTransferringResult(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -5524,7 +5526,8 @@ public:
         fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation);
+        isolation,
+        fnTy->hasTransferringResult());
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -5541,7 +5544,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation,
+        isolation, fnTy->hasTransferringResult(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -5628,7 +5631,8 @@ public:
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->isUnimplementable(), fnTy->hasErasedIsolation(),
-        stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        stableDiffKind, fnTy->hasErrorResult(), fnTy->hasTransferringResult(),
+        fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);

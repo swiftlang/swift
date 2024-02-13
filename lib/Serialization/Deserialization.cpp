@@ -3928,6 +3928,7 @@ public:
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
     bool isDistributedThunk;
+    bool hasTransferringResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -3947,6 +3948,7 @@ public:
                                           opaqueReturnTypeID,
                                           isUserAccessible,
                                           isDistributedThunk,
+                                          hasTransferringResult,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -4162,6 +4164,9 @@ public:
       fn->setUserAccessible(isUserAccessible);
 
     fn->setDistributedThunk(isDistributedThunk);
+
+    if (hasTransferringResult)
+      fn->setTransferringResult();
 
     return fn;
   }
@@ -6705,7 +6710,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, concurrent, async, throws;
+  bool noescape = false, concurrent, async, throws, hasTransferringResult;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -6714,12 +6719,14 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (!isGeneric) {
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, concurrent,
-        async, throws, thrownErrorID, rawDiffKind, rawIsolation);
+        async, throws, thrownErrorID, rawDiffKind, rawIsolation,
+        hasTransferringResult);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, concurrent, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, rawGenericSig);
+        thrownErrorID, rawDiffKind, rawIsolation, hasTransferringResult,
+        rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -6769,7 +6776,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   // TODO: Handle LifetimeDependenceInfo here.
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
-                  clangFunctionType, isolation, LifetimeDependenceInfo())
+                  clangFunctionType, isolation, LifetimeDependenceInfo(),
+                  hasTransferringResult)
                   .withConcurrent(concurrent)
                   .withAsync(async)
                   .build();
@@ -7259,6 +7267,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool noescape;
   bool erasedIsolation;
   bool hasErrorResult;
+  bool hasTransferringResult;
   unsigned numParams;
   unsigned numYields;
   unsigned numResults;
@@ -7271,7 +7280,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, concurrent, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      erasedIsolation, rawDiffKind, hasErrorResult,
+      erasedIsolation, rawDiffKind, hasErrorResult, hasTransferringResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -7298,11 +7307,12 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     isolation = SILFunctionTypeIsolation::Erased;
 
   // Handle LifetimeDependenceInfo here.
-  auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, concurrent,
-                     async, unimplementable, isolation, *diffKind,
-                     clangFunctionType, LifetimeDependenceInfo())
-                     .build();
+  auto extInfo =
+      SILFunctionType::ExtInfoBuilder(
+          *representation, pseudogeneric, noescape, concurrent, async,
+          unimplementable, isolation, *diffKind, clangFunctionType,
+          LifetimeDependenceInfo(), hasTransferringResult)
+          .build();
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

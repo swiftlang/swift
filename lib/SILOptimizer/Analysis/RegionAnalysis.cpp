@@ -1184,6 +1184,10 @@ enum class TranslationSemantics {
   /// without updating this code correctly. This is most likely driver error and
   /// should be caught in testing when we assert.
   AssertingIfNonSendable,
+
+  /// Instructions that always unconditionally transfer all of their
+  /// non-Sendable parameters and that do not have any results.
+  TransferringNoResult,
 };
 
 } // namespace
@@ -1225,6 +1229,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::AssertingIfNonSendable:
     os << "asserting_if_nonsendable";
+    return os;
+  case TranslationSemantics::TransferringNoResult:
+    os << "transferring_no_result";
     return os;
   }
 
@@ -1750,8 +1757,24 @@ public:
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
-    return translateSILMultiAssign(applyResults, nonTransferringParameters,
-                                   options);
+
+    auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
+
+    // If our result is not transferring, just do the normal multi-assign.
+    if (!type->hasTransferringResult()) {
+      return translateSILMultiAssign(applyResults, nonTransferringParameters,
+                                     options);
+    }
+
+    // If our result is transferring, then pass in empty as our results and then
+    // perform assign fresh.
+    ArrayRef<SILValue> empty;
+    translateSILMultiAssign(empty, nonTransferringParameters, options);
+    for (SILValue result : applyResults) {
+      if (auto value = tryToTrackValue(result)) {
+        builder.addAssignFresh(value->getRepresentative().getValue());
+      }
+    }
   }
 
   void translateSILApply(SILInstruction *inst) {
@@ -2042,6 +2065,17 @@ public:
     }
   }
 
+  /// Instructions that transfer all of their non-Sendable parameters
+  /// unconditionally and that do not have a result.
+  void translateSILTransferringNoResult(MutableArrayRef<Operand> values) {
+    for (auto &op : values) {
+      if (auto ns = tryToTrackValue(op.get())) {
+        builder.addRequire(ns->getRepresentative().getValue());
+        builder.addTransfer(ns->getRepresentative().getValue(), &op);
+      }
+    }
+  }
+
   /// Translate the instruction's in \p basicBlock to a vector of PartitionOps
   /// that define the block's dataflow.
   void translateSILBasicBlock(SILBasicBlock *basicBlock,
@@ -2141,8 +2175,9 @@ public:
           "transfer-non-sendable: Found instruction that is not allowed to "
           "have non-Sendable parameters with such parameters?!");
       return;
+    case TranslationSemantics::TransferringNoResult:
+      return translateSILTransferringNoResult(inst->getAllOperands());
     }
-
     llvm_unreachable("Covered switch isn't covered?!");
   }
 };
@@ -2458,7 +2493,6 @@ CONSTANT_TRANSLATION(UnwindInst, Ignored)
 CONSTANT_TRANSLATION(ThrowAddrInst, Ignored)
 
 // Terminators that only need require.
-CONSTANT_TRANSLATION(ReturnInst, Require)
 CONSTANT_TRANSLATION(ThrowInst, Require)
 CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
 CONSTANT_TRANSLATION(YieldInst, Require)
@@ -2632,6 +2666,13 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  if (ri->getFunction()->getLoweredFunctionType()->hasTransferringResult()) {
+    return TranslationSemantics::TransferringNoResult;
+  }
+  return TranslationSemantics::Require;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitRefToBridgeObjectInst(RefToBridgeObjectInst *r) {

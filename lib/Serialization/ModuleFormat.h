@@ -1230,7 +1230,8 @@ namespace decls_block {
     BCFixed<1>,                      // throws?
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
-    FunctionTypeIsolationField       // isolation
+    FunctionTypeIsolationField,      // isolation
+    BCFixed<1>                       // has transferring result
     // trailed by parameters
   );
 
@@ -1329,6 +1330,7 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
+    BCFixed<1>,                      // has transferring result
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1347,6 +1349,7 @@ namespace decls_block {
     BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
+    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -1639,6 +1642,7 @@ namespace decls_block {
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
+    BCFixed<1>,   // has transferring result
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

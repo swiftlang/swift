@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults
+// RUN: %target-typecheck-verify-swift -disable-experimental-parser-round-trip -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -enable-experimental-feature TransferringArgsAndResults
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -23,4 +23,4 @@ func test_repeated_transferring_mixed(_ x: transferring borrowing transferring i
 
 // Just until we get the results setup.
 func test_transferring_result_in_tuple() -> (transferring Int, Int) {}
-// expected-error @-1 {{'transferring' may only be used on parameters}}
+// expected-error @-1 {{'transferring' cannot be applied to tuple elements}}
