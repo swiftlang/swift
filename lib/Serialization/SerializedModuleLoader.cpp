@@ -392,7 +392,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-SerializedModuleLoaderBase::BinaryModuleImports
+llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
@@ -484,7 +484,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
                          Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports.moduleImports;
+  auto importedModuleSet = binaryModuleImports->moduleImports;
   std::vector<std::string> importedModuleNames;
   importedModuleNames.reserve(importedModuleSet.size());
   llvm::transform(importedModuleSet.keys(),
@@ -493,8 +493,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
                      return N.str();
                   });
 
-  auto importedHeader = binaryModuleImports.headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports.moduleImports;
+  auto importedHeader = binaryModuleImports->headerImport;
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
   std::vector<std::string> importedOptionalModuleNames;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))

@@ -1175,6 +1175,13 @@ bool CompilerInstance::canImportSwiftBacktracing() const {
   return getASTContext().testImportModule(modulePath);
 }
 
+bool CompilerInstance::canImportCxx() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(CXX_MODULE_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().testImportModule(modulePath);
+}
+
 bool CompilerInstance::canImportCxxShim() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(CXX_SHIM_NAME));
@@ -1278,8 +1285,13 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     }
   }
 
-  if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
-    pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
+  if (Invocation.getLangOptions().EnableCXXInterop) {
+    if (imports.StdlibKind != ImplicitStdlibKind::Builtin &&
+        Invocation.getFrontendOptions().ModuleName != CXX_MODULE_NAME &&
+        canImportCxx())
+      pushImport(CXX_MODULE_NAME);
+    if (canImportCxxShim())
+      pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;

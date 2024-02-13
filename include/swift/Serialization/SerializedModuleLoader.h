@@ -172,7 +172,7 @@ protected:
   };
 
   llvm::ErrorOr<BinaryModuleImports>
-  getImportsOfModule(Twine modulePath,
+  getImportsOfModule(const ModuleFileSharedCore &loadedModuleFile,
                      ModuleLoadingBehavior transitiveBehavior,
                      StringRef packageName, bool isTestableImport);
 
