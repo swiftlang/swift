@@ -57,6 +57,11 @@ struct InverseMarking {
     }
     operator bool() const { return isPresent(); }
 
+    // Is there any kind of explicit marking?
+    bool isAnyExplicit() const {
+      return is(Kind::Explicit) || is(Kind::LegacyExplicit);
+    }
+
     SourceLoc getLoc() const { return loc; }
 
     void set(Kind k, SourceLoc l = SourceLoc()) {

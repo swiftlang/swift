@@ -169,7 +169,12 @@ protocol NeedsCopyable {}
 
 struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required to be 'Copyable' but is marked with '~Copyable'}}
 enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
+
 class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Copyable'}}
+                                      // expected-error@-1 {{class 'NiceTry' required to be 'Copyable' but is marked with '~Copyable}}
+
+@_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
+                                       // expected-error@-1 {{class 'NiceTry2' required to be 'Copyable' but is marked with '~Copyable'}}
 
 struct OopsConformance1: ~Copyable, NeedsCopyable {}
 // expected-error@-1 {{type 'OopsConformance1' does not conform to protocol 'NeedsCopyable'}}

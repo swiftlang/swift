@@ -102,9 +102,10 @@ switch (getKind()) {                                                         \
     return cast<NormalProtocolConformance>(this)->Method Args;               \
   case ProtocolConformanceKind::Self:                                        \
     return cast<SelfProtocolConformance>(this)->Method Args;                 \
+  case ProtocolConformanceKind::Builtin:                                     \
+    return cast<BuiltinProtocolConformance>(this)->Method Args;              \
   case ProtocolConformanceKind::Specialized:                                 \
   case ProtocolConformanceKind::Inherited:                                   \
-  case ProtocolConformanceKind::Builtin:                                     \
     llvm_unreachable("not a root conformance");                              \
 }                                                                            \
 llvm_unreachable("bad ProtocolConformanceKind");
@@ -1090,19 +1091,21 @@ void NominalTypeDecl::prepareConformanceTable() const {
   // Synthesize the unconditional conformances to invertible protocols.
   // For conditional ones, see findSynthesizedConformances .
   if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    bool missingOne = false;
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto invertible = getMarking(ip);
-      if (!invertible.getInverse() || bool(invertible.getPositive()))
-        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
-      else
-        missingOne = true;
+    // Classes get their conformances during ModuleDecl::lookupConformance.
+    if (!isa<ClassDecl>(this)) {
+      bool missingOne = false;
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto invertible = getMarking(ip);
+        if (!invertible.getInverse() || bool(invertible.getPositive()))
+          addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+        else
+          missingOne = true;
+      }
+
+      // FIXME: rdar://122289155 (NCGenerics: convert Equatable, Hashable, and RawRepresentable to ~Copyable.)
+      if (missingOne)
+        return;
     }
-
-    // FIXME: rdar://122289155 (NCGenerics: convert Equatable, Hashable, and RawRepresentable to ~Copyable.)
-    if (missingOne)
-      return;
-
   } else if (!canBeCopyable()) {
     return; // No synthesized conformances for move-only nominals.
   }

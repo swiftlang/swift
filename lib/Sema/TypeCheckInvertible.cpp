@@ -171,20 +171,14 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
   auto &ctx = nom->getASTContext();
   bool conforms = true;
 
-  // An explicit `~IP` prevents conformance if any of these are true:
+  // An explicit `~IP` prevents conformance if it appears on the same
+  // declaration that also declares the conformance.
   //
-  // 1. It appears on a class.
-  // 2. Appears on the same declaration that also declares the conformance.
-  //    So, if the nominal has `~Copyable` but this conformance is
-  //    written in an extension, then we do not raise an error.
+  // So, if the nominal has `~Copyable` but this conformance is
+  // written in an extension, then we do not raise an error.
   auto marking = nom->getMarking(ip);
-  if (marking.getInverse().getKind() == InverseMarking::Kind::Explicit) {
-    if (isa<ClassDecl>(nom)) {
-      ctx.Diags.diagnose(marking.getInverse().getLoc(),
-                         diag::inverse_on_class,
-                         getProtocolName(kp));
-      conforms &= false;
-    } else if (conformance->getDeclContext() == nom) {
+  if (marking.getInverse().isAnyExplicit()) {
+    if (conformance->getDeclContext() == nom) {
       ctx.Diags.diagnose(marking.getInverse().getLoc(),
                          diag::inverse_but_also_conforms,
                          nom, getProtocolName(kp));
@@ -198,7 +192,7 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
 
   // Protocols do not directly define any storage.
   if (isa<ProtocolDecl, BuiltinTupleDecl>(nom))
-    llvm_unreachable("unexpected nominal to check Copyable conformance");
+    llvm_unreachable("unexpected nominal to check invertible's conformance");
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {
@@ -343,6 +337,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
   if (!ip)
     llvm_unreachable("not an invertible protocol");
 
+  assert(!isa<ClassDecl>(nominal) && "classes aren't handled here");
   auto file = cast<FileUnit>(nominal->getModuleScopeContext());
 
   // Generates a conformance for the nominal to the protocol.
@@ -403,20 +398,6 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return generateConformance(ext);
   };
 
-  switch (*ip) {
-  case InvertibleProtocolKind::Copyable:
-    // If move-only classes is enabled, we'll check the markings.
-    if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
-      break;
-
-  LLVM_FALLTHROUGH;
-  case InvertibleProtocolKind::Escapable:
-    // Always derive unconditional IP conformance for classes
-    if (isa<ClassDecl>(nominal))
-      return generateConformance(nominal);
-    break;
-  }
-
   auto marking = nominal->getMarking(*ip);
 
   // Unexpected to have any positive marking for IP if we're deriving it.
@@ -430,10 +411,8 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return nullptr; // No positive IP conformance will be inferred.
 
   case InverseMarking::Kind::Inferred:
-    if (!isa<ClassDecl>(nominal))
-      return generateConditionalConformance();
+    return generateConditionalConformance();
 
-  LLVM_FALLTHROUGH;
   case InverseMarking::Kind::None:
     // All types already start with conformances to the invertible protocols in
     // this case, within `NominalTypeDecl::prepareConformanceTable`.
