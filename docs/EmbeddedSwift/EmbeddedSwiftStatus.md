@@ -10,8 +10,8 @@ For an introduction and motivation into Embedded Swift, please see "[A Vision fo
 
 This status table describes which of the following standard library features can be used in Embedded Swift:
 
-| **Swift Standard Library Feature**          | **Currently Supported In Embedded Swift** |
-|---------------------------------------------|-----------------------------------------------------|
+| **Swift Standard Library Feature**                         | **Currently Supported In Embedded Swift?**          |
+|------------------------------------------------------------|-----------------------------------------------------|
 | Array (dynamic heap-allocated container)                   | Yes    |                                      
 | Array slices                                               | Yes    |                                      
 | assert, precondition, fatalError                           | Partial, only StaticStrings can be used as a failure message |
@@ -46,6 +46,10 @@ This status table describes which of the following standard library features can
 
 This status table describes which of the following Swift features can be used in Embedded Swift:
 
-| **Swift Feature**                           | **Currently Supported In Embedded Swift** |
-|---------------------------------------------|-----------------------------------------------------|
-| Swift Concurrency                   | Partial, experimental (basics of actors and tasks work in single-threaded concurrency mode)    |
+| **Swift Feature**                                          | **Currently Supported In Embedded Swift?**          |
+|------------------------------------------------------------|-----------------------------------------------------|
+| Swift Concurrency                                          | Partial, experimental (basics of actors and tasks work in single-threaded concurrency mode) |
+| C interop                                                  | Yes    | 
+| C++ interop                                                | Yes    |
+| ObjC interop                                               | No, intentionally unsupported long-term |
+| Library Evolution                                          | No, intentionally unsupported long-term |
