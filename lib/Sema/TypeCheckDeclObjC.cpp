@@ -2843,16 +2843,18 @@ public:
 
     // Did we actually match this extension to an interface? (In invalid code,
     // we might not have.)
-    auto interfaceDecl = ext->getImplementedObjCDecl();
-    if (!interfaceDecl)
+    auto interfaceDecls = ext->getAllImplementedObjCDecls();
+    if (interfaceDecls.empty())
       return;
 
     // Add the @_objcImplementation extension's members as candidates.
     addCandidates(ext);
 
     // Add its interface's members as requirements.
-    auto interface = cast<IterableDeclContext>(interfaceDecl);
-    addRequirements(interface);
+    for (auto interfaceDecl : interfaceDecls) {
+      auto interface = cast<IterableDeclContext>(interfaceDecl);
+      addRequirements(interface);
+    }
   }
 
 private:
@@ -3335,9 +3337,9 @@ private:
 
     // Check only applies to members of implementations, not implementations in
     // their own right.
-    if (!cand->isObjCImplementation()
-          && cand->getDeclContext()->getImplementedObjCContext()
-                 != req->getDeclContext())
+    if (!cand->isObjCImplementation() &&
+          getCategoryName(cand->getDeclContext()->getImplementedObjCContext())
+               != getCategoryName(req->getDeclContext()))
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())

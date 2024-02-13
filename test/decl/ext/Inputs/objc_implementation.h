@@ -59,6 +59,13 @@
 
 @end
 
+@interface ObjCClass () <NSCopying>
+
+- (void)extensionMethodFromHeader1:(int)param;
+- (void)extensionMethodFromHeader2:(int)param;
+
+@end
+
 @interface ObjCClass (PresentAdditions)
 
 - (void)categoryMethodFromHeader1:(int)param;

@@ -132,6 +132,12 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
 
+  // Make requests in the ClangImporter zone friends so they can access `Impl`.
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
+  friend class Name;
+#include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 public:
   class Implementation;
 

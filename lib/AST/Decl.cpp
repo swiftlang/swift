@@ -1813,11 +1813,9 @@ bool Decl::isObjCImplementation() const {
 
 llvm::Optional<Identifier>
 ExtensionDecl::getCategoryNameForObjCImplementation() const {
-  assert(isObjCImplementation());
-
   auto attr = getAttrs()
                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-  if (attr->isCategoryNameInvalid())
+  if (!attr || attr->isCategoryNameInvalid())
     return llvm::None;
 
   return attr->CategoryName;

@@ -207,17 +207,21 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangCategoryLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
 
-/// Given a Swift class, find the imported Swift decl representing the
-/// \c \@interface with the given category name. That is, this will return an
-/// \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl, or a
-/// \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, or \c nullptr
-/// if the class is not imported from Clang or it does not have a category by
-/// that name.
+/// Given a Swift class, find the imported Swift decl(s) representing the
+/// \c \@interface with the given category name. An empty \c categoryName
+/// represents the main interface for the class.
 ///
-/// An empty/invalid \c categoryName requests the main interface for the class.
+/// That is, this request will return one of:
+///
+/// \li a single \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl
+/// \li a \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, plus
+///     zero or more \c swift::ExtensionDecl s backed by 
+///     \c clang::ObjCCategoryDecl s (representing ObjC class extensions).
+/// \li an empty list if the class is not imported from Clang or it does not
+///     have a category by that name.
 class ClangCategoryLookupRequest
     : public SimpleRequest<ClangCategoryLookupRequest,
-                           IterableDeclContext *(ClangCategoryLookupDescriptor),
+                           TinyPtrVector<Decl *>(ClangCategoryLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -226,39 +230,46 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  IterableDeclContext *evaluate(Evaluator &evaluator,
+ TinyPtrVector<Decl *> evaluate(Evaluator &evaluator,
                                 ClangCategoryLookupDescriptor desc) const;
 };
 
-/// Links an imported Clang decl to the native Swift decl(s) that implement it
-/// using \c \@_objcImplementation.
+/// Links an \c \@_objcImplementation decl to the imported declaration(s) that
+/// it implements.
+///
+/// There is usually a 1:1 correspondence between interfaces and
+/// implementations, except that a class's main implementation implements
+/// both its main interface and any class extension interfaces. In this
+/// situation, the main class is always the first decl in \c interfaceDecls.
 struct ObjCInterfaceAndImplementation final {
-  Decl *interfaceDecl;
+  llvm::TinyPtrVector<Decl *> interfaceDecls;
   Decl *implementationDecl;
 
-  ObjCInterfaceAndImplementation(Decl *interfaceDecl,
+  ObjCInterfaceAndImplementation(llvm::TinyPtrVector<Decl *> interfaceDecls,
                                  Decl *implementationDecl)
-      : interfaceDecl(interfaceDecl), implementationDecl(implementationDecl)
+      : interfaceDecls(interfaceDecls), implementationDecl(implementationDecl)
   {
-    assert(interfaceDecl && implementationDecl &&
+    assert(!interfaceDecls.empty() && implementationDecl &&
            "interface and implementation are both non-null");
   }
 
   ObjCInterfaceAndImplementation()
-      : interfaceDecl(nullptr), implementationDecl(nullptr) {}
+      : interfaceDecls(), implementationDecl(nullptr) {}
 
   operator bool() const {
-    return interfaceDecl;
+    return interfaceDecls.empty();
   }
 
   friend llvm::hash_code
   hash_value(const ObjCInterfaceAndImplementation &pair) {
-    return llvm::hash_combine(pair.interfaceDecl, pair.implementationDecl);
+    return hash_combine(llvm::hash_combine_range(pair.interfaceDecls.begin(),
+                                                 pair.interfaceDecls.end()),
+                        pair.implementationDecl);
   }
 
   friend bool operator==(const ObjCInterfaceAndImplementation &lhs,
                          const ObjCInterfaceAndImplementation &rhs) {
-    return lhs.interfaceDecl == rhs.interfaceDecl
+    return lhs.interfaceDecls == rhs.interfaceDecls
                && lhs.implementationDecl == rhs.implementationDecl;
   }
 
@@ -272,13 +283,12 @@ void simple_display(llvm::raw_ostream &out,
                     const ObjCInterfaceAndImplementation &desc);
 SourceLoc extractNearestSourceLoc(const ObjCInterfaceAndImplementation &desc);
 
-/// Given a \c Decl whose declaration is imported from ObjC but whose
-/// implementation is provided by a Swift \c \@_objcImplementation
-/// \c extension , return both decls, with the imported interface first.
-/// Otherwise return \c {nullptr,nullptr} .
+/// Given a \c Decl , determine if it is an implementation with separate
+/// interfaces imported from ObjC (or vice versa) and if so, return all of the
+/// declarations involved in this relationship. Otherwise return an empty value.
 ///
-/// We retrieve both in a single request because we want to cache the
-/// relationship on both sides to avoid duplicating work.
+/// We perform this lookup in both directions using a single request because
+/// we want to cache the relationship on both sides to avoid duplicating work.
 class ObjCInterfaceAndImplementationRequest
     : public SimpleRequest<ObjCInterfaceAndImplementationRequest,
                            ObjCInterfaceAndImplementation(Decl *),

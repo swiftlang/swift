@@ -5922,18 +5922,6 @@ struct OrderDecls {
 };
 }
 
-static llvm::TinyPtrVector<Decl *>
-findImplsGivenInterface(ClassDecl *classDecl, Identifier categoryName) {
-  llvm::TinyPtrVector<Decl *> impls;
-  for (ExtensionDecl *ext : classDecl->getExtensions()) {
-    if (ext->isObjCImplementation()
-        && ext->getCategoryNameForObjCImplementation() == categoryName)
-      impls.push_back(ext);
-  }
-
-  return impls;
-}
-
 Identifier ExtensionDecl::getObjCCategoryName() const {
   // Could it be an imported category?
   if (!hasClangNode())
@@ -5947,29 +5935,24 @@ Identifier ExtensionDecl::getObjCCategoryName() const {
 
   // We'll look for an implementation with this category name.
   auto clangCategoryName = category->getName();
+  if (clangCategoryName.empty())
+    // Class extension (has an empty name).
+    return Identifier();
+  
   return getASTContext().getIdentifier(clangCategoryName);
 }
 
-static IterableDeclContext *
-findInterfaceGivenImpl(ClassDecl *classDecl, ExtensionDecl *ext) {
-  assert(ext->isObjCImplementation());
-
-  if (auto name = ext->getCategoryNameForObjCImplementation())
-    return classDecl->getImportedObjCCategory(*name);
-
-  return nullptr;
-}
-
 static ObjCInterfaceAndImplementation
-constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> &impls,
+constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
+                llvm::TinyPtrVector<Decl *> &impls,
                 Decl *diagnoseOn, Identifier categoryName) {
-  if (!interface || impls.empty())
+  if (interfaces.empty() || impls.empty())
     return ObjCInterfaceAndImplementation();
 
   if (impls.size() > 1) {
     llvm::sort(impls, OrderDecls());
 
-    auto &diags = interface->getASTContext().Diags;
+    auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
       auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
       attr->setCategoryNameInvalid();
@@ -5981,7 +5964,7 @@ constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> &impls,
     }
   }
 
-  return ObjCInterfaceAndImplementation(interface, impls.front());
+  return ObjCInterfaceAndImplementation(interfaces, impls.front());
 }
 
 static ObjCInterfaceAndImplementation
@@ -5994,42 +5977,38 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
     // Only extensions of ObjC classes can have @_objcImplementations.
     return {};
 
-  // The name of the category to find implementations for, if `dc` turns out
-  // to be an interface.
+  // We know the class we're trying to work with. Next, the category name.
   Identifier categoryName;
 
-  // The interface, if we find one.
-  Decl *interfaceDecl;
-
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    // Is this an `@_objcImplementation extension`? If so, find the interface
-    // and process that instead.
-    if (ext->isObjCImplementation()) {
-      if (auto interfaceDC = findInterfaceGivenImpl(classDecl, ext))
-        return findContextInterfaceAndImplementation(
-                                         interfaceDC->getAsGenericContext());
-      return {};
+    if (ext->hasClangNode()) {
+      // This is either an interface, or it's not objcImpl at all.
+      categoryName = ext->getObjCCategoryName();
+    } else {
+      // This is either the implementation, or it's not objcImpl at all.
+      if (auto name = ext->getCategoryNameForObjCImplementation())
+        categoryName = *name;
+      else
+        return {};
     }
-
-    // Is this an imported category? If so, extract its name so we can look for
-    // implementations of that category.
-    categoryName = ext->getObjCCategoryName();
-    if (categoryName.empty())
-      return {};
-
-    interfaceDecl = ext;
   } else {
     // Must be an imported class. Look for its main implementation.
     assert(isa_and_nonnull<ClassDecl>(dc));
-    categoryName = Identifier();    // technically a no-op
-    interfaceDecl = classDecl;
+    categoryName = Identifier();
   }
 
-  // If we reach here, we found an ObjC @interface of some kind and want to
-  // look for extensions implementing it.
+  // Now let's look up the interfaces for this...
+  auto interfaceDecls = classDecl->getImportedObjCCategory(categoryName);
 
-  auto implDecls = findImplsGivenInterface(classDecl, categoryName);
-  return constructResult(interfaceDecl, implDecls, classDecl, categoryName);
+  // And the implementations.
+  llvm::TinyPtrVector<Decl *> implDecls;
+  for (ExtensionDecl *ext : classDecl->getExtensions()) {
+    if (ext->isObjCImplementation()
+        && ext->getCategoryNameForObjCImplementation() == categoryName)
+      implDecls.push_back(ext);
+  }
+
+  return constructResult(interfaceDecls, implDecls, classDecl, categoryName);
 }
 
 static void lookupRelatedFuncs(AbstractFunctionDecl *func,
@@ -6109,7 +6088,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   assert(interface == nullptr || impls.empty() ||
          interface == func || llvm::is_contained(impls, func));
 
-  return constructResult(interface, impls, interface,
+  return constructResult({ interface }, impls, interface,
                          /*categoryName=*/Identifier());
 }
 
@@ -6137,7 +6116,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 
   out << "clang interface ";
-  simple_display(out, pair.interfaceDecl);
+  simple_display(out, pair.interfaceDecls);
   out << " with @_objcImplementation ";
   simple_display(out, pair.implementationDecl);
 }
@@ -6149,14 +6128,13 @@ swift::extractNearestSourceLoc(const ObjCInterfaceAndImplementation &pair) {
   return extractNearestSourceLoc(pair.implementationDecl);
 }
 
-Decl *Decl::getImplementedObjCDecl() const {
+llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
   if (hasClangNode())
     // This *is* the interface, if there is one.
-    return nullptr;
+    return {};
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
-  return evaluateOrDefault(getASTContext().evaluator, req, {})
-             .interfaceDecl;
+  return evaluateOrDefault(getASTContext().evaluator, req, {}).interfaceDecls;
 }
 
 DeclContext *DeclContext::getImplementedObjCContext() const {
@@ -6176,36 +6154,49 @@ Decl *Decl::getObjCImplementationDecl() const {
              .implementationDecl;
 }
 
-IterableDeclContext *ClangCategoryLookupRequest::
-evaluate(Evaluator &evaluator, ClangCategoryLookupDescriptor desc) const {
+llvm::TinyPtrVector<Decl *>
+ClangCategoryLookupRequest::evaluate(Evaluator &evaluator,
+                                     ClangCategoryLookupDescriptor desc) const {
   const ClassDecl *CD = desc.classDecl;
   Identifier categoryName = desc.categoryName;
 
   auto clangClass =
       dyn_cast_or_null<clang::ObjCInterfaceDecl>(CD->getClangDecl());
   if (!clangClass)
-    return nullptr;
+    return {};
 
-  if (categoryName.empty())
+  auto importCategory = [&](const clang::ObjCCategoryDecl *clangCat) -> Decl * {
+    return CD->getASTContext().getClangModuleLoader()
+                  ->importDeclDirectly(clangCat);
+  };
+
+  if (categoryName.empty()) {
     // No category name, so we want the decl for the `@interface` in
-    // `clangClass`.
-    return const_cast<ClassDecl *>(CD);
+    // `clangClass`, as well as any class extensions.
+    llvm::TinyPtrVector<Decl *> results;
+    results.push_back(const_cast<ClassDecl *>(CD));
+
+    for (auto clangExt : clangClass->known_extensions()) {
+      results.push_back(importCategory(clangExt));
+    }
+
+    return results;
+  }
 
   auto ident = &clangClass->getASTContext().Idents.get(categoryName.str());
   auto clangCategory = clangClass->FindCategoryDeclaration(ident);
   if (!clangCategory)
-    return nullptr;
+    return {};
 
-  ASTContext &ctx = CD->getASTContext();
-  auto imported = ctx.getClangModuleLoader()->importDeclDirectly(clangCategory);
-  return cast_or_null<ExtensionDecl>(imported);
+  return { importCategory(clangCategory) };
 }
 
-IterableDeclContext *ClassDecl::getImportedObjCCategory(Identifier name) const {
+llvm::TinyPtrVector<Decl *>
+ClassDecl::getImportedObjCCategory(Identifier name) const {
   ClangCategoryLookupDescriptor desc{this, name};
   return evaluateOrDefault(getASTContext().evaluator,
                            ClangCategoryLookupRequest(desc),
-                           nullptr);
+                           {});
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
