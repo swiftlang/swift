@@ -3183,6 +3183,29 @@ public:
     }
   }
 
+  static void diagnoseInverseOnClass(ClassDecl *decl) {
+    auto &ctx = decl->getASTContext();
+
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto marking = decl->getMarking(ip);
+
+      // Inferred inverses are already ignored for classes.
+      // FIXME: we can also diagnose @_moveOnly here if we use `isAnyExplicit`
+      if (!marking.getInverse().is(InverseMarking::Kind::Explicit))
+        continue;
+
+      // Allow ~Copyable when MoveOnlyClasses is enabled
+      if (ip == InvertibleProtocolKind::Copyable
+          && ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
+        continue;
+
+
+      ctx.Diags.diagnose(marking.getInverse().getLoc(),
+                         diag::inverse_on_class,
+                         getProtocolName(getKnownProtocolKind(ip)));
+    }
+  }
+
   /// check to see if a move-only type can ever conform to the given type.
   /// \returns true iff a diagnostic was emitted because it was not compatible
   static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
@@ -3415,6 +3438,7 @@ public:
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(CD);
 
+    diagnoseInverseOnClass(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {

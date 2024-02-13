@@ -1157,6 +1157,19 @@ public:
     return getBuiltinConformanceKind() == BuiltinConformanceKind::Missing;
   }
 
+  bool isInvalid() const {
+    switch (getBuiltinConformanceKind()) {
+    case BuiltinConformanceKind::Synthesized:
+      return false;
+    case BuiltinConformanceKind::Missing:
+      return true;
+    }
+  }
+
+  SourceLoc getLoc() const {
+    return SourceLoc();
+  }
+
   /// Get any requirements that must be satisfied for this conformance to apply.
   llvm::Optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
@@ -1191,12 +1204,20 @@ public:
     llvm_unreachable("builtin-conformances never have associated types");
   }
 
+  bool hasWitness(ValueDecl *requirement) const {
+    llvm_unreachable("builtin-conformances never have requirement witnesses");
+  }
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options = llvm::None) const {
     llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  Witness getWitness(ValueDecl *requirement) const {
+    llvm_unreachable("builtin-conformances never have requirement witnesses");
   }
 
   /// Given that the requirement signature of the protocol directly states
