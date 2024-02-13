@@ -1382,11 +1382,37 @@ enum class InferenceCandidateKind {
 static InferenceCandidateKind checkInferenceCandidate(
     std::pair<AssociatedTypeDecl *, Type> *result,
     NormalProtocolConformance *conformance,
-    DeclContext *witnessDC,
+    ValueDecl *witness,
     Type selfTy) {
   auto &ctx = selfTy->getASTContext();
 
+  // The unbound form of `Self.A`.
+  auto selfAssocTy = DependentMemberType::get(selfTy, result->first->getName());
+  auto genericSig = witness->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    // If the witness is in a protocol extension for a completely unrelated
+    // protocol that doesn't declare an associated type with the same name as
+    // the one we are trying to infer, then it will never be tautological.
+    if (!genericSig->isValidTypeParameter(selfAssocTy))
+      return InferenceCandidateKind::Good;
+  }
+
+  // A tautological binding is one where the left-hand side has the same
+  // reduced type as the right-hand side in the generic signature of the
+  // witness.
   auto isTautological = [&](Type t) -> bool {
+    if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+
+    auto dmt = t->getAs<DependentMemberType>();
+    if (!dmt)
+      return false;
+
+    return genericSig->areReducedTypeParametersEqual(dmt, selfAssocTy);
+
+    } else {
+
     auto dmt = t->getAs<DependentMemberType>();
     if (!dmt)
       return false;
@@ -1394,34 +1420,27 @@ static InferenceCandidateKind checkInferenceCandidate(
                                                 result->first))
       return false;
 
-    Type typeInContext;
-    if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
-
-    typeInContext = selfTy;
-
-    } else {
-
-    typeInContext =
+    Type typeInContext =
       conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
-
-    }
-
     if (!dmt->getBase()->isEqual(typeInContext))
       return false;
 
     return true;
+
+    }
   };
 
   // Self.X == Self.X doesn't give us any new information, nor does it
   // immediately fail.
   if (isTautological(result->second)) {
-    auto *dmt = result->second->castTo<DependentMemberType>();
-
-    auto selfAssocTy = DependentMemberType::get(selfTy, dmt->getAssocType());
+    // FIXME: This should be getInnermostDeclContext()->getGenericSignature(),
+    // but that might introduce new ambiguities in existing code so we need
+    // to be careful.
+    auto genericSig = witness->getDeclContext()->getGenericSignatureOfContext();
 
     // If we have a same-type requirement `Self.X == Self.Y`,
     // introduce a binding `Self.X := Self.Y`.
-    for (auto &reqt : witnessDC->getGenericSignatureOfContext().getRequirements()) {
+    for (auto &reqt : genericSig.getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::SameShape:
         llvm_unreachable("Same-shape requirement not supported here");
@@ -1432,6 +1451,45 @@ static InferenceCandidateKind checkInferenceCandidate(
         break;
 
       case RequirementKind::SameType:
+        if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+
+        auto matches = [&](Type t) {
+          if (auto *dmt = t->getAs<DependentMemberType>()) {
+            return (dmt->getName() == result->first->getName() &&
+                    dmt->getBase()->isEqual(selfTy));
+          }
+
+          return false;
+        };
+
+        // If we have a tautological binding, check if the witness generic
+        // signature has a same-type requirement `Self.A == Self.X` or
+        // `Self.X == Self.A`, where `A` is an associated type with the same
+        // name as the one we're trying to infer, and `X` is some other type
+        // parameter.
+        Type other;
+        if (matches(reqt.getFirstType())) {
+          other = reqt.getSecondType();
+        } else if (matches(reqt.getSecondType())) {
+          other = reqt.getFirstType();
+        } else {
+          break;
+        }
+
+        if (other->isTypeParameter() &&
+            other->getRootGenericParam()->isEqual(selfTy)) {
+          result->second = other;
+          LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
+                     result->second->dump(llvm::dbgs()));
+          return InferenceCandidateKind::Good;
+
+        }
+
+        } else {
+
+        auto *dmt = result->second->castTo<DependentMemberType>();
+        auto selfAssocTy = DependentMemberType::get(selfTy, dmt->getAssocType());
+
         Type other;
         if (reqt.getFirstType()->isEqual(selfAssocTy)) {
           other = reqt.getSecondType();
@@ -1443,17 +1501,8 @@ static InferenceCandidateKind checkInferenceCandidate(
 
         if (auto otherAssoc = other->getAs<DependentMemberType>()) {
           if (otherAssoc->getBase()->isEqual(selfTy)) {
-            DependentMemberType *otherDMT;
-            if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
-
-            otherDMT = otherAssoc;
-  
-            } else {
-
-            otherDMT = DependentMemberType::get(dmt->getBase(),
+            auto *otherDMT = DependentMemberType::get(dmt->getBase(),
                                                 otherAssoc->getAssocType());
-
-            }
 
             result->second = result->second.transform([&](Type t) -> Type{
               if (t->isEqual(dmt))
@@ -1464,6 +1513,8 @@ static InferenceCandidateKind checkInferenceCandidate(
                        result->second->dump(llvm::dbgs()));
             return InferenceCandidateKind::Good;
           }
+        }
+
         }
         break;
       }
@@ -1609,8 +1660,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
       // itself involve unresolved type witnesses.
       if (selfTy) {
         // Handle Self.X := Self.X and Self.X := G<Self.X>.
-        switch (checkInferenceCandidate(&result, conformance,
-                                        witness->getDeclContext(), selfTy)) {
+        switch (checkInferenceCandidate(&result, conformance, witness, selfTy)) {
         case InferenceCandidateKind::Good:
           // The "good" case is something like `Self.X := Self.Y`.
           break;
@@ -1864,37 +1914,27 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   auto proto = conformance->getProtocol();
   auto selfTy = proto->getSelfInterfaceType();
 
-  // Get the reduced type of the witness. This rules our certain tautological
-  // inferences below.
-  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
-    if (auto genericSig = witness->getInnermostDeclContext()
-            ->getGenericSignatureOfContext()) {
-      type = genericSig.getReducedType(type);
-      type = genericSig->getSugaredType(type);
-    }
-  }
-
-  // Remap associated types that reference other protocols into this
-  // protocol.
-  type = type.transformRec([proto](TypeBase *type) -> llvm::Optional<Type> {
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-      if (depMemTy->getAssocType() &&
-          depMemTy->getAssocType()->getProtocol() != proto) {
-        if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
-          auto origProto = depMemTy->getAssocType()->getProtocol();
-          if (proto->inheritsFrom(origProto))
-            return Type(DependentMemberType::get(depMemTy->getBase(),
-                                                 assocType));
+  if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    // Remap associated types that reference other protocols into this
+    // protocol.
+    auto resultType = Type(type).transformRec([proto](TypeBase *type)
+                                                 -> llvm::Optional<Type> {
+      if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
+        if (depMemTy->getAssocType() &&
+            depMemTy->getAssocType()->getProtocol() != proto) {
+          if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+            auto origProto = depMemTy->getAssocType()->getProtocol();
+            if (proto->inheritsFrom(origProto))
+              return Type(DependentMemberType::get(depMemTy->getBase(),
+                                                   assocType));
+          }
         }
       }
-    }
 
-    return llvm::None;
-  });
-
-  if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
-    auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
-                                 LookUpConformanceInModule(module));
+      return llvm::None;
+    });
+    resultType = resultType.subst(QueryTypeSubstitutionMap{substitutions},
+                                  LookUpConformanceInModule(module));
     if (!resultType->hasError()) return resultType;
 
     // Map error types with original types *back* to the original, dependent type.
@@ -1916,9 +1956,28 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     if (!rootParam->isEqual(selfTy))
       return type;
 
+    // Remap associated types that reference other protocols into this
+    // protocol.
+    auto substType = Type(type).transformRec([proto](TypeBase *type)
+                                                 -> llvm::Optional<Type> {
+      if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
+        if (depMemTy->getAssocType() &&
+            depMemTy->getAssocType()->getProtocol() != proto) {
+          if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+            auto origProto = depMemTy->getAssocType()->getProtocol();
+            if (proto->inheritsFrom(origProto))
+              return Type(DependentMemberType::get(depMemTy->getBase(),
+                                                   assocType));
+          }
+        }
+      }
+
+      return llvm::None;
+    });
+
     // Replace Self with the concrete conforming type.
-    auto substType = Type(type).subst(QueryTypeSubstitutionMap{substitutions},
-                                      LookUpConformanceInModule(module));
+    substType = substType.subst(QueryTypeSubstitutionMap{substitutions},
+                                LookUpConformanceInModule(module));
 
     // If we don't have enough type witnesses, leave it abstract.
     if (substType->hasError())
