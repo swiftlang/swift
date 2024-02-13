@@ -3511,6 +3511,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       P.diagnose(InstLoc.getSourceLoc(), diag);
       return true;
     }
+    
+    auto Strict = MarkUnresolvedNonCopyableValueInst::IsNotStrict;
+    if (AttrName.equals("strict")) {
+      Strict = MarkUnresolvedNonCopyableValueInst::IsStrict;
+      if (!parseSILOptional(AttrName, *this)) {
+        auto diag = diag::sil_markmustcheck_requires_attribute;
+        P.diagnose(InstLoc.getSourceLoc(), diag);
+        return true;
+      }
+    }
 
     using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
     CheckKind CKind =
@@ -3535,7 +3545,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    auto *MVI = B.createMarkUnresolvedNonCopyableValueInst(InstLoc, Val, CKind);
+    auto *MVI = B.createMarkUnresolvedNonCopyableValueInst(InstLoc, Val, CKind,
+                                                           Strict);
     ResultVal = MVI;
     break;
   }

@@ -202,6 +202,9 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
     // really do not want to abort. Instead, our caller can choose to abort if
     // they get back a None. This ensures that we do not abort in cases where we
     // just want to emit to the user a "I do not understand" error.
+    LLVM_DEBUG(llvm::dbgs() << "unhandled projection derived from root:\n";
+               projectionDerivedFromRoot->print(llvm::dbgs()));
+
     return llvm::None;
   }
 }

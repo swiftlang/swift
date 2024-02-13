@@ -1579,6 +1579,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              (unsigned(MVI->isFromVarDecl() << 3));
     } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
+      assert(Attr < (1 << 3));
+      Attr |= unsigned(I->isStrict()) << 3;
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
       Attr = unsigned(I->getKind());
     } else if (auto *I = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(&SI)) {

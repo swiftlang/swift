@@ -1103,6 +1103,36 @@ void UseState::initializeLiveness(
   
   if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
         stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding accessor coroutine begin_apply as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+  
+  if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
+          stripAccessMarkers(address->getOperand()))) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding enum projection as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+
+  // Assume a strict check of a temporary or formal access is initialized
+  // before the check.
+  if (auto *asi = dyn_cast<AllocStackInst>(
+          stripAccessMarkers(address->getOperand()));
+      asi && address->isStrict()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding strict-marked alloc_stack as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+
+  // Assume a strict check of a temporary is initialized before the check.
+  if (auto *asi = dyn_cast<BeginAccessInst>(address->getOperand());
+      asi && address->isStrict()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding strict-marked begin_access as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
@@ -1838,6 +1868,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
         diagnosticEmitter(diagnosticEmitter) {}
 
   bool visitUse(Operand *op);
+  bool visitTransitiveUseAsEndPointUse(Operand *op);
   void reset(MarkUnresolvedNonCopyableValueInst *address) {
     useState.address = address;
   }
@@ -1891,9 +1922,31 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     }
     return emittedError;
   }
+  
+  void onError(Operand *op) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found use unrecognized by the walker!\n";
+                 op->getUser()->print(llvm::dbgs()));
+  }
 };
 
 } // end anonymous namespace
+
+bool GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
+  // If an access is checked by its own strict mark_unresolved_noncopyable
+  // instruction, then treat the access as an opaque borrowing use from the
+  // outside.
+  if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
+    for (auto accessUse : ba->getUses()) {
+      if (auto mark
+         = dyn_cast<MarkUnresolvedNonCopyableValueInst>(accessUse->getUser())) {
+        if (mark->isStrict()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
 
 // Filter out recognized uses that do not write to memory.
 //
@@ -1921,8 +1974,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // TODO: What about copy_addr of itself. We really should just pre-process
     // those maybe.
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
+    }
 
     useState.recordInitUse(user, op->get(), *leafRange);
     return true;
@@ -1931,8 +1986,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (noncopyable::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
+    }
     useState.recordReinitUse(user, op->get(), *leafRange);
     return true;
   }
@@ -1951,8 +2008,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
+    }
 
     useState.destroys.insert({dvi, *leafRange});
     return true;
@@ -1974,8 +2033,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
       LLVM_DEBUG(llvm::dbgs() << "Found store_borrow: " << *sbi);
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
+      }
 
       useState.recordInitUse(user, op->get(), *leafRange);
       return true;
@@ -2003,8 +2064,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
+    }
 
     // If we have a non-move only type, just treat this as a liveness use.
     if (isCopyableValue(copyAddr->getSrc())) {
@@ -2066,8 +2129,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
         isCopyableValue(li)) {
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
+      }
       useState.recordLivenessUse(user, *leafRange);
       return true;
     }
@@ -2170,8 +2235,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       // If set, this will tell the checker that we can change this load into
       // a load_borrow.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
+      }
 
       LLVM_DEBUG(llvm::dbgs() << "Found potential borrow: " << *user);
 
@@ -2285,8 +2352,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
 
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
+    }
 
     // Now check if we have a destructure through deinit. If we do, emit an
     // error.
@@ -2310,9 +2379,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (auto fas = FullApplySite::isa(user)) {
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
+      LLVM_DEBUG(llvm::dbgs() << "in_guaranteed argument to function application\n");
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
+      }
 
       useState.recordLivenessUse(user, *leafRange);
       return true;
@@ -2335,9 +2407,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   if (auto *yi = dyn_cast<YieldInst>(user)) {
     if (yi->getYieldInfoForOperand(*op).isGuaranteed()) {
+      LLVM_DEBUG(llvm::dbgs() << "coroutine yield\n");
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
+      }
 
       useState.recordLivenessUse(user, *leafRange);
       return true;
@@ -2354,6 +2429,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (fArg->getArgumentConvention().isInoutConvention() &&
           pas->getCalleeFunction()->hasSemanticsAttr(
               semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+        LLVM_DEBUG(llvm::dbgs() << "has no_moveonly_diagnostics attribute!\n");
         diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
         return false;
       }
@@ -2365,6 +2441,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (auto *f = pas->getCalleeFunction()) {
       if (f->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
         if (ApplySite(pas).getCaptureConvention(*op).isInoutConvention()) {
+          LLVM_DEBUG(llvm::dbgs() << "has no_moveonly_diagnostics attribute!\n");
           diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
           return false;
         }
@@ -2414,9 +2491,26 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   }
 
   if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "fix_lifetime use\n");
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
+      return false;
+    }
+
+    useState.recordLivenessUse(user, *leafRange);
+    return true;
+  }
+  
+  // Treat an opaque read access as a borrow liveness use for the duration
+  // of the access.
+  if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
+    assert(access->getAccessKind() == SILAccessKind::Read);
+    LLVM_DEBUG(llvm::dbgs() << "begin_access use\n");
+    
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
     }
 
@@ -2427,11 +2521,14 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // If we don't fit into any of those categories, just track as a liveness
   // use. We assume all such uses must only be reads to the memory. So we assert
   // to be careful.
-  auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-  if (!leafRange)
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *user);
+
+  auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+  if (!leafRange) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
+    return false;
+  }
+
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
     llvm::errs() << "Found a write classified as a liveness use?!\n";

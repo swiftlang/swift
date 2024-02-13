@@ -1444,9 +1444,11 @@ public:
 
   MarkUnresolvedNonCopyableValueInst *createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, SILValue src,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict) {
     return insert(new (getModule()) MarkUnresolvedNonCopyableValueInst(
-        getSILDebugLocation(loc), src, kind));
+        getSILDebugLocation(loc), src, kind, strict));
   }
 
   MarkUnresolvedReferenceBindingInst *createMarkUnresolvedReferenceBindingInst(

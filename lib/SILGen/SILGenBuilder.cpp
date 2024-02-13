@@ -1090,13 +1090,14 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 
 ManagedValue SILGenBuilder::createMarkUnresolvedNonCopyableValueInst(
     SILLocation loc, ManagedValue value,
-    MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+    MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+    MarkUnresolvedNonCopyableValueInst::IsStrict_t strict) {
   assert((value.isPlusOne(SGF) || value.isLValue() ||
           value.getType().isAddress()) &&
          "Argument must be at +1 or be an address!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkUnresolvedNonCopyableValueInst(
-      loc, value.forward(getSILGenFunction()), kind);
+      loc, value.forward(getSILGenFunction()), kind, strict);
   return cloner.clone(mdi);
 }
 

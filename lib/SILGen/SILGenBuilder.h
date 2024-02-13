@@ -493,7 +493,9 @@ public:
   using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
   ManagedValue createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, ManagedValue value,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);

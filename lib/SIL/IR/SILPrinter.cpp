@@ -2114,6 +2114,9 @@ public:
   void visitMarkUnresolvedNonCopyableValueInst(
       MarkUnresolvedNonCopyableValueInst *I) {
     using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+    if (I->isStrict()) {
+      *this << "[strict] ";
+    }
     switch (I->getCheckKind()) {
     case CheckKind::Invalid:
       llvm_unreachable("Invalid?!");

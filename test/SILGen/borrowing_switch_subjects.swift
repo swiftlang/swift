@@ -22,7 +22,7 @@ func temporary() -> Outer { fatalError() }
 // CHECK-LABEL: sil {{.*}}@{{.*}}11borrowParam
 // CHECK:  = mark_unresolved_non_copyable_value [no_consume_or_assign]
 func borrowParam(x: borrowing Outer) {
-    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign]
+    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign]
     // CHECK: [[BORROW:%.*]] = begin_borrow [[MARK]]
     switch x {
     case _borrowing y:
@@ -35,7 +35,7 @@ func borrowParam(x: borrowing Outer) {
     // CHECK: [[BORROW_OUTER:%.*]] = begin_borrow {{.*}} : $Outer
     // CHECK: [[BORROW_INNER:%.*]] = struct_extract [[BORROW_OUTER]]
     // CHECK: [[COPY_INNER:%.*]] = copy_value [[BORROW_INNER]]
-    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_INNER]]
+    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[COPY_INNER]]
     // CHECK: [[BORROW:%.*]] = begin_borrow [[MARK]]
     switch x.storedInner {
     case _borrowing y:
@@ -51,7 +51,7 @@ func borrowParam(x: borrowing Outer) {
     // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_INNER]]
     // CHECK: [[BORROW:%.*]] = begin_borrow [[MARK]]
     // CHECK: [[COPY2:%.*]] = copy_value [[BORROW]]
-    // CHECK: [[MARK2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY2]]
+    // CHECK: [[MARK2:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[COPY2]]
     // CHECK: [[BORROW2:%.*]] = begin_borrow [[MARK2]]
     switch x.readInner {
     case _borrowing y:
@@ -65,7 +65,7 @@ func borrowParam(x: borrowing Outer) {
     // CHECK: [[TMP:%.*]] = apply [[FN]]()
     // CHECK: [[BORROW_OUTER:%.*]] = begin_borrow [[TMP]]
     // CHECK: [[COPY:%.*]] = copy_value [[BORROW_OUTER]]
-    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+    // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[COPY]]
     // CHECK: [[BORROW:%.*]] = begin_borrow [[MARK]]
     switch temporary() {
     case _borrowing y:
