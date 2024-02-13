@@ -12,7 +12,7 @@
 
 import SIL
 
-private let verbose = false
+private let verbose = true
 
 private func log(_ message: @autoclosure () -> String) {
   if verbose {
