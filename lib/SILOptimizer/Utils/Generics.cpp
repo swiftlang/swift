@@ -2451,7 +2451,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     }
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
-        pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        pai->getCalleeConvention(), pai->getResultIsolation(),
         pai->isOnStack());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
@@ -3347,7 +3347,7 @@ void swift::trySpecializeApplyOfGeneric(
     Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
-      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PAI->getCalleeConvention(), PAI->getResultIsolation(),
       PAI->isOnStack());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);

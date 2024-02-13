@@ -1618,6 +1618,13 @@ static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
                             _executor);
 }
 
+static ValueDecl *getExtractFunctionIsolation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_typeparam(0)),
+                            _optional(_existential(_actor)));
+}
+
 static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
                                             Identifier Id) {
   auto int32Type = BuiltinIntegerType::get(32, Context);
@@ -3000,6 +3007,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getBuildOrdinarySerialExecutorRef(Context, Id);
   case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     return getBuildComplexEqualitySerialExecutorRef(Context, Id);
+
+  case BuiltinValueKind::ExtractFunctionIsolation:
+    return getExtractFunctionIsolation(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

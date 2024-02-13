@@ -54,6 +54,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    SILFunctionTypeIsolation resultIsolation,
     PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -68,6 +69,7 @@ SILType SILBuilder::getPartialApplyResultType(
       FTI->getExtInfo()
           .intoBuilder()
           .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsolation(resultIsolation)
           .withIsPseudogeneric(false);
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();

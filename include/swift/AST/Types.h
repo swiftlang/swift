@@ -384,7 +384,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 14 };
-  enum { NumSILExtInfoBits = 13 };
+  enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -4883,6 +4883,10 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
+  SILFunctionTypeIsolation getIsolation() const {
+    return getExtInfo().getIsolation();
+  }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
@@ -5467,6 +5471,8 @@ public:
     enum innerty {
       None,
       DifferentFunctionRepresentations,
+      DifferentAsyncness,
+      DifferentErasedIsolation,
       ABIEscapeToNoEscapeConversion,
       DifferentNumberOfResults,
       DifferentReturnValueConventions,

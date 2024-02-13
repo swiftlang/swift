@@ -737,7 +737,8 @@ PartialApplyInst::PartialApplyInst(
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
-    SubstitutionMap Subs, ParameterConvention CalleeConvention, SILFunction &F,
+    SubstitutionMap Subs, ParameterConvention calleeConvention,
+    SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *SpecializationInfo,
     OnStackKind onStack) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
@@ -745,7 +746,7 @@ PartialApplyInst *PartialApplyInst::create(
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      CalleeConvention, onStack);
+      calleeConvention, resultIsolation, onStack);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,

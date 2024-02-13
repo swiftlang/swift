@@ -921,6 +921,10 @@ public:
                                               CanAnyFunctionType isolatedType,
                                               CanAnyFunctionType nonIsolatedType);
 
+  ManagedValue emitExtractFunctionIsolation(SILLocation loc,
+                                            ArgumentSource &&fnSource,
+                                            SGFContext C);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.
@@ -2012,6 +2016,9 @@ public:
                             SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc,
                                MultipleValueInstructionResult *token);
+
+  ManagedValue emitExtractFunctionIsolation(SILLocation loc,
+                                        ArgumentSource &&fnValue);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);

@@ -1431,6 +1431,8 @@ public:
     llvm_unreachable("extract_executor should never be seen in Lowered SIL");
   }
 
+  void visitFunctionExtractIsolationInst(FunctionExtractIsolationInst *i);
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
@@ -7071,6 +7073,21 @@ void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
   getLoweredExplosion(i->getOperand(), executor);
 
   emitSuspensionPoint(executor, resumeFn);
+}
+
+void IRGenSILFunction::visitFunctionExtractIsolationInst(
+                                              FunctionExtractIsolationInst *i) {
+  Explosion fnValue;
+  getLoweredExplosion(i->getFunction(), fnValue);
+  assert(fnValue.size() == 2);
+
+  // Ignore the function pointer and claim the closure value.
+  (void) fnValue.claimNext();
+  auto fnContext = fnValue.claimNext();
+
+  Explosion result;
+  emitExtractFunctionIsolation(*this, fnContext, result);
+  setLoweredExplosion(i, result);
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {

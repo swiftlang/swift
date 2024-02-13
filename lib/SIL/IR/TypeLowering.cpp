@@ -4490,6 +4490,11 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy1->isUnimplementable() || fnTy2->isUnimplementable())
     return ABIDifference::NeedsThunk;
 
+  // Erased isolation is a restriction on the context value, so we can
+  // remove it but not add it.
+  if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
+    return ABIDifference::NeedsThunk;
+
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 

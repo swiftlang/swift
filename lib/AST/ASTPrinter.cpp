@@ -7344,6 +7344,13 @@ public:
       Printer << " ";
     }
 
+    if (info.hasErasedIsolation()) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@isolated");
+      Printer << "(any)";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
+    }
     if (info.isUnimplementable()) {
       Printer.printSimpleAttr("@unimplementable") << " ";
     }

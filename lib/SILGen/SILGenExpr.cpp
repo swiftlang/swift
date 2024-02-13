@@ -6599,6 +6599,41 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
   return visit(E->getActor(), C);
 }
 
+ManagedValue
+SILGenFunction::emitExtractFunctionIsolation(SILLocation loc,
+                                             ArgumentSource &&fnSource,
+                                             SGFContext C) {
+  std::optional<Scope> scope;
+
+  // Emit the function value in its own scope unless we're going
+  // to return it at +0.
+  if (!C.isGuaranteedPlusZeroOk())
+    scope.emplace(Cleanups, CleanupLocation(loc));
+
+  // Emit a borrow of the function value.  Isolation extraction is a kind
+  // of projection, so we can emit the function with the same context as
+  // we got.
+  auto fnLoc = fnSource.getLocation();
+  auto fn = std::move(fnSource).getAsSingleValue(*this,
+                                                 C.withFollowingProjection());
+  fn = fn.borrow(*this, fnLoc);
+
+  // Extract the isolation value.
+  SILValue isolation = B.createFunctionExtractIsolation(loc, fn.getValue());
+
+  // If we can return the isolation at +0, do so.
+  if (C.isGuaranteedPlusZeroOk())
+    return ManagedValue::forBorrowedObjectRValue(isolation);
+
+  // Otherwise, copy it.
+  isolation = B.createCopyValue(loc, isolation);
+
+  // Manage the copy and exit the scope we entered earlier.
+  auto isolationMV = emitManagedRValueWithCleanup(isolation);
+  isolationMV = scope->popPreservingValue(isolationMV);
+  return isolationMV;
+}
+
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
   assert(!E->getType()->hasLValueType() &&
          "l-values must be emitted with emitLValue");

@@ -158,6 +158,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssumeAlignment:
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
+    case BuiltinValueKind::ExtractFunctionIsolation:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

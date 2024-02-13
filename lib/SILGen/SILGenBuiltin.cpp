@@ -1861,6 +1861,23 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
                               BuiltinValueKind::BuildMainActorExecutorRef);
 }
 
+static ManagedValue emitBuiltinExtractFunctionIsolation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&args, SGFContext C) {
+  auto argSources = std::move(args).getSources();
+  assert(argSources.size() == 1);
+
+  auto argType = argSources[0].getSubstRValueType();
+  if (auto fnType = dyn_cast<AnyFunctionType>(argType);
+      !fnType || !fnType->getIsolation().isErased()) {
+    SGF.SGM.diagnose(argSources[0].getLocation(),
+                     diag::builtin_get_function_isolation_bad_argument);
+    return SGF.emitUndef(SILType::getOpaqueIsolationType(SGF.getASTContext()));
+  }
+
+  return SGF.emitExtractFunctionIsolation(loc, std::move(argSources[0]), C);
+}
+
 static ManagedValue emitBuiltinGetEnumTag(SILGenFunction &SGF, SILLocation loc,
                                           SubstitutionMap subs,
                                           ArrayRef<ManagedValue> args,

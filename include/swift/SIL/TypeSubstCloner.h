@@ -244,11 +244,10 @@ protected:
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
     ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
-    auto ParamConvention =
-        Inst->getType().getAs<SILFunctionType>()->getCalleeConvention();
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
-        Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
+        Helper.getSubstitutions(), Helper.getArguments(),
+        Inst->getCalleeConvention(), Inst->getResultIsolation(),
         Inst->isOnStack(),
         GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);

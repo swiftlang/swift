@@ -1776,6 +1776,11 @@ ManglingError Remangler::mangleImplEscaping(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
+  Buffer << 'A';
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplConvention(Node *node, unsigned depth) {
   char ConvCh = llvm::StringSwitch<char>(node->getText())
                   .Case("@callee_unowned", 'y')
@@ -1930,6 +1935,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplEscaping:
         Buffer << 'e';
+        break;
+      case Node::Kind::ImplErasedIsolation:
+        Buffer << 'A';
         break;
       case Node::Kind::ImplConvention: {
         char ConvCh = llvm::StringSwitch<char>(Child->getText())

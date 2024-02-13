@@ -644,7 +644,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // Convert to a partial_apply [stack].
   auto newPA = b.createPartialApply(
       origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
-      origPA->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      origPA->getCalleeConvention(), origPA->getResultIsolation(),
       PartialApplyInst::OnStackKind::OnStack);
 
   // Insert mark_dependence for any non-trivial address operands to the

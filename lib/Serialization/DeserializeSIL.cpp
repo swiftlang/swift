@@ -1823,7 +1823,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
-    SILType closureTy = getSILType(Ty2, SILValueCategory::Object, Fn);
+    auto closureTy = getSILType(Ty2, SILValueCategory::Object, Fn)
+                       .castTo<SILFunctionType>();
 
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
@@ -1846,13 +1847,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
           ListOfValues[I],
           fnConv.getSILArgumentType(I + unappliedArgs,
                                     Builder.getTypeExpansionContext())));
-    auto onStack = closureTy.castTo<SILFunctionType>()->isNoEscape()
+    auto onStack = closureTy->isNoEscape()
                        ? PartialApplyInst::OnStackKind::OnStack
                        : PartialApplyInst::OnStackKind::NotOnStack;
+
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy.castTo<SILFunctionType>()->getCalleeConvention(), onStack);
+        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -2192,6 +2194,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
   UNARY_INSTRUCTION(ExtractExecutor)
+  UNARY_INSTRUCTION(FunctionExtractIsolation)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 

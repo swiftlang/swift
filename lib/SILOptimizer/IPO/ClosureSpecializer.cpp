@@ -241,10 +241,8 @@ public:
                    llvm::SmallVectorImpl<SILValue> &Args) const {
     if (auto *PA = dyn_cast<PartialApplyInst>(getClosure()))
       return B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
-                                  getClosure()
-                                      ->getType()
-                                      .getAs<SILFunctionType>()
-                                      ->getCalleeConvention(),
+                                  PA->getCalleeConvention(),
+                                  PA->getResultIsolation(),
                                   PA->isOnStack());
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
@@ -762,7 +760,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(), origRef);
     auto NewPA = Builder.createPartialApply(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        PAI->getCalleeConvention(), PAI->getResultIsolation(),
         PAI->isOnStack());
     // If the partial_apply is on stack we will emit a dealloc_stack in the
     // epilog.

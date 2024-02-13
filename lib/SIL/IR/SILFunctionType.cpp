@@ -4839,11 +4839,19 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
 
+  if (isAsync() != other->isAsync())
+    return ABICompatibilityCheckResult::DifferentAsyncness;
+
   // `() async -> ()` is not compatible with `() async -> @error Error` and
   // vice versa.
   if (hasErrorResult() != other->hasErrorResult() && isAsync()) {
     return ABICompatibilityCheckResult::DifferentErrorResultConventions;
   }
+
+  // @isolated(any) imposes an additional requirement on the context
+  // storage and cannot be added.
+  if (other->hasErasedIsolation() != hasErasedIsolation())
+    return ABICompatibilityCheckResult::DifferentErasedIsolation;
 
   // Check the results.
   if (getNumResults() != other->getNumResults())
@@ -4932,6 +4940,10 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "ABI incompatible error results";
   case innerty::DifferentNumberOfParameters:
     return "Different number of parameters";
+  case innerty::DifferentAsyncness:
+    return "sync/async mismatch";
+  case innerty::DifferentErasedIsolation:
+    return "Different @isolated(any) values";
 
   // These two have to do with specific parameters, so keep the error message
   // non-plural.

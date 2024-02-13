@@ -3092,7 +3092,7 @@ private:
   static PartialApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
-         SILFunction &F,
+         SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack);
 
@@ -3101,8 +3101,14 @@ public:
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
+  ParameterConvention getCalleeConvention() const {
+    return getFunctionType()->getCalleeConvention();
+  }
   bool hasCalleeGuaranteedContext() const {
-    return getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
+    return getFunctionType()->isCalleeGuaranteed();
+  }
+  SILFunctionTypeIsolation getResultIsolation() {
+    return getFunctionType()->getIsolation();
   }
 
   OnStackKind isOnStack() const {
@@ -3948,6 +3954,21 @@ class ExtractExecutorInst
 
 public:
   SILValue getExpectedExecutor() const { return getOperand(); }
+};
+
+/// Extract the isolation of an @isolated(any) function value.
+class FunctionExtractIsolationInst
+    : public UnaryInstructionBase<SILInstructionKind::FunctionExtractIsolationInst,
+                                  SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  FunctionExtractIsolationInst(SILDebugLocation debugLoc, SILValue fnValue,
+                               SILType type)
+      : UnaryInstructionBase(debugLoc, fnValue, type) { }
+
+public:
+  SILValue getFunction() const { return getOperand(); }
 };
 
 /// Instantiates a key path object.

@@ -1987,6 +1987,14 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
+  switch (fn->getIsolation()) {
+  case SILFunctionTypeIsolation::Unknown:
+    break;
+  case SILFunctionTypeIsolation::Erased:
+    OpArgs.push_back('A');
+    break;
+  }
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {

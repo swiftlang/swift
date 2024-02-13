@@ -1068,6 +1068,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
                                    "buildMainActorExecutorRef", "n", Special)
 
+/// extractFunctionIsolation: <T>(_: T) -> (any Actor)?
+///
+/// Returns the isolation of a value, which must be an @isolated(any)
+/// function type.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ExtractFunctionIsolation,
+                                   "extractFunctionIsolation", "", Special)
+
 /// getEnumTag: <T>(_: T) -> Builtin.Int32
 ///
 /// Given a dynamic generic value, unsafely assume it is an enum type and call
