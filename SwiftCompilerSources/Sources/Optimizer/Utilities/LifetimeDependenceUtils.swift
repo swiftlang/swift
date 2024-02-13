@@ -66,11 +66,12 @@ import SIL
 /// Value.enclosingAccess iteratively to find to AccessBase. This
 /// walker is useful for finding the innermost access, which may also
 /// be relevant for diagnostics.
-func gatherVariableIntroducers(for value: Value, _ context: Context) -> [Value]
+func gatherVariableIntroducers(for value: Value, _ context: Context)
+  -> SingleInlineArray<Value>
 {
-  var introducers: [Value] = []
+  var introducers = SingleInlineArray<Value>()
   var useDefVisitor = VariableIntroducerUseDefWalker(context) {
-    introducers.append($0)
+    introducers.push($0)
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }

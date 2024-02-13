@@ -199,6 +199,9 @@ extension AccessBase {
     case let .stack(allocStack):
       baseAddr = allocStack
     case let .argument(arg):
+      guard arg.convention.isIndirectOut else {
+        return nil
+      }
       baseAddr = arg
     default:
       return nil
@@ -208,7 +211,10 @@ extension AccessBase {
          == .abortWalk {
       return nil
     }
-    return (initialAddress: baseAddr, initializingStore: walker.initializer!)
+    guard let initializingStore = walker.initializingStore else {
+      return nil
+    }
+    return (initialAddress: baseAddr, initializingStore: initializingStore)
   }
 }
 
@@ -241,15 +247,15 @@ struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   var isProjected = false
-  var initializer: Instruction?
+  var initializingStore: Instruction?
 
   private mutating func setInitializer(instruction: Instruction) -> WalkResult {
     // An initializer must be unique and store the full value.
-    if initializer != nil || isProjected {
-      initializer = nil
+    if initializingStore != nil || isProjected {
+      initializingStore = nil
       return .abortWalk
     }
-    initializer = instruction
+    initializingStore = instruction
     return .continueWalk
   }
 }
