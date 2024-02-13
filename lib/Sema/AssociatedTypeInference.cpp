@@ -1228,8 +1228,7 @@ struct TypeReprCycleCheckWalker : ASTWalker {
   bool checkForPotentialCycle(ValueDecl *witness) {
     // Don't do this for protocol extension members, because we have a
     // mini "solver" that avoids similar issues instead.
-    if (witness->getDeclContext()->getSelfProtocolDecl() != nullptr)
-      return false;
+    assert(!witness->getDeclContext()->getExtendedProtocolDecl());
 
     // If we already have an interface type, don't bother trying to
     // avoid a cycle.
@@ -1383,12 +1382,9 @@ enum class InferenceCandidateKind {
 static InferenceCandidateKind checkInferenceCandidate(
     std::pair<AssociatedTypeDecl *, Type> *result,
     NormalProtocolConformance *conformance,
-    ValueDecl *witness) {
-  auto witnessContext = witness->getDeclContext();
-  auto &ctx = witnessContext->getASTContext();
-
-  assert(witnessContext->getExtendedProtocolDecl());
-  auto selfTy = witnessContext->getSelfInterfaceType();
+    DeclContext *witnessDC,
+    Type selfTy) {
+  auto &ctx = selfTy->getASTContext();
 
   auto isTautological = [&](Type t) -> bool {
     auto dmt = t->getAs<DependentMemberType>();
@@ -1416,17 +1412,16 @@ static InferenceCandidateKind checkInferenceCandidate(
     return true;
   };
 
+  // Self.X == Self.X doesn't give us any new information, nor does it
+  // immediately fail.
   if (isTautological(result->second)) {
     auto *dmt = result->second->castTo<DependentMemberType>();
 
-    // If this associated type is same-typed to another associated type
-    // on `Self`, then it may still be an interesting candidate if we find
-    // an answer for that other type.
-    auto selfTy = witnessContext->getSelfInterfaceType();
-    auto selfAssocTy = DependentMemberType::get(selfTy,
-                                                dmt->getAssocType());
-    for (auto &reqt : witnessContext->getGenericSignatureOfContext()
-                                    .getRequirements()) {
+    auto selfAssocTy = DependentMemberType::get(selfTy, dmt->getAssocType());
+
+    // If we have a same-type requirement `Self.X == Self.Y`,
+    // introduce a binding `Self.X := Self.Y`.
+    for (auto &reqt : witnessDC->getGenericSignatureOfContext().getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::SameShape:
         llvm_unreachable("Same-shape requirement not supported here");
@@ -1460,8 +1455,6 @@ static InferenceCandidateKind checkInferenceCandidate(
 
             }
 
-            // We may be able to infer one associated type from the
-            // other.
             result->second = result->second.transform([&](Type t) -> Type{
               if (t->isEqual(dmt))
                 return otherDMT;
@@ -1479,6 +1472,8 @@ static InferenceCandidateKind checkInferenceCandidate(
     return InferenceCandidateKind::Tautological;
   }
 
+  // If we have something like `Self.X := G<Self.X>` on the other hand,
+  // the binding can never be satisfied.
   if (result->second.findIf(isTautological))
     return InferenceCandidateKind::Infinite;
 
@@ -1537,6 +1532,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
                witness->dump(llvm::dbgs()));
 
+    // This is the protocol `Self` type if the witness is declared in a protocol
+    // extension, or nullptr.
+    Type selfTy;
+
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
@@ -1545,18 +1544,28 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
         LLVM_DEBUG(llvm::dbgs() << "Extension not usable for inference\n");
         continue;
       }
+
+      if (auto *proto = dyn_cast<ProtocolDecl>(extension->getExtendedNominal()))
+        selfTy = proto->getSelfInterfaceType();
     }
 
-    if (cycleCheck.checkForPotentialCycle(witness)) {
-      LLVM_DEBUG(llvm::dbgs() << "Skipping witness to avoid request cycle\n");
+    if (!selfTy) {
+      if (cycleCheck.checkForPotentialCycle(witness)) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping witness to avoid request cycle\n");
 
-      // We must consider the possibility that none of the witnesses for this
-      // requirement can be chosen.
-      hadTautologicalWitness = true;
-      continue;
+        // We must consider the possibility that none of the witnesses for this
+        // requirement can be chosen.
+        hadTautologicalWitness = true;
+        continue;
+      }
     }
 
-    // Try to resolve the type witness via this value witness.
+    // Match the type of the requirement against the type of the witness to
+    // produce a list of bindings. The left-hand side of each binding is an
+    // associated type of our protocol, and the right-hand side is either
+    // a concrete type (possibly containing archetypes of the conforming type)
+    // or a type parameter rooted in the protocol 'Self' type, representing
+    // an unresolved type witness.
     auto witnessResult = getPotentialTypeWitnessesByMatchingTypes(req, witness);
 
     // Filter out duplicated inferred types as well as inferred types
@@ -1574,9 +1583,10 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
                               << " can infer to:\n";
                  result.second->dump(llvm::dbgs()));
 
-      bool fromProtocolExtension =
-          witness->getDeclContext()->getExtendedProtocolDecl();
-      assert(!result.second->hasTypeParameter() || fromProtocolExtension);
+      assert(!result.second->hasTypeParameter() || selfTy &&
+             "We should only see unresolved type witnesses on the "
+             "right-hand side of a binding when the value witness came from a "
+             "protocol extension");
 
       // Filter out errors.
       if (result.second->hasError()) {
@@ -1595,23 +1605,28 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
         REJECT;
       }
 
-      if (fromProtocolExtension) {
-        // Filter out circular possibilities, e.g. that
-        // AssocType == Self.AssocType or
-        // AssocType == Foo<Self.AssocType>.
-        switch (checkInferenceCandidate(&result, conformance, witness)) {
+      // The type of a potential value witness in a protocol extensions may
+      // itself involve unresolved type witnesses.
+      if (selfTy) {
+        // Handle Self.X := Self.X and Self.X := G<Self.X>.
+        switch (checkInferenceCandidate(&result, conformance,
+                                        witness->getDeclContext(), selfTy)) {
         case InferenceCandidateKind::Good:
-          // Continued below.
+          // The "good" case is something like `Self.X := Self.Y`.
           break;
 
         case InferenceCandidateKind::Tautological: {
           LLVM_DEBUG(llvm::dbgs() << "-- tautological\n");
+          // A tautology is the `Self.X := Self.X` case.
+          //
           // Skip this binding because it is immediately satisfied.
           REJECT;
         }
 
         case InferenceCandidateKind::Infinite: {
           LLVM_DEBUG(llvm::dbgs() << "-- infinite\n");
+          // The infinite case is `Self.X := G<Self.X>`.
+          //
           // Discard this witness altogether, because it has an unsatisfiable
           // binding.
           goto next_witness;
@@ -1619,18 +1634,19 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
         }
       }
 
-      // Check that the binding doesn't contradict an explicitly-given type
-      // witness. If it does contradict, throw out the witness completely.
+      // Check that the binding doesn't contradict a type witness previously
+      // resolved via name lookup.
+      //
+      // If it does contradict, throw out the witness entirely.
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
           conformance->getTypeWitness(result.first);
         existingWitness = dc->mapTypeIntoContext(existingWitness);
 
-        // If the deduced type contains an irreducible
-        // DependentMemberType, that indicates a dependency
-        // on another associated type we haven't deduced,
-        // so we can't tell whether there's a contradiction
-        // yet.
+        // For now, only a fully-concrete binding can contradict an existing
+        // type witness.
+        //
+        // FIXME: Generate new constraints by matching the two types.
         auto newWitness = result.second->getCanonicalType();
         if (!newWitness->hasTypeParameter() &&
             !newWitness->hasDependentMember() &&
@@ -1641,8 +1657,8 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
         }
       }
 
-      // Check that the type witness meets the requirements on the
-      // associated type.
+      // Check that the potential type witness satisfies the local requirements
+      // imposed upon the associated type.
       if (auto failed =
               checkTypeWitness(result.second, result.first, conformance)) {
         witnessResult.NonViable.push_back(
@@ -1661,15 +1677,15 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
 #undef REJECT
 
     // If no viable or non-viable bindings remain, the witness does not
-    // inter anything new, nor contradict any existing bindings. We collapse
-    // all tautological witnesses into a single element of the disjunction.
+    // give us anything new or contradict any existing bindings. We collapse
+    // all tautological witnesses into a single disjunction term.
     if (witnessResult.Inferred.empty() && witnessResult.NonViable.empty()) {
       hadTautologicalWitness = true;
       continue;
     }
 
-    // If there were any non-viable inferred associated types, don't
-    // infer anything from this witness.
+    // If we had at least one non-viable binding, drop the viable bindings;
+    // we cannot infer anything from this witness.
     if (!witnessResult.NonViable.empty())
       witnessResult.Inferred.clear();
 
@@ -3627,6 +3643,8 @@ void AssociatedTypeInference::findSolutionsRec(
 
         // If one has a type parameter remaining but the other does not,
         // drop the one with the type parameter.
+        //
+        // FIXME: This is too ad-hoc. Generate new constraints instead.
         if ((known->first->hasTypeParameter() ||
              known->first->hasDependentMember())
             != (typeWitness.second->hasTypeParameter() ||
