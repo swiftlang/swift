@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/ModuleA.swiftmodule %S/Inputs/where_clause_across_module_boundaries_module.swift
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t -enable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift -I %t -disable-experimental-associated-type-inference
 
 // https://github.com/apple/swift/issues/58084
 // Associated Type Inference fails across module boundaries

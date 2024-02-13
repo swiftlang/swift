@@ -1066,6 +1066,16 @@ private:
   bool isBetterSolution(const InferredTypeWitnessesSolution &first,
                         const InferredTypeWitnessesSolution &second);
 
+  /// Find the best solution.
+  ///
+  /// \param solutions All of the solutions to consider. On success,
+  /// this will contain only the best solution.
+  ///
+  /// \returns \c false if there was a single best solution,
+  /// \c true if no single best solution exists.
+  bool findBestSolution(
+                SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
+
   /// Emit a diagnostic for the case where there are no solutions at all
   /// to consider.
   ///
@@ -1902,6 +1912,13 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     else
       continue;
 
+    if (result.empty()) {
+      // If we found at least one default candidate, we must allow for the
+      // possibility that no default is chosen by adding a tautological witness
+      // to our disjunction.
+      result.push_back(InferredAssociatedTypesByWitness());
+    }
+
     // Add this result.
     InferredAssociatedTypesByWitness inferred;
     inferred.Witness = typeDecl;
@@ -1909,12 +1926,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     result.push_back(std::move(inferred));
   }
 
-  if (!result.empty()) {
-    // If we found at least one default candidate, we must allow for the
-    // possibility that no default is chosen by adding a tautological witness
-    // to our disjunction.
-    result.push_back(InferredAssociatedTypesByWitness());
-  }
   return result;
 }
 
@@ -3130,6 +3141,35 @@ void AssociatedTypeInference::findSolutionsRec(
       known->first = replaced;
     }
 
+    if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+      // Check whether our current solution matches the given solution.
+      auto matchesSolution =
+          [&](const InferredTypeWitnessesSolution &solution) {
+        for (const auto &existingTypeWitness : solution.TypeWitnesses) {
+          auto typeWitness = typeWitnesses.begin(existingTypeWitness.first);
+          if (!typeWitness->first->isEqual(existingTypeWitness.second.first))
+            return false;
+        }
+
+        return true;
+      };
+
+      // If we've seen this solution already, bail out; there's no point in
+      // checking further.
+      if (llvm::any_of(solutions, matchesSolution)) {
+        LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
+                   << "+ Duplicate valid solution found\n";);
+        ++NumDuplicateSolutionStates;
+        return;
+      }
+      if (llvm::any_of(nonViableSolutions, matchesSolution)) {
+        LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
+                   << "+ Duplicate invalid solution found\n";);
+        ++NumDuplicateSolutionStates;
+        return;
+      }
+    }
+
     /// Check the current set of type witnesses.
     bool invalid = checkCurrentTypeWitnesses(valueWitnesses);
 
@@ -3156,6 +3196,8 @@ void AssociatedTypeInference::findSolutionsRec(
       = numValueWitnessesInProtocolExtensions;
 
     // We fold away non-viable solutions that have the same type witnesses.
+    if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+
     if (invalid) {
       if (llvm::find(nonViableSolutions, solution) != nonViableSolutions.end()) {
         LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
@@ -3167,6 +3209,22 @@ void AssociatedTypeInference::findSolutionsRec(
       nonViableSolutions.push_back(std::move(solution));
       return;
     }
+
+    }
+
+    if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+
+    auto &solutionList = invalid ? nonViableSolutions : solutions;
+    solutionList.push_back(solution);
+
+    // If this solution was clearly better than the previous best solution,
+    // swap them.
+    if (solutionList.back().NumValueWitnessesInProtocolExtensions
+          < solutionList.front().NumValueWitnessesInProtocolExtensions) {
+      std::swap(solutionList.front(), solutionList.back());
+    }
+ 
+    } else {
 
     // For valid solutions, we want to find the best solution if one exists.
     // We maintain the invariant that no viable solution is clearly worse than
@@ -3197,6 +3255,8 @@ void AssociatedTypeInference::findSolutionsRec(
     });
 
     solutions.push_back(std::move(solution));
+
+    }
     return;
   }
 
@@ -3563,6 +3623,58 @@ bool AssociatedTypeInference::isBetterSolution(
   }
 
   return firstBetter;
+}
+
+bool AssociatedTypeInference::findBestSolution(
+                   SmallVectorImpl<InferredTypeWitnessesSolution> &solutions) {
+  if (solutions.empty()) return true;
+  if (solutions.size() == 1) return false;
+
+  // The solution at the front has the smallest number of value witnesses found
+  // in protocol extensions, by construction.
+  unsigned bestNumValueWitnessesInProtocolExtensions
+    = solutions.front().NumValueWitnessesInProtocolExtensions;
+
+  // Erase any solutions with more value witnesses in protocol
+  // extensions than the best.
+  solutions.erase(
+    std::remove_if(solutions.begin(), solutions.end(),
+                   [&](const InferredTypeWitnessesSolution &solution) {
+                     return solution.NumValueWitnessesInProtocolExtensions >
+                              bestNumValueWitnessesInProtocolExtensions;
+                   }),
+    solutions.end());
+
+  // If we're down to one solution, success!
+  if (solutions.size() == 1) return false;
+
+  // Find a solution that's at least as good as the solutions that follow it.
+  unsigned bestIdx = 0;
+  for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+    if (isBetterSolution(solutions[i], solutions[bestIdx]))
+      bestIdx = i;
+  }
+
+  // Make sure that solution is better than any of the other solutions.
+  bool ambiguous = false;
+  for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+    if (i != bestIdx && !isBetterSolution(solutions[bestIdx], solutions[i])) {
+      ambiguous = true;
+      break;
+    }
+  }
+
+  // If the result was ambiguous, fail.
+  if (ambiguous) {
+    assert(solutions.size() != 1 && "should have succeeded somewhere above?");
+    return true;
+
+  }
+  // Keep the best solution, erasing all others.
+  if (bestIdx != 0)
+    solutions[0] = std::move(solutions[bestIdx]);
+  solutions.erase(solutions.begin() + 1, solutions.end());
+  return false;
 }
 
 namespace {
@@ -3971,7 +4083,9 @@ auto AssociatedTypeInference::solve()
   }
 
   // Happy case: we found exactly one unique viable solution.
-  if (solutions.size() == 1) {
+  if (!findBestSolution(solutions)) {
+    assert(solutions.size() == 1 && "Not a unique best solution?");
+
     // Form the resulting solution.
     auto &typeWitnesses = solutions.front().TypeWitnesses;
     for (auto assocType : unresolvedAssocTypes) {
