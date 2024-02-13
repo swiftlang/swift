@@ -4575,7 +4575,17 @@ bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
   SourceLoc loc = genericTy->getDecl()->getSourceRange().End;
   StringRef replacement;
 
-  if (archetype->getConformsTo().size()) {
+  // FIXME: this won't handle an explicit Copyable written in source, but it's
+  // close enough.
+  bool conformsToAnExplicitRequirement = false;
+  for (auto proto : archetype->getConformsTo()) {
+    if (proto->getInvertibleProtocolKind())
+      continue;
+    conformsToAnExplicitRequirement = true;
+    break;
+  }
+
+  if (conformsToAnExplicitRequirement) {
     loc = loc.getAdvancedLoc(
         archetype->getConformsTo().back()->getName().getLength());
     replacement = " &";
