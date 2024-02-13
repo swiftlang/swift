@@ -1498,8 +1498,8 @@ bool CompilerInstance::loadStdlibIfNeeded() {
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
-//    assert(Diagnostics.hadAnyError() &&
-//           "Module failed to load but nothing was diagnosed?");
+    assert(Diagnostics.hadAnyError() &&
+           "stdlib module failed to load but nothing was diagnosed?");
     return true;
   }
   return false;
