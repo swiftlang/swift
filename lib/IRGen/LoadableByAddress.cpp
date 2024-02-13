@@ -2619,13 +2619,12 @@ void LoadableByAddress::recreateSingleApply(
   case SILInstructionKind::PartialApplyInst: {
     auto *castedApply = cast<PartialApplyInst>(applyInst);
     // Change the type of the Closure
-    auto partialApplyConvention = castedApply->getType()
-                                      .getAs<SILFunctionType>()
-                                      ->getCalleeConvention();
+    auto partialApplyConvention = castedApply->getCalleeConvention();
+    auto resultIsolation = castedApply->getResultIsolation();
 
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, castedApply->isOnStack());
+        partialApplyConvention, resultIsolation, castedApply->isOnStack());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }

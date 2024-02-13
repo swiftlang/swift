@@ -1196,7 +1196,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
 
         auto newPA = Builder.createPartialApply(
             pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
-            pa->getFunctionType()->getCalleeConvention());
+            pa->getFunctionType()->getCalleeConvention(),
+            pa->getResultIsolation());
         auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
                                                         partialApplyTy, false);
         replaceInstUsesWith(*pa, newConvert);
@@ -1217,7 +1218,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       SILBuilderWithScope localBuilder(std::next(pa->getIterator()), Builder);
       auto *newPA = localBuilder.createPartialApply(
           pa->getLoc(), newValue, pa->getSubstitutionMap(), args,
-          pa->getFunctionType()->getCalleeConvention());
+          pa->getFunctionType()->getCalleeConvention(),
+          pa->getResultIsolation());
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }

@@ -358,6 +358,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:

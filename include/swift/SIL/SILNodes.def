@@ -561,13 +561,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
                     SingleValueInstruction, None, DoesNotRelease)
 
-  // Function Application
+  // Functions
   SINGLE_VALUE_INST(ApplyInst, apply,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(BuiltinInst, builtin,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(FunctionExtractIsolationInst, function_extract_isolation,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,

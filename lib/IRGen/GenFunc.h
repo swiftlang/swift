@@ -36,6 +36,12 @@ namespace irgen {
   Address projectBlockStorageCapture(IRGenFunction &IGF,
                                      Address storageAddr,
                                      CanSILBlockStorageType storageTy);
+
+  /// Load the stored isolation of an @isolated(any) function type, which
+  /// is assumed to be at a known offset within a closure object.
+  void emitExtractFunctionIsolation(IRGenFunction &IGF,
+                                    llvm::Value *fnContext,
+                                    Explosion &result);
   
   /// Emit the block header into a block storage slot.
   void emitBlockHeader(IRGenFunction &IGF,

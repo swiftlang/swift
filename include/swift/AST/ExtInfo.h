@@ -120,6 +120,20 @@ public:
   }
 };
 
+/// For now, the kinds of isolation we carry on SIL function types
+/// are significantly reduced compared to AST function types.
+/// Isolation is not part of the SIL function model after the
+/// early portion of the pipeline.
+enum class SILFunctionTypeIsolation {
+  /// We don't normally record isolation in SIL function types,
+  /// so the empty case here is "unknown".
+  Unknown, 
+
+  /// The isolation of the function has been statically erased.
+  /// This corresponds to @isolated(any).
+  Erased,
+};
+
 // MARK: - ClangTypeInfo
 /// Wrapper class for storing a clang::Type in an (AST|SIL)ExtInfo.
 class ClangTypeInfo {
@@ -893,7 +907,8 @@ class SILExtInfoBuilder {
     DifferentiabilityMaskOffset = 9,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     UnimplementableMask = 1 << 12,
-    NumMaskBits = 13
+    ErasedIsolationMask = 1 << 13,
+    NumMaskBits = 14
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -913,12 +928,15 @@ class SILExtInfoBuilder {
   static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
                                      bool isNoEscape, bool isSendable,
                                      bool isAsync, bool isUnimplementable,
+                                     SILFunctionTypeIsolation isolation,
                                      DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) |
            (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (isUnimplementable ? UnimplementableMask : 0) |
+           (isolation == SILFunctionTypeIsolation::Erased
+              ? ErasedIsolationMask : 0) |
            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
             DifferentiabilityMask);
   }
@@ -929,15 +947,18 @@ public:
   SILExtInfoBuilder()
       : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
                                    false, false, false, false,
+                                   SILFunctionTypeIsolation::Unknown,
                                    DifferentiabilityKind::NonDifferentiable),
                           ClangTypeInfo(nullptr), LifetimeDependenceInfo()) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,
+                    SILFunctionTypeIsolation isolation,
                     DifferentiabilityKind diffKind, const clang::Type *type,
                     LifetimeDependenceInfo lifetimeDependenceInfo)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
-                                   isAsync, isUnimplementable, diffKind),
+                                   isAsync, isUnimplementable,
+                                   isolation, diffKind),
                           ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
@@ -945,6 +966,9 @@ public:
       : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
                                    info.isNoEscape(), info.isSendable(),
                                    info.isAsync(), /*unimplementable*/ false,
+                                   info.getIsolation().isErased()
+                                     ? SILFunctionTypeIsolation::Erased
+                                     : SILFunctionTypeIsolation::Unknown,
                                    info.getDifferentiabilityKind()),
                           info.getClangTypeInfo(),
                           info.getLifetimeDependenceInfo()) {}
@@ -986,6 +1010,18 @@ public:
 
   constexpr bool isUnimplementable() const {
     return bits & UnimplementableMask;
+  }
+
+  /// Does this function type have erased isolation (i.e. is it the
+  /// lowering of an @isolated(any) function type)?
+  constexpr bool hasErasedIsolation() const {
+    return bits & ErasedIsolationMask;
+  }
+
+  constexpr SILFunctionTypeIsolation getIsolation() const {
+    return hasErasedIsolation()
+              ? SILFunctionTypeIsolation::Erased
+              : SILFunctionTypeIsolation::Unknown;
   }
 
   /// Get the underlying ClangTypeInfo value.
@@ -1071,6 +1107,22 @@ public:
                              clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
+  SILExtInfoBuilder withErasedIsolation(bool erased = true) const {
+    return SILExtInfoBuilder(erased ? (bits | ErasedIsolationMask)
+                                    : (bits & ~ErasedIsolationMask),
+                             clangTypeInfo, lifetimeDependenceInfo);
+  }
+  [[nodiscard]]
+  SILExtInfoBuilder withIsolation(SILFunctionTypeIsolation isolation) const {
+    switch (isolation) {
+    case SILFunctionTypeIsolation::Unknown:
+      return *this;
+    case SILFunctionTypeIsolation::Erased:
+      return withErasedIsolation(true);
+    }
+    llvm_unreachable("bad kind");
+  }
+  [[nodiscard]]
   SILExtInfoBuilder withUnimplementable(bool isUnimplementable = true) const {
     return SILExtInfoBuilder(isUnimplementable ? (bits | UnimplementableMask)
                                                : (bits & ~UnimplementableMask),
@@ -1143,6 +1195,7 @@ public:
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
                              false, false, false, false,
+                             SILFunctionTypeIsolation::Unknown,
                              DifferentiabilityKind::NonDifferentiable, nullptr,
                              LifetimeDependenceInfo())
         .build();
@@ -1173,6 +1226,13 @@ public:
 
   constexpr bool isUnimplementable() const {
     return builder.isUnimplementable();
+  }
+
+  constexpr bool hasErasedIsolation() const {
+    return builder.hasErasedIsolation();
+  }
+  constexpr SILFunctionTypeIsolation getIsolation() const {
+    return builder.getIsolation();
   }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -1211,6 +1271,10 @@ public:
 
   SILExtInfo withAsync(bool isAsync = true) const {
     return builder.withAsync(isAsync).build();
+  }
+
+  SILExtInfo withErasedIsolation(bool erased = true) const {
+    return builder.withErasedIsolation(erased).build();
   }
 
   SILExtInfo withUnimplementable(bool isUnimplementable = true) const {

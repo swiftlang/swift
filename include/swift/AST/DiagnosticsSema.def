@@ -5558,6 +5558,9 @@ ERROR(isolated_any_experimental,none,
 ERROR(isolated_attr_global_actor_type,none,
       "function type cannot have both a global actor and '@isolated(%0)'",
       (StringRef))
+ERROR(isolated_attr_bad_convention,none,
+      "'@isolated(%0)' function type cannot have %1 convention",
+      (StringRef, StringRef))
 ERROR(isolation_macro_experimental,none,
       "#isolation macro is experimental", ())
 

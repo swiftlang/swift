@@ -3854,7 +3854,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   AnyFunctionType::Representation representation =
     FunctionType::Representation::Swift;
   const clang::Type *parsedClangFunctionType = nullptr;
-  if (auto conventionAttr = claim<ConventionTypeAttr>(attrs)) {
+  auto conventionAttr = claim<ConventionTypeAttr>(attrs);
+  if (conventionAttr) {
     auto parsedRep =
         llvm::StringSwitch<std::optional<FunctionType::Representation>>(
             conventionAttr->getConventionName())
@@ -3951,8 +3952,18 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       case IsolatedTypeAttr::IsolationKind::Dynamic:
         if (!getASTContext().LangOpts.hasFeature(Feature::IsolatedAny)) {
           diagnose(isolatedAttr->getAtLoc(), diag::isolated_any_experimental);
+          // Proceed as normal.
         }
-        isolation = FunctionTypeIsolation::forErased();
+
+        if (representation != FunctionType::Representation::Swift) {
+          assert(conventionAttr);
+          diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
+                          diag::isolated_attr_bad_convention,
+                          isolatedAttr->getIsolationKindName(),
+                          conventionAttr->getConventionName());
+        } else {
+          isolation = FunctionTypeIsolation::forErased();
+        }
         break;
       }
     }
@@ -4173,7 +4184,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     SILFunctionType::Representation::Thick;
   const clang::Type *clangFnType = nullptr;
   TypeRepr *witnessMethodProtocol = nullptr;
-  if (auto conventionAttr = claim<ConventionTypeAttr>(attrs)) {
+  auto conventionAttr = claim<ConventionTypeAttr>(attrs);
+  if (conventionAttr) {
     auto parsedRep =
       llvm::StringSwitch<std::optional<SILFunctionType::Representation>>(
             conventionAttr->getConventionName())
@@ -4235,11 +4247,28 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool sendable = claim<SendableTypeAttr>(attrs);
   bool async = claim<AsyncTypeAttr>(attrs);
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
+  auto isolation = SILFunctionTypeIsolation::Unknown;
+
+  if (auto isolatedAttr = claim<IsolatedTypeAttr>(attrs)) {
+    switch (isolatedAttr->getIsolationKind()) {
+    case IsolatedTypeAttr::IsolationKind::Dynamic:
+      if (representation != SILFunctionType::Representation::Thick) {
+        assert(conventionAttr);
+        diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
+                        diag::isolated_attr_bad_convention,
+                        isolatedAttr->getIsolationKindName(),
+                        conventionAttr->getConventionName());
+      } else {
+        isolation = SILFunctionTypeIsolation::Erased;
+      }
+      break;
+    }
+  }
 
   // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      diffKind, clangFnType, LifetimeDependenceInfo());
+      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
 
   // Resolve parameter and result types using the function's generic
   // environment.

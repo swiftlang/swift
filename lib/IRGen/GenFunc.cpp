@@ -833,6 +833,34 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
   llvm_unreachable("unhandled convention");
 }
 
+static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
+                                      const LoadableTypeInfo &isolationTI) {
+  auto offset = IGM.RefCountedStructSize;
+  return offset.roundUpToAlignment(isolationTI.getFixedAlignment());
+
+}
+
+/// Load the stored isolation of an @isolated(any) function type, which
+/// is assumed to be at a known offset within a closure object.
+void irgen::emitExtractFunctionIsolation(IRGenFunction &IGF,
+                                         llvm::Value *fnContext,
+                                         Explosion &result) {
+  auto isolationTy = SILType::getOpaqueIsolationType(IGF.IGM.Context);
+  auto &isolationTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(isolationTy));
+
+  Address baseAddr = Address(fnContext, IGF.IGM.RefCountedStructTy,
+                            IGF.IGM.getPointerAlignment());
+  baseAddr = IGF.Builder.CreateElementBitCast(baseAddr, IGF.IGM.Int8Ty);
+
+  auto offset = getOffsetOfOpaqueIsolationField(IGF.IGM, isolationTI);
+  Address fieldAddr = IGF.Builder.CreateConstByteArrayGEP(baseAddr, offset);
+  fieldAddr =
+    IGF.Builder.CreateElementBitCast(fieldAddr, isolationTI.getStorageType());
+
+  // Really a borrow
+  isolationTI.loadAsTake(IGF, fieldAddr, result);
+}
+
 static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 IRGenFunction &IGF,
                                                 CanSILFunctionType substType,
@@ -1468,7 +1496,6 @@ static llvm::Value *emitPartialApplicationForwarder(
   // This is where the context parameter appears.
   llvm::Value *rawData = nullptr;
   Address data;
-  unsigned nextCapturedField = 0;
   if (!layout) {
     rawData = emission->getContext();
   } else if (!layout->isKnownEmpty()) {
@@ -1477,7 +1504,7 @@ static llvm::Value *emitPartialApplicationForwarder(
 
     // Restore type metadata bindings, if we have them.
     if (layout->hasBindings()) {
-      auto bindingLayout = layout->getElement(nextCapturedField++);
+      auto bindingLayout = layout->getElement(layout->getBindingsIndex());
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr =
@@ -1564,7 +1591,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     // We need to retain the parameter if:
     //   - we received at +0 (either) and are passing as owned
     //   - we received as unowned and are passing as guaranteed
-    auto argConvention = conventions[nextCapturedField++];
+    auto argConvention = conventions[0];
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
@@ -1645,12 +1672,15 @@ static llvm::Value *emitPartialApplicationForwarder(
     HeapNonFixedOffsets offsets(subIGF, *layout);
 
     // Perform the loads.
-    for (unsigned n = layout->getElements().size();
-         nextCapturedField < n;
-         ++nextCapturedField) {
-      auto &fieldLayout = layout->getElement(nextCapturedField);
-      auto &fieldTy = layout->getElementTypes()[nextCapturedField];
-      auto fieldConvention = conventions[nextCapturedField];
+    for (unsigned fieldIndex : indices(layout->getElements())) {
+      // Ignore the bindings field, which we handled above.
+      if (layout->hasBindings() &&
+          fieldIndex == layout->getBindingsIndex())
+        continue;
+
+      auto &fieldLayout = layout->getElement(fieldIndex);
+      auto &fieldTy = layout->getElementTypes()[fieldIndex];
+      auto fieldConvention = conventions[fieldIndex];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       lastCapturedFieldPtr = fieldAddr.getAddress();
@@ -1956,23 +1986,7 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
 
-  // Reserve space for polymorphic bindings.
-  auto bindings = NecessaryBindings::forPartialApplyForwarder(
-      IGF.IGM, origType, subs, outType->isNoEscape(),
-      considerParameterSources);
-
-  if (!bindings.empty()) {
-    hasSingleSwiftRefcountedContext = No;
-    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
-    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(bindingsSize,
-                                                 IGF.IGM.getPointerAlignment());
-    argValTypes.push_back(SILType());
-    argTypeInfos.push_back(&bindingsTI);
-    argConventions.push_back(ParameterConvention::Direct_Unowned);
-  }
-
-  // Collect the type infos for the context parameters.
-  for (auto param : params) {
+  auto addParam = [&](SILParameterInfo param) {
     SILType argType = IGF.IGM.silConv.getSILType(
         param, origType, IGF.IGM.getMaximalTypeExpansionContext());
 
@@ -1984,7 +1998,7 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     // Empty values don't matter.
     auto schema = ti.getSchema();
     if (schema.empty() && !param.isFormalIndirect())
-      continue;
+      return;
 
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
@@ -1993,14 +2007,14 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     // Update the single-swift-refcounted check, unless we already ruled that
     // out.
     if (hasSingleSwiftRefcountedContext == No)
-      continue;
+      return;
     
     
     // Adding nonempty values when we already have a single refcounted pointer
     // means we don't have a single value anymore.
     if (hasSingleSwiftRefcountedContext != Maybe) {
       hasSingleSwiftRefcountedContext = No;
-      continue;
+      return;
     }
       
     if (ti.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
@@ -2010,6 +2024,37 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     } else {
       hasSingleSwiftRefcountedContext = No;
     }
+  };
+
+  // If the out type is @isolated(any), the storage for the erased isolation
+  // goes first.
+  bool hasErasedIsolation = outType->hasErasedIsolation();
+  if (hasErasedIsolation) {
+    assert(params[0].getInterfaceType() ==
+             SILType::getOpaqueIsolationType(IGF.IGM.Context).getASTType());
+    addParam(params[0]);
+  }
+
+  // Reserve space for polymorphic bindings.
+  auto bindings = NecessaryBindings::forPartialApplyForwarder(
+      IGF.IGM, origType, subs, outType->isNoEscape(),
+      considerParameterSources);
+
+  std::optional<unsigned> bindingsIndex;
+  if (!bindings.empty()) {
+    bindingsIndex = argTypeInfos.size();
+    hasSingleSwiftRefcountedContext = No;
+    auto bindingsSize = bindings.getBufferSize(IGF.IGM);
+    auto &bindingsTI = IGF.IGM.getOpaqueStorageTypeInfo(bindingsSize,
+                                                 IGF.IGM.getPointerAlignment());
+    argValTypes.push_back(SILType());
+    argTypeInfos.push_back(&bindingsTI);
+    argConventions.push_back(ParameterConvention::Direct_Unowned);
+  }
+
+  // Collect the type infos for the context parameters.
+  for (auto param : params.slice(hasErasedIsolation ? 1 : 0)) {
+    addParam(param);
   }
 
   // We can't just bitcast if there's an error parameter to forward.
@@ -2116,6 +2161,8 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
         ParameterConvention::Indirect_InoutAliasable) {
     assert(bindings.empty());
     assert(args.size() == 1);
+    assert(!substType->hasErasedIsolation());
+    assert(!hasErasedIsolation);
 
     auto origSig = IGF.IGM.getSignature(origType);
 
@@ -2150,7 +2197,17 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
          && "argument info lists out of sync");
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos,
                     /*typeToFill*/ nullptr, std::move(bindings),
-                    /*bindingsIndex*/ 0);
+                    bindingsIndex ? *bindingsIndex : 0);
+
+#ifndef NDEBUG
+  if (hasErasedIsolation) {
+    auto &isolationFieldLayout = layout.getElement(0);
+    assert(isolationFieldLayout.hasByteOffset() &&
+           isolationFieldLayout.getByteOffset() ==
+             getOffsetOfOpaqueIsolationField(IGF.IGM,
+               cast<LoadableTypeInfo>(isolationFieldLayout.getType())));
+  }
+#endif
 
   llvm::Value *data;
 
@@ -2182,21 +2239,18 @@ llvm::Optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
     
-    unsigned i = 0;
-
-    // Store necessary bindings, if we have them.
-    if (layout.hasBindings()) {
-      auto &bindingsLayout = layout.getElement(i);
-      Address bindingsAddr = bindingsLayout.project(IGF, dataAddr, offsets);
-      layout.getBindings().save(IGF, bindingsAddr);
-      ++i;
-    }
-    
     // Store the context arguments.
-    for (unsigned end = layout.getElements().size(); i < end; ++i) {
+    for (unsigned i : indices(layout.getElements())) {
       auto &fieldLayout = layout.getElement(i);
-      auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
+
+      // Handle necessary bindings specially.
+      if (i == bindingsIndex) {
+        layout.getBindings().save(IGF, fieldAddr);
+        continue;
+      }
+
+      auto &fieldTy = layout.getElementTypes()[i];
 
       // We don't add non-constant function pointers to the explosion above,
       // so we need to handle them specially now.

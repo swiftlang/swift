@@ -614,6 +614,10 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
+  auto isolation = SILFunctionTypeIsolation::Unknown;
+  if (flags.hasErasedIsolation())
+    isolation = SILFunctionTypeIsolation::Erased;
+
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
   bool unimplementable = false;
@@ -655,7 +659,7 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), unimplementable,
-                   diffKind, clangFnType, LifetimeDependenceInfo())
+                   isolation, diffKind, clangFnType, LifetimeDependenceInfo())
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,

@@ -569,6 +569,9 @@ static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
   //   - thickness, so that we can promote thin-to-thick without rehashing;
   //   - error results, so that we can promote nonthrowing-to-throwing
   //     without rehashing;
+  //   - isolation, so that global actor annotations can change in the SDK
+  //     without breaking compatibility and so that we can erase it to
+  //     nonisolated without rehashing;
   //   - types of indirect arguments/retvals, so they can be substituted freely;
   //   - types of class arguments/retvals
   //   - types of metatype arguments/retvals

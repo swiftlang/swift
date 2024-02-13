@@ -280,6 +280,7 @@ class ImplFunctionTypeFlags {
   unsigned Escaping : 1;
   unsigned Concurrent : 1;
   unsigned Async : 1;
+  unsigned ErasedIsolation : 1;
   unsigned DifferentiabilityKind : 3;
 
 public:
@@ -289,6 +290,7 @@ public:
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
+                        bool erasedIsolation,
                         ImplFunctionDifferentiabilityKind diffKind)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async),
@@ -297,7 +299,7 @@ public:
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
     return ImplFunctionTypeFlags(
-        rep, Pseudogeneric, Escaping, Concurrent, Async,
+        rep, Pseudogeneric, Escaping, Concurrent, Async, ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
@@ -305,20 +307,31 @@ public:
   withConcurrent() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true,
-        Async, ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+        Async, ErasedIsolation,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withAsync() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
-        true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+        true, ErasedIsolation,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withEscaping() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
+        ErasedIsolation,
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+  }
+
+  ImplFunctionTypeFlags
+  withErasedIsolation() const {
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
+        Async, true,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
   
@@ -326,13 +339,15 @@ public:
   withPseudogeneric() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
+        ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
     return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
-                                 Escaping, Concurrent, Async, diffKind);
+                                 Escaping, Concurrent, Async, ErasedIsolation,
+                                 diffKind);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -346,6 +361,8 @@ public:
   bool isSendable() const { return Concurrent; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
+
+  bool hasErasedIsolation() const { return ErasedIsolation; }
 
   bool isDifferentiable() const {
     return getDifferentiabilityKind() !=
@@ -1016,6 +1033,8 @@ protected:
           flags = flags.withDifferentiabilityKind(implDiffKind);
         } else if (child->getKind() == NodeKind::ImplEscaping) {
           flags = flags.withEscaping();
+        } else if (child->getKind() == NodeKind::ImplErasedIsolation) {
+          flags = flags.withErasedIsolation();
         } else if (child->getKind() == NodeKind::ImplParameter) {
           if (decodeImplFunctionParam(child, depth + 1, parameters))
             return MAKE_NODE_TYPE_ERROR0(child,

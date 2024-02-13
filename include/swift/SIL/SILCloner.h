@@ -1043,7 +1043,8 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
       Inst, getBuilder().createPartialApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
-                Inst->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+                Inst->getCalleeConvention(),
+                Inst->getResultIsolation(),
                 Inst->isOnStack(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
@@ -3580,6 +3581,16 @@ void SILCloner<ImplClass>
                           getBuilder().createExtractExecutor(
                             getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getExpectedExecutor())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitFunctionExtractIsolationInst(FunctionExtractIsolationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createFunctionExtractIsolation(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getFunction())));
 }
 
 template <typename ImplClass>

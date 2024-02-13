@@ -51,6 +51,7 @@ enum SingletonTypeSynthesizer {
   _word,
   _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
   _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
+  _actor,          // the '_Concurrency.Actor' protocol
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -72,6 +73,9 @@ inline Type synthesizeType(SynthesisContext &SC,
       ->getDeclaredInterfaceType();
   case _taskExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
+      ->getDeclaredInterfaceType();
+  case _actor:
+    return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
   }
 }
@@ -117,6 +121,21 @@ template <class S>
 Type synthesizeType(SynthesisContext &SC,
                     const MetatypeTypeSynthesizer<S> &M) {
   return MetatypeType::get(synthesizeType(SC, M.Sub));
+}
+
+/// A synthesizer which generates an existential type from a requirement type.
+template <class S>
+struct ExistentialTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr ExistentialTypeSynthesizer<S> _existential(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const ExistentialTypeSynthesizer<S> &M) {
+  return ExistentialType::get(synthesizeType(SC, M.Sub));
 }
 
 /// A synthesizer which generates an existential metatype type.

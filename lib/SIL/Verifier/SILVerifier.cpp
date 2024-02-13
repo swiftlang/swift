@@ -2085,6 +2085,17 @@ public:
       }
     }
 
+    if (resultInfo->hasErasedIsolation()) {
+      require(!PAI->getArguments().empty(),
+              "erasure to @isolated(any) requires an actor argument");
+      auto isolationTy =
+        substConv.getSILArgumentType(appliedArgStartIdx,
+                                     F.getTypeExpansionContext());
+      requireSameType(isolationTy,
+                      SILType::getOpaqueIsolationType(F.getASTContext()),
+                      "first applied argument must be the isolation value");
+    }
+
     // TODO: Impose additional constraints when partial_apply when the
     // -disable-sil-partial-apply flag is enabled. We want to reduce
     // partial_apply to being only a means of associating a closure invocation
@@ -2135,6 +2146,13 @@ public:
       require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
               "partial_apply context argument must be swift-refcounted");
     }
+  }
+
+  void checkFunctionExtractIsolationInst(FunctionExtractIsolationInst *FEI) {
+    auto fnType = requireObjectType(SILFunctionType, FEI->getFunction(),
+                                    "function_extract_isolation operand");
+    require(fnType->hasErasedIsolation(),
+            "function_extract_isolation operand must have erased isolation");
   }
 
   void checkBuiltinInst(BuiltinInst *BI) {
@@ -2212,6 +2230,10 @@ public:
       auto semanticName = semantics::LIFETIMEMANAGEMENT_COPY;
       require(BI->getFunction()->hasSemanticsAttr(semanticName),
               "_copy used within a generic context");
+    }
+
+    if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
+      require(false, "this builtin is pre-SIL-only");
     }
   }
   
@@ -6386,6 +6408,10 @@ public:
     require(!FTy->hasSelfParam() || !FTy->getParameters().empty(),
             "Functions with a calling convention with self parameter must "
             "have at least one argument for self.");
+
+    require(!FTy->hasErasedIsolation() ||
+             FTy->getRepresentation() == SILFunctionType::Representation::Thick,
+            "only thick function types can have erased isolation");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
@@ -6857,6 +6883,9 @@ public:
       // return.
       return;
     }
+
+    require(!FTy->hasErasedIsolation(),
+            "function declarations cannot have erased isolation");
 
     assert(!F->hasForeignBody());
 

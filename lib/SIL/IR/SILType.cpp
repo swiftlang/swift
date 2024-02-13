@@ -108,6 +108,12 @@ SILType SILType::getPackIndexType(const ASTContext &C) {
   return getPrimitiveObjectType(C.ThePackIndexType);
 }
 
+SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
+  auto actorProtocol = C.getProtocol(KnownProtocolKind::Actor);
+  auto actorType = ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
+  return getPrimitiveObjectType(CanType(actorType).wrapInOptionalType());
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   

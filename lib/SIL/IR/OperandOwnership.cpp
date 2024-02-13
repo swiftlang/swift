@@ -323,6 +323,7 @@ OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 // using getForwardingOperandOwnership.
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, FunctionExtractIsolation)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -907,6 +908,9 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
+
+// This should actually never be seen in SIL
+BUILTIN_OPERAND_OWNERSHIP(GuaranteedForwarding, ExtractFunctionIsolation)
 
 OperandOwnership
 OperandOwnershipBuiltinClassifier
