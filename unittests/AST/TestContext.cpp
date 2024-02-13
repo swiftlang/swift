@@ -35,8 +35,8 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
     : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
-                           ClangImporterOpts, SymbolGraphOpts, SourceMgr,
-                           Diags)) {
+                           ClangImporterOpts, SymbolGraphOpts, CASOpts,
+                           SourceMgr, Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   registerClangImporterRequestFunctions(Ctx.evaluator);

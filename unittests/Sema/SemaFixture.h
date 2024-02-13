@@ -42,6 +42,7 @@ public:
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 

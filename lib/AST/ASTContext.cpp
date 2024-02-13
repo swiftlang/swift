@@ -677,7 +677,7 @@ ASTContext *ASTContext::get(
     LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
-    symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+    symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
@@ -692,7 +692,7 @@ ASTContext *ASTContext::get(
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
-                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags,
+                 ClangImporterOpts, SymbolGraphOpts, casOpts, SourceMgr, Diags,
                  std::move(OutputBackend));
 }
 
@@ -700,15 +700,14 @@ ASTContext::ASTContext(
     LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
-    symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+    symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend
-    )
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
-      SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
-      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
-      TheBuiltinModule(createBuiltinModule(*this)),
+      SymbolGraphOpts(SymbolGraphOpts), CASOpts(casOpts), SourceMgr(SourceMgr),
+      Diags(Diags), OutputBackend(std::move(OutBackend)),
+      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(

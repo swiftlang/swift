@@ -220,7 +220,7 @@ private:
                              MainExecutablePath))
       return true;
 
-    if (!Invocation.getFrontendOptions().EnableCaching) {
+    if (!Invocation.getCASOptions().EnableCaching) {
       llvm::errs() << "Requested command-line arguments do not enable CAS\n";
       return true;
     }

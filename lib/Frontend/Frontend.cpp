@@ -290,7 +290,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      SourceMgr, Diagnostics, OutputBackend));
+      Invocation.getCASOptions(), SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -434,10 +434,10 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 }
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
-  const auto &Opts = getInvocation().getFrontendOptions();
   if (!getInvocation().requiresCAS())
     return false;
 
+  const auto &Opts = getInvocation().getCASOptions();
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
@@ -559,10 +559,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  if (Invocation.getFrontendOptions().EnableCaching) {
-    const auto &Opts = getInvocation().getFrontendOptions();
-    if (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
-        !Invocation.getFrontendOptions().ClangIncludeTrees.empty()) {
+  if (Invocation.getCASOptions().requireCASFS()) {
+    const auto &Opts = getInvocation().getCASOptions();
+    if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty()) {
       // Set up CASFS as BaseFS.
       auto FS =
           createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
@@ -579,10 +578,10 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::InMemoryFileSystem();
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
-    if (!ClangOpts.BridgingHeaderPCHCacheKey.empty()) {
+    if (!Opts.BridgingHeaderPCHCacheKey.empty()) {
       if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
               getObjectStore(), getActionCache(), Diagnostics,
-              ClangOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
+              Opts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
               ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
@@ -592,11 +591,14 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
             Invocation.getClangImporterOptions().BridgingHeader);
     }
     if (!Opts.InputFileKey.empty()) {
-      if (Opts.InputsAndOutputs.getAllInputs().size() != 1)
+      if (Invocation.getFrontendOptions()
+              .InputsAndOutputs.getAllInputs()
+              .size() != 1)
         Diagnostics.diagnose(SourceLoc(),
                              diag::error_wrong_input_num_for_input_file_key);
       else {
-        auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+        auto InputPath = Invocation.getFrontendOptions()
+                             .InputsAndOutputs.getFilenameOfFirstInput();
         auto Type = file_types::lookupTypeFromFilename(
             llvm::sys::path::filename(InputPath));
         if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
@@ -741,7 +743,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    if (Invocation.getFrontendOptions().EnableCaching)
+    if (Invocation.getCASOptions().EnableCaching)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
           MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
@@ -812,7 +814,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
-        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        Context->LangOpts, Context->ClangImporterOpts, Context->CASOpts,
+        LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
@@ -1172,7 +1175,7 @@ bool CompilerInstance::canImportCxxShim() const {
 }
 
 bool CompilerInstance::supportCaching() const {
-  if (!Invocation.getFrontendOptions().EnableCaching)
+  if (!Invocation.getCASOptions().EnableCaching)
     return false;
 
   return FrontendOptions::supportCompilationCaching(

@@ -336,7 +336,7 @@ static llvm::Error resolveExplicitModuleInputs(
   }
 
   // Handle CAS options.
-  if (instance.getInvocation().getFrontendOptions().EnableCaching) {
+  if (instance.getInvocation().getCASOptions().EnableCaching) {
     // Merge CASFS from clang dependency.
     auto &CASFS = cache.getScanService().getSharedCachingFS();
     auto &CAS = CASFS.getCAS();

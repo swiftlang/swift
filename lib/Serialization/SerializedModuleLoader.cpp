@@ -486,7 +486,7 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   // of binary module dependencies. In the meantime, in non-CAS mode
   // loading clients will consume the `.h` files encoded in the `.swiftmodules`
   // directly.
-  if (Ctx.ClangImporterOpts.CASOpts) {
+  if (Ctx.CASOpts.EnableCaching) {
     importedHeaders.reserve(importedHeaderSet.size());
     llvm::transform(importedHeaderSet.keys(),
                     std::back_inserter(importedHeaders),

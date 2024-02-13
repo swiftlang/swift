@@ -26,6 +26,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -102,6 +103,7 @@ class CompilerInvocation {
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
+  CASOptions CASOpts;
   llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
   /// The offset that IDEInspection wants to further examine in offset of bytes
@@ -166,7 +168,7 @@ public:
   }
 
   bool requiresCAS() const {
-    return FrontendOpts.EnableCaching || FrontendOpts.UseCASBackend;
+    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -273,6 +275,9 @@ public:
 
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
+
+  CASOptions &getCASOptions() { return CASOpts; }
+  const CASOptions &getCASOptions() const { return CASOpts; }
 
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }

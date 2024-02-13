@@ -237,22 +237,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     std::string IncludeTree =
         clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
-    if (ctx.ClangImporterOpts.CASOpts) {
-      swiftArgs.push_back("-cache-compile-job");
-      if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
-        swiftArgs.push_back("-cas-path");
-        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
-      }
-      if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
-        swiftArgs.push_back("-cas-plugin-path");
-        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
-        for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
-          swiftArgs.push_back("-cas-plugin-option");
-          swiftArgs.push_back(
-              (llvm::Twine(Opt.first) + "=" + Opt.second).str());
-        }
-      }
-    }
+    ctx.CASOpts.enumerateCASConfigurationFlags(
+        [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
 
     if (!RootID.empty()) {
       swiftArgs.push_back("-no-clang-include-tree");
@@ -343,21 +329,8 @@ void ClangImporter::recordBridgingHeaderOptions(
 
   llvm::for_each(clangArgs, addClangArg);
 
-  if (ctx.ClangImporterOpts.CASOpts) {
-    swiftArgs.push_back("-cache-compile-job");
-    if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
-      swiftArgs.push_back("-cas-path");
-      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
-    }
-    if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
-      swiftArgs.push_back("-cas-plugin-path");
-      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
-      for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
-        swiftArgs.push_back("-cas-plugin-option");
-        swiftArgs.push_back((llvm::Twine(Opt.first) + "=" + Opt.second).str());
-      }
-    }
-  }
+  ctx.CASOpts.enumerateCASConfigurationFlags(
+      [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
 
   if (auto Tree = deps.IncludeTreeID) {
     swiftArgs.push_back("-clang-include-tree-root");

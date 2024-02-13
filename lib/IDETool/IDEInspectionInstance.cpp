@@ -240,9 +240,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
+  CASOptions casOpts;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, tmpSM, tmpDiags));
+                      symbolOpts, casOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);

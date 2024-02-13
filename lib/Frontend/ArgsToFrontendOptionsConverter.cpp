@@ -253,31 +253,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkBuildFromInterfaceOnlyOptions())
     return true;
 
-  Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
-  Opts.EnableCaching = Args.hasArg(OPT_cache_compile_job);
-  Opts.EnableCachingRemarks = Args.hasArg(OPT_cache_remarks);
-  Opts.CacheSkipReplay = Args.hasArg(OPT_cache_disable_replay);
-  Opts.CASOpts.CASPath =
-      Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
-  Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
-  for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
-    StringRef Name, Value;
-    std::tie(Name, Value) = Opt.split('=');
-    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
-                                            std::string(Value));
-  }
-
-  Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
-  Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
-  Opts.InputFileKey = Args.getLastArgValue(OPT_input_file_key);
+  Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
   Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
-
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
-    Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-    return true;
-  }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -401,17 +378,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
-
-  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
-    Opts.CASObjMode = llvm::StringSwitch<llvm::CASBackendMode>(A->getValue())
-                          .Case("native", llvm::CASBackendMode::Native)
-                          .Case("casid", llvm::CASBackendMode::CASID)
-                          .Case("verify", llvm::CASBackendMode::Verify)
-                          .Default(llvm::CASBackendMode::Native);
-  }
-
-  Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
-  Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
 

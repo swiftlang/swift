@@ -418,19 +418,18 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   // currently we need to ensure it still reads the flags written out
   // in the .swiftinterface file itself. Instead, creation of that
   // job should incorporate those flags.
-  if (FEOpts.ExplicitInterfaceBuild &&
-      !(FEOpts.isTypeCheckAction() && !FEOpts.EnableCaching))
+  if (FEOpts.ExplicitInterfaceBuild && !(FEOpts.isTypeCheckAction()))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
         Invocation.getOutputFilename(),
         /* shouldSerializeDeps */ true,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
-  else
-    return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
+
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
-      Invocation.getClangImporterOptions(),
+      Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(), ABIPath,
@@ -1455,7 +1454,7 @@ static bool performAction(CompilerInstance &Instance,
 /// false and will not replay any output.
 static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   if (!Instance.supportCaching() ||
-      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
+      Instance.getInvocation().getCASOptions().CacheSkipReplay)
     return false;
 
   assert(Instance.getCompilerBaseKey() &&
@@ -1471,7 +1470,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
-      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
+      Instance.getInvocation().getCASOptions().EnableCachingRemarks);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
