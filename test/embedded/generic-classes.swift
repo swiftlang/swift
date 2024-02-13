@@ -22,6 +22,18 @@ func makeItFoo<F: Fooable>(f: F) {
   f.foo()
 }
 
+class BaseClass<A> {
+  func test() {}
+}
+
+class SubClass1<B>: BaseClass<Int> {
+  override func test() {}
+}
+
+class SubClass2 : SubClass1<Int> {
+  override func test() { print("SubClass2") }
+}
+
 @main
 struct Main {
   static func main() {
@@ -29,9 +41,12 @@ struct Main {
     makeItFoo(f: f)
     let g: GenericFooableClass = GenericFooableSubClass<Int>()
     makeItFoo(f: g)
+    let x = SubClass2()
+    x.test()
   }
 }
 
 // CHECK: GenericFooableClass<T>.foo
 // CHECK: GenericFooableSubClass<T>.foo
+// CHECK: SubClass2
 
