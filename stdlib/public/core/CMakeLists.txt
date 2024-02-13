@@ -260,6 +260,10 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
+if(NOT SWIFT_FREESTANDING_FLAVOR)
+  list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
+endif()
+
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift

@@ -94,15 +94,6 @@ extension ObjectIdentifier: CustomDebugStringConvertible {
   }
 }
 
-#if !$Embedded
-@_DebugDescription
-extension ObjectIdentifier {
-  var _debugDescription: String {
-    return "ObjectIdentifier(\(_value))"
-  }
-}
-#endif
-
 extension ObjectIdentifier: Equatable {
   @inlinable // trivial-implementation
   public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {

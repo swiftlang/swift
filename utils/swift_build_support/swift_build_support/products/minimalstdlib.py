@@ -93,7 +93,7 @@ class MinimalStdlib(cmake_product.CMakeProduct):
             'SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
-        self.cmake_options.define('SWIFT_INCLUDE_TOOLS:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_INCLUDE_TOOLS:BOOL', 'FALSE')
 
         # Stdlib feature flags
         self.cmake_options.define('SWIFT_ENABLE_BACKTRACING:BOOL', 'FALSE')
