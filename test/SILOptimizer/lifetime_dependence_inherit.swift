@@ -37,3 +37,10 @@ struct NE {
     return self
   }
 }
+
+// Test lifetime inheritance through chained consumes.
+//
+// This requires an inherit_lifetime marker on the argument.
+func bv_derive(bv: consuming BV) -> _consume(bv) BV {
+  bv.derive()
+}

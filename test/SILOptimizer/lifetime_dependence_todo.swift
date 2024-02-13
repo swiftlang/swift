@@ -19,11 +19,16 @@ func bv_get_mutate(container: inout NC) -> _mutate(container) BV {
   container.getBV()
 }
 
-// Test lifetime inheritance through chained consumes.
+// =============================================================================
+// Diagnostics that should fail.
+
+// Test that an unsafe dependence requires Builtin.lifetime_dependence.
 //
-// This requires an inherit_lifetime marker on the argument.
-func bv_derive(bv: consuming BV) -> _consume(bv) BV {
-  bv.derive()
+func bv_derive_local(bv: consuming BV) -> _consume(bv) BV {
+  let bv2 = BV(bv.p, bv.i)
+  return bv2.derive() // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on the lifetime of variable 'bv2'}}
+  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
 }
 
 // =============================================================================

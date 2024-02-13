@@ -36,10 +36,3 @@ struct NE {
     return self
   }
 }
-
-func bv_derive_local(bv: consuming BV) -> _consume(bv) BV {
-  let bv2 = BV(bv.p, bv.i)
-  return bv2.derive() // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on the lifetime of variable 'bv2'}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
-}
