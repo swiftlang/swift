@@ -315,6 +315,8 @@ module WinSDK [system] {
   }
 
   module Security {
+    header "../shared/sddl.h"
+
     module AuthZ {
       header "AuthZ.h"
       export *
