@@ -1922,6 +1922,10 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // invalidation behavior of this cache item.
       genericSubInvocation.getFrontendOptions().shouldTrackSystemDependencies(),
 
+      // Whether or not caching is enabled affects if the instance is able to
+      // correctly load the dependencies.
+      genericSubInvocation.getCASOptions().getModuleScanningHashComponents(),
+
       // Whether or not OSSA modules are enabled.
       //
       // If OSSA modules are enabled, we use a separate namespace of modules to

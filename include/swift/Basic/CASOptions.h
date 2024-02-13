@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_CASOPTIONS_H
 
 #include "clang/CAS/CASOptions.h"
+#include "llvm/ADT/Hashing.h"
 
 namespace swift {
 
@@ -57,6 +58,21 @@ public:
     return EnableCaching &&
            (!CASFSRootIDs.empty() || !ClangIncludeTrees.empty() ||
             !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    // The CASIDs are generated from scanner, thus not part of the hash since
+    // they will always be empty when requested.
+    // TODO: Add frozen clang::CASOptions to the hash.
+    return llvm::hash_combine(EnableCaching);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
+    return getPCHHashComponents();
   }
 };
 

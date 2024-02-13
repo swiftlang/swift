@@ -71,7 +71,8 @@ std::string CompilerInvocation::getPCHHash() const {
                            SearchPathOpts.getPCHHashComponents(),
                            DiagnosticOpts.getPCHHashComponents(),
                            SILOpts.getPCHHashComponents(),
-                           IRGenOpts.getPCHHashComponents());
+                           IRGenOpts.getPCHHashComponents(),
+                           CASOpts.getPCHHashComponents());
 
   return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
@@ -85,7 +86,8 @@ std::string CompilerInvocation::getModuleScanningHash() const {
                            SearchPathOpts.getModuleScanningHashComponents(),
                            DiagnosticOpts.getModuleScanningHashComponents(),
                            SILOpts.getModuleScanningHashComponents(),
-                           IRGenOpts.getModuleScanningHashComponents());
+                           IRGenOpts.getModuleScanningHashComponents(),
+                           CASOpts.getModuleScanningHashComponents());
 
   return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
