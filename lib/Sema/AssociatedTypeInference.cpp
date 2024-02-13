@@ -1902,6 +1902,13 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     else
       continue;
 
+    if (result.empty()) {
+      // If we found at least one default candidate, we must allow for the
+      // possibility that no default is chosen by adding a tautological witness
+      // to our disjunction.
+      result.push_back(InferredAssociatedTypesByWitness());
+    }
+
     // Add this result.
     InferredAssociatedTypesByWitness inferred;
     inferred.Witness = typeDecl;
@@ -1909,12 +1916,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     result.push_back(std::move(inferred));
   }
 
-  if (!result.empty()) {
-    // If we found at least one default candidate, we must allow for the
-    // possibility that no default is chosen by adding a tautological witness
-    // to our disjunction.
-    result.push_back(InferredAssociatedTypesByWitness());
-  }
   return result;
 }
 
