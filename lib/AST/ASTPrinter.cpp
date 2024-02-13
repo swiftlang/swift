@@ -2964,34 +2964,10 @@ static bool usesFeatureStaticAssert(Decl *decl) {
 }
 
 static bool usesFeatureEffectfulProp(Decl *decl) {
-  if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-    return asd->getEffectfulGetAccessor() != nullptr;
   return false;
 }
 
 static bool usesFeatureAsyncAwait(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (func->hasAsync())
-      return true;
-  }
-
-  // Check for async functions in the types of declarations.
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-    if (Type type = value->getInterfaceType()) {
-      bool hasAsync = type.findIf([](Type type) {
-        if (auto fnType = type->getAs<AnyFunctionType>()) {
-          if (fnType->isAsync())
-            return true;
-        }
-
-        return false;
-      });
-
-      if (hasAsync)
-        return true;
-    }
-  }
-
   return false;
 }
 
@@ -3000,34 +2976,6 @@ static bool usesFeatureMarkerProtocol(Decl *decl) {
 }
 
 static bool usesFeatureActors(Decl *decl) {
-  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    if (classDecl->isActor())
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto classDecl = ext->getSelfClassDecl())
-      if (classDecl->isActor())
-        return true;
-  }
-
-  // Check for actors in the types of declarations.
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-    if (Type type = value->getInterfaceType()) {
-      bool hasActor = type.findIf([](Type type) {
-        if (auto classDecl = type->getClassOrBoundGenericClass()) {
-          if (classDecl->isActor())
-            return true;
-        }
-
-        return false;
-      });
-
-      if (hasActor)
-        return true;
-    }
-  }
-
   return false;
 }
 
@@ -3100,28 +3048,6 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
 }
 
 static bool usesFeatureSendable(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (func->isSendable())
-      return true;
-  }
-
-  // Check for sendable functions in the types of declarations.
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-    if (Type type = value->getInterfaceType()) {
-      bool hasSendable = type.findIf([](Type type) {
-        if (auto fnType = type->getAs<AnyFunctionType>()) {
-          if (fnType->isSendable())
-            return true;
-        }
-
-        return false;
-      });
-
-      if (hasSendable)
-        return true;
-    }
-  }
-
   return false;
 }
 
@@ -3226,20 +3152,12 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
   return false;
 }
 
-static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
-  return usesTypeMatching(decl, [=](Type type) {
-    if (auto builtinTy = type->getAs<BuiltinType>())
-      return builtinTy->getBuiltinTypeKind() == kind;
-    return false;
-  });
-}
-
 static bool usesFeatureBuiltinJob(Decl *decl) {
-  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinJob);
+  return false;
 }
 
 static bool usesFeatureBuiltinExecutor(Decl *decl) {
-  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
+  return false;
 }
 
 static bool usesFeatureBuiltinBuildTaskExecutorRef(Decl *decl) { return false; }
@@ -3330,24 +3248,10 @@ static void suppressingFeatureSpecializeAttributeWithAvailability(
 }
 
 static bool usesFeatureInheritActorContext(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    for (auto param : *func->getParameters()) {
-      if (param->getAttrs().hasAttribute<InheritActorContextAttr>())
-        return true;
-    }
-  }
-
   return false;
 }
 
 static bool usesFeatureImplicitSelfCapture(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    for (auto param : *func->getParameters()) {
-      if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>())
-        return true;
-    }
-  }
-
   return false;
 }
 
