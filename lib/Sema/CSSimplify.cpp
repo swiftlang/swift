@@ -8572,6 +8572,47 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance) {
       return recordConformance(conformance);
     }
+
+    // Account for ad-hoc requirements on some distributed actor
+    // requirements.
+    if (auto witnessInfo = locator.isForWitnessGenericParameterRequirement()) {
+      auto *GP = witnessInfo->second;
+
+      // Conformance requirement between on `Res` and `SerializationRequirement`
+      // of `DistributedActorSystem.remoteCall` are not expressible at the moment
+      // but they are verified by Sema so it's okay to omit them here and lookup
+      // dynamically during IRGen.
+      if (auto *witness = dyn_cast<FuncDecl>(witnessInfo->first)) {
+        auto synthesizeConformance = [&]() {
+          ProtocolConformanceRef synthesized(protocol);
+          auto witnessLoc = getConstraintLocator(
+              /*anchor=*/{}, LocatorPathElt::Witness(witness));
+          SynthesizedConformances.insert({witnessLoc, synthesized});
+          return recordConformance(synthesized);
+        };
+
+        if (witness->isGeneric()) {
+          // `DistributedActorSystem.remoteCall`
+          if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
+            if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
+              return synthesizeConformance();
+          }
+
+          // `DistributedTargetInvocationEncoder.record{Argument, ResultType}`
+          // `DistributedTargetInvocationDecoder.decodeNextArgument`
+          // `DistributedTargetInvocationResultHandler.onReturn`
+          if (witness->isDistributedTargetInvocationEncoderRecordArgument() ||
+              witness->isDistributedTargetInvocationEncoderRecordReturnType() ||
+              witness
+                  ->isDistributedTargetInvocationDecoderDecodeNextArgument() ||
+              witness->isDistributedTargetInvocationResultHandlerOnReturn()) {
+            auto genericParams = witness->getGenericParams()->getParams();
+            if (GP->isEqual(genericParams.front()->getDeclaredInterfaceType()))
+              return synthesizeConformance();
+          }
+        }
+      }
+    }
   } break;
 
   default:

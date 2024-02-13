@@ -83,7 +83,8 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 SubstitutionMap
-Solution::computeSubstitutions(GenericSignature sig,
+Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
+                               GenericSignature sig,
                                ConstraintLocator *locator) const {
   if (sig.isNull())
     return SubstitutionMap();
@@ -114,8 +115,17 @@ Solution::computeSubstitutions(GenericSignature sig,
     }
 
     // FIXME: Retrieve the conformance from the solution itself.
-    return getConstraintSystem().DC->getParentModule()->lookupConformance(
-        replacement, protoType, /*allowMissing=*/true);
+    auto conformance =
+        getConstraintSystem().DC->getParentModule()->lookupConformance(
+            replacement, protoType, /*allowMissing=*/true);
+
+    if (conformance.isInvalid()) {
+      auto synthesized = SynthesizedConformances.find(locator);
+      if (synthesized != SynthesizedConformances.end())
+        return synthesized->second;
+    }
+
+    return conformance;
   };
 
   return SubstitutionMap::get(sig,
@@ -148,7 +158,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
   // Get the generic signature of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  auto subst = computeSubstitutions(sig, locator);
+  auto subst = computeSubstitutions(decl, sig, locator);
 
   maybeInstantiateCXXMethodDefinition(decl);
 
@@ -7132,7 +7142,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto opaqueLocator = solution.getConstraintSystem().getOpenOpaqueLocator(
         locator, opaqueDecl);
     SubstitutionMap substitutions = solution.computeSubstitutions(
-        opaqueDecl->getOpaqueInterfaceGenericSignature(), opaqueLocator);
+        opaqueDecl, opaqueDecl->getOpaqueInterfaceGenericSignature(),
+        opaqueLocator);
 
     // If we don't have substitutions, this is an opaque archetype from
     // another declaration being manipulated, and not an erasure of a

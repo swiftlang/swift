@@ -312,7 +312,6 @@ namespace sil_block {
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
-                     DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      ModuleIDField, // Parent ModuleDecl *

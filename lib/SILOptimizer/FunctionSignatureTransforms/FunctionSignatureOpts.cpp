@@ -141,6 +141,17 @@ static bool canSpecializeFunction(SILFunction *F,
                                      OptForPartialApply))
     return false;
 
+  // Cannot specialize witnesses of distributed protocol requirements with
+  // ad-hoc `SerializationRequirement` because that erases information
+  // IRGen relies on to emit protocol conformances at runtime.
+  if (F->hasLocation()) {
+    if (auto *funcDecl =
+            dyn_cast_or_null<FuncDecl>(F->getLocation().getAsDeclContext())) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return false;
+    }
+  }
+
   return true;
 }
 
@@ -657,7 +668,6 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
-                     F->getReferencedAdHocRequirementWitnessFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;

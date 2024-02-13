@@ -249,7 +249,7 @@ import _Concurrency
 /// - [SE-0336: Distributed Actor Isolation](https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md)
 /// - [SE-0344: Distributed Actor Runtime](https://github.com/apple/swift-evolution/blob/main/proposals/0344-distributed-actor-runtime.md)
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedActorSystem: Sendable {
+public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// The type ID that will be assigned to any distributed actor managed by this actor system.
   ///
   /// ### A note on Codable IDs
@@ -261,21 +261,18 @@ public protocol DistributedActorSystem: Sendable {
 
   /// Type of ``DistributedTargetInvocationEncoder`` that should be used when the Swift runtime needs to encode
   /// a distributed target call into an encoder, before passing it off to `remoteCall(...)`.
-  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
+  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder<SerializationRequirement>
   /// Type of ``DistributedTargetInvocationDecoder`` that should be used when decoding invocations during
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)`` calls.
-  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
+  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder<SerializationRequirement>
 
   /// The type of the result handler which will be offered the results
   /// returned by a distributed function invocation called via
   /// ``executeDistributedTarget(on:target:invocationDecoder:handler:)``.
-  associatedtype ResultHandler: DistributedTargetInvocationResultHandler
+  associatedtype ResultHandler: DistributedTargetInvocationResultHandler<SerializationRequirement>
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
   associatedtype SerializationRequirement // TODO: constrain SerializationRequirement in type-system to only be ok with protocol or class here
-    where SerializationRequirement == InvocationEncoder.SerializationRequirement,
-          SerializationRequirement == InvocationDecoder.SerializationRequirement,
-          SerializationRequirement == ResultHandler.SerializationRequirement
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity
@@ -375,63 +372,47 @@ public protocol DistributedActorSystem: Sendable {
   /// that are associated with this specific invocation.
   func makeInvocationEncoder() -> InvocationEncoder
 
-//  /// Invoked by the Swift runtime when making a remote call.
-//  ///
-//  /// The `arguments` are the arguments container that was previously created
-//  /// by `makeInvocationEncoder` and has been populated with all arguments.
-//  ///
-//  /// This method should perform the actual remote function call, and await for its response.
-//  ///
-//  /// ## Errors
-//  /// This method is allowed to throw because of underlying transport or serialization errors,
-//  /// as well as by re-throwing the error received from the remote callee (if able to).
-//  func remoteCall<Act, Err, Res>(
-//      on actor: Act,
-//      target: RemoteCallTarget,
-//      invocation: inout InvocationEncoder,
-//      throwing: Err.Type,
-//      returning: Res.Type
-//  ) async throws -> Res
-//      where Act: DistributedActor,
-//            Act.ID == ActorID,
-//            Err: Error,
-//            Res: SerializationRequirement
+  /// Invoked by the Swift runtime when making a remote call.
+  ///
+  /// The `arguments` are the arguments container that was previously created
+  /// by `makeInvocationEncoder` and has been populated with all arguments.
+  ///
+  /// This method should perform the actual remote function call, and await for its response.
+  ///
+  /// ## Errors
+  /// This method is allowed to throw because of underlying transport or serialization errors,
+  /// as well as by re-throwing the error received from the remote callee (if able to).
+  func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+      where Act: DistributedActor,
+            Act.ID == ActorID,
+            Err: Error
+//          Res: SerializationRequirement
 
-//  /// Invoked by the Swift runtime when making a remote call.
-//  ///
-//  /// The `arguments` are the arguments container that was previously created
-//  /// by `makeInvocationEncoder` and has been populated with all arguments.
-//  ///
-//  /// This method should perform the actual remote function call, and await for its response.
-//  ///
-//  /// ## Errors
-//  /// This method is allowed to throw because of underlying transport or serialization errors,
-//  /// as well as by re-throwing the error received from the remote callee (if able to).
-//  func remoteCallVoid<Act, Err>(
-//      on actor: Act,
-//      target: RemoteCallTarget,
-//      invocation: inout InvocationEncoder,
-//      throwing: Err.Type
-//  ) async throws -> Res
-//      where Act: DistributedActor,
-//            Act.ID == ActorID,
-//            Err: Error
-
-  // Implementation notes:
-  // The `metatype` must be the type of `Value`, and it must conform to
-  // `SerializationRequirement`. If it does not, the method will crash at
-  // runtime. This is because we cannot express
-  // `Value: SerializationRequirement`, however the generic `Value` is still
-  // useful since it allows us to avoid boxing the value into an existential,
-  // before we'd right away unbox it as first thing in the implementation of
-  // this function.
-  /// Implementation synthesized by the compiler.
-  /// Not intended to be invoked explicitly from user code!
-  func invokeHandlerOnReturn(
-    handler: ResultHandler,
-    resultBuffer: UnsafeRawPointer,
-    metatype: Any.Type
+  /// Invoked by the Swift runtime when making a remote call.
+  ///
+  /// The `arguments` are the arguments container that was previously created
+  /// by `makeInvocationEncoder` and has been populated with all arguments.
+  ///
+  /// This method should perform the actual remote function call, and await for its response.
+  ///
+  /// ## Errors
+  /// This method is allowed to throw because of underlying transport or serialization errors,
+  /// as well as by re-throwing the error received from the remote callee (if able to).
+  func remoteCallVoid<Act, Err>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder,
+      throwing: Err.Type
   ) async throws
+      where Act: DistributedActor,
+            Act.ID == ActorID,
+            Err: Error
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
@@ -619,11 +600,12 @@ extension DistributedActorSystem {
       if returnType == Void.self {
         try await handler.onReturnVoid()
       } else {
-        try await self.invokeHandlerOnReturn(
-          handler: handler,
-          resultBuffer: resultBuffer,
-          metatype: returnType
-        )
+        func invokeOnReturn<R>(_ returnType: R.Type) async throws {
+          let value = resultBuffer.load(as: returnType)
+          try await handler.onReturn(value: value)
+        }
+
+        try await _openExistential(returnType, do: invokeOnReturn)
       }
     } catch {
       try await handler.onThrow(error: error)
@@ -739,7 +721,7 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder, DA: Distri
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationEncoder {
+public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `recordArgument` and `recordReturnType` are required to conform to.
   associatedtype SerializationRequirement
 
@@ -749,13 +731,11 @@ public protocol DistributedTargetInvocationEncoder {
   /// - Parameter type: a generic substitution type to be recorded for this invocation.
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record an argument of `Argument` type.
-//  /// This will be invoked for every argument of the target, in declaration order.
-//  mutating func recordArgument<Value: SerializationRequirement>(
-//    _ argument: DistributedTargetArgument<Value>
-//  ) throws
+  /// Record an argument of `Argument` type.
+  /// This will be invoked for every argument of the target, in declaration order.
+  mutating func recordArgument<Value/*: SerializationRequirement*/>(
+    _ argument: RemoteCallArgument<Value>
+  ) throws
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.
@@ -763,11 +743,9 @@ public protocol DistributedTargetInvocationEncoder {
   /// - Parameter type: the type of error that was declared to be thrown by the invocation target. Currently this can only ever be `Error.self`.
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
-//  /// Ad-hoc requirement
-//  ///
-//  /// Record the return type of the distributed method.
-//  /// This method will not be invoked if the target is returning `Void`.
-//  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
+  /// Record the return type of the distributed method.
+  /// This method will not be invoked if the target is returning `Void`.
+  mutating func recordReturnType<R/*: SerializationRequirement*/>(_ type: R.Type) throws
 
   /// Invoked to signal to the encoder that no further `record...` calls will be made on it.
   ///
@@ -880,7 +858,7 @@ public struct RemoteCallArgument<Value> {
 /// }
 /// ```
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationDecoder {
+public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
   /// The type returned by `decodeReturnType` is also expected to conform to this associated type requirement.
   associatedtype SerializationRequirement
@@ -894,20 +872,18 @@ public protocol DistributedTargetInvocationDecoder {
   /// - Throws: if decoding substitutions fails.
   mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
-//  /// Ad-hoc protocol requirement
-//  ///
-//  /// Attempt to decode the next argument from the underlying buffers into pre-allocated storage
-//  /// pointed at by 'pointer'.
-//  ///
-//  /// This method should throw if it has no more arguments available, if decoding the argument failed,
-//  /// or, optionally, if the argument type we're trying to decode does not match the stored type.
-//  ///
-//  /// The result of the decoding operation must be stored into the provided 'pointer' rather than
-//  /// returning a value. This pattern allows the runtime to use a heavily optimized, pre-allocated
-//  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
-//  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
-//  /// performs the actual distributed (local) instance method invocation.
-//  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
+  /// Attempt to decode the next argument from the underlying buffers into pre-allocated storage
+  /// pointed at by 'pointer'.
+  ///
+  /// This method should throw if it has no more arguments available, if decoding the argument failed,
+  /// or, optionally, if the argument type we're trying to decode does not match the stored type.
+  ///
+  /// The result of the decoding operation must be stored into the provided 'pointer' rather than
+  /// returning a value. This pattern allows the runtime to use a heavily optimized, pre-allocated
+  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
+  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
+  /// performs the actual distributed (local) instance method invocation.
+  mutating func decodeNextArgument<Argument/*: SerializationRequirement*/>() throws -> Argument
 
   /// Decode the specific error type that the distributed invocation target has recorded.
   /// Currently this effectively can only ever be `Error.self`.
@@ -949,15 +925,13 @@ public protocol DistributedTargetInvocationDecoder {
 /// func onReturn<Success: SerializationRequirement>(value: Success) async throws
 /// ```
 @available(SwiftStdlib 5.7, *)
-public protocol DistributedTargetInvocationResultHandler {
+public protocol DistributedTargetInvocationResultHandler<SerializationRequirement> {
   /// The serialization requirement that the value passed to `onReturn` is required to conform to.
   associatedtype SerializationRequirement
 
-//  /// Ad-hoc protocol requirement
-//  ///
-//  /// Invoked when the distributed target execution returns successfully.
-//  /// The `value` is the return value of the executed distributed invocation target.
-//  func onReturn<Success: SerializationRequirement>(value: Success) async throws
+  /// Invoked when the distributed target execution returns successfully.
+  /// The `value` is the return value of the executed distributed invocation target.
+  func onReturn<Success/*: SerializationRequirement*/>(value: Success) async throws
 
   /// Invoked when the distributed target execution of a `Void` returning
   /// function has completed successfully.

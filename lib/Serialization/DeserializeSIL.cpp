@@ -538,7 +538,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
@@ -554,7 +553,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
+      replacedFunctionID, genericSigID,
       clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   if (funcTyID == 0)
@@ -581,13 +580,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         getFuncForReference(MF->getIdentifier(replacedFunctionID).str());
   } else if (replacedFunctionID) {
     replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
-  }
-
-  SILFunction *usedAdHocWitnessFunction = nullptr;
-  if (usedAdHocWitnessFunctionID) {
-    auto usedAdHocWitnessFunctionStr =
-        MF->getIdentifier(usedAdHocWitnessFunctionID).str();
-    usedAdHocWitnessFunction = getFuncForReference(usedAdHocWitnessFunctionStr);
   }
 
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
@@ -708,8 +700,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
       fn->setObjCReplacement(replacedObjectiveCFunc);
-    if (usedAdHocWitnessFunction)
-      fn->setReferencedAdHocRequirementWitnessFunction(usedAdHocWitnessFunction);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -3385,7 +3375,6 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
@@ -3401,7 +3390,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
+      replacedFunctionID, genericSigID,
       clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

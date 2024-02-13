@@ -1240,9 +1240,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       /// If the *only* problems are that `@Sendable` attributes are missing,
       /// allow the match in some circumstances.
       requiresNonSendable = solution
-          && llvm::all_of(solution->Fixes, [](constraints::ConstraintFix *fix) {
-            return fix->getKind() == constraints::FixKind::AddSendableAttribute;
-          });
+        && llvm::all_of(solution->Fixes, [](constraints::ConstraintFix *fix) {
+          return fix->getKind() == constraints::FixKind::AddSendableAttribute;
+        });
       if (!requiresNonSendable)
         return RequirementMatch(witness, MatchKind::TypeConflict,
                                 witnessType);
@@ -1273,8 +1273,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     auto witnessSig =
       witness->getInnermostDeclContext()->getGenericSignatureOfContext();
     result.WitnessSubstitutions =
-      solution->computeSubstitutions(witnessSig, witnessLocator);
-    
+        solution->computeSubstitutions(witness, witnessSig, witnessLocator);
+
     return result;
   };
 

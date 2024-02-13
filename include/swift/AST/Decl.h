@@ -7498,6 +7498,17 @@ public:
   /// 'DistributedTargetInvocationResultHandler' protocol.
   bool isDistributedTargetInvocationResultHandlerOnReturn() const;
 
+  /// Determines whether this declaration is a witness to a
+  /// protocol requirement with ad-hoc `SerializationRequirement`
+  /// conformance.
+  bool isDistributedWitnessWithAdHocSerializationRequirement() const {
+    return isDistributedActorSystemRemoteCall(/*isVoidResult=*/false) ||
+           isDistributedTargetInvocationEncoderRecordArgument() ||
+           isDistributedTargetInvocationEncoderRecordReturnType() ||
+           isDistributedTargetInvocationDecoderDecodeNextArgument() ||
+           isDistributedTargetInvocationResultHandlerOnReturn();
+  }
+
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;

@@ -110,9 +110,6 @@ class DeadFunctionAndGlobalElimination {
     if (F->isDynamicallyReplaceable())
       return true;
 
-    if (F->getReferencedAdHocRequirementWitnessFunction())
-      return true;
-
     // Don't remove pre-specialized functions. We need to preserver the
     // pre-specialization specifications from other modules.
     if (F->hasPrespecialization())
@@ -342,9 +339,6 @@ class DeadFunctionAndGlobalElimination {
 
     if (auto *replacedFn = F->getDynamicallyReplacedFunction())
       ensureAlive(replacedFn);
-
-    if (auto *adHocWitness = F->getReferencedAdHocRequirementWitnessFunction())
-      ensureAlive(adHocWitness);
 
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {

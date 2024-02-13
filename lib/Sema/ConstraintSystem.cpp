@@ -4431,7 +4431,8 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         ImplicitCallAsFunctionRoots.getMemorySize();
+         ImplicitCallAsFunctionRoots.getMemorySize() +
+         size_in_bytes(SynthesizedConformances);
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }

@@ -278,7 +278,6 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->DeclCtxt = DeclCtxt;
   newSnapshot->Profiler = Profiler;
   newSnapshot->ReplacedFunction = ReplacedFunction;
-  newSnapshot->RefAdHocRequirementFunction = RefAdHocRequirementFunction;
   newSnapshot->ObjCReplacementFor = ObjCReplacementFor;
   newSnapshot->SemanticsAttrSet = SemanticsAttrSet;
   newSnapshot->SpecializeAttrSet = SpecializeAttrSet;
