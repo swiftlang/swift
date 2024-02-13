@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
-// REQUIRES: concurrency && asserts
+// REQUIRES: concurrency
 
 class Box {
     let size : Int = 0

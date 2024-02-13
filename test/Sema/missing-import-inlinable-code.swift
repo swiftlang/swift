@@ -36,8 +36,6 @@
 // RUN: cat %t/ClientFixed.swiftinterface | %FileCheck -check-prefix ALIASED %s
 // ALIASED: import Module___libB
 
-// REQUIRES: asserts
-
 // BEGIN empty.swift
 
 // BEGIN libA.swift

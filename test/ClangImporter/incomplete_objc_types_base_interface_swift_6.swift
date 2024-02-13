@@ -8,7 +8,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
 
 import Foundation
 import IncompleteTypeLibrary1

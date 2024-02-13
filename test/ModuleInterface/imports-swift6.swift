@@ -1,6 +1,5 @@
 /// Swift 6 variant to imports.swift. Both can be reintegrated once
 /// -swift-version 6 is accepted by release compilers.
-// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t

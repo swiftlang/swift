@@ -180,16 +180,7 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
   case 6:
-    // Allow version '6' in asserts compilers *only* so that we can start
-    // testing changes slated for Swift 6. Note that it's still not listed in
-    // `Version::getValidEffectiveVersions()`.
-    // FIXME: When Swift 6 becomes real, remove 'REQUIRES: asserts' from tests
-    //        using '-swift-version 6'.
-#ifdef NDEBUG
-    LLVM_FALLTHROUGH;
-#else
     return Version{6};
-#endif
   default:
     return llvm::None;
   }

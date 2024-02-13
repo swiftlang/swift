@@ -9,7 +9,6 @@
 // RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency import NonStrictModule
 @preconcurrency import StrictModule

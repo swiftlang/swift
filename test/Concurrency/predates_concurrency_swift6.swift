@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 

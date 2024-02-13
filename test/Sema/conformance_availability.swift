@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
 
 public protocol Horse {}
 func takesHorse<T : Horse>(_: T) {}

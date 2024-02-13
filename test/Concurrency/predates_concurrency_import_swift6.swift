@@ -5,8 +5,6 @@
 // RUN: %target-swift-frontend -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
-// REQUIRES: asserts
-
 @preconcurrency import NonStrictModule
 @preconcurrency import StrictModule
 

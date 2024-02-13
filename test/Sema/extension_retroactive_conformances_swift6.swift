@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
-// REQUIRES: asserts
-
 struct LocalStruct {}
 protocol LocalProtocol {}
 

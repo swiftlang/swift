@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
-// REQUIRES: asserts
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/DepUsedFromInlinableCode.swift -o %t

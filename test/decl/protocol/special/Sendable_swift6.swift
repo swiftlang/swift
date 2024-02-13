@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 6
 
-// REQUIRES: asserts
-
 func acceptSendable<T: Sendable>(_: T) { }
 
 class NotSendable { } // expected-note 2{{class 'NotSendable' does not conform to the 'Sendable' protocol}}

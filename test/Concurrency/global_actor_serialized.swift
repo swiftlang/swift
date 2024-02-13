@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 6 -I %t
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 // This test ensures that, when loading a Swift 5 serialized module with
 // a global-actor annotation that is an error in Swift 6, but only a warning
