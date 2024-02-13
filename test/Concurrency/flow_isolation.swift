@@ -734,3 +734,86 @@ actor CheckDeinitFromActor {
     ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
   }
 }
+
+// https://github.com/apple/swift/issues/70550
+func testActorWithInitAccessorInit() {
+  @available(SwiftStdlib 5.1, *)
+  actor Angle {
+    var degrees: Double
+    var radians: Double = 0 {
+      @storageRestrictions(initializes: degrees)
+      init(initialValue)  {
+        degrees = initialValue * 180 / .pi
+      }
+
+      get { degrees * .pi / 180 }
+      set { degrees = newValue * 180 / .pi }
+    }
+
+    init(degrees: Double) {
+      self.degrees = degrees // Ok
+    }
+
+    init(radians: Double) {
+      self.radians = radians // Ok
+    }
+
+    init(value: Double) {
+      let escapingSelf: (Angle) -> Void = { _ in }
+
+      // degrees are initialized here via default value associated with radians
+
+      escapingSelf(self)
+
+      self.radians = 0
+      // expected-warning@-1 {{actor-isolated property 'radians' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor EscapeBeforeFullInit {
+    var _a: Int // expected-note {{'self._a' not initialized}}
+
+    var a: Int {
+      @storageRestrictions(initializes: _a)
+      init {
+        _a = newValue
+      }
+
+      get { _a }
+      set { _a = newValue }
+    }
+
+    init(v: Int) {
+      let escapingSelf: (EscapeBeforeFullInit) -> Void = { _ in }
+
+      escapingSelf(self) // expected-error {{'self' used before all stored properties are initialized}}
+      // expected-note@-1 {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+
+      self.a = v
+      // expected-warning@-1 {{cannot access property '_a' here in non-isolated initializer; this is an error in Swift 6}}
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor NonisolatedAccessors {
+    nonisolated var a: Int = 0 {
+      init {
+      }
+
+      get { 0 }
+      set {}
+    }
+
+    init(value: Int) {
+      let escapingSelf: (NonisolatedAccessors) -> Void = { _ in }
+
+      // a is initialized here via default value
+
+      escapingSelf(self)
+
+      self.a = value // Ok (nonisolated)
+      print(a) // Ok (nonisolated)
+    }
+  }
+}

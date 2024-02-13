@@ -457,11 +457,22 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     // If the illegal use is a call to a defer, then recursively diagnose
     // all of the defer's uses, if this is the first time encountering it.
     if (auto *callee = getCallee(use)) {
-      assert(info.haveDeferInfo(callee) && "non-defer call as a property use?");
-      auto &defer = info.getOrCreateDeferInfo(callee);
-      if (defer.setNonisolatedStart()) {
-        defer.diagnoseEntireFunction(blame);
+      if (info.haveDeferInfo(callee)) {
+        auto &defer = info.getOrCreateDeferInfo(callee);
+        if (defer.setNonisolatedStart()) {
+          defer.diagnoseEntireFunction(blame);
+        }
+        continue;
       }
+
+      // Init accessor `setter` use.
+      auto *accessor =
+          cast<AccessorDecl>(callee->getLocation().getAsDeclContext());
+      auto illegalLoc = use->getDebugLocation().getLocation();
+      diag.diagnose(illegalLoc.getSourceLoc(),
+                    diag::isolated_property_mutation_in_nonisolated_context,
+                    accessor->getStorage(), accessor->isSetter())
+          .warnUntilSwiftVersion(6);
       continue;
     }
 
@@ -627,6 +638,37 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
               if (defer.hasPropertyUse())
                 markPropertyUse(user);
 
+              continue;
+            }
+          }
+        }
+
+        // Detect and handle use of init accessor properties.
+        if (callee->hasLocation()) {
+          auto loc = callee->getLocation();
+          if (auto *accessor =
+                  dyn_cast_or_null<AccessorDecl>(loc.getAsDeclContext())) {
+            auto *storage = accessor->getStorage();
+
+            // Note 'nonisolated' property use.
+            if (storage->getAttrs().hasAttribute<NonisolatedAttr>()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Init accessor is used exclusively for initialization
+            // of properties while 'self' is not fully initialized.
+            if (accessor->isInitAccessor()) {
+              markNonIsolated(user);
+              continue;
+            }
+
+            // Otherwise if this is an init accessor property, it's either
+            // a call to a getter or a setter and should be treated like
+            // an isolated computed property reference.
+
+            if (storage->hasInitAccessor()) {
+              markPropertyUse(user);
               continue;
             }
           }
