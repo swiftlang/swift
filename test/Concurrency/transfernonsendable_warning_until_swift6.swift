@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -disable-availability-checking -verify %s -o /dev/null -swift-version 6 -enable-experimental-feature TransferringArgsAndResults
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 // This test makes sure that all of our warnings are errors in swift6 mode.
 

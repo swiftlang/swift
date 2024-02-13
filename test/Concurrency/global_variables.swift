@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency import GlobalVariables
 

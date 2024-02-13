@@ -9,7 +9,6 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
-// REQUIRES: asserts
 
 // Verify that a forward declared protocol not inheriting from NSObject is usable
 // from Swift, if cumbersome

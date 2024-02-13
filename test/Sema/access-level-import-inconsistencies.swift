@@ -10,8 +10,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// REQUIRES: asserts
-
 /// Build the library.
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -o %t
 

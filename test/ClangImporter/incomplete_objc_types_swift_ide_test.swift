@@ -11,7 +11,6 @@
 // RUN:     -enable-objc-interop -swift-version 6 -source-filename x | %FileCheck %s
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
 
 // CHECK: import Foundation
 // CHECK: @available(*, unavailable, message: "This Objective-C class has only been forward-declared; import its owning module to use it")

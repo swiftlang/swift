@@ -1,5 +1,3 @@
-// REQUIRES: asserts
-
 // RUN: not %target-swiftc_driver -swift-version 6 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_6 %s
 // RUN: not %target-swiftc_driver -swift-version 7 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_7 %s
 

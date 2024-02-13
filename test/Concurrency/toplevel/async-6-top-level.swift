@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -disable-availability-checking -enable-experimental-async-top-level -swift-version 6 %s -verify
 
-// REQUIRES: asserts
-
 var a = 10
 // expected-note@-1 2 {{var declared here}}
 // expected-note@-2 2 {{mutation of this var is only permitted within the actor}}

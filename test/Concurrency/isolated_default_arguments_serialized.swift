@@ -5,7 +5,6 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 6 -I %t -enable-experimental-feature RegionBasedIsolation -enable-upcoming-feature IsolatedDefaultValues
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import SerializedDefaultArguments
 

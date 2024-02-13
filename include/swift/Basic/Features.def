@@ -219,7 +219,7 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
 /// Region Based Isolation testing using the TransferNonSendable pass
-EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
+EXPERIMENTAL_FEATURE(RegionBasedIsolation, true)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.

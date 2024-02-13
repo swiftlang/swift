@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
-// REQUIRES: asserts
-
 // Note: In Swift >= 6 mode this would become an error.
 func test_subscript_accepts_type_name_argument() {
   struct A {

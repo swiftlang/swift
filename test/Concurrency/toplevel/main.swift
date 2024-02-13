@@ -1,8 +1,6 @@
 // RUN: not %target-swift-frontend -enable-experimental-async-top-level -swift-version 6 -typecheck %s %S/Inputs/foo.swift 2>&1 | %FileCheck %s --check-prefixes='Swift6-CHECK,CHECK'
 // RUN: not %target-swift-frontend -enable-experimental-async-top-level -swift-version 5 -typecheck %s %S/Inputs/foo.swift 2>&1 | %FileCheck %s --check-prefixes='Swift5-CHECK,CHECK'
 
-// REQUIRES: asserts
-
 var a = 10
 
 @MainActor

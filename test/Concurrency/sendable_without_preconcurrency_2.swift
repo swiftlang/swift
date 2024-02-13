@@ -7,7 +7,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -strict-concurrency=complete) type
 import NonStrictModule // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'NonStrictModule'}}
