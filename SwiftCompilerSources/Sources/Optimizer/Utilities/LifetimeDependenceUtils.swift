@@ -66,11 +66,12 @@ import SIL
 /// Value.enclosingAccess iteratively to find to AccessBase. This
 /// walker is useful for finding the innermost access, which may also
 /// be relevant for diagnostics.
-func gatherVariableIntroducers(for value: Value, _ context: Context) -> [Value]
+func gatherVariableIntroducers(for value: Value, _ context: Context)
+  -> SingleInlineArray<Value>
 {
-  var introducers: [Value] = []
+  var introducers = SingleInlineArray<Value>()
   var useDefVisitor = VariableIntroducerUseDefWalker(context) {
-    introducers.append($0)
+    introducers.push($0)
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }
@@ -1052,10 +1053,32 @@ extension LifetimeDependenceDefUseWalker {
     if let conv = apply.convention(of: operand), conv.isIndirectOut {
       return leafUse(of: operand)
     }
-
     if apply.isCallee(operand: operand) {
       return leafUse(of: operand)
     }
+    if let dep = apply.resultDependence(on: operand),
+       dep == .inherit {
+      // Operand is nonescapable and passed as a call argument. If the
+      // result inherits its lifetime, then consider any nonescapable
+      // result value to be a dependent use.
+      //
+      // If the lifetime dependence is scoped, then we can ignore it
+      // because a mark_dependence [nonescaping] represents the
+      // dependence.
+      if let result = apply.singleDirectResult, !result.type.isEscapable {
+        if dependentUse(of: operand, into: result) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      for resultAddr in apply.indirectResultOperands
+          where !resultAddr.value.type.isEscapable {
+        if visitStoredUses(of: operand, into: resultAddr.value) == .abortWalk {
+          return .abortWalk
+        }
+      }
+    }
+    // Regardless of lifetime dependencies, consider the operand to be
+    // use for the duration of the call.
     if apply is BeginApplyInst {
       return scopedAddressUse(of: operand)
     }

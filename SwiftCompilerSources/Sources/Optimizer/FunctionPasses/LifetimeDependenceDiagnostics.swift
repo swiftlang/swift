@@ -131,6 +131,14 @@ private struct DiagnoseDependence {
     if function.hasUnsafeNonEscapableResult {
       return .continueWalk
     }
+    // FIXME: remove this condition once we have a Builtin.dependence,
+    // which developers should use to model the unsafe
+    // dependence. Builtin.lifetime_dependence will be lowered to
+    // mark_dependence [unresolved], which will be checked
+    // independently. Instead, of this function result check, allow
+    // isUnsafeApplyResult to be used be mark_dependence [unresolved]
+    // without checking its dependents.
+    //
     // Allow returning an apply result (@_unsafeNonescapableResult) if
     // the calling function has a dependence. This implicitly makes
     // the unsafe nonescapable result dependent on the calling

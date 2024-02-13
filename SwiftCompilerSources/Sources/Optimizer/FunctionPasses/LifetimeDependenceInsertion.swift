@@ -102,14 +102,16 @@ extension LifetimeDependentApply {
   }
 }
 
-/// Replace the each dependent apply result with a chain of
-/// mark_dependence [nonescaping] instructions; one for each base.
+/// If the result of this apply depends on the scope of one or more
+/// arguments, then insert a mark_dependence [unresolved] from the
+/// result on each argument so that the result is recognized as a
+/// dependent value within each scope.
 private func insertDependencies(for apply: LifetimeDependentApply,
   _ context: FunctionPassContext ) {
   precondition(apply.applySite.results.count > 0,
     "a lifetime-dependent instruction must have at least one result")
 
-  let bases = recursivelyFindDependenceBases(of: apply, context)
+  let bases = findDependenceBases(of: apply, context)
   let builder = Builder(after: apply.applySite, context)
   for dependentValue in apply.applySite.resultOrYields {
     insertMarkDependencies(value: dependentValue, initializer: nil,
@@ -138,6 +140,31 @@ private func insertDependencies(for apply: LifetimeDependentApply,
   }
 }
 
+private func findDependenceBases(of apply: LifetimeDependentApply,
+                                 _ context: FunctionPassContext)
+  -> [Value] {
+  log("Creating dependencies for \(apply.applySite)")
+  var bases: [Value] = []
+  for lifetimeArg in apply.getLifetimeArguments() {
+    switch lifetimeArg.convention {
+    case .inherit:
+      continue
+    case .scope:
+      // Create a new dependence on the apply's access to the argument.
+      for varIntoducer in gatherVariableIntroducers(for: lifetimeArg.value,
+                                                    context) {
+        if let scope =
+             LifetimeDependence.Scope(base: varIntoducer, context) {
+          log("Scoped lifetime from \(lifetimeArg.value)")
+          log("  scope: \(scope)")
+          bases.append(scope.parentValue)
+        }
+      }
+    }
+  }
+  return bases
+}
+
 private func insertMarkDependencies(value: Value, initializer: Instruction?,
                                     bases: [Value], builder: Builder,
                                     _ context: FunctionPassContext) {
@@ -155,6 +182,7 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
   }
 }
 
+/*
 /// Return base values that this return value depends on.
 ///
 /// For lifetime copies, walk up the dependence chain to find the
@@ -212,3 +240,4 @@ private func recursivelyUpdate(scope: LifetimeDependence.Scope,
   }
   return scope
 }
+*/
