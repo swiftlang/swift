@@ -53,9 +53,13 @@ toolchain as a one-off, there are a couple of differences:
 4. Disk space:
    Make sure that you have enough available disk space before starting.
    The source code, including full git history, requires about 3.5 GB.
-   Build artifacts take anywhere between 5 GB to 70 GB, depending on the
-   build settings.
-5. Time:
+   Build artifacts take anywhere between 5 GB to 100 GB, depending on the
+   build settings. It is recommended to have at least 150 GB of available disk space.
+5. RAM:
+   It is recommended to have at least 8 GB for building a toolchain and 16 GB 
+   for development. When building for development on a virtual machine or
+   emulator, you might need more than 32 GB.
+6. Time:
    Depending on your machine and build settings,
    a from-scratch build can take a few minutes to several hours,
    so you might want to grab a beverage while you follow the instructions.
