@@ -1608,6 +1608,7 @@ VTables
 
   decl ::= sil-vtable
   sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
+  sil-vtable ::= 'sil_vtable' sil-type '{' sil-vtable-entry* '}'
 
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
@@ -1669,6 +1670,13 @@ class (such as ``C.bas`` in ``C``'s vtable).
 
 In case the SIL function is a thunk, the function name is preceded with the
 linkage of the original implementing function.
+
+If the vtable refers to a specialized class, a SIL type specifies the bound
+generic class type::
+
+  sil_vtable $G<Int> {
+    // ...
+  }
 
 Witness Tables
 ~~~~~~~~~~~~~~

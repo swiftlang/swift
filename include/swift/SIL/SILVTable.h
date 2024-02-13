@@ -115,6 +115,7 @@ private:
   /// The ClassDecl mapped to this VTable.
   ClassDecl *Class;
 
+  /// The class type if this is a specialized vtable, otherwise null.
   SILType classType;
 
   /// Whether or not this vtable is serialized, which allows
