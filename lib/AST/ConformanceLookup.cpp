@@ -477,6 +477,11 @@ LookupConformanceInModuleRequest::evaluate(
   if (auto selfType = type->getAs<DynamicSelfType>())
     type = selfType->getSelfType();
 
+  // A pack element type conforms to whatever its underlying pack type
+  // conforms to.
+  if (auto packElement = type->getAs<PackElementType>())
+    type = packElement->getPackType();
+
   // An archetype conforms to a protocol if the protocol is listed in the
   // archetype's list of conformances, or if the archetype has a superclass
   // constraint and the superclass conforms to the protocol.
