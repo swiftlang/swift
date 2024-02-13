@@ -25,6 +25,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Config.h"
 #include "clang/Basic/PointerAuthOptions.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
