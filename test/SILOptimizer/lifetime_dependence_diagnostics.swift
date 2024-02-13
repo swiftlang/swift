@@ -20,7 +20,7 @@ func bv_copy(_ bv: borrowing BV) -> _copy(bv) BV {
 
 // Diagnostics resolves mark_dependence [nonescaping].
 //
-// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copy0B0AA2BVVAE_tF : $@convention(thin) (@guaranteed BV) -> _inherit(1) @owned BV {
+// CHECK-LABEL: sil hidden @$s4test14bv_borrow_copy0B0AA2BVVAE_tF : $@convention(thin) (@guaranteed BV) -> _scope(1) @owned BV {
 // CHECK: bb0(%0 : @noImplicitCopy $BV):
 // CHECK:   [[R:%.*]] = apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> _inherit(1) @owned BV
 // CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
