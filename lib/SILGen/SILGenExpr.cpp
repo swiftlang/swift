@@ -1903,12 +1903,21 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
+/// Whether the given abstraction pattern as an opaque thrown error.
+static bool hasOpaqueThrownError(const AbstractionPattern &pattern) {
+  if (auto thrownPattern = pattern.getFunctionThrownErrorType())
+    return thrownPattern->isTypeParameterOrOpaqueArchetype();
+
+  return false;
+}
+
 // Ideally our prolog/epilog emission would be able to handle all possible
 // reabstractions and conversions. Until then, this returns true if a closure
 // literal of type `literalType` can be directly emitted by SILGen as
 // `convertedType`.
-static bool canPeepholeLiteralClosureConversion(Type literalType,
-                                                Type convertedType) {
+static bool canPeepholeLiteralClosureConversion(
+    Type literalType, Type convertedType,
+    const std::optional<AbstractionPattern> &closurePattern) {
   auto literalFnType = literalType->getAs<FunctionType>();
   auto convertedFnType = convertedType->getAs<FunctionType>();
   
@@ -1919,7 +1928,7 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
   if (literalFnType->isEqual(convertedFnType)) {
     return true;
   }
-  
+
   // Are the types equivalent aside from effects (throws) or coeffects
   // (escaping)? Then we should emit the literal as having the destination type
   // (co)effects, even if it doesn't exercise them.
@@ -1927,14 +1936,20 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
   // TODO: We could also in principle let `async` through here, but that
   // interferes with the implementation of `reasync`.
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
-    .withThrows(false, Type())
     .withNoEscape(false)
     .build();
     
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
-    .withThrows(false, Type())
     .withNoEscape(false)
     .build();
+
+  // If the closure pattern has an abstract thrown error, we are unable to
+  // emit the literal with a difference in the thrown error type.
+  if (!(closurePattern && hasOpaqueThrownError(*closurePattern))) {
+    literalWithoutEffects = literalWithoutEffects.withThrows(false, Type());
+    convertedWithoutEffects = convertedWithoutEffects.withThrows(false, Type());
+  }
+
   if (literalFnType->withExtInfo(literalWithoutEffects)
         ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects))) {
     return true;
@@ -2000,7 +2015,8 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   
   if ((isa<AbstractClosureExpr>(subExpr) || isa<CaptureListExpr>(subExpr))
       && canPeepholeLiteralClosureConversion(subExpr->getType(),
-                                             e->getType())) {
+                                             e->getType(),
+                                             C.getAbstractionPattern())) {
     // If we're emitting into a context with a preferred abstraction pattern
     // already, carry that along.
     auto origType = C.getAbstractionPattern();
