@@ -5,7 +5,7 @@
 // RUN: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
 // RUN: %target-codesign %t/buildMetadataJSON
 //
-// RUN: %target-build-swift %S/Inputs/json2c.swift -o %t/json2c
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/json2c.swift -o %t/json2c
 // RUN: %target-codesign %t/json2c
 //
 // RUN: %target-run %t/VerifyExternalMetadata getJSON > %t/names.json
