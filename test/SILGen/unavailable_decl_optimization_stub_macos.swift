@@ -1,5 +1,7 @@
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.8-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK-SWIFT5_8
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.9-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK-SWIFT5_9
+// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.8-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
+// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.8-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
+// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.9-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
+// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.9-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
 
 // REQUIRES: OS=macosx
 
@@ -19,3 +21,22 @@ public func unavailableFunc() {}
 @available(*, unavailable)
 @inlinable public func unavailableInlinableFunc() {}
 
+// CHECK-LABEL:     sil{{.*}}@$s4Test22unavailableOnMacOSFuncyyF
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:           } // end sil function '$s4Test22unavailableOnMacOSFuncyyF'
+@available(macOS, unavailable)
+public func unavailableOnMacOSFunc() {}
+
+// CHECK-LABEL:     sil{{.*}}@$s4Test31unavailableOnMacOSExtensionFuncyyF
+// CHECK-NOT:         function_ref @$ss36_diagnoseUnavailableCodeReached{{.*}} : $@convention(thin) () -> Never
+// CHECK:           } // end sil function '$s4Test31unavailableOnMacOSExtensionFuncyyF'
+@available(macOSApplicationExtension, unavailable)
+public func unavailableOnMacOSExtensionFunc() {}
+
+// CHECK-LABEL:     sil{{.*}}@$s4Test20unavailableOniOSFuncyyF
+// CHECK-NOT:         function_ref @$ss36_diagnoseUnavailableCodeReached{{.*}} : $@convention(thin) () -> Never
+// CHECK:           } // end sil function '$s4Test20unavailableOniOSFuncyyF'
+@available(iOS, unavailable)
+public func unavailableOniOSFunc() {}

@@ -321,11 +321,29 @@ llvm::Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
                            llvm::None);
 }
 
-static bool isUnconditionallyUnavailable(const Decl *D) {
-  if (auto unavailableAttrAndDecl = D->getSemanticUnavailableAttr())
-    return unavailableAttrAndDecl->first->isUnconditionallyUnavailable();
+static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
+  // Don't trust unavailability on declarations from clang modules.
+  if (isa<ClangModuleUnit>(D->getDeclContext()->getModuleScopeContext()))
+    return false;
 
-  return false;
+  auto unavailableAttrAndDecl = D->getSemanticUnavailableAttr();
+  if (!unavailableAttrAndDecl)
+    return false;
+
+  // getSemanticUnavailableAttr() can return an @available attribute that makes
+  // its declaration unavailable conditionally due to deployment target. Only
+  // stub or skip a declaration that is unavailable regardless of deployment
+  // target.
+  auto *unavailableAttr = unavailableAttrAndDecl->first;
+  if (!unavailableAttr->isUnconditionallyUnavailable())
+    return false;
+
+  // If the decl is only unavailable to app extensions it still may need to be
+  // present at runtime for non-extension processes.
+  if (isApplicationExtensionPlatform(unavailableAttr->Platform))
+    return false;
+
+  return true;
 }
 
 static UnavailableDeclOptimization
@@ -343,10 +361,7 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
-  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
-    return true;
-
-  return !isUnconditionallyUnavailable(this);
+  return !shouldStubOrSkipUnavailableDecl(this);
 }
 
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
@@ -356,10 +371,7 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
       UnavailableDeclOptimization::Stub)
     return false;
 
-  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
-    return false;
-
-  return isUnconditionallyUnavailable(this);
+  return shouldStubOrSkipUnavailableDecl(this);
 }
 
 bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
