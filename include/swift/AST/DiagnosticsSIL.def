@@ -126,6 +126,10 @@ ERROR(function_type_mismatch,none,
 NOTE(function_declared_here,none,
      "function declared here", ())
 
+ERROR(deserialize_function_type_mismatch,Fatal,
+      "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
+      (StringRef, Type, Type))
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
