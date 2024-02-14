@@ -42,3 +42,8 @@ func bv_get_borrow(container: borrowing NC) -> _borrow(container) BV {
 func bv_get_copy(container: borrowing NC) -> _copy(container) BV {
   return container.getBV()
 }
+
+// Recognize nested accesses as part of the same dependence scope.
+func bv_get_mutate(container: inout NC) -> _mutate(container) BV {
+  container.getBV()
+}
