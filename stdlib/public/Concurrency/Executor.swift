@@ -294,7 +294,7 @@ public struct UnownedTaskExecutor: Sendable {
 
   @inlinable
   public init<E: TaskExecutor>(ordinary executor: __shared E) {
-    #if $BuiltinBuildTaskExecutor
+    #if $BuiltinBuildTaskExecutorRef
     self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
