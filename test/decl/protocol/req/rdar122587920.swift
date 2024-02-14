@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
-// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
+// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference -DNEW
+// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference -DOLD
 
 struct S<Element> {}
 
@@ -27,4 +27,10 @@ extension S: Collection {
   }
 }
 
+// The old behavior didn't make much sense.
+
+#if NEW
 let x: S<Int>.Type = S<Int>.Iterator.self
+#elseif OLD
+let x: IndexingIterator<S<Int>>.Type = S<Int>.Iterator.self
+#endif
