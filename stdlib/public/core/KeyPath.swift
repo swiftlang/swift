@@ -1814,15 +1814,14 @@ internal struct RawKeyPathComponent {
   }
 }
 
-internal func _pop<T>(from: inout UnsafeRawBufferPointer,
+internal func _pop<T : _BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
                       as type: T.Type) -> T {
   let buffer = _pop(from: &from, as: type, count: 1)
   return buffer.baseAddress.unsafelyUnwrapped.pointee
 }
-internal func _pop<T>(from: inout UnsafeRawBufferPointer,
+internal func _pop<T : _BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
                       as: T.Type,
                       count: Int) -> UnsafeBufferPointer<T> {
-  _internalInvariant(_isPOD(T.self), "should be POD")
   from = MemoryLayout<T>._roundingUpBaseToAlignment(from)
   let byteCount = MemoryLayout<T>.stride * count
   let result = UnsafeBufferPointer(
@@ -3414,8 +3413,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     }
     return (baseAddress, misalign)
   }
-  mutating func pushDest<T>(_ value: T) {
-    _internalInvariant(_isPOD(T.self))
+  mutating func pushDest<T : _BitwiseCopyable>(_ value: T) {
     let size = MemoryLayout<T>.size
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
     _withUnprotectedUnsafeBytes(of: value) {
