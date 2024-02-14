@@ -139,17 +139,9 @@ open class SwiftSubclass: ImplClass {
 // Functions
 //
 
-@_objcImplementation @_cdecl("implFunc")
-public func implFunc(_ param: Int32) {}
-
-@_objcImplementation @_cdecl("implFuncCName")
-public func implFuncCName(_ param: Int32) {}
-
 public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
   impl.mainMethod(0)
   swiftSub.mainMethod(1)
-  implFunc(2)
-  implFuncCName(3)
 }
 
 // Swift calling convention -[ImplClass init]
@@ -247,23 +239,12 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // Swift calling convention SwiftSubclass.deinit (deallocating)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation13SwiftSubclassCfD"
 
-// inplFunc(_:)
-// CHECK-LABEL: define void @implFunc
-// FIXME: We'd like this to be internal or hidden, not public.
-// CHECK: define swiftcc void @"$s19objc_implementation8implFuncyys5Int32VF"
-
-// inplFuncCName(_:)
-// CHECK-LABEL: define void @"\01_implFuncAsmName"
-// FIXME: We'd like this to be internal or hidden, not public.
-// CHECK: define swiftcc void @"$s19objc_implementation13implFuncCNameyys5Int32VF"
-
 // fn(impl:swiftSub:)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation2fn4impl8swiftSubySo9ImplClassC_AA13SwiftSubclassCtF"
 // CHECK:   [[SEL_1:%[^ ]+]] = load ptr, ptr @"\01L_selector(mainMethod:)", align 8
 // CHECK:   call void @objc_msgSend(ptr {{.*}}, ptr [[SEL_1]], i32 0)
 // CHECK:   [[SEL_2:%[^ ]+]] = load ptr, ptr @"\01L_selector(mainMethod:)", align 8
 // CHECK:   call void @objc_msgSend(ptr {{.*}}, ptr [[SEL_2]], i32 1)
-// CHECK:   call void @implFunc
 // CHECK:   ret void
 // CHECK: }
 

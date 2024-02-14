@@ -1,0 +1,4 @@
+module cdecl_implementation_private {
+  header "cdecl_implementation.h"
+  export *
+}

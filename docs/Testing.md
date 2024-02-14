@@ -320,6 +320,11 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: executable_test`` to the test.
 
+* ``%target-run-additional-libs(`` *path* ``)``: run a command on the target
+   machine, adding *path* to the search paths for dynamic libraries.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
 * ``%target-jit-run``: run a Swift program on the target machine using a JIT
   compiler.
 
