@@ -3049,7 +3049,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (lowering.isTrivial() && !conformance) {
     // A trivial type can lack a conformance in a few cases:
-    // (1) containing or being a resilient type
+    // (1) containing or being a public, non-frozen type
     // (2) containing or being a generic type which doesn't conform
     //     unconditionally but in this particular instantiation is trivial
     // (3) being a special type that's not worth forming a conformance for
@@ -3082,8 +3082,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return true;
           }
 
-          // Resilient trivial types may not conform (case (1)).
-          if (nominal->isResilient())
+          // Public, non-frozen trivial types may not conform (case (1)).
+          if (nominal
+                  ->getFormalAccessScope(/*useDC=*/nullptr,
+                                         /*treatUsableFromInlineAsPublic=*/true)
+                  .isPublic())
             return true;
 
           auto *module = nominal->getModuleContext();
@@ -3149,8 +3152,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
-          // Resilient trivial types may not conform (case (1)).
-          if (nominal->isResilient())
+          // Public, non-frozen trivial types may not conform (case (1)).
+          if (nominal
+                  ->getFormalAccessScope(/*useDC=*/nullptr,
+                                         /*treatUsableFromInlineAsPublic=*/true)
+                  .isPublic())
             return false;
 
           auto *module = nominal->getModuleContext();
