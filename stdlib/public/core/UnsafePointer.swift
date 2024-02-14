@@ -205,7 +205,7 @@
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafePointer<Pointee>: _Pointer {
+public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
@@ -308,7 +308,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T: ~Copyable, Result>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws -> Result
@@ -578,7 +578,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafeMutablePointer<Pointee>: _Pointer {
+public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
@@ -712,29 +712,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
       return self
     }
   }
-
-  /// Initializes this pointer's memory with the specified number of
-  /// consecutive copies of the given value.
-  ///
-  /// The destination memory must be uninitialized or the pointer's `Pointee`
-  /// must be a trivial type. After a call to `initialize(repeating:count:)`, the
-  /// memory referenced by this pointer is initialized.
-  ///
-  /// - Parameters:
-  ///   - repeatedValue: The instance to initialize this pointer's memory with.
-  ///   - count: The number of consecutive copies of `newValue` to initialize.
-  ///     `count` must not be negative. 
-  @inlinable
-  public func initialize(repeating repeatedValue: Pointee, count: Int) {
-    // FIXME: add tests (since the `count` has been added)
-    _debugPrecondition(count >= 0,
-      "UnsafeMutablePointer.initialize(repeating:count:): negative count")
-    // Must not use `initializeFrom` with a `Collection` as that will introduce
-    // a cycle.
-    for offset in 0..<count {
-      Builtin.initialize(repeatedValue, (self + offset)._rawValue)
-    }
-  }
   
   /// Initializes this pointer's memory with a single instance of the given value.
   ///
@@ -746,8 +723,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameters:
   ///   - value: The instance to initialize this pointer's pointee to.
+  @_alwaysEmitIntoClient
   @inlinable
-  public func initialize(to value: Pointee) {
+  public func initialize(to value: consuming Pointee) {
     Builtin.initialize(value, self._rawValue)
   }
 
@@ -770,86 +748,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   public func move() -> Pointee {
     return Builtin.take(_rawValue)
-  }
-
-  /// Update this pointer's initialized memory with the specified number of
-  /// consecutive copies of the given value.
-  ///
-  /// The region of memory starting at this pointer and covering `count`
-  /// instances of the pointer's `Pointee` type must be initialized or
-  /// `Pointee` must be a trivial type. After calling
-  /// `update(repeating:count:)`, the region is initialized.
-  ///
-  /// - Parameters:
-  ///   - repeatedValue: The value used when updating this pointer's memory.
-  ///   - count: The number of consecutive elements to update.
-  ///     `count` must not be negative.
-  @inlinable
-  @_silgen_name("$sSp6assign9repeating5countyx_SitF")
-  public func update(repeating repeatedValue: Pointee, count: Int) {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.update(repeating:count:) with negative count")
-    for i in 0..<count {
-      self[i] = repeatedValue
-    }
-  }
-  
-  @inlinable
-  @_alwaysEmitIntoClient
-  @available(*, deprecated, renamed: "update(repeating:count:)")
-  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
-  public func assign(repeating repeatedValue: Pointee, count: Int) {
-    update(repeating: repeatedValue, count: count)
-  }
-
-  /// Update this pointer's initialized memory with the specified number of
-  /// instances, copied from the given pointer's memory.
-  ///
-  /// The region of memory starting at this pointer and covering `count`
-  /// instances of the pointer's `Pointee` type must be initialized or
-  /// `Pointee` must be a trivial type. After calling
-  /// `update(from:count:)`, the region is initialized.
-  ///
-  /// - Note: Returns without performing work if `self` and `source` are equal.
-  ///
-  /// - Parameters:
-  ///   - source: A pointer to at least `count` initialized instances of type
-  ///     `Pointee`. The memory regions referenced by `source` and this
-  ///     pointer may overlap.
-  ///   - count: The number of instances to copy from the memory referenced by
-  ///     `source` to this pointer's memory. `count` must not be negative.
-  @inlinable
-  @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
-  public func update(from source: UnsafePointer<Pointee>, count: Int) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.update with negative count")
-    if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
-      // assign forward from a disjoint or following overlapping range.
-      Builtin.assignCopyArrayFrontToBack(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // for i in 0..<count {
-      //   self[i] = source[i]
-      // }
-    }
-    else if UnsafePointer(self) != source {
-      // assign backward from a non-following overlapping range.
-      Builtin.assignCopyArrayBackToFront(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // var i = count-1
-      // while i >= 0 {
-      //   self[i] = source[i]
-      //   i -= 1
-      // }
-    }
-  }
-
-  @inlinable
-  @_alwaysEmitIntoClient
-  @available(*, deprecated, renamed: "update(from:count:)")
-  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
-  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
-    update(from: source, count: count)
   }
 
   /// Moves instances from initialized source memory into the uninitialized
@@ -896,38 +794,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
       //   (--dst).initialize(to: (--src).move())
       // }
     }
-  }
-
-  /// Initializes the memory referenced by this pointer with the values
-  /// starting at the given pointer.
-  ///
-  /// The region of memory starting at this pointer and covering `count`
-  /// instances of the pointer's `Pointee` type must be uninitialized or
-  /// `Pointee` must be a trivial type. After calling
-  /// `initialize(from:count:)`, the region is initialized.
-  ///
-  /// - Note: The source and destination memory regions must not overlap.
-  ///
-  /// - Parameters:
-  ///   - source: A pointer to the values to copy. The memory region
-  ///     `source..<(source + count)` must be initialized. The memory regions
-  ///     referenced by `source` and this pointer must not overlap.
-  ///   - count: The number of instances to move from `source` to this
-  ///     pointer's memory. `count` must not be negative.
-  @inlinable
-  public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.initialize with negative count")
-    _debugPrecondition(
-      UnsafePointer(self) + count <= source ||
-      source + count <= UnsafePointer(self),
-      "UnsafeMutablePointer.initialize overlapping range")
-    Builtin.copyArray(
-      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // This builtin is equivalent to:
-    // for i in 0..<count {
-    //   (self + i).initialize(to: source[i])
-    // }
   }
 
   /// Update this pointer's initialized memory by moving the specified number
@@ -1060,7 +926,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
@@ -1075,23 +941,6 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
       ),
       "self must be a properly aligned pointer for types Pointee and T"
     )
-    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
-  }
-
-  // This unavailable implementation uses the expected mangled name
-  // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
-  // an entry point for any binary linked against the stdlib binary
-  // for Swift 5.6 and older.
-  @available(*, unavailable)
-  @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
-  @usableFromInline
-  internal func _legacy_se0333_withMemoryRebound<T, Result>(
-    to type: T.Type,
-    capacity count: Int,
-    _ body: (UnsafeMutablePointer<T>) throws -> Result
-  ) rethrows -> Result {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
@@ -1120,6 +969,169 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     nonmutating unsafeMutableAddress {
       return self + i
     }
+  }
+
+  @inlinable // unsafe-performance
+  internal static var _max: UnsafeMutablePointer {
+    return UnsafeMutablePointer(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafeMutablePointer where Pointee: Copyable {
+  /// Initializes this pointer's memory with the specified number of
+  /// consecutive copies of the given value.
+  ///
+  /// The destination memory must be uninitialized or the pointer's `Pointee`
+  /// must be a trivial type. After a call to `initialize(repeating:count:)`, the
+  /// memory referenced by this pointer is initialized.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The instance to initialize this pointer's memory with.
+  ///   - count: The number of consecutive copies of `newValue` to initialize.
+  ///     `count` must not be negative.
+  @inlinable
+  @_silgen_name("$sSp10initialize9repeating5countyx_SitF")
+  public func initialize(repeating repeatedValue: Pointee, count: Int) {
+    // FIXME: add tests (since the `count` has been added)
+    _debugPrecondition(count >= 0,
+      "UnsafeMutablePointer.initialize(repeating:count:): negative count")
+    // Must not use `initializeFrom` with a `Collection` as that will introduce
+    // a cycle.
+    for offset in 0..<count {
+      Builtin.initialize(repeatedValue, (self + offset)._rawValue)
+    }
+  }
+
+  /// Update this pointer's initialized memory with the specified number of
+  /// consecutive copies of the given value.
+  ///
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `update(repeating:count:)`, the region is initialized.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value used when updating this pointer's memory.
+  ///   - count: The number of consecutive elements to update.
+  ///     `count` must not be negative.
+  @inlinable
+  @_silgen_name("$sSp6assign9repeating5countyx_SitF")
+  public func update(repeating repeatedValue: Pointee, count: Int) {
+    _debugPrecondition(count >= 0, "UnsafeMutablePointer.update(repeating:count:) with negative count")
+    for i in 0..<count {
+      self[i] = repeatedValue
+    }
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(repeating:count:)")
+  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
+  public func assign(repeating repeatedValue: Pointee, count: Int) {
+    update(repeating: repeatedValue, count: count)
+  }
+
+  /// Update this pointer's initialized memory with the specified number of
+  /// instances, copied from the given pointer's memory.
+  ///
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `update(from:count:)`, the region is initialized.
+  ///
+  /// - Note: Returns without performing work if `self` and `source` are equal.
+  ///
+  /// - Parameters:
+  ///   - source: A pointer to at least `count` initialized instances of type
+  ///     `Pointee`. The memory regions referenced by `source` and this
+  ///     pointer may overlap.
+  ///   - count: The number of instances to copy from the memory referenced by
+  ///     `source` to this pointer's memory. `count` must not be negative.
+  @inlinable
+  @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
+  public func update(from source: UnsafePointer<Pointee>, count: Int) {
+    _debugPrecondition(
+      count >= 0, "UnsafeMutablePointer.update with negative count")
+    if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
+      // assign forward from a disjoint or following overlapping range.
+      Builtin.assignCopyArrayFrontToBack(
+        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // for i in 0..<count {
+      //   self[i] = source[i]
+      // }
+    }
+    else if UnsafePointer(self) != source {
+      // assign backward from a non-following overlapping range.
+      Builtin.assignCopyArrayBackToFront(
+        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // var i = count-1
+      // while i >= 0 {
+      //   self[i] = source[i]
+      //   i -= 1
+      // }
+    }
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(from:count:)")
+  @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
+  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
+    update(from: source, count: count)
+  }
+
+  /// Initializes the memory referenced by this pointer with the values
+  /// starting at the given pointer.
+  ///
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be uninitialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `initialize(from:count:)`, the region is initialized.
+  ///
+  /// - Note: The source and destination memory regions must not overlap.
+  ///
+  /// - Parameters:
+  ///   - source: A pointer to the values to copy. The memory region
+  ///     `source..<(source + count)` must be initialized. The memory regions
+  ///     referenced by `source` and this pointer must not overlap.
+  ///   - count: The number of instances to move from `source` to this
+  ///     pointer's memory. `count` must not be negative.
+  @inlinable
+  @_silgen_name("$sSp10initialize4from5countySPyxG_SitF")
+  public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
+    _debugPrecondition(
+      count >= 0, "UnsafeMutablePointer.initialize with negative count")
+    _debugPrecondition(
+      UnsafePointer(self) + count <= source ||
+      source + count <= UnsafePointer(self),
+      "UnsafeMutablePointer.initialize overlapping range")
+    Builtin.copyArray(
+      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
+    // This builtin is equivalent to:
+    // for i in 0..<count {
+    //   (self + i).initialize(to: source[i])
+    // }
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
+  // an entry point for any binary linked against the stdlib binary
+  // for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
+  @usableFromInline
+  internal func _legacy_se0333_withMemoryRebound<T, Result>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
   }
 
   /// Obtain a pointer to the stored property referred to by a key path.
@@ -1168,11 +1180,12 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
-  @inlinable // unsafe-performance
-  internal static var _max: UnsafeMutablePointer {
-    return UnsafeMutablePointer(
-      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
-    )._unsafelyUnwrappedUnchecked
+  // Old 'initialize(to:)' because it took the newValue as shared instead of
+  // consuming.
+  @usableFromInline
+  @_silgen_name("$sSp10initialize2toyx_tF")
+  internal func initialize(to newValue: Pointee) {
+    Builtin.initialize(newValue, self._rawValue)
   }
 }
 

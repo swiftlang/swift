@@ -40,7 +40,7 @@
 ///             byteCount: count * MemoryLayout<Point>.stride,
 ///             alignment: MemoryLayout<Point>.alignment)
 @frozen // namespace
-public enum MemoryLayout<T> {
+public enum MemoryLayout<T: ~Copyable>: Copyable {
   /// The contiguous memory footprint of `T`, in bytes.
   ///
   /// A type's size does not include any dynamically allocated or out of line
@@ -76,7 +76,7 @@ public enum MemoryLayout<T> {
   }
 }
 
-extension MemoryLayout {
+extension MemoryLayout where T: ~Copyable {
   /// Returns the contiguous memory footprint of the given instance.
   ///
   /// The result does not include any dynamically allocated or out of line
@@ -100,7 +100,7 @@ extension MemoryLayout {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The size, in bytes, of the given value's type.
   @_transparent
-  public static func size(ofValue value: T) -> Int {
+  public static func size(ofValue value: borrowing T) -> Int {
     return MemoryLayout.size
   }
 
@@ -128,7 +128,7 @@ extension MemoryLayout {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The stride, in bytes, of the given value's type.
   @_transparent
-  public static func stride(ofValue value: T) -> Int {
+  public static func stride(ofValue value: borrowing T) -> Int {
     return MemoryLayout.stride
   }
 
@@ -153,10 +153,12 @@ extension MemoryLayout {
   /// - Returns: The default memory alignment, in bytes, of the given value's
   ///   type. This value is always positive.
   @_transparent
-  public static func alignment(ofValue value: T) -> Int {
+  public static func alignment(ofValue value: borrowing T) -> Int {
     return MemoryLayout.alignment
   }
+}
 
+extension MemoryLayout where T: Copyable {
   /// Returns the offset of an inline stored property within a type's in-memory
   /// representation.
   ///
@@ -223,6 +225,7 @@ extension MemoryLayout {
   ///   is available for the storage referenced by `key`. If the value is
   ///   `nil`, it can be because `key` is computed, has observers, requires
   ///   reabstraction, or overlaps storage with other properties.
+  @_silgen_name("$ss12MemoryLayoutO6offset2ofSiSgs14PartialKeyPathCyxG_tFZ")
   @_transparent
   @_unavailableInEmbedded
   public static func offset(of key: PartialKeyPath<T>) -> Int? {
@@ -231,7 +234,7 @@ extension MemoryLayout {
 }
 
 // Not-yet-public alignment conveniences
-extension MemoryLayout {
+extension MemoryLayout where T: ~Copyable {
   internal static var _alignmentMask: Int { return alignment - 1 }
 
   internal static func _roundingUpToAlignment(_ value: Int) -> Int {

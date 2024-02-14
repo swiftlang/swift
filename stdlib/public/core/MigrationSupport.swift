@@ -344,17 +344,20 @@ extension Collection {
 
 extension UnsafeMutablePointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initialize(repeating:count:)")
+  @_silgen_name("$sSp10initialize2to5countyx_SitF")
   public func initialize(to newValue: Pointee, count: Int = 1) { 
     initialize(repeating: newValue, count: count)
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
   @discardableResult
+  @_silgen_name("$sSp12deinitializeSvyF")
   public func deinitialize() -> UnsafeMutableRawPointer {
     return deinitialize(count: 1)
   }
   
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
+  @_silgen_name("$sSp10deallocate8capacityySi_tF")
   public func deallocate(capacity _: Int) { 
     self.deallocate()
   }
@@ -371,6 +374,7 @@ extension UnsafeMutablePointer {
   ///   type.
   // This is fundamentally unsafe since collections can underreport their count.
   @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
+  @_silgen_name("$sSp10initialize4fromyqd___t7ElementQyd__RszSlRd__lF")
   public func initialize<C: Collection>(from source: C)
     where C.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
@@ -425,7 +429,7 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafePointer: _CustomPlaygroundQuickLookable {
+extension UnsafePointer: _CustomPlaygroundQuickLookable where Pointee: ~Copyable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
@@ -439,7 +443,7 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
+extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable where Pointee: ~Copyable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
