@@ -31,8 +31,7 @@ import Swift
 /// detailed discussion of task executor preferences.
 ///
 /// Customizing the global concurrent executor is currently not supported.
-@available(SwiftStdlib 9999, *)
-nonisolated(unsafe)
+@available(SwiftStdlib 5.11, *)
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
     _DefaultGlobalConcurrentExecutor.shared
@@ -44,7 +43,7 @@ public var globalConcurrentExecutor: any TaskExecutor {
 /// A task executor which enqueues all work on the default global concurrent
 /// thread pool that is used as the default executor for Swift concurrency
 /// tasks.
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.11, *)
 internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
   public static let shared: _DefaultGlobalConcurrentExecutor = .init()
 
