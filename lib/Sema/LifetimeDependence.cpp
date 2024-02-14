@@ -293,19 +293,21 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     if (param->getValueOwnership() == ValueOwnership::Default) {
       continue;
     }
-
-    if (!paramTypeInContext->isEscapable() ||
-        paramTypeInContext->isNoncopyable()) {
-      if (candidateParam) {
-        diags.diagnose(
-            returnLoc,
-            diag::lifetime_dependence_cannot_infer_wo_ambiguous_candidate);
-        return llvm::None;
-      }
-      candidateParam = param;
-      lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
-          afd, paramIndex + 1, param->getValueOwnership());
+    if (param->getValueOwnership() == ValueOwnership::Owned &&
+        paramTypeInContext->isEscapable()) {
+      continue;
     }
+
+    if (candidateParam) {
+      diags.diagnose(
+          returnLoc,
+          diag::lifetime_dependence_cannot_infer_ambiguous_candidate);
+      return llvm::None;
+    }
+    candidateParam = param;
+    lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
+        afd, paramIndex + 1, param->getValueOwnership());
+
     paramIndex++;
   }
   if (!candidateParam && !hasParamError) {
