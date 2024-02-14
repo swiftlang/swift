@@ -32,7 +32,6 @@ import Swift
 ///
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 9999, *)
-nonisolated(unsafe)
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
     _DefaultGlobalConcurrentExecutor.shared
