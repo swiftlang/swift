@@ -1851,6 +1851,19 @@ static Type mapErrorTypeToOriginal(Type type) {
   return type;
 }
 
+/// Desugar protocol type aliases, since they can cause request cycles in
+/// type resolution if printed in a module interface and parsed back in.
+static Type getWithoutProtocolTypeAliases(Type type) {
+  return type.transformRec([](TypeBase *t) -> llvm::Optional<Type> {
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(t)) {
+      if (aliasTy->getDecl()->getDeclContext()->getExtendedProtocolDecl())
+        return getWithoutProtocolTypeAliases(aliasTy->getSinglyDesugaredType());
+    }
+
+    return llvm::None;
+  });
+}
+
 /// Produce the type when matching a witness.
 ///
 /// If the witness is a member of the type itself or a superclass, we
@@ -1884,6 +1897,9 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
+
+  type = getWithoutProtocolTypeAliases(type);
+
   LLVM_DEBUG(llvm::dbgs() << "Witness interface type is " << type << "\n";);
 
   if (substitutions.empty())
