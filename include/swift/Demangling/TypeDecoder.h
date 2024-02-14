@@ -286,7 +286,7 @@ class ImplFunctionTypeFlags {
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
-        DifferentiabilityKind(0) {}
+        ErasedIsolation(0), DifferentiabilityKind(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
