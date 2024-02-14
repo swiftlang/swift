@@ -1641,6 +1641,7 @@ static void diagnoseRetroactiveConformances(
   // At this point, we know we're extending a type declared outside this module.
   // We better only be conforming it to protocols declared within this module.
   llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
+  llvm::SmallSet<ProtocolDecl *, 8> protocolsWithRetroactiveAttr;
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
     if (entry.getType().isNull() || !entry.getTypeRepr()) {
       continue;
@@ -1665,7 +1666,6 @@ static void diagnoseRetroactiveConformances(
       auto conformanceRef = ext->getParentModule()->lookupConformance(
           extendedType, decl);
       if (!conformanceRef.isConcrete()) {
-
         return TypeWalker::Action::Continue;
       }
       auto conformance = conformanceRef.getConcrete();
@@ -1701,6 +1701,10 @@ static void diagnoseRetroactiveConformances(
 
       // If it's marked @retroactive, no need to warn.
       if (entry.isRetroactive()) {
+        // Note that we encountered this protocol through a conformance marked
+        // @retroactive in case multiple clauses cause the protocol to be
+        // inherited.
+        protocolsWithRetroactiveAttr.insert(decl);
         return TypeWalker::Action::Continue;
       }
 
@@ -1710,6 +1714,11 @@ static void diagnoseRetroactiveConformances(
 
       return TypeWalker::Action::Continue;
     });
+  }
+
+  // Remove protocols that are reachable through a @retroactive conformance.
+  for (auto *proto : protocolsWithRetroactiveAttr) {
+    externalProtocols.remove(proto);
   }
 
   // If we didn't find any violations, we're done.
