@@ -40,7 +40,7 @@ enum Context<T> {
 
 func doit() -> Context<Int>.Here { .init(t: 0) }
 
-public enum E {
+public enum E : _BitwiseCopyable {
   case a
 }
 

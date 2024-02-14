@@ -25,3 +25,13 @@ indirect enum E_Explicit_Indirect : _BitwiseCopyable { // expected-error {{non_b
 enum E_Explicit_Indirect_Case : _BitwiseCopyable { // expected-error {{non_bitwise_copyable_type_indirect_enum_element}}
   indirect case s(S) // expected-note {{note_non_bitwise_copyable_type_indirect_enum_element}}
 }
+
+func take<T : _BitwiseCopyable>(_ t: T) {}
+
+// public (effectively) => !conforms
+@usableFromInline internal struct InternalUsableStruct {
+  public var int: Int
+}
+
+func passInternalUsableStruct(_ s: InternalUsableStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
+                                                                     // expected-note@-8{{where_requirement_failure_one_subst}}

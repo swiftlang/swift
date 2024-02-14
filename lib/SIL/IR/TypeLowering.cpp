@@ -54,6 +54,10 @@ llvm::cl::opt<bool> TypeLoweringForceOpaqueValueLowering(
     llvm::cl::desc("Force TypeLowering to behave as if building with opaque "
                    "values enabled"));
 
+llvm::cl::opt<bool> TypeLoweringDisableVerification(
+    "type-lowering-disable-verification", llvm::cl::init(false),
+    llvm::cl::desc("Disable the asserts-only verification of lowerings"));
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
@@ -2945,6 +2949,9 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
+  if (TypeLoweringDisableVerification) {
+    return;
+  }
   verifyLexicalLowering(lowering, origType, substType, forExpansion);
   verifyTrivialLowering(lowering, origType, substType, forExpansion);
 }
@@ -3049,7 +3056,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (lowering.isTrivial() && !conformance) {
     // A trivial type can lack a conformance in a few cases:
-    // (1) containing or being a resilient type
+    // (1) containing or being a public, non-frozen type
     // (2) containing or being a generic type which doesn't conform
     //     unconditionally but in this particular instantiation is trivial
     // (3) being a special type that's not worth forming a conformance for
@@ -3064,6 +3071,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //               unowned(unsafe) var o: AnyObject
     //             }
     // (5) being defined in a different module
+    // (6) being defined in a module built from interface
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3081,12 +3089,22 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return true;
           }
 
-          // Resilient trivial types may not conform (case (1)).
-          if (nominal->isResilient())
+          // Public, non-frozen trivial types may not conform (case (1)).
+          if (nominal
+                  ->getFormalAccessScope(/*useDC=*/nullptr,
+                                         /*treatUsableFromInlineAsPublic=*/true)
+                  .isPublic())
             return true;
 
+          auto *module = nominal->getModuleContext();
+
+          // Types in modules built from interfaces may not conform (case (6)).
+          if (module && module->isBuiltFromInterface()) {
+            return false;
+          }
+
           // Trivial types from other modules may not conform (case (5)).
-          return nominal->getModuleContext() != &M;
+          return module != &M;
         },
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
@@ -3141,12 +3159,22 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
-          // Resilient trivial types may not conform (case (1)).
-          if (nominal->isResilient())
+          // Public, non-frozen trivial types may not conform (case (1)).
+          if (nominal
+                  ->getFormalAccessScope(/*useDC=*/nullptr,
+                                         /*treatUsableFromInlineAsPublic=*/true)
+                  .isPublic())
             return false;
 
+          auto *module = nominal->getModuleContext();
+
+          // Types in modules built from interfaces may not conform (case (6)).
+          if (module && module->isBuiltFromInterface()) {
+            return false;
+          }
+
           // Trivial types from other modules may not conform (case (5)).
-          return nominal->getModuleContext() == &M;
+          return module == &M;
         });
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
@@ -3159,10 +3187,19 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (!lowering.isTrivial() && conformance) {
     // A non-trivial type can have a conformance in one case:
     // (1) contains a conforming archetype
+    // (2) is resilient with minimal expansion
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // A resilient type that's with minimal expansion may be non-trivial
+          // but still conform (case (2)).
+          auto *nominal = ty.getAnyNominal();
+          if (nominal && nominal->isResilient() &&
+              forExpansion.getResilienceExpansion() ==
+                  ResilienceExpansion::Minimal) {
+            return true;
+          }
           // Walk into every aggregate.
           return false;
         },
@@ -3173,7 +3210,16 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 
-          // An archetype may conform but be non-trivial (case (2)).
+          // A resilient type that's with minimal expansion may be non-trivial
+          // but still conform (case (2)).
+          auto *nominal = ty.getAnyNominal();
+          if (nominal && nominal->isResilient() &&
+              forExpansion.getResilienceExpansion() ==
+                  ResilienceExpansion::Minimal) {
+            return false;
+          }
+
+          // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
 
