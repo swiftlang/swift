@@ -846,6 +846,12 @@ bool BridgedInstruction::maySuspend() const {
   return unbridged()->maySuspend();
 }
 
+bool BridgedInstruction::shouldBeForwarding() const {
+  return llvm::isa<swift::OwnershipForwardingSingleValueInstruction>(unbridged()) ||
+         llvm::isa<swift::OwnershipForwardingTermInst>(unbridged()) ||
+         llvm::isa<swift::OwnershipForwardingMultipleValueInstruction>(unbridged());
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }

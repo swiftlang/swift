@@ -27,10 +27,23 @@ extension Function {
   func verify(_ context: FunctionPassContext) {
     for block in blocks {
       for inst in block.instructions {
+
+        inst.checkForwardingConformance()
+
         if let verifyableInst = inst as? VerifyableInstruction {
           verifyableInst.verify(context)
         }
       }
+    }
+  }
+}
+
+private extension Instruction {
+  func checkForwardingConformance() {
+    if bridged.shouldBeForwarding() {
+      require(self is ForwardingInstruction, "instruction \(self)\nshould conform to ForwardingInstruction")
+    } else {
+      require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
     }
   }
 }
