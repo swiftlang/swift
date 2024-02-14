@@ -361,6 +361,7 @@ public func addQueuedSourceFile(
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
   let sourceFileID = queuedDiagnostics.pointee.grouped.addSourceFile(
     tree: sourceFile.pointee.syntax,
+    sourceLocationConverter: sourceFile.pointee.sourceLocationConverter,
     displayName: displayName,
     parent: parent
   )
