@@ -308,7 +308,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
-  public func withMemoryRebound<T: ~Copyable, Result>(
+  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws -> Result
@@ -335,7 +335,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
   @available(*, unavailable)
   @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
   @usableFromInline
-  internal func _legacy_se0333_withMemoryRebound<T, Result>(
+  internal func _legacy_se0333_withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (UnsafePointer<T>) throws -> Result
@@ -357,6 +357,33 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
     @_transparent
     unsafeAddress {
       return self + i
+    }
+  }
+
+  @inlinable // unsafe-performance
+  internal static var _max: UnsafePointer {
+    return UnsafePointer(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafePointer where Pointee: Copyable {
+  @inlinable
+  public var pointee: Pointee {
+    @_silgen_name("$sSP7pointeexvg")
+    @_transparent
+    get {
+      self[0]
+    }
+  }
+
+  @inlinable
+  public subscript(i: Int) -> Pointee {
+    @_silgen_name("$sSPyxSicig")
+    @_transparent
+    get {
+      Builtin.load((self + i)._rawValue)
     }
   }
 
@@ -382,15 +409,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
-
-  @inlinable // unsafe-performance
-  internal static var _max: UnsafePointer {
-    return UnsafePointer(
-      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
-    )._unsafelyUnwrappedUnchecked
-  }
 }
-
 
 /// A pointer for accessing and manipulating data of a
 /// specific type.
@@ -980,6 +999,24 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 }
 
 extension UnsafeMutablePointer where Pointee: Copyable {
+  @inlinable
+  public var pointee: Pointee {
+    @_silgen_name("$sSp7pointeexvg")
+    @_transparent
+    get {
+      self[0]
+    }
+  }
+
+  @inlinable
+  public subscript(i: Int) -> Pointee {
+    @_silgen_name("$sSpyxSicig")
+    @_transparent
+    get {
+      Builtin.load((self + i)._rawValue)
+    }
+  }
+
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
