@@ -250,11 +250,6 @@ extension UnaryInstruction {
 //                             no-value instructions
 //===----------------------------------------------------------------------===//
 
-/// Used for all non-value instructions which are not implemented here, yet.
-/// See registerBridgedClass() in SILBridgingUtils.cpp.
-final public class UnimplementedInstruction : Instruction {
-}
-
 /// Only one of the operands may have an address type.
 public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
@@ -352,6 +347,9 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
   }
 }
 
+final public class BeginUnpairedAccessInst : Instruction {}
+final public class EndUnpairedAccessInst : Instruction {}
+
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
 final public class MarkUninitializedInst : SingleValueInstruction, ConversionInstruction {
@@ -400,6 +398,8 @@ final public class CondFailInst : Instruction, UnaryInstruction {
   public var message: StringRef { StringRef(bridged: bridged.CondFailInst_getMessage()) }
 }
 
+final public class IncrementProfilerCounterInst : Instruction {}
+
 final public class MarkFunctionEscapeInst : Instruction {}
 
 final public class HopToExecutorInst : Instruction, UnaryInstruction {}
@@ -445,6 +445,8 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
 
 final public class DebugStepInst : Instruction {}
 
+final public class SpecifyTestInst : Instruction {}
+
 final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }
@@ -459,6 +461,9 @@ final public class BeginDeallocRefInst : SingleValueInstruction {
 
 final public class EndInitLetRefInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class BindMemoryInst : SingleValueInstruction {}
+final public class RebindMemoryInst : SingleValueInstruction {}
+
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
 }
@@ -466,6 +471,8 @@ public class RefCountingInst : Instruction, UnaryInstruction {
 final public class StrongRetainInst : RefCountingInst {
   public var instance: Value { operand.value }
 }
+
+final public class StrongRetainUnownedInst : RefCountingInst {}
 
 final public class UnownedRetainInst : RefCountingInst {
   public var instance: Value { operand.value }
@@ -501,6 +508,9 @@ final public class UnmanagedReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
 }
 
+final public class AutoreleaseValueInst : RefCountingInst {}
+final public class UnmanagedAutoreleaseValueInst : RefCountingInst {}
+
 final public class DestroyValueInst : Instruction, UnaryInstruction {
   public var destroyedValue: Value { operand.value }
 }
@@ -515,8 +525,6 @@ final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstr
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
 }
-
-final public class UnimplementedRefCountingInst : RefCountingInst {}
 
 //===----------------------------------------------------------------------===//
 //                      no-value deallocation instructions
@@ -538,6 +546,7 @@ final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocatio
 }
 
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -554,11 +563,6 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //===----------------------------------------------------------------------===//
 //                           single-value instructions
 //===----------------------------------------------------------------------===//
-
-/// Used for all SingleValueInstructions which are not implemented here, yet.
-/// See registerBridgedClass() in SILBridgingUtils.cpp.
-final public class UnimplementedSingleValueInst : SingleValueInstruction {
-}
 
 public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
 
@@ -622,6 +626,15 @@ final public class UncheckedTrivialBitCastInst : SingleValueInstruction, UnaryIn
   public var fromValue: Value { operand.value }
 }
 
+final public class UncheckedBitwiseCastInst : SingleValueInstruction, UnaryInstruction {}
+final public class UncheckedValueCastInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class RefToRawPointerInst : SingleValueInstruction, UnaryInstruction {}
+final public class RefToUnmanagedInst : SingleValueInstruction, UnaryInstruction {}
+final public class RefToUnownedInst : SingleValueInstruction, UnaryInstruction {}
+final public class UnmanagedToRefInst : SingleValueInstruction, UnaryInstruction {}
+final public class UnownedToRefInst : SingleValueInstruction, UnaryInstruction {}
+
 final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
@@ -651,6 +664,8 @@ class IndexAddrInst : SingleValueInstruction {
     bridged.IndexAddrInst_needsStackProtection()
   }
 }
+
+final public class IndexRawPointerInst : SingleValueInstruction {}
 
 final public
 class TailAddrInst : SingleValueInstruction {
@@ -708,7 +723,15 @@ class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
-public class GlobalAccessInst : SingleValueInstruction {
+final public class OpenPackElementInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {}
+final public class DynamicPackIndexInst : SingleValueInstruction {}
+final public class PackPackIndexInst : SingleValueInstruction {}
+final public class ScalarPackIndexInst : SingleValueInstruction {}
+
+final public class ObjCProtocolInst : SingleValueInstruction {}
+
+public class GlobalAccessInstruction : SingleValueInstruction {
   final public var global: GlobalVariable {
     bridged.GlobalAccessInst_getGlobal().globalVar
   }
@@ -733,7 +756,7 @@ final public class DynamicFunctionRefInst : FunctionRefBaseInst {
 final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
-final public class GlobalAddrInst : GlobalAccessInst, VarDeclInstruction {
+final public class GlobalAddrInst : GlobalAccessInstruction, VarDeclInstruction {
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.GlobalAddr_getDecl())
   }
@@ -743,9 +766,11 @@ final public class GlobalAddrInst : GlobalAccessInst, VarDeclInstruction {
   }
 }
 
-final public class GlobalValueInst : GlobalAccessInst {
+final public class GlobalValueInst : GlobalAccessInstruction {
   public var isBare: Bool { bridged.GlobalValueInst_isBare() }
 }
+
+final public class BaseAddrForOffsetInst : SingleValueInstruction {}
 
 final public class AllocGlobalInst : Instruction {
   public var global: GlobalVariable {
@@ -787,6 +812,8 @@ final public class StringLiteralInst : SingleValueInstruction {
     }
   }
 }
+
+final public class HasSymbolInst : SingleValueInstruction {}
 
 final public class TupleInst : SingleValueInstruction, ForwardingInstruction {}
 
@@ -897,6 +924,12 @@ class ConvertFunctionInst : SingleValueInstruction, ConversionInstruction {
 final public
 class ThinToThickFunctionInst : SingleValueInstruction, ConversionInstruction {}
 
+final public class ThickToObjCMetatypeInst : SingleValueInstruction, ConversionInstruction {}
+final public class ObjCToThickMetatypeInst : SingleValueInstruction, ConversionInstruction {}
+
+final public class CopyBlockInst : SingleValueInstruction {}
+final public class CopyBlockWithoutEscapingInst : SingleValueInstruction {}
+
 final public
 class ConvertEscapeToNoEscapeInst : SingleValueInstruction, UnaryInstruction {
   public var fromFunction: Value { operand.value }
@@ -919,6 +952,8 @@ class GetAsyncContinuationInst : SingleValueInstruction {}
 
 final public
 class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ExtractExecutorInst : SingleValueInstruction {}
 
 final public
 class MarkDependenceInst : SingleValueInstruction, ForwardingInstruction {
@@ -1002,6 +1037,8 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.ProjectBoxInst_fieldIndex() }
 }
 
+final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
+
 public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
@@ -1011,6 +1048,11 @@ final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, Cop
 final public class ExplicitCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
+
+final public class UnownedCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
+final public class WeakCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
+
+final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
@@ -1025,8 +1067,8 @@ final public class DropDeinitInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class StrongCopyUnownedValueInst : SingleValueInstruction, UnaryInstruction {}
-
 final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryInstruction  {}
+final public class StrongCopyWeakValueInst : SingleValueInstruction, UnaryInstruction  {}
 
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
@@ -1055,6 +1097,8 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 }
 
+final public class FunctionExtractIsolationInst : SingleValueInstruction {}
+
 final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
@@ -1072,6 +1116,8 @@ final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruct
 final public class MarkUnresolvedNonCopyableValueInst
   : SingleValueInstruction, UnaryInstruction, ConversionInstruction {}
 
+final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
+
 final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {
   public var isTakeOfSrc: Bool { true }
   public var isInitializationOfDest: Bool { true }
@@ -1082,6 +1128,8 @@ final public class CopyableToMoveOnlyWrapperValueInst
 
 final public class MoveOnlyWrapperToCopyableValueInst
   : SingleValueInstruction, UnaryInstruction, ConversionInstruction {}
+
+final public class MoveOnlyWrapperToCopyableBoxInst : SingleValueInstruction {}
 
 final public class CopyableToMoveOnlyWrapperAddrInst
   : SingleValueInstruction, UnaryInstruction {}
@@ -1120,6 +1168,9 @@ final public class PackElementSetInst: SingleValueInstruction {}
 final public class DifferentiableFunctionInst: SingleValueInstruction, ForwardingInstruction {}
 
 final public class LinearFunctionInst: SingleValueInstruction, ForwardingInstruction {}
+final public class DifferentiableFunctionExtractInst: SingleValueInstruction {}
+final public class LinearFunctionExtractInst: SingleValueInstruction {}
+final public class DifferentiabilityWitnessFunctionInst: SingleValueInstruction {}
 
 final public class ProjectBlockStorageInst: SingleValueInstruction, UnaryInstruction {}
 
@@ -1146,6 +1197,9 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
 final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
   public var capacity: Value { operand.value }
 }
+
+final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
   final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
@@ -1346,7 +1400,7 @@ final public class SwitchEnumInst : TermInst, ForwardingInstruction {
 final public class SwitchEnumAddrInst : TermInst {
 }
 
-final public class SelectEnumAddrInst : TermInst {
+final public class SelectEnumAddrInst : SingleValueInstruction {
 }
 
 final public class DynamicMethodBranchInst : TermInst {
