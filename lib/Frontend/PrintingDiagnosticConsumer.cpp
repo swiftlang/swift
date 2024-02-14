@@ -305,7 +305,7 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
 }
 
 void *PrintingDiagnosticConsumer::getSourceFileSyntax(
-    SourceManager &sourceMgr, unsigned bufferID) {
+    SourceManager &sourceMgr, unsigned bufferID, StringRef displayName) {
   auto known = sourceFileSyntax.find({&sourceMgr, bufferID});
   if (known != sourceFileSyntax.end())
     return known->second;
@@ -313,7 +313,7 @@ void *PrintingDiagnosticConsumer::getSourceFileSyntax(
   auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
   auto sourceFile = swift_ASTGen_parseSourceFile(
       bufferContents.data(), bufferContents.size(),
-      "module", "file.swift", /*ctx*/ nullptr);
+      "module", displayName.str().c_str(), /*ctx*/ nullptr);
 
   sourceFileSyntax[{&sourceMgr, bufferID}] = sourceFile;
   return sourceFile;
@@ -355,7 +355,7 @@ void PrintingDiagnosticConsumer::queueBuffer(
         sourceMgr.getLocForBufferStart(bufferID)).str();
   }
 
-  auto sourceFile = getSourceFileSyntax(sourceMgr, bufferID);
+  auto sourceFile = getSourceFileSyntax(sourceMgr, bufferID, displayName);
   swift_ASTGen_addQueuedSourceFile(
       queuedDiagnostics, bufferID, sourceFile,
       (const uint8_t*)displayName.data(), displayName.size(),

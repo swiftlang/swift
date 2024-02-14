@@ -94,7 +94,8 @@ public:
 
 private:
   /// Retrieve the SourceFileSyntax for the given buffer.
-  void *getSourceFileSyntax(SourceManager &SM, unsigned bufferID);
+  void *getSourceFileSyntax(SourceManager &SM, unsigned bufferID,
+                            StringRef displayName);
 
   void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
