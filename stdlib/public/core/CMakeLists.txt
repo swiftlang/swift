@@ -260,7 +260,8 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
-if(NOT SWIFT_FREESTANDING_FLAVOR)
+# Freestanding and Linux builds both have failures to resolve.
+if(NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
   list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
 endif()
 
