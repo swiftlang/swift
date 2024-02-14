@@ -36,8 +36,11 @@ static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
   auto path = runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH();
   if (path && path[0]) {
     void *handle = dlopen(path, RTLD_LAZY);
-    if (!handle)
+    if (!handle) {
+      swift::warning(0, "Failed to load prespecializations library: %s\n",
+                     dlerror());
       return nullptr;
+    }
 
     dataPtr = dlsym(handle, LIB_PRESPECIALIZED_TOP_LEVEL_SYMBOL_NAME);
   }

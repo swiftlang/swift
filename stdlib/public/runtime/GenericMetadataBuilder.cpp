@@ -485,13 +485,6 @@ bool swift::compareGenericMetadata(const Metadata *original,
         equal = false;
       }
 
-      if (memcmp(original, newMetadata, genericArgumentsStart)) {
-        validationLog(
-            true,
-            "Metadatas do not match in the part before generic arguments");
-        equal = false;
-      }
-
       for (unsigned i = 0; i < genericContextHeader.NumKeyArguments; i++) {
         auto *originalArg =
             originalDescriptor->getGenericArguments(original)[i];

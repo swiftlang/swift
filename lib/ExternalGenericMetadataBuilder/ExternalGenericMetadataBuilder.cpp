@@ -118,10 +118,60 @@ struct TypedExternal {
   template <typename T, bool Nullable = true, typename Offset = int32_t>
   using CompactFunctionPointer = TypedInteger<T, int32_t, Nullable>;
 
+  template <unsigned discriminator>
+  struct ValueWitnessFunctionPointer {
+    StoredPointer pointer;
+  };
+
   StoredPointer
   getStrippedSignedPointer(const StoredSignedPointer pointer) const {
     return swift_ptrauth_strip(pointer);
   }
+};
+
+using ExternalRuntime32 =
+    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<4>>>;
+using ExternalRuntime64 =
+    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<8>>>;
+
+// Declare a specialized version of the value witness types that use a wrapper
+// on the functions that captures the ptrauth discriminator.
+template <>
+class TargetValueWitnessTypes<ExternalRuntime64> {
+public:
+  using StoredPointer = typename ExternalRuntime64::StoredPointer;
+
+#define WANT_ALL_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
+  typedef ExternalRuntime64::ValueWitnessFunctionPointer<                      \
+      SpecialPointerAuthDiscriminators::upperId>                               \
+      lowerId;
+#define MUTABLE_VALUE_TYPE TargetPointer<ExternalRuntime64, OpaqueValue>
+#define IMMUTABLE_VALUE_TYPE ConstTargetPointer<ExternalRuntime64, OpaqueValue>
+#define MUTABLE_BUFFER_TYPE TargetPointer<ExternalRuntime64, ValueBuffer>
+#define IMMUTABLE_BUFFER_TYPE ConstTargetPointer<ExternalRuntime64, ValueBuffer>
+#define TYPE_TYPE ConstTargetPointer<ExternalRuntime64, Metadata>
+#define SIZE_TYPE StoredSize
+#define INT_TYPE int
+#define UINT_TYPE unsigned
+#define VOID_TYPE void
+#include "swift/ABI/ValueWitness.def"
+
+  // Handle the data witnesses explicitly so we can use more specific
+  // types for the flags enums.
+  typedef size_t size;
+  typedef size_t stride;
+  typedef TargetValueWitnessFlags<typename ExternalRuntime64::StoredSize> flags;
+  typedef uint32_t extraInhabitantCount;
+};
+
+enum class PtrauthKey : int8_t {
+  None = -1,
+  IA = 0,
+  IB = 1,
+  DA = 2,
+  DB = 3,
 };
 
 template <typename T>
@@ -189,6 +239,26 @@ class ReaderWriter;
 
 template <typename Runtime>
 class ExternalGenericMetadataBuilderContext {
+  // Structs that provide the ptrauth info for pointers to specific tyeps.
+  template <typename Target>
+  struct PtrauthInfo;
+
+  template <>
+  struct PtrauthInfo<const TargetValueTypeDescriptor<Runtime>> {
+    static constexpr PtrauthKey key = PtrauthKey::DA;
+    static constexpr bool addressDiversified = true;
+    static constexpr unsigned discriminator =
+        SpecialPointerAuthDiscriminators::TypeDescriptor;
+  };
+
+  template <>
+  struct PtrauthInfo<const TargetValueWitnessTable<Runtime>> {
+    static constexpr PtrauthKey key = PtrauthKey::DA;
+    static constexpr bool addressDiversified = true;
+    static constexpr unsigned discriminator =
+        SpecialPointerAuthDiscriminators::ValueWitnessTable;
+  };
+
   struct Atom;
 
   struct FileTarget {
@@ -207,6 +277,10 @@ class ExternalGenericMetadataBuilderContext {
 
     unsigned offset;
     unsigned size;
+
+    PtrauthKey ptrauthKey;
+    bool addressDiversified;
+    unsigned discriminator;
 
     std::variant<FileTarget, AtomTarget> fileOrAtom;
   };
@@ -513,7 +587,10 @@ public:
     }
 
     template <typename U>
-    void writePointerImpl(void *where, Buffer<U> value) {
+    void writePointerImpl(void *where, Buffer<U> value,
+                          PtrauthKey ptrauthKey = PtrauthKey::None,
+                          bool addressDiversified = true,
+                          unsigned discriminator = 0) {
       if (!value) {
         memset(where, 0, sizeof(StoredPointer));
         return;
@@ -530,6 +607,10 @@ public:
              this->atom->buffer.size());
 
       target.size = sizeof(StoredPointer);
+
+      target.ptrauthKey = ptrauthKey;
+      target.addressDiversified = addressDiversified;
+      target.discriminator = discriminator;
 
       if (auto *file = value.file) {
         auto contents = value.section.getContents();
@@ -625,7 +706,9 @@ public:
       checkPtr(where);
       where->SignedValue.value = ~(uintptr_t)value.ptr;
 
-      writePointerImpl(where, value);
+      writePointerImpl(where, value, PtrauthInfo<U>::key,
+                       PtrauthInfo<U>::addressDiversified,
+                       PtrauthInfo<U>::discriminator);
     }
 
     template <typename U>
@@ -638,6 +721,15 @@ public:
 
     void writeFunctionPointer(void *where, Buffer<const char> target) {
       writePointer(reinterpret_cast<StoredPointer *>(where), target);
+    }
+
+    template <unsigned discriminator>
+    void writeFunctionPointer(
+        ExternalRuntime64::ValueWitnessFunctionPointer<discriminator> *where,
+        Buffer<const char> target) {
+      checkPtr(where);
+
+      writePointerImpl(where, target, PtrauthKey::IA, true, discriminator);
     }
   };
 
@@ -669,7 +761,11 @@ public:
     return allocate<T>(count * sizeof(T));
   }
 
-  void setArch(const char *arch) { this->arch = arch; }
+  void setArch(const char *arch) {
+    this->arch = arch;
+    this->usePtrauth = this->arch == "arm64e";
+  }
+
   void setNamesToBuild(const std::vector<std::string> &names) {
     this->mangledNamesToBuild = names;
   }
@@ -735,6 +831,9 @@ private:
 
   // The architecture being targeted.
   std::string arch;
+
+  // Does this target use pointer authentication?
+  bool usePtrauth = false;
 
   // The readerWriter and builder helper objects.
   std::unique_ptr<ReaderWriter<Runtime>> readerWriter;
@@ -2152,6 +2251,14 @@ void ExternalGenericMetadataBuilderContext<Runtime>::writeAtomContentsJSON(
         J.attribute("addend", atomTarget.offset);
         J.attribute("kind", ptrTargetKind);
       }
+
+      if (usePtrauth && targetsCursor->ptrauthKey != PtrauthKey::None) {
+        J.attributeObject("authPtr", [&] {
+          J.attribute("key", static_cast<uint8_t>(targetsCursor->ptrauthKey));
+          J.attribute("addr", targetsCursor->addressDiversified);
+          J.attribute("diversity", targetsCursor->discriminator);
+        });
+      }
     });
 
     bufferCursor = targetsCursor->offset + targetsCursor->size;
@@ -2311,16 +2418,11 @@ BuilderErrorOr<unsigned> getPointerWidth(std::string arch) {
 
 } // namespace swift
 
-using ExternalRuntime32 =
-    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<4>>>;
-using ExternalRuntime64 =
-    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<8>>>;
-
 struct SwiftExternalMetadataBuilder {
   using Builder32 =
-      swift::ExternalGenericMetadataBuilderContext<ExternalRuntime32>;
+      swift::ExternalGenericMetadataBuilderContext<swift::ExternalRuntime32>;
   using Builder64 =
-      swift::ExternalGenericMetadataBuilderContext<ExternalRuntime64>;
+      swift::ExternalGenericMetadataBuilderContext<swift::ExternalRuntime64>;
 
   std::variant<Builder32, Builder64> context;
 
