@@ -6634,6 +6634,11 @@ bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
     if (proto->getInvertibleProtocolKind())
       return TypeWalker::Action::Continue;
 
+    // HACK: claim that Sendable also doesn't implicitly inherit Copyable, etc.
+    // This shouldn't be needed after Swift 6.0
+    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+      return TypeWalker::Action::Continue;
+
     // Otherwise, check to see if there's an inverse on this protocol.
     switch (proto->getMarking(ip).getInverse().getKind()) {
     case InverseMarking::Kind::None:
