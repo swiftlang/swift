@@ -98,8 +98,14 @@ func TestHashable<T: Hashable>(_ h: T)
 // Test Obj-C hashValue for Swift types that are Equatable but not Hashable
 func TestEquatableHash<T: Equatable>(_ e: T)
 {
-  // These should have a constant hash value
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  // Legacy behavior used the pointer value, which is
+  // incompatible with user-defined equality.
+  TestSwiftValueNSObjectDefaultHashValue(e as AnyObject)
+#else
+  // New behavior uses a constant hash value in this case
   TestSwiftValueNSObjectHashValue(e as AnyObject, 1)
+#endif
 }
 
 func TestNonEquatableHash<T>(_ e: T)
@@ -112,10 +118,6 @@ func TestNonEquatableHash<T>(_ e: T)
 // CHECK: c ##This is C's debug description##
 // CHECK-NEXT: d ##This is D's description##
 // CHECK-NEXT: S ##{{.*}}__SwiftValue##
-
-// Full message is longer, but this is the essential part...
-// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftValueNSObject.E` {{.*}} Equatable but not Hashable
-// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftValueNSObject.E1` {{.*}} Equatable but not Hashable
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
@@ -156,6 +158,4 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("c ##This is C's debug description##\n", stderr)
   fputs("d ##This is D's description##\n", stderr)
   fputs("S ##__SwiftValue##\n", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftValueNSObject.E` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftValueNSObject.E1` ... Equatable but not Hashable", stderr)
 }

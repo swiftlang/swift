@@ -102,9 +102,10 @@ void TestSwiftValueNSObjectNotEquals(id e1, id e2)
 
 void TestSwiftValueNSObjectHashValue(id e, NSUInteger hashValue)
 {
-  printf("NSObjectProtocol.hash: Expect [%s hashValue] == %lu\n",
+  printf("NSObjectProtocol.hash: Expect [%s hashValue] == %lu,  Got %lu\n",
 	 [[e description] UTF8String],
-	 (unsigned long)hashValue);
+	 (unsigned long)hashValue,
+	 [e hash]);
   expectTrue([e hash] == hashValue);
 }
 
