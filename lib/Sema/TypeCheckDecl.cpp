@@ -982,7 +982,7 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
         result.positive.setIfUnset(Kind::Explicit, loc);
 
       if (isInverseTarget(type))
-          result.inverse.setIfUnset(Kind::Explicit, loc);
+        result.inverse.setIfUnset(Kind::Explicit, loc);
     }
 
     return result;
@@ -1008,38 +1008,47 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
 
     Mark result;
     // Next, scan the where clause and return the result.
-    WhereClauseOwner(genCtx).visitRequirements(TypeResolutionStage::Structural,
-      [&](Requirement req, RequirementRepr *repr) -> bool /* = stop search */ {
-      if (req.getKind() != RequirementKind::Conformance)
-        return false;
+    auto whereClause = genCtx->getTrailingWhereClause();
+    if (!whereClause)
+      return result;
+
+    auto requirements = whereClause->getRequirements();
+    for (unsigned i : indices(requirements)) {
+      auto requirementRepr = requirements[i];
+      if (requirementRepr.getKind() != RequirementReprKind::TypeConstraint)
+        continue;
+
+      auto *constraintRepr =
+          dyn_cast<InverseTypeRepr>(requirementRepr.getConstraintRepr());
+      if (!constraintRepr || constraintRepr->isInvalid())
+        continue;
+
+      auto req = evaluator(
+          RequirementRequest{genCtx, i, TypeResolutionStage::Structural},
+          [&]() {
+            return Requirement(RequirementKind::SameType,
+                               ErrorType::get(ctx),
+                               ErrorType::get(ctx));
+          });
+
+      if (req.hasError() || req.getKind() != RequirementKind::Conformance)
+        continue;
 
       auto subject = req.getFirstType();
       if (!subject->isTypeParameter())
-        return false;
+        continue;
 
       // Skip outer params and implicit ones.
       auto *param = subject->getRootGenericParam()->getDecl();
       if (!param || !params.contains(param))
-        return false;
+        continue;
 
-      // Check constraint type
-      auto constraint = req.getSecondType();
-
-      // Found it?
-      if (isInverseTarget(constraint)) {
-        // Try to find a good location.
-        SourceLoc loc;
-        if (repr && !repr->isInvalid())
-          if (auto *constraintRepr = repr->getConstraintRepr())
-            if (!repr->isInvalid())
-              loc = constraintRepr->getLoc();
-
-        result.set(Kind::Inferred, loc);
-        return true;
+      if (isInverseTarget(req.getSecondType())) {
+        result.set(Kind::Inferred, constraintRepr->getLoc());
+        break;
       }
+    }
 
-      return false;
-    });
     return result;
   };
 
