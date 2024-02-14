@@ -1803,6 +1803,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // in the Swift compile commands, when different.
     inheritedParentContextClangArgs =
         clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+    genericSubInvocation.getFrontendOptions()
+        .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext) {
     // If the compiler has been asked to be strict with ensuring downstream
     // dependencies get the parent invocation's context, inherit the extra Clang

@@ -336,6 +336,9 @@ public:
   /// for testing purposes only.
   bool DisableBuildingInterface = false;
 
+  /// Is this frontend configuration of an interface dependency scan sub-invocation
+  bool DependencyScanningSubInvocation = false;
+
   /// When performing a dependency scanning action, only identify and output all imports
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
