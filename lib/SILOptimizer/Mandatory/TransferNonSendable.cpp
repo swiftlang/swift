@@ -214,7 +214,10 @@ void RequireLiveness::processDefBlock() {
 
   // Then walk from our transferInst to the end of the block looking for the
   // first require inst. Once we find it... return.
-  for (auto ii = std::next(transferInst->getIterator()),
+  //
+  // NOTE: We start walking at the transferInst since the transferInst could use
+  // the requireInst as well.
+  for (auto ii = transferInst->getIterator(),
             ie = transferInst->getParent()->end();
        ii != ie; ++ii) {
     if (!allRequires.contains(&*ii))
@@ -1083,11 +1086,6 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
                << "Transfer Op. Number: " << transferOp->getOperandNumber()
                << ". User: " << *transferOp->getUser());
 
-    RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
-                             blockLivenessInfo);
-    ++blockLivenessInfoGeneration;
-    liveness.process(requireInsts);
-
     UseAfterTransferDiagnosticInferrer diagnosticInferrer(
         regionInfo->getValueMap());
     diagnosticInferrer.init(transferOp);
@@ -1100,6 +1098,40 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // editor UIs providing a more actionable error message.
     auto applyUses = diagnosticInferrer.getApplyUses();
     if (applyUses.empty()) {
+      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
+      continue;
+    }
+
+    // Then look for our requires before we emit any error. We want to emit a
+    // single we don't understand error if we do not find the require.
+    bool didEmitRequireNote = false;
+    InstructionSet requireInstsUnique(function);
+    RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
+                             blockLivenessInfo);
+    ++blockLivenessInfoGeneration;
+    liveness.process(requireInsts);
+
+    SmallVector<SILInstruction *, 8> requireInstsForError;
+    for (auto *require : requireInsts) {
+      // We can have multiple of the same require insts if we had a require
+      // and an assign from the same instruction. Our liveness checking
+      // above doesn't care about that, but we still need to make sure we do
+      // not emit twice.
+      if (!requireInstsUnique.insert(require))
+        continue;
+
+      // If this was not a last require, do not emit an error.
+      if (!liveness.finalRequires.contains(require))
+        continue;
+
+      requireInstsForError.push_back(require);
+      didEmitRequireNote = true;
+    }
+
+    // If we did not emit a require, emit an "unknown pattern" error that
+    // tells the user to file a bug. This importantly ensures that we can
+    // guarantee that we always find the require if we successfully compile.
+    if (!didEmitRequireNote) {
       diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
       continue;
     }
@@ -1170,29 +1202,13 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
             .highlight(info.getLoc().getSourceRange());
         break;
       }
+    }
 
-      // Ok, we now have our requires... emit the errors.
-      bool didEmitRequire = false;
-
-      InstructionSet requireInstsUnique(function);
-      for (auto *require : requireInsts) {
-        // We can have multiple of the same require insts if we had a require
-        // and an assign from the same instruction. Our liveness checking
-        // above doesn't care about that, but we still need to make sure we do
-        // not emit twice.
-        if (!requireInstsUnique.insert(require))
-          continue;
-
-        // If this was not a last require, do not emit an error.
-        if (!liveness.finalRequires.contains(require))
-          continue;
-
-        diagnoseNote(require, diag::regionbasedisolation_maybe_race)
-            .highlight(require->getLoc().getSourceRange());
-        didEmitRequire = true;
-      }
-
-      assert(didEmitRequire && "Should have a require for all errors?!");
+    // Now actually emit the require notes.
+    while (!requireInstsForError.empty()) {
+      auto *require = requireInstsForError.pop_back_val();
+      diagnoseNote(require, diag::regionbasedisolation_maybe_race)
+          .highlight(require->getLoc().getSourceRange());
     }
   }
 }

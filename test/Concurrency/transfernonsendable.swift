@@ -1133,10 +1133,16 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
   var cls = {}
 
   for _ in 0..<1024 {
+    // TODO: The error here is b/c of the loop carry. We should probably store
+    // the operand instead of just the require inst, so we can better separate a
+    // loop carry use and an error due to multiple params. Then we could emit
+    // the error on test below. This is still correct though, just not as
+    // good... that is QoI though.
     await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
     // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-    test = StructFieldTests() // expected-tns-note {{access here could race}}
+    // expected-tns-note @-2 {{access here could race}}
+    // expected-complete-warning @-3 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
+    test = StructFieldTests()
     cls = {
       useInOut(&test.varSendableNonTrivial)
     }
@@ -1167,7 +1173,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
   }
 
   test.varSendableNonTrivial = SendableKlass()
-  useValue(test)  // expected-tns-note {{access here could race}}
+  useValue(test)
 }
 
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
@@ -1321,7 +1327,7 @@ func controlFlowTest2() async {
     x = NonSendableKlass()
   }
 
-  useValue(x) // expected-tns-note {{access here could race}}
+  useValue(x)
 }
 
 ////////////////////////

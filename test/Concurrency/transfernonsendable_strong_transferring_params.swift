@@ -38,6 +38,8 @@ func transferArgWithOtherParam(_ x: transferring Klass, _ y: Klass) {
 func transferArgWithOtherParam2(_ x: Klass, _ y: transferring Klass) {
 }
 
+func twoTransferArg(_ x: transferring Klass, _ y: transferring Klass) {}
+
 @MainActor var globalKlass = Klass()
 
 /////////////////
@@ -281,4 +283,16 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   useValue(x) // expected-note {{access here could race}}
 
   useValue(y) // expected-note {{access here could race}}
+}
+
+func doubleArgument() async {
+  let x = Klass()
+  twoTransferArg(x, x) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred}}
+  // expected-note @-1 {{access here could race}}
+}
+
+func testTransferSrc(_ x: transferring Klass) async {
+  let y = Klass()
+  await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
+  x = y // expected-note {{access here could race}}
 }

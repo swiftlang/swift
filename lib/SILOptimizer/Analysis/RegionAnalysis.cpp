@@ -1625,6 +1625,7 @@ public:
       if (auto value = tryToTrackValue(op.get())) {
         // If we are tracking it, transfer it and if it is actor derived, mark
         // our partial apply as actor derived.
+        builder.addRequire(value->getRepresentative().getValue());
         builder.addTransfer(value->getRepresentative().getValue(), &op);
       }
     }
@@ -1731,6 +1732,7 @@ public:
             fas.getArgumentParameterInfo(op).hasOption(
                 SILParameterInfo::Transferring)) {
           if (auto value = tryToTrackValue(op.get())) {
+            builder.addRequire(value->getRepresentative().getValue());
             builder.addTransfer(value->getRepresentative().getValue(), &op);
           }
         } else {
@@ -1747,6 +1749,7 @@ public:
       if (fas.getArgumentParameterInfo(selfOperand)
               .hasOption(SILParameterInfo::Transferring)) {
         if (auto value = tryToTrackValue(selfOperand.get())) {
+          builder.addRequire(value->getRepresentative().getValue());
           builder.addTransfer(value->getRepresentative().getValue(),
                               &selfOperand);
         }
@@ -1816,7 +1819,7 @@ public:
     assert((sourceApply || bool(applySite.getIsolationCrossing())) &&
            "only ApplyExpr's should cross isolation domains");
 
-    // require all operands
+    // Require all operands first before we emit transferring.
     for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative().getValue());
@@ -1938,6 +1941,7 @@ public:
     // Transfer src. This ensures that we cannot use src again locally in this
     // function... which makes sense since its value is now in the transferring
     // parameter.
+    builder.addRequire(srcRoot.getRepresentative().getValue());
     builder.addTransfer(srcRoot.getRepresentative().getValue(), srcOperand);
 
     // Then check if we are assigning into an aggregate projection. In such a
