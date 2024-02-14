@@ -3511,7 +3511,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       emitCXXConstructorCall(subIGF, ctor, ctorFnType, ctorAddress, Args);
   if (isa<llvm::InvokeInst>(call))
     IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
-  subIGF.Builder.CreateRetVoid();
+  if (ctorFnType->getReturnType()->isVoidTy())
+    subIGF.Builder.CreateRetVoid();
+  else
+    subIGF.Builder.CreateRet(call);
 
   return thunk;
 }

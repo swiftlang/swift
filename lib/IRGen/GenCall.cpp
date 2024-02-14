@@ -1375,8 +1375,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
             IGM.getSILModule(), FnType, TypeExpansionContext::minimal()));
   }();
 
-  // Convert the SIL result type to a Clang type.
-  auto clangResultTy = IGM.getClangType(SILResultTy);
+  // Convert the SIL result type to a Clang type. If this is for a c++
+  // constructor, use 'void' as the return type to arrange the function type.
+  auto clangResultTy = IGM.getClangType(
+      cxxCtorDecl
+          ? SILType::getPrimitiveObjectType(IGM.Context.TheEmptyTupleType)
+          : SILResultTy);
 
   // Now convert the parameters to Clang types.
   auto params = FnType->getParameters();
@@ -1445,14 +1449,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
 
-  if (cxxCtorDecl)
-    ForeignInfo.ClangInfo = &clang::CodeGen::arrangeCXXStructorDeclaration(
-        IGM.ClangCodeGen->CGM(), {cxxCtorDecl, clang::Ctor_Complete});
-  else
-    ForeignInfo.ClangInfo = &clang::CodeGen::arrangeFreeFunctionCall(
-        IGM.ClangCodeGen->CGM(), clangResultTy, paramTys, extInfo,
-        clang::CodeGen::RequiredArgs::All);
-  auto &FI = *ForeignInfo.ClangInfo;
+  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
+                                             clangResultTy, paramTys, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+  ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
          "Expected one ArgInfo for each parameter type!");
@@ -1596,7 +1596,12 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   for (auto i : indices(paramTys).slice(firstParamToLowerNormally))
     emitArg(i);
 
-  if (returnInfo.isIndirect() || returnInfo.isIgnore()) {
+  if (cxxCtorDecl) {
+    ResultIRType = cast<llvm::Function>(IGM.getAddrOfClangGlobalDecl(
+                                            {cxxCtorDecl, clang::Ctor_Complete},
+                                            (ForDefinition_t) false))
+                       ->getReturnType();
+  } else if (returnInfo.isIndirect() || returnInfo.isIgnore()) {
     ResultIRType = IGM.VoidTy;
   } else {
     ResultIRType = returnInfo.getCoerceToType();
@@ -3996,12 +4001,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     // swiftcall function pointers through SIL as C functions anyway.
     assert(FI.getExtParameterInfo(i).getABI() == clang::ParameterABI::Ordinary);
 
-    assert((!silConv.isSILIndirect(params[i - firstParam]) ||
-            AI.getKind() == clang::CodeGen::ABIArgInfo::Direct ||
-            AI.getKind() == clang::CodeGen::ABIArgInfo::Indirect) &&
-           "indirect SIL types passed indirectly should be classified as "
-           "either Direct or Indirect");
-
     // Add a padding argument if required.
     if (auto *padType = AI.getPaddingType())
       out.add(llvm::UndefValue::get(padType));
@@ -4053,15 +4052,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     case clang::CodeGen::ABIArgInfo::IndirectAliased:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      // If this is a SIL type passed indirectly, avoid emitting a redundant
-      // initializing copy.
-      if (silConv.isSILIndirect(params[i - firstParam])) {
-        assert(paramType.isAddress() && "SIL type is not an address?");
-        auto addr = in.claimNext();
-        out.add(addr);
-        break;
-      }
-
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
 
       auto temp = ti.allocateStack(IGF, paramType, "indirect-temporary");
