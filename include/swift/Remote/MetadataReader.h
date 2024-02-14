@@ -527,15 +527,26 @@ public:
         // Dig out the protocol from the protocol list.
         auto protocolList = readMangledName(resolved.getResolvedAddress(),
                                             MangledNameKind::Type, dem);
-        assert(protocolList->getFirstChild()
-                   ->getFirstChild()
-                   ->getFirstChild()
-                   ->getFirstChild()
-                   ->getKind() == Node::Kind::Protocol);
-        auto protocol = protocolList->getFirstChild()
-                            ->getFirstChild()
-                            ->getFirstChild()
-                            ->getFirstChild();
+        assert(protocolList && protocolList->getNumChildren());
+        if (!protocolList || !protocolList->getNumChildren())
+          return nullptr;
+        auto child = protocolList->getFirstChild();
+        assert(child && child->getNumChildren());
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        child = child->getFirstChild();
+        assert(child && child->getNumChildren());
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        assert(child && child->getNumChildren());
+        child = child->getFirstChild();
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        child = child->getFirstChild();
+        assert(child && child->getKind() == Node::Kind::Protocol);
+        if (!child || child->getKind() != Node::Kind::Protocol)
+          return nullptr;
+        auto protocol = child;
         auto protocolType = dem.createNode(Node::Kind::Type);
         protocolType->addChild(protocol, dem);
         return protocolType;
