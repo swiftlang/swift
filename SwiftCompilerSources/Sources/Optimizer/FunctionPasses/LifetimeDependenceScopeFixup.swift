@@ -37,18 +37,26 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     guard let markDep = instruction as? MarkDependenceInst else {
       continue
     }
-    if let lifetimeDep = LifetimeDependence(markDep, context) {
-      fixup(dependence: lifetimeDep, context)
+    guard let lifetimeDep = LifetimeDependence(markDep, context) else {
+      continue
     }
+    guard let beginAccess = extendAccessScopes(dependence: lifetimeDep,
+                                               context) else {
+      continue
+    }
+    extendDependenceBase(dependenceInstruction: markDep,
+                         beginAccess: beginAccess, context)
   }
 }
 
-private func fixup(dependence: LifetimeDependence,
-  _ context: FunctionPassContext) {
+// Extend all access scopes that enclose `dependence` and return the
+// outermost access.
+private func extendAccessScopes(dependence: LifetimeDependence,
+  _ context: FunctionPassContext) -> BeginAccessInst? {
   log("Scope fixup for lifetime dependent instructions: \(dependence)")
 
   guard case .access(let bai) = dependence.scope else {
-    return
+    return nil
   }
   var range = InstructionRange(begin: bai, context)
   var walker = LifetimeDependenceScopeFixupWalker(bai.parentFunction, context) {
@@ -89,6 +97,29 @@ private func fixup(dependence: LifetimeDependence,
     }
     beginAccess = enclosingBeginAccess
   }
+  return beginAccess
+}
+
+/// Rewrite the mark_dependence to depend on the outermost access
+/// scope now that the nested scopes have all been extended.
+private func extendDependenceBase(dependenceInstruction: MarkDependenceInst,
+                                  beginAccess: BeginAccessInst,
+                                  _ context: FunctionPassContext) {
+  guard case let .base(accessBase) = beginAccess.address.enclosingAccessScope
+  else {
+    fatalError("this must be the outer-most access scope")
+  }
+  // If the outermost access is in the caller, then depende on the
+  // address argument.
+  let baseAddress: Value
+  switch accessBase {
+  case let .argument(arg):
+    assert(arg.type.isAddress)
+    baseAddress = arg
+  default:
+    baseAddress = beginAccess
+  }
+  dependenceInstruction.baseOperand.set(to: baseAddress, context)
 }
 
 private struct LifetimeDependenceScopeFixupWalker : LifetimeDependenceDefUseWalker {

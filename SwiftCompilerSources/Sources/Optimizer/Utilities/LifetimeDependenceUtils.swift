@@ -233,6 +233,9 @@ extension LifetimeDependence {
 
   /// Construct LifetimeDependence from mark_dependence [unresolved]
   ///
+  /// For any LifetimeDependence constructed from a mark_dependence,
+  /// its `dependentValue` will be the result of the mark_dependence.
+  ///
   /// TODO: Add SIL verification that all mark_depedence [unresolved]
   /// have a valid LifetimeDependence.
   init?(_ markDep: MarkDependenceInst, _ context: some Context) {
@@ -485,8 +488,7 @@ extension LifetimeDependence {
   -> WalkResult {
     var useDefVisitor = UseDefVisitor(context, visitor)
     defer { useDefVisitor.deinitialize() }
-    let owner = value.ownership == .owned ? value : nil
-    return useDefVisitor.walkUp(value: value, owner)
+    return useDefVisitor.walkUp(valueOrAddress: value)
   }
   
   private struct UseDefVisitor : LifetimeDependenceUseDefWalker {
@@ -534,6 +536,18 @@ extension LifetimeDependence {
   }
 }
 
+/// Walk up the lifetime dependence
+///
+/// This uses LifetimeDependenceUseDefWalker to find the introducers
+/// of a dependence chain, which represent the value's "inherited"
+/// dependencies. This stops at an address, unless the address refers
+/// to a singly-initialized temprorary, in which case it continues to
+/// walk up the stored value.
+///
+/// This overrides LifetimeDependenceUseDefWalker to stop at a value
+/// that introduces an immutable variable: move_value [var_decl] or
+/// begin_borrow [var_decl], and to stop at an access of a mutable
+/// variable: begin_access.
 struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
   let context: Context
   // This visited set is only really needed for instructions with
@@ -576,16 +590,28 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
     }
     return walkUpDefault(dependent: value, owner: owner)
   }
+
+  mutating func walkUp(address: Value) -> WalkResult {
+    if let beginAccess = address.definingInstruction as? BeginAccessInst {
+      return introducer(beginAccess, nil)
+    }
+    return walkUpDefault(address: address)
+  }
 }
 
-/// Walk up dominating dependent values.
+/// Walk up the lifetime dependence chain.
 ///
-/// Find the roots of a dependence chain stopping at phis. These root
-/// LifeDependence instances are the value's "inherited"
-/// dependencies. In this example, the dependence root is copied,
-/// borrowed, and forwarded before being used as the base operand of
-/// `mark_dependence`. The dependence "root" is the parent of the
-/// outer-most dependence scope.
+/// This finds the introducers of a dependence chain. which represent
+/// the value's "inherited" dependencies. This stops at phis; all
+/// introducers dominate. This stops at addresses in general, but if
+/// the value is loaded from a singly-initialized location, then it
+/// continues walking up the value stored by the initializer. This
+/// bypasses the copies to temporary memory locations emitted by SILGen.
+///
+/// In this example, the dependence root is
+/// copied, borrowed, and forwarded before being used as the base
+/// operand of `mark_dependence`. The dependence "root" is the parent
+/// of the outer-most dependence scope.
 ///
 ///   %root = apply                  // lifetime dependence root
 ///   %copy = copy_value %root
@@ -593,7 +619,7 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///   %base = struct_extract %parent // lifetime dependence base value
 ///   %dependent = mark_dependence [nonescaping] %value on %base
 ///
-/// This extends the ForwardingDefUseWalker, which finds the
+/// This extends the ForwardingUseDefWalker, which finds the
 /// forward-extended lifetime introducers. Certain forward-extended
 /// lifetime introducers can inherit a lifetime dependency from their
 /// operand: namely copies, moves, and borrows. These introducers are
@@ -631,7 +657,7 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///   needWalk(for value: Value) -> Bool
 ///
 /// Start walking:
-///   walkUp(value: Value) -> WalkResult
+///   walkUp(valueOrAddress: Value) -> WalkResult
 protocol LifetimeDependenceUseDefWalker : ForwardingUseDefWalker where PathContext == Value? {
   var context: Context { get }
 
@@ -642,12 +668,26 @@ protocol LifetimeDependenceUseDefWalker : ForwardingUseDefWalker where PathConte
   mutating func needWalk(for value: Value, _ owner: Value?) -> Bool
 
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult
+
+  mutating func walkUp(address: Value) -> WalkResult
 }
 
 // Implement ForwardingUseDefWalker
 extension LifetimeDependenceUseDefWalker {
+  mutating func walkUp(valueOrAddress: Value) -> WalkResult {
+    if valueOrAddress.type.isAddress {
+      return walkUp(address: valueOrAddress)
+    }
+    let owner = valueOrAddress.ownership == .owned ? valueOrAddress : nil
+    return walkUp(value: valueOrAddress, owner)
+  }
+
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
     walkUpDefault(dependent: value, owner: owner)
+  }
+
+  mutating func walkUp(address: Value) -> WalkResult {
+    walkUpDefault(address: address)
   }
 
   // Extend ForwardingUseDefWalker to handle copies, moves, and
@@ -691,17 +731,12 @@ extension LifetimeDependenceUseDefWalker {
     return walkUpDefault(forwarded: value, owner)
   }
 
-  private mutating func walkUp(newLifetime: Value) -> WalkResult {
-    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
-    return walkUp(value: newLifetime, newOwner)
-  }
-
   // Walk up from a load of a singly-initialized address to find the
   // dependence root of the stored value. This ignores mutable
   // variables, which require an access scope. This ignores applies
   // because an lifetime dependence will already be expressed as a
   // mark_dependence.
-  private mutating func walkUp(address: Value) -> WalkResult {
+  mutating func walkUpDefault(address: Value) -> WalkResult {
     if let (_, initializingStore) =
          address.accessBase.findSingleInitializer(context) {
       switch initializingStore {
@@ -714,6 +749,11 @@ extension LifetimeDependenceUseDefWalker {
       }
     }
     return introducer(address, nil)
+  }
+
+  private mutating func walkUp(newLifetime: Value) -> WalkResult {
+    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
+    return walkUp(value: newLifetime, newOwner)
   }
 }
 
