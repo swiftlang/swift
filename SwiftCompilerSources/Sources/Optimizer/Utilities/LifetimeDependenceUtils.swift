@@ -233,6 +233,9 @@ extension LifetimeDependence {
 
   /// Construct LifetimeDependence from mark_dependence [unresolved]
   ///
+  /// For any LifetimeDependence constructed from a mark_dependence,
+  /// its `dependentValue` will be the result of the mark_dependence.
+  ///
   /// TODO: Add SIL verification that all mark_depedence [unresolved]
   /// have a valid LifetimeDependence.
   init?(_ markDep: MarkDependenceInst, _ context: some Context) {
