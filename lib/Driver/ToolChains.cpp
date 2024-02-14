@@ -299,6 +299,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_Rpass_missed_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
+  inputArgs.AddLastArg(arguments, options::OPT_package_bypass_resilience_optimization);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -551,7 +552,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_CrossModuleOptimization)) {
     Arguments.push_back("-cross-module-optimization");
   }
-                                 
+
   if (context.Args.hasArg(options::OPT_ExperimentalPerformanceAnnotations)) {
     Arguments.push_back("-experimental-performance-annotations");
   }

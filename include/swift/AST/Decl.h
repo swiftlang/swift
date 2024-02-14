@@ -2920,10 +2920,6 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
-  /// Returns whether this declaration should be treated as having the \c
-  /// package access level.
-  bool hasPackageAccess() const;
-
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
 
@@ -5845,13 +5841,6 @@ public:
                                    AccessKind accessKind,
                                    ModuleDecl *module,
                                    ResilienceExpansion expansion) const;
-
-  /// Should this declaration behave as if it must be accessed
-  /// resiliently, even when we're building a non-resilient module?
-  ///
-  /// This is used for diagnostics, because we do not want a behavior
-  /// change between builds with resilience enabled and disabled.
-  bool isFormallyResilient() const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?

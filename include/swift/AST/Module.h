@@ -480,6 +480,10 @@ public:
     return Identifier();
   }
 
+  bool inSamePackage(ModuleDecl *other) {
+    return !getPackageName().empty() && getPackageName() == other->getPackageName();
+  }
+
   /// Get the package associated with this module
   PackageUnit *getPackage() const { return Package; }
 

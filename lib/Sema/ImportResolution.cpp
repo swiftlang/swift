@@ -762,8 +762,7 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
 
   // If source file is .swift or non-interface, show diags when importing an interface file
   ASTContext &ctx = topLevelModule->getASTContext();
-  if (!topLevelModule->getPackageName().empty() &&
-      topLevelModule->getPackageName().str() == ctx.LangOpts.PackageName &&
+  if (topLevelModule->inSamePackage(ctx.MainModule) &&
       topLevelModule->isBuiltFromInterface() &&
       !topLevelModule->getModuleSourceFilename().endswith(".package.swiftinterface")) {
       ctx.Diags.diagnose(import.module.getModulePath().front().Loc,

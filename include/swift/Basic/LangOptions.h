@@ -186,6 +186,9 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
+    /// Enable optimization to bypass resilience checks in a package
+    bool EnableBypassResilienceInPackage = false;
+
     /// Optimization mode for unavailable declarations.
     llvm::Optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 

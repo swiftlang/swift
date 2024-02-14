@@ -530,6 +530,13 @@ public:
   LLVM_READONLY
   PackageUnit *getPackageContext(bool lookupIfNotCurrent = false) const;
 
+  /// True if resilience checks can be bypassed within a package.
+  /// \p isForPackageDecl Bypassing only applies to package types
+  /// (possibly also public types later) if opted-in, client and defining module
+  /// are in the same package, and the defining module is a binary module.
+  LLVM_READONLY
+  bool bypassResilienceInPackage(bool isForPackageDecl) const;
+
   /// Returns the module context that contains this context.
   LLVM_READONLY
   ModuleDecl *getParentModule() const;

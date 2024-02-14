@@ -2952,31 +2952,30 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::isFormallyResilient() const {
+bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
   // If we're an instance property of a nominal type, query the type.
-  auto *dc = getDeclContext();
   if (!isStatic())
-    if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
+    if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
 
   // Non-public global and static variables always have a
   // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
+  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
+                                          /*treatUsableFromInlineAsPublic=*/true);
+  if (!accessScope.isPublicOrPackage())
     return false;
 
-  return true;
-}
-
-bool AbstractStorageDecl::isResilient() const {
-  if (!isFormallyResilient())
+  if (!getModuleContext()->isResilient())
     return false;
 
-  return getModuleContext()->isResilient();
+  // Allows bypassing resilience checks for package decls
+  // at use site within a package if opted in, whether the
+  // loaded module was built resiliently or not.
+  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
 }
 
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
@@ -4207,13 +4206,6 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
-bool ValueDecl::hasPackageAccess() const {
-  AccessLevel access =
-      getAdjustedFormalAccess(this, /*useDC*/ nullptr,
-                              /*treatUsableFromInlineAsPublic*/ false);
-  return access == AccessLevel::Package;
-}
-
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
 /// \@_spi imports, and enclosing access levels into account.
@@ -5054,8 +5046,14 @@ bool NominalTypeDecl::isFormallyResilient() const {
 bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-
-  return getModuleContext()->isResilient();
+  if (!getModuleContext()->isResilient())
+    return false;
+  // Allows bypassing resilience checks for package decls
+  // at use site within a package if opted in, whether the
+  // loaded module was built resiliently or not.
+  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
+                                          /*treatUsableFromInlineAsPublic=*/true);
+  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
@@ -6375,7 +6373,11 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Non-public, non-versioned enums are always exhaustive.
   AccessScope accessScope = getFormalAccessScope(/*useDC*/nullptr,
                                                  /*respectVersioned*/true);
-  if (!accessScope.isPublic())
+  // Both public and package enums should behave the same unless
+  // package enum is optimized with bypassing resilience checks.
+  if (!accessScope.isPublicOrPackage())
+    return true;
+  if (useDC && useDC->bypassResilienceInPackage(accessScope.isPackage()))
     return true;
 
   // All other checks are use-site specific; with no further information, the
