@@ -333,7 +333,7 @@ getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
   if (ctx.LangOpts.UnavailableDeclOptimizationMode.has_value())
     return *ctx.LangOpts.UnavailableDeclOptimizationMode;
 
-  return UnavailableDeclOptimization::Stub;
+  return UnavailableDeclOptimization::None;
 }
 
 bool Decl::isAvailableDuringLowering() const {
