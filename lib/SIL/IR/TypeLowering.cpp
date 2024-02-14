@@ -3187,10 +3187,19 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (!lowering.isTrivial() && conformance) {
     // A non-trivial type can have a conformance in one case:
     // (1) contains a conforming archetype
+    // (2) is resilient with minimal expansion
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // A resilient type that's with minimal expansion may be non-trivial
+          // but still conform (case (2)).
+          auto *nominal = ty.getAnyNominal();
+          if (nominal && nominal->isResilient() &&
+              forExpansion.getResilienceExpansion() ==
+                  ResilienceExpansion::Minimal) {
+            return true;
+          }
           // Walk into every aggregate.
           return false;
         },
@@ -3201,7 +3210,16 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 
-          // An archetype may conform but be non-trivial (case (2)).
+          // A resilient type that's with minimal expansion may be non-trivial
+          // but still conform (case (2)).
+          auto *nominal = ty.getAnyNominal();
+          if (nominal && nominal->isResilient() &&
+              forExpansion.getResilienceExpansion() ==
+                  ResilienceExpansion::Minimal) {
+            return false;
+          }
+
+          // An archetype may conform but be non-trivial (case (1)).
           if (origTy.isTypeParameter())
             return false;
 
