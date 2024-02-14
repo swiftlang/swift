@@ -667,10 +667,7 @@ extension _GraphemeBreakingState {
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
-
-    let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    let y = Unicode._GraphemeBreakProperty(from: scalar2)
-
+    
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
     // happen to see a rhs .extend or .zwj, then it's a signal that we should
@@ -684,114 +681,130 @@ extension _GraphemeBreakingState {
       self.isInEmojiSequence = enterEmojiSequence
       self.isInIndicSequence = enterIndicSequence
     }
+    
+    var x = Unicode._GraphemeBreakProperty(fastApproximationFrom: scalar1)
+    var y = Unicode._GraphemeBreakProperty(fastApproximationFrom: scalar2)
 
-    switch (x, y) {
+    while true {
+      switch (x, y) {
 
-    // Fast path: If we know our scalars have no properties the decision is
-    //            trivial and we don't need to crawl to the default statement.
-    case (.any, .any):
-      return true
+      // Fast path: If we know our scalars have no properties the decision is
+      //            trivial and we don't need to crawl to the default statement.
+      case (.any, .any):
+        return true
 
-    // GB4
-    case (.control, _):
-      return true
+      // GB4
+      case (.control, _):
+        return true
 
-    // GB5
-    case (_, .control):
-      return true
+      // GB5
+      case (_, .control):
+        return true
 
-    // GB6
-    case (.l, .l),
-         (.l, .v),
-         (.l, .lv),
-         (.l, .lvt):
-      return false
+      // GB6
+      case (.l, .l),
+           (.l, .v),
+           (.l, .lv),
+           (.l, .lvt):
+        return false
 
-    // GB7
-    case (.lv, .v),
-         (.v, .v),
-         (.lv, .t),
-         (.v, .t):
-      return false
+      // GB7
+      case (.lv, .v),
+           (.v, .v),
+           (.lv, .t),
+           (.v, .t):
+        return false
 
-    // GB8
-    case (.lvt, .t),
-         (.t, .t):
-      return false
+      // GB8
+      case (.lvt, .t),
+           (.t, .t):
+        return false
 
-    // GB9 (partial GB11)
-    case (_, .extend),
-         (_, .zwj):
+      // GB9 (partial GB11)
+      case (_, .extend),
+           (_, .zwj):
+        if x == nil {
+          //we need to know the actual value of the lhs for this case
+          x = Unicode._GraphemeBreakProperty(fullLookupFrom: scalar1)
+          continue
+        }
+        
+        // Prepare for recognizing GB11, by remembering if we're in an emoji
+        // sequence.
+        //
+        //   GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
+        //
+        // If our left-side scalar is a pictograph, then it starts a new emoji
+        // sequence; the sequence continues through subsequent extend/extend and
+        // extend/zwj pairs.
+        if (
+          x == .extendedPictographic || (self.isInEmojiSequence && x == .extend)
+        ) {
+          enterEmojiSequence = true
+        }
 
-      // Prepare for recognizing GB11, by remembering if we're in an emoji
-      // sequence.
-      //
-      //   GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
-      //
-      // If our left-side scalar is a pictograph, then it starts a new emoji
-      // sequence; the sequence continues through subsequent extend/extend and
-      // extend/zwj pairs.
-      if (
-        x == .extendedPictographic || (self.isInEmojiSequence && x == .extend)
-      ) {
-        enterEmojiSequence = true
-      }
+        // If we're currently in an indic sequence (or if our lhs is a linking
+        // consonant), then this check and everything underneath ensures that
+        // we continue being in one and may check if this extend is a Virama.
+        if self.isInIndicSequence || scalar1._isLinkingConsonant {
+          if y == .extend {
+            let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
 
-      // If we're currently in an indic sequence (or if our lhs is a linking
-      // consonant), then this check and everything underneath ensures that
-      // we continue being in one and may check if this extend is a Virama.
-      if self.isInIndicSequence || scalar1._isLinkingConsonant {
-        if y == .extend {
-          let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
+            // If our extend's CCC is 0, then this rule does not apply.
+            guard extendNormData.ccc != 0 else {
+              return false
+            }
+          }
 
-          // If our extend's CCC is 0, then this rule does not apply.
-          guard extendNormData.ccc != 0 else {
-            return false
+          enterIndicSequence = true
+
+          if scalar2._isVirama {
+            self.hasSeenVirama = true
           }
         }
 
-        enterIndicSequence = true
-
-        if scalar2._isVirama {
-          self.hasSeenVirama = true
-        }
-      }
-
-      return false
-
-    // GB9a
-    case (_, .spacingMark):
-      return false
-
-    // GB9b
-    case (.prepend, _):
-      return false
-
-    // GB11
-    case (.zwj, .extendedPictographic):
-      return !self.isInEmojiSequence
-
-    // GB12 & GB13
-    case (.regionalIndicator, .regionalIndicator):
-      defer {
-        self.shouldBreakRI.toggle()
-      }
-
-      return self.shouldBreakRI
-
-    // GB999
-    default:
-      // GB9c
-      if
-        self.isInIndicSequence,
-        self.hasSeenVirama,
-        scalar2._isLinkingConsonant
-      {
-        self.hasSeenVirama = false
         return false
-      }
 
-      return true
+      // GB9a
+      case (_, .spacingMark):
+        return false
+
+      // GB9b
+      case (.prepend, _):
+        return false
+
+      // GB11
+      case (.zwj, .extendedPictographic):
+        return !self.isInEmojiSequence
+
+      // GB12 & GB13
+      case (.regionalIndicator, .regionalIndicator):
+        defer {
+          self.shouldBreakRI.toggle()
+        }
+
+        return self.shouldBreakRI
+
+      // GB999
+      default:
+        if x == nil || y == nil {
+          x = x ?? Unicode._GraphemeBreakProperty(fullLookupFrom: scalar1)
+          y = y ?? Unicode._GraphemeBreakProperty(fullLookupFrom: scalar2)
+          //try again with full information
+          continue
+        }
+        // GB9c
+        if
+          self.isInIndicSequence,
+          self.hasSeenVirama,
+          scalar2._isLinkingConsonant
+        {
+          self.hasSeenVirama = false
+          return false
+        }
+
+        return true
+      }
     }
   }
 }

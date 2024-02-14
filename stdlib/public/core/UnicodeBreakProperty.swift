@@ -27,8 +27,9 @@ extension Unicode {
     case t
     case v
     case zwj
-
-    init(from scalar: Unicode.Scalar) {
+    
+    @inline(__always)
+    init?(fastApproximationFrom scalar: Unicode.Scalar) {
       switch scalar.value {
       // Some fast paths for ascii characters...
       case 0x0 ... 0x1F:
@@ -60,26 +61,35 @@ extension Unicode {
       case 0xE01F0 ... 0xE0FFF:
         self = .control
       default:
-        // Otherwise, default to binary searching the data array.
-        let rawEnumValue = _swift_stdlib_getGraphemeBreakProperty(scalar.value)
-
-        switch rawEnumValue {
-        case 0:
-          self = .control
-        case 1:
-          self = .extend
-        case 2:
-          self = .prepend
-        case 3:
-          self = .spacingMark
-
-        // Extended pictographic uses 2 values for its representation.
-        case 4, 5:
-          self = .extendedPictographic
-        default:
-          self = .any
-        }
+        return nil
       }
+    }
+    
+    init(fullLookupFrom scalar: Unicode.Scalar) {
+      // Otherwise, default to binary searching the data array.
+      let rawEnumValue = _swift_stdlib_getGraphemeBreakProperty(scalar.value)
+
+      switch rawEnumValue {
+      case 0:
+        self = .control
+      case 1:
+        self = .extend
+      case 2:
+        self = .prepend
+      case 3:
+        self = .spacingMark
+
+      // Extended pictographic uses 2 values for its representation.
+      case 4, 5:
+        self = .extendedPictographic
+      default:
+        self = .any
+      }
+    }
+
+    init(from scalar: Unicode.Scalar) {
+      self = _GraphemeBreakProperty(fastApproximationFrom: scalar) ??
+             _GraphemeBreakProperty(fullLookupFrom: scalar)
     }
   }
 }
