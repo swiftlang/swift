@@ -34,7 +34,6 @@ struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
-/*
 // rdar://121983770
 func testBasic() {
   let capacity = 4
@@ -46,7 +45,6 @@ func testBasic() {
     use(newView)    
   }
 }
-*/
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView {
 func derive(_ x: borrowing BufferView) -> BufferView {

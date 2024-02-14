@@ -290,6 +290,9 @@ SWIFT_FUNCTION_PASS(LifetimeDependenceDiagnostics,
 SWIFT_FUNCTION_PASS(LifetimeDependenceInsertion,
      "lifetime-dependence-insertion",
      "Insert Lifetime Dependence Markers")
+SWIFT_FUNCTION_PASS(LifetimeDependenceScopeFixup,
+     "lifetime-dependence-scope-fixup",
+     "Fixup scope for lifetime dependence")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
