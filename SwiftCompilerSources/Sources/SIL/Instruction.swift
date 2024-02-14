@@ -239,7 +239,6 @@ public class MultipleValueInstruction : Instruction {
 
 /// Instructions, which have a single operand.
 public protocol UnaryInstruction : Instruction {
-  var operands: OperandArray { get }
   var operand: Operand { get }
 }
 
