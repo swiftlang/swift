@@ -380,51 +380,42 @@ extension UInt64 {
   }
 }
 
+extension FixedWidthInteger {
+  /// Construct with value `v.value`.
+  @inlinable @_alwaysEmitIntoClient
+  public init(unicode v: Unicode.Scalar) {
+    _precondition(v.value <= Self.max,
+        "Code point value does not fit into type")
+    self = Self(v.value)
+  }
+}
+
 /// Allows direct comparisons between UInt8 and double quoted literals.
 extension UInt8 {
-  /// Basic comparison operators
+  /// Basic equality operator
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
     return i == UInt8(ascii: s)
   }
+  /// Basic inequality operator
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
     return i != UInt8(ascii: s)
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func <= (i: Self, s: Unicode.Scalar) -> Bool {
-    return i <= UInt8(ascii: s)
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func >= (i: Self, s: Unicode.Scalar) -> Bool {
-    return i >= UInt8(ascii: s)
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func < (i: Self, s: Unicode.Scalar) -> Bool {
-    return i < UInt8(ascii: s)
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func > (i: Self, s: Unicode.Scalar) -> Bool {
-    return i > UInt8(ascii: s)
   }
   /// Used in switch statements
   @_transparent @_alwaysEmitIntoClient
   public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
     return i == UInt8(ascii: s)
   }
-  /// Useful now and then
-  @_transparent @_alwaysEmitIntoClient
-  public static func - (i: Self, s: Unicode.Scalar) -> Self {
-    return i - UInt8(ascii: s)
-  }
 }
 
 extension UInt8? {
-  /// Basic equality operators
+  /// Optional equality operator
   @_transparent @_alwaysEmitIntoClient
   public static func == (i: Self, s: Unicode.Scalar) -> Bool {
     return i == UInt8(ascii: s)
   }
+  /// Optional inequality operator
   @_transparent @_alwaysEmitIntoClient
   public static func != (i: Self, s: Unicode.Scalar) -> Bool {
     return i != UInt8(ascii: s)
