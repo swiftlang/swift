@@ -381,6 +381,13 @@ static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   return nullptr;
 }
 
+static bool isFiniteFloatLiteral(SILValue v) {
+  if (auto *lit = dyn_cast<FloatLiteralInst>(v)) {
+    return lit->getValue().isFinite();
+  }
+  return false;
+}
+
 static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   static auto hasIEEEFloatNanBitRepr = [](const APInt val) -> bool {
     auto bitWidth = val.getBitWidth();
@@ -640,17 +647,11 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg)))))) {
     APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val)) {
-      // One of the operands is infinity, but unless the other operand is not
-      // fully visible we cannot definitively say what it is. It can be anything, 
-      // including NaN and infinity itself. Therefore, we cannot fold the comparison
-      // just yet.
-      if (isa<StructExtractInst>(Other) || isa<TupleExtractInst>(Other)) {
-        return nullptr;
-      } else {  
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-      }
+    if (hasIEEEFloatPosInfBitRepr(val) &&
+        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
+        isFiniteFloatLiteral(Other)) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
     }
   }
 
@@ -682,17 +683,11 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val)) {
-      // One of the operands is infinity, but unless the other operand is not
-      // fully visible we cannot definitively say what it is. It can be anything, 
-      // including NaN and infinity itself. Therefore, we cannot fold the comparison
-      // just yet.
-      if (isa<StructExtractInst>(Other) || isa<TupleExtractInst>(Other)) {
-        return nullptr;
-      } else {  
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-      }
+    if (hasIEEEFloatPosInfBitRepr(val) &&
+        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
+        isFiniteFloatLiteral(Other)) {
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
     }
   }
 
