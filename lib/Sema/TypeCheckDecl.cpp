@@ -964,6 +964,20 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
     return false;
   };
 
+  auto resolveRequirement = [&](GenericContext *GC,
+                                unsigned reqIdx) -> std::optional<Requirement> {
+    auto req = evaluator(
+        RequirementRequest{GC, reqIdx, TypeResolutionStage::Structural}, [&]() {
+          return Requirement(RequirementKind::SameType, ErrorType::get(ctx),
+                             ErrorType::get(ctx));
+        });
+
+    if (req.hasError())
+      return std::nullopt;
+
+    return req;
+  };
+
   // Function to check an inheritance clause for the ~IP marking.
   auto searchInheritanceClause =
       [&](InheritedTypes inherited) -> InverseMarking {
@@ -1023,18 +1037,14 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
       if (!constraintRepr || constraintRepr->isInvalid())
         continue;
 
-      auto req = evaluator(
-          RequirementRequest{genCtx, i, TypeResolutionStage::Structural},
-          [&]() {
-            return Requirement(RequirementKind::SameType,
-                               ErrorType::get(ctx),
-                               ErrorType::get(ctx));
-          });
-
-      if (req.hasError() || req.getKind() != RequirementKind::Conformance)
+      auto req = resolveRequirement(genCtx, i);
+      if (!req)
         continue;
 
-      auto subject = req.getFirstType();
+      if (req->getKind() != RequirementKind::Conformance)
+        continue;
+
+      auto subject = req->getFirstType();
       if (!subject->isTypeParameter())
         continue;
 
@@ -1043,7 +1053,7 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
       if (!param || !params.contains(param))
         continue;
 
-      if (isInverseTarget(req.getSecondType())) {
+      if (isInverseTarget(req->getSecondType())) {
         result.set(Kind::Inferred, constraintRepr->getLoc());
         break;
       }
@@ -1053,32 +1063,35 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   };
 
   // Checks a where clause for constraints of the form:
-  //   - selfTy : TARGET
-  //   - selfTy : ~TARGET
+  //   - Self : TARGET
+  //   - Self : ~TARGET
   // and records them in the `InverseMarking` result.
-  auto genWhereClauseVisitor = [&](CanType selfTy, InverseMarking &result) {
-    return [&, selfTy](Requirement req,
-                       RequirementRepr *repr) -> bool/*=stop search*/ {
-      if (req.getKind() != RequirementKind::Conformance)
-        return false;
+  auto whereClauseVisitor = [&](GenericContext *GC, unsigned reqIdx,
+                                RequirementRepr &reqRepr,
+                                InverseMarking &result) {
+    if (reqRepr.isInvalid() ||
+        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
+      return;
 
-      if (req.getFirstType()->getCanonicalType() != selfTy)
-        return false;
+    auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
+    auto *constraintRepr = reqRepr.getConstraintRepr();
 
-      // Check constraint type
-      auto loc = repr->getConstraintRepr()->getLoc();
-      auto constraint = req.getSecondType();
+    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
+      return;
 
-      if (isTarget(constraint))
-        result.positive.setIfUnset(Kind::Explicit, loc);
+    auto req = resolveRequirement(GC, reqIdx);
 
-      if (isInverseTarget(constraint))
-        result.inverse.setIfUnset(Kind::Explicit, loc);
+    if (!req || req->getKind() != RequirementKind::Conformance)
+      return;
 
-      return false;
-    };
+    auto constraint = req->getSecondType();
+
+    if (isTarget(constraint))
+      result.positive.setIfUnset(Kind::Explicit, constraintRepr->getLoc());
+
+    if (isInverseTarget(constraint))
+      result.inverse.setIfUnset(Kind::Explicit, constraintRepr->getLoc());
   };
-
 
   /// MARK: procedure for determining if a nominal is marked with ~TARGET.
 
@@ -1105,22 +1118,11 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   // Check the where clause for markings that refer to this decl, if this
   // TypeDecl has a where-clause at all.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
-    WhereClauseOwner(proto)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
-
-  } else if (auto assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
-    auto selfTy = assocTy->getInterfaceType()->getCanonicalType();
-    WhereClauseOwner(assocTy)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
-
-  } else if (auto genericTyDecl = dyn_cast<GenericTypeDecl>(decl)) {
-    auto selfTy = genericTyDecl->getInterfaceType()->getCanonicalType();
-    WhereClauseOwner(genericTyDecl)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
+    if (auto whereClause = proto->getTrailingWhereClause()) {
+      auto requirements = whereClause->getRequirements();
+      for (unsigned i : indices(requirements))
+        whereClauseVisitor(proto, i, requirements[i], result);
+    }
   }
 
   return result;
