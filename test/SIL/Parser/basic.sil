@@ -1807,3 +1807,14 @@ sil_vtable Foo2 {
   #Foo.subscript!getter: @Foo_subscript_getter [inherited] [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter [override]
 }
+
+class GenKlass<T> {}
+
+// CHECK-LABEL: sil_vtable GenKlass {
+sil_vtable GenKlass {
+}
+
+// CHECK-LABEL: sil_vtable $GenKlass<Int> {
+sil_vtable $GenKlass<Int> {
+}
+
