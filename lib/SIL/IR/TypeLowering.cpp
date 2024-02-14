@@ -54,6 +54,10 @@ llvm::cl::opt<bool> TypeLoweringForceOpaqueValueLowering(
     llvm::cl::desc("Force TypeLowering to behave as if building with opaque "
                    "values enabled"));
 
+llvm::cl::opt<bool> TypeLoweringDisableVerification(
+    "type-lowering-disable-verification", llvm::cl::init(false),
+    llvm::cl::desc("Disable the asserts-only verification of lowerings"));
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// is a singleton type, i.e. whether there can only ever be one
@@ -2945,6 +2949,9 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
+  if (TypeLoweringDisableVerification) {
+    return;
+  }
   verifyLexicalLowering(lowering, origType, substType, forExpansion);
   verifyTrivialLowering(lowering, origType, substType, forExpansion);
 }
