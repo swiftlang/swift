@@ -565,7 +565,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   // If there are no added requirements, we can form the signature directly
   // with the added parameters.
-  if (addedRequirements.empty()) {
+  if (addedRequirements.empty() && !allowInverses) {
     auto result = GenericSignature::get(genericParams,
                                         baseSignature.getRequirements());
     return GenericSignatureWithError(result, GenericSignatureErrors());
