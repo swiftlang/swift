@@ -243,6 +243,71 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
     }
   }
 
+  /// Accesses the pointee at the specified offset from this pointer.
+  ///
+  ///
+  /// For a pointer `p`, the memory at `p + i` must be initialized.
+  ///
+  /// - Parameter i: The offset from this pointer at which to access an
+  ///   instance, measured in strides of the pointer's `Pointee` type.
+  @inlinable
+  public subscript(i: Int) -> Pointee {
+    @_transparent
+    unsafeAddress {
+      return self + i
+    }
+  }
+
+  @inlinable // unsafe-performance
+  internal static var _max: UnsafePointer {
+    return UnsafePointer(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafePointer where Pointee: Copyable {
+  @inlinable
+  public var pointee: Pointee {
+    @_silgen_name("$sSP7pointeexvg")
+    @_transparent
+    get {
+      self[0]
+    }
+  }
+
+  @inlinable
+  public subscript(i: Int) -> Pointee {
+    @_silgen_name("$sSPyxSicig")
+    @_transparent
+    get {
+      Builtin.load((self + i)._rawValue)
+    }
+  }
+
+  /// Obtain a pointer to the stored property referred to by a key path.
+  ///
+  /// If the key path represents a computed property,
+  /// this function will return `nil`.
+  ///
+  /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
+  /// - Returns: A pointer to the stored property represented
+  ///            by the key path, or `nil`.
+  @inlinable
+  @_alwaysEmitIntoClient
+  @_unavailableInEmbedded
+  public func pointer<Property>(
+    to property: KeyPath<Pointee, Property>
+  ) -> UnsafePointer<Property>? {
+    guard let o = property._storedInlineOffset else { return nil }
+    _internalInvariant(o >= 0)
+    _debugPrecondition(
+      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      "Overflow in pointer arithmetic"
+    )
+    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
+  }
+
   /// Executes the given closure while temporarily binding memory to
   /// the specified number of instances of type `T`.
   ///
@@ -343,71 +408,6 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try body(.init(_rawValue))
-  }
-
-  /// Accesses the pointee at the specified offset from this pointer.
-  ///
-  ///
-  /// For a pointer `p`, the memory at `p + i` must be initialized.
-  ///
-  /// - Parameter i: The offset from this pointer at which to access an
-  ///   instance, measured in strides of the pointer's `Pointee` type.
-  @inlinable
-  public subscript(i: Int) -> Pointee {
-    @_transparent
-    unsafeAddress {
-      return self + i
-    }
-  }
-
-  @inlinable // unsafe-performance
-  internal static var _max: UnsafePointer {
-    return UnsafePointer(
-      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
-    )._unsafelyUnwrappedUnchecked
-  }
-}
-
-extension UnsafePointer where Pointee: Copyable {
-  @inlinable
-  public var pointee: Pointee {
-    @_silgen_name("$sSP7pointeexvg")
-    @_transparent
-    get {
-      self[0]
-    }
-  }
-
-  @inlinable
-  public subscript(i: Int) -> Pointee {
-    @_silgen_name("$sSPyxSicig")
-    @_transparent
-    get {
-      Builtin.load((self + i)._rawValue)
-    }
-  }
-
-  /// Obtain a pointer to the stored property referred to by a key path.
-  ///
-  /// If the key path represents a computed property,
-  /// this function will return `nil`.
-  ///
-  /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
-  /// - Returns: A pointer to the stored property represented
-  ///            by the key path, or `nil`.
-  @inlinable
-  @_alwaysEmitIntoClient
-  @_unavailableInEmbedded
-  public func pointer<Property>(
-    to property: KeyPath<Pointee, Property>
-  ) -> UnsafePointer<Property>? {
-    guard let o = property._storedInlineOffset else { return nil }
-    _internalInvariant(o >= 0)
-    _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
-      "Overflow in pointer arithmetic"
-    )
-    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 }
 
@@ -882,89 +882,6 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
     return UnsafeMutableRawPointer(self)
   }
 
-  /// Executes the given closure while temporarily binding memory to
-  /// the specified number of instances of the given type.
-  ///
-  /// Use this method when you have a pointer to memory bound to one type and
-  /// you need to access that memory as instances of another type. Accessing
-  /// memory as a type `T` requires that the memory be bound to that type. A
-  /// memory location may only be bound to one type at a time, so accessing
-  /// the same memory as an unrelated type without first rebinding the memory
-  /// is undefined.
-  ///
-  /// The region of memory that starts at this pointer and covers `count`
-  /// strides of `T` instances must be bound to `Pointee`.
-  /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. Every instance of `Pointee` overlapping with a given
-  /// instance of `T` should have the same initialization state (i.e.
-  /// initialized or uninitialized.) Accessing a `T` whose underlying
-  /// `Pointee` storage is in a mixed initialization state shall be
-  /// undefined behaviour.
-  ///
-  /// The following example temporarily rebinds the memory of a `UInt64`
-  /// pointer to `Int64`, then modifies the signed integer.
-  ///
-  ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
-  ///     uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) {
-  ///         $0.pointee.negate()
-  ///     }
-  ///
-  /// Because this pointer's memory is no longer bound to its `Pointee` type
-  /// while the `body` closure executes, do not access memory using the
-  /// original pointer from within `body`. Instead, use the `body` closure's
-  /// pointer argument to access the values in memory as instances of type
-  /// `T`.
-  ///
-  /// After executing `body`, this method rebinds memory back to the original
-  /// `Pointee` type.
-  ///
-  /// - Note: Only use this method to rebind the pointer's memory to a type
-  ///   that is layout compatible with the `Pointee` type. The stride of the
-  ///   temporary type (`T`) may be an integer multiple or a whole fraction
-  ///   of `Pointee`'s stride, for example to point to one element of
-  ///   an aggregate.
-  ///   To bind a region of memory to a type that does not match these
-  ///   requirements, convert the pointer to a raw pointer and use the
-  ///   `bindMemory(to:)` method.
-  ///   If `T` and `Pointee` have different alignments, this pointer
-  ///   must be aligned with the larger of the two alignments.
-  ///
-  /// - Parameters:
-  ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. The type `T` must be layout compatible
-  ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `T` in the re-bound region.
-  ///   - body: A closure that takes a mutable typed pointer to the
-  ///     same memory as this pointer, only bound to type `T`. The closure's
-  ///     pointer argument is valid only for the duration of the closure's
-  ///     execution. If `body` has a return value, that value is also used as
-  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - pointer: The pointer temporarily bound to `T`.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  @_alwaysEmitIntoClient
-  // This custom silgen name is chosen to not interfere with the old ABI
-  @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
-  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
-    to type: T.Type,
-    capacity count: Int,
-    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
-  ) rethrows -> Result {
-    _debugPrecondition(
-      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
-      ( count == 1 ||
-        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
-          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
-          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
-        )
-      ),
-      "self must be a properly aligned pointer for types Pointee and T"
-    )
-    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
-  }
-
   /// Reads or updates the pointee at the specified offset from this pointer.
   ///
   /// For a pointer `p`, the memory at `p + i` must be initialized when reading
@@ -1223,6 +1140,89 @@ extension UnsafeMutablePointer where Pointee: Copyable {
   @_silgen_name("$sSp10initialize2toyx_tF")
   internal func initialize(to newValue: Pointee) {
     Builtin.initialize(newValue, self._rawValue)
+  }
+
+  /// Executes the given closure while temporarily binding memory to
+  /// the specified number of instances of the given type.
+  ///
+  /// Use this method when you have a pointer to memory bound to one type and
+  /// you need to access that memory as instances of another type. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// The region of memory that starts at this pointer and covers `count`
+  /// strides of `T` instances must be bound to `Pointee`.
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
+  ///
+  /// The following example temporarily rebinds the memory of a `UInt64`
+  /// pointer to `Int64`, then modifies the signed integer.
+  ///
+  ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
+  ///     uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) {
+  ///         $0.pointee.negate()
+  ///     }
+  ///
+  /// Because this pointer's memory is no longer bound to its `Pointee` type
+  /// while the `body` closure executes, do not access memory using the
+  /// original pointer from within `body`. Instead, use the `body` closure's
+  /// pointer argument to access the values in memory as instances of type
+  /// `T`.
+  ///
+  /// After executing `body`, this method rebinds memory back to the original
+  /// `Pointee` type.
+  ///
+  /// - Note: Only use this method to rebind the pointer's memory to a type
+  ///   that is layout compatible with the `Pointee` type. The stride of the
+  ///   temporary type (`T`) may be an integer multiple or a whole fraction
+  ///   of `Pointee`'s stride, for example to point to one element of
+  ///   an aggregate.
+  ///   To bind a region of memory to a type that does not match these
+  ///   requirements, convert the pointer to a raw pointer and use the
+  ///   `bindMemory(to:)` method.
+  ///   If `T` and `Pointee` have different alignments, this pointer
+  ///   must be aligned with the larger of the two alignments.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. The type `T` must be layout compatible
+  ///     with the pointer's `Pointee` type.
+  ///   - count: The number of instances of `T` in the re-bound region.
+  ///   - body: A closure that takes a mutable typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+  @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
+  public func withMemoryRebound<T: ~Copyable, Result: ~Copyable>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    _debugPrecondition(
+      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
+      ( count == 1 ||
+        ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+          ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+          : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+        )
+      ),
+      "self must be a properly aligned pointer for types Pointee and T"
+    )
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
   }
 }
 
