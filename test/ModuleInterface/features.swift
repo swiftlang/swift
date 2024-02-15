@@ -21,7 +21,7 @@ public func specializeWithAvailability<T>(_ t: T) {
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: public actor MyActor
+// CHECK:      public actor MyActor
 // CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
 // CHECK-NEXT:     get
 // CHECK-NEXT:   }
@@ -30,32 +30,32 @@ public actor MyActor {
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: extension FeatureTest.MyActor
+// CHECK:     extension FeatureTest.MyActor
 public extension MyActor {
   // CHECK-NOT: $Actors
-  // CHECK: testFunc
+  // CHECK:     testFunc
   func testFunc() async { }
   // CHECK: }
 }
 
 // CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
-// CHECK: globalAsync
+// CHECK:     globalAsync
 public func globalAsync() async { }
 
-// CHECK: @_marker public protocol MP {
+// CHECK:      @_marker public protocol MP {
 // CHECK-NEXT: }
 @_marker public protocol MP { }
 
-// CHECK: @_marker public protocol MP2 : FeatureTest.MP {
+// CHECK:      @_marker public protocol MP2 : FeatureTest.MP {
 // CHECK-NEXT: }
 @_marker public protocol MP2: MP { }
 
 // CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: public protocol MP3 : AnyObject, FeatureTest.MP {
+// CHECK:      public protocol MP3 : AnyObject, FeatureTest.MP {
 // CHECK-NEXT: }
 public protocol MP3: AnyObject, MP { }
 
-// CHECK: extension FeatureTest.MP2 {
+// CHECK:      extension FeatureTest.MP2 {
 // CHECK-NEXT: func inMP2
 extension MP2 {
   public func inMP2() { }
@@ -64,18 +64,18 @@ extension MP2 {
 // CHECK: class OldSchool : FeatureTest.MP {
 public class OldSchool: MP {
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
-  // CHECK: takeClass()
+  // CHECK:     takeClass()
   public func takeClass() async { }
 }
 
 // CHECK: class OldSchool2 : FeatureTest.MP {
 public class OldSchool2: MP {
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
-  // CHECK: takeClass()
+  // CHECK:     takeClass()
   public func takeClass() async { }
 }
 
-// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: @rethrows public protocol RP
 @rethrows public protocol RP {
   func f() throws -> Bool
@@ -83,24 +83,24 @@ public class OldSchool2: MP {
 
 // CHECK: public struct UsesRP {
 public struct UsesRP {
-  // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+  // CHECK:     #if compiler(>=5.3) && $RethrowsProtocol
   // CHECK-NEXT:  public var value: (any FeatureTest.RP)? {
   // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK: get
+  // CHECK:         get
   public var value: RP? {
     nil
   }
 }
 
-// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: public struct IsRP
 public struct IsRP: RP {
   // CHECK-NEXT: public func f()
   public func f() -> Bool { }
 
   // CHECK-NOT: $RethrowsProtocol
-  // CHECK-NEXT: public var isF: 
-  // CHECK-NEXT: get
+  // CHECK-NEXT: public var isF:
+  // CHECK-NEXT:   get
   public var isF: Bool {
     f()
   }
@@ -111,43 +111,43 @@ public struct IsRP: RP {
 public func acceptsRP<T: RP>(_: T) { }
 
 // CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {
+// CHECK:     extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK: }
 
 // CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: extension FeatureTest.OldSchool : Swift.UnsafeSendable {
+// CHECK:     extension FeatureTest.OldSchool : Swift.UnsafeSendable {
 extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
 
 // CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
-// CHECK: func runSomethingSomewhere
+// CHECK:     func runSomethingSomewhere
 public func runSomethingSomewhere(body: () async -> Void) { }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Sendable
-// CHECK: func runSomethingConcurrently(body: @Sendable () -> 
+// CHECK:     func runSomethingConcurrently(body: @Sendable () -> 
 public func runSomethingConcurrently(body: @Sendable () -> Void) { }
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: func stage
+// CHECK:     func stage
 public func stage(with actor: MyActor) { }
 
 // CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait && $Sendable && $InheritActorContext
-// CHECK: func asyncIsh
+// CHECK:     func asyncIsh
 public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
-// CHECK-NOT:      #if compiler(>=5.3) && $AsyncAwait
-// CHECK: #if compiler(>=5.3) && $UnsafeInheritExecutor
-// CHECK: @_unsafeInheritExecutor public func unsafeInheritExecutor() async
+// CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
+// CHECK:     #if compiler(>=5.3) && $UnsafeInheritExecutor
+// CHECK:     @_unsafeInheritExecutor public func unsafeInheritExecutor() async
 @_unsafeInheritExecutor
 public func unsafeInheritExecutor() async {}
 
-// CHECK-NOT:      #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NOT: #if compiler(>=5.3) && $AsyncAwait
 // CHECK-NOT: #if $UnsafeInheritExecutor
-// CHECK: #elseif compiler(>=5.3) && $SpecializeAttributeWithAvailability
-// CHECK: @_specialize{{.*}}
-// CHECK: public func multipleSuppressible<T>(value: T) async
+// CHECK:     #elseif compiler(>=5.3) && $SpecializeAttributeWithAvailability
+// CHECK:     @_specialize{{.*}}
+// CHECK:     public func multipleSuppressible<T>(value: T) async
 @_unsafeInheritExecutor
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func multipleSuppressible<T>(value: T) async {}

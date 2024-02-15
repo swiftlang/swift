@@ -7,8 +7,8 @@
 
 import Distributed
 
-// CHECK-NOT:      #if compiler(>=5.3) && $Actors
-// CHECK: @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+// CHECK-NOT:  #if compiler(>=5.3) && $Actors
+// CHECK:      @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
 // CHECK-NEXT: distributed public actor DA {
 @available(SwiftStdlib 5.7, *)
 public distributed actor DA {
@@ -32,12 +32,12 @@ public distributed actor DA {
 }
 
 
-// CHECK-NOT:       #if compiler(>=5.3) && $Actors
-// CHECK:  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:  extension Library.DA : Distributed.DistributedActor {}
-// CHECK-NOT:       #if compiler(>=5.3) && $Actors
-// CHECK:  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:  extension Library.DA : Swift.Encodable {}
-// CHECK-NOT:       #if compiler(>=5.3) && $Actors
-// CHECK:  @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:  extension Library.DA : Swift.Decodable {}
+// CHECK-NOT: #if compiler(>=5.3) && $Actors
+// CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+// CHECK-NEXT:extension Library.DA : Distributed.DistributedActor {}
+// CHECK-NOT: #if compiler(>=5.3) && $Actors
+// CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+// CHECK-NEXT:extension Library.DA : Swift.Encodable {}
+// CHECK-NOT: #if compiler(>=5.3) && $Actors
+// CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
+// CHECK-NEXT:extension Library.DA : Swift.Decodable {}
