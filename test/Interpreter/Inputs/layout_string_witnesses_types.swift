@@ -588,6 +588,12 @@ public enum NestedMultiPayloadOuter {
     case c(NestedMultiPayloadInner)
 }
 
+public enum MultiPayloadError {
+    case empty
+    case error1(Int, Error)
+    case error2(Int, Error)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
