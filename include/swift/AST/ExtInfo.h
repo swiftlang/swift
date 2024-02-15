@@ -127,7 +127,7 @@ public:
 enum class SILFunctionTypeIsolation {
   /// We don't normally record isolation in SIL function types,
   /// so the empty case here is "unknown".
-  Unknown, 
+  Unknown,
 
   /// The isolation of the function has been statically erased.
   /// This corresponds to @isolated(any).
