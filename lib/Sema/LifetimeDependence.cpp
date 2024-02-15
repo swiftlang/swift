@@ -330,4 +330,37 @@ LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
   return LifetimeDependenceInfo::infer(afd, resultType);
 }
 
+LifetimeDependenceInfo
+LifetimeDependenceInfo::get(ASTContext &ctx,
+                            const SmallBitVector &inheritLifetimeIndices,
+                            const SmallBitVector &scopeLifetimeIndices) {
+  return LifetimeDependenceInfo{
+      inheritLifetimeIndices.any()
+          ? IndexSubset::get(ctx, inheritLifetimeIndices)
+          : nullptr,
+      scopeLifetimeIndices.any() ? IndexSubset::get(ctx, scopeLifetimeIndices)
+                                 : nullptr};
+}
+
+std::optional<LifetimeDependenceKind>
+LifetimeDependenceInfo::getLifetimeDependenceOnParam(unsigned paramIndex) {
+  if (inheritLifetimeParamIndices) {
+    if (inheritLifetimeParamIndices->contains(paramIndex)) {
+      // Can arbitarily return copy or consume here.
+      // If we converge on dependsOn(borrowed: paramName)/dependsOn(borrowed:
+      // paramName) syntax, this can be a single case value.
+      return LifetimeDependenceKind::Copy;
+    }
+  }
+  if (scopeLifetimeParamIndices) {
+    if (scopeLifetimeParamIndices->contains(paramIndex)) {
+      // Can arbitarily return borrow or mutate here.
+      // If we converge on dependsOn(borrowed: paramName)/dependsOn(borrowed:
+      // paramName) syntax, this can be a single case value.
+      return LifetimeDependenceKind::Borrow;
+    }
+  }
+  return {};
+}
+
 } // namespace swift
