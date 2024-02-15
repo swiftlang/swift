@@ -2514,9 +2514,9 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
 
   // If the storage is resilient, we cannot access it directly at all.
   if (var->isResilient(UseDC->getParentModule(),
-                       UseDC->getResilienceExpansion())) {
-    return (var->getModuleContext()->getBypassResilience());
-  }
+                       UseDC->getResilienceExpansion()))
+    return var->getModuleContext()->getBypassResilience();
+
   if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
     // The access must also be a member access on 'self' in all language modes.
     if (!isAccessOnSelf)
@@ -2978,8 +2978,9 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    if (getModuleContext() == M)
+    if (M == getModuleContext())
       return false;
+    // Non-resilient if bypass optimization in package is enabled
     if (bypassResilienceInPackage(M))
       return false;
     return isResilient();
@@ -5083,7 +5084,7 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     // We can access declarations from the same module
     // non-resiliently in a maximal context.
-    if (getModuleContext() == M)
+    if (M == getModuleContext())
       return false;
     // Non-resilient if bypass optimization in package is enabled
     if (bypassResilienceInPackage(M))

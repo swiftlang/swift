@@ -60,17 +60,12 @@ package final class ClassWithResilientProperty {
   package let p: Point
   package let s: Size
   package let color: Int32
-  package let px: Int
 
   package init(p: Point, s: Size, color: Int32) {
     self.p = p
-    self.px = p.x
     self.s = s
     self.color = color
 
-  }
-  func foo(p: Point) -> Int {
-    return p.x + 31
   }
 }
 
