@@ -35,6 +35,15 @@ public func unavailableOnMacOSFunc() {}
 @available(macOSApplicationExtension, unavailable)
 public func unavailableOnMacOSExtensionFunc() {}
 
+// CHECK-LABEL:     sil{{.*}}@$s4Test021unavailableOnMacOSAndD15OSExtensionFuncyyF
+// CHECK-SWIFT5_8:    [[FNREF:%.*]] = function_ref @$ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF : $@convention(thin) () -> Never
+// CHECK-SWIFT5_9:    [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:           } // end sil function '$s4Test021unavailableOnMacOSAndD15OSExtensionFuncyyF'
+@available(macOS, unavailable)
+@available(macOSApplicationExtension, unavailable) // FIXME: Seems like this should be diagnosed as redundant
+public func unavailableOnMacOSAndMacOSExtensionFunc() {}
+
 // CHECK-LABEL:     sil{{.*}}@$s4Test20unavailableOniOSFuncyyF
 // CHECK-NOT:         function_ref @$ss36_diagnoseUnavailableCodeReached{{.*}} : $@convention(thin) () -> Never
 // CHECK:           } // end sil function '$s4Test20unavailableOniOSFuncyyF'

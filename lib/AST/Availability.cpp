@@ -302,23 +302,26 @@ bool Decl::isAvailableAsSPI() const {
 }
 
 llvm::Optional<AvailableAttrDeclPair>
-SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
-                                         const Decl *decl) const {
+SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
+                                         bool ignoreAppExtensions) const {
   // Directly marked unavailable.
-  if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext()))
+  if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext(),
+                                                  ignoreAppExtensions))
     return std::make_pair(attr, decl);
 
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl))
-    return parent->getSemanticUnavailableAttr();
+    return parent->getSemanticUnavailableAttr(ignoreAppExtensions);
 
   return llvm::None;
 }
 
-llvm::Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
+llvm::Optional<AvailableAttrDeclPair>
+Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
   auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, SemanticUnavailableAttrRequest{this},
-                           llvm::None);
+  return evaluateOrDefault(
+      eval, SemanticUnavailableAttrRequest{this, ignoreAppExtensions},
+      llvm::None);
 }
 
 static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
@@ -326,7 +329,8 @@ static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
   if (isa<ClangModuleUnit>(D->getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto unavailableAttrAndDecl = D->getSemanticUnavailableAttr();
+  auto unavailableAttrAndDecl =
+      D->getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
   if (!unavailableAttrAndDecl)
     return false;
 
@@ -336,11 +340,6 @@ static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
   // target.
   auto *unavailableAttr = unavailableAttrAndDecl->first;
   if (!unavailableAttr->isUnconditionallyUnavailable())
-    return false;
-
-  // If the decl is only unavailable to app extensions it still may need to be
-  // present at runtime for non-extension processes.
-  if (isApplicationExtensionPlatform(unavailableAttr->Platform))
     return false;
 
   return true;

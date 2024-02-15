@@ -2655,7 +2655,8 @@ public:
   /// Finds the most-specific platform-specific attribute that is
   /// active for the current platform.
   const AvailableAttr *
-  findMostSpecificActivePlatform(const ASTContext &ctx) const;
+  findMostSpecificActivePlatform(const ASTContext &ctx,
+                                 bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's
@@ -2664,7 +2665,8 @@ public:
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
-  const AvailableAttr *getUnavailable(const ASTContext &ctx) const;
+  const AvailableAttr *getUnavailable(const ASTContext &ctx,
+                                      bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is deprecated on all deployment targets, or null otherwise.
