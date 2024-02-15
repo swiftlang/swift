@@ -141,9 +141,12 @@ inline Feature partialMutationFeature(PartialMutation::Kind kind) {
 ///
 /// Emulates the following enum with associated value:
 ///
-/// enum class PartialMutationError {
-/// case featureDisabled(SILType)
-/// case hasDeinit(SILType, NominalTypeDecl)
+/// struct PartialMutationError {
+///   let type: SILType
+///   enum Kind {
+///     case featureDisabled
+///     case hasDeinit(NominalTypeDecl)
+///   }
 /// }
 class PartialMutationError {
   struct FeatureDisabled {
@@ -154,9 +157,8 @@ class PartialMutationError {
   };
   TaggedUnion<FeatureDisabled, HasDeinit> kind;
 
-  PartialMutationError(SILType type, FeatureDisabled fd)
-      : kind({fd}), type(type) {}
-  PartialMutationError(SILType type, HasDeinit r) : kind({r}), type(type) {}
+  PartialMutationError(SILType type, Payload payload)
+      : payload(payload), type(type) {}
 
 public:
   /// The type within the aggregate responsible for the error.
