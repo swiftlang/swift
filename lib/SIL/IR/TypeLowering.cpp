@@ -3074,6 +3074,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (6) being defined in a module built from interface
     // (7) being or containing a variadic generic type which doesn't conform
     //     unconditionally but does in this case
+    // (8) being or containing the error type
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3119,6 +3120,10 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // being trivial but not conforming to BitwiseCopyable.
 
           auto isTopLevel = !field;
+
+          // The error type doesn't conform but is trivial (case (8)).
+          if (isa<ErrorType>(ty))
+            return false;
 
           // These show up in the context of non-conforming variadic generics
           // which may lack a conformance (case (7)).
