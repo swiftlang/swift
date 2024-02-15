@@ -2963,21 +2963,12 @@ static bool usesFeatureStaticAssert(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureEffectfulProp(Decl *decl) {
-  return false;
+#define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+static bool usesFeature##FeatureName(Decl *decl) { \
+  return false; \
 }
-
-static bool usesFeatureAsyncAwait(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureMarkerProtocol(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureActors(Decl *decl) {
-  return false;
-}
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#include "swift/Basic/Features.def"
 
 static bool usesFeatureMacros(Decl *decl) {
   return isa<MacroDecl>(decl);
@@ -3041,14 +3032,6 @@ static bool usesFeatureAttachedMacros(Decl *decl) {
     return false;
 
   return static_cast<bool>(macro->getMacroRoles() & getAttachedMacroRoles());
-}
-
-static bool usesFeatureConcurrentFunctions(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureSendable(Decl *decl) {
-  return false;
 }
 
 static bool usesFeatureRethrowsProtocol(
@@ -3126,10 +3109,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
   return usesFeatureRethrowsProtocol(decl, checked);
 }
 
-static bool usesFeatureGlobalActors(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   auto ext = dyn_cast<ExtensionDecl>(decl);
   if (!ext)
@@ -3152,14 +3131,6 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
   return false;
 }
 
-static bool usesFeatureBuiltinJob(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinExecutor(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinBuildTaskExecutorRef(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
@@ -3170,35 +3141,11 @@ static bool usesFeatureBuiltinBuildComplexEqualityExecutor(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinBuildMainExecutor(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinContinuation(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinHopToActor(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinCreateAsyncTaskInGroupWithExecutor(Decl *decl) {
   return false;
 }
 
 static bool usesFeatureBuiltinCreateAsyncDiscardingTaskInGroup(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
   return false;
 }
 
@@ -3245,14 +3192,6 @@ static void suppressingFeatureSpecializeAttributeWithAvailability(
   llvm::SaveAndRestore<bool> scope(
     options.PrintSpecializeAttributeWithAvailability, false);
   action();
-}
-
-static bool usesFeatureInheritActorContext(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureImplicitSelfCapture(Decl *decl) {
-  return false;
 }
 
 static bool usesFeatureBuiltinStackAlloc(Decl *decl) {

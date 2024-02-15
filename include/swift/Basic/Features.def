@@ -34,6 +34,10 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// BASELINE_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but is used
+// for features that can be assumed to be available in any Swift compiler that
+// will be used to process the textual interface files produced by this
+// Swift compiler.
 //===----------------------------------------------------------------------===//
 
 #ifndef LANGUAGE_FEATURE
@@ -62,29 +66,34 @@
      EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #endif
 
-LANGUAGE_FEATURE(AsyncAwait, 296, "async/await")
-LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties")
-LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol")
-LANGUAGE_FEATURE(Actors, 0, "actors")
-LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions")
+#ifndef BASELINE_LANGUAGE_FEATURE
+#  define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+BASELINE_LANGUAGE_FEATURE(AsyncAwait, 296, "async/await")
+BASELINE_LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties")
+BASELINE_LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol")
+BASELINE_LANGUAGE_FEATURE(Actors, 0, "actors")
+BASELINE_LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions")
 LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol")
-LANGUAGE_FEATURE(GlobalActors, 316, "Global actors")
-LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type")
-LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable")
-LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type")
-LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins")
-LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor")
-LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins")
-LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute")
-LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute")
+BASELINE_LANGUAGE_FEATURE(GlobalActors, 316, "Global actors")
+BASELINE_LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type")
+BASELINE_LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable")
+BASELINE_LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type")
+BASELINE_LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins")
+BASELINE_LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor")
+BASELINE_LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins")
+BASELINE_LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute")
+BASELINE_LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute")
 LANGUAGE_FEATURE(BuiltinBuildTaskExecutorRef, 0, "TaskExecutor-building builtins")
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
 LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
-LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
-LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
+BASELINE_LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in task group builtin with extra flags")
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
-LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
 LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
@@ -287,5 +296,6 @@ EXPERIMENTAL_FEATURE(IsolatedAny, false)
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
+#undef BASELINE_LANGUAGE_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE
