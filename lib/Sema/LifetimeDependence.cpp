@@ -107,6 +107,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
+  auto *mod = afd->getModuleContext();
   auto &diags = ctx.Diags;
   auto capacity = afd->getParameters()->size() + 1;
   auto lifetimeDependentRepr =
@@ -156,6 +157,16 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
         return true;
       }
     }
+
+    if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+      auto *bitwiseCopyableProtocol =
+          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+      if (bitwiseCopyableProtocol && mod->checkConformance(type, bitwiseCopyableProtocol)) {
+        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+        return true;
+      }
+    }
+
     if (inheritLifetimeParamIndices.test(paramIndexToSet) ||
         scopeLifetimeParamIndices.test(paramIndexToSet)) {
       diags.diagnose(loc, diag::lifetime_dependence_duplicate_param_id);
