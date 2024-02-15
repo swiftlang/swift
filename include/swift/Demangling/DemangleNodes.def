@@ -358,7 +358,7 @@ NODE(AsyncSuspendResumePartialFunction)
 NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
-// Added in Swift 5.10
+// Added in Swift 5.11
 NODE(AccessibleProtocolRequirementFunctionRecord)
 
 // Added in Swift 5.7

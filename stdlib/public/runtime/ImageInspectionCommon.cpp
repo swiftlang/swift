@@ -130,7 +130,7 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
         baseAddress, functions, accessible_funcs_section.length);
   }
 
-  const auto &dist_accessible_funcs_section = sections->swift5_distributed_accessible_functions;
+  const auto &dist_accessible_funcs_section = sections->swift5_accessible_protocol_requirement_functions;
   const void *dist_functions =
       reinterpret_cast<void *>(dist_accessible_funcs_section.start);
   if (dist_accessible_funcs_section.length) {
