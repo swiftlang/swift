@@ -1376,7 +1376,7 @@ public:
 /// requirement.
 class GetDistributedMethodWitnessedProtocolRequirements :
     public SimpleRequest<GetDistributedMethodWitnessedProtocolRequirements,
-                         llvm::TinyPtrVector<ValueDecl *> (AbstractFunctionDecl *),
+                         llvm::ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1384,7 +1384,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::TinyPtrVector<ValueDecl *> evaluate(
+  llvm::ArrayRef<ValueDecl *> evaluate(
       Evaluator &evaluator,
       AbstractFunctionDecl *nominal) const;
 

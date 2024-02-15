@@ -390,7 +390,7 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
-llvm::TinyPtrVector<ValueDecl *>
+llvm::ArrayRef<ValueDecl *>
 AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
 
