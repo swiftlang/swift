@@ -1159,13 +1159,16 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
-    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
+    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls.first,
                                                  ResolveToNominalOptions(),
                                                  modulesFound,
                                                  result.anyObject);
     result.decls.insert(result.decls.end(),
                         rhsNominals.begin(),
                         rhsNominals.end());
+
+    // Collect inverse markings on 'Self'.
+    result.inverses.insertAll(rhsDecls.second);
   }
 
   return result;
@@ -1184,7 +1187,6 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
 SelfBounds SelfBoundsFromGenericSignatureRequest::evaluate(
     Evaluator &evaluator, const ExtensionDecl *extDecl) const {
   SelfBounds result;
-  ASTContext &ctx = extDecl->getASTContext();
   auto selfType = extDecl->getSelfInterfaceType();
   for (const auto &req : extDecl->getGenericRequirements()) {
     auto kind = req.getKind();
@@ -1192,17 +1194,10 @@ SelfBounds SelfBoundsFromGenericSignatureRequest::evaluate(
         kind != RequirementKind::Superclass)
       continue;
     // The left-hand side of the type constraint must be 'Self'.
-    bool isSelfLHS = selfType->isEqual(req.getFirstType());
-    if (!isSelfLHS)
+    if (!selfType->isEqual(req.getFirstType()))
       continue;
 
-    auto rhsDecls = directReferencesForType(req.getSecondType());
-    SmallVector<ModuleDecl *, 2> modulesFound;
-    auto rhsNominals = resolveTypeDeclsToNominal(
-        evaluator, ctx, rhsDecls, ResolveToNominalOptions(),
-        modulesFound, result.anyObject);
-    result.decls.insert(result.decls.end(), rhsNominals.begin(),
-                        rhsNominals.end());
+    result.decls.push_back(req.getSecondType()->getAnyNominal());
   }
 
   return result;
@@ -1215,15 +1210,18 @@ swift::getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl) {
                            SelfBoundsFromGenericSignatureRequest{extDecl}, {});
 }
 
-TinyPtrVector<TypeDecl *>
+DirectlyReferencedTypeDecls
 TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ext) const {
   ASTContext &ctx = ext->getASTContext();
 
-  TinyPtrVector<TypeDecl *> result;
+  DirectlyReferencedTypeDecls result;
   auto resolve = [&](TypeRepr *typeRepr) {
     auto decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-    result.insert(result.end(), decls.begin(), decls.end());
+    result.first.insert(result.first.end(),
+                        decls.first.begin(),
+                        decls.first.end());
+    result.second.insertAll(decls.second);
   };
 
   if (auto *whereClause = ext->getTrailingWhereClause()) {
@@ -2755,7 +2753,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         UnderlyingTypeDeclsReferencedRequest{typealias}, {});
 
       auto underlyingNominalReferences
-        = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
+        = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences.first,
                                     options, modulesFound, anyObject, typealiases);
       std::for_each(underlyingNominalReferences.begin(),
                     underlyingNominalReferences.end(),
@@ -2874,19 +2872,19 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
     if (isa<NominalTypeDecl>(typeDecl))
       nominalTypeDeclCount++;
 
-    results.push_back(typeDecl);
+    results.first.push_back(typeDecl);
   }
 
   // If we saw multiple nominal type declarations with the same name,
   // the result of the lookup is definitely ambiguous.
   if (nominalTypeDeclCount > 1)
-    results.clear();
+    results.first.clear();
 
   return results;
 }
 
 /// Perform qualified name lookup for types.
-static DirectlyReferencedTypeDecls
+static llvm::TinyPtrVector<TypeDecl *>
 directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
@@ -2894,7 +2892,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        DeclContext *dc,
                                        SourceLoc loc,
                                        bool allowUsableFromInline=false) {
-  DirectlyReferencedTypeDecls result;
+  llvm::TinyPtrVector<TypeDecl *> result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
       assert(isa<TypeDecl>(decl) &&
@@ -2949,7 +2947,7 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
     // If we already set a declaration, use it.
     if (auto *typeDecl = identBase->getBoundDecl()) {
-      current = {1, typeDecl};
+      current.first.push_back(typeDecl);
     } else {
       // For the base component, perform unqualified name lookup.
       current = directReferencesForUnqualifiedTypeLookup(
@@ -2966,23 +2964,23 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     return current;
 
   // If we didn't find anything, fail now.
-  if (current.empty())
+  if (current.first.empty())
     return current;
 
   for (const auto &component : memberTR->getMemberComponents()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
-      current = {1, typeDecl};
+      current.first.push_back(typeDecl);
       continue;
     }
 
     // For subsequent components, perform qualified name lookup.
-    current =
-        directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
+    current.first =
+        directReferencesForQualifiedTypeLookup(evaluator, ctx, current.first,
                                                component->getNameRef(), dc,
                                                component->getLoc(),
                                                allowUsableFromInline);
-    if (current.empty())
+    if (current.first.empty())
       return current;
   }
 
@@ -2993,9 +2991,12 @@ static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
                             DeclContext *dc, bool allowUsableFromInline) {
+  DirectlyReferencedTypeDecls result;
+
   switch (typeRepr->getKind()) {
   case TypeReprKind::Array:
-    return {1, ctx.getArrayDecl()};
+    result.first.push_back(ctx.getArrayDecl());
+    return result;
 
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
@@ -3005,15 +3006,17 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   }
 
   case TypeReprKind::Composition: {
-    DirectlyReferencedTypeDecls result;
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
       auto componentResult =
           directReferencesForTypeRepr(evaluator, ctx, component, dc,
                                       allowUsableFromInline);
-      result.insert(result.end(),
-                    componentResult.begin(),
-                    componentResult.end());
+      result.first.insert(result.first.end(),
+                          componentResult.first.begin(),
+                          componentResult.first.end());
+
+      // Merge inverses.
+      result.second.insertAll(componentResult.second);
     }
     return result;
   }
@@ -3026,18 +3029,19 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                               dc, allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
-    return { 1, ctx.getDictionaryDecl()};
+    result.first.push_back(ctx.getDictionaryDecl());
+    return result;
 
   case TypeReprKind::Tuple: {
     auto tupleRepr = cast<TupleTypeRepr>(typeRepr);
     if (tupleRepr->isParenType()) {
-      return directReferencesForTypeRepr(evaluator, ctx,
-                                         tupleRepr->getElementType(0), dc,
-                                         allowUsableFromInline);
+      result = directReferencesForTypeRepr(evaluator, ctx,
+                                           tupleRepr->getElementType(0), dc,
+                                           allowUsableFromInline);
     } else {
-      return { 1, ctx.getBuiltinTupleDecl() };
+      result.first.push_back(ctx.getBuiltinTupleDecl());
     }
-    return { };
+    return result;
   }
 
   case TypeReprKind::Vararg: {
@@ -3061,6 +3065,23 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
+  case TypeReprKind::Inverse: {
+    // If ~P references a protocol P with a known inverse kind, record it in
+    // our set of inverses, otherwise just ignore it. We'll diagnose it later.
+    auto *inverseRepr = cast<InverseTypeRepr>(typeRepr);
+    auto innerResult = directReferencesForTypeRepr(evaluator, ctx,
+                                                   inverseRepr->getConstraint(), dc,
+                                                   allowUsableFromInline);
+    if (innerResult.first.size() == 1) {
+      auto *proto = dyn_cast<ProtocolDecl>(innerResult.first[0]);
+      if (auto ip = proto->getInvertibleProtocolKind()) {
+        result.second.insert(*ip);
+      }
+    }
+
+    return result;
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
@@ -3074,11 +3095,10 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
-  case TypeReprKind::Inverse:
   case TypeReprKind::ResultDependsOn:
   case TypeReprKind::LifetimeDependentReturn:
   case TypeReprKind::Transferring:
-    return { };
+    return result;
 
   case TypeReprKind::Fixed:
     llvm_unreachable("Cannot get fixed TypeReprs in name lookup");
@@ -3087,41 +3107,62 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
-    return { 1, ctx.getOptionalDecl() };
+    result.first.push_back(ctx.getOptionalDecl());
+    return result;
   }
   llvm_unreachable("unhandled kind");
 }
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
+  DirectlyReferencedTypeDecls result;
+
   // If it's a typealias, return that.
-  if (auto aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
-    return { 1, aliasType->getDecl() };
-
-  // If there is a generic declaration, return it.
-  if (auto genericDecl = type->getAnyGeneric())
-    return { 1, genericDecl };
-
-  if (dyn_cast<TupleType>(type.getPointer()))
-    return { 1, type->getASTContext().getBuiltinTupleDecl() };
-
-  if (type->isExistentialType()) {
-    DirectlyReferencedTypeDecls result;
-    const auto &layout = type->getExistentialLayout();
-
-    // Superclass.
-    if (auto superclassType = layout.explicitSuperclass) {
-      if (auto superclassDecl = superclassType->getAnyGeneric()) {
-        result.push_back(superclassDecl);
-      }
-    }
-
-    // Protocols.
-    for (auto protoDecl : layout.getProtocols())
-      result.push_back(protoDecl);
+  if (auto aliasType = dyn_cast<TypeAliasType>(type.getPointer())) {
+    result.first.push_back(aliasType->getDecl());
     return result;
   }
 
-  return { };
+  // If there is a generic declaration, return it.
+  if (auto genericDecl = type->getAnyGeneric()) {
+    result.first.push_back(genericDecl);
+    return result;
+  }
+
+  if (type->is<TupleType>()) {
+    result.first.push_back(type->getASTContext().getBuiltinTupleDecl());
+    return result;
+  }
+
+  if (auto *protoType = type->getAs<ProtocolType>()) {
+    result.first.push_back(protoType->getDecl());
+    return result;
+  }
+
+  if (auto *compositionType = type->getAs<ProtocolCompositionType>()) {
+    for (auto member : compositionType->getMembers()) {
+      auto componentResult = directReferencesForType(member);
+      result.first.insert(result.first.end(),
+                          componentResult.first.begin(),
+                          componentResult.first.end());
+
+      // Merge inverses from each member recursively.
+      result.second.insertAll(componentResult.second);
+    }
+
+    // Merge inverses attached to the composition itself.
+    result.second.insertAll(compositionType->getInverses());
+    return result;
+  }
+
+  if (auto *paramType = type->getAs<ParameterizedProtocolType>()) {
+    return directReferencesForType(paramType->getBaseType());
+  }
+
+  if (auto *existentialType = type->getAs<ExistentialType>()) {
+    return directReferencesForType(existentialType->getConstraintType());
+  }
+
+  return result;
 }
 
 DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
@@ -3217,7 +3258,8 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     bool anyObject = false;
     auto inheritedNominalTypes
       = resolveTypeDeclsToNominal(evaluator, Ctx,
-                                  inheritedTypes, ResolveToNominalOptions(),
+                                  inheritedTypes.first,
+                                  ResolveToNominalOptions(),
                                   modulesFound, anyObject);
 
     // Look for a class declaration.
@@ -3250,13 +3292,16 @@ ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
-  for (const auto &found :
-       getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+  for (const auto &found : getDirectlyInheritedNominalTypeDecls(
+            PD, inverses, anyObject)) {
     auto proto = dyn_cast<ProtocolDecl>(found.Item);
     if (proto && proto != PD)
       inherited.insert(proto);
   }
+
+  // FIXME: Apply inverses
 
   return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
 }
@@ -3293,7 +3338,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(evaluator, ctx, referenced,
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced.first,
                                 ResolveToNominalFlags::AllowTupleType,
                                 modulesFound, anyObject);
 
@@ -3333,9 +3378,10 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   });
 }
 
-bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc){
+bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc) {
   auto &ctx = dc->getASTContext();
-    return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc));
+  auto references = directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc);
+  return declsAreProtocols(references.first);
 }
 
 static GenericParamList *
@@ -3368,11 +3414,11 @@ createTupleExtensionGenericParams(ASTContext &ctx,
     directReferencesForTypeRepr(ctx.evaluator, ctx,
                                 extendedTypeRepr,
                                 ext->getParent());
-
-  if (referenced.size() != 1 || !isa<TypeAliasDecl>(referenced[0]))
+  assert(referenced.second.empty() && "Implement me");
+  if (referenced.first.size() != 1 || !isa<TypeAliasDecl>(referenced.first[0]))
     return nullptr;
 
-  auto *typeAlias = cast<TypeAliasDecl>(referenced[0]);
+  auto *typeAlias = cast<TypeAliasDecl>(referenced.first[0]);
   if (!typeAlias->isGeneric())
     return nullptr;
 
@@ -3644,7 +3690,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // Dig out the nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
-  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                             ResolveToNominalOptions(),
                                             modulesFound, anyObject);
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
@@ -3652,17 +3698,17 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 
   // If we found declarations that are associated types, look outside of
   // the current context to see if we can recover.
-  if (declsAreAssociatedTypes(decls)) {
+  if (declsAreAssociatedTypes(decls.first)) {
     if (auto typeRepr = attr->getTypeRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
-        auto assocType = cast<AssociatedTypeDecl>(decls.front());
+        auto assocType = cast<AssociatedTypeDecl>(decls.first.front());
 
         modulesFound.clear();
         anyObject = false;
         decls = directReferencesForUnqualifiedTypeLookup(
             identTypeRepr->getNameRef(), identTypeRepr->getLoc(), dc,
             LookupOuterResults::Included);
-        nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+        nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                              ResolveToNominalOptions(),
                                              modulesFound, anyObject);
         if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front())) {
@@ -3696,10 +3742,12 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+/// Decompose the ith inheritance clause entry to a list of type declarations,
+/// inverses, and optional AnyObject member.
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    bool &anyObject) {
+    InvertibleProtocolSet &inverses, bool &anyObject) {
   auto typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
@@ -3710,10 +3758,13 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   auto referenced = evaluateOrDefault(ctx.evaluator,
     InheritedDeclsReferencedRequest{decl, i}, {});
 
+  // Apply inverses written on this inheritance clause entry.
+  inverses.insertAll(referenced.second);
+
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced,
+    = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced.first,
                                 ResolveToNominalOptions(),
                                 modulesFound, anyObject);
 
@@ -3736,32 +3787,21 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   }
 }
 
+/// Decompose all inheritance clause entries and return the union of their
+/// type declarations, inverses, and optional AnyObject member.
 SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    bool &anyObject) {
-  auto inheritedTypes = InheritedTypes(decl);
-
-  // Gather results from all of the inherited types.
+    InvertibleProtocolSet &inverses, bool &anyObject) {
   SmallVector<InheritedNominalEntry, 4> result;
-  for (unsigned i : inheritedTypes.getIndices()) {
-    getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
-  }
 
+  // For a deserialized protocol, the syntactic representations are not going to
+  // tell us anything. Ask the requirement signature instead.
   auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
-  if (protoDecl == nullptr)
-    return result;
-
-  // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
-  // the source location.
-  SourceLoc loc = SourceLoc();
-
-  // For a deserialized protocol, the where clause isn't going to tell us
-  // anything. Ask the requirement signature instead.
-  if (protoDecl->wasDeserialized()) {
+  if (protoDecl && protoDecl->wasDeserialized()) {
     auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto &req : protoDecl->getRequirementSignature().getRequirements()) {
+    for (auto req : protoDecl->getRequirementSignature().getRequirements()) {
       // Dig out a conformance requirement...
       if (req.getKind() != RequirementKind::Conformance)
         continue;
@@ -3770,10 +3810,20 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc(), SourceLoc());
+      result.emplace_back(req.getProtocolDecl(),
+                          SourceLoc(), SourceLoc(), SourceLoc());
     }
     return result;
   }
+
+  // Gather results from all of the inherited types.
+  auto inheritedTypes = InheritedTypes(decl);
+  for (unsigned i : inheritedTypes.getIndices()) {
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject);
+  }
+
+  if (!protoDecl)
+    return result;
 
   // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
   // these to add `Sendable` conformances to protocols without modifying the
@@ -3788,10 +3838,13 @@ swift::getDirectlyInheritedNominalTypeDecls(
 
   // Else we have access to this information on the where clause.
   auto selfBounds = getSelfBoundsFromWhereClause(decl);
+  inverses.insertAll(selfBounds.inverses);
   anyObject |= selfBounds.anyObject;
 
+  // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
+  // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, loc, SourceLoc(), SourceLoc());
+    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc());
 
   return result;
 }
@@ -3913,7 +3966,7 @@ ProtocolDecl *ImplementsAttrProtocolRequest::evaluate(
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
   auto nominalTypes
-    = resolveTypeDeclsToNominal(evaluator, ctx, referenced,
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced.first,
                                 ResolveToNominalOptions(),
                                 modulesFound, anyObject);
 

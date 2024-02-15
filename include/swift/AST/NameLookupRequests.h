@@ -58,7 +58,8 @@ void simple_display(
 
 /// Describes a set of type declarations that are "direct" referenced by
 /// a particular type in the AST.
-using DirectlyReferencedTypeDecls = llvm::TinyPtrVector<TypeDecl *>;
+using DirectlyReferencedTypeDecls = std::pair<llvm::TinyPtrVector<TypeDecl *>,
+                                              InvertibleProtocolSet>;
 
 /// Request the set of declarations directly referenced by the an "inherited"
 /// type of a type or extension declaration.
@@ -270,6 +271,7 @@ public:
 
 struct SelfBounds {
   llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
 };
 
