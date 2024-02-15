@@ -733,6 +733,53 @@ static void recordShadowedDeclsAfterTypeMatch(
   }
 }
 
+/// Return an extended info for a function types that removes the use of
+/// the thrown error type, if present.
+///
+/// Returns \c None when no adjustment is needed.
+static std::optional<ASTExtInfo>
+extInfoRemovingThrownError(AnyFunctionType *fnType) {
+  if (!fnType->hasExtInfo())
+    return std::nullopt;
+
+  auto extInfo = fnType->getExtInfo();
+  if (!extInfo.isThrowing() || !extInfo.getThrownError())
+    return std::nullopt;
+
+  return extInfo.withThrows(true, Type());
+}
+
+/// Remove the thrown error type.
+static CanType removeThrownError(Type type) {
+  ASTContext &ctx = type->getASTContext();
+
+  return type.transformRec([](TypeBase *type) -> std::optional<Type> {
+    if (auto funcTy = dyn_cast<FunctionType>(type)) {
+      if (auto newExtInfo = extInfoRemovingThrownError(funcTy)) {
+        return FunctionType::get(
+                  funcTy->getParams(), funcTy->getResult(), *newExtInfo)
+          ->getCanonicalType();
+      }
+
+      return std::nullopt;
+    }
+
+    if (auto genericFuncTy = dyn_cast<GenericFunctionType>(type)) {
+      if (auto newExtInfo = extInfoRemovingThrownError(genericFuncTy)) {
+        return GenericFunctionType::get(
+                  genericFuncTy->getGenericSignature(),
+                  genericFuncTy->getParams(), genericFuncTy->getResult(),
+                  *newExtInfo)
+          ->getCanonicalType();
+      }
+
+      return std::nullopt;
+    }
+
+    return std::nullopt;
+  })->getCanonicalType();
+}
+
 /// Given a set of declarations whose names and generic signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
@@ -757,7 +804,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
       type = asd->getOverloadSignatureType();
     else
-      type = decl->getInterfaceType()->getCanonicalType();
+      type = removeThrownError(decl->getInterfaceType()->getCanonicalType());
 
     // Record this declaration based on its signature.
     auto &known = collisions[type];
