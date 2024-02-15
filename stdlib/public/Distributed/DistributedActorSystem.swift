@@ -487,32 +487,12 @@ extension DistributedActorSystem {
     let concreteTargetNameLength = (concreteTargetNameTypeNamePair?.1).map(UInt.init)
 
     // Gen the generic environment (if any) associated with the target.
-//    let genericEnv =
-//      if #available(SwiftStdlib 5.11, *),
-//         let concreteTargetNameData,
-//         let concreteTargetNameLength {
-//        _getGenericEnvironmentOfDistributedTarget(
-//          on: actor,
-//          concreteTargetNameData, UInt(concreteTargetNameLength))
-//      } else {
-//        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-//          _deprecated_getGenericEnvironmentOfDistributedTarget(
-//            targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))
-//        }
-//      }
     let genericEnv =
-//      if let concreteTargetNameData,
-//         let concreteTargetNameLength {
-//        _deprecated_getGenericEnvironmentOfDistributedTarget( // FIXME: not deprecated
-//          on: actor,
-//          concreteTargetNameData, UInt(concreteTargetNameLength))
-//      } else {
         targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-          _deprecated_getGenericEnvironmentOfDistributedTarget(
+          _getGenericEnvironmentOfDistributedTarget(
             concreteTargetNameData ?? targetNameUTF8.baseAddress!,
             concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
         }
-//      }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
     var witnessTablesBuffer: UnsafeRawPointer? = nil

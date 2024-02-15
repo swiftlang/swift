@@ -107,7 +107,7 @@ func _getConcreteAccessibleWitnessName(
 /// the given distributed target.
 @available(SwiftStdlib 5.11, *)
 @_silgen_name("swift_distributed_getGenericEnvironmentForConcreteActor")
-public // SPI Distributed
+// SPI Distributed
 func _getGenericEnvironmentOfDistributedTarget(
     on actor: AnyObject, // : DistributedActor
     _ targetNameStart: UnsafePointer<UInt8>,
@@ -118,7 +118,7 @@ func _getGenericEnvironmentOfDistributedTarget(
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")
 public // SPI Distributed
-func _deprecated_getGenericEnvironmentOfDistributedTarget(
+func _getGenericEnvironmentOfDistributedTarget(
     _ targetNameStart: UnsafePointer<UInt8>,
     _ targetNameLength: UInt
 ) -> UnsafeRawPointer?

@@ -255,7 +255,7 @@ static const AccessibleProtocolRequirementFunctionRecord *
 _searchForProtocolRequirementFunctionRecord(
     AccessibleFunctionsState &S, std::optional<llvm::StringRef> actorTypeName,
     llvm::StringRef targetFuncName) {
-  auto traceState = runtime::trace::distributed_accessible_function_scan_begin(
+  auto traceState = runtime::trace::accessible_protocol_requirement_function_scan_begin(
       targetFuncName);
   for (const auto &section : S.WitnessSectionsToScan.snapshot()) {
     for (auto &record : section) {
@@ -267,16 +267,10 @@ _searchForProtocolRequirementFunctionRecord(
           auto recordConcreteActorName =
               swift::Demangle::makeSymbolicMangledNameStringRef(
                   record.ConcreteActorName.get());
-          if (recordConcreteActorName.endswith(
-                  *actorTypeName)) { // FIXME: this is missing the "$s" on right
-                                     // side
+          // FIXME: this is missing the "$s" on right side
+          if (recordConcreteActorName.endswith(*actorTypeName)) {
             return traceState.end(&record);
           }
-        } else {
-          // it's a call directly identified by the record/method
-          // targetFuncName, not a protocol call, so we return the record...
-          // FIXME: what to do here
-          return traceState.end(&record);
         }
       }
     }

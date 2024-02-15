@@ -88,7 +88,7 @@ accessible_function_scan_begin(llvm::StringRef name) {
 }
 
 static inline ScanTraceState
-distributed_accessible_function_scan_begin(llvm::StringRef name) {
+accessible_protocol_requirement_function_scan_begin(llvm::StringRef name) {
   ENSURE_LOG(ScanLog);
 
   auto id = os_signpost_id_generate(ScanLog);
@@ -174,7 +174,7 @@ accessible_function_scan_begin(llvm::StringRef name) {
 }
 
 static inline ScanTraceState
-distributed_accessible_function_scan_begin(llvm::StringRef name) {
+accessible_protocol_requirement_function_scan_begin(llvm::StringRef name) {
   return {};
 }
 
