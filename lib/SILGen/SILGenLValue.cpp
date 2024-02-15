@@ -1193,9 +1193,11 @@ namespace {
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
-      assert(base
-             && base.getType().isAddress()
-             && "should have an address base to borrow from");
+      // If the base is already loaded, we just need to borrow it.
+      if (!base.getType().isAddress()) {
+        return base.formalAccessBorrow(SGF, loc);
+      }
+
       // If the base value is address-only then we can borrow from the
       // address in-place.
       if (!base.getType().isLoadable(SGF.F)) {
@@ -3384,9 +3386,15 @@ void LValue::addNonMemberVarComponent(
                "local var should not be actor isolated!");
       }
 
-      assert(address.isLValue() &&
-             "Must have a physical copyable lvalue decl ref that "
-             "evaluates to an address");
+      if (!address.isLValue()) {
+        assert((AccessKind == SGFAccessKind::BorrowedObjectRead
+                || AccessKind == SGFAccessKind::BorrowedAddressRead)
+               && "non-borrow component requires an address base");
+        LV.add<ValueComponent>(address, std::nullopt, typeData,
+                               /*rvalue*/ true);
+        LV.add<BorrowValueComponent>(typeData);
+        return;
+      }
 
       llvm::Optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
