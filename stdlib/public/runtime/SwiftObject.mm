@@ -376,6 +376,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 }
 
 - (NSUInteger)hash {
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable
+    return (NSUInteger)self;
+  }
+
   auto selfMetadata = _swift_getClassOfAllocated(self);
 
   // If it's Hashable, use that
@@ -423,6 +428,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
   if (self == other) {
     return YES;
   }
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable or Equatable
+    return NO; // We know the ids are different
+  }
+
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
