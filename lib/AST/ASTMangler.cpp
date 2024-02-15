@@ -2346,30 +2346,83 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     if (!decl)
       return appendContext(ExtD->getDeclContext(), useModuleName);
 
-    if (!ExtD->isEquivalentToExtendedContext()) {
-    // Mangle the extension if:
-    // - the extension is defined in a different module from the original
-    //   nominal type decl,
-    // - the extension is constrained, or
-    // - the extension is to a protocol.
+    // Determine if we need to actually mangle the extension. If any of the
+    // following are true, then we must mangle it:
+    //
+    // 1. The extension is defined in a different module from the original
+    //    nominal type decl.
+    // 2. The extension is to a protocol.
+    // 3. The extension has a different generic signature than the extended
+    //    type's generic signature OR if they were the same, if there are any
+    //    inverse requirements imposed.
+    //
     // FIXME: In a world where protocol extensions are dynamically dispatched,
     // "extension is to a protocol" would no longer be a reason to use the
     // extension mangling, because an extension method implementation could be
     // resiliently moved into the original protocol itself.
-      auto sig = ExtD->getGenericSignature();
-      // If the extension is constrained, mangle the generic signature that
-      // constrains it.
-      appendAnyGenericType(decl);
-      appendModule(ExtD->getParentModule(), useModuleName);
-      if (sig && ExtD->isConstrainedExtension()) {
-        Mod = ExtD->getModuleContext();
-        auto nominalSig = ExtD->getSelfNominalTypeDecl()
-                            ->getGenericSignatureOfContext();
-        appendGenericSignature(sig, nominalSig);
+
+    auto sig = ExtD->getGenericSignature();
+    auto nominalSig = ExtD->getSelfNominalTypeDecl()
+                        ->getGenericSignatureOfContext();
+
+    auto mangleExtension = [&](bool genericSignatureRequiredMangling) {
+      if (!ExtD->isInSameDefiningModule() ||
+          ExtD->getDeclaredInterfaceType()->isExistentialType() ||
+          genericSignatureRequiredMangling) {
+        appendAnyGenericType(decl);
+        appendModule(ExtD->getParentModule(), useModuleName);
+
+        if (sig && genericSignatureRequiredMangling) {
+          appendGenericSignature(sig, nominalSig);
+        }
+
+        return appendOperator("E");
       }
-      return appendOperator("E");
+
+      return appendAnyGenericType(decl);
+    };
+
+    // If we don't have a generic signature, then we don't need to go through
+    // the work of determining generic signature differences or inverse
+    // requirements and such.
+    if (!sig) {
+      return mangleExtension(/* genericSignatureRequiredMangling */ false);
     }
-    return appendAnyGenericType(decl);
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+
+    // If the extension's generic signature == the extended type's generic
+    // signature, then we only we need to check if there are any inverse
+    // requirements present.
+    if (sig->isEqual(decl->getGenericSignature())) {
+      // Mangle the extension if there are inverse requirements present.
+      return mangleExtension(
+          /* genericSignatureRequiredMangling */ !inverseReqs.empty());
+    }
+
+    // Otherwise, we need to check if all of the requirements not satisfied by
+    // the context decl are copyable requirements. If all of them are copyable
+    // requirements, then we don't need to mangle the generic signature 
+    auto requirementDiff = sig.requirementsNotSatisfiedBy(nominalSig);
+
+    for (auto req : requirementDiff) {
+      if (req.getKind() != RequirementKind::Conformance) {
+        return mangleExtension(/* genericSignatureRequiredMangling */ true);
+      }
+
+      auto protocol = req.getProtocolDecl();
+
+      if (!protocol->getInvertibleProtocolKind()) {
+        return mangleExtension(/* genericSignatureRequiredMangling */ true);
+      }
+    }
+
+    // We know that all requirements of this extension are the positive
+    // constraint to an invertible protocol. Mangle the extension as if it had
+    // no generic signature.
+    return mangleExtension(/* genericSignatureRequiredMangling */ false);
   }
 
   case DeclContextKind::AbstractClosureExpr:
