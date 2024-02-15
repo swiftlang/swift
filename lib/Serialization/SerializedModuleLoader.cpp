@@ -1527,12 +1527,16 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
+  if (AllowMemoryCache)
+    Ctx.addLoadedModule(M);
 
   auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath=*/"",
                        /*moduleInterfaceSourcePath=*/"",
                        std::move(moduleInputBuffer), {}, {}, isFramework);
-  if (!file)
+  if (!file) {
+    Ctx.removeLoadedModule(moduleID.Item);
     return nullptr;
+  }
 
   // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
   // from .swift_ast sections are never produced from textual interfaces. By
@@ -1540,8 +1544,6 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (BypassResilience)
     M->setBypassResilience();
   M->addFile(*file);
-  if (AllowMemoryCache)
-    Ctx.addLoadedModule(M);
   return M;
 }
 

@@ -2267,6 +2267,10 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   getImpl().LoadedModules[M->getRealName()] = M;
 }
 
+void ASTContext::removeLoadedModule(Identifier RealName) {
+  getImpl().LoadedModules.erase(RealName);
+}
+
 void ASTContext::setIgnoreAdjacentModules(bool value) {
   IgnoreAdjacentModules = value;
 }
