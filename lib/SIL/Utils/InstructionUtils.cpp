@@ -870,6 +870,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isBlockPointerCompatible())
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
+    if (impactType.isMoveOnly() &&
+        !isa<DropDeinitInst>(lookThroughOwnershipInsts(inst->getOperand(0)))) {
+      // Not de-virtualized value type deinits can require metatype in case the
+      // deinit needs to be called via the value witness table.
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    }
     return ifNonTrivial(inst->getOperand(0)->getType(),
                         RuntimeEffect::Releasing);
 
