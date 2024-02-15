@@ -885,7 +885,7 @@ private:
     }
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::IsolatedAnyFunctionType) {
-      Printer << "@isolated(any) ";
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() ==
