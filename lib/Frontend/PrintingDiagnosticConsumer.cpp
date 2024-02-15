@@ -304,16 +304,26 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
   }
 }
 
+void *PrintingDiagnosticConsumer::getSourceFileSyntax(
+    SourceManager &sourceMgr, unsigned bufferID, StringRef displayName) {
+  auto known = sourceFileSyntax.find({&sourceMgr, bufferID});
+  if (known != sourceFileSyntax.end())
+    return known->second;
+
+  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
+  auto sourceFile = swift_ASTGen_parseSourceFile(
+      bufferContents.data(), bufferContents.size(),
+      "module", displayName.str().c_str(), /*ctx*/ nullptr);
+
+  sourceFileSyntax[{&sourceMgr, bufferID}] = sourceFile;
+  return sourceFile;
+}
+
 void PrintingDiagnosticConsumer::queueBuffer(
     SourceManager &sourceMgr, unsigned bufferID) {
   QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
   if (knownSourceFile)
     return;
-
-  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
-  auto sourceFile = swift_ASTGen_parseSourceFile(
-      bufferContents.data(), bufferContents.size(),
-      "module", "file.swift", /*ctx*/ nullptr);
 
   // Find the parent and position in parent, if there is one.
   int parentID = -1;
@@ -345,6 +355,7 @@ void PrintingDiagnosticConsumer::queueBuffer(
         sourceMgr.getLocForBufferStart(bufferID)).str();
   }
 
+  auto sourceFile = getSourceFileSyntax(sourceMgr, bufferID, displayName);
   swift_ASTGen_addQueuedSourceFile(
       queuedDiagnostics, bufferID, sourceFile,
       (const uint8_t*)displayName.data(), displayName.size(),
@@ -423,9 +434,6 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
     queuedDiagnostics = nullptr;
-    for (const auto &buffer : queuedBuffers) {
-      swift_ASTGen_destroySourceFile(buffer.second);
-    }
     queuedBuffers.clear();
 
     if (includeTrailingBreak)
@@ -566,4 +574,9 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
 PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
     llvm::raw_ostream &stream)
     : Stream(stream) {}
-PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() = default;
+
+PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+  for (const auto &sourceFileSyntax : sourceFileSyntax) {
+    swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
+  }
+}
