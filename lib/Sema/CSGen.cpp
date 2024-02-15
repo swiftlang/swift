@@ -2467,6 +2467,17 @@ namespace {
         if (closure->getThrowsLoc().isValid())
           return Type();
 
+        // If we are inferring thrown error types, create a type variable
+        // to capture the thrown error type. This will be resolved based on the
+        // throw sites that occur within the body of the closure.
+        // FIXME: Single-expression closures don't yet work.
+        if (CS.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows) &&
+            !CS.getAppliedResultBuilderTransform(closure) &&
+            !closure->hasSingleExpressionBody()) {
+          return Type(
+              CS.createTypeVariable(thrownErrorLocator, TVO_CanBindToHole));
+        }
+
         // Thrown type inferred from context.
         if (auto contextualType = CS.getContextualType(
                 closure, /*forConstraint=*/false)) {

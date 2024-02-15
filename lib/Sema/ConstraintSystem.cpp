@@ -436,6 +436,11 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
     return ctx.getErrorExistentialType();
 
   // Handle inference of caught error types.
+  return inferCaughtErrorType(catchNode);
+}
+
+Type ConstraintSystem::inferCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
 
   // Collect all of the potential throw sites for this catch node.
   SmallVector<PotentialThrowSite, 2> throwSites;
@@ -478,6 +483,15 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   }
 
   return caughtErrorType;
+}
+
+TypeVariableType *
+ConstraintSystem::getInferredThrownError(ClosureExpr *closure) {
+  auto closureType = getClosureType(closure);
+  if (Type thrownError = closureType->getThrownError())
+    return thrownError->getAs<TypeVariableType>();
+
+  return nullptr;
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(

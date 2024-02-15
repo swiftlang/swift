@@ -367,15 +367,28 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
         cs, element, context, elementLoc, isDiscarded));
   }
 
+  for (auto *externalVar : paramCollector.getTypeVars())
+    referencedVars.push_back(externalVar);
+
+  // If the body of the closure is being used to infer the thrown error type
+  // of that closure, introduce a constraint to do so.
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+    if (auto thrownErrorTypeVar = cs.getInferredThrownError(closure)) {
+      referencedVars.push_back(thrownErrorTypeVar);
+      constraints.push_back(
+          Constraint::createCaughtError(cs, Type(thrownErrorTypeVar), closure,
+                                        locator, referencedVars));
+      referencedVars.pop_back();
+    }
+  }
+
   // It's possible that there are no viable elements in the body,
   // because e.g. whole body is an `#if` statement or it only has
   // declarations that are checked during solution application.
   // In such cases, let's avoid creating a conjunction.
   if (constraints.empty())
     return;
-
-  for (auto *externalVar : paramCollector.getTypeVars())
-    referencedVars.push_back(externalVar);
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, constraints, isIsolated, locator, referencedVars));
@@ -1089,10 +1102,11 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
+    ClosureExpr *closure = nullptr;
     CaptureListExpr *captureList = nullptr;
     {
       if (locator->directlyAt<ClosureExpr>()) {
-        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+        closure = castToExpr<ClosureExpr>(locator->getAnchor());
         captureList = getAsExpr<CaptureListExpr>(cs.getParentExpr(closure));
       }
     }
