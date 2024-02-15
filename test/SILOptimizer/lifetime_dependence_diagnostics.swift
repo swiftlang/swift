@@ -6,6 +6,7 @@
 // RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 @_nonescapable
