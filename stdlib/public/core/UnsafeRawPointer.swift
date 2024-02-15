@@ -1310,6 +1310,20 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func storeBytes<T : _BitwiseCopyable>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    withUnsafePointer(to: value) { source in
+      _memcpy(
+        dest: (self + offset), 
+        src: source, 
+        size: UInt(MemoryLayout<T>.size))
+    }
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
