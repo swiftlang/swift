@@ -7533,7 +7533,7 @@ public:
   /// If the method is witness to multiple requirements this is incorrect and
   /// should be diagnosed during type-checking as it may make remoteCalls
   /// ambiguous.
-  llvm::TinyPtrVector<ValueDecl *>
+  llvm::ArrayRef<ValueDecl *>
   getDistributedMethodWitnessedProtocolRequirements() const;
 
   /// Determines whether this function is a 'remoteCall' function,

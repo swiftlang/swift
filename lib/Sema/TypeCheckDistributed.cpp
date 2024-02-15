@@ -926,19 +926,20 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   return candidates.front();
 }
 
-llvm::TinyPtrVector<ValueDecl *>
+llvm::ArrayRef<ValueDecl *>
 GetDistributedMethodWitnessedProtocolRequirements::evaluate(
     Evaluator &evaluator,
     AbstractFunctionDecl *afd) const {
   // Only a 'distributed' decl can witness 'distributed' protocol
   assert(afd->isDistributed());
+  auto &C = afd->getASTContext();
 
-  auto result = llvm::TinyPtrVector<ValueDecl *>();
+  auto result = llvm::SmallVector<ValueDecl *, 1>();
   for (auto witnessedRequirement : afd->getSatisfiedProtocolRequirements()) {
     if (witnessedRequirement->isDistributed()) {
       result.push_back(witnessedRequirement);
     }
   }
 
-  return result;
+  return C.AllocateCopy(result);
 }

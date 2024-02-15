@@ -151,7 +151,7 @@ SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallTargetInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedMethodWitnessedProtocolRequirements,
-              llvm::TinyPtrVector<ValueDecl *> (AbstractFunctionDecl *),
+              ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteCallArgumentInitFunctionRequest,
               ConstructorDecl *(NominalTypeDecl *),
