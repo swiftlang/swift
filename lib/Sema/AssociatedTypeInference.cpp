@@ -986,7 +986,6 @@ private:
 
   /// Infer associated type witnesses for the given associated type.
   InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType);
 
   /// Infer associated type witnesses for all relevant value requirements.
@@ -1790,8 +1789,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (assocTypes.count(assocType) == 0)
         continue;
 
-      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocTypes,
-                                                             assocType);
+      auto reqInferred = inferTypeWitnessesViaAssociatedType(assocType);
       if (!reqInferred.empty())
         result.push_back({req, std::move(reqInferred)});
 
@@ -1853,6 +1851,19 @@ static Type mapErrorTypeToOriginal(Type type) {
   return type;
 }
 
+/// Desugar protocol type aliases, since they can cause request cycles in
+/// type resolution if printed in a module interface and parsed back in.
+static Type getWithoutProtocolTypeAliases(Type type) {
+  return type.transformRec([](TypeBase *t) -> llvm::Optional<Type> {
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(t)) {
+      if (aliasTy->getDecl()->getDeclContext()->getExtendedProtocolDecl())
+        return getWithoutProtocolTypeAliases(aliasTy->getSinglyDesugaredType());
+    }
+
+    return llvm::None;
+  });
+}
+
 /// Produce the type when matching a witness.
 ///
 /// If the witness is a member of the type itself or a superclass, we
@@ -1886,6 +1897,9 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
+
+  type = getWithoutProtocolTypeAliases(type);
+
   LLVM_DEBUG(llvm::dbgs() << "Witness interface type is " << type << "\n";);
 
   if (substitutions.empty())
@@ -1998,7 +2012,6 @@ static Type removeSelfParam(ValueDecl *value, Type type) {
 
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
   InferredAssociatedTypesByWitnesses result;
 
