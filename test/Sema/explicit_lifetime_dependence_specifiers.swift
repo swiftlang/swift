@@ -1,11 +1,19 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module -enable-experimental-feature BitwiseCopyable
 // REQUIRES: noncopyable_generics
 import Builtin
+
+struct Container {
+  let ptr: UnsafeRawBufferPointer
+}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
+  }
+  init(_ c: borrowing Container) -> _borrow(c) Self { // expected-error{{invalid lifetime dependence on bitwise copyable type}}
+    self.ptr = c.ptr
+    return self
   }
 }
 

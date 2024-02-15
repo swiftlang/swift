@@ -1,13 +1,16 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module -enable-experimental-lifetime-dependence-inference 
+// REQUIRES: asserts
 // REQUIRES: noncopyable_generics
 
 import Builtin
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
+  @_unsafeNonescapableResult
   init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
     if (i % 2 == 0) {
       return nil
@@ -18,15 +21,15 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) -> _consume(a) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
     self.ptr = ptr
     return self
   }
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, b: borrowing Array<Int>, c: Double) -> _consume(a) _borrow(b) Int { // expected-error{{expected Self return type for initializers with lifetime dependence specifiers}}
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Double>, b: borrowing Array<Int>, c: Double) -> _consume(a) _borrow(b) Int { // expected-error{{expected Self return type for initializers with lifetime dependence specifiers}}
     self.ptr = ptr
     return 0
   }
@@ -43,6 +46,7 @@ struct BufferView : ~Escapable {
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeMutableRawBufferPointer) {
     self.ptr = ptr
   }
@@ -131,6 +135,10 @@ func invalidSpecifier4(_ x: borrowing BufferView) -> _borrow(0) BufferView { // 
 
 struct Wrapper : ~Escapable {
   let view: BufferView
+  init(_ view: consuming BufferView) -> _consume(view) Self {
+    self.view = view
+    return self
+  }
   borrowing func getView1() -> _borrow(self) BufferView {
     return view
   }

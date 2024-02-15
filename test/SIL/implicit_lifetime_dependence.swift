@@ -24,6 +24,10 @@ struct BufferView : ~Escapable {
   init(_ otherBV: consuming BufferView) {
     self.ptr = otherBV.ptr
   }
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSWYls_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
+    self.ptr = ptr
+  }
 }
 
 struct MutableBufferView : ~Escapable, ~Copyable {

@@ -107,6 +107,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
+  auto *mod = afd->getModuleContext();
   auto &diags = ctx.Diags;
   auto capacity = afd->getParameters()->size() + 1;
   auto lifetimeDependentRepr =
@@ -116,7 +117,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
   SmallBitVector scopeLifetimeParamIndices(capacity);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDependenceSpecifier specifier,
-                                          unsigned paramIndexToSet,
+                                          unsigned paramIndexToSet, Type type,
                                           ValueOwnership ownership) {
     auto loc = specifier.getLoc();
     auto kind = specifier.getLifetimeDependenceKind();
@@ -148,6 +149,24 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                      getOwnershipSpelling(ownership));
       return true;
     }
+    if (kind == LifetimeDependenceKind::Consume ||
+        kind == LifetimeDependenceKind::Copy) {
+      if (type->isEscapable()) {
+        diags.diagnose(loc, diag::lifetime_dependence_cannot_use_infer,
+                       specifier.getLifetimeDependenceKindString());
+        return true;
+      }
+    }
+
+    if (ctx.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+      auto *bitwiseCopyableProtocol =
+          ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+      if (bitwiseCopyableProtocol && mod->checkConformance(type, bitwiseCopyableProtocol)) {
+        diags.diagnose(loc, diag::lifetime_dependence_on_bitwise_copyable);
+        return true;
+      }
+    }
+
     if (inheritLifetimeParamIndices.test(paramIndexToSet) ||
         scopeLifetimeParamIndices.test(paramIndexToSet)) {
       diags.diagnose(loc, diag::lifetime_dependence_duplicate_param_id);
@@ -168,17 +187,20 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
     switch (specifier.getSpecifierKind()) {
     case LifetimeDependenceSpecifier::SpecifierKind::Named: {
       bool foundParamName = false;
-      unsigned paramIndexToSet = 1;
+      unsigned paramIndex = 0;
       for (auto *param : *afd->getParameters()) {
         if (param->getParameterName() == specifier.getName()) {
           foundParamName = true;
-          if (updateLifetimeDependenceInfo(specifier, paramIndexToSet,
-                                           param->getValueOwnership())) {
+          if (updateLifetimeDependenceInfo(
+                  specifier, paramIndex + 1,
+                  afd->mapTypeIntoContext(
+                      param->toFunctionParam().getParameterType()),
+                  param->getValueOwnership())) {
             return llvm::None;
           }
           break;
         }
-        paramIndexToSet++;
+        paramIndex++;
       }
       if (!foundParamName) {
         diags.diagnose(specifier.getLoc(),
@@ -189,29 +211,23 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       break;
     }
     case LifetimeDependenceSpecifier::SpecifierKind::Ordered: {
-      auto paramIndex = specifier.getIndex();
-      if (paramIndex > afd->getParameters()->size()) {
+      auto index = specifier.getIndex();
+      if (index > afd->getParameters()->size()) {
         diags.diagnose(specifier.getLoc(),
-                       diag::lifetime_dependence_invalid_param_index,
-                       paramIndex);
+                       diag::lifetime_dependence_invalid_param_index, index);
         return llvm::None;
       }
-      if (paramIndex == 0) {
-        if (!afd->hasImplicitSelfDecl()) {
-          diags.diagnose(specifier.getLoc(),
-                         diag::lifetime_dependence_invalid_self);
+      if (index != 0) {
+        auto param = afd->getParameters()->get(index - 1);
+        auto ownership = param->getValueOwnership();
+        auto type = afd->mapTypeIntoContext(
+            param->toFunctionParam().getParameterType());
+        if (updateLifetimeDependenceInfo(specifier, index, type, ownership)) {
           return llvm::None;
         }
+        break;
       }
-      auto ownership =
-          paramIndex == 0
-              ? afd->getImplicitSelfDecl()->getValueOwnership()
-              : afd->getParameters()->get(paramIndex - 1)->getValueOwnership();
-      if (updateLifetimeDependenceInfo(
-              specifier, /*paramIndexToSet*/ specifier.getIndex(), ownership)) {
-        return llvm::None;
-      }
-      break;
+      LLVM_FALLTHROUGH;
     }
     case LifetimeDependenceSpecifier::SpecifierKind::Self: {
       if (!afd->hasImplicitSelfDecl()) {
@@ -221,6 +237,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       }
       if (updateLifetimeDependenceInfo(
               specifier, /*selfIndex*/ 0,
+              afd->getImplicitSelfDecl()->getTypeInContext(),
               afd->getImplicitSelfDecl()->getValueOwnership())) {
         return llvm::None;
       }
@@ -293,19 +310,21 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     if (param->getValueOwnership() == ValueOwnership::Default) {
       continue;
     }
-
-    if (!paramTypeInContext->isEscapable() ||
-        paramTypeInContext->isNoncopyable()) {
-      if (candidateParam) {
-        diags.diagnose(
-            returnLoc,
-            diag::lifetime_dependence_cannot_infer_wo_ambiguous_candidate);
-        return llvm::None;
-      }
-      candidateParam = param;
-      lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
-          afd, paramIndex + 1, param->getValueOwnership());
+    if (param->getValueOwnership() == ValueOwnership::Owned &&
+        paramTypeInContext->isEscapable()) {
+      continue;
     }
+
+    if (candidateParam) {
+      diags.diagnose(
+          returnLoc,
+          diag::lifetime_dependence_cannot_infer_ambiguous_candidate);
+      return llvm::None;
+    }
+    candidateParam = param;
+    lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
+        afd, paramIndex + 1, param->getValueOwnership());
+
     paramIndex++;
   }
   if (!candidateParam && !hasParamError) {
