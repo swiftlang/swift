@@ -7832,6 +7832,9 @@ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
 ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
       "expected nil or self as return values in an initializer with "
        "lifetime dependent specifiers", ())
+ERROR(lifetime_dependence_cannot_use_infer, none,
+       "invalid use of %0 lifetime dependence on Escapable type",
+       (StringRef))
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring
