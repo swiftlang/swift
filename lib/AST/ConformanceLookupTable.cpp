@@ -209,9 +209,10 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
+      InvertibleProtocolSet inverses;
       bool anyObject = false;
       for (const auto &found :
-               getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
+               getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
           protocols.push_back(
               {proto, found.Loc, found.uncheckedLoc, found.preconcurrencyLoc});
@@ -497,9 +498,10 @@ void ConformanceLookupTable::addInheritedProtocols(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     ConformanceSource source) {
   // Find all of the protocols in the inheritance list.
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
   for (const auto &found :
-          getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+          getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       addProtocol(proto, found.Loc,
                   source.withUncheckedLoc(found.uncheckedLoc)
