@@ -2995,7 +2995,7 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
 ManglingError
 Remangler::mangleAccessibleProtocolRequirementFunctionRecord(Node *node,
                                                              unsigned depth) {
-  Buffer << "DF";
+  Buffer << "HpF";
   return ManglingError::Success;
 }
 

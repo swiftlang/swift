@@ -530,7 +530,7 @@ std::string LinkEntity::mangleAsString() const {
   }
   case Kind::AccessibleProtocolRequirementFunctionRecord: {
     std::string Result(getSILFunction()->getName());
-    Result.append("DF");
+    Result.append("HpF");
     return Result;
   }
 
