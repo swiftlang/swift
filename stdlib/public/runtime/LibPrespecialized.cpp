@@ -86,6 +86,16 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
 
   Demangler dem;
   auto mangleNode = _buildDemanglingForGenericType(description, arguments, dem);
+  if (!mangleNode) {
+    if (SWIFT_UNLIKELY(runtime::environment::
+                           SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING()))
+      fprintf(stderr,
+              "Prespecializations library: failed to build demangling with "
+              "descriptor %p.\n",
+              description);
+    return nullptr;
+  }
+
   if (mangleNode->getKind() != Node::Kind::Global) {
     auto wrapper = dem.createNode(Node::Kind::Global);
     wrapper->addChild(mangleNode, dem);
