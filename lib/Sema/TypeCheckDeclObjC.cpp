@@ -3283,17 +3283,25 @@ private:
           if (reqParams.size() != implParams.size())
             return false;
 
-          auto implParamList =
-              cast<AbstractFunctionDecl>(implDecl)->getParameters();
+          ParameterList *implParamList = nullptr;
+          if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
+            implParamList = afd->getParameters();
 
           for (auto i : indices(reqParams)) {
             const auto &reqParam = reqParams[i];
             const auto &implParam = implParams[i];
-            ParamDecl *implParamDecl = implParamList->get(i);
-
-            if (!matchParamTypes(reqParam.getOldType(), implParam.getOldType(),
-                                 implParamDecl))
-              return false;
+            if (implParamList) {
+              // Some of the parameters may be IUOs; apply special logic.
+              if (!matchParamTypes(reqParam.getOldType(),
+                                   implParam.getOldType(),
+                                   implParamList->get(i)))
+                return false;
+            } else {
+              // IUOs not allowed here; apply ordinary logic.
+              if (!reqParam.getOldType()->matchesParameter(
+                      implParam.getOldType(), matchOpts))
+                return false;
+            }
           }
 
           return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),

@@ -57,6 +57,9 @@
 - (void)instanceMethod1:(int)param;
 - (void)instanceMethod2:(int)param;
 
+// rdar://122280735 - crash when the parameter of a block property needs @escaping
+@property (nonatomic, readonly) void (^ _Nonnull rdar122280735)(void (^_Nonnull completion)());
+
 @end
 
 @interface ObjCClass () <NSCopying>
