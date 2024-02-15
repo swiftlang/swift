@@ -225,6 +225,10 @@ protocol EmptySwiftProto {}
     // OK
     return self
   }
+
+  // rdar://122280735 - crash when the parameter of a block property needs @escaping
+  let rdar122280735: (() -> ()) -> Void = { _ in }
+  // expected-warning@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {
