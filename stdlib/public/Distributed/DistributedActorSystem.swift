@@ -272,7 +272,10 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   associatedtype ResultHandler: DistributedTargetInvocationResultHandler<SerializationRequirement>
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
-  associatedtype SerializationRequirement // TODO: constrain SerializationRequirement in type-system to only be ok with protocol or class here
+  /// 
+  /// The serialization requirement must be a protocol type, or protocol type
+  /// composition, like e.g. `any Codable` which is `Encodable & Decodable`.
+  associatedtype SerializationRequirement
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity

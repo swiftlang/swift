@@ -710,9 +710,18 @@ SILFunction *SILGenModule::emitProtocolWitness(
        witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
        witnessRef.getFuncDecl()->isDistributed());
   if (shouldUseDistributedThunkWitness) {
-    auto thunkDeclRef = SILDeclRef(
-        witnessRef.getFuncDecl()->getDistributedThunk(),
+    auto funcDecl = witnessRef.getFuncDecl();
+    auto thunkDecl = funcDecl->getDistributedThunk();
+    auto thunkDeclRef = SILDeclRef(thunkDecl,
         SILDeclRef::Kind::Func);
+#ifndef NDEBUG
+    if (!thunkDeclRef) {
+      witnessRef.dump();
+      witnessRef.getFuncDecl()->dump();
+      witnessRef.getFuncDecl()->dumpContext();
+      assert(thunkDeclRef && "Could not find distributed thunk for decl");
+    }
+#endif
     witnessRef = thunkDeclRef.asDistributed();
   }
 

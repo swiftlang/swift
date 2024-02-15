@@ -722,16 +722,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       if (!func->isDistributed())
         continue;
 
-      if (!isa<ProtocolDecl>(nominal)) {
-        auto systemTy = getConcreteReplacementForProtocolActorSystemType(func);
-        if (!systemTy || systemTy->hasError()) {
-          nominal->diagnose(
-              diag::distributed_actor_conformance_missing_system_type,
-              nominal->getName());
-          return;
-        }
-      }
-
       if (auto thunk = func->getDistributedThunk()) {
         SF->addDelayedFunction(thunk);
       }

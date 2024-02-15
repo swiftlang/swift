@@ -1314,7 +1314,7 @@ private:
 
 public:
   // Caching
-  bool isCached() const { return true; }
+  bool isCached() const { return false; }
 };
 
 /// Obtain the 'id' property of a 'distributed actor'.

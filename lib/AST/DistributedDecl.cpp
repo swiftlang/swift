@@ -1329,8 +1329,8 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 /******************************************************************************/
 
 FuncDecl *AbstractStorageDecl::getDistributedThunk() const {
-  if (!isDistributed())
-    return nullptr;
+//  if (!isDistributed())
+//    return nullptr;
 
   auto mutableThis = const_cast<AbstractStorageDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -1339,14 +1339,13 @@ FuncDecl *AbstractStorageDecl::getDistributedThunk() const {
 
 FuncDecl*
 AbstractFunctionDecl::getDistributedThunk() const {
-  if (!isDistributed())
-    return nullptr;
+//  if (!isDistributed()) {
+//    return nullptr;
+//  }
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedThunkRequest{mutableThis},
-      nullptr);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedThunkRequest{mutableThis}, nullptr);
 }
 
 VarDecl*

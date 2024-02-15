@@ -15,8 +15,7 @@
 import Distributed
 import FakeDistributedActorSystems
 
-// @DistributedRemotelyJustViaProxyAccessible
-protocol GreeterP_UnknownSystem: DistributedActor {
+protocol GreeterP: DistributedActor where DistributedActorSystem<any Codable> {
   distributed func greet() -> String
 }
 
@@ -50,17 +49,6 @@ extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_LocalTesti
     print("\(Self.self).\(#function) -> return \(GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub.self)")
 
     return try GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub(actorSystem: system)
-  }
-}
-
-// TODO: remove manual stubs code
-distributed actor GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub: GreeterP_UnknownSystem {
-  typealias ActorSystem = LocalTestingDistributedActorSystem
-
-  distributed func greet() -> String {
-    let message = "STUB:\(Self.self).\(#function)"
-    print(message)
-    return message
   }
 }
 

@@ -741,9 +741,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     return nullptr;
   }
 
-  assert(getConcreteReplacementForProtocolActorSystemType(func) &&
-         "Thunk synthesis must have concrete actor system type available");
-
   DeclName thunkName;
 
   // Since accessors don't have names, let's generate one based on
@@ -894,12 +891,14 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
                                                Originator originator) const {
   AbstractFunctionDecl *distributedTarget = nullptr;
   if (auto *storage = originator.dyn_cast<AbstractStorageDecl *>()) {
-    if (!storage->isDistributed())
+    if (!storage->isDistributed()) {
       return nullptr;
+    }
 
     if (auto *var = dyn_cast<VarDecl>(storage)) {
-      if (checkDistributedActorProperty(var, /*diagnose=*/false))
+      if (checkDistributedActorProperty(var, /*diagnose=*/false)) {
         return nullptr;
+      }
 
       distributedTarget = var->getAccessor(AccessorKind::Get);
     } else {
@@ -907,8 +906,9 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     distributedTarget = originator.get<AbstractFunctionDecl *>();
-    if (!distributedTarget->isDistributed())
+    if (!distributedTarget->isDistributed()) {
       return nullptr;
+    }
   }
   assert(distributedTarget);
 
@@ -920,13 +920,6 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   }
 
   auto &C = distributedTarget->getASTContext();
-
-  if (!getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
-    // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
-    // TODO(distributed): we should be able to lift this eventually,
-    // and allow resolving distributed actor protocols.
-    return nullptr;
-  }
 
   // If the target function signature has errors, or if it is illegal in other
   // ways, such as e.g. parameters not conforming to SerializationRequirement,
