@@ -292,28 +292,35 @@ extension FlattenCollection: Collection {
     // The following check makes sure that distance(from:to:) is invoked on the
     // _base at least once, to trigger a _precondition in forward only
     // collections.
-    if end < start {
+    if start > end {
       _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
     }
-    var _start: Index
-    let _end: Index
-    let step: Int
-    if start > end {
-      _start = end
-      _end = start
-      step = -1
+    
+    // This handles the case where both indices belong to the same collection.
+    if start._outer == end._outer {
+      return start._outer < _base.endIndex ? _base[start._outer].distance(from: start._inner!, to: end._inner!) : Int.zero
     }
-    else {
-      _start = start
-      _end = end
-      step = 1
+    
+    // The following path combines the prefix, the middle, and the suffix distance.
+    let range = Range(uncheckedBounds: start <= end ? (start, end) : (end, start))
+    var outer = range.lowerBound._outer
+    var count = 0 as Int // 0...Int.max
+    
+    if let inner = range.lowerBound._inner {
+      count += _base[outer][inner...].count
+      _base.formIndex(after: &outer)
     }
-    var count = 0
-    while _start != _end {
-      count += step
-      formIndex(after: &_start)
+    
+    while outer < range.upperBound._outer {
+      count += _base[outer].count
+      _base.formIndex(after: &outer)
     }
-    return count
+    
+    if let inner = range.upperBound._inner {
+      count += _base[outer][..<inner].count
+    }
+    
+    return start <= end ? count : -count
   }
 
   @inline(__always)
