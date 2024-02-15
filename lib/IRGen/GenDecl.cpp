@@ -4749,8 +4749,8 @@ void IRGenModule::emitAccessibleFunctions() {
   if (AccessibleFunctions.empty() && AccessibleProtocolFunctions.empty())
     return;
 
-  // TODO: remove the repetition here
-  StringRef sectionName;
+  StringRef fnsSectionName;
+  StringRef protocolFnsSectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
@@ -4759,36 +4759,18 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_acfuncs, regular";
+    fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
+    protocolFnsSectionName = "__TEXT, __swift5_acpfuns, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
-    sectionName = "swift5_accessible_functions";
+    fnsSectionName = "swift5_accessible_functions";
+    protocolFnsSectionName = "swift5_accessible_protocol_requirement_functions";
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
-    sectionName = ".sw5acfn$B";
-    break;
-  }
-
-  StringRef sectionName2;
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::DXContainer:
-  case llvm::Triple::GOFF:
-  case llvm::Triple::SPIRV:
-  case llvm::Triple::UnknownObjectFormat:
-    llvm_unreachable("Don't know how to emit accessible functions for "
-                     "the selected object format.");
-  case llvm::Triple::MachO:
-    sectionName2 = "__TEXT, __swift5_dacfuns, regular";
-    break;
-  case llvm::Triple::ELF:
-  case llvm::Triple::Wasm:
-    sectionName2 = "swift5_distributed_accessible_functions";
-    break;
-  case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    sectionName2 = ".sw5dacfn$B";
+    fnsSectionName = ".sw5acfn$B";
+    protocolFnsSectionName = ".sw5acpfn$B";
     break;
   }
 
@@ -4799,7 +4781,7 @@ void IRGenModule::emitAccessibleFunctions() {
         LinkEntity::forSILFunction(func).mangleAsString();
 
     emitAccessibleFunction(
-        sectionName, mangledRecordName,
+        fnsSectionName, mangledRecordName,
         /*mangledActorName=*/{}, mangledFunctionName, func);
   }
 
@@ -4817,7 +4799,7 @@ void IRGenModule::emitAccessibleFunctions() {
                                        : "<none>";
 
     emitAccessibleFunction(
-        sectionName2, mangledRecordName,
+        protocolFnsSectionName, mangledRecordName,
         mangledActorName, mangledFunctionName, func);
   }
 }
