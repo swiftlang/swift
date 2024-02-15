@@ -915,6 +915,8 @@ InverseMarking
 InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
                                        TypeDecl *decl,
                                        InvertibleProtocolKind ip) const {
+  assert(!isa<ProtocolDecl>(decl));
+
   auto &ctx = decl->getASTContext();
   const auto TARGET = ip;
   using Kind = InverseMarking::Kind;
@@ -1062,69 +1064,20 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
     return result;
   };
 
-  // Checks a where clause for constraints of the form:
-  //   - Self : TARGET
-  //   - Self : ~TARGET
-  // and records them in the `InverseMarking` result.
-  auto whereClauseVisitor = [&](GenericContext *GC, unsigned reqIdx,
-                                RequirementRepr &reqRepr,
-                                InverseMarking &result) {
-    if (reqRepr.isInvalid() ||
-        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
-      return;
-
-    auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
-    auto *constraintRepr = reqRepr.getConstraintRepr();
-
-    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
-      return;
-
-    auto req = resolveRequirement(GC, reqIdx);
-
-    if (!req || req->getKind() != RequirementKind::Conformance)
-      return;
-
-    auto constraint = req->getSecondType();
-
-    if (isTarget(constraint))
-      result.positive.setIfUnset(Kind::Explicit, constraintRepr->getLoc());
-
-    if (isInverseTarget(constraint))
-      result.inverse.setIfUnset(Kind::Explicit, constraintRepr->getLoc());
-  };
-
   /// MARK: procedure for determining if a nominal is marked with ~TARGET.
 
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // Claim that the tuple decl has an inferred ~TARGET marking.
-    if (isa<BuiltinTupleDecl>(nominal))
-      return InverseMarking::forInverse(InverseMarking::Kind::Inferred);
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal)
+    return InverseMarking::forInverse(Kind::None);
 
-    if (!isa<ProtocolDecl>(nominal)) {
-      // Handle non-protocol nominals specially because they infer a ~TARGET
-      // based on their generic parameters.
-      auto result = searchInheritanceClause(nominal->getInherited());
-      result.inverse.setIfUnset(hasInferredInverseTarget(nominal));
-      return result;
-    }
-  }
+  // Claim that the tuple decl has an inferred ~TARGET marking.
+  if (isa<BuiltinTupleDecl>(nominal))
+    return InverseMarking::forInverse(InverseMarking::Kind::Inferred);
 
-
-  /// MARK: procedure for handling other TypeDecls
-
-  // Check inheritance clause.
-  auto result = searchInheritanceClause(decl->getInherited());
-
-  // Check the where clause for markings that refer to this decl, if this
-  // TypeDecl has a where-clause at all.
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (auto whereClause = proto->getTrailingWhereClause()) {
-      auto requirements = whereClause->getRequirements();
-      for (unsigned i : indices(requirements))
-        whereClauseVisitor(proto, i, requirements[i], result);
-    }
-  }
-
+  // Handle non-protocol nominals specially because they infer a ~TARGET
+  // based on their generic parameters.
+  auto result = searchInheritanceClause(nominal->getInherited());
+  result.inverse.setIfUnset(hasInferredInverseTarget(nominal));
   return result;
 }
 
