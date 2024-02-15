@@ -56,7 +56,7 @@ import resilient_struct
 import resilient_enum
 
 // Concrete class with resilient stored property
-package final class ClassWithResilientProperty {
+package class ClassWithResilientProperty {
   package let p: Point
   package let s: Size
   package let color: Int32
@@ -65,7 +65,6 @@ package final class ClassWithResilientProperty {
     self.p = p
     self.s = s
     self.color = color
-
   }
 }
 
