@@ -10,8 +10,8 @@
 // RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg | %FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
 // RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
 
-// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -package-bypass-resilience-optimization | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
-// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -package-bypass-resilience-optimization -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
+// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
+// RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK,CHECK-BYPASS
 
 //--- Utils.swift
 package struct PkgStruct {

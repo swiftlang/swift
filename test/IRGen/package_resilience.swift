@@ -2,7 +2,7 @@
 // Unlike its counterparts in the other *_resilience.swift files, the goal is
 // for the package's component modules to all be considered within the same
 // resilience domain. This file ensures that we use direct access to package
-// decls at use site as much as possible with -package-bypass-resilience-optimization.
+// decls at use site as much as possible with -experimental-package-bypass-resilience.
 //
 
 // RUN: %empty-directory(%t)
@@ -11,11 +11,11 @@
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/Inputs/package_types/resilient_enum.swift
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/Inputs/package_types/resilient_class.swift
 
-// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -package-bypass-resilience-optimization -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
 
-// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -package-bypass-resilience-optimization -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
 
-// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -package-bypass-resilience-optimization -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
 
 // REQUIRES: objc_codegen
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
