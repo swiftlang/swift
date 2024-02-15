@@ -8,10 +8,10 @@
 // RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
 
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
 // REQUIRES: swift_in_compiler
 
-struct BV : ~Escapable {
+@_nonescapable
+struct BV {
   let p: UnsafeRawPointer
   let c: Int
 
@@ -24,7 +24,8 @@ struct BV : ~Escapable {
   }
 }
 
-struct NCNE : ~Copyable, ~Escapable {
+@_nonescapable
+struct NCNE : ~Copyable {
   let p: UnsafeRawPointer
   let c: Int
 

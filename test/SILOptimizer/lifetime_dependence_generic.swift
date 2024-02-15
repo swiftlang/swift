@@ -9,6 +9,7 @@
 // RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
 // RUN:   -parse-stdlib -module-name Swift
 
+// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 @_marker public protocol Escapable {}
