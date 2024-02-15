@@ -1,4 +1,3 @@
-// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/deps)
 // RUN: split-file %s %t
