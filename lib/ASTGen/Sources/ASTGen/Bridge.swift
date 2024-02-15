@@ -236,3 +236,45 @@ extension BridgedSourceRange {
     self = astgen.generateSourceRange(start: startToken, end: endToken)
   }
 }
+
+/// Helper collection type that lazily concatenates two collections.
+struct ConcatCollection<C1: Collection, C2: Collection> where C1.Element == C2.Element {
+  let c1: C1
+  let c2: C2
+
+  init(_ c1: C1, _ c2: C2) {
+    self.c1 = c1
+    self.c2 = c2
+  }
+}
+
+extension ConcatCollection: LazyCollectionProtocol {
+  typealias Element = C1.Element
+  enum Index: Comparable {
+    case c1(C1.Index)
+    case c2(C2.Index)
+  }
+
+  var count: Int { c1.count + c2.count }
+
+  private func _normalizedIndex(_ i: C1.Index) -> Index {
+    return i != c1.endIndex ? .c1(i) : .c2(c2.startIndex)
+  }
+
+  var startIndex: Index { _normalizedIndex(c1.startIndex) }
+  var endIndex: Index { .c2(c2.endIndex) }
+
+  func index(after i: Index) -> Index {
+    switch i {
+    case .c1(let i): return _normalizedIndex(c1.index(after: i))
+    case .c2(let i): return .c2(c2.index(after: i))
+    }
+  }
+
+  subscript(i: Index) -> Element {
+    switch i {
+    case .c1(let i): return c1[i]
+    case .c2(let i): return c2[i]
+    }
+  }
+}
