@@ -49,6 +49,8 @@ struct NonSendableMoveOnlyStruct {
 
 sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
 sil @transferMoveOnlyStruct : $@convention(thin) @async (@guaranteed NonSendableMoveOnlyStruct) -> ()
+sil @transferMoveOnlyStructIndirectly : $@convention(thin) @async (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
+sil @useMoveOnlyStructIndirectly : $@convention(thin) (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
 
 struct NonSendableStruct {
   var ns: NonSendableKlass
@@ -176,26 +178,24 @@ bb0:
   return %9999 : $()
 }
 
-// sil [ossa] @mark_unresolved_noncopyable_value_test : $@convention(thin) @async () -> () {
-// bb0:
-//   %0 = function_ref @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
-//   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
-//   %box = alloc_box ${ var NonSendableMoveOnlyStruct }
-//   %project = project_box %box : ${ var NonSendableMoveOnlyStruct }, 0
-//   %unresolved = mark_unresolved_non_copyable_value [consumable_and_assignable] %project : $*NonSendableMoveOnlyStruct
-//   store %1 to [init] %unresolved : $*NonSendableMoveOnlyStruct
-
-  // FIXME: rdar://122773845 substitution replacement type 'NonSendableMoveOnlyStruct' does not conform to protocol 'Copyable'
-//   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-//   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableMoveOnlyStruct>(%unresolved) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // x-warning @-1 {{transferring value of non-Sendable type 'NonSendableMoveOnlyStruct' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
-//   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-//   apply %5<NonSendableMoveOnlyStruct>(%unresolved) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // x-note @-1 {{access here could race}}
-//   destroy_value %box : ${ var NonSendableMoveOnlyStruct }
-//   %9999 = tuple ()
-//   return %9999 : $()
-// }
+sil [ossa] @mark_unresolved_noncopyable_value_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+  %box = alloc_box ${ var NonSendableMoveOnlyStruct }
+  %project = project_box %box : ${ var NonSendableMoveOnlyStruct }, 0
+  %unresolved = mark_unresolved_non_copyable_value [consumable_and_assignable] %project : $*NonSendableMoveOnlyStruct
+  store %1 to [init] %unresolved : $*NonSendableMoveOnlyStruct
+  %4 = function_ref @transferMoveOnlyStructIndirectly : $@convention(thin) @async (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4(%unresolved) : $@convention(thin) @async (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableMoveOnlyStruct' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  %5 = function_ref @useMoveOnlyStructIndirectly : $@convention(thin) (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
+  apply %5(%unresolved) : $@convention(thin) (@in_guaranteed NonSendableMoveOnlyStruct) -> ()
+  // expected-note @-1 {{access here could race}}
+  destroy_value %box : ${ var NonSendableMoveOnlyStruct }
+  %9999 = tuple ()
+  return %9999 : $()
+}
 
 sil [ossa] @mark_unresolved_reference_binding_test : $@convention(thin) @async () -> () {
 bb0:
