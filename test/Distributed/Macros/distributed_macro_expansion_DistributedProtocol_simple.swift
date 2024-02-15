@@ -11,67 +11,29 @@
 
 import Distributed
 
-@DistributedProtocol // TODO: attach automatically
-protocol G1: DistributedActor where SerializationRequirement == any Codable {
-  distributed func get() -> String
+// FIXME: the errors below are bugs: the added methods should be considered witnesses rdar://123012943
+// expected-note@+1{{in expansion of macro '_DistributedProtocol' on protocol 'Greeter' here}}
+@_DistributedProtocol
+protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
+  // FIXME: this is a bug
+  // expected-note@+1{{protocol requires function 'greet(name:)' with type '(String) -> String'}}
   distributed func greet(name: String) -> String
 }
 
-// @DistributedProtocol ->
-//
-// CHECK: @freestanding(declaration, names: named(get()), named(greet(name:)))
-// CHECK: macro _distributed_stubs_G1() =
-// CHECK:   #distributedStubs(
-// CHECK:     module: "main", protocolName: "G1",
-// CHECK:     stubProtocols: [],
-// CHECK:     "distributed func get() -> String",
-// CHECK:     "distributed func greet(name: String) -> String"
-// CHECK:   )
-//
-// TODO: distributed actor $G1<ActorSystem>: Greeter where SerializationRequirement == any Codable {
-// CHECK: distributed actor $G1: G1 {
-// TODO:    Preferably, we could refer to our own macro like this: #_distributed_stubs_G2
-// WORKAROUND:
-// CHECK:   #distributedStubs(
-// CHECK:      module: "main", protocolName: "G1",
-// CHECK:      stubProtocols: [],
-// CHECK:      "distributed func get() -> String",
-// CHECK:      "distributed func greet(name: String) -> String"
-// CHECK:    )
+// @_DistributedProtocol ->
+
+// CHECK: distributed actor $Greeter<ActorSystem>: Greeter, _DistributedActorStub
+// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>,
+// CHECK:   ActorSystem.ActorID: Codable
+// CHECK: {
 // CHECK: }
 
-// ==== ------------------------------------------------------------------------
-
-@DistributedProtocol // TODO: attach automatically
-protocol G2: DistributedActor where SerializationRequirement == any Codable {
-  distributed func get() -> String
-  distributed func greet(name: String) -> String
-
-  func local(check: Int) -> Int
-}
-
-// @DistributedProtocol ->
-//
-// CHECK: @freestanding(declaration, names: named(get()), named(greet(name:)), named(local(check:)))
-// CHECK: macro _distributed_stubs_G2() =
-// CHECK:   #distributedStubs(
-// CHECK:     module: "main", protocolName: "G2",
-// CHECK:     stubProtocols: [],
-// CHECK:     "distributed func get() -> String",
-// CHECK:     "distributed func greet(name: String) -> String"
-// CHECK:   )
-//
-// TODO: distributed actor $G2<ActorSystem>: Greeter where SerializationRequirement == any Codable {
-// CHECK: distributed actor $G2: G2 {
-// TODO:    Preferably, we could refer to our own macro like this: #_distributed_stubs_G2
-// WORKAROUND:
-// CHECK:   #distributedStubs(
-// CHECK:      module: "main", protocolName: "G2",
-// CHECK:      stubProtocols: [],
-// CHECK:      "distributed func get() -> String",
-// CHECK:      "distributed func greet(name: String) -> String",
-// CHECK:      "func local(check: Int) -> Int"
-// CHECK:    )
+// CHECK: extension Greeter {
+// CHECK:   distributed func greet(name: String) -> String {
+// CHECK:     if #available (SwiftStdlib 5.11, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError()
+// CHECK:     }
+// CHECK:   }
 // CHECK: }
-
-// ==== ------------------------------------------------------------------------

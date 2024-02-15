@@ -17,44 +17,9 @@ import _Concurrency
 
 #if $Macros
 
-/// ### Sample usage
-///     try #resolve<any Worker, SampleSystem>(id: id, using: system)
-@available(SwiftStdlib 9999, *)
-@freestanding(expression)
- public macro resolve<DA, DAS: DistributedActorSystem>(
-  id: DAS.ActorID, using system: DAS) -> DA =
-    #externalMacro(module: "DistributedMacros", type: "DistributedResolveMacro")
-
-@available(SwiftStdlib 9999, *)
-@freestanding(expression)
-public macro distributedResolveStub<DAS: DistributedActorSystem>(
-  stubTypeName: String,
-  module: String, protocolName: String,
-  id: DAS.ActorID, using system: DAS,
-  stubProtocols: String...) -> Any =
-    #externalMacro(module: "DistributedMacros", type: "DistributedResolveStubMacro")
-
-/// Macro which expands a list of protocol requirements into their "stub"
-/// implementations, which invoke the ``Distributed/_methodStub()`` method.
-///
-/// Distributed stubs are used during distributed protocol stub synthesis,
-/// in order to generate a type that can be used as underlying implementation
-/// for a created remote distributed actor reference object, when given only a
-/// protocol to create such reference for.
-///
-/// Distributed method stubs are not used for concrete distributed actors --
-/// as those have concrete (local) implementations already provided by the
-/// type's author.
-@available(SwiftStdlib 9999, *)
-@freestanding(declaration, names: arbitrary)
-public macro distributedStubs(
-  module: String, protocolName: String,
-  stubProtocols: [String],
-  _ requirements: String...) =
-    #externalMacro(module: "DistributedMacros", type: "DistributedRequirementStubsMacro")
-
-@attached(peer, names: prefixed(`$`), prefixed(_distributed_stubs_))
-public macro DistributedProtocol() =
-  #externalMacro(module: "DistributedMacros", type: "DistributedMakeProtocolStubTypeMacro")
+@attached(peer, names: prefixed(`$`)) // provides $Greeter concrete stub type
+@attached(extension, names: arbitrary) // provides extension for Greeter & _DistributedActorStub
+public macro _DistributedProtocol() =
+  #externalMacro(module: "SwiftMacros", type: "DistributedProtocolMacro")
 
 #endif

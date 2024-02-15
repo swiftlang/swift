@@ -76,4 +76,3 @@ endfunction()
 
 add_subdirectory(Sources/SwiftMacros)
 add_subdirectory(Sources/ObservationMacros)
-add_subdirectory(Sources/DistributedMacros)

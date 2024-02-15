@@ -16,14 +16,14 @@ import Distributed
 
 typealias System = LocalTestingDistributedActorSystem
 
-@DistributedProtocol
+@_DistributedProtocol
 protocol EmptyBase {}
 
 // TODO: allow this?
-//@DistributedProtocol
+//@_DistributedProtocol
 //extension EmptyBase {}
 
-// @DistributedProtocol ->
+// @_DistributedProtocol ->
 //
 // CHECK: @freestanding(declaration)
 // CHECK: macro _distributed_stubs_EmptyBase() =
@@ -42,13 +42,13 @@ protocol EmptyBase {}
 // CHECK:   )
 // CHECK: }
 
-@DistributedProtocol // TODO: attach automatically
+@_DistributedProtocol
 protocol G3: DistributedActor, EmptyBase where SerializationRequirement == any Codable {
   distributed func get() -> String
   distributed func greet(name: String) -> String
 }
 
-// @DistributedProtocol ->
+// @_DistributedProtocol ->
 //
 // Since we have also the EmptyBase we don't know what names it will introduce,
 // so this stubs macro must be "names: arbitrary":
