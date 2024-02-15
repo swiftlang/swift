@@ -3291,19 +3291,59 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
+  auto &ctx = PD->getASTContext();
+
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
-  InvertibleProtocolSet inverses;
-  bool anyObject = false;
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(
-            PD, inverses, anyObject)) {
-    auto proto = dyn_cast<ProtocolDecl>(found.Item);
-    if (proto && proto != PD)
-      inherited.insert(proto);
+
+  if (PD->wasDeserialized()) {
+    auto protoSelfTy = PD->getSelfInterfaceType();
+    for (auto req : PD->getRequirementSignature().getRequirements()) {
+      // Dig out a conformance requirement...
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // constraining Self.
+      if (!req.getFirstType()->isEqual(protoSelfTy))
+        continue;
+
+      inherited.insert(req.getProtocolDecl());
+    }
+  } else {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    for (const auto &found : getDirectlyInheritedNominalTypeDecls(
+              PD, inverses, anyObject)) {
+      auto proto = dyn_cast<ProtocolDecl>(found.Item);
+      if (proto && proto != PD)
+        inherited.insert(proto);
+    }
+
+    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+      bool skipInverses = false;
+
+      if (auto kp = PD->getKnownProtocolKind()) {
+        switch (*kp) {
+        case KnownProtocolKind::Sendable:
+        case KnownProtocolKind::Copyable:
+        case KnownProtocolKind::Escapable:
+          skipInverses = true;
+          break;
+
+        default:
+          break;
+        }
+      }
+
+      if (!skipInverses) {
+        for (auto ip : InvertibleProtocolSet::full()) {
+          if (!inverses.contains(ip))
+            inherited.insert(ctx.getProtocol(getKnownProtocolKind(ip)));
+        }
+      }
+    }
   }
 
-  // FIXME: Apply inverses
-
-  return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
+  return ctx.AllocateCopy(inherited.getArrayRef());
 }
 
 ArrayRef<ValueDecl *>
@@ -3795,35 +3835,17 @@ swift::getDirectlyInheritedNominalTypeDecls(
     InvertibleProtocolSet &inverses, bool &anyObject) {
   SmallVector<InheritedNominalEntry, 4> result;
 
-  // For a deserialized protocol, the syntactic representations are not going to
-  // tell us anything. Ask the requirement signature instead.
-  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
-  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
-  if (protoDecl && protoDecl->wasDeserialized()) {
-    auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto req : protoDecl->getRequirementSignature().getRequirements()) {
-      // Dig out a conformance requirement...
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      // constraining Self.
-      if (!req.getFirstType()->isEqual(protoSelfTy))
-        continue;
-
-      result.emplace_back(req.getProtocolDecl(),
-                          SourceLoc(), SourceLoc(), SourceLoc());
-    }
-    return result;
-  }
-
-  // Gather results from all of the inherited types.
   auto inheritedTypes = InheritedTypes(decl);
   for (unsigned i : inheritedTypes.getIndices()) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject);
   }
 
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
   if (!protoDecl)
     return result;
+
+  assert(!protoDecl->wasDeserialized() && "Use getInheritedProtocols()");
 
   // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
   // these to add `Sendable` conformances to protocols without modifying the

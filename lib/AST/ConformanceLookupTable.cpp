@@ -554,8 +554,14 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       }
     }
 
-    addInheritedProtocols(conformingProtocol,
-                          ConformanceSource::forImplied(conformanceEntry));
+    auto source = ConformanceSource::forImplied(conformanceEntry);
+    for (auto *inherited : conformingProtocol->getInheritedProtocols()) {
+      // FIXME: This is a temporary hack until other stuff is cleaned up.
+      if (inherited->getInvertibleProtocolKind())
+        continue;
+
+      addProtocol(inherited, SourceLoc(), source);
+    }
   }
 }
 
