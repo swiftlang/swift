@@ -300,17 +300,6 @@ PackageUnit *DeclContext::getPackageContext(bool lookupIfNotCurrent) const {
   return nullptr;
 }
 
-bool DeclContext::bypassResilienceInPackage(bool isForPackageDecl) const {
-  // Bypassing resilience checks only applies to package types (and possibly
-  // public types in the same package in the future). Allowed only if opted-in
-  // for bypassing optimization, client and defining module are in the same
-  // package, and defining module is a binary module.
-  return isForPackageDecl &&
-         getASTContext().LangOpts.EnableBypassResilienceInPackage &&
-         getParentModule()->inSamePackage(getASTContext().MainModule) &&
-         !getParentModule()->isBuiltFromInterface();
-}
-
 ModuleDecl *DeclContext::getParentModule() const {
   // If the current context is PackageUnit, return the module
   // decl context pointing to the current context. This check
