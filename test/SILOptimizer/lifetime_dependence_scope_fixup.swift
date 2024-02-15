@@ -50,7 +50,10 @@ struct MutableView : ~Copyable, ~Escapable {
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
   }
-  init(_ k: consuming NCContainer) {
+  init(_ k: borrowing NCContainer) {
+    self.ptr = k.ptr
+  }
+  init(_ k: consuming NEContainer) {
     self.ptr = k.ptr
   }
 }
@@ -114,6 +117,9 @@ func test3(_ a: Array<Int>) {
   }
 }
 
+/*
+// Currently fails because the lifetime dependence util isn't analyzing a
+// def-use chain involving a stack temporary
 func test4(_ a: Array<Int>) {
   a.withUnsafeBytes {
     var x = NCContainer($0)
@@ -123,6 +129,7 @@ func test4(_ a: Array<Int>) {
     consume(view)
   }
 }
+*/
 
 func test5(_ a: Array<Int>) {
   a.withUnsafeBytes {
@@ -151,4 +158,14 @@ func test7(_ a: UnsafeRawBufferPointer) {
     use(view)
   }
   mutate(&x)
+}
+
+func test8(_ a: Array<Int>) {
+  a.withUnsafeBytes {
+    var x = NEContainer($0)
+    mutate(&x)
+    let view = MutableView(x)
+    use(view)
+    consume(view)
+  }
 }

@@ -34,20 +34,14 @@ func testInitializers() {
   let b = Array(0..<capacity)
   a.withUnsafeBytes {
     let view1 = BufferView($0, a)
-    let view2 = BufferView($0, a, b)
+    let view2 = BufferView($0, b)
     let mysteryView = deriveThisOrThat(view1, view2)
     use(mysteryView)
   }
 }
-
 // CHECK: sil @$s32def_explicit_lifetime_dependence6deriveyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView
-
 // CHECK: sil @$s32def_explicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(1) @owned BufferView
-
 // CHECK: sil @$s32def_explicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) @owned BufferView
-
 // CHECK: sil @$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVADYls_ADYlstF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> _scope(1, 2) @owned BufferView
 
 // CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView
-
-// CHECK: sil @$s32def_explicit_lifetime_dependence10BufferViewVyACSW_SaySiGYliADhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Int>, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_scope(3) @owned BufferView

@@ -7,10 +7,11 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
 
+// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 // REQUIRES: swift_in_compiler
 
-@_nonescapable
-struct BV {
+struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
@@ -23,7 +24,7 @@ struct BV {
   }
 }
 
-struct NC : ~Copyable {
+struct NCNE : ~Copyable, ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
@@ -34,16 +35,16 @@ struct NC : ~Copyable {
 }
 
 // Propagate a borrow.
-func bv_get_borrow(container: borrowing NC) -> _borrow(container) BV {
+func bv_get_borrow(container: borrowing NCNE) -> _borrow(container) BV {
   container.getBV()
 }
 
 // Copy a borrow.
-func bv_get_copy(container: borrowing NC) -> _copy(container) BV {
+func bv_get_copy(container: borrowing NCNE) -> _copy(container) BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-func bv_get_mutate(container: inout NC) -> _mutate(container) BV {
+func bv_get_mutate(container: inout NCNE) -> _mutate(container) BV {
   container.getBV()
 }

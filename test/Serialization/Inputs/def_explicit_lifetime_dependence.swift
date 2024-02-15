@@ -1,3 +1,11 @@
+public struct AnotherView : ~Escapable {
+  let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
+  public init(_ ptr: UnsafeRawBufferPointer) {
+    self.ptr = ptr
+  }
+}
+
 public struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   @_unsafeNonescapableResult
@@ -8,11 +16,11 @@ public struct BufferView : ~Escapable {
     self.ptr = ptr
     return self
   }
-  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) -> _consume(a) Self {
     self.ptr = ptr
     return self
   }
-  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Int>, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
     self.ptr = ptr
     return self
   }
