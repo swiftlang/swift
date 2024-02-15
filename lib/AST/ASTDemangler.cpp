@@ -842,7 +842,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
     ArrayRef<BuiltSubstitution> Substitutions,
     ArrayRef<BuiltRequirement> Requirements) {
   SmallVector<Type, 4> replacements;
-  SmallVector<GenericTypeParamType *, 4> genericTypeParams;
+  SmallVector<GenericTypeParamType *, 2> genericTypeParams;
   for (const auto &s : Substitutions) {
     if (auto *t = dyn_cast_or_null<GenericTypeParamType>(s.first.getPointer()))
       genericTypeParams.push_back(t);
@@ -850,8 +850,14 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   }
 
   GenericSignature signature;
-  if (!genericTypeParams.empty())
-    signature = GenericSignature::get(genericTypeParams, Requirements);
+  if (!genericTypeParams.empty()) {
+    SmallVector<BuiltRequirement, 2> RequirementsVec(Requirements);
+    signature = swift::buildGenericSignature(Ctx,
+                                             signature,
+                                             genericTypeParams,
+                                             std::move(RequirementsVec),
+                                             /*allowInverses=*/true);
+  }
   SmallVector<SILField, 4> silFields;
   for (auto field: fields)
     silFields.emplace_back(field.getPointer()->getCanonicalType(),

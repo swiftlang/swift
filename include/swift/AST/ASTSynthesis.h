@@ -40,8 +40,10 @@ inline Type synthesizeType(SynthesisContext &SC, Type type) {
 enum SingletonTypeSynthesizer {
   _any,
   _bridgeObject,
+  _copyable,
   _error,
   _executor, // the 'BuiltinExecutor' type
+  _escapable,
   _job,
   _nativeObject,
   _never,
@@ -77,6 +79,12 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();
+  case _copyable:
+    return SC.Context.getProtocol(KnownProtocolKind::Copyable)
+        ->getDeclaredInterfaceType();
+  case _escapable:
+    return SC.Context.getProtocol(KnownProtocolKind::Escapable)
+        ->getDeclaredInterfaceType();
   }
 }
 
