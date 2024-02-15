@@ -268,10 +268,24 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
       scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
+
+    if (SF->Kind == SourceFileKind::DefaultArgument) {
+      auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
+          *SF->getBufferID());
+      parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
+      if (auto parentScope =
+              findStartingScopeForLookup(enclosingSF, parentLoc)) {
+        parentAndWasExpanded.setPointer(
+            const_cast<ASTScopeImpl *>(parentScope));
+      }
+      return;
+    }
+
     auto macroRole = SF->getFulfilledMacroRole();
 
     // Determine the parent source location based on the macro role.
     AbstractFunctionDecl *bodyForDecl = nullptr;
+
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:

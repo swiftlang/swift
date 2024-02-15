@@ -537,6 +537,7 @@ enum class DefaultArgumentKind : uint8_t {
   EmptyArray,
   EmptyDictionary,
   StoredProperty,
+  ExpressionMacro,
 };
 using DefaultArgumentField = BCFixed<4>;
 

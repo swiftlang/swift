@@ -467,7 +467,8 @@ bool typeCheckClosureBody(ClosureExpr *closure);
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                               Type paramType, bool isAutoClosure);
+                               Type paramType, bool isAutoClosure,
+                               bool atCallerSide);
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
@@ -760,6 +761,7 @@ void checkPatternBindingCaptures(IterableDeclContext *DC);
 /// Change the context of closures in the given initializer
 /// expression to the given context.
 void contextualizeInitializer(Initializer *DC, Expr *init);
+void contextualizeCallSideDefaultArgument(DeclContext *DC, Expr *init);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
@@ -1134,6 +1136,7 @@ void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 void checkTopLevelEffects(TopLevelCodeDecl *D);
 void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
+void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 

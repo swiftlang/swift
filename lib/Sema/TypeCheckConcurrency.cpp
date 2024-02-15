@@ -45,6 +45,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
           // Interfaces have explicitly called-out Sendable conformances.
           return false;
 
+        case SourceFileKind::DefaultArgument:
         case SourceFileKind::Library:
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
@@ -874,6 +875,7 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   case SourceFileKind::SIL:
       return false;
 
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
@@ -5717,6 +5719,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
           // Interfaces have explicitly called-out Sendable conformances.
           return nullptr;
 
+        case SourceFileKind::DefaultArgument:
         case SourceFileKind::Library:
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:

@@ -54,6 +54,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -1019,6 +1020,32 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   }
 }
 
+static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
+  assert(param->getDefaultArgumentKind() ==
+         DefaultArgumentKind::ExpressionMacro);
+  auto &ctx = param->getASTContext();
+  auto *initExpr = param->getStructuralDefaultExpr();
+  assert(initExpr);
+
+  // Prohibit default argument that is a non-built-in macro to avoid confusion,
+  // unless the experimental feature flag is set.
+  if (!ctx.LangOpts.hasFeature(Feature::ExpressionMacroDefaultArguments)) {
+    ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
+    return false;
+  }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  auto *DC = param->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  return swift_ASTGen_checkDefaultArgumentMacroExpression(
+      &ctx.Diags, SF->getExportedSourceFile(),
+      initExpr->getLoc().getOpaquePointerValue());
+#else
+  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported));
+  return false;
+#endif
+}
+
 void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
                                                   Type inferredType) {
   assert(writtenType && inferredType &&
@@ -1132,11 +1159,12 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  // Prohibit default argument that is a non-built-in macro to avoid confusion.
-  if (isa<MacroExpansionExpr>(initExpr)) {
-    ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
+  auto isMacroExpansionExpr =
+      param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro;
+
+  if (isMacroExpansionExpr &&
+      !checkExpressionMacroDefaultValueRestrictions(param))
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
-  }
 
   // If the param has an error type, there's no point type checking the default
   // expression, unless we are type checking for code completion, in which case
@@ -1148,9 +1176,14 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   assert(dc);
 
   if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
-                                              param->isAutoClosure())) {
+                                              param->isAutoClosure(),
+                                              /*atCallerSide=*/false)) {
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
+
+  // Expression macro default arguments are checked at caller side
+  if (isMacroExpansionExpr)
+    return initExpr;
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
@@ -1545,6 +1578,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
       return;
+    case SourceFileKind::DefaultArgument:
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
@@ -2618,6 +2652,7 @@ public:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
+          case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
@@ -2640,6 +2675,7 @@ public:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
+          case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
             break;

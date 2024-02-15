@@ -3043,6 +3043,18 @@ static bool usesFeatureFreestandingMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Declaration);
 }
 
+static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto param : *func->getParameters()) {
+      if (param->getDefaultArgumentKind() ==
+          DefaultArgumentKind::ExpressionMacro)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeatureCodeItemMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)

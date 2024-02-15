@@ -85,7 +85,7 @@ llvm::Optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
                 OptionSet<TypeCheckExprFlags> options);
 
-Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool);
+Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
 } // end namespace TypeChecker
 
@@ -3019,7 +3019,7 @@ private:
 
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
                                                             DeclContext *, Type,
-                                                            bool);
+                                                            bool, bool);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.

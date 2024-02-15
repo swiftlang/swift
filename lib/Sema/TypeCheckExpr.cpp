@@ -710,8 +710,59 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   return Result;
 }
 
+static SourceFile *createDefaultArgumentSourceFile(StringRef macroExpression,
+                                                   SourceLoc insertionPoint,
+                                                   ASTNode target,
+                                                   DeclContext *dc) {
+  ASTContext &ctx = dc->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  llvm::SmallString<256> builder;
+  unsigned line, column;
+  std::tie(line, column) = sourceMgr.getLineAndColumnInBuffer(insertionPoint);
+  auto file = dc->getParentSourceFile()->getFilename();
+
+  // find a way to pass the file:line:column to macro expansion
+  // so that we can share same buffer for the same default argument
+  builder.append(line - 1, '\n');
+  builder.append(column - 1, ' ');
+  builder.append(macroExpression);
+
+  std::unique_ptr<llvm::MemoryBuffer> buffer;
+  buffer = llvm::MemoryBuffer::getMemBufferCopy(builder.str(), file);
+
+  // Dump default argument to standard output, if requested.
+  if (ctx.LangOpts.DumpMacroExpansions) {
+    llvm::errs() << buffer->getBufferIdentifier()
+                 << "\n------------------------------\n"
+                 << buffer->getBuffer()
+                 << "\n------------------------------\n";
+  }
+
+  // Create a new source buffer with the contents of the default argument
+  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(buffer));
+  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
+  GeneratedSourceInfo sourceInfo{GeneratedSourceInfo::DefaultArgument,
+                                 {insertionPoint, 0},
+                                 macroBufferRange,
+                                 target.getOpaqueValue(),
+                                 dc,
+                                 nullptr};
+  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
+
+  // Create a source file to hold the macro buffer. This is automatically
+  // registered with the enclosing module.
+  auto sourceFile = new (ctx) SourceFile(
+      *dc->getParentModule(), SourceFileKind::DefaultArgument, macroBufferID,
+      /*parsingOpts=*/{}, /*isPrimary=*/false);
+  sourceFile->setImports(dc->getParentSourceFile()->getImports());
+  return sourceFile;
+}
+
 static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
-                                         SourceLoc loc) {
+                                         DefaultArgumentExpr *defaultExpr,
+                                         DeclContext *dc) {
+  SourceLoc loc = defaultExpr->getLoc();
   auto &ctx = param->getASTContext();
   switch (param->getDefaultArgumentKind()) {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -720,6 +771,25 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
         MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::NAME, loc, \
                                    /*implicit=*/true);
 #include "swift/AST/MagicIdentifierKinds.def"
+
+  case DefaultArgumentKind::ExpressionMacro: {
+    // FIXME: ApolloZhu serialize and deserialize expressions instead
+    SmallString<128> scratch;
+    const StringRef text = param->getDefaultValueStringRepresentation(scratch);
+    SourceFile *defaultArgSourceFile =
+        createDefaultArgumentSourceFile(text, loc, defaultExpr, dc);
+    auto topLevelItems = defaultArgSourceFile->getTopLevelItems();
+    for (auto item : topLevelItems) {
+      if (auto *expr = item.dyn_cast<Expr *>())
+        if (auto *callerSideMacroExpansionExpr =
+                dyn_cast<MacroExpansionExpr>(expr)) {
+          callerSideMacroExpansionExpr->setImplicit();
+          return callerSideMacroExpansionExpr;
+        }
+    }
+    llvm_unreachable("default argument source file missing caller side macro "
+                     "expansion expression");
+  }
 
   case DefaultArgumentKind::NilLiteral:
     return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
@@ -750,15 +820,15 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   auto paramTy = defaultExpr->getType();
 
   // Re-create the default argument using the location info of the call site.
-  auto *initExpr =
-      synthesizeCallerSideDefault(param, defaultExpr->getLoc());
   auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr, dc);
   assert(dc && "Expected a DeclContext before type-checking caller-side arg");
 
   auto &ctx = param->getASTContext();
   DiagnosticTransaction transaction(ctx.Diags);
   if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
-                                              param->isAutoClosure())) {
+                                              param->isAutoClosure(),
+                                              /*atCallerSide=*/true)) {
     if (param->hasDefaultExpr()) {
       // HACK: If we were unable to type-check the default argument in context,
       // then retry by type-checking it within the parameter decl, which should
@@ -769,6 +839,10 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
       assert(ctx.Diags.hadAnyError());
     }
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
+  }
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro) {
+    TypeChecker::contextualizeCallSideDefaultArgument(dc, initExpr);
+    TypeChecker::checkCallerSideDefaultArgumentEffects(dc, initExpr);
   }
   return initExpr;
 }

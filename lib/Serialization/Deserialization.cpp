@@ -452,6 +452,7 @@ getActualDefaultArgKind(uint8_t raw) {
   CASE(EmptyArray)
   CASE(EmptyDictionary)
   CASE(StoredProperty)
+  CASE(ExpressionMacro)
 #undef CASE
   }
   return llvm::None;

@@ -8279,6 +8279,9 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
   if (isa<NilLiteralExpr>(init))
     return DefaultArgumentKind::NilLiteral;
 
+  if (isa<MacroExpansionExpr>(init))
+    return DefaultArgumentKind::ExpressionMacro;
+
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
     return DefaultArgumentKind::Normal;
@@ -8478,6 +8481,7 @@ bool ParamDecl::hasDefaultExpr() const {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::ExpressionMacro:
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
@@ -8501,6 +8505,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
     return true;
   }
   llvm_unreachable("invalid default argument kind");
@@ -8697,6 +8702,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   switch (getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
+  case DefaultArgumentKind::ExpressionMacro:
   case DefaultArgumentKind::Normal: {
     assert(DefaultValueAndFlags.getPointer() &&
            "default value not provided yet");
@@ -8789,7 +8795,8 @@ ParamDecl::getDefaultValueStringRepresentation(
 void
 ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
   assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal ||
-         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty);
+         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty ||
+         getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro);
   assert(!stringRepresentation.empty());
 
   if (!DefaultValueAndFlags.getPointer()) {
@@ -12011,6 +12018,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::DefaultArgument:
     return origDC;
   }
 }

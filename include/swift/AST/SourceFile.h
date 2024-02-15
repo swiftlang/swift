@@ -674,6 +674,7 @@ public:
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");

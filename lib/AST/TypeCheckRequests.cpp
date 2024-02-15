@@ -2131,6 +2131,7 @@ UniqueUnderlyingTypeSubstitutionsRequest::evaluate(
       switch (sf->Kind) {
       case SourceFileKind::Interface:
       case SourceFileKind::MacroExpansion:
+      case SourceFileKind::DefaultArgument:
       case SourceFileKind::SIL:
         return true;
       case SourceFileKind::Main:

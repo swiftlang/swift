@@ -920,6 +920,8 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       bufferID = SM.findBufferContainingLoc(loc);
       break;
     }
+    case GeneratedSourceInfo::DefaultArgument:
+      // No original location as it's not actually in any source file
     case GeneratedSourceInfo::ReplacedFunctionBody:
       // There's not really any "original" location for locations within
       // replaced function bodies. The body is actually different code to the
@@ -1214,12 +1216,14 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::DefaultArgument:
     return llvm::None;
   }
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  if (Kind != SourceFileKind::MacroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion &&
+      Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
   auto genInfo =
@@ -3308,7 +3312,8 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
 
-  if (Kind == SourceFileKind::MacroExpansion)
+  if (Kind == SourceFileKind::MacroExpansion ||
+      Kind == SourceFileKind::DefaultArgument)
     M.addAuxiliaryFile(*this);
 }
 

@@ -1781,6 +1781,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   StringRef explicitSwiftModuleMap = searchPathOpts.ExplicitSwiftModuleMap;
   genericSubInvocation.getSearchPathOptions().ExplicitSwiftModuleMap =
     explicitSwiftModuleMap.str();
+
+  // Load plugin libraries for macro expression as default arguments
+  genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
+      searchPathOpts.PluginSearchOpts;
+
   auto &subClangImporterOpts = genericSubInvocation.getClangImporterOptions();
   // Respect the detailed-record preprocessor setting of the parent context.
   // This, and the "raw" clang module format it implicitly enables, are

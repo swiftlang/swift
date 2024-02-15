@@ -1415,6 +1415,7 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(EmptyArray)
   CASE(EmptyDictionary)
   CASE(StoredProperty)
+  CASE(ExpressionMacro)
 #undef CASE
   }
 
@@ -4402,12 +4403,14 @@ public:
 
     swift::DefaultArgumentKind argKind = param->getDefaultArgumentKind();
     if (argKind == swift::DefaultArgumentKind::Normal ||
-        argKind == swift::DefaultArgumentKind::StoredProperty) {
+        argKind == swift::DefaultArgumentKind::StoredProperty ||
+        argKind == swift::DefaultArgumentKind::ExpressionMacro) {
       defaultArgumentText =
         param->getDefaultValueStringRepresentation(scratch);
 
       // Serialize the type of the default expression (if any).
-      defaultExprType = param->getTypeOfDefaultExpr();
+      if (!param->hasCallerSideDefaultExpr())
+        defaultExprType = param->getTypeOfDefaultExpr();
     }
 
     auto isolation = param->getInitializerIsolation();

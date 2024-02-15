@@ -1986,6 +1986,74 @@ public struct NestedMagicLiteralMacro: ExpressionMacro {
   }
 }
 
+public struct NativeFileIDMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(
+        of: node, at: .afterLeadingTrivia, filePathMode: .fileID
+    )!.file
+  }
+}
+
+public struct NativeFilePathMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(
+        of: node, at: .afterLeadingTrivia, filePathMode: .filePath
+    )!.file
+  }
+}
+
+public struct NativeLineMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(of: node)!.line
+  }
+}
+
+public struct NativeColumnMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(of: node)!.column
+  }
+}
+
+public struct ClosureCallerMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        let location = context.location(of: node)!
+        return #"""
+        ClosureCaller({ (value, then) in
+            #sourceLocation(file: \#(location.file), line: \#(location.line))
+            print("\(value)@\(\#(location.file))#\(\#(location.line))")
+            then()
+            #sourceLocation()
+        })
+        """#
+    }
+}
+
+public struct PrependHelloToShadowedMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        #"""
+        "hello \(shadowed)"
+        """#
+    }
+}
+
 public struct InvalidIfExprMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
