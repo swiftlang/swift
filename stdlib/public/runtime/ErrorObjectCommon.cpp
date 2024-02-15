@@ -43,26 +43,37 @@ swift::swift_willThrow(SWIFT_CONTEXT void *unused,
   }
 }
 
+std::atomic<void (*)(
+  OpaqueValue *value,
+  const Metadata *type,
+  const WitnessTable *errorConformance
+)> swift::_swift_willThrowTypedImpl;
+
 /// Breakpoint hook for debuggers that is called for typed throws, and calls
-/// _swift_willThrow if set. This implicitly boxes the typed error in an
-/// any Error for the call.
+/// _swift_willThrowTypedImpl if set. If not set and _swift_willThrow is set, this calls
+/// that hook instead and implicitly boxes the typed error in an any Error for that call.
 SWIFT_CC(swift) void
 swift::swift_willThrowTypedImpl(OpaqueValue *value,
                                 const Metadata *type,
                                 const WitnessTable *errorConformance) {
   // Cheap check to bail out early, since we expect there to be no callbacks
   // the vast majority of the time.
-  auto handler = _swift_willThrow.load(std::memory_order_acquire);
+  auto handler = _swift_willThrowTypedImpl.load(std::memory_order_acquire);
   if (SWIFT_UNLIKELY(handler)) {
-    // Form an error box containing the error.
-    BoxPair boxedError = swift_allocError(
+    (* handler)(value, type, errorConformance);
+  } else {
+    auto fallbackHandler = _swift_willThrow.load(std::memory_order_acquire);
+    if (SWIFT_UNLIKELY(fallbackHandler)) {
+      // Form an error box containing the error.
+      BoxPair boxedError = swift_allocError(
         type, errorConformance, value, /*isTake=*/false);
 
-    // Hand the boxed error off to the handler.
-    auto errorBox = reinterpret_cast<SwiftError *>(boxedError.object);
-    (* handler)(errorBox);
+      // Hand the boxed error off to the handler.
+      auto errorBox = reinterpret_cast<SwiftError *>(boxedError.object);
+      (* fallbackHandler)(errorBox);
 
-    // Release the error box.
-    swift_errorRelease(errorBox);
+      // Release the error box.
+      swift_errorRelease(errorBox);
+    }
   }
 }
