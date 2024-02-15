@@ -824,17 +824,15 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
         astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
         astContext.LangOpts.hasFeature(
             Feature::MoveOnlyPartialReinitialization));
-    switch (kind) {
-    case PartialMutation::Kind::Consume:
-      diagnose(astContext, user,
-               diag::sil_movechecking_cannot_destructure_has_deinit, varName);
-      break;
-    case PartialMutation::Kind::Reinit:
-      diagnose(astContext, user,
-               diag::sil_movechecking_cannot_partially_reinit_has_deinit,
-               varName);
-      break;
-    }
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::sil_movechecking_cannot_destructure_has_deinit;
+      case PartialMutation::Kind::Reinit:
+        return diag::sil_movechecking_cannot_partially_reinit_has_deinit;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName);
     registerDiagnosticEmitted(address);
     auto deinitLoc = error.getNominal().getValueTypeDestructor()->getLoc(
         /*SerializedOK=*/false);
