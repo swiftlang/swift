@@ -1064,10 +1064,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
     break;
-  case serialization::Status::NotUsingNoncopyableGenerics:
-    Ctx.Diags.diagnose(diagLoc,
-                       diag::serialization_noncopyable_generics_mismatch,
-                       ModuleName);
+  case serialization::Status::NoncopyableGenericsMismatch:
+    // Ignore; the module should get rebuilt from its interface.
     break;
   case serialization::Status::NotInOSSA:
     // soft reject, silently ignore.
@@ -1161,7 +1159,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::FormatTooNew:
   case serialization::Status::FormatTooOld:
   case serialization::Status::NotInOSSA:
-  case serialization::Status::NotUsingNoncopyableGenerics:
+  case serialization::Status::NoncopyableGenericsMismatch:
   case serialization::Status::RevisionIncompatible:
   case serialization::Status::Malformed:
   case serialization::Status::MalformedDocumentation:

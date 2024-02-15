@@ -426,8 +426,8 @@ static ValidationInfo validateControlBlock(
     }
     case control_block::HAS_NONCOPYABLE_GENERICS: {
       auto hasNoncopyableGenerics = scratch[0];
-      if (requiresNoncopyableGenerics && !hasNoncopyableGenerics)
-        result.status = Status::NotUsingNoncopyableGenerics;
+      if (requiresNoncopyableGenerics != hasNoncopyableGenerics)
+        result.status = Status::NoncopyableGenericsMismatch;
       break;
     }
     default:
@@ -533,8 +533,8 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
-  case Status::NotUsingNoncopyableGenerics:
-    return "NotUsingNoncopyableGenerics";
+  case Status::NoncopyableGenericsMismatch:
+    return "NoncopyableGenericsMismatch";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";

@@ -84,9 +84,9 @@ enum class Status {
   /// to build the client.
   SDKMismatch,
 
-  /// The module file was not built with support for NoncopyableGenerics,
-  /// yet that is required to by this compiler.
-  NotUsingNoncopyableGenerics,
+  /// The module file was built with a different NoncopyableGenerics feature
+  /// mode than the compiler loading it.
+  NoncopyableGenericsMismatch,
 };
 
 /// Returns the string for the Status enum.

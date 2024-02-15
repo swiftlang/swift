@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
+
 
 /// MARK: types
 

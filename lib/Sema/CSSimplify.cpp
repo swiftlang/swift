@@ -3985,7 +3985,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     // move-only types (and their metatypes) cannot match with existential types.
     if (type1->getMetatypeInstanceType()->isNoncopyable()) {
       // tailor error message
@@ -8494,7 +8494,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // FIXME: This is already handled by tuple conformance lookup path and
   // should be removed once non-copyable generics are enabled by default.
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     // Copyable is checked structurally, so for better performance, split apart
     // this constraint into individual Copyable constraints on each tuple
     // element.

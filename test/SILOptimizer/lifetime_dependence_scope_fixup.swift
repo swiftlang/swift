@@ -7,7 +7,7 @@
 // RUN:  -Xllvm -enable-lifetime-dependence-diagnostics=true
 
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
+
 // REQUIRES: swift_in_compiler
 
 struct NCContainer : ~Copyable {

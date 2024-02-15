@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
-// REQUIRES: noncopyable_generics
+
 
 protocol U {}
 

@@ -3,7 +3,7 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:   -enable-experimental-lifetime-dependence-inference | %FileCheck %s
-// REQUIRES: noncopyable_generics
+
 
 protocol P {
   associatedtype E: ~Escapable
