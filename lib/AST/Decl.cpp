@@ -6481,6 +6481,13 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
                            {});
 }
 
+ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AllInheritedProtocolsRequest{mutThis},
+                           {});
+}
+
 ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   if (Bits.ProtocolDecl.HasAssociatedTypes)
@@ -6612,18 +6619,12 @@ bool ProtocolDecl::walkInheritedProtocols(
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   assert(super);
 
+  // Fast path.
   if (this == super)
     return false;
 
-  if (auto ip = super->getInvertibleProtocolKind())
-    return requiresInvertible(*ip);
-
-  return walkInheritedProtocols([super](ProtocolDecl *inherited) {
-    if (inherited == super)
-      return TypeWalker::Action::Stop;
-
-    return TypeWalker::Action::Continue;
-  });
+  auto allInherited = getAllInheritedProtocols();
+  return (llvm::find(allInherited, super) != allInherited.end());
 }
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
