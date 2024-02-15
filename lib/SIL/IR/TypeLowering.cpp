@@ -3072,13 +3072,20 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //             }
     // (5) being defined in a different module
     // (6) being defined in a module built from interface
+    // (7) being or containing a variadic generic type which doesn't conform
+    //     unconditionally but does in this case
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // These show up in the context of non-conforming variadic generics
+          // which may lack a conformance (case (7)).
+          if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
+            return true;
+
           auto *nominal = ty.getAnyNominal();
-          // Non-nominal aggregates must not be responsible for non-conformance;
-          // walk into them.
+          // Only pack-related non-nominal aggregates may be responsible for
+          // non-conformance; walk into the rest.
           if (!nominal)
             return false;
 
@@ -3112,6 +3119,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // being trivial but not conforming to BitwiseCopyable.
 
           auto isTopLevel = !field;
+
+          // These show up in the context of non-conforming variadic generics
+          // which may lack a conformance (case (7)).
+          if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
+            return false;
 
           // A BitwiseCopyable conformer appearing within its layout doesn't
           // explain why substType doesn't itself conform.
