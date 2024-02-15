@@ -884,9 +884,9 @@ static ValueDecl *getTakeOperation(ASTContext &ctx, Identifier id) {
                             _typeparam(0));
 }
 
-static ValueDecl *getStoreOperation(ASTContext &ctx, Identifier id) {
+static ValueDecl *getInitOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted, _conformsToDefaults(0)),
+                            _generics(_unrestricted),
                             _parameters(_owned(_typeparam(0)),
                                         _rawPointer),
                             _void);
@@ -902,7 +902,7 @@ static ValueDecl *getDestroyOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted, _conformsToDefaults(0)),
+                            _generics(_unrestricted),
                             _parameters(_metatype(_typeparam(0)),
                                         _rawPointer,
                                         _word),
@@ -922,14 +922,29 @@ static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
                             _rawPointer);
 }
 
-static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
+static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id,
+                                            BuiltinValueKind builtinKind) {
+  switch (builtinKind) {
+  case BuiltinValueKind::AssignTakeArray:
+  case BuiltinValueKind::TakeArrayFrontToBack:
+  case BuiltinValueKind::TakeArrayBackToFront:
+    return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0)),
+                                        _rawPointer,
+                                        _rawPointer,
+                                        _word),
+                            _void);
+
+  default:
+    return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted, _conformsToDefaults(0)),
                             _parameters(_metatype(_typeparam(0)),
                                         _rawPointer,
                                         _rawPointer,
                                         _word),
                             _void);
+  }
 }
 
 static ValueDecl *getIsUniqueOperation(ASTContext &ctx, Identifier id) {
@@ -2779,7 +2794,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Assign:
   case BuiltinValueKind::Init:
     if (!Types.empty()) return nullptr;
-    return getStoreOperation(Context, Id);
+    return getInitOperation(Context, Id);
 
   case BuiltinValueKind::DestroyArray:
     if (!Types.empty()) return nullptr;
@@ -2794,7 +2809,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AssignCopyArrayBackToFront:
   case BuiltinValueKind::AssignTakeArray:
     if (!Types.empty()) return nullptr;
-    return getTransferArrayOperation(Context, Id);
+    return getTransferArrayOperation(Context, Id, BV);
 
   case BuiltinValueKind::IsUnique:
   case BuiltinValueKind::IsUnique_native:
