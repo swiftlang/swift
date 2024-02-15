@@ -16,24 +16,21 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
-// CHECK-NEXT:    [[T_BUF:%.*]] = alloc_stack $T
-// CHECK-NEXT:    copy_addr [[ARG1]] to [init] [[T_BUF]] : $*T
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT:    copy_addr [take] [[T_BUF]] to [init] [[PB]]
+// CHECK-NEXT:    copy_addr [[ARG1]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<T>, #TreeA.Leaf!enumelt, [[BOX]]
 // CHECK-NEXT:    destroy_value [[LEAF]]
-// CHECK-NEXT:    dealloc_stack [[T_BUF]] : $*T
   let _ = TreeA<T>.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
-// CHECK-NEXT:    [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
-// CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]]
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 1
+// CHECK-NEXT:    [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
 // CHECK-NEXT:    store [[ARG2_COPY]] to [init] [[LEFT]]
+// CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]]
 // CHECK-NEXT:    store [[ARG3_COPY]] to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeA<T>, #TreeA.Branch!enumelt, [[BOX]]
 // CHECK-NEXT:    destroy_value [[BRANCH]]
@@ -46,9 +43,9 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
-// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Int) -> Int>
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         [[THUNK:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG_COPY]])
 // CHECK-NEXT:    [[FNC:%.*]] = convert_function [[FN]]
@@ -77,36 +74,27 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
   let _ = TreeB<T>.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
-// CHECK-NEXT:    [[T_BUF:%.*]] = alloc_stack $T
-// CHECK-NEXT:    copy_addr %0 to [init] [[T_BUF]]
 // CHECK-NEXT:    [[LEAF:%.*]] = alloc_stack $TreeB<T>
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[LEAF]] : $*TreeB<T>, #TreeB.Leaf!enumelt
-// CHECK-NEXT:    copy_addr [take] [[T_BUF]] to [init] [[PAYLOAD]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[LEAF]] : $*TreeB<T>, #TreeB.Leaf!enumelt
 // CHECK-NEXT:    destroy_addr [[LEAF]]
 // CHECK-NEXT:    dealloc_stack [[LEAF]]
-// CHECK-NEXT:    dealloc_stack [[T_BUF]]
   let _ = TreeB<T>.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
-// CHECK-NEXT:    [[ARG1_COPY:%.*]] = alloc_stack $TreeB<T>
-// CHECK-NEXT:    copy_addr %1 to [init] [[ARG1_COPY]] : $*TreeB<T>
-// CHECK-NEXT:    [[ARG2_COPY:%.*]] = alloc_stack $TreeB<T>
-// CHECK-NEXT:    copy_addr %2 to [init] [[ARG2_COPY]] : $*TreeB<T>
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]]
-// CHECK-NEXT:    copy_addr [take] [[ARG1_COPY]] to [init] [[LEFT]] : $*TreeB<T>
-// CHECK-NEXT:    copy_addr [take] [[ARG2_COPY]] to [init] [[RIGHT]] : $*TreeB<T>
+// CHECK-NEXT:    copy_addr %1 to [init] [[LEFT]] : $*TreeB<T>
+// CHECK-NEXT:    copy_addr %2 to [init] [[RIGHT]] : $*TreeB<T>
 // CHECK-NEXT:    [[BRANCH:%.*]] = alloc_stack $TreeB<T>
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[BRANCH]]
 // CHECK-NEXT:    store [[BOX]] to [init] [[PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[BRANCH]] : $*TreeB<T>, #TreeB.Branch!enumelt
 // CHECK-NEXT:    destroy_addr [[BRANCH]]
 // CHECK-NEXT:    dealloc_stack [[BRANCH]]
-// CHECK-NEXT:    dealloc_stack [[ARG2_COPY]]
-// CHECK-NEXT:    dealloc_stack [[ARG1_COPY]]
   let _ = TreeB<T>.Branch(left: l, right: r)
 
 // CHECK:         return
@@ -126,13 +114,13 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
   let _ = TreeInt.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
-// CHECK-NEXT:    [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $TreeInt
-// CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]] : $TreeInt
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ var (left: TreeInt, right: TreeInt) }
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]]
+// CHECK-NEXT:    [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $TreeInt
 // CHECK-NEXT:    store [[ARG2_COPY]] to [init] [[LEFT]]
+// CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]] : $TreeInt
 // CHECK-NEXT:    store [[ARG3_COPY]] to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeInt, #TreeInt.Branch!enumelt, [[BOX]]
 // CHECK-NEXT:    destroy_value [[BRANCH]]

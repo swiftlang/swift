@@ -898,12 +898,21 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   LoweredParamsInContextGenerator loweredParams(*this);
 
   // Emit the exploded constructor argument.
-  ArgumentSource payload;
+  SmallVector<ArgumentSource, 2> payloads;
   if (element->hasAssociatedValues()) {
-    auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
-    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element,
-                                                 loweredParams);
-    payload = ArgumentSource(Loc, std::move(arg));
+    auto elementFnTy =
+      cast<AnyFunctionType>(
+        cast<AnyFunctionType>(element->getInterfaceType()->getCanonicalType())
+          .getResult());
+    auto elementParams = elementFnTy.getParams();
+    payloads.reserve(elementParams.size());
+
+    for (auto param: elementParams) {
+      auto paramType = param.getParameterType();
+      RValue arg = emitImplicitValueConstructorArg(*this, Loc, paramType,
+                                                   element, loweredParams);
+      payloads.emplace_back(Loc, std::move(arg));
+    }
   }
 
   // Emit the metatype argument.
@@ -913,7 +922,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // If possible, emit the enum directly into the indirect return.
   SGFContext C = (dest ? SGFContext(dest.get()) : SGFContext());
-  ManagedValue mv = emitInjectEnum(Loc, std::move(payload),
+  ManagedValue mv = emitInjectEnum(Loc, payloads,
                                    enumTI.getLoweredType(),
                                    element, C);
 

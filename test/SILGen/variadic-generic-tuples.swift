@@ -399,3 +399,27 @@ func test() {
   let tuple = identityOnVariadicTuples((1, 2, 3))
   takesVariadicTuple(tuple: tuple)
 }
+
+func createTuple<each T>(including: repeat Stored<each T>, from: Int) -> (repeat each T) {
+  fatalError()
+}
+
+// rdar://121489308
+func testTupleExpansionInEnumConstructor<each T>(
+  from: repeat Stored<each T>,
+  to: @escaping (Result<(repeat each T), Error>) -> ()
+) {
+  _ = {
+    let tuple = createTuple(including: repeat each from,
+                            from: 42)
+    to(.success(tuple))
+  }
+}
+// CHECK-LABEL: sil {{.*}}@$s4main35testTupleExpansionInEnumConstructor4from2toyAA6StoredVyxGxQp_ys6ResultOyxxQp_ts5Error_pGctRvzlFyycfU_ :
+// CHECK:         [[VAR:%.*]] = alloc_stack [lexical] $(repeat each T), let, name "tuple"
+//   (a few moments later)
+// CHECK:         metatype $@thin Result<(repeat each T), any Error>.Type
+// CHECK:         [[RESULT_TEMP:%.*]] = alloc_stack $Result<(repeat each T), any Error>
+// CHECK-NEXT:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+// CHECK-NEXT:    copy_addr [[VAR]] to [init] [[PAYLOAD_ADDR]] : $*(repeat each T)
+// CHECK-NEXT:    inject_enum_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
