@@ -7835,6 +7835,8 @@ ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
 ERROR(lifetime_dependence_cannot_use_infer, none,
        "invalid use of %0 lifetime dependence on Escapable type",
        (StringRef))
+ERROR(lifetime_dependence_on_bitwise_copyable, none,
+      "invalid lifetime dependence on bitwise copyable type", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring
