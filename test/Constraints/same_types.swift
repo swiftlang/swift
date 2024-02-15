@@ -61,21 +61,21 @@ func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
 }
 
 // CHECK-LABEL: same_types.(file).fail1(_:u:)@
-// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == U.[Fooable]Foo>
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == Y, U.[Fooable]Foo == Y>
 func fail1< // expected-error{{no type for 'T.Foo' can satisfy both 'T.Foo == X' and 'T.Foo == Y'}}
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == X, U.Foo == Y, T.Foo == U.Foo {
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(T.Foo, T.Foo)' to return type '(X, Y)'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(Y, Y)' to return type '(X, Y)'}}
 }
 
 // CHECK-LABEL: same_types.(file).fail2(_:u:)@
-// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == U.[Fooable]Foo>
+// CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == X, U.[Fooable]Foo == X>
 func fail2< // expected-error{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == U.Foo, T.Foo == X, U.Foo == Y {
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(T.Foo, T.Foo)' to return type '(X, Y)'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
@@ -83,10 +83,10 @@ func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
 }
 
 // CHECK-LABEL: same_types.(file).fail3@
-// CHECK-NEXT: Generic signature: <T where T : Barrable>
+// CHECK-NEXT: Generic signature: <T where T : Barrable, T.[Barrable]Bar == X>
 func fail3<T: Barrable>(_ t: T) -> X // expected-error {{no type for 'T.Bar' can satisfy both 'T.Bar == X' and 'T.Bar : Fooable'}}
   where T.Bar == X {
-  return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' }}
+  return t.bar
 }
 
 func test5<T: Barrable>(_ t: T) -> X where T.Bar.Foo == X {
@@ -122,7 +122,7 @@ func fail5<T: Barrable>(_ t: T) -> (Y, Z)
 }
 
 // CHECK-LABEL: same_types.(file).test8@
-// CHECK-NEXT: Generic signature: <T where T : Fooable>
+// CHECK-NEXT: Generic signature: <T where T : Fooable, T.[Fooable]Foo == X>
 func test8<T: Fooable>(_ t: T) // expected-error{{no type for 'T.Foo' can satisfy both 'T.Foo == Y' and 'T.Foo == X'}}
   where T.Foo == X,
   T.Foo == Y {}
@@ -300,7 +300,7 @@ protocol P4 {
 }
 
 // CHECK-LABEL: same_types.(file).test9@
-// CHECK-NEXT: Generic signature: <T where T : P4>
+// CHECK-NEXT: Generic signature: <T where T : P4, T.[P4]A : P3, T.[P4]A == X>
 func test9<T>(_: T) where T.A == X, T: P4, T.A: P3 { } // expected-error{{no type for 'T.A' can satisfy both 'T.A == X' and 'T.A : P3'}}
 
 // Same-type constraint conflict through protocol where clauses.
@@ -318,7 +318,7 @@ struct X5a {}
 struct X5b { }
 
 // CHECK-LABEL: same_types.(file).test9(_:u:)@
-// CHECK-NEXT: Generic signature: <T, U where T : P6, U : P6, T.[P6]Bar == U.[P6]Bar>
+// CHECK-NEXT: Generic signature: <T, U where T : P6, U : P6, T.[P6]Bar == U.[P6]Bar, T.[P6]Bar.[P5]Foo1 == X5b>
 func test9<T: P6, U: P6>(_ t: T, u: U) // expected-error{{no type for 'T.Bar.Foo1' can satisfy both 'T.Bar.Foo1 == X5a' and 'T.Bar.Foo1 == X5b'}}
   where T.Bar.Foo1 == X5a,
         U.Bar.Foo2 == X5b,
