@@ -2086,12 +2086,6 @@ static bool canDeriveCodable(NominalTypeDecl *NTD,
     return false;
   }
 
-  // Actor-isolated structs and classes cannot derive encodable/decodable
-  // unless all of their stored properties are immutable.
-  if ((isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) &&
-      memberwiseAccessorsRequireActorIsolation(NTD))
-    return false;
-
   return true;
 }
 
