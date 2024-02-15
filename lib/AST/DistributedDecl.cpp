@@ -396,7 +396,7 @@ AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const 
 
   // Only a 'distributed' decl can witness 'distributed' protocol
   if (!isDistributed()) {
-    return {};
+    return llvm::ArrayRef<ValueDecl *>();
   }
 
   return evaluateOrDefault(

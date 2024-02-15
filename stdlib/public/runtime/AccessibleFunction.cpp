@@ -192,7 +192,7 @@ static void _registerAccessibleFunctions(AccessibleFunctionsState &C,
   C.SectionsToScan.push_back(section);
 }
 
-static void _registerAccessibleProtocolFunctionss(
+static void _registerAccessibleProtocolFunctions(
     AccessibleFunctionsState &C, AccessibleProtocolFunctionsSection section) {
   C.WitnessSectionsToScan.push_back(section);
 }
@@ -215,7 +215,7 @@ void swift::addImageAccessibleProtocolFunctionsBlockCallbackUnsafe(
          "AccessibleProtocolRequirementFunctionRecord");
 
   auto &C = Functions.unsafeGetAlreadyInitialized();
-  _registerAccessibleProtocolFunctionss(
+  _registerAccessibleProtocolFunctions(
       C, AccessibleProtocolFunctionsSection{dfunctions, dsize});
 }
 
@@ -223,9 +223,7 @@ void swift::addImageAccessibleFunctionsBlockCallback(
   const void *baseAddress,
     const void *functions, uintptr_t size) {
   Functions.get();
-  addImageAccessibleFunctionsBlockCallbackUnsafe(
-      baseAddress,
-      functions, size);
+  addImageAccessibleFunctionsBlockCallbackUnsafe(baseAddress, functions, size);
 }
 
 void swift::addImageAccessibleProtocolFunctionsBlockCallback(

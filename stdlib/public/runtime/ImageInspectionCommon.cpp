@@ -134,7 +134,7 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
   const void *dist_functions =
       reinterpret_cast<void *>(dist_accessible_funcs_section.start);
   if (dist_accessible_funcs_section.length) {
-    swift::addImageAccessibleFunctionsBlockCallback(
+    swift::addImageAccessibleProtocolFunctionsBlockCallback(
         baseAddress, dist_functions, dist_accessible_funcs_section.length);
   }
 
