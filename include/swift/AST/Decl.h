@@ -5222,6 +5222,11 @@ public:
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
 
+  /// Determine whether this protocol has ~<target>` stated on
+  /// itself, one of its inherited types or `Self` requirements.
+  std::pair</*found=*/bool, /*where=*/SourceLoc>
+  hasInverseMarking(InvertibleProtocolKind target) const;
+
   /// Determine whether this protocol requires conformance to `IP`, without
   /// querying a generic signature.
   bool requiresInvertible(InvertibleProtocolKind ip) const;

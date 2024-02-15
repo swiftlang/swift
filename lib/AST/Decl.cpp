@@ -6614,45 +6614,50 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   });
 }
 
-static bool hasInverseMarking(ProtocolDecl *P, InvertibleProtocolKind target) {
-  auto &ctx = P->getASTContext();
+std::pair</*found=*/bool, /*where=*/SourceLoc>
+ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  auto &ctx = getASTContext();
 
   // Legacy support stops here.
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return false;
+    return std::make_pair(false, SourceLoc());
 
-  auto inheritedTypes = P->getInherited();
+  auto inheritedTypes = getInherited();
   for (unsigned i = 0; i < inheritedTypes.size(); ++i) {
-    auto type = inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
+    auto type =
+        inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
     if (!type)
       continue;
+
+    auto *repr = inheritedTypes.getTypeRepr(i);
 
     if (auto *composition = type->getAs<ProtocolCompositionType>()) {
       // Found ~<target> in the protocol inheritance clause.
       if (composition->getInverses().contains(target))
-        return true;
+        return std::make_pair(true, repr ? repr->getLoc() : SourceLoc());
     }
   }
 
-  auto *whereClause = P->getTrailingWhereClause();
+  auto *whereClause = getTrailingWhereClause();
   if (!whereClause)
-    return false;
+    return std::make_pair(false, SourceLoc());
 
-  return llvm::any_of(
-      whereClause->getRequirements(), [&](const RequirementRepr &reqRepr) {
-        if (reqRepr.isInvalid() ||
-            reqRepr.getKind() != RequirementReprKind::TypeConstraint)
-          return false;
+  for (const auto &reqRepr : whereClause->getRequirements()) {
+    if (reqRepr.isInvalid() ||
+        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
 
-        auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
-        auto *constraintRepr = reqRepr.getConstraintRepr();
+    auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
+    auto *constraintRepr = reqRepr.getConstraintRepr();
 
-        if (!subjectRepr ||
-            !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
-          return false;
+    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
+      continue;
 
-        return constraintRepr->isInverseOf(target, P->getDeclContext());
-      });
+    if (constraintRepr->isInverseOf(target, getDeclContext()))
+      return std::make_pair(true, constraintRepr->getLoc());
+  }
+
+  return std::make_pair(false, SourceLoc());
 }
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
@@ -6684,7 +6689,7 @@ bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
     // Otherwise, check to see if there's an inverse on this protocol.
 
     // The implicit requirement was suppressed on this protocol, keep looking.
-    if (hasInverseMarking(proto, ip))
+    if (proto->hasInverseMarking(ip).first)
       return TypeWalker::Action::Continue;
 
     return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
