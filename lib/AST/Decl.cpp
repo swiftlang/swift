@@ -6614,6 +6614,47 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   });
 }
 
+static bool hasInverseMarking(ProtocolDecl *P, InvertibleProtocolKind target) {
+  auto &ctx = P->getASTContext();
+
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
+  auto inheritedTypes = P->getInherited();
+  for (unsigned i = 0; i < inheritedTypes.size(); ++i) {
+    auto type = inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
+    if (!type)
+      continue;
+
+    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
+      // Found ~<target> in the protocol inheritance clause.
+      if (composition->getInverses().contains(target))
+        return true;
+    }
+  }
+
+  auto *whereClause = P->getTrailingWhereClause();
+  if (!whereClause)
+    return false;
+
+  return llvm::any_of(
+      whereClause->getRequirements(), [&](const RequirementRepr &reqRepr) {
+        if (reqRepr.isInvalid() ||
+            reqRepr.getKind() != RequirementReprKind::TypeConstraint)
+          return false;
+
+        auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
+        auto *constraintRepr = reqRepr.getConstraintRepr();
+
+        if (!subjectRepr ||
+            !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
+          return false;
+
+        return constraintRepr->isInverseOf(target, P->getDeclContext());
+      });
+}
+
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
   // Protocols don't inherit from themselves.
   if (auto thisIP = getInvertibleProtocolKind()) {
@@ -6641,16 +6682,12 @@ bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
       return TypeWalker::Action::Continue;
 
     // Otherwise, check to see if there's an inverse on this protocol.
-    switch (proto->getMarking(ip).getInverse().getKind()) {
-    case InverseMarking::Kind::None:
-      return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
 
-    case InverseMarking::Kind::LegacyExplicit:
-    case InverseMarking::Kind::Explicit:
-    case InverseMarking::Kind::Inferred:
-      // The implicit requirement was suppressed on this protocol, keep looking.
+    // The implicit requirement was suppressed on this protocol, keep looking.
+    if (hasInverseMarking(proto, ip))
       return TypeWalker::Action::Continue;
-    }
+
+    return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
   });
 }
 
