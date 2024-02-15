@@ -110,7 +110,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 /// argument value would be overly strict.
 struct LifetimeDependence : CustomStringConvertible {
   enum Scope : CustomStringConvertible {
-    /// A guaranteed argument whose scope is provided by the caller
+    /// A guaranteed or inout argument whose scope is provided by the caller
     /// and covers the entire function.
     case caller(Argument)
     /// An access scope.
@@ -120,11 +120,12 @@ struct LifetimeDependence : CustomStringConvertible {
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
     /// Singly-initialized addressible storage (likely for an
-    /// immutable address-only value). The entire initialized region
-    /// is a lifetime (as opposed to an individual access for mutable
-    /// variables). e.g. A value produced by an @in FunctionArgument
-    /// or @out apply. We don't need to hande mutable variables,
-    /// because those require an access scope.
+    /// immutable address-only value). The lifetime extends until the
+    /// memory is destroyed. e.g. A value produced by an @in
+    /// FunctionArgument or @out apply. @inout has caller scope
+    /// instead because its lifetime does not end inside the callee. A
+    /// separate analysis diagnoses mutation after the dependence is
+    /// formed.
     ///
     /// If `initializingStore` is nil, then the `initialAddress` is
     /// initialized on function entry.
@@ -346,6 +347,8 @@ extension LifetimeDependence.Scope {
       case let .argument(arg):
         if arg.convention.isIndirectIn {
           self = .initialized(initialAddress: arg, initializingStore: nil)
+        } else if arg.convention.isInout {
+          self = .caller(arg)
         } else {
           // Note: we do not expect arg.convention.isInout because
           // mutable variables require an access scope. The .caller
