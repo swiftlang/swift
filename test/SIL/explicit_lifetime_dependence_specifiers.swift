@@ -27,13 +27,13 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
     return self
   }
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySdGYlitcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Double>, @thin BufferView.Type) -> _inherit(2) @owned BufferView {
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>) -> _consume(a) Self {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYlitcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @thin BufferView.Type) -> _inherit(2) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) -> _consume(a) Self {
     self.ptr = ptr
     return self
   }
-// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_SaySdGYliSaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Array<Double>, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_scope(3) @owned BufferView {
-  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Array<Double>, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
+// CHECK: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVYliSaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @guaranteed Array<Int>, @thin BufferView.Type) -> _inherit(2)_scope(3) @owned BufferView {
+  init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, _ b: borrowing Array<Int>) -> _consume(a) _borrow(b) Self {
     self.ptr = ptr
     return self
   }
@@ -102,19 +102,20 @@ struct Wrapper : ~Escapable {
   }
 }
 
-struct Container {
+struct Container : ~Escapable {
  let ptr: UnsafeRawBufferPointer
+ @_unsafeNonescapableResult
  init(_ ptr: UnsafeRawBufferPointer) {
    self.ptr = ptr
  }
 }
 
-// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnYliF : $@convention(thin) (Container) -> _inherit(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnYliF : $@convention(thin) (@owned Container) -> _inherit(1) @owned BufferView {
 func getConsumingView(_ x: consuming Container) -> _consume(x) BufferView {
   return BufferView(x.ptr)
 }
 
-// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVYlsF : $@convention(thin) (Container) -> _scope(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getBorrowingViewyAA06BufferG0VAA9ContainerVYlsF : $@convention(thin) (@guaranteed Container) -> _scope(1) @owned BufferView {
 func getBorrowingView(_ x: borrowing Container) -> _borrow(x) BufferView {
   return BufferView(x.ptr)
 }
