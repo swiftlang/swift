@@ -9,4 +9,8 @@ public struct Foo {
 
 private extension String {}
 
+
+
+
+
 // CHECK-NO-ASSERTION-NOT: Assertion
