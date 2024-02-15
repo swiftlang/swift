@@ -109,10 +109,6 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   llvm_unreachable("bad PlatformKind");
 }
 
-static bool isApplicationExtensionPlatform(PlatformKind Platform) {
-  return basePlatformForExtensionPlatform(Platform).has_value();
-}
-
 static bool isPlatformActiveForTarget(PlatformKind Platform,
                                       const llvm::Triple &Target,
                                       bool EnableAppExtensionRestrictions) {

@@ -57,6 +57,12 @@ StringRef prettyPlatformString(PlatformKind platform);
 llvm::Optional<PlatformKind>
 basePlatformForExtensionPlatform(PlatformKind Platform);
 
+/// Returns true if \p Platform represents and application extension platform,
+/// e.g. `iOSApplicationExtension`.
+inline bool isApplicationExtensionPlatform(PlatformKind Platform) {
+  return basePlatformForExtensionPlatform(Platform).has_value();
+}
+
 /// Returns whether the passed-in platform is active, given the language
 /// options. A platform is active if either it is the target platform or its
 /// AppExtension variant is the target platform. For example, OS X is

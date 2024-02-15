@@ -3985,7 +3985,8 @@ public:
 
 class SemanticUnavailableAttrRequest
     : public SimpleRequest<SemanticUnavailableAttrRequest,
-                           llvm::Optional<AvailableAttrDeclPair>(const Decl *),
+                           llvm::Optional<AvailableAttrDeclPair>(
+                               const Decl *decl, bool ignoreAppExtensions),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3993,8 +3994,9 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                                 const Decl *decl) const;
+  llvm::Optional<AvailableAttrDeclPair>
+  evaluate(Evaluator &evaluator, const Decl *decl,
+           bool ignoreAppExtensions) const;
 
 public:
   bool isCached() const { return true; }
