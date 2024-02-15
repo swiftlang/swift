@@ -293,7 +293,7 @@ public:
                         bool erasedIsolation,
                         ImplFunctionDifferentiabilityKind diffKind)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
-        Concurrent(concurrent), Async(async),
+        Concurrent(concurrent), Async(async), ErasedIsolation(erasedIsolation),
         DifferentiabilityKind(unsigned(diffKind)) {}
 
   ImplFunctionTypeFlags
