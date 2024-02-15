@@ -2677,6 +2677,16 @@ public:
     }
   }
 
+  DelayedArgument(DefaultArgumentExpr *defArg,
+                  AbstractionPattern origParamType,
+                  ClaimedParamsRef params,
+                  SILFunctionTypeRepresentation functionTypeRepresentation)
+    : DelayedArgument(defArg, defArg->getDefaultArgsOwner(),
+                      defArg->getParamIndex(),
+                      defArg->getType()->getCanonicalType(),
+                      origParamType, params, functionTypeRepresentation,
+                      defArg->isImplicitlyAsync()) {}
+
   DelayedArgument(SILLocation loc,
                   ConcreteDeclRef defaultArgsOwner,
                   unsigned destIndex,
@@ -3389,17 +3399,12 @@ public:
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
     if (arg.isDelayedDefaultArg()) {
-      auto substParamType = arg.getSubstRValueType();
       auto defArg = std::move(arg).asKnownDefaultArg();
 
       auto numParams = getFlattenedValueCount(origParamType,
                                               ImportAsMemberStatus());
-      DelayedArguments.emplace_back(defArg,
-                                    defArg->getDefaultArgsOwner(),
-                                    defArg->getParamIndex(),
-                                    substParamType, origParamType,
-                                    claimNextParameters(numParams),
-                                    Rep, defArg->isImplicitlyAsync());
+      DelayedArguments.emplace_back(defArg, origParamType,
+                                    claimNextParameters(numParams), Rep);
       Args.push_back(ManagedValue());
 
       maybeEmitForeignArgument();
@@ -4329,10 +4334,30 @@ private:
   }
 };
 
+static ManagedValue
+emitDefaultArgument(SILGenFunction &SGF, DefaultArgumentExpr *E,
+                    AbstractionPattern origType, SILType expectedTy,
+                    SGFContext origC) {
+  return SGF.emitAsOrig(E, origType, E->getType()->getCanonicalType(),
+                        expectedTy, origC,
+      [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+    auto result =
+      SGF.emitApplyOfDefaultArgGenerator(loc, E->getDefaultArgsOwner(),
+                                         E->getParamIndex(),
+                                         E->getType()->getCanonicalType(),
+                                         E->isImplicitlyAsync(),
+                                         C);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, loc);
+  });
+}
+
 void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                           const DefaultArgumentStorage &info,
                                           SmallVectorImpl<ManagedValue> &args,
                                           size_t &argIndex) {
+  // TODO: call emitDefaultArgument above.
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
@@ -4535,7 +4560,7 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(theBox)) {
         SGF.B.createEndBorrow(l, bbi);
         theBox = bbi->getOperand();
       }
@@ -5132,16 +5157,13 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
   // pattern, to ensure that function types in payloads are re-abstracted
   // correctly.
   auto formalType = callee.getSubstFormalType();
-  auto origFormalType = callee.getOrigFormalType();
+  CanType formalResultType = formalType.getResult();
 
   // We have a fully-applied enum element constructor: open-code the
   // construction.
   EnumElementDecl *element = callee.getEnumElementDecl();
 
   SILLocation uncurriedLoc = selfArg->Loc;
-
-  origFormalType = origFormalType.getFunctionResultType();
-  CanType formalResultType = formalType.getResult();
 
   // Ignore metatype argument
   SmallVector<ManagedValue, 0> metatypeVal;
@@ -5152,34 +5174,17 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
   assert(metatypeVal.size() == 1);
 
 
-  // Get the payload argument.
-  ArgumentSource payload;
+  // Get the payload argument sources, if there are any.
+  MutableArrayRef<ArgumentSource> payloads;
   if (element->hasAssociatedValues()) {
-    SmallVector<ManagedValue, 4> argVals;
-    auto resultFnType = cast<FunctionType>(formalResultType);
-
-    emitPseudoFunctionArguments(SGF, uncurriedLoc,
-                                AbstractionPattern(resultFnType),
-                                resultFnType, argVals,
-                                std::move(*callSite).forward());
-
-    // We need to implode a tuple rvalue for enum construction. This is
-    // essentially an implosion of the internal arguments of a pseudo case
-    // constructor, so we can drop the parameter flags.
-    auto payloadTy = AnyFunctionType::composeTuple(
-        SGF.getASTContext(), resultFnType->getParams(),
-        ParameterFlagHandling::IgnoreNonEmpty);
-
-    auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
-    payload = ArgumentSource(uncurriedLoc, std::move(arg));
+    payloads = std::move(*callSite).forward().getSources();
     formalResultType = cast<FunctionType>(formalResultType).getResult();
-    origFormalType = origFormalType.getFunctionResultType();
   } else {
     assert(!callSite.has_value());
   }
 
   ManagedValue resultMV = SGF.emitInjectEnum(
-      uncurriedLoc, std::move(payload),
+      uncurriedLoc, payloads,
       SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
 
@@ -6035,16 +6040,130 @@ void SILGenFunction::emitRawYield(SILLocation loc,
   B.emitBlock(resumeBB);
 }
 
+static bool isEnumElementPayloadTupled(EnumElementDecl *element,
+                                       MutableArrayRef<ArgumentSource> payloads,
+                                       CanTupleType &formalPayloadTupleType) {
+  auto params = element->getParameterList();
+  assert(params);
+  assert(payloads.size() == params->size());
+  if (payloads.size() == 1 && params->get(0)->getArgumentName().empty())
+    return false;
+
+  SmallVector<TupleTypeElt, 8> tupleElts;
+  for (auto i : indices(payloads)) {
+    tupleElts.push_back({payloads[i].getSubstRValueType(),
+                         params->get(0)->getArgumentName()});
+  }
+  formalPayloadTupleType = cast<TupleType>(
+    CanType(TupleType::get(tupleElts, element->getASTContext())));
+
+  return true;
+}
+
+static ManagedValue
+emitEnumElementPayloads(SILGenFunction &SGF, SILLocation loc,
+                        EnumElementDecl *element,
+                        MutableArrayRef<ArgumentSource> eltPayloads,
+                        AbstractionPattern origPayloadType, SILType payloadTy,
+                        Initialization *dest) {
+  // The payloads array is parallel to the parameters of the enum element.
+  // The abstraction pattern is taken from the element's argument interface
+  // type, so it has extra tuple structure if the argument interface type does.
+  CanTupleType formalPayloadTupleType;
+  auto treatAsTuple =
+    isEnumElementPayloadTupled(element, eltPayloads, formalPayloadTupleType);
+
+  // The Initialization we get passed is always one of several cases in
+  // emitInjectEnum, all of which are splittable.
+  assert(!treatAsTuple || !dest || dest->canSplitIntoTupleElements());
+
+  SmallVector<InitializationPtr, 4> eltInitBuffer;
+  SmallVector<ManagedValue, 4> elts;
+
+  MutableArrayRef<InitializationPtr> eltInits;
+  if (!treatAsTuple) {
+    // nothing required
+  } else if (dest) {
+    eltInits = dest->splitIntoTupleElements(SGF, loc, formalPayloadTupleType,
+                                            eltInitBuffer);
+  } else {
+    elts.reserve(eltPayloads.size());
+  }
+
+  // Do an initial pass, emitting non-default arguments.
+  SmallVector<unsigned, 4> delayedArgIndices;
+  for (auto i : indices(eltPayloads)) {
+    auto &eltPayload = eltPayloads[i];
+    if (eltPayload.isDelayedDefaultArg()) {
+      delayedArgIndices.push_back(i);
+      if (!dest) elts.push_back(ManagedValue());
+      continue;
+    }
+
+    AbstractionPattern origEltType =
+      (treatAsTuple ? origPayloadType.getTupleElementType(i) : origPayloadType);
+    SILType eltTy =
+      (treatAsTuple ? payloadTy.getTupleElementType(i) : payloadTy);
+    Initialization *eltInit =
+      (dest ? (treatAsTuple ? eltInits[i].get() : dest) : nullptr);
+    if (dest) {
+      std::move(eltPayload).forwardInto(SGF, origEltType, eltInit,
+                                        SGF.getTypeLowering(eltTy));
+    } else {
+      auto elt = std::move(eltPayload).getAsSingleValue(SGF, origEltType, eltTy);
+      elts.push_back(elt);
+    }
+  }
+
+  // Emit all of the default arguments in a separate pass.
+  for (auto i : delayedArgIndices) {
+    auto &eltPayload = eltPayloads[i];
+    AbstractionPattern  origEltType =
+      (treatAsTuple ? origPayloadType.getTupleElementType(i) : origPayloadType);
+    SILType eltTy =
+      (treatAsTuple ? payloadTy.getTupleElementType(i) : payloadTy);
+    Initialization *eltInit =
+      (dest ? (treatAsTuple ? eltInits[i].get() : dest) : nullptr);
+
+    auto result = emitDefaultArgument(SGF,
+                                      std::move(eltPayload).asKnownDefaultArg(),
+                                      origEltType, eltTy, SGFContext(eltInit));
+    if (dest) {
+      assert(result.isInContext());
+    } else {
+      elts[i] = result;
+    }
+  }
+
+  // If we're not breaking down a tuple, we can wrap up immediately.
+  if (!treatAsTuple) {
+    if (dest) return ManagedValue::forInContext();
+    assert(elts.size() == 1);
+    return elts[0];
+  }
+
+  // If we've been emitting into split element contexts, finish the
+  // overall tuple initialization.
+  if (dest) {
+    dest->finishInitialization(SGF);
+    return ManagedValue::forInContext();
+  }
+
+  // Otherwise, create a tuple value.
+  return SGF.B.createTuple(loc, payloadTy.getObjectType(), elts);
+}
+
 /// Emits SIL instructions to create an enum value. Attempts to avoid
 /// unnecessary copies by emitting the payload directly into the enum
 /// payload, or into the box in the case of an indirect payload.
 ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
-                                            ArgumentSource &&payload,
+                            MutableArrayRef<ArgumentSource> payloads,
                                             SILType enumTy,
                                             EnumElementDecl *element,
                                             SGFContext C) {
   // Easy case -- no payload
-  if (!payload) {
+  if (!element->hasAssociatedValues()) {
+    assert(payloads.empty());
     if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
@@ -6057,25 +6176,29 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
                            });
   }
 
-  ManagedValue payloadMV;
-  AbstractionPattern origFormalType =
-      (element == getASTContext().getOptionalSomeDecl()
-           ? AbstractionPattern(payload.getSubstRValueType())
-           : SGM.M.Types.getAbstractionPattern(element));
-  auto &payloadTL = getTypeLowering(origFormalType,
-                                    payload.getSubstRValueType());
+  AbstractionPattern origPayloadType = [&] {
+    if (element == getASTContext().getOptionalSomeDecl()) {
+      assert(payloads.size() == 1);
+      auto substPayloadType = payloads[0].getSubstRValueType();
+      return AbstractionPattern(substPayloadType);
+    } else {
+      return SGM.M.Types.getAbstractionPattern(element);
+    }
+  }();
 
-  SILType loweredPayloadType = payloadTL.getLoweredType();
+  SILType payloadTy = enumTy.getEnumElementType(element, &F);
 
   // If the payload is indirect, emit it into a heap allocated box.
   //
   // To avoid copies, evaluate it directly into the box, being
   // careful to stage the cleanups so that if the expression
   // throws, we know to deallocate the uninitialized box.
+  ManagedValue boxMV;
   if (element->isIndirect() || element->getParentEnum()->isIndirect()) {
-    auto boxTy = SGM.M.Types.getBoxTypeForEnumElement(getTypeExpansionContext(),
-                                                      enumTy, element);
-    auto *box = B.createAllocBox(loc, boxTy);
+    CanSILBoxType boxType = payloadTy.castTo<SILBoxType>();
+    assert(boxType->getLayout()->getFields().size() == 1);
+    SILType boxPayloadTy = payloadTy.getSILBoxFieldType(&F, 0);
+    auto *box = B.createAllocBox(loc, boxType);
     auto *addr = B.createProjectBox(loc, box, 0);
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
@@ -6083,20 +6206,26 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
     CleanupHandle uninitCleanup = enterDeallocBoxCleanup(box);
 
     BoxInitialization dest(box, addr, uninitCleanup, initCleanup);
-    std::move(payload).forwardInto(*this, origFormalType, &dest,
-                                   payloadTL);
+    auto result =
+      emitEnumElementPayloads(*this, loc, element, payloads, origPayloadType,
+                              boxPayloadTy, &dest);
+    assert(result.isInContext()); (void) result;
 
-    payloadMV = dest.getManagedBox();
-    loweredPayloadType = payloadMV.getType();
+    boxMV = dest.getManagedBox();
+    payloadTy = boxMV.getType();
   }
 
   // Loadable with payload
   if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
-    if (!payloadMV) {
+    ManagedValue payloadMV;
+    if (boxMV) {
+      payloadMV = boxMV;
+    } else {
       // If the payload was indirect, we already evaluated it and
       // have a single value. Otherwise, evaluate the payload.
-      payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType,
-                                                      loweredPayloadType);
+      payloadMV = emitEnumElementPayloads(*this, loc, element, payloads,
+                                          origPayloadType, payloadTy,
+                                          /*emit into*/ nullptr);
     }
 
     SILValue argValue = payloadMV.forward(*this);
@@ -6107,34 +6236,36 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 
   // Address-only with payload
   return B.bufferForExpr(
-      loc, enumTy, getTypeLowering(enumTy), C, [&](SILValue bufferAddr) {
-        SILValue resultData = B.createInitEnumDataAddr(
-            loc, bufferAddr, element, loweredPayloadType.getAddressType());
+      loc, enumTy, getTypeLowering(enumTy), C, [&](SILValue enumAddr) {
+        SILValue payloadAddr = B.createInitEnumDataAddr(
+            loc, enumAddr, element, payloadTy.getAddressType());
 
-        if (payloadMV) {
+        if (boxMV) {
           // If the payload was indirect, we already evaluated it and
           // have a single value. Store it into the result.
-          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+          B.emitStoreValueOperation(loc, boxMV.forward(*this), payloadAddr,
                                     StoreOwnershipQualifier::Init);
-        } else if (payloadTL.isLoadable()) {
+        } else if (payloadTy.isLoadable(F)) {
           // The payload of this specific enum case might be loadable
           // even if the overall enum is address-only.
-          payloadMV =
-            std::move(payload).getAsSingleValue(*this, origFormalType,
-                                                loweredPayloadType);
-          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+          auto payloadMV = 
+            emitEnumElementPayloads(*this, loc, element, payloads,
+                                    origPayloadType, payloadTy,
+                                    /*emit into*/ nullptr);
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), payloadAddr,
                                     StoreOwnershipQualifier::Init);
         } else {
           // The payload is address-only. Evaluate it directly into
           // the enum.
-
-          TemporaryInitialization dest(resultData, CleanupHandle::invalid());
-          std::move(payload).forwardInto(*this, origFormalType, &dest,
-                                         payloadTL);
+          TemporaryInitialization dest(payloadAddr, CleanupHandle::invalid());
+          auto result =
+            emitEnumElementPayloads(*this, loc, element, payloads,
+                                    origPayloadType, payloadTy, &dest);
+          assert(result.isInContext()); (void) result;
         }
 
         // The payload is initialized, now apply the tag.
-        B.createInjectEnumAddr(loc, bufferAddr, element);
+        B.createInjectEnumAddr(loc, enumAddr, element);
       });
 }
 
