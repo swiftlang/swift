@@ -2900,7 +2900,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
   case ParamSpecifier::InOut:
     return flags;
 
-  case ParamSpecifier::Transferring:
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
   case ParamSpecifier::Consuming:
   case ParamSpecifier::Borrowing:
     // Only mangle the ownership if it diverges from the default.

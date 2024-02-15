@@ -2224,6 +2224,10 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitTransferringTypeRepr(TransferringTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
   return doIt(T->getBase());
 }

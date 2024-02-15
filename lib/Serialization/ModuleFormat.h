@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 852; // SILFunctionType::ErasedIsolation
+const uint16_t SWIFTMODULE_VERSION_MINOR = 853; // transferring fixes
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -359,7 +359,7 @@ enum class ParamDeclSpecifier : uint8_t {
   Consuming = 3,
   LegacyShared = 4,
   LegacyOwned = 5,
-  Transferring = 6,
+  ImplicitlyCopyableConsuming = 6,
 };
 using ParamDeclSpecifierField = BCFixed<3>;
 
@@ -402,6 +402,7 @@ enum class SILParameterDifferentiability : uint8_t {
 enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
+  Transferring = 0x4,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -1230,7 +1231,8 @@ namespace decls_block {
     BCFixed<1>,                      // throws?
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
-    FunctionTypeIsolationField       // isolation
+    FunctionTypeIsolationField,      // isolation
+    BCFixed<1>                       // has transferring result
     // trailed by parameters
   );
 
@@ -1329,6 +1331,7 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
+    BCFixed<1>,                      // has transferring result
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1347,6 +1350,7 @@ namespace decls_block {
     BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
+    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -1606,6 +1610,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isTransferring?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -1638,6 +1643,7 @@ namespace decls_block {
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
+    BCFixed<1>,   // has transferring result
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:

@@ -76,6 +76,8 @@
 
 #define DEBUG_TYPE "Serialization"
 
+#pragma clang optimize off
+
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
@@ -2548,8 +2550,9 @@ static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
     return uint8_t(serialization::ParamDeclSpecifier::LegacyShared);
   case swift::ParamDecl::Specifier::LegacyOwned:
     return uint8_t(serialization::ParamDeclSpecifier::LegacyOwned);
-  case swift::ParamDecl::Specifier::Transferring:
-    return uint8_t(serialization::ParamDeclSpecifier::Transferring);
+  case swift::ParamDecl::Specifier::ImplicitlyCopyableConsuming:
+    return uint8_t(
+        serialization::ParamDeclSpecifier::ImplicitlyCopyableConsuming);
   }
   llvm_unreachable("bad param decl specifier kind");
 }
@@ -4430,6 +4433,7 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeConst(),
+        param->isTransferring(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -4461,7 +4465,6 @@ public:
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
-
     FuncLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                            contextID.getOpaqueValue(),
                            fn->isImplicit(),
@@ -4489,6 +4492,7 @@ public:
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
+                           fn->hasTransferringResult(),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -5116,6 +5120,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     result |= SILParameterInfoFlags::Isolated;
   }
 
+  if (options.contains(SILParameterInfo::Transferring)) {
+    options -= SILParameterInfo::Transferring;
+    result |= SILParameterInfoFlags::Transferring;
+  }
+
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
     return {};
@@ -5520,7 +5529,8 @@ public:
         fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation);
+        isolation,
+        fnTy->hasTransferringResult());
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -5537,7 +5547,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation,
+        isolation, fnTy->hasTransferringResult(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -5624,7 +5634,8 @@ public:
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->isUnimplementable(), fnTy->hasErasedIsolation(),
-        stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        stableDiffKind, fnTy->hasErrorResult(), fnTy->hasTransferringResult(),
+        fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         invocationSigID, invocationSubstMapID, patternSubstMapID,
         clangTypeID, variableData);

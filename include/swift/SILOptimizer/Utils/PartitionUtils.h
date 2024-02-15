@@ -1117,6 +1117,12 @@ public:
       if (isActorDerived(op.getOpArgs()[0]))
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
 
+      // NOTE: We purposely do not check here if a transferred value is already
+      // transferred. Callers are expected to put a require for that
+      // purpose. This ensures that if we pass the same argument multiple times
+      // to the same transferring function as weakly transferred arguments, we
+      // do not get an error.
+
       // While we are checking for actor derived, also check if our value or any
       // value in our region is closure captured and propagate that bit in our
       // transferred inst.

@@ -383,8 +383,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 14 };
-  enum { NumSILExtInfoBits = 14 };
+  enum { NumAFTExtInfoBits = 15 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -2207,10 +2207,12 @@ enum class ParamSpecifier : uint8_t {
   /// `__owned`, a legacy spelling of `consuming`.
   LegacyOwned = 5,
 
-  /// `transferring`. Indicating the transfer of a value from one isolation
-  /// domain to another.
-  Transferring = 6,
+  /// A convention that is similar to consuming a parameter that is mutable and
+  /// var like, but for which no implicit copy semantics are not implemented.
+  ImplicitlyCopyableConsuming = 6,
 };
+
+StringRef getNameForParamSpecifier(ParamSpecifier name);
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
@@ -3642,6 +3644,10 @@ public:
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 
+  bool hasTransferringResult() const {
+    return getExtInfo().hasTransferringResult();
+  }
+
   bool hasEffect(EffectKind kind) const;
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
@@ -4886,6 +4892,9 @@ public:
   bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
+  }
+  bool hasTransferringResult() const {
+    return getExtInfo().hasTransferringResult();
   }
 
   /// Return the array of all the yields.

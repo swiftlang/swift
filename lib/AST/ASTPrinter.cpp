@@ -3902,7 +3902,7 @@ static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
   if (auto *pd = dyn_cast<ParamDecl>(decl))
-    if (pd->getSpecifier() == ParamSpecifier::Transferring)
+    if (pd->isTransferring())
       return true;
 
   // TODO: Results.
@@ -4583,7 +4583,7 @@ static void printParameterFlags(ASTPrinter &printer,
       flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
   if (flags.isTransferring())
-    printer.printAttrName("@transferring ");
+    printer.printAttrName("transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -4604,8 +4604,9 @@ static void printParameterFlags(ASTPrinter &printer,
   case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
     break;
-  case ParamSpecifier::Transferring:
-    printer.printKeyword("transferring", options, " ");
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
+    // Nothing... we infer from transferring.
+    assert(flags.isTransferring() && "Only valid when transferring is enabled");
     break;
   }
   
@@ -5016,6 +5017,21 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+
+      {
+        auto fnTy = decl->getInterfaceType();
+        bool hasTransferring = false;
+        if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
+          if (ft->hasExtInfo())
+            hasTransferring = ft->hasTransferringResult();
+        } else if (auto *ft =
+                       llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
+          if (ft->hasExtInfo())
+            hasTransferring = ft->hasTransferringResult();
+        }
+        if (hasTransferring)
+          Printer << "transferring ";
+      }
 
       // HACK: When printing result types for funcs with opaque result types,
       //       always print them using the `some` keyword instead of printing
@@ -7459,6 +7475,10 @@ public:
 
     Printer << " -> ";
 
+    if (T->hasExtInfo() && T->hasTransferringResult()) {
+      Printer.printKeyword("transferring", Options);
+    }
+
     if (T->hasLifetimeDependenceInfo()) {
       auto lifetimeDependenceInfo = T->getExtInfo().getLifetimeDependenceInfo();
       assert(!lifetimeDependenceInfo.empty());
@@ -7617,6 +7637,10 @@ public:
         param.print(sub->Printer, subOptions);
       }
       sub->Printer << ") -> ";
+
+      if (T->hasTransferringResult()) {
+        sub->Printer << "transferring ";
+      }
 
       auto lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
       if (!lifetimeDependenceInfo.empty()) {
@@ -8365,7 +8389,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
 
   if (options.contains(SILParameterInfo::Transferring)) {
     options -= SILParameterInfo::Transferring;
-    Printer << "@transferring ";
+    Printer << "@sil_transferring ";
   }
 
   if (options.contains(SILParameterInfo::Isolated)) {

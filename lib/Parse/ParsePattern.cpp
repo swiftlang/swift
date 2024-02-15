@@ -265,6 +265,19 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           continue;
         }
 
+        if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+            Tok.isContextualKeyword("transferring")) {
+          if (param.TransferringLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
+          param.TransferringLoc = consumeToken();
+          continue;
+        }
+
         if (!hasSpecifier) {
           // These cases are handled later when mapping to ParamDecls for
           // better fixits.
@@ -282,11 +295,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
-            param.SpecifierLoc = consumeToken();
-          } else if (Context.LangOpts.hasFeature(
-                         Feature::TransferringArgsAndResults) &&
-                     Tok.isContextualKeyword("transferring")) {
-            param.SpecifierKind = ParamDecl::Specifier::Transferring;
             param.SpecifierLoc = consumeToken();
           }
 
@@ -574,6 +582,12 @@ mapParsedParameters(Parser &parser,
         param->setResultDependsOn();
       }
 
+      if (paramInfo.TransferringLoc.isValid()) {
+        type = new (parser.Context)
+            TransferringTypeRepr(type, paramInfo.TransferringLoc);
+        param->setTransferring();
+      }
+
       param->setTypeRepr(type);
 
       // Dig through the type to find any attributes or modifiers that are
@@ -601,6 +615,8 @@ mapParsedParameters(Parser &parser,
               param->setCompileTimeConst(true);
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
+            else if (isa<TransferringTypeRepr>(STR))
+              param->setTransferring(true);
             unwrappedType = STR->getBase();
             continue;
           }

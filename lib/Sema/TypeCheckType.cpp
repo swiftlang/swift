@@ -2164,6 +2164,8 @@ namespace {
                                            TypeResolutionOptions options);
     NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                           TypeResolutionOptions options);
+    NeverNullType resolveTransferringTypeRepr(TransferringTypeRepr *repr,
+                                              TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
     NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
@@ -2605,6 +2607,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveOwnershipTypeRepr(cast<OwnershipTypeRepr>(repr), options);
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
+  case TypeReprKind::Transferring:
+    return resolveTransferringTypeRepr(cast<TransferringTypeRepr>(repr),
+                                       options);
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
@@ -3672,6 +3677,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     auto *nestedRepr = eltTypeRepr->getWithoutParens();
 
     ParamSpecifier ownership = ParamSpecifier::Default;
+    OwnershipTypeRepr *ownershipRepr = nullptr;
 
     bool isolated = false;
     bool compileTimeConst = false;
@@ -3681,9 +3687,13 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
         case TypeReprKind::Ownership:
-          ownership = cast<OwnershipTypeRepr>(specifierRepr)->getSpecifier();
+          ownershipRepr = cast<OwnershipTypeRepr>(specifierRepr);
+          ownership = ownershipRepr->getSpecifier();
           nestedRepr = specifierRepr->getBase();
-          isTransferring = ownership == ParamSpecifier::Transferring;
+          continue;
+        case TypeReprKind::Transferring:
+          isTransferring = true;
+          nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
@@ -3791,6 +3801,17 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       parameterName = inputRepr->getElement(i).SecondName;
     } else {
       parameterName = inputRepr->getElementName(i);
+    }
+
+    if (isTransferring) {
+      if (ownership == ParamSpecifier::Default) {
+        ownership = ParamSpecifier::ImplicitlyCopyableConsuming;
+      } else {
+        assert(ownershipRepr);
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::transferring_unsupported_param_specifier,
+                 ownershipRepr->getSpecifierSpelling());
+      }
     }
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
@@ -4051,6 +4072,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  bool hasTransferringResult =
+      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
+
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
@@ -4058,7 +4082,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      LifetimeDependenceInfo());
+      LifetimeDependenceInfo(), hasTransferringResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4265,10 +4289,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  bool hasTransferringResult =
+      isa_and_nonnull<TransferringTypeRepr>(repr->getResultTypeRepr());
+
   // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType, LifetimeDependenceInfo());
+      isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
+      hasTransferringResult);
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -4505,6 +4533,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
       case TypeAttrKind::SILIsolated:
         parameterOptions |= SILParameterInfo::Isolated;
+        return true;
+
+      case TypeAttrKind::SILTransferring:
+        parameterOptions |= SILParameterInfo::Transferring;
         return true;
 
       default:
@@ -4878,7 +4910,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::LegacyOwned:
   case ParamSpecifier::Borrowing:
     break;
-  case ParamSpecifier::Transferring:
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
@@ -4935,6 +4967,27 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   }
 
   return type;
+}
+
+NeverNullType
+TypeResolver::resolveTransferringTypeRepr(TransferringTypeRepr *repr,
+                                          TypeResolutionOptions options) {
+  if (options.is(TypeResolverContext::TupleElement)) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::transferring_cannot_be_applied_to_tuple_elt);
+    return ErrorType::get(getASTContext());
+  }
+
+  if (!options.is(TypeResolverContext::FunctionResult) &&
+      (!options.is(TypeResolverContext::FunctionInput) ||
+       options.hasBase(TypeResolverContext::EnumElementDecl))) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::transferring_only_on_parameters_and_results);
+    return ErrorType::get(getASTContext());
+  }
+
+  // Return the type.
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
@@ -5951,6 +6004,7 @@ public:
     case TypeReprKind::Array:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:
+    case TypeReprKind::Transferring:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::Vararg:

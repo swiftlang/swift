@@ -869,6 +869,8 @@ BridgedParamDecl BridgedParamDecl_createParsed(
           paramDecl->setIsolated(true);
         else if (isa<CompileTimeConstTypeRepr>(STR))
           paramDecl->setCompileTimeConst(true);
+        else if (isa<TransferringTypeRepr>(STR))
+          paramDecl->setTransferring(true);
 
         unwrappedType = STR->getBase();
         continue;
@@ -2175,8 +2177,7 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
         OwnershipTypeRepr(baseType, ParamSpecifier::LegacyOwned, loc);
   }
   case BridgedAttributedTypeSpecifierTransferring: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::Transferring, loc);
+    return new (context) TransferringTypeRepr(baseType, loc);
   }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);

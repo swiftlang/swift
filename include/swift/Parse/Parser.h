@@ -1244,6 +1244,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
+    SourceLoc TransferringLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
@@ -1560,6 +1561,9 @@ public:
 
     /// The location of the '_resultDependsOn' keyword, if present.
     SourceLoc ResultDependsOnLoc;
+
+    /// The location of the 'transferring' keyword if present.
+    SourceLoc TransferringLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;

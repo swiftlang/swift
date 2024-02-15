@@ -507,7 +507,7 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl,
-                        1+1+2+1+1+NumSelfAccessKindBits+1,
+                        1+1+2+1+1+NumSelfAccessKindBits+1+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -529,7 +529,10 @@ protected:
     /// Whether this is a top-level function which should be treated
     /// as if it were in local context for the purposes of capture
     /// analysis.
-    HasTopLevelLocalContextCaptures : 1
+    HasTopLevelLocalContextCaptures : 1,
+
+    /// Set to true if this FuncDecl has a transferring result.
+    HasTransferringResult : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
@@ -6457,8 +6460,6 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
-  TypeRepr *TyRepr = nullptr;
-
   struct alignas(1 << StoredDefaultArgumentAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
 
@@ -6477,7 +6478,9 @@ class ParamDecl : public VarDecl {
   /// argument without triggering a request.
   llvm::Optional<Initializer *> getCachedDefaultArgumentInitContext() const;
 
-  enum class Flags : uint8_t {
+  /// NOTE: This is stored using bits from TyReprAndFlags and
+  /// DefaultValueAndFlags.
+  enum class Flag : uint8_t {
     /// Whether or not this parameter is vargs.
     IsVariadic = 1 << 0,
 
@@ -6489,11 +6492,65 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this paramater is '_resultDependsOn'
     IsResultDependsOn = 1 << 3,
+
+    /// Whether or not this parameter is 'transferring'.
+    IsTransferring = 1 << 4,
   };
 
-  /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
+  /// The type repr and 3 bits used for flags.
+  llvm::PointerIntPair<TypeRepr *, 3, std::underlying_type<Flag>::type>
+      TyReprAndFlags;
+
+  /// The default value, if any, along with 3 bits for flags.
+  llvm::PointerIntPair<StoredDefaultArgument *, 3,
+                       std::underlying_type<Flag>::type>
       DefaultValueAndFlags;
+
+  OptionSet<Flag> getOptions() const {
+    uint8_t result = 0;
+    result |= TyReprAndFlags.getInt();
+    result |= DefaultValueAndFlags.getInt() << 3;
+    return OptionSet<Flag>(result);
+  }
+
+  /// Set the current set of options to \p newFlags.
+  void setOptions(OptionSet<Flag> newFlags) {
+    uint8_t bits = newFlags.toRaw();
+    TyReprAndFlags.setInt(bits & 0x7);
+    DefaultValueAndFlags.setInt(bits >> 3);
+  }
+
+  void setOptionsAndPointers(TypeRepr *tyRepr,
+                             StoredDefaultArgument *storedArgs,
+                             OptionSet<Flag> newFlags) {
+    uint8_t bits = newFlags.toRaw();
+    TyReprAndFlags.setPointerAndInt(tyRepr, bits & 0x7);
+    DefaultValueAndFlags.setPointerAndInt(storedArgs, bits >> 3);
+  }
+
+  void addFlag(Flag newFlag) {
+    auto flagBits = uint8_t(newFlag);
+    if (uint8_t(newFlag) < (1 << 3)) {
+      flagBits &= 0x7;
+      TyReprAndFlags.setInt(TyReprAndFlags.getInt() | flagBits);
+      return;
+    }
+
+    flagBits >>= 3;
+    DefaultValueAndFlags.setInt(DefaultValueAndFlags.getInt() | flagBits);
+  }
+
+  void removeFlag(Flag newFlag) {
+    auto flagBits = uint8_t(newFlag);
+    if (uint8_t(newFlag) < (1 << 3)) {
+      flagBits &= 0x7;
+      TyReprAndFlags.setInt(TyReprAndFlags.getInt() & ~flagBits);
+      return;
+    }
+
+    flagBits >>= 3;
+    DefaultValueAndFlags.setInt(DefaultValueAndFlags.getInt() & ~flagBits);
+  }
 
   friend class ParamSpecifierRequest;
 
@@ -6540,8 +6597,8 @@ public:
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
 
   /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
-  TypeRepr *getTypeRepr() const { return TyRepr; }
-  void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
+  TypeRepr *getTypeRepr() const { return TyReprAndFlags.getPointer(); }
+  void setTypeRepr(TypeRepr *repr) { TyReprAndFlags.setPointer(repr); }
 
   bool isDestructured() const {
     auto flags = ArgumentNameAndFlags.getInt();
@@ -6663,30 +6720,44 @@ public:
   /// Whether or not this parameter is old-style variadic.
   bool isVariadic() const;
   void setVariadic(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
-                                      : flags - Flags::IsVariadic);
+    if (value)
+      addFlag(Flag::IsVariadic);
+    else
+      removeFlag(Flag::IsVariadic);
   }
 
   /// Whether or not this parameter is marked with `@autoclosure`.
   bool isAutoClosure() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsAutoClosure);
+    return getOptions().contains(Flag::IsAutoClosure);
   }
+
   void setAutoClosure(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
-                                      : flags - Flags::IsAutoClosure);
+    if (value)
+      addFlag(Flag::IsAutoClosure);
+    else
+      removeFlag(Flag::IsAutoClosure);
   }
 
   /// Whether or not this parameter is marked with 'isolated'.
-  bool isIsolated() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsIsolated);
-  }
+  bool isIsolated() const { return getOptions().contains(Flag::IsIsolated); }
 
   void setIsolated(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
-                                      : flags - Flags::IsIsolated);
+    if (value)
+      addFlag(Flag::IsIsolated);
+    else
+      removeFlag(Flag::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'transferring'.
+  bool isTransferring() const {
+    return getOptions().contains(Flag::IsTransferring);
+  }
+
+  void setTransferring(bool value = true) {
+    if (value)
+      addFlag(Flag::IsTransferring);
+    else
+      removeFlag(Flag::IsTransferring);
   }
 
   /// Whether or not this parameter is marked with '_const'.
@@ -6765,7 +6836,7 @@ public:
       return true;
     case Specifier::Consuming:
     case Specifier::InOut:
-    case Specifier::Transferring:
+    case Specifier::ImplicitlyCopyableConsuming:
       return false;
     }
     llvm_unreachable("unhandled specifier");
@@ -6783,7 +6854,7 @@ public:
     case ParamSpecifier::LegacyShared:
       return ValueOwnership::Shared;
     case ParamSpecifier::Consuming:
-    case ParamSpecifier::Transferring:
+    case ParamSpecifier::ImplicitlyCopyableConsuming:
     case ParamSpecifier::LegacyOwned:
       return ValueOwnership::Owned;
     case ParamSpecifier::Default:
@@ -7708,6 +7779,7 @@ protected:
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
     Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
+    Bits.FuncDecl.HasTransferringResult = false;
   }
 
   void setResultInterfaceType(Type type);
@@ -7862,6 +7934,16 @@ public:
   }
   void setForcedStaticDispatch(bool flag) {
     Bits.FuncDecl.ForcedStaticDispatch = flag;
+  }
+
+  /// Returns true if this FuncDecl has a transferring result... returns false
+  /// otherwise.
+  bool hasTransferringResult() const {
+    return Bits.FuncDecl.HasTransferringResult;
+  }
+
+  void setTransferringResult(bool newValue = true) {
+    Bits.FuncDecl.HasTransferringResult = newValue;
   }
 
   static bool classof(const Decl *D) {

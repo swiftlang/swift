@@ -3016,8 +3016,7 @@ public:
         case ParamSpecifier::InOut:
         case ParamSpecifier::LegacyShared:
         case ParamSpecifier::LegacyOwned:
-        // For now, transferring isn't implicitly copyable.
-        case ParamSpecifier::Transferring:
+        case ParamSpecifier::ImplicitlyCopyableConsuming:
           return false;
         }
         if (pd->hasResultDependsOn()) {
