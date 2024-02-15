@@ -5,11 +5,11 @@
 
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(WithMacroDefaultArg)) %S/Inputs/with_macro_default_arg_module.swift -module-name WithMacroDefaultArg -emit-module -emit-module-path %t/WithMacroDefaultArg.swiftmodule -load-plugin-library %t/%target-library-name(MacroDefinition) -enable-experimental-feature ExpressionMacroDefaultArguments -I %t -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(WithMacroDefaultArg)) %S/Inputs/with_macro_default_arg_module.swift -module-name WithMacroDefaultArg -emit-module -emit-module-path %t/WithMacroDefaultArg.swiftmodule -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t -swift-version 5
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(WithMacroDefaultArgInterface)) %S/Inputs/with_macro_default_arg_interface.swift -module-name WithMacroDefaultArgInterface -enable-library-evolution -emit-module-interface-path %t/WithMacroDefaultArgInterface.swiftinterface -load-plugin-library %t/%target-library-name(MacroDefinition) -enable-experimental-feature ExpressionMacroDefaultArguments -I %t -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(WithMacroDefaultArgInterface)) %S/Inputs/with_macro_default_arg_interface.swift -module-name WithMacroDefaultArgInterface -enable-library-evolution -emit-module-interface-path %t/WithMacroDefaultArgInterface.swiftinterface -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t -swift-version 5
 
-// RUN: %target-build-swift -enable-experimental-feature ExpressionMacroDefaultArguments -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %S/Inputs/with_macro_default_arg_same_module.swift %s -o %t/main -module-name MacroUser -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t -L %t %target-rpath(%t) -lWithMacroDefaultArg -lWithMacroDefaultArgInterface
+// RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %S/Inputs/with_macro_default_arg_same_module.swift %s -o %t/main -module-name MacroUser -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t -L %t %target-rpath(%t) -lWithMacroDefaultArg -lWithMacroDefaultArgInterface
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

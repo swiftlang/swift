@@ -4,6 +4,33 @@
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 5.11
+* [SE-0422][]:
+  Non-built-in expression macros can now be used as default arguments that
+  expand at each call site. For example, a custom `#CurrentFile` macro used as
+  a default argument in 'Library.swift' won't be expanded to `"Library.swift"`:
+
+  ```swift
+  @freestanding(expression)
+  public macro CurrentFile() -> String = ...
+
+  public func currentFile(name: String = #CurrentFile) { name }
+  ```
+
+  Instead, it will be expanded at where the function is called:
+  
+  ```swift
+  print(currentFile())
+  // Prints "main.swift"
+  ```
+
+  The expanded code can also use declarations from the caller side context:
+
+  ```swift
+  var person = "client"
+  greetPerson(/* greeting: #informalGreeting */)
+  // Prints "Hi client" if macro expands to "Hi \(person)"
+  ```
+
 * [SE-0417][]:
   Tasks now gain the ability to respect Task Executor preference.
   This allows tasks executing default actors (which do not declare a custom executor),

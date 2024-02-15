@@ -123,6 +123,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
+LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -144,7 +145,6 @@ EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(BodyMacros, true)
-EXPERIMENTAL_FEATURE(ExpressionMacroDefaultArguments, false)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 
 // Whether to enable @_used and @_section attributes
