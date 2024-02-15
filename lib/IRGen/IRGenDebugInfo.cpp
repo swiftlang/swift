@@ -101,6 +101,41 @@ public:
   };
 };
 
+class EqualExceptSILFunctionExtInfoIsolation
+  : public CanTypeDifferenceVisitor<EqualExceptSILFunctionExtInfoIsolation> {
+public:
+  // Disregard isolation differences in SILFunctionType ExtInfo.
+  bool visitDifferentTypeStructure(CanType t1, CanType t2) {
+    if (auto f1 = dyn_cast<SILFunctionType>(t1)) {
+      if (auto f2 = cast<SILFunctionType>(t2)) {
+        // If only the ExtInfos differ, allow a "@isolated(any)" difference.
+        if (!f1->hasSameExtInfoAs(f2) &&
+            f1->getCoroutineKind() == f2->getCoroutineKind() &&
+            f1->getInvocationGenericSignature() ==
+                f2->getInvocationGenericSignature()) {
+          auto e1 = f1->getExtInfo().withErasedIsolation(false);
+          auto e2 = f2->getExtInfo().withErasedIsolation(false);
+          return !(e1.isEqualTo(e2, /*useClangTypes*/ true) ||
+                   e1.isEqualTo(e2, /*useClangTypes*/ false));
+        }
+      }
+    }
+    return true;
+  }
+  // Disregard ExistentialType differences like equalWithoutExistentialTypes.
+  bool visitDifferentComponentTypes(CanType type1, CanType type2) {
+    if (auto e1 = dyn_cast<ExistentialType>(type1)) {
+      type1 = e1->getConstraintType()->getCanonicalType();
+    } else if (auto e2 = dyn_cast<ExistentialType>(type2)) {
+      type2 = e2->getConstraintType()->getCanonicalType();
+    }
+    return visit(type1, type2);
+  }
+  bool check(Type t1, Type t2) {
+    return !visit(t1->getCanonicalType(), t2->getCanonicalType());
+  };
+};
+
 static bool equalWithoutExistentialTypes(Type t1, Type t2) {
   static Type (*withoutExistentialTypes)(Type) = [](Type type) -> Type {
     return type.transform([](Type type) -> Type {
@@ -991,7 +1026,8 @@ private:
                  // FIXME: Some existential types are reconstructed without
                  // an explicit ExistentialType wrapping the constraint.
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
-                 !EqualUpToClangTypes().check(Reconstructed, Ty)) {
+                 !EqualUpToClangTypes().check(Reconstructed, Ty) &&
+                 !EqualExceptSILFunctionExtInfoIsolation().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
