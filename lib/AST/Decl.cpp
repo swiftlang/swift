@@ -4901,6 +4901,14 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
+InverseMarking::Mark
+TypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  if (auto P = dyn_cast<ProtocolDecl>(this))
+    return P->hasInverseMarking(target);
+
+  return getMarking(target).getInverse();
+}
+
 InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
   return evaluateOrDefault(
       getASTContext().evaluator,
@@ -6614,13 +6622,13 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   });
 }
 
-std::pair</*found=*/bool, /*where=*/SourceLoc>
+InverseMarking::Mark
 ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   auto &ctx = getASTContext();
 
   // Legacy support stops here.
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return std::make_pair(false, SourceLoc());
+    return InverseMarking::Mark();
 
   auto inheritedTypes = getInherited();
   for (unsigned i = 0; i < inheritedTypes.size(); ++i) {
@@ -6634,13 +6642,14 @@ ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
     if (auto *composition = type->getAs<ProtocolCompositionType>()) {
       // Found ~<target> in the protocol inheritance clause.
       if (composition->getInverses().contains(target))
-        return std::make_pair(true, repr ? repr->getLoc() : SourceLoc());
+        return InverseMarking::Mark(InverseMarking::Kind::Explicit,
+                                    repr ? repr->getLoc() : SourceLoc());
     }
   }
 
   auto *whereClause = getTrailingWhereClause();
   if (!whereClause)
-    return std::make_pair(false, SourceLoc());
+    return InverseMarking::Mark();
 
   for (const auto &reqRepr : whereClause->getRequirements()) {
     if (reqRepr.isInvalid() ||
@@ -6654,10 +6663,11 @@ ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
       continue;
 
     if (constraintRepr->isInverseOf(target, getDeclContext()))
-      return std::make_pair(true, constraintRepr->getLoc());
+      return InverseMarking::Mark(InverseMarking::Kind::Explicit,
+                                  constraintRepr->getLoc());
   }
 
-  return std::make_pair(false, SourceLoc());
+  return InverseMarking::Mark();
 }
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
@@ -6689,7 +6699,7 @@ bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
     // Otherwise, check to see if there's an inverse on this protocol.
 
     // The implicit requirement was suppressed on this protocol, keep looking.
-    if (proto->hasInverseMarking(ip).first)
+    if (proto->hasInverseMarking(ip))
       return TypeWalker::Action::Continue;
 
     return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.

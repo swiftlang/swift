@@ -2064,15 +2064,13 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (EnabledNoncopyableGenerics) {
       if (auto kp = otherProto->getKnownProtocolKind()) {
         if (auto ip = getInvertibleProtocolKind(*kp)) {
-          bool hasInverse;
-          SourceLoc inverseLoc;
-
-          std::tie(hasInverse, inverseLoc) = proto->hasInverseMarking(*ip);
-          if (!hasInverse)
+          auto inverse = proto->hasInverseMarking(*ip);
+          if (!inverse)
             continue; // no ~IP annotation
 
           auto &Diags = proto->getASTContext().Diags;
-          Diags.diagnose(inverseLoc, diag::inverse_generic_but_also_conforms,
+          Diags.diagnose(inverse.getLoc(),
+                         diag::inverse_generic_but_also_conforms,
                          proto->getSelfInterfaceType(), getProtocolName(*kp));
           continue;
         }

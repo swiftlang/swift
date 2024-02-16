@@ -32,6 +32,7 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -3234,6 +3235,8 @@ public:
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
 
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
+
   /// Determine how the given invertible protocol was written on this TypeDecl,
   /// if at all.
   InverseMarking getMarking(InvertibleProtocolKind ip) const;
@@ -5224,8 +5227,7 @@ public:
 
   /// Determine whether this protocol has ~<target>` stated on
   /// itself, one of its inherited types or `Self` requirements.
-  std::pair</*found=*/bool, /*where=*/SourceLoc>
-  hasInverseMarking(InvertibleProtocolKind target) const;
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
 
   /// Determine whether this protocol requires conformance to `IP`, without
   /// querying a generic signature.
