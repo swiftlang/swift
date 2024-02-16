@@ -77,3 +77,16 @@ struct Wrapper : ~Escapable {
     return view
   }
 }
+
+struct Container : ~Copyable {
+  var ptr: UnsafeRawBufferPointer
+// CHECK: sil hidden @$s28implicit_lifetime_dependence9ContainerV4viewAA10BufferViewVvg : $@convention(method) (@guaranteed Container) -> _scope(0) @owned BufferView {
+  var view: BufferView {
+    get {
+      return BufferView(ptr)
+    }
+    set(newView) {
+      ptr = newView.ptr
+    }
+  }
+}
