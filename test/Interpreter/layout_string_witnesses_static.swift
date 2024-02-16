@@ -1132,6 +1132,54 @@ func testMultiPayloadEnumNested() {
 
 testMultiPayloadEnumNested()
 
+struct MyError: Error {
+    let x: SimpleClass
+}
+
+// Regression test for rdar://122911427
+func testMultiPayloadError() {
+    let ptr = UnsafeMutablePointer<MultiPayloadError>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = MultiPayloadError.error2(0, MyError(x: SimpleClass(x: 23)))
+        testInitTake(ptr, to: consume x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadError.error2(1, MyError(x: SimpleClass(x: 32)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadError.error2(2, MyError(x: SimpleClass(x: 41)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadError()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
