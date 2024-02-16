@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020-2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -127,13 +127,12 @@ import Swift
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws
 /// - SeeAlso: ``TaskExecutor``
-@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-public func withTaskExecutorPreference<T: Sendable>(
+public func withTaskExecutorPreference<T: Sendable, E>(
   _ taskExecutor: (any TaskExecutor)?,
-  operation: @Sendable () async throws -> T
-  ) async rethrows -> T {
+  operation: @Sendable () async throws(E) -> T
+  ) async throws(E) -> T {
   guard let taskExecutor else {
     // User explicitly passed a "nil" preference, so we invoke the operation
     // as is, which will hop to it's expected executor without any change in
@@ -158,6 +157,21 @@ public func withTaskExecutorPreference<T: Sendable>(
   // the operation, its enqueue will respect the attached executor preference.
   return try await operation()
 }
+
+// ABI: Historical withTaskExecutorPreference, rethrows was changed to typed throws `throws(E)`
+@_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
+@available(*, deprecated, renamed: "withTaskExecutorPreference(_:operation:)")
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@usableFromInline
+internal func old_withTaskExecutorPreference<T: Sendable>(
+  _ taskExecutor: (any TaskExecutor)?,
+  operation: @Sendable () async throws -> T
+) async rethrows -> T {
+  try await withTaskExecutorPreference(taskExecutor, operation: operation)
+}
+
 
 /// Task with specified executor -----------------------------------------------
 
