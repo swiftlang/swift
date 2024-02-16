@@ -219,11 +219,11 @@ void swift_distributed_execute_target(
 
   auto actorTy = swift_getObjectType(actor);
   auto actorTyNamePair = swift_getMangledTypeName(actorTy);
-  std::string actorTyName = actorTyNamePair.data;
 
   auto *accessor = findDistributedProtocolMethodAccessor(
-      /*findConcreteWitness=*/false, actorTyNamePair.data,
-      actorTyNamePair.length, targetNameStart, targetNameLength);
+      /*findConcreteWitness=*/false,
+      actorTyNamePair.data, actorTyNamePair.length,
+      targetNameStart, targetNameLength);
 
   if (!accessor) {
     SwiftError *error =
@@ -231,7 +231,8 @@ void swift_distributed_execute_target(
     auto resumeInParent =
         reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
             callerContext->ResumeParent);
-    return resumeInParent(callerContext, error);
+    resumeInParent(callerContext, error);
+    return;
   }
 
   auto *asyncFnPtr = reinterpret_cast<
