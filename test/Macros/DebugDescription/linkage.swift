@@ -13,7 +13,7 @@ struct MyStruct: CustomDebugStringConvertible {
 // CHECK: #elseif os(Windows)
 // CHECK: @_section(".lldbsummaries")
 // CHECK: #else
-// CHECK: @_section("__DATA_CONST,__lldbsummaries")
+// CHECK: @_section("__TEXT,__lldbsummaries")
 // CHECK: #endif
 // CHECK: @_used
 // CHECK: static let _lldb_summary = (
