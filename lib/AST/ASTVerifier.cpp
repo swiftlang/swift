@@ -1078,6 +1078,7 @@ public:
       } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
         if (CD->hasLifetimeDependentReturn()) {
           resultType = CD->getResultInterfaceType();
+          resultType = CD->mapTypeIntoContext(resultType);
         } else {
           resultType = TupleType::getEmpty(Ctx);
         }

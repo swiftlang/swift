@@ -1719,16 +1719,10 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
     if (!nilExpr) {
       if (ctor->hasLifetimeDependentReturn()) {
-        // Typecheck the expression unconditionally.
-        TypeChecker::typeCheckExpression(E, DC, {});
-
-        auto *checkE = E;
-        if (auto *load = dyn_cast<LoadExpr>(checkE))
-          checkE = load->getSubExpr();
         bool isSelf = false;
-        if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
-          isSelf = DRE->getDecl() == ctor->getImplicitSelfDecl();
-
+        if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+          isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
+        }
         if (!isSelf) {
           ctx.Diags.diagnose(
               RS->getStartLoc(),
