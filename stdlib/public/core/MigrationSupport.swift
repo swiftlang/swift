@@ -425,7 +425,9 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafePointer: _CustomPlaygroundQuickLookable {
+extension UnsafePointer: _CustomPlaygroundQuickLookable
+where Pointee: ~Copyable // FIXME: This should not be necessary
+{
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
@@ -439,7 +441,9 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
+extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable
+where Pointee: ~Copyable // FIXME: This should not be necessary
+{
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
