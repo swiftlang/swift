@@ -1187,6 +1187,10 @@ public:
       unsigned numIgnoredTrailingParameters,
       llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
 
+  /// Set up the ExpectedExecutor field for the current function and emit
+  /// whatever hops or assertions are locally expected.
+  void emitExpectedExecutor();
+
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
   void bindParameterForForwarding(ParamDecl *param,
