@@ -11349,7 +11349,8 @@ ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
 }
 
 NominalTypeDecl *ActorIsolation::getActor() const {
-  assert(getKind() == ActorInstance);
+  assert(getKind() == ActorInstance ||
+         getKind() == GlobalActor);
 
   if (silParsed)
     return nullptr;

@@ -114,7 +114,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await remoteW.dist_sync(work: "Direct")
     print("replySync direct (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
     // CHECK: replySync direct (remote): dist_sync(work:): Direct
   }
   print("==== ----------------------------------------------------------------")
@@ -122,7 +122,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await remoteW.dist_async(work: "Direct")
     print("replyAsync direct (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
     // CHECK: replyAsync direct (remote): dist_async(work:): Direct
   }
   print("==== ----------------------------------------------------------------")
@@ -130,7 +130,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await remoteW.dist_syncThrows(work: "Direct")
     print("replyThrows direct (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
     // CHECK: replyThrows direct (remote): dist_syncThrows(work:): Direct
   }
   print("==== ----------------------------------------------------------------")
@@ -138,7 +138,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await remoteW.dist_asyncThrows(work: "Direct")
     print("replyAsyncThrows direct (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
     // CHECK: replyAsyncThrows direct (remote): dist_asyncThrows(work:): Direct
   }
   print("==== ----------------------------------------------------------------")
@@ -150,7 +150,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await call_dist_sync(w: remoteW)
     print("reply (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
     // CHECK: << remoteCall return: dist_sync(work:): Hello
     // CHECK: reply (remote): dist_sync(work:): Hello
 
@@ -167,7 +167,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await call_dist_async(w: remoteW)
     print("reply (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
     // CHECK: << remoteCall return: dist_async(work:): Hello
     // CHECK: reply (remote): dist_async(work:): Hello
 
@@ -184,7 +184,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await call_dist_throws(w: remoteW)
     print("reply (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
     // CHECK: << remoteCall return: dist_syncThrows(work:): Hello
     // CHECK: reply (remote): dist_syncThrows(work:): Hello
 
@@ -201,7 +201,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   do {
     let reply = try await call_dist_asyncThrows(w: remoteW)
     print("reply (remote): \(reply)")
-    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: >> remoteCall: on:main.TheWorker, target:dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
     // CHECK: << remoteCall return: dist_asyncThrows(work:): Hello
     // CHECK: reply (remote): dist_asyncThrows(work:): Hello
 
