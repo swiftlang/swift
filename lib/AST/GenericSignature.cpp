@@ -882,6 +882,11 @@ void GenericSignature::verify() const {
 
 void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   auto dumpAndAbort = [&]() {
+    llvm::errs() << "All requirements:\n";
+    for (auto reqt : reqts) {
+      reqt.dump(llvm::errs());
+      llvm::errs() << "\n";
+    }
     getPointer()->getRequirementMachine()->dump(llvm::errs());
     abort();
   };
@@ -1081,7 +1086,14 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     ProtocolType::canonicalizeProtocols(canonicalProtos);
 
     if (protos.size() != canonicalProtos.size()) {
-      llvm::errs() << "Redundant conformance requirements in signature\n";
+      llvm::errs() << "Redundant conformance requirements in signature "
+                   << *this << ":\n";
+      llvm::errs() << "Ours:\n";
+      for (auto *proto : protos)
+        llvm::errs() << "- " << proto->getName() << "\n";
+      llvm::errs() << "Theirs:\n";
+      for (auto *proto : canonicalProtos)
+        llvm::errs() << "- " << proto->getName() << "\n";
       dumpAndAbort();
     }
     if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
