@@ -84,16 +84,13 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(DeclRefTypeRepr, TypeRepr);
-  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, DeclRefTypeRepr);
-
-  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, IdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(DeclRefTypeRepr, TypeRepr, 1+32,
+    /// Whether this instance has a valid angle bracket source range.
+    HasAngleBrackets: 1,
     : NumPadBits,
+
     NumGenericArgs : 32
   );
-
-  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, DeclRefTypeRepr, 32,
-                             : NumPadBits, NumMemberComponents : 32);
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
     : NumPadBits,
@@ -194,6 +191,12 @@ public:
   /// Most use cases should analyze the resolved \c Type instead and use
   /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
   TypeRepr *getWithoutParens() const;
+
+  /// Whether this is a `SimpleIdentTypeRepr` matching the given identifier.
+  bool isSimpleUnqualifiedIdentifier(Identifier identifier) const;
+
+  /// Whether this is a `SimpleIdentTypeRepr` matching the given string.
+  bool isSimpleUnqualifiedIdentifier(StringRef str) const;
 
   //*** Allocation Routines ************************************************/
 
@@ -326,23 +329,78 @@ class IdentTypeRepr;
 ///   Foo.Bar<Gen>
 /// \endcode
 class DeclRefTypeRepr : public TypeRepr {
+  DeclNameLoc NameLoc;
+
+  /// Either the identifier or declaration that describes this
+  /// component.
+  ///
+  /// The initial parsed representation is always an identifier, and
+  /// name lookup will resolve this to a specific declaration.
+  llvm::PointerUnion<DeclNameRef, TypeDecl *> NameOrDecl;
+
+  /// The declaration context from which the bound declaration was
+  /// found. only valid if IdOrDecl is a TypeDecl.
+  DeclContext *DC;
+
 protected:
-  explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
+  explicit DeclRefTypeRepr(TypeReprKind K, DeclNameRef Name,
+                           DeclNameLoc NameLoc, unsigned NumGenericArgs,
+                           bool HasAngleBrackets);
 
 public:
-  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
-  /// is a \c MemberTypeRepr, and the method returns its base component.
-  TypeRepr *getBaseComponent();
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name);
 
-  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
-  /// is a \c MemberTypeRepr, and the method returns its last member component.
-  IdentTypeRepr *getLastComponent();
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name,
+                                 ArrayRef<TypeRepr *> GenericArgs,
+                                 SourceRange AngleBrackets);
 
-  /// The type declaration the last component is bound to.
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`. The base of a `IdentTypeRepr` is null.
+  TypeRepr *getBase() const;
+
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `IdentTypeRepr` is itself.
+  TypeRepr *getRoot();
+
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `IdentTypeRepr` is itself.
+  const TypeRepr *getRoot() const;
+
+  DeclNameLoc getNameLoc() const;
+  DeclNameRef getNameRef() const;
+
+  /// Replace the identifier with a new identifier, e.g., due to typo
+  /// correction.
+  void overwriteNameRef(DeclNameRef newId);
+
+  /// Returns whether this instance has been bound to a type declaration. This
+  /// happens during type resolution.
+  bool isBound() const;
+
+  /// Returns the type declaration this instance has been bound to.
   TypeDecl *getBoundDecl() const;
 
-  /// The identifier that describes the last component.
-  DeclNameRef getNameRef() const;
+  DeclContext *getDeclContext() const;
+
+  void setValue(TypeDecl *TD, DeclContext *DC);
+
+  /// Returns whether this instance has a generic argument list. That is, either
+  /// a valid angle bracket source range, or a positive number of generic
+  /// arguments.
+  bool hasGenericArgList() const;
+
+  unsigned getNumGenericArgs() const;
+
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
+protected:
+  /// Returns whether this instance has a valid angle bracket source range.
+  bool hasAngleBrackets() const;
+
+public:
+  SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
@@ -350,6 +408,13 @@ public:
            T->getKind() == TypeReprKind::Member;
   }
   static bool classof(const DeclRefTypeRepr *T) { return true; }
+
+protected:
+  SourceLoc getLocImpl() const;
+
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+
+  friend class TypeRepr;
 };
 
 /// An identifier type with an optional set of generic arguments.
@@ -358,47 +423,12 @@ public:
 ///   Bar<Gen>
 /// \endcode
 class IdentTypeRepr : public DeclRefTypeRepr {
-  DeclNameLoc Loc;
-
-  /// Either the identifier or declaration that describes this
-  /// component.
-  ///
-  /// The initial parsed representation is always an identifier, and
-  /// name lookup will resolve this to a specific declaration.
-  llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
-
-  /// The declaration context from which the bound declaration was
-  /// found. only valid if IdOrDecl is a TypeDecl.
-  DeclContext *DC;
-
 protected:
-  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
-      : DeclRefTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
+  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id,
+                unsigned NumGenericArgs, bool hasGenericArgList)
+      : DeclRefTypeRepr(K, Id, Loc, NumGenericArgs, hasGenericArgList) {}
 
 public:
-  DeclNameLoc getNameLoc() const { return Loc; }
-  DeclNameRef getNameRef() const;
-
-  /// Replace the identifier with a new identifier, e.g., due to typo
-  /// correction.
-  void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
-
-  /// Return true if this name has been resolved to a type decl. This happens
-  /// during type resolution.
-  bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
-
-  TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
-
-  DeclContext *getDeclContext() const {
-    assert(isBound());
-    return DC;
-  }
-
-  void setValue(TypeDecl *TD, DeclContext *DC) {
-    IdOrDecl = TD;
-    this->DC = DC;
-  }
-
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent;
@@ -406,9 +436,8 @@ public:
   static bool classof(const IdentTypeRepr *T) { return true; }
 
 protected:
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
 
-  SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
   friend class TypeRepr;
 };
 
@@ -416,7 +445,8 @@ protected:
 class SimpleIdentTypeRepr : public IdentTypeRepr {
 public:
   SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
+      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id, /*NumGenericArgs=*/0,
+                      /*HasAngleBrackets=*/false) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -431,7 +461,6 @@ public:
   static bool classof(const SimpleIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
   SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
   friend class TypeRepr;
 };
@@ -448,17 +477,7 @@ class GenericIdentTypeRepr final
 
   GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
                        ArrayRef<TypeRepr *> GenericArgs,
-                       SourceRange AngleBrackets)
-      : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-        AngleBrackets(AngleBrackets) {
-    Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
-#ifndef NDEBUG
-    for (auto arg : GenericArgs)
-      assert(arg != nullptr);
-#endif
-    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
-                            getTrailingObjects<TypeRepr*>());
-  }
+                       SourceRange AngleBrackets);
 
 public:
   static GenericIdentTypeRepr *create(const ASTContext &C,
@@ -467,13 +486,8 @@ public:
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 
-  unsigned getNumGenericArgs() const {
-    return Bits.GenericIdentTypeRepr.NumGenericArgs;
-  }
-
   ArrayRef<TypeRepr*> getGenericArgs() const {
-    return {getTrailingObjects<TypeRepr*>(),
-            Bits.GenericIdentTypeRepr.NumGenericArgs};
+    return {getTrailingObjects<TypeRepr *>(), getNumGenericArgs()};
   }
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
@@ -483,7 +497,6 @@ public:
   static bool classof(const GenericIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };
@@ -494,39 +507,42 @@ private:
 ///   Foo.Bar<Gen>.Baz
 ///   [Int].Bar
 /// \endcode
-class MemberTypeRepr final : public DeclRefTypeRepr,
-      private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
+class MemberTypeRepr final
+    : public DeclRefTypeRepr,
+      private llvm::TrailingObjects<MemberTypeRepr, TypeRepr *, SourceRange> {
   friend TrailingObjects;
 
-  /// The base component, which is not necessarily an identifier type.
+  /// The qualifier or base type representation. For example, `A.B` for `A.B.C`.
   TypeRepr *Base;
 
-  MemberTypeRepr(TypeRepr *Base, ArrayRef<IdentTypeRepr *> MemberComponents)
-      : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
-    Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
-    assert(MemberComponents.size() > 0 &&
-           "MemberTypeRepr requires at least 1 member component");
-    std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
-                            getTrailingObjects<IdentTypeRepr *>());
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
+    return getNumGenericArgs();
   }
+
+  MemberTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc);
+
+  MemberTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc,
+                 ArrayRef<TypeRepr *> GenericArgs, SourceRange AngleBrackets);
 
 public:
-  static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
-                          ArrayRef<IdentTypeRepr *> MemberComponents);
+  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                DeclNameLoc NameLoc, DeclNameRef Name);
 
-  static DeclRefTypeRepr *create(const ASTContext &Ctx,
-                                 ArrayRef<IdentTypeRepr *> Components);
+  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                DeclNameLoc NameLoc, DeclNameRef Name,
+                                ArrayRef<TypeRepr *> GenericArgs,
+                                SourceRange AngleBrackets);
 
-  TypeRepr *getBaseComponent() const { return Base; }
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`.
+  TypeRepr *getBase() const;
 
-  ArrayRef<IdentTypeRepr *> getMemberComponents() const {
-    return {getTrailingObjects<IdentTypeRepr *>(),
-            Bits.MemberTypeRepr.NumMemberComponents};
-  }
+  /// Returns the root qualifier. For example, `A` for `A.B.C`.
+  TypeRepr *getRoot() const;
 
-  IdentTypeRepr *getLastComponent() const {
-    return getMemberComponents().back();
-  }
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
+  SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Member;
@@ -534,13 +550,9 @@ public:
   static bool classof(const MemberTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    return getBaseComponent()->getStartLoc();
-  }
-  SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
-  SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
 
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 

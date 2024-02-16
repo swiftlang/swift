@@ -3877,11 +3877,20 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   const ExportContext &where;
   DeclAvailabilityFlags flags;
 
-  bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
+  bool checkDeclRefTypeRepr(DeclRefTypeRepr *declRefTR) const {
     ArrayRef<AssociatedTypeDecl *> primaryAssociatedTypes;
 
-    if (auto *typeDecl = ITR->getBoundDecl()) {
-      auto range = ITR->getNameLoc().getSourceRange();
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(declRefTR)) {
+      // If the base is unavailable, don't go on to diagnose
+      // the member since that will just produce a redundant
+      // diagnostic.
+      if (diagnoseTypeReprAvailability(memberTR->getBase(), where, flags)) {
+        return true;
+      }
+    }
+
+    if (auto *typeDecl = declRefTR->getBoundDecl()) {
+      auto range = declRefTR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
         return true;
 
@@ -3892,7 +3901,7 @@ class TypeReprAvailabilityWalker : public ASTWalker {
 
     bool foundAnyIssues = false;
 
-    if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(ITR)) {
+    if (auto *GTR = dyn_cast<GenericIdentTypeRepr>(declRefTR)) {
       auto genericFlags = flags;
       genericFlags -= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
@@ -3932,27 +3941,8 @@ public:
     if (!declRefTR)
       return Action::Continue();
 
-    auto *baseComp = declRefTR->getBaseComponent();
-    if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
-      if (checkIdentTypeRepr(identBase)) {
-        foundAnyIssues = true;
-        return Action::SkipNode();
-      }
-    } else if (diagnoseTypeReprAvailability(baseComp, where, flags)) {
+    if (checkDeclRefTypeRepr(declRefTR)) {
       foundAnyIssues = true;
-      return Action::SkipNode();
-    }
-
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
-      for (auto *comp : memberTR->getMemberComponents()) {
-        // If a parent type is unavailable, don't go on to diagnose
-        // the member since that will just produce a redundant
-        // diagnostic.
-        if (checkIdentTypeRepr(comp)) {
-          foundAnyIssues = true;
-          break;
-        }
-      }
     }
 
     // We've already visited all the children above, so we don't

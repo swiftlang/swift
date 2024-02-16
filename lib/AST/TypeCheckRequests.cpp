@@ -1826,11 +1826,8 @@ SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
     auto [_, macro] = attr->destructureMacroRef();
     if (!macro)
       return SourceRange();
-    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(macro);
-    if (!genericTypeRepr)
-      return SourceRange();
 
-    return genericTypeRepr->getAngleBrackets();
+    return macro->getAngleBrackets();
   }
 
   llvm_unreachable("Unhandled case");
@@ -1844,11 +1841,8 @@ ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
     auto [_, macro] = attr->destructureMacroRef();
     if (!macro)
       return {};
-    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(macro);
-    if (!genericTypeRepr)
-      return {};
 
-    return genericTypeRepr->getGenericArgs();
+    return macro->getGenericArgs();
   }
 
   llvm_unreachable("Unhandled case");

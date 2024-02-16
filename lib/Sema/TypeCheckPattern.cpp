@@ -171,83 +171,67 @@ static bool hasEnumElementOrStaticVarMember(DeclContext *DC, Type ty,
   });
 }
 
-namespace {
-/// Build up an \c DeclRefTypeRepr and see what it resolves to.
-/// FIXME: Support DeclRefTypeRepr nodes with non-identifier base components.
-struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
-  SmallVectorImpl<IdentTypeRepr *> &components;
-  ASTContext &C;
+static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
+  // FIXME: Support MemberTypeRepr nodes with non-DeclRefTypeRepr bases.
+  /// Translates an expression to a \c DeclRefTypeRepr.
+  class ExprToDeclRefTypeRepr
+      : public ExprVisitor<ExprToDeclRefTypeRepr, DeclRefTypeRepr *> {
+    ASTContext &C;
 
-  ExprToDeclRefTypeRepr(decltype(components) &components, ASTContext &C)
-      : components(components), C(C) {}
+  public:
+    ExprToDeclRefTypeRepr(ASTContext &C) : C(C) {}
 
-  bool visitExpr(Expr *e) {
-    return false;
-  }
-  
-  bool visitTypeExpr(TypeExpr *te) {
-    if (auto *TR = te->getTypeRepr())
-      if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
-        components.push_back(ITR);
-        return true;
-      }
-    return false;
-  }
+    DeclRefTypeRepr *visitExpr(Expr *e) { return nullptr; }
 
-  bool visitDeclRefExpr(DeclRefExpr *dre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    
-    // Get the declared type.
-    if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
-      components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef()));
-      components.back()->setValue(td, nullptr);
-      return true;
+    DeclRefTypeRepr *visitTypeExpr(TypeExpr *te) {
+      return dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr());
     }
-    return false;
-  }
-  
-  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    // Track the AST location of the component.
-    components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getNameLoc(),
-                                  udre->getName()));
-    return true;
-  }
-  
-  bool visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    if (!visit(ude->getBase()))
-      return false;
-    
-    assert(!components.empty() && "no components before dot expr?!");
 
-    // Track the AST location of the new component.
-    components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getNameLoc(),
-                                  ude->getName()));
-    return true;
-  }
-  
-  bool visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
-    if (!visit(use->getSubExpr()))
-      return false;
-    
-    assert(!components.empty() && "no components before generic args?!");
-    
-    // Track the AST location of the generic arguments.
-    auto origComponent = components.back();
-    components.back() =
-      GenericIdentTypeRepr::create(C, origComponent->getNameLoc(),
-                                   origComponent->getNameRef(),
-                                   use->getUnresolvedParams(),
-                                   SourceRange(use->getLAngleLoc(),
-                                               use->getRAngleLoc()));
+    DeclRefTypeRepr *visitDeclRefExpr(DeclRefExpr *dre) {
+      // Get the declared type.
+      auto *td = dyn_cast<TypeDecl>(dre->getDecl());
+      if (!td) {
+        return nullptr;
+      }
 
-    return true;
-  }
-};
-} // end anonymous namespace
+      auto *repr =
+          new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef());
+      repr->setValue(td, nullptr);
+
+      return repr;
+    }
+
+    DeclRefTypeRepr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
+      return new (C) SimpleIdentTypeRepr(udre->getNameLoc(), udre->getName());
+    }
+
+    DeclRefTypeRepr *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
+      auto *base = visit(ude->getBase());
+      if (!base) {
+        return nullptr;
+      }
+
+      return MemberTypeRepr::create(C, base, ude->getNameLoc(), ude->getName());
+    }
+
+    DeclRefTypeRepr *
+    visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
+      auto *base = visit(use->getSubExpr());
+      if (!base) {
+        return nullptr;
+      }
+
+      assert(!base->hasGenericArgList() && "Already has generic arguments");
+
+      return DeclRefTypeRepr::create(
+          C, base->getBase(), base->getNameLoc(), base->getNameRef(),
+          use->getUnresolvedParams(),
+          SourceRange(use->getLAngleLoc(), use->getRAngleLoc()));
+    }
+  } translator(C);
+
+  return translator.visit(E);
+}
 
 namespace {
 class ResolvePattern : public ASTVisitor<ResolvePattern,
@@ -470,14 +454,14 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    SmallVector<IdentTypeRepr *, 2> components;
-    if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
+    DeclRefTypeRepr *repr =
+        translateExprToDeclRefTypeRepr(ude->getBase(), Context);
+    if (!repr) {
       return nullptr;
+    }
 
     const auto options =
         TypeResolutionOptions(llvm::None) | TypeResolutionFlags::SilenceErrors;
-
-    DeclRefTypeRepr *repr = MemberTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
@@ -572,22 +556,19 @@ public:
       return P;
     }
 
-    SmallVector<IdentTypeRepr *, 2> components;
-    if (!ExprToDeclRefTypeRepr(components, Context).visit(ce->getFn()))
+    DeclRefTypeRepr *repr =
+        translateExprToDeclRefTypeRepr(ce->getFn(), Context);
+    if (!repr) {
       return nullptr;
-    
-    if (components.empty())
-      return nullptr;
+    }
 
-    auto tailComponent = components.pop_back_val();
     EnumElementDecl *referencedElement = nullptr;
     TypeExpr *baseTE = nullptr;
 
-    if (components.empty()) {
-      // Only one component. Try looking up an enum element in context.
-      referencedElement
-        = lookupUnqualifiedEnumMemberElement(DC, tailComponent->getNameRef(),
-                                             tailComponent->getLoc());
+    if (isa<IdentTypeRepr>(repr)) {
+      // Not qualified. Try looking up an enum element in context.
+      referencedElement = lookupUnqualifiedEnumMemberElement(
+          DC, repr->getNameRef(), repr->getLoc());
       if (!referencedElement)
         return nullptr;
 
@@ -595,16 +576,16 @@ public:
       baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
                                         Context);
     } else {
+      // Otherwise, see whether we had an enum type as the penultimate
+      // component, and look up an element inside it.
+      auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+
       const auto options = TypeResolutionOptions(llvm::None) |
                            TypeResolutionFlags::SilenceErrors;
 
-      // Otherwise, see whether we had an enum type as the penultimate
-      // component, and look up an element inside it.
-      DeclRefTypeRepr *prefixRepr = MemberTypeRepr::create(Context, components);
-
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(
-          prefixRepr, DC, options,
+          qualIdentTR->getBase(), DC, options,
           [](auto unboundTy) {
             // FIXME: Don't let unbound generic types escape type
             // resolution. For now, just return the unbound generic type.
@@ -619,26 +600,23 @@ public:
       if (!enumDecl)
         return nullptr;
 
-      referencedElement
-        = lookupEnumMemberElement(DC, enumTy,
-                                  tailComponent->getNameRef(),
-                                  tailComponent->getLoc());
+      referencedElement = lookupEnumMemberElement(
+          DC, enumTy, qualIdentTR->getNameRef(), qualIdentTR->getLoc());
       if (!referencedElement)
         return nullptr;
 
       baseTE = TypeExpr::createForMemberDecl(
-          prefixRepr, tailComponent->getNameLoc(), enumDecl);
+          qualIdentTR->getBase(), qualIdentTR->getNameLoc(), enumDecl);
       baseTE->setType(MetatypeType::get(enumTy));
     }
 
     assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
-    assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
-           "should be handled above");
+    assert(!repr->hasGenericArgList() && "should be handled above");
 
     auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
     return new (Context) EnumElementPattern(
-        baseTE, SourceLoc(), tailComponent->getNameLoc(),
-        tailComponent->getNameRef(), referencedElement, subPattern, DC);
+        baseTE, SourceLoc(), repr->getNameLoc(), repr->getNameRef(),
+        referencedElement, subPattern, DC);
   }
 };
 

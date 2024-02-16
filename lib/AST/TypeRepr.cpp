@@ -119,6 +119,26 @@ TypeRepr *TypeRepr::getWithoutParens() const {
   return repr;
 }
 
+bool TypeRepr::isSimpleUnqualifiedIdentifier(Identifier identifier) const {
+  if (auto *identTR = dyn_cast<SimpleIdentTypeRepr>(this)) {
+    if (identTR->getNameRef().getBaseIdentifier() == identifier) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool TypeRepr::isSimpleUnqualifiedIdentifier(StringRef str) const {
+  if (auto *identTR = dyn_cast<SimpleIdentTypeRepr>(this)) {
+    if (identTR->getNameRef().getBaseIdentifier().is(str)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
@@ -134,35 +154,129 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   return SourceLoc();
 }
 
-TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
-  return const_cast<DeclRefTypeRepr *>(this)
-      ->getLastComponent()
-      ->getBoundDecl();
+DeclRefTypeRepr::DeclRefTypeRepr(TypeReprKind K, DeclNameRef Name,
+                                 DeclNameLoc NameLoc, unsigned NumGenericArgs,
+                                 bool HasAngleBrackets)
+    : TypeRepr(K), NameLoc(NameLoc), NameOrDecl(Name), DC(nullptr) {
+  assert(Name.isSimpleName() && !Name.isSpecial() && !Name.isOperator());
+  Bits.DeclRefTypeRepr.HasAngleBrackets = HasAngleBrackets;
+  Bits.DeclRefTypeRepr.NumGenericArgs = NumGenericArgs;
 }
+
+DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                         DeclNameLoc NameLoc,
+                                         DeclNameRef Name) {
+  if (Base) {
+    return MemberTypeRepr::create(C, Base, NameLoc, Name);
+  }
+
+  return new (C) SimpleIdentTypeRepr(NameLoc, Name);
+}
+
+DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                         DeclNameLoc NameLoc, DeclNameRef Name,
+                                         ArrayRef<TypeRepr *> GenericArgs,
+                                         SourceRange AngleBrackets) {
+  if (Base) {
+    return MemberTypeRepr::create(C, Base, NameLoc, Name, GenericArgs,
+                                  AngleBrackets);
+  } else if (AngleBrackets.isInvalid() && GenericArgs.empty()) {
+    return new (C) SimpleIdentTypeRepr(NameLoc, Name);
+  }
+
+  return GenericIdentTypeRepr::create(C, NameLoc, Name, GenericArgs,
+                                      AngleBrackets);
+}
+
+TypeRepr *DeclRefTypeRepr::getBase() const {
+  if (isa<IdentTypeRepr>(this)) {
+    return nullptr;
+  }
+
+  return cast<MemberTypeRepr>(this)->getBase();
+}
+
+TypeRepr *DeclRefTypeRepr::getRoot() {
+  return const_cast<TypeRepr *>(
+      const_cast<const DeclRefTypeRepr *>(this)->getRoot());
+}
+
+const TypeRepr *DeclRefTypeRepr::getRoot() const {
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
+
+  return cast<MemberTypeRepr>(this)->getRoot();
+}
+
+DeclNameLoc DeclRefTypeRepr::getNameLoc() const { return NameLoc; }
 
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
-  return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameRef();
+  if (NameOrDecl.is<DeclNameRef>())
+    return NameOrDecl.get<DeclNameRef>();
+
+  return NameOrDecl.get<TypeDecl *>()->createNameRef();
 }
 
-TypeRepr *DeclRefTypeRepr::getBaseComponent() {
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
-    return ITR;
-
-  return cast<MemberTypeRepr>(this)->getBaseComponent();
+void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
+  assert(newId.isSimpleName() && !newId.isSpecial() && !newId.isOperator());
+  NameOrDecl = newId;
 }
 
-IdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
-    return ITR;
+bool DeclRefTypeRepr::isBound() const { return NameOrDecl.is<TypeDecl *>(); }
 
-  return cast<MemberTypeRepr>(this)->getLastComponent();
+TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
+  return NameOrDecl.dyn_cast<TypeDecl *>();
 }
 
-DeclNameRef IdentTypeRepr::getNameRef() const {
-  if (IdOrDecl.is<DeclNameRef>())
-    return IdOrDecl.get<DeclNameRef>();
+DeclContext *DeclRefTypeRepr::getDeclContext() const {
+  assert(isBound());
+  return DC;
+}
 
-  return IdOrDecl.get<TypeDecl *>()->createNameRef();
+void DeclRefTypeRepr::setValue(TypeDecl *TD, DeclContext *DC) {
+  NameOrDecl = TD;
+  this->DC = DC;
+}
+
+unsigned DeclRefTypeRepr::getNumGenericArgs() const {
+  return Bits.DeclRefTypeRepr.NumGenericArgs;
+}
+
+bool DeclRefTypeRepr::hasGenericArgList() const {
+  return Bits.DeclRefTypeRepr.NumGenericArgs ||
+         Bits.DeclRefTypeRepr.HasAngleBrackets;
+}
+
+ArrayRef<TypeRepr *> DeclRefTypeRepr::getGenericArgs() const {
+  if (getNumGenericArgs() == 0) {
+    return {};
+  }
+
+  if (auto *genericITR = dyn_cast<GenericIdentTypeRepr>(this)) {
+    return genericITR->getGenericArgs();
+  }
+
+  return cast<MemberTypeRepr>(this)->getGenericArgs();
+}
+
+bool DeclRefTypeRepr::hasAngleBrackets() const {
+  return Bits.DeclRefTypeRepr.HasAngleBrackets;
+}
+
+SourceRange DeclRefTypeRepr::getAngleBrackets() const {
+  if (!hasAngleBrackets()) {
+    return SourceRange();
+  }
+
+  if (auto *genericITR = dyn_cast<GenericIdentTypeRepr>(this)) {
+    return genericITR->getAngleBrackets();
+  }
+
+  return cast<MemberTypeRepr>(this)->getAngleBrackets();
+}
+
+SourceLoc DeclRefTypeRepr::getLocImpl() const {
+  return NameLoc.getBaseNameLoc();
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -261,19 +375,13 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   }
 }
 
-static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
-                             ArrayRef<TypeRepr *> Args) {
-  if (Args.empty())
-    return;
+void DeclRefTypeRepr::printImpl(ASTPrinter &Printer,
+                                const PrintOptions &Opts) const {
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(this)) {
+    printTypeRepr(memberTR->getBase(), Printer, Opts);
+    Printer << ".";
+  }
 
-  Printer << "<";
-  interleave(Args, [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
-             [&] { Printer << ", "; });
-  Printer << ">";
-}
-
-void IdentTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
@@ -283,16 +391,13 @@ void IdentTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printName(getNameRef().getBaseIdentifier());
   }
 
-  if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
-    printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());
-}
-
-void MemberTypeRepr::printImpl(ASTPrinter &Printer,
-                               const PrintOptions &Opts) const {
-  printTypeRepr(getBaseComponent(), Printer, Opts);
-  for (auto C : getMemberComponents()) {
-    Printer << ".";
-    printTypeRepr(C, Printer, Opts);
+  if (hasGenericArgList()) {
+    Printer << "<";
+    interleave(
+        getGenericArgs(),
+        [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
+        [&] { Printer << ", "; });
+    Printer << ">";
   }
 }
 
@@ -373,6 +478,21 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
   return create(C, {}, Parens);
 }
 
+GenericIdentTypeRepr::GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
+                                           ArrayRef<TypeRepr *> GenericArgs,
+                                           SourceRange AngleBrackets)
+    : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id,
+                    /*NumGenericArgs=*/GenericArgs.size(),
+                    /*HasAngleBrackets=*/AngleBrackets.isValid()),
+      AngleBrackets(AngleBrackets) {
+#ifndef NDEBUG
+  for (auto arg : GenericArgs)
+    assert(arg != nullptr);
+#endif
+  std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                          getTrailingObjects<TypeRepr *>());
+}
+
 GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
                                                    DeclNameLoc Loc,
                                                    DeclNameRef Id,
@@ -383,20 +503,84 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
-TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
-                                 ArrayRef<IdentTypeRepr *> MemberComponents) {
-  if (MemberComponents.empty())
-    return Base;
+MemberTypeRepr::MemberTypeRepr(TypeRepr *Base, DeclNameRef Name,
+                               DeclNameLoc NameLoc,
+                               ArrayRef<TypeRepr *> GenericArgs,
+                               SourceRange AngleBrackets)
+    : DeclRefTypeRepr(TypeReprKind::Member, Name, NameLoc,
+                      /*NumGenericArgs=*/GenericArgs.size(),
+                      /*HasAngleBrackets=*/AngleBrackets.isValid()),
+      Base(Base) {
+  assert(Base);
 
-  auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
-  auto mem = C.Allocate(size, alignof(MemberTypeRepr));
-  return new (mem) MemberTypeRepr(Base, MemberComponents);
+  if (AngleBrackets.isValid()) {
+    *getTrailingObjects<SourceRange>() = AngleBrackets;
+  }
+
+  if (!GenericArgs.empty()) {
+    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                            getTrailingObjects<TypeRepr *>());
+  }
 }
 
-DeclRefTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
-                                        ArrayRef<IdentTypeRepr *> Components) {
-  return cast<DeclRefTypeRepr>(
-      create(Ctx, Components.front(), Components.drop_front()));
+MemberTypeRepr::MemberTypeRepr(TypeRepr *Base, DeclNameRef Name,
+                               DeclNameLoc NameLoc)
+    : DeclRefTypeRepr(TypeReprKind::Member, Name, NameLoc, /*NumGenericArgs=*/0,
+                      /*HasAngleBrackets=*/false),
+      Base(Base) {
+  assert(Base);
+}
+
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                       DeclNameLoc NameLoc, DeclNameRef Name) {
+  return new (C) MemberTypeRepr(Base, Name, NameLoc);
+}
+
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                       DeclNameLoc NameLoc, DeclNameRef Name,
+                                       ArrayRef<TypeRepr *> GenericArgs,
+                                       SourceRange AngleBrackets) {
+  const auto size = totalSizeToAlloc<TypeRepr *, SourceRange>(
+      GenericArgs.size(), AngleBrackets.isValid() ? 1 : 0);
+  auto *mem = C.Allocate(size, alignof(MemberTypeRepr));
+  return new (mem)
+      MemberTypeRepr(Base, Name, NameLoc, GenericArgs, AngleBrackets);
+}
+
+TypeRepr *MemberTypeRepr::getBase() const { return Base; }
+
+TypeRepr *MemberTypeRepr::getRoot() const {
+  auto *base = getBase();
+  while (auto *memberTR = dyn_cast<MemberTypeRepr>(base)) {
+    base = memberTR->getBase();
+  }
+
+  return base;
+}
+
+ArrayRef<TypeRepr *> MemberTypeRepr::getGenericArgs() const {
+  return {getTrailingObjects<TypeRepr *>(), getNumGenericArgs()};
+}
+
+SourceRange MemberTypeRepr::getAngleBrackets() const {
+  if (hasAngleBrackets()) {
+    return *getTrailingObjects<SourceRange>();
+  }
+
+  return SourceRange();
+}
+
+SourceLoc MemberTypeRepr::getStartLocImpl() const {
+  return getBase()->getStartLoc();
+}
+
+SourceLoc MemberTypeRepr::getEndLocImpl() const {
+  const auto range = getAngleBrackets();
+  if (range.isValid()) {
+    return range.End;
+  }
+
+  return getNameLoc().getEndLoc();
 }
 
 PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,

@@ -115,54 +115,67 @@ public:
   void checkGlobalActorAccess(const Decl *D);
 };
 
-class TypeAccessScopeDiagnoser : private ASTWalker {
-  AccessScope accessScope;
-  const DeclContext *useDC;
-  bool treatUsableFromInlineAsPublic;
-  const IdentTypeRepr *offendingType = nullptr;
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
-    auto ITR = dyn_cast<IdentTypeRepr>(TR);
-    if (!ITR)
-      return Action::Continue();
-
-    const ValueDecl *VD = ITR->getBoundDecl();
-    if (!VD)
-      return Action::Continue();
-
-    if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic)
-        != accessScope)
-      return Action::Continue();
-
-    offendingType = ITR;
-    return Action::Stop();
-  }
-
-  explicit TypeAccessScopeDiagnoser(AccessScope accessScope,
-                                    const DeclContext *useDC,
-                                    bool treatUsableFromInlineAsPublic)
-    : accessScope(accessScope), useDC(useDC),
-      treatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic) {}
-
-public:
-  static const TypeRepr *findTypeWithScope(TypeRepr *TR,
-                                           AccessScope accessScope,
-                                           const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic) {
-    if (TR == nullptr)
-      return nullptr;
-    TypeAccessScopeDiagnoser diagnoser(accessScope, useDC,
-                                       treatUsableFromInlineAsPublic);
-    TR->walk(diagnoser);
-    return diagnoser.offendingType;
-  }
-};
-
 } // end anonymous namespace
+
+/// Searches the given type representation for a `DeclRefTypeRepr` that is
+/// bound to a type declaration with the given access scope. The type
+/// representation is searched in source order. For example, nodes in
+/// `A<T>.B<U>` will be checked in the following order: `ATBU`.
+static const DeclRefTypeRepr *
+findTypeDeclWithAccessScope(TypeRepr *TR, AccessScope accessScope,
+                            const DeclContext *useDC,
+                            bool treatUsableFromInlineAsPublic) {
+  if (!TR) {
+    return nullptr;
+  }
+
+  class Finder : public ASTWalker {
+    AccessScope accessScope;
+    const DeclContext *useDC;
+    bool treatUsableFromInlineAsPublic;
+
+    const DeclRefTypeRepr *theFind;
+
+  public:
+    explicit Finder(AccessScope accessScope, const DeclContext *useDC,
+                    bool treatUsableFromInlineAsPublic)
+        : accessScope(accessScope), useDC(useDC),
+          treatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
+          theFind(nullptr) {}
+
+    const DeclRefTypeRepr *getFind() const { return theFind; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
+    MemberTypeReprWalkingScheme
+    getMemberTypeReprWalkingScheme() const override {
+      return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+    }
+
+    PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
+      auto *declRefTR = dyn_cast<DeclRefTypeRepr>(TR);
+      if (!declRefTR)
+        return Action::Continue();
+
+      const ValueDecl *VD = declRefTR->getBoundDecl();
+      if (!VD)
+        return Action::Continue();
+
+      if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic) !=
+          accessScope)
+        return Action::Continue();
+
+      theFind = declRefTR;
+      return Action::Stop();
+    }
+  } walker(accessScope, useDC, treatUsableFromInlineAsPublic);
+
+  TR->walk(walker);
+
+  return walker.getFind();
+}
 
 /// Checks if the access scope of the type described by \p TL contains
 /// \p contextAccessScope. If it isn't, calls \p diagnose with a TypeRepr
@@ -196,7 +209,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (contextAccessScope.isPublic() ||
       contextAccessScope.isPackage()) {
     auto SF = useDC->getParentSourceFile();
-    auto report = [&](const IdentTypeRepr *typeRepr, const ValueDecl *VD) {
+    auto report = [&](const DeclRefTypeRepr *typeRepr, const ValueDecl *VD) {
       ImportAccessLevel import = VD->getImportAccessFrom(useDC);
       if (import.has_value()) {
         if (SF) {
@@ -219,7 +232,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     };
 
     if (typeRepr) {
-      typeRepr->walk(TypeReprIdentFinder([&](const IdentTypeRepr *TR) {
+      typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
         const ValueDecl *VD = TR->getBoundDecl();
         report(TR, VD);
         return true;
@@ -300,14 +313,14 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     }
   }
 
-  const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
+  const DeclRefTypeRepr *complainRepr = findTypeDeclWithAccessScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
   ImportAccessLevel complainImport = llvm::None;
   if (complainRepr) {
-    const ValueDecl *VD =
-      static_cast<const IdentTypeRepr*>(complainRepr)->getBoundDecl();
-    assert(VD && "findTypeWithScope should return bound TypeReprs only");
+    const ValueDecl *VD = complainRepr->getBoundDecl();
+    assert(VD &&
+           "findTypeDeclWithAccessScope should return bound TypeReprs only");
     complainImport = VD->getImportAccessFrom(useDC);
 
     // Don't complain about an import that doesn't restrict the access
@@ -361,8 +374,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   diag.highlight(complainRepr->getSourceRange());
   diag.flush();
 
-  if (auto ITR = dyn_cast<IdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = ITR->getBoundDecl();
+  if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = declRefTR->getBoundDecl();
     VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
@@ -378,8 +391,8 @@ static void noteLimitingImport(ASTContext &ctx,
   assert(limitImport->accessLevel != AccessLevel::Public &&
          "a public import shouldn't limit the access level of a decl");
 
-  if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
-    ValueDecl *VD = ITR->getBoundDecl();
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr)) {
+    ValueDecl *VD = declRefTR->getBoundDecl();
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,

@@ -1464,12 +1464,13 @@ public:
   /// \endverbatim
   ParserResult<TypeRepr> parseQualifiedDeclNameBaseType();
 
-  /// Parse an identifier type, e.g 'Foo' or 'Bar<Int>'.
+  /// Parse a single type identifier, possibly followed by a generic argument
+  /// list, e.g `Foo` or `Bar<Int>`.
   ///
   /// \verbatim
   /// type-identifier: identifier generic-args?
   /// \endverbatim
-  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+  ParserResult<DeclRefTypeRepr> parseTypeIdentifier(TypeRepr *Base);
 
   /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
   ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);

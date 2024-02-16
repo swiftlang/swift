@@ -692,10 +692,11 @@ private:
     } else if (isa<ArrayTypeRepr>(T) || isa<DictionaryTypeRepr>(T)) {
       if (!handleSquares(T->getStartLoc(), T->getEndLoc(), T->getStartLoc()))
         return Action::Stop();
-    } else if (auto *GI = dyn_cast<GenericIdentTypeRepr>(T)) {
-      SourceLoc ContextLoc = GI->getNameLoc().getBaseNameLoc();
-      SourceRange Brackets = GI->getAngleBrackets();
-      if (!handleAngles(Brackets.Start, Brackets.End, ContextLoc))
+    } else if (auto *DRTR = dyn_cast<DeclRefTypeRepr>(T)) {
+      SourceLoc ContextLoc = DRTR->getNameLoc().getBaseNameLoc();
+      auto Brackets = DRTR->getAngleBrackets();
+      if (Brackets.isValid() &&
+          !handleAngles(Brackets.Start, Brackets.End, ContextLoc))
         return Action::Stop();
     }
     return Action::Continue();
@@ -2784,17 +2785,17 @@ private:
     if (TrailingTarget)
       return llvm::None;
 
-    if (auto *GIT = dyn_cast<GenericIdentTypeRepr>(T)) {
-      SourceLoc ContextLoc = GIT->getNameLoc().getBaseNameLoc();
-      SourceRange Brackets = GIT->getAngleBrackets();
+    if (auto *DRTR = dyn_cast<DeclRefTypeRepr>(T)) {
+      SourceLoc ContextLoc = DRTR->getNameLoc().getBaseNameLoc();
+      SourceRange Brackets = DRTR->getAngleBrackets();
       if (Brackets.isInvalid())
         return llvm::None;
 
       SourceLoc L = Brackets.Start;
       SourceLoc R = getLocIfTokenTextMatches(SM, Brackets.End, ">");
       ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-      for (auto *Arg: GIT->getGenericArgs())
-        Aligner.updateAlignment(Arg->getSourceRange(), GIT);
+      for (auto *Arg: DRTR->getGenericArgs())
+        Aligner.updateAlignment(Arg->getSourceRange(), DRTR);
 
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }
