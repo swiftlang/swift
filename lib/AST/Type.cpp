@@ -290,10 +290,24 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   containsParameterized = false;
   representsAnyObject = false;
 
+  // The canonical protocol list for a single protocol type `any P` isn't
+  // quite as simple as just {P}, because an existential type `any P` is
+  // formally `any P & Copyable`, so if P is ~Copyable, the canonical list
+  // is {P, Copyable}.
   protocols.push_back(protoDecl);
 
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(), {}, protocols);
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    auto &ctx = type->getASTContext();
+
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      protocols.push_back(proto);
+    }
+  }
+
+  // But P might inherit from Copyable, in which case the canonical list is
+  // just {P}.
+  ProtocolType::canonicalizeProtocols(protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
@@ -326,13 +340,31 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    auto &ctx = type->getASTContext();
+
+    auto inverses = type->getInverses();
+
+    // An existential type `any P & Q` is formally `any P & Q & Copyable`.
+    //
+    // FIXME: We could store the expansion in the ProtocolCompositionType
+    // itself, because the canonicalizeProtocols() call does more work than
+    // needed here.
+    for (auto ip : InvertibleProtocolSet::full()) {
+      if (!inverses.contains(ip)) {
+        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        protocols.push_back(proto);
+      }
+    }
+  }
+
+  // If any of the protocols are not ~Copyable, fold away Copyable from the
+  // canonical list.
+  ProtocolType::canonicalizeProtocols(protocols);
+
   representsAnyObject =
       hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
 
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(),
-                                     type->getInverses(),
-                                     protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
