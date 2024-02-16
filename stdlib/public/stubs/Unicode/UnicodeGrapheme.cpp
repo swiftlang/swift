@@ -42,15 +42,15 @@ __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) 
       upper = lower + ((entry << 2) >> 23);
     }
     
-    if (scalar >= lower && scalar <= upper) {
-      return enumValue;
-    }
-    
     //If we want the left child of the current node in our virtual tree,
     //that's at index * 2, if we want the right child it's at (index * 2) + 1
-    //bsearch branches are inherently unpredictable so ideally we want it to
-    //generate a csel here
-    index = 2 * index + (scalar < lower ? 0 : 1);
+    if (scalar < lower) {
+      index = 2 * index;
+    } else if (scalar <= upper) {
+      return enumValue;
+    } else {
+      index = 2 * index + 1;
+    }
   }
   // If we made it out here, then our scalar was not found in the grapheme
   // array (this occurs when a scalar doesn't map to any grapheme break
