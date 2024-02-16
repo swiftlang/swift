@@ -172,77 +172,6 @@ public:
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
   }
 };
-
-class BitwiseCopyableArchetypeTypeInfo
-    : public WitnessSizedTypeInfo<BitwiseCopyableArchetypeTypeInfo> {
-  using Self = BitwiseCopyableArchetypeTypeInfo;
-  using Super = WitnessSizedTypeInfo<Self>;
-  BitwiseCopyableArchetypeTypeInfo(llvm::Type *type,
-                                   IsABIAccessible_t abiAccessible)
-      : Super(type, Alignment(1), IsNotTriviallyDestroyable,
-              IsNotBitwiseTakable, IsCopyable, abiAccessible) {}
-
-public:
-  static const BitwiseCopyableArchetypeTypeInfo *
-  create(llvm::Type *type, IsABIAccessible_t abiAccessible) {
-    return new Self(type, abiAccessible);
-  }
-
-  void bitwiseCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                   SILType T, bool isOutlined) const {
-    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
-  }
-
-  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override {
-    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
-  }
-
-  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override {
-    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
-  }
-
-  void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                      SILType T, bool isOutlined) const override {
-    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
-  }
-
-  void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                      SILType T, bool isOutlined) const override {
-    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
-  }
-
-  void destroy(IRGenFunction &IGF, Address address, SILType T,
-               bool isOutlined) const override {
-    // BitwiseCopyable types are trivial, so destroy is a no-op.
-  }
-
-  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
-                                       llvm::Value *numEmptyCases,
-                                       Address enumAddr, SILType T,
-                                       bool isOutlined) const override {
-    return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
-  }
-
-  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
-                                 llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T, bool isOutlined) const override {
-    emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases,
-                                      enumAddr);
-  }
-
-  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
-                                   SILType T) const override {
-    // We'll need formal type metadata for this archetype.
-    collector.collectTypeMetadataForLayout(T);
-  }
-
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
-                                        bool useStructLayouts) const override {
-    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
-  }
-};
 } // end anonymous namespace
 
 /// Emit a single protocol witness table reference.
@@ -440,7 +369,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // The protocol won't be present in swiftinterfaces from older SDKs.
   if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
                                      archetype, bitwiseCopyableProtocol)) {
-    return BitwiseCopyableArchetypeTypeInfo::create(storageType, abiAccessible);
+    return BitwiseCopyableTypeInfo::create(storageType, abiAccessible);
   }
 
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
