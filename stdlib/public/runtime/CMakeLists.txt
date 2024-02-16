@@ -47,7 +47,6 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
-    Exception.cpp
     Exclusivity.cpp
     ExistentialContainer.cpp
     Float16Support.cpp
