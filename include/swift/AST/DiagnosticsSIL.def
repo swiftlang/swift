@@ -831,12 +831,24 @@ ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
       (StringRef))
+ERROR(sil_movechecking_cannot_destructure_imported_nonfrozen, none,
+      "cannot partially consume '%0' of non-frozen type %1 imported from %2",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially consume '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      (StringRef, Type))
 ERROR(sil_movechecking_cannot_destructure, none,
       "cannot partially consume '%0'",
       (StringRef))
 ERROR(sil_movechecking_cannot_partially_reinit_has_deinit, none,
       "cannot partially reinitialize '%0' when it has a deinitializer; only full reinitialization is allowed",
       (StringRef))
+ERROR(sil_movechecking_cannot_partially_reinit_nonfrozen, none,
+      "cannot partially reinitialize '%0' of non-frozen type %1 imported from %2; only full reinitialization is allowed",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially reinitialize '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      (StringRef, Type))
 ERROR(sil_movechecking_cannot_partially_reinit, none,
       "cannot partially reinitialize '%0' after it has been consumed; only full reinitialization is allowed",
       (StringRef))
