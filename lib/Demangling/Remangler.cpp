@@ -1046,6 +1046,25 @@ Remangler::mangleDependentGenericConformanceRequirement(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDependentGenericInverseConformanceRequirement(
+                                                  Node *node, unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  auto Mangling = mangleConstrainedType(node->getChild(0), depth + 1);
+
+  if (!Mangling.isSuccess()) {
+    return Mangling.error();
+  }
+
+  auto NumMembersAndParamIdx = Mangling.result();
+  DEMANGLER_ASSERT(
+      NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second, node);
+
+  Buffer << "Ri";
+
+  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentGenericParamCount(Node *node,
                                                           unsigned depth) {
   // handled inline in DependentGenericSignature

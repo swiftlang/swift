@@ -482,6 +482,16 @@ public:
   /// Utility wrapper for use when this is an opened existential signature.
   Type getExistentialType(Type type) const;
 
+  /// Determines if this generic signature is the complete opposite of a generic
+  /// signature with inverse requirements.
+  ///
+  /// Given the following 'other' signature (this assumes Equatable: ~Copyable):
+  ///   <T: ~Copyable & Equatable, U: ~Copyable, V: Copyable>
+  /// returns true iff our generic signature is:
+  ///   <T: Copyable & Equatable, U: Copyable, V: Copyable>
+  bool areAllRequirementsPositiveInverseRequirementsSatisfying(
+                                                  GenericSignature other) const;
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

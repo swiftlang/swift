@@ -2265,8 +2265,19 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
     }
   }
 
+  bool hasInverseRequirements = false;
+
+  if (auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext()) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+
+    hasInverseRequirements = !inverseReqs.empty();
+  }
+
   // Just mangle the decl's DC.
-  appendContext(decl->getDeclContext(), decl->getAlternateModuleName());
+  appendContext(decl->getDeclContext(), decl->getAlternateModuleName(),
+                /* shouldTreatAsConstrainedExtension */ hasInverseRequirements);
 }
 
 namespace {
@@ -2323,7 +2334,8 @@ findFirstVariable(PatternBindingDecl *binding) {
   return llvm::None;
 }
 
-void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) {
+void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName,
+                               bool shouldMangleInverseGenerics) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Package:
     return;
@@ -2336,7 +2348,8 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     return;
 
   case DeclContextKind::GenericTypeDecl:
-    appendAnyGenericType(cast<GenericTypeDecl>(ctx));
+    appendAnyGenericType(cast<GenericTypeDecl>(ctx),
+                         shouldMangleInverseGenerics);
     return;
 
   case DeclContextKind::ExtensionDecl: {
@@ -2346,30 +2359,76 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     if (!decl)
       return appendContext(ExtD->getDeclContext(), useModuleName);
 
-    if (!ExtD->isEquivalentToExtendedContext()) {
-    // Mangle the extension if:
-    // - the extension is defined in a different module from the original
-    //   nominal type decl,
-    // - the extension is constrained, or
-    // - the extension is to a protocol.
+    // Determine if we need to actually mangle the extension. If any of the
+    // following are true, then we must mangle it:
+    //
+    // 1. The extension is defined in a different module from the original
+    //    nominal type decl.
+    // 2. The extension is to a protocol.
+    // 3. The extension has a different generic signature than the extended
+    //    type's generic signature OR if they were the same, if there are any
+    //    inverse requirements imposed. If the extension has a different generic
+    //    signature BUT all of the requirements are positive inverse ones, then
+    //    it can mangle as if it were the type itself.
+    //
     // FIXME: In a world where protocol extensions are dynamically dispatched,
     // "extension is to a protocol" would no longer be a reason to use the
     // extension mangling, because an extension method implementation could be
     // resiliently moved into the original protocol itself.
-      auto sig = ExtD->getGenericSignature();
-      // If the extension is constrained, mangle the generic signature that
-      // constrains it.
-      appendAnyGenericType(decl);
-      appendModule(ExtD->getParentModule(), useModuleName);
-      if (sig && ExtD->isConstrainedExtension()) {
-        Mod = ExtD->getModuleContext();
-        auto nominalSig = ExtD->getSelfNominalTypeDecl()
-                            ->getGenericSignatureOfContext();
-        appendGenericSignature(sig, nominalSig);
+
+    auto sig = ExtD->getGenericSignature();
+    auto nominalSig = ExtD->getSelfNominalTypeDecl()
+                        ->getGenericSignatureOfContext();
+
+    auto mangleExtension = [&](bool genericSignatureRequiredMangling,
+                               bool skipEquivalanceCheck = false) {
+      if (!ExtD->isInSameDefiningModule() ||
+          ExtD->getExtendedProtocolDecl() ||
+          genericSignatureRequiredMangling) {
+        appendAnyGenericType(decl);
+        appendModule(ExtD->getParentModule(), useModuleName);
+
+        if (sig && genericSignatureRequiredMangling) {
+          appendGenericSignature(sig, nominalSig, skipEquivalanceCheck);
+        }
+
+        return appendOperator("E");
       }
-      return appendOperator("E");
+
+      return appendAnyGenericType(decl);
+    };
+
+    // If we don't have a generic signature, then we don't need to go through
+    // the work of determining generic signature differences or inverse
+    // requirements and such.
+    if (!sig) {
+      return mangleExtension(/* genericSignatureRequiredMangling */ false);
     }
-    return appendAnyGenericType(decl);
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+
+    // If the extension's generic signature == the extended type's generic
+    // signature, then we only we need to check if there are any inverse
+    // requirements present.
+    if (sig->isEqual(nominalSig)) {
+      // Mangle the extension if there are inverse requirements present.
+      return mangleExtension(
+          /* genericSignatureRequiredMangling */ !inverseReqs.empty(),
+          /* skipEquivalenceCheck */ !inverseReqs.empty());
+    }
+
+    // If we have inverse requirements still in our signature, just mangle.
+    if (!inverseReqs.empty()) {
+      return mangleExtension(/* genericSignatureRequiredMangling */ true);
+    }
+
+    return mangleExtension(
+      /* genericSignatureRequiredMangling */
+      !sig->areAllRequirementsPositiveInverseRequirementsSatisfying(nominalSig) &&
+      !reqs.empty() &&
+      inverseReqs.empty());
   }
 
   case DeclContextKind::AbstractClosureExpr:
@@ -2568,8 +2627,31 @@ void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
   SymbolicReferences.emplace_back(referent, offset);
 }
 
-void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
+void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
+                                      bool shouldTreatAsConstrainedExtension) {
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+
+  SWIFT_DEFER {
+    if (shouldTreatAsConstrainedExtension) {
+      auto sig = decl->getGenericSignature();
+
+      if (!sig) {
+        return;
+      }
+
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverseReqs;
+      sig->getRequirementsWithInverses(reqs, inverseReqs);
+
+      if (inverseReqs.empty()) {
+        return;
+      }
+
+      appendModule(decl->getParentModule(), decl->getAlternateModuleName());
+      appendGenericSignature(sig, sig, /* skipEquivalenceCheck */ true);
+      return appendOperator("E");
+    }
+  };
 
   if (nominal && isa<BuiltinTupleDecl>(nominal))
     return appendOperator("BT");
@@ -3084,24 +3166,25 @@ void ASTMangler::appendTupleTypeListElement(Identifier name, Type elementType,
 }
 
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
-                                        GenericSignature contextSig) {
+                                        GenericSignature contextSig,
+                                        bool skipEquivalenceCheck) {
   auto canSig = sig.getCanonicalSignature();
 
-  // FIXME: We just ignore invertible requirements for now.
   SmallVector<Requirement, 2> reqs;
   SmallVector<InverseRequirement, 2> inverseReqs;
   canSig->getRequirementsWithInverses(reqs, inverseReqs);
 
   unsigned initialParamDepth;
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
+  bool areAllRequirementsPositiveInverseRequirementsSatisfying = false;
+
   if (contextSig) {
     // If the signature is the same as the context signature, there's nothing
     // to do.
-    if (contextSig.getCanonicalSignature() == canSig) {
+    if (!skipEquivalenceCheck && contextSig.getCanonicalSignature() == canSig) {
       return false;
     }
 
-    // FIXME: We just ignore invertible requirements for now.
     SmallVector<Requirement, 2> contextReqs;
     SmallVector<InverseRequirement, 2> contextInverseReqs;
     contextSig->getRequirementsWithInverses(contextReqs, contextInverseReqs);
@@ -3133,17 +3216,22 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
         return contextSig->isRequirementSatisfied(req);
       });
     }
+
+    areAllRequirementsPositiveInverseRequirementsSatisfying =
+      canSig->areAllRequirementsPositiveInverseRequirementsSatisfying(contextSig);
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
     genericParams = canSig.getGenericParams();
   }
 
-  if (genericParams.empty() && reqs.empty())
+  if ((genericParams.empty() || areAllRequirementsPositiveInverseRequirementsSatisfying) &&
+      reqs.empty() &&
+      inverseReqs.empty())
     return false;
 
   appendGenericSignatureParts(sig, genericParams,
-                              initialParamDepth, reqs);
+                              initialParamDepth, reqs, inverseReqs);
   return true;
 }
 
@@ -3234,11 +3322,33 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   llvm_unreachable("bad requirement type");
 }
 
+void ASTMangler::appendInverseRequirement(const InverseRequirement &req,
+                                          GenericSignature sig,
+                                          bool lhsBaseIsProtocolSelf) {
+  appendOperator("R");
+
+  assert(req.protocol->getInvertibleProtocolKind());
+
+  switch (req.protocol->getInvertibleProtocolKind().value()) {
+  case InvertibleProtocolKind::Copyable: {
+    appendOperator("i");
+    break;
+  }
+  default:
+    llvm_unreachable("unknown invertible protocol kind");
+  }
+
+  auto firstType = req.subject->getCanonicalType();
+  auto gpBase = firstType->castTo<GenericTypeParamType>();
+  return appendOpWithGenericParamIndex("", gpBase);
+}
+
 void ASTMangler::appendGenericSignatureParts(
                                      GenericSignature sig,
                                      ArrayRef<CanGenericTypeParamType> params,
                                      unsigned initialParamDepth,
-                                     ArrayRef<Requirement> requirements) {
+                                     ArrayRef<Requirement> requirements,
+                              ArrayRef<InverseRequirement> inverseRequirements) {
   // Mangle which generic parameters are pack parameters.
   for (auto param : params) {
     if (param->isParameterPack())
@@ -3248,6 +3358,11 @@ void ASTMangler::appendGenericSignatureParts(
   // Mangle the requirements.
   for (const Requirement &reqt : requirements) {
     appendRequirement(reqt, sig);
+  }
+
+  // Mangle the inverse requirements.
+  for (auto inverseReq : inverseRequirements) {
+    appendInverseRequirement(inverseReq, sig);
   }
 
   if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)

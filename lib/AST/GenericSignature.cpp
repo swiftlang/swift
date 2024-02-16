@@ -1336,6 +1336,47 @@ void GenericSignatureImpl::getRequirementsWithInverses(
   }
 }
 
+bool
+GenericSignatureImpl::areAllRequirementsPositiveInverseRequirementsSatisfying(
+                                                GenericSignature other) const {
+  SmallVector<Requirement, 2> otherReqs;
+  SmallVector<InverseRequirement, 2> otherInverseReqs;
+  other->getRequirementsWithInverses(otherReqs, otherInverseReqs);
+
+  // If the signature we're comparing against doesn't have any inverse
+  // requirements to begin with, then we can't be positive against it.
+  if (otherInverseReqs.empty()) {
+    return false;
+  }
+
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  getRequirementsWithInverses(reqs, inverseReqs);
+
+  // Similarly, if we have inverse requirements still present in our signature,
+  // then not all of the other inverse requirements were satisfied or we
+  // introduced new ones.
+  if (!inverseReqs.empty()) {
+    return false;
+  }
+
+  auto requirementDiff = requirementsNotSatisfiedBy(other);
+
+  for (auto req : requirementDiff) {
+    if (req.getKind() != RequirementKind::Conformance) {
+      return false;
+    }
+
+    auto protocol = req.getProtocolDecl();
+
+    if (!protocol->getInvertibleProtocolKind()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void RequirementSignature::getRequirementsWithInverses(
     ProtocolDecl *owner,
     SmallVector<Requirement, 2> &reqs,

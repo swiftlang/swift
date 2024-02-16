@@ -932,6 +932,7 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= protocol assoc-type-name 'Rp' GENERIC-PARAM-INDEX // protocol requirement on associated type
   requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
   requirement ::= protocol substitution 'RQ'                        // protocol requirement with substitution
+  requirement ::= 'Ri' GENERIC-PARAM-INDEX                          // inverse protocol requirement to Copyable
   requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
   requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type
   requirement ::= type assoc-type-list 'RC' GENERIC-PARAM-INDEX     // base class requirement on associated type at depth
@@ -944,7 +945,6 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= type assoc-type-name 'Rm' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type
   requirement ::= type assoc-type-list 'RM' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type at depth
   requirement ::= type substitution 'RM' LAYOUT-CONSTRAINT                           // layout requirement with substitution
-
   requirement ::= type 'Rh' GENERIC-PARAM-INDEX                     // same-shape requirement (only supported on a generic parameter)
 
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0

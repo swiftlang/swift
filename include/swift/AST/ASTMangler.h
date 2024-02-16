@@ -451,14 +451,16 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx, StringRef useModuleName);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName,
+                     bool shouldTreatAsConstrainedExtension = false);
 
   void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
 
-  void appendAnyGenericType(const GenericTypeDecl *decl);
+  void appendAnyGenericType(const GenericTypeDecl *decl,
+                            bool shouldTreatAsConstrainedExtension = false);
 
   enum FunctionManglingKind {
     NoFunctionMangling,
@@ -512,7 +514,8 @@ protected:
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
   bool appendGenericSignature(GenericSignature sig,
-                              GenericSignature contextSig = nullptr);
+                              GenericSignature contextSig = nullptr,
+                              bool skipEquivalenceCheck = false);
 
   /// Append a requirement to the mangling.
   ///
@@ -526,10 +529,21 @@ protected:
   void appendRequirement(const Requirement &reqt, GenericSignature sig,
                          bool lhsBaseIsProtocolSelf = false);
 
+  /// Append an inverse requirement into the mangling.
+  ///
+  /// Instead of mangling the presence of an invertible protocol, we mangle
+  /// their absence, which is what an inverse represents.
+  ///
+  /// \param req The inverse requirement to mangle.
+  void appendInverseRequirement(const InverseRequirement &req,
+                                GenericSignature sig,
+                                bool lhsBaseIsProtocolSelf = false);
+
   void appendGenericSignatureParts(GenericSignature sig,
                                    ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
                                    unsigned initialParamDepth,
-                                   ArrayRef<Requirement> requirements);
+                                   ArrayRef<Requirement> requirements,
+                                   ArrayRef<InverseRequirement> inverseRequirements);
 
   DependentMemberType *dropProtocolFromAssociatedType(DependentMemberType *dmt,
                                                       GenericSignature sig);
