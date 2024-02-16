@@ -26,6 +26,7 @@
 
 #include <unwind.h>
 
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Exception.h"
 
 using namespace swift;
@@ -39,11 +40,17 @@ _swift_exceptionPersonality(int version,
                             struct _Unwind_Exception *exceptionObject,
                             struct _Unwind_Context *context)
 {
+#if __cpp_exceptions
   // Handle exceptions by catching them and calling std::terminate().
   // This, in turn, will trigger the unhandled exception routine in the
   // C++ runtime.
   __cxa_begin_catch(exceptionObject);
   std::terminate();
+#else
+  fatalError(0,
+             "C++ exception handling detected but the Swift runtime was "
+             "compiled with exceptions disabled\n");
+#endif
 
   return _URC_FATAL_PHASE1_ERROR;
 }
