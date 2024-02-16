@@ -520,6 +520,13 @@ namespace {
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   if (tuple->containsPackExpansionType()) {
+    auto *bitwiseCopyableProtocol =
+        IGM.getSwiftModule()->getASTContext().getProtocol(
+            KnownProtocolKind::BitwiseCopyable);
+    if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
+                                       tuple, bitwiseCopyableProtocol)) {
+      return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, IsABIAccessible);
+    }
     // FIXME: Figure out if its copyable at least
     return &getDynamicTupleTypeInfo(IsCopyable);
   }
