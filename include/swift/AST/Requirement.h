@@ -251,11 +251,6 @@ struct InverseRequirement {
 
   InvertibleProtocolKind getKind() const;
 
-  /// Adds the type parameters of this generic context to the result if
-  /// it has default requirements.
-  static void enumerateDefaultedParams(GenericContext *decl,
-                                       SmallVectorImpl<Type> &result);
-
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.
   static void expandDefaults(ASTContext &ctx,

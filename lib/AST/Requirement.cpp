@@ -316,32 +316,6 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
-void InverseRequirement::enumerateDefaultedParams(
-    GenericContext *genericContext,
-    SmallVectorImpl<Type> &result) {
-
-  auto add = [&](Type t) {
-    assert(t->isTypeParameter());
-    result.push_back(t);
-  };
-
-  // Nothing to enumerate if it's not generic.
-  if (!genericContext->isGeneric())
-    return;
-
-  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
-    add(proto->getSelfInterfaceType());
-
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
-      add(assocTypeDecl->getDeclaredInterfaceType());
-
-    return;
-  }
-
-  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
-    add(gtpd->getDeclaredInterfaceType());
-}
-
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
