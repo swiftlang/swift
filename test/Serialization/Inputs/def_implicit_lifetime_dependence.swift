@@ -31,3 +31,19 @@ public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
   return BufferView(view.ptr)
 }
 
+public struct Container : ~Copyable {
+  var ptr: UnsafeRawBufferPointer
+
+  public init(_ ptr: UnsafeRawBufferPointer) {
+    self.ptr = ptr
+  }
+
+  public var view: BufferView {
+    get {
+      return BufferView(ptr)
+    }
+    set(newView) {
+      ptr = newView.ptr
+    }
+  }
+}

@@ -282,8 +282,18 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return llvm::None;
   }
 
-  if (afd->getKind() == DeclKind::Func && afd->hasImplicitSelfDecl()) {
-    auto ownership = afd->getImplicitSelfDecl()->getValueOwnership();
+  if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
+    ValueOwnership ownership = ValueOwnership::Default;
+    if (auto *AD = dyn_cast<AccessorDecl>(afd)) {
+      if (AD->getAccessorKind() == AccessorKind::Get) {
+        // We don't support "borrowing/consuming" ownership modifiers on
+        // getters, by default they are guaranteed for now.
+        ownership = ValueOwnership::Shared;
+      }
+    } else {
+      ownership = afd->getImplicitSelfDecl()->getValueOwnership();
+    }
+
     if (ownership == ValueOwnership::Default) {
       diags.diagnose(
           returnLoc,
@@ -338,10 +348,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 llvm::Optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
                             bool allowIndex) {
-  if (afd->getKind() != DeclKind::Func &&
-      afd->getKind() != DeclKind::Constructor) {
-    return llvm::None;
-  }
   auto *returnTypeRepr = afd->getResultTypeRepr();
   if (isa_and_nonnull<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
     return LifetimeDependenceInfo::fromTypeRepr(afd, resultType, allowIndex);
