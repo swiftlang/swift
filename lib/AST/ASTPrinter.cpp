@@ -887,8 +887,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTransformedTypeWithOptions(T, Options);
   }
 
-  void printTypeLocWithOptions(const TypeLoc &TL, const PrintOptions &options) {
+  void printTypeLocWithOptions(const TypeLoc &TL, const PrintOptions &options,
+      std::optional<llvm::function_ref<void()>> printBeforeType = std::nullopt) {
     if (CurrentType && TL.getType()) {
+      if (printBeforeType) (*printBeforeType)();
       printTransformedTypeWithOptions(TL.getType(), options);
       return;
     }
@@ -901,10 +903,20 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
     }
 
+    if (printBeforeType) (*printBeforeType)();
     TL.getType().print(Printer, options);
   }
 
   void printTypeLoc(const TypeLoc &TL) { printTypeLocWithOptions(TL, Options); }
+
+  /// Print a TypeLoc.  If we decide to print based on the type, rather than
+  /// based on the TypeRepr, call the given function before printing the type;
+  /// this is useful if there are attributes in the TypeRepr which don't end
+  /// up being part of the type, such as `@unchecked` in inheritance clauses.
+  void printTypeLoc(const TypeLoc &TL,
+                    llvm::function_ref<void()> printBeforeType) {
+    printTypeLocWithOptions(TL, Options, printBeforeType);
+  }
 
   void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
     PrintOptions options = Options;
@@ -2710,15 +2722,15 @@ void PrintAST::printInherited(const Decl *decl) {
   Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
-    if (inherited.isUnchecked())
-      Printer << "@unchecked ";
-    if (inherited.isRetroactive() &&
-        !llvm::is_contained(Options.ExcludeAttrList, TypeAttrKind::Retroactive))
-      Printer << "@retroactive ";
-    if (inherited.isPreconcurrency())
-      Printer << "@preconcurrency ";
-
-    printTypeLoc(inherited);
+    printTypeLoc(inherited, [&] {
+      if (inherited.isUnchecked())
+        Printer << "@unchecked ";
+      if (inherited.isRetroactive() &&
+          !llvm::is_contained(Options.ExcludeAttrList, TypeAttrKind::Retroactive))
+        Printer << "@retroactive ";
+      if (inherited.isPreconcurrency())
+        Printer << "@preconcurrency ";
+    });
   }, [&]() {
     Printer << ", ";
   });
