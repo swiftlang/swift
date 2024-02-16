@@ -670,7 +670,7 @@ extension _GraphemeBreakingState {
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
     
-    //GB4 handled here because we don't need to know `y` for this csae
+    // GB4 handled here because we don't need to know `y` for this csae
     if x == .control {
       return true
     }
@@ -698,9 +698,7 @@ extension _GraphemeBreakingState {
     case (.any, .any):
       return true
 
-    // GB4 (handled above)
-    // case (.control, _):
-    //   return true
+    // (GB4 is handled above)
 
     // GB5
     case (_, .control):
