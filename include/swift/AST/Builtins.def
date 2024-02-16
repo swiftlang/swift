@@ -261,6 +261,12 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
+/// StoreRaw has type (T, Builtin.RawPointer) -> ()
+/// Stores a T to raw memory.
+/// Its address does not adhere to strict aliasing.
+/// See also LoadRaw.
+BUILTIN_SIL_OPERATION(StoreRaw, "storeRaw", Special)
+
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 ///
 /// This builtin asserts if the underlying type /could/ be objc.

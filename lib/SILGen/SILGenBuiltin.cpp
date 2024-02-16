@@ -240,6 +240,14 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &SGF, SILLocation loc,
                           /*isInvariant=*/false, llvm::MaybeAlign());
 }
 
+static ManagedValue emitBuiltinStoreRaw(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/false,
+                          /*isInvariant=*/false, llvm::MaybeAlign(1));
+}
+
 /// Emit Builtin.initialize by evaluating the operand directly into
 /// the address.
 static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
