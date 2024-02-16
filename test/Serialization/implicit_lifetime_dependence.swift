@@ -12,7 +12,7 @@
 // RUN: -enable-experimental-feature NoncopyableGenerics \
 // RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
 
-// REQUIRES: noncopyable_generics
+
 
 import def_implicit_lifetime_dependence
 

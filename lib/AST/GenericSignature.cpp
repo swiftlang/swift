@@ -714,8 +714,7 @@ Type GenericSignatureImpl::getUpperBound(Type type,
   // we didn't have a superclass or require AnyObject.
   InvertibleProtocolSet inverses;
 
-  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     if (!superclass && !hasExplicitAnyObject) {
       for (auto ip : InvertibleProtocolSet::full()) {
         auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
@@ -726,8 +725,7 @@ Type GenericSignatureImpl::getUpperBound(Type type,
   }
 
   for (auto *proto : getRequiredProtocols(type)) {
-    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
       // Don't add invertible protocols to the composition, because we recorded
       // their absence above.
       if (proto->getInvertibleProtocolKind())
@@ -1298,8 +1296,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     reqs.append(getRequirements().begin(), getRequirements().end());
     return;
   }
@@ -1342,8 +1339,7 @@ void RequirementSignature::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = owner->getASTContext();
 
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     reqs.append(getRequirements().begin(), getRequirements().end());
     return;
   }

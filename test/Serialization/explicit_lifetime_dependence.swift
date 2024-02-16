@@ -11,7 +11,7 @@
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 
-// REQUIRES: noncopyable_generics
+
 
 import def_explicit_lifetime_dependence
 

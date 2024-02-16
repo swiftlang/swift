@@ -869,9 +869,6 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
-ERROR(serialization_noncopyable_generics_mismatch,none,
-      "module %0 was not compiled with NoncopyableGenerics",
-      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "

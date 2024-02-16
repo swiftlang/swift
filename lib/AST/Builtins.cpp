@@ -299,8 +299,7 @@ struct CollectGenericParams {
     // If it's an invertible protocol and NoncopyableGenerics is disabled
     // then skip the requirement.
     if (req.getProtocolDecl()->getInvertibleProtocolKind())
-      if (!(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
-          SC.Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)))
+      if (!SC.Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
         return;
 
     AddedRequirements.push_back(req);
@@ -736,8 +735,7 @@ namespace {
       // If it's an invertible protocol and NoncopyableGenerics is disabled
       // then skip the requirement.
       if (req.getProtocolDecl()->getInvertibleProtocolKind())
-        if (!(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
-            Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)))
+        if (!Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
           return;
 
       addedRequirements.push_back(req);
