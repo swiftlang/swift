@@ -4,6 +4,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
 
+// UNSUPPORTED: OS=windows-msvc
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
