@@ -4909,14 +4909,6 @@ TypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   return InverseMarking::Mark(InverseMarking::Kind::None);
 }
 
-InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      InvertibleAnnotationRequest{const_cast<TypeDecl *>(this), ip},
-      InverseMarking::forInverse(InverseMarking::Kind::None)
-  );
-}
-
 static TypeDecl::CanBeInvertible::Result
 conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
