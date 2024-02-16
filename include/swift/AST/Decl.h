@@ -4370,6 +4370,14 @@ public:
   /// Returns null if the type is a class, or does not have a declared `deinit`.
   DestructorDecl *getValueTypeDestructor();
 
+  /// Determine whether this type has `: <target>` stated explicitly in
+  /// its inheritance clause.
+  bool hasMarking(InvertibleProtocolKind target) const;
+
+  /// Determine whether this type has ~<target>` stated on
+  /// itself, one of its inherited types or `Self` requirements.
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&

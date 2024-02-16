@@ -60,8 +60,7 @@ static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
   diag.flush();
 
   // Have no advice for situations where the KP conformance is explicit.
-  auto marking = nominal->getMarking(ip);
-  if (marking.getPositive().isPresent())
+  if (nominal->hasMarking(ip))
     return;
 
   auto &ctx = nominal->getASTContext();

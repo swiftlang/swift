@@ -4903,10 +4903,10 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
 
 InverseMarking::Mark
 TypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  if (auto P = dyn_cast<ProtocolDecl>(this))
-    return P->hasInverseMarking(target);
+  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->hasInverseMarking(target);
 
-  return getMarking(target).getInverse();
+  return InverseMarking::Mark(InverseMarking::Kind::None);
 }
 
 InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
@@ -6620,6 +6620,188 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   });
 }
 
+static void findInheritedType(
+    InheritedTypes inherited,
+    llvm::function_ref<bool(Type, NullablePtr<TypeRepr>)> isMatch) {
+  for (size_t i = 0; i < inherited.size(); i++) {
+    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
+    if (!type)
+      continue;
+
+    if (isMatch(type, inherited.getTypeRepr(i)))
+      break;
+  }
+}
+
+static InverseMarking::Mark
+findInverseInInheritance(InheritedTypes inherited,
+                         InvertibleProtocolKind target) {
+  auto isInverseOfTarget = [&](Type t) {
+    if (auto pct = t->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(target);
+    return false;
+  };
+
+  InverseMarking::Mark inverse;
+  findInheritedType(inherited,
+                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
+                      if (!isInverseOfTarget(inheritedTy))
+                        return false;
+
+                      inverse = InverseMarking::Mark(
+                          InverseMarking::Kind::Explicit,
+                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
+                      return true;
+                    });
+  return inverse;
+}
+
+bool NominalTypeDecl::hasMarking(InvertibleProtocolKind target) const {
+  InverseMarking::Mark mark;
+
+  std::function<bool(Type)> isTarget = [&](Type t) -> bool {
+    if (auto kp = t->getKnownProtocol()) {
+      if (auto ip = getInvertibleProtocolKind(*kp))
+        return *ip == target;
+    } else if (auto pct = t->getAs<ProtocolCompositionType>()) {
+      return llvm::any_of(pct->getMembers(), isTarget);
+    }
+
+    return false;
+  };
+
+  findInheritedType(getInherited(),
+                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
+                      if (!isTarget(inheritedTy))
+                        return false;
+
+                      mark = InverseMarking::Mark(
+                          InverseMarking::Kind::Explicit,
+                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
+                      return true;
+                    });
+  return mark;
+}
+
+InverseMarking::Mark
+NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  switch (target) {
+  case InvertibleProtocolKind::Copyable:
+    // Handle the legacy '@_moveOnly' for types they can validly appear.
+    // TypeCheckAttr handles the illegal situations for us.
+    if (auto attr = getAttrs().getAttribute<MoveOnlyAttr>())
+      if (isa<StructDecl, EnumDecl, ClassDecl>(this))
+        return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
+                                    attr->getLocation());
+    break;
+
+  case InvertibleProtocolKind::Escapable:
+    // Handle the legacy '@_nonEscapable' attribute
+    if (auto attr = getAttrs().getAttribute<NonEscapableAttr>()) {
+      assert((isa<ClassDecl, StructDecl, EnumDecl>(this)));
+      return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
+                                  attr->getLocation());
+    }
+    break;
+  }
+
+  auto &ctx = getASTContext();
+
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::Mark(InverseMarking::Kind::None);
+
+  // Claim that the tuple decl has an inferred ~TARGET marking.
+  if (isa<BuiltinTupleDecl>(this))
+    return InverseMarking::Mark(InverseMarking::Kind::Inferred);
+
+  if (auto P = dyn_cast<ProtocolDecl>(this))
+    return P->hasInverseMarking(target);
+
+  // Search the inheritance clause first.
+  if (auto inverse = findInverseInInheritance(getInherited(), target))
+    return inverse;
+
+  // Check the generic parameters for an explicit ~TARGET marking
+  // which would result in an Inferred ~TARGET marking for this context.
+  auto *gpList = getParsedGenericParams();
+  if (!gpList)
+    return InverseMarking::Mark();
+
+  auto isInverseTarget = [&](Type t) -> bool {
+    if (auto pct = t->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(target);
+    return false;
+  };
+
+  auto resolveRequirement = [&](unsigned reqIdx) -> std::optional<Requirement> {
+    WhereClauseOwner owner(const_cast<NominalTypeDecl *>(this));
+    auto req = ctx.evaluator(
+        RequirementRequest{owner, reqIdx, TypeResolutionStage::Structural},
+        [&]() {
+          return Requirement(RequirementKind::SameType, ErrorType::get(ctx),
+                             ErrorType::get(ctx));
+        });
+
+    if (req.hasError())
+      return std::nullopt;
+
+    return req;
+  };
+
+  llvm::SmallSet<GenericTypeParamDecl *, 4> params;
+
+  // Scan the inheritance clauses of generic parameters only for an inverse.
+  for (GenericTypeParamDecl *param : gpList->getParams()) {
+    auto inverse = findInverseInInheritance(param->getInherited(), target);
+
+    // Inverse is inferred from one of the generic parameters.
+    if (inverse)
+      return inverse.with(InverseMarking::Kind::Inferred);
+
+    params.insert(param);
+  }
+
+  // Next, scan the where clause and return the result.
+  auto whereClause = getTrailingWhereClause();
+  if (!whereClause)
+    return InverseMarking::Mark();
+
+  auto requirements = whereClause->getRequirements();
+  for (unsigned i : indices(requirements)) {
+    auto requirementRepr = requirements[i];
+    if (requirementRepr.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
+
+    auto *constraintRepr =
+        dyn_cast<InverseTypeRepr>(requirementRepr.getConstraintRepr());
+    if (!constraintRepr || constraintRepr->isInvalid())
+      continue;
+
+    auto req = resolveRequirement(i);
+    if (!req)
+      continue;
+
+    if (req->getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto subject = req->getFirstType();
+    if (!subject->isTypeParameter())
+      continue;
+
+    // Skip outer params and implicit ones.
+    auto *param = subject->getRootGenericParam()->getDecl();
+    if (!param || !params.contains(param))
+      continue;
+
+    if (isInverseTarget(req->getSecondType()))
+      return InverseMarking::Mark(InverseMarking::Kind::Inferred,
+                                  constraintRepr->getLoc());
+  }
+
+  return InverseMarking::Mark();
+}
+
 InverseMarking::Mark
 ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   auto &ctx = getASTContext();
@@ -6628,22 +6810,8 @@ ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return InverseMarking::Mark();
 
-  auto inheritedTypes = getInherited();
-  for (unsigned i = 0; i < inheritedTypes.size(); ++i) {
-    auto type =
-        inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
-    if (!type)
-      continue;
-
-    auto *repr = inheritedTypes.getTypeRepr(i);
-
-    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
-      // Found ~<target> in the protocol inheritance clause.
-      if (composition->getInverses().contains(target))
-        return InverseMarking::Mark(InverseMarking::Kind::Explicit,
-                                    repr ? repr->getLoc() : SourceLoc());
-    }
-  }
+  if (auto inverse = findInverseInInheritance(getInherited(), target))
+    return inverse;
 
   auto *whereClause = getTrailingWhereClause();
   if (!whereClause)
