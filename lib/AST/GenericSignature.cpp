@@ -1083,7 +1083,14 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     ProtocolType::canonicalizeProtocols(canonicalProtos);
 
     if (protos.size() != canonicalProtos.size()) {
-      llvm::errs() << "Redundant conformance requirements in signature\n";
+      llvm::errs() << "Redundant conformance requirements in signature "
+                   << *this << ":\n";
+      llvm::errs() << "Ours:\n";
+      for (auto *proto : protos)
+        llvm::errs() << "- " << proto->getName() << "\n";
+      llvm::errs() << "Theirs:\n";
+      for (auto *proto : canonicalProtos)
+        llvm::errs() << "- " << proto->getName() << "\n";
       dumpAndAbort();
     }
     if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
