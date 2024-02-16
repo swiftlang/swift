@@ -452,7 +452,7 @@ protected:
   void appendContextOf(const ValueDecl *decl);
 
   void appendContext(const DeclContext *ctx, StringRef useModuleName,
-                     bool shouldTreatAsConstrainedExtension = false);
+                     bool shouldMangleInverseGenerics = false);
 
   void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
@@ -515,7 +515,8 @@ protected:
   /// if it was empty.
   bool appendGenericSignature(GenericSignature sig,
                               GenericSignature contextSig = nullptr,
-                              bool skipEquivalenceCheck = false);
+                              bool skipEquivalenceCheck = false,
+                              bool shouldMangleInverseGenerics = true);
 
   /// Append a requirement to the mangling.
   ///

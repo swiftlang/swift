@@ -237,6 +237,7 @@ extension ASTGenVisitor {
         .objCMembers,
         .objCNonLazyRealization,
         .preconcurrency,
+        .preInverseGenerics,
         .propertyWrapper,
         .requiresStoredPropertyInits,
         .resultBuilder,

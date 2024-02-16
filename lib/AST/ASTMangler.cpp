@@ -2275,9 +2275,13 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
     hasInverseRequirements = !inverseReqs.empty();
   }
 
+  if (decl->getAttrs().hasAttribute<PreInverseGenericsAttr>()) {
+    hasInverseRequirements = false;
+  }
+
   // Just mangle the decl's DC.
   appendContext(decl->getDeclContext(), decl->getAlternateModuleName(),
-                /* shouldTreatAsConstrainedExtension */ hasInverseRequirements);
+                /* shouldMangleInverseGenerics */ hasInverseRequirements);
 }
 
 namespace {
@@ -2389,7 +2393,8 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName,
         appendModule(ExtD->getParentModule(), useModuleName);
 
         if (sig && genericSignatureRequiredMangling) {
-          appendGenericSignature(sig, nominalSig, skipEquivalanceCheck);
+          appendGenericSignature(sig, nominalSig, skipEquivalanceCheck,
+                                 shouldMangleInverseGenerics);
         }
 
         return appendOperator("E");
@@ -2408,6 +2413,10 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName,
     SmallVector<Requirement, 2> reqs;
     SmallVector<InverseRequirement, 2> inverseReqs;
     sig->getRequirementsWithInverses(reqs, inverseReqs);
+
+    if (!shouldMangleInverseGenerics) {
+      return mangleExtension(/* genericSignatureRequiredMangling */ !reqs.empty());
+    }
 
     // If the extension's generic signature == the extended type's generic
     // signature, then we only we need to check if there are any inverse
@@ -3167,7 +3176,8 @@ void ASTMangler::appendTupleTypeListElement(Identifier name, Type elementType,
 
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
                                         GenericSignature contextSig,
-                                        bool skipEquivalenceCheck) {
+                                        bool skipEquivalenceCheck,
+                                        bool shouldMangleInverseGenerics) {
   auto canSig = sig.getCanonicalSignature();
 
   SmallVector<Requirement, 2> reqs;
@@ -3223,6 +3233,10 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     // Use the complete canonical signature.
     initialParamDepth = 0;
     genericParams = canSig.getGenericParams();
+  }
+
+  if (!shouldMangleInverseGenerics) {
+    inverseReqs = {};
   }
 
   if ((genericParams.empty() || areAllRequirementsPositiveInverseRequirementsSatisfying) &&

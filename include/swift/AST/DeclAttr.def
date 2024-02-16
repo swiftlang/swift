@@ -485,7 +485,10 @@ SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   155)
-LAST_DECL_ATTR(NoObjCBridging)
+SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+  OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  156)
+LAST_DECL_ATTR(PreInverseGenerics)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
