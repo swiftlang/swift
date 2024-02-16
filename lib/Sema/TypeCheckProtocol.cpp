@@ -2355,18 +2355,18 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     // If the protocol to which we are conditionally conforming is not a marker
     // protocol, the conditional requirements must not involve conformance to a
     // marker protocol. We cannot evaluate such a conformance at runtime.
-    if (!Proto->isMarkerProtocol()) {
-      for (const auto &req : conditionalReqs) {
-        if (req.getKind() == RequirementKind::Conformance &&
-            req.getProtocolDecl()->isMarkerProtocol()) {
-          Context.Diags.diagnose(
-            ComplainLoc, diag::marker_protocol_conditional_conformance,
-            Proto->getName(), req.getFirstType(),
-            req.getProtocolDecl()->getName());
-          conformance->setInvalid();
-        }
-      }
-    }
+    // if (!Proto->isMarkerProtocol()) {
+    //   for (const auto &req : conditionalReqs) {
+    //     if (req.getKind() == RequirementKind::Conformance &&
+    //         req.getProtocolDecl()->isMarkerProtocol()) {
+    //       Context.Diags.diagnose(
+    //         ComplainLoc, diag::marker_protocol_conditional_conformance,
+    //         Proto->getName(), req.getFirstType(),
+    //         req.getProtocolDecl()->getName());
+    //       conformance->setInvalid();
+    //     }
+    //   }
+    // }
   }
 
   // If the protocol contains missing requirements, it can't be conformed to
