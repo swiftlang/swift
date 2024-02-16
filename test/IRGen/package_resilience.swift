@@ -2,7 +2,7 @@
 // Unlike its counterparts in the other *_resilience.swift files, the goal is
 // for the package's component modules to all be considered within the same
 // resilience domain. This file ensures that we use direct access to package
-// decls at use site as much as possible with -package-bypass-resilience-optimization.
+// decls at use site as much as possible with -experimental-package-bypass-resilience.
 //
 
 // RUN: %empty-directory(%t)
@@ -10,24 +10,29 @@
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/Inputs/package_types/resilient_struct.swift
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/Inputs/package_types/resilient_enum.swift
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/Inputs/package_types/resilient_class.swift
-// RUN: %target-swift-frontend -package-name MyPkg -package-bypass-resilience-optimization -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
-// RUN: %target-swift-frontend -package-name MyPkg -package-bypass-resilience-optimization -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
-// RUN: %target-swift-frontend -package-name MyPkg -package-bypass-resilience-optimization -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
+
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -enable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-%target-import-type-objc-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=7 -D#MDSIZE32=52 -D#MDSIZE64=80 -D#WORDSIZE=%target-alignment
+
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
+
+// RUN: %target-swift-frontend -package-name MyPkg -module-name=package_resilience -experimental-package-bypass-resilience -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
+
 // REQUIRES: objc_codegen
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 // REQUIRES: CPU=x86_64 || CPU=arm64
 
-// CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1p16resilient_struct5PointVvpWvd" = constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
-// CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = constant [[INT]] {{32|16}}, align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1p16resilient_struct5PointVvpWvd" = hidden constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden constant [[INT]] {{32|16}}, align [[#WORDSIZE]]
 
-// CHECK: @"$s18package_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd" = constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
-// CHECK: @"$s18package_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd" = constant [[INT]] 56, align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd" = hidden constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd" = hidden constant [[INT]] 56, align [[#WORDSIZE]]
 
+// class metadata base offset for package_resilience.MyResilientParent
 // CHECK: @"$s18package_resilience17MyResilientParentCMo" = constant [[BOUNDS:{ (i32|i64), i32, i32 }]]
 // CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 2]] }, align [[#WORDSIZE]]
 // CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 2]] }, align [[#WORDSIZE]]
 
-// CHECK: @"$s18package_resilience16MyResilientChildC5fields5Int32VvpWvd" = constant [[INT]] [[#WORDSIZE + WORDSIZE + 4]], align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience16MyResilientChildC5fields5Int32VvpWvd" = hidden constant [[INT]] [[#WORDSIZE + WORDSIZE + 4]], align [[#WORDSIZE]]
 
 // CHECK: @"$s18package_resilience16MyResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 3]] }
@@ -41,17 +46,16 @@
 // CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 5]] }
 // CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 3 + 5]] }
 
-// CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = constant [[INT]] 0,
-// CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC9resilient0H7_struct0G3IntVvpWvd" = constant [[INT]] [[#WORDSIZE + WORDSIZE]], align [[#WORDSIZE]]
-// CHECK: @"$s18package_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = constant [[INT]] [[#WORDSIZE + WORDSIZE]], align [[#WORDSIZE]]
-// CHECK: @"$s18package_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = constant [[INT]] 0,
+// CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
+// CHECK: @"$s18package_resilience27ClassWithEmptyThenResilientC9resilient0H7_struct0G3IntVvpWvd" = hidden constant [[INT]] [[#WORDSIZE + WORDSIZE]], align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = hidden constant [[INT]] [[#WORDSIZE + WORDSIZE]], align [[#WORDSIZE]]
+// CHECK: @"$s18package_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = hidden constant [[INT]] 0,
 
 import resilient_class
 import resilient_struct
 import resilient_enum
 
 // Concrete class with resilient stored property
-
 package class ClassWithResilientProperty {
   package let p: Point
   package let s: Size
@@ -230,15 +234,17 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
   return MemoryLayout<Size>.alignment
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc [[BOUNDS:{ (i32|i64), (i32|i64), i8 }]] @"$s18package_resilience31constructResilientEnumNoPayload14resilient_enum6MediumOyF"
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void  @"$s18package_resilience31constructResilientEnumNoPayload14resilient_enum6MediumOyF"
 package func constructResilientEnumNoPayload() -> Medium {
-  // CHECK: ret [[BOUNDS]] { {{i32|i64}} 0, {{i32|i64}} 0, i8 2 }
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum6MediumO, ptr %0, i32 0, i32 1
+  // CHECK: ret void
   return Medium.Paper
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc [[BOUNDS:{ (i32|i64), (i32|i64), i8 }]] @"$s18package_resilience39constructExhaustiveWithResilientMembers14resilient_enum11SimpleShapeOyF"() #0 {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s18package_resilience39constructExhaustiveWithResilientMembers14resilient_enum11SimpleShapeOyF"
 package func constructExhaustiveWithResilientMembers() -> SimpleShape {
-  // CHECK: ret [[BOUNDS]] { {{i32|i64}} 0, {{i32|i64}} 0, i8 1 }
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum11SimpleShapeO, ptr %0, i32 0, i32 1
+  // CHECK: ret void
   return .KleinBottle
 }
 

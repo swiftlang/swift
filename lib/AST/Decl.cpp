@@ -2968,13 +2968,7 @@ bool AbstractStorageDecl::isResilient() const {
   if (!accessScope.isPublicOrPackage())
     return false;
 
-  if (!getModuleContext()->isResilient())
-    return false;
-
-  // Allows bypassing resilience checks for package decls
-  // at use site within a package if opted in, whether the
-  // loaded module was built resiliently or not.
-  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
+  return getModuleContext()->isResilient();
 }
 
 bool AbstractStorageDecl::isResilient(ModuleDecl *M,
@@ -2983,7 +2977,12 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    if (M == getModuleContext())
+      return false;
+    // Non-resilient if bypass optimization in package is enabled
+    if (bypassResilienceInPackage(M))
+      return false;
+    return isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -4205,6 +4204,14 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
+bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
+  return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
+          getModuleContext()->inSamePackage(accessingModule) &&
+          !getModuleContext()->isBuiltFromInterface() &&
+          getFormalAccessScope(/*useDC=*/nullptr,
+                               /*treatUsableFromInlineAsPublic=*/true).isPackage();
+}
+
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
 /// \@_spi imports, and enclosing access levels into account.
@@ -5045,14 +5052,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
 bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-  if (!getModuleContext()->isResilient())
-    return false;
-  // Allows bypassing resilience checks for package decls
-  // at use site within a package if opted in, whether the
-  // loaded module was built resiliently or not.
-  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
-                                          /*treatUsableFromInlineAsPublic=*/true);
-  return !getDeclContext()->bypassResilienceInPackage(accessScope.isPackage());
+  return getModuleContext()->isResilient();
 }
 
 DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
@@ -5083,9 +5083,12 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     // We can access declarations from the same module
     // non-resiliently in a maximal context.
-    if (M == getModuleContext()) {
+    if (M == getModuleContext())
       return false;
-    }
+    // Non-resilient if bypass optimization in package is enabled
+    if (bypassResilienceInPackage(M))
+      return false;
+
     // If a protocol is originally declared in the current module, then we
     // directly expose protocol witness tables and their contents for any
     // conformances in the same module as symbols. If the protocol later
@@ -6376,7 +6379,7 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // package enum is optimized with bypassing resilience checks.
   if (!accessScope.isPublicOrPackage())
     return true;
-  if (useDC && useDC->bypassResilienceInPackage(accessScope.isPackage()))
+  if (useDC && bypassResilienceInPackage(useDC->getParentModule()))
     return true;
 
   // All other checks are use-site specific; with no further information, the
