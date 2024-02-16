@@ -1,4 +1,9 @@
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -dump-ast %s -enable-experimental-feature OptionalIsolatedParameters | %FileCheck %s
+
+// Diagnostics testing
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature OptionalIsolatedParameters -DTEST_DIAGNOSTICS %s > %t/diagnostics.txt 2>&1
+// RUN: %FileCheck %s --check-prefix CHECK-DIAGS < %t/diagnostics.txt
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -94,3 +99,18 @@ extension A {
 
   func g() {}
 }
+
+#if TEST_DIAGNOSTICS
+@available(SwiftStdlib 5.1, *)
+@MainActor
+func testContextualType() {
+  let _: any Actor = #isolation
+  let _: MainActor = #isolation
+  let _: MainActor? = #isolation
+
+  // CHECK-DIAGS: error: cannot convert value of type 'MainActor' to expected argument type 'Int'
+  // CHECK-DIAGS: note: in expansion of macro 'isolation' here
+  // CHECK-DIAGS: let _: Int = #isolation
+  let _: Int = #isolation
+}
+#endif

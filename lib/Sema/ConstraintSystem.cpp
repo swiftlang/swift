@@ -25,6 +25,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -3963,6 +3964,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (!locator->isForMacroExpansion()) {
         // Record a fix here
         (void)recordFix(MacroMissingPound::create(*this, macro, locator));
+      }
+
+      // The default type of the #isolation builtin macro is `(any Actor)?`
+      if (macro->getBuiltinKind() == BuiltinMacroKind::IsolationMacro) {
+        auto *fnType = openedType->getAs<FunctionType>();
+        auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
+        addConstraint(
+            ConstraintKind::Defaultable, fnType->getResult(),
+            OptionalType::get(actor->getDeclaredExistentialType()),
+            locator);
       }
     }
   }
