@@ -1720,7 +1720,7 @@ for host in "${ALL_HOSTS[@]}"; do
             libcxx)
                 build_targets=(cxx)
                 cmake_options=(
-                    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" -DLIBCXX_INSTALL_LIBRARY=OFF
+                    -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" -DLIBCXX_INSTALL_LIBRARY=OFF
                     "${cmake_options[@]}"
                     "${llvm_cmake_options[@]}"
                 )
