@@ -3368,9 +3368,8 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 /// \param isRelevantInverse the function used to inspect a mark corresponding
 /// to an inverse to determine whether it "has" an inverse that we care about.
 static bool hasInverse(
-    Decl *decl,
-    InvertibleProtocolKind ip,
-    std::function<bool(InverseMarking const&)> isRelevantInverse) {
+    Decl *decl, InvertibleProtocolKind ip,
+    std::function<bool(InverseMarking::Mark const &)> isRelevantInverse) {
 
   auto getTypeDecl = [](Type type) -> TypeDecl* {
     if (auto genericTy = type->getAnyGeneric())
@@ -3382,38 +3381,22 @@ static bool hasInverse(
 
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (isRelevantInverse(nominal->getMarking(ip)))
-        return true;
+      return hasInverse(nominal, ip, isRelevantInverse);
   }
 
-  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-    if (isRelevantInverse(typeDecl->getMarking(ip)))
-      return true;
-
-    // Check the protocol's associated types too.
-    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-      auto hasInverse =
-          llvm::any_of(proto->getAssociatedTypeMembers(),
-                       [&](AssociatedTypeDecl *assocTyDecl) {
-                         return isRelevantInverse(assocTyDecl->getMarking(ip));
-                       });
-      if (hasInverse)
-        return true;
-    }
-  }
+  if (auto *TD = dyn_cast<TypeDecl>(decl))
+    return isRelevantInverse(TD->hasInverseMarking(ip));
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     // Check for noncopyable types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
-      bool hasInverse = type.findIf([&](Type type) {
+      bool foundInverse = type.findIf([&](Type type) -> bool {
         if (auto *typeDecl = getTypeDecl(type))
-          if (isRelevantInverse(typeDecl->getMarking(ip)))
-            return true;
-
+          return hasInverse(typeDecl, ip, isRelevantInverse);
         return false;
       });
 
-      if (hasInverse)
+      if (foundInverse)
         return true;
     }
   }
@@ -3424,8 +3407,8 @@ static bool hasInverse(
 static bool usesFeatureMoveOnly(Decl *decl) {
   return hasInverse(decl, InvertibleProtocolKind::Copyable,
                     [](auto &marking) -> bool {
-    return marking.getInverse().is(InverseMarking::Kind::LegacyExplicit);
-  });
+                      return marking.is(InverseMarking::Kind::LegacyExplicit);
+                    });
 }
 
 static bool usesFeatureLazyImmediate(Decl *D) { return false; }
@@ -3469,8 +3452,8 @@ static bool usesFeatureMoveOnlyPartialReinitialization(Decl *decl) {
 }
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
-  auto checkMarking = [](auto &marking) -> bool {
-    switch (marking.getInverse().getKind()) {
+  auto checkInverseMarking = [](auto &marking) -> bool {
+    switch (marking.getKind()) {
     case InverseMarking::Kind::None:
     case InverseMarking::Kind::LegacyExplicit: // covered by other checks.
       return false;
@@ -3481,8 +3464,10 @@ static bool usesFeatureNoncopyableGenerics(Decl *decl) {
     }
   };
 
-  return hasInverse(decl, InvertibleProtocolKind::Copyable, checkMarking)
-      || hasInverse(decl, InvertibleProtocolKind::Escapable, checkMarking);
+  return hasInverse(decl, InvertibleProtocolKind::Copyable,
+                    checkInverseMarking) ||
+         hasInverse(decl, InvertibleProtocolKind::Escapable,
+                    checkInverseMarking);
 }
 
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
