@@ -2316,6 +2316,9 @@ public:
       llvm::DenseMap<std::pair<CanType, ProtocolDecl*>, ProtocolConformanceRef> addedConformances;
       
       for (auto proto : upperBound->getConformsTo()) {
+        if (proto->getInvertibleProtocolKind())
+          continue;
+
         // Find the DeclContext providing the conformance for the type.
         auto nomConformance = moduleDecl->lookupConformance(
             substType, proto, /*allowMissing=*/true);
@@ -2426,6 +2429,11 @@ public:
       SmallVector<ProtocolConformanceRef, 4> paramSubstConformances;
       if (paramUpperBound) {
         for (auto proto : paramUpperBound->getConformsTo()) {
+          // FIXME: Skip invertible protocol requirements because they won't
+          // be in the substitution map.
+          if (proto->getInvertibleProtocolKind())
+            continue;
+
           auto conformance = upperBoundSubstMap.lookupConformance(gp, proto);
           if (!conformance)
             return CanType();
