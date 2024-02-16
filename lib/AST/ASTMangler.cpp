@@ -1989,6 +1989,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
+  if (fn->hasTransferringResult())
+    OpArgs.push_back('T');
+
   switch (fn->getIsolation()) {
   case SILFunctionTypeIsolation::Unknown:
     break;
@@ -2089,6 +2092,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
+    if (param.hasOption(SILParameterInfo::Transferring))
+      OpArgs.push_back('T');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType(), sig, forDecl);
@@ -2858,6 +2863,10 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
   }
 
+  if (fn->hasTransferringResult()) {
+    appendOperator("YT");
+  }
+
   if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(forDecl)) {
     if (afd->hasImplicitSelfDecl()) {
       auto lifetimeDependenceKind =
@@ -3034,7 +3043,8 @@ void ASTMangler::appendParameterTypeListElement(
   }
   if (flags.isIsolated())
     appendOperator("Yi");
-
+  if (flags.isTransferring())
+    appendOperator("Yu");
   if (flags.isCompileTimeConst())
     appendOperator("Yt");
 

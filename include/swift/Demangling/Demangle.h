@@ -278,7 +278,7 @@ public:
   /// Prints the whole node tree in readable form to stderr.
   ///
   /// Useful to be called from the debugger.
-  void dump();
+  void dump() LLVM_ATTRIBUTE_USED;
 };
 
 /// Returns the length of the swift mangling prefix of the \p SymbolName.
@@ -555,6 +555,7 @@ struct [[nodiscard]] ManglingError {
     InvalidImplDifferentiability,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
+    InvalidImplParameterTransferring,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
     BadValueWitnessKind,

@@ -1379,11 +1379,12 @@ static llvm::Value *getFunctionParameterRef(IRGenFunction &IGF,
 /// Mapping type-level parameter flags to ABI parameter flags.
 ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
   return ParameterFlags()
-        .withValueOwnership(flags.getValueOwnership())
-        .withVariadic(flags.isVariadic())
-        .withAutoClosure(flags.isAutoClosure())
-        .withNoDerivative(flags.isNoDerivative())
-        .withIsolated(flags.isIsolated());
+      .withValueOwnership(flags.getValueOwnership())
+      .withVariadic(flags.isVariadic())
+      .withAutoClosure(flags.isAutoClosure())
+      .withNoDerivative(flags.isNoDerivative())
+      .withIsolated(flags.isIsolated())
+      .withTransferring(flags.isTransferring());
 }
 
 static std::pair<FunctionTypeFlags, ExtendedFunctionTypeFlags>
@@ -1416,8 +1417,9 @@ getFunctionTypeFlags(CanFunctionType type) {
   }
 
   auto extFlags = ExtendedFunctionTypeFlags()
-      .withTypedThrows(!type->getThrownError().isNull());
-  
+                      .withTypedThrows(!type->getThrownError().isNull())
+                      .withTransferringResult(type->hasTransferringResult());
+
   auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
       .withAsync(type->isAsync())

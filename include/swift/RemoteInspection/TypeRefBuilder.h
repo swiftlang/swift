@@ -1163,6 +1163,8 @@ public:
     funcFlags = funcFlags.withConcurrent(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
     funcFlags = funcFlags.withDifferentiable(flags.isDifferentiable());
+    extFuncFlags =
+        extFuncFlags.withTransferringResult(flags.hasTransferringResult());
 
     FunctionMetadataDifferentiabilityKind diffKind;
     switch (flags.getDifferentiabilityKind()) {
