@@ -439,3 +439,13 @@ public func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
+
+// ==== Distributed Actor Stubs ------------------------------------------------
+
+@available(SwiftStdlib 5.11, *)
+public protocol _DistributedActorStub where Self: DistributedActor {}
+
+@available(SwiftStdlib 5.11, *)
+public func _distributedStubFatalError(function: String = #function) -> Never {
+  fatalError("Unexpected invocation of distributed method '\(function)' stub!")
+}

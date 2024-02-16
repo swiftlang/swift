@@ -126,6 +126,10 @@ ERROR(function_type_mismatch,none,
 NOTE(function_declared_here,none,
      "function declared here", ())
 
+ERROR(deserialize_function_type_mismatch,Fatal,
+      "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
+      (StringRef, Type, Type))
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
@@ -365,6 +369,8 @@ ERROR(perf_diag_existential_type,none,
       "cannot use a value of protocol type %0 in @_noExistential function", (Type))
 ERROR(perf_diag_existential,none,
       "cannot use a value of protocol type in @_noExistential function", ())
+ERROR(embedded_swift_value_deinit,none,
+      "cannot de-virtualize deinit of type %0", (Type))
 ERROR(embedded_swift_metatype_type,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_metatype,none,
@@ -831,12 +837,24 @@ ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
       (StringRef))
+ERROR(sil_movechecking_cannot_destructure_imported_nonfrozen, none,
+      "cannot partially consume '%0' of non-frozen type %1 imported from %2",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially consume '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      (StringRef, Type))
 ERROR(sil_movechecking_cannot_destructure, none,
       "cannot partially consume '%0'",
       (StringRef))
 ERROR(sil_movechecking_cannot_partially_reinit_has_deinit, none,
       "cannot partially reinitialize '%0' when it has a deinitializer; only full reinitialization is allowed",
       (StringRef))
+ERROR(sil_movechecking_cannot_partially_reinit_nonfrozen, none,
+      "cannot partially reinitialize '%0' of non-frozen type %1 imported from %2; only full reinitialization is allowed",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially reinitialize '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      (StringRef, Type))
 ERROR(sil_movechecking_cannot_partially_reinit, none,
       "cannot partially reinitialize '%0' after it has been consumed; only full reinitialization is allowed",
       (StringRef))

@@ -3,7 +3,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
+
 
 // Needed due to limitations of autoclosures and noncopyable types.
 func eagerAssert(_ b: Bool, _ line: Int = #line) {

@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
+
 
 // TODO: Use the real stdlib types once `UnsafePointer` supports noncopyable
 // types.

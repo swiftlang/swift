@@ -543,6 +543,9 @@ This limitation is similar to the limitation for stored properties on structs.
 Adding or removing the ``@objc`` attribute from an enum is not permitted; this
 affects the enum's memory representation and is not backwards-compatible.
 
+Adding or removing ``indirect`` to any of the cases or the enum itself is not
+permitted; this affects the enum's memory representation and is not
+backwards-compatible.
 
 Initializers
 ------------
@@ -586,7 +589,6 @@ Adding or removing ``@frozen`` from an existing enum is forbidden.
 Even for default "non-frozen" enums, adding new cases should not be done
 lightly. Any clients attempting to do an exhaustive switch over all enum cases
 will likely not handle new cases well.
-
 
 Protocols
 ~~~~~~~~~

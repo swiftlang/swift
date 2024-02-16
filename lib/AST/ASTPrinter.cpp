@@ -1586,7 +1586,9 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
 
   // The invertible protocols themselves do not need to state inverses in their
   // inheritance clause, because they do not gain any default requirements.
-  if (!proto->getInvertibleProtocolKind())
+  // HACK: also exclude Sendable from getting inverses printed.
+  if (!proto->getInvertibleProtocolKind()
+      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
     flags |= PrintInverseRequirements;
 
   printRequirementSignature(

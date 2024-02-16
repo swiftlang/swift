@@ -21,12 +21,12 @@
 
 //--- Library.swift
 
-// !public => conforms
+// package => exported => !inferred
 package struct PackageStruct {
   package var int: Int
 }
 
-// Public => !conforms
+// public => exported => !inferred
 public struct PublicStruct {
   public var int: Int
 }
@@ -36,7 +36,8 @@ import Library
 
 func take<T : _BitwiseCopyable>(_ t: T) {}
 
-func passPackageStruct(_ s: PackageStruct) { take(s) }
+func passPackageStruct(_ s: PackageStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
+                                                       // expected-note@-3{{where_requirement_failure_one_subst}}
 
 func passPublicStruct(_ s: PublicStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
-                                                     // expected-note@-5{{where_requirement_failure_one_subst}}
+                                                     // expected-note@-6{{where_requirement_failure_one_subst}}

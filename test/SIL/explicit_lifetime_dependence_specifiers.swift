@@ -5,7 +5,7 @@
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics \
 // RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
-// REQUIRES: noncopyable_generics
+
 
 import Builtin
 

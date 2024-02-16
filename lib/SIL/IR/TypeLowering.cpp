@@ -3056,7 +3056,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (lowering.isTrivial() && !conformance) {
     // A trivial type can lack a conformance in a few cases:
-    // (1) containing or being a public, non-frozen type
+    // (1) containing or being a exported, non-frozen type
     // (2) containing or being a generic type which doesn't conform
     //     unconditionally but in this particular instantiation is trivial
     // (3) being a special type that's not worth forming a conformance for
@@ -3072,13 +3072,21 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //             }
     // (5) being defined in a different module
     // (6) being defined in a module built from interface
+    // (7) being or containing a variadic generic type which doesn't conform
+    //     unconditionally but does in this case
+    // (8) being or containing the error type
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // These show up in the context of non-conforming variadic generics
+          // which may lack a conformance (case (7)).
+          if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
+            return true;
+
           auto *nominal = ty.getAnyNominal();
-          // Non-nominal aggregates must not be responsible for non-conformance;
-          // walk into them.
+          // Only pack-related non-nominal aggregates may be responsible for
+          // non-conformance; walk into the rest.
           if (!nominal)
             return false;
 
@@ -3089,11 +3097,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return true;
           }
 
-          // Public, non-frozen trivial types may not conform (case (1)).
+          // Exported, non-frozen trivial types may not conform (case (1)).
           if (nominal
                   ->getFormalAccessScope(/*useDC=*/nullptr,
                                          /*treatUsableFromInlineAsPublic=*/true)
-                  .isPublic())
+                  .isPublicOrPackage())
             return true;
 
           auto *module = nominal->getModuleContext();
@@ -3112,6 +3120,15 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // being trivial but not conforming to BitwiseCopyable.
 
           auto isTopLevel = !field;
+
+          // The error type doesn't conform but is trivial (case (8)).
+          if (isa<ErrorType>(ty))
+            return false;
+
+          // These show up in the context of non-conforming variadic generics
+          // which may lack a conformance (case (7)).
+          if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
+            return false;
 
           // A BitwiseCopyable conformer appearing within its layout doesn't
           // explain why substType doesn't itself conform.
@@ -3159,11 +3176,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return false;
           }
 
-          // Public, non-frozen trivial types may not conform (case (1)).
+          // Exported, non-frozen trivial types may not conform (case (1)).
           if (nominal
                   ->getFormalAccessScope(/*useDC=*/nullptr,
                                          /*treatUsableFromInlineAsPublic=*/true)
-                  .isPublic())
+                  .isPublicOrPackage())
             return false;
 
           auto *module = nominal->getModuleContext();

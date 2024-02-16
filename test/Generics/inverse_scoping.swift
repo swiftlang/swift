@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: noncopyable_generics
+
 
 protocol NoCopyReq: ~Copyable {}
 

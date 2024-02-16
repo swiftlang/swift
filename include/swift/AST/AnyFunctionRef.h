@@ -118,7 +118,7 @@ public:
         return FD->mapTypeIntoContext(FD->getResultInterfaceType());
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
         if (CD->hasLifetimeDependentReturn()) {
-          return CD->getResultInterfaceType();
+          return CD->mapTypeIntoContext(CD->getResultInterfaceType());
         }
       }
       return TupleType::getEmpty(AFD->getASTContext());

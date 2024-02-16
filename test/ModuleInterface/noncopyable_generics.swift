@@ -35,7 +35,7 @@
 // RUN:    -enable-experimental-feature NoncopyableGenerics \
 // RUN:    -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: noncopyable_generics
+
 
 import NoncopyableGenerics_Misc
 

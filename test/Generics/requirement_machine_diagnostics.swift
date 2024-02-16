@@ -327,4 +327,5 @@ func sameTypeConflicts() {
 
   // expected-error@+1{{no type for 'T' can satisfy both 'T == G<U.Foo>' and 'T == Int'}}
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
+  // expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic; this is an error in Swift 6}}
 }

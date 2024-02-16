@@ -1192,6 +1192,10 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
+    auto conformances =
+        SGM.SwiftModule->collectExistentialConformances(mainClassMetaty,
+                                                        anyObjectMetaTy);
+
     auto paramConvention = ParameterConvention::Direct_Unowned;
     auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
     std::array<SILResultInfo, 1> resultInfos = {
@@ -1218,7 +1222,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
-                          {});
+                          conformances);
     SILValue optNameValue = B.createApply(
         mainClass, NSStringFromClass, {}, metaTy);
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);

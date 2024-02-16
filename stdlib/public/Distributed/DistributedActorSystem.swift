@@ -256,7 +256,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// If this type is ``Codable``, then any `distributed actor` using this `ActorID` as its ``DistributedActor/ID``
   /// will gain a synthesized ``Codable`` conformance which is implemented by encoding the `ID`.
   /// The decoding counter part of the ``Codable`` conformance is implemented by decoding the `ID` and passing it to
-  // the ``DistributedActor/resolve(id:using:)`` method.
+  /// the ``DistributedActor/resolve(id:using:)`` method.
   associatedtype ActorID: Sendable & Hashable
 
   /// Type of ``DistributedTargetInvocationEncoder`` that should be used when the Swift runtime needs to encode

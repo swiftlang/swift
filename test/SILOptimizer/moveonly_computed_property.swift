@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s > /dev/null
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify %s > /dev/null
 
-// REQUIRES: noncopyable_generics
+
 
 // Applying a computed property to a move-only field in a class should occur
 // entirely within a formal access to the class property. rdar://105794506

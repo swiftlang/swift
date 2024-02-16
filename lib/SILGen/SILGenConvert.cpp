@@ -1026,6 +1026,34 @@ ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,
   return value.copyUnmanaged(*this, loc);
 }
 
+ManagedValue SILGenFunction::emitAsOrig(SILLocation loc,
+                                        AbstractionPattern origType,
+                                        CanType substType,
+                                        SILType expectedTy,
+                                        SGFContext C,
+                                        ValueProducerRef produceValue) {
+  // If the lowered substituted type already matches the substitution,
+  // we can just emit directly.
+  if (getLoweredType(substType).getASTType() == expectedTy.getASTType()) {
+    auto result = produceValue(*this, loc, C);
+
+    // For convenience, force the result into the destination.
+    if (auto init = C.getEmitInto(); init && !result.isInContext()) {
+      result.forwardInto(*this, loc, init);
+      return ManagedValue::forInContext();
+    }
+    return result;
+  }
+
+  auto conversion =
+    Conversion::getSubstToOrig(origType, substType, expectedTy);
+  auto result = emitConvertedRValue(loc, conversion, C, produceValue);
+
+  // emitConvertedRValue always forces results into the context.
+  assert((C.getEmitInto() != nullptr) == result.isInContext());
+  return result;
+}
+
 ManagedValue SILGenFunction::emitConvertedRValue(Expr *E,
                                                  const Conversion &conversion,
                                                  SGFContext C) {

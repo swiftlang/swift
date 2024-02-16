@@ -987,7 +987,10 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<StructuralRequirement, 2> defaults;
   // We do not expand defaults for invertible protocols themselves.
-  if (!proto->getInvertibleProtocolKind())
+  // HACK: We don't expand for Sendable either. This shouldn't be needed after
+  // Swift 6.0
+  if (!proto->getInvertibleProtocolKind()
+      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
     InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
 
   applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);

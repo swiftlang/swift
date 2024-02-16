@@ -318,8 +318,8 @@ struct ModuleRebuildInfo {
       return "compiled with a different version of the compiler";
     case Status::NotInOSSA:
       return "module was not built with OSSA";
-    case Status::NotUsingNoncopyableGenerics:
-      return "module was not built with NoncopyableGenerics";
+    case Status::NoncopyableGenericsMismatch:
+      return "module was not built with matching NoncopyableGenerics feature";
     case Status::MissingDependency:
       return "missing dependency";
     case Status::MissingUnderlyingModule:
@@ -869,7 +869,10 @@ class ModuleInterfaceLoaderImpl {
                    loadMode == ModuleLoadingMode::PreferSerialized &&
                    !version::isCurrentCompilerTagged() &&
                    rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch) {
+                     serialization::Status::SDKMismatch &&
+                     // FIXME(kavon): temporary while we bootstrap NoncopyableGenerics.
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
+                     serialization::Status::NoncopyableGenericsMismatch) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is to support local development of Swift,
@@ -1808,6 +1811,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // in the Swift compile commands, when different.
     inheritedParentContextClangArgs =
         clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+    genericSubInvocation.getFrontendOptions()
+        .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext) {
     // If the compiler has been asked to be strict with ensuring downstream
     // dependencies get the parent invocation's context, inherit the extra Clang
@@ -1931,7 +1936,13 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       //
       // If OSSA modules are enabled, we use a separate namespace of modules to
       // ensure that we compile all swift interface files with the option set.
-      unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules));
+      unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules),
+
+      // Whether or not NoncopyableGenerics are enabled, as that influences
+      // many things like generic signatures and conformances.
+      unsigned(genericSubInvocation.getLangOptions()
+               .hasFeature(Feature::NoncopyableGenerics))
+      );
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

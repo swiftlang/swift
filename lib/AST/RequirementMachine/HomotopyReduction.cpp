@@ -595,10 +595,18 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
   GenericSignatureErrors result;
 
+  if (!ConflictingRules.empty())
+    result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+
   for (const auto &rule : getLocalRules()) {
     if (rule.isPermanent())
       continue;
 
+    // The conditional requirement inference feature imports new protocol
+    // components after the basic rewrite system is already built, so that's
+    // why we end up with imported rules that appear to be in the local rules
+    // slice. Those rules are well-formed, but their isRedundant() bit isn't
+    // set, so we must ignore them here.
     if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
@@ -607,7 +615,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         rule.containsUnresolvedSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (rule.isConflicting() || rule.isRecursive())
+    if (rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (!rule.isRedundant()) {

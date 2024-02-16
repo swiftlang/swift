@@ -5,6 +5,7 @@
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
 
+// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 // Future tests for LifetimeDependenceDiagnostics.

@@ -337,7 +337,8 @@ DeclAttributes::isUnavailableInSwiftVersion(
 }
 
 const AvailableAttr *
-DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx) const{
+DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
+                                               bool ignoreAppExtensions) const {
   const AvailableAttr *bestAttr = nullptr;
 
   for (auto attr : *this) {
@@ -352,6 +353,9 @@ DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx) const{
       continue;
 
     if (!avAttr->isActivePlatform(ctx))
+      continue;
+
+    if (ignoreAppExtensions && isApplicationExtensionPlatform(avAttr->Platform))
       continue;
 
     // We have an attribute that is active for the platform, but
@@ -407,10 +411,12 @@ DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
   return potential;
 }
 
-const AvailableAttr *DeclAttributes::getUnavailable(
-                          const ASTContext &ctx) const {
+const AvailableAttr *
+DeclAttributes::getUnavailable(const ASTContext &ctx,
+                               bool ignoreAppExtensions) const {
   const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
+  const AvailableAttr *bestActive =
+      findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
 
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
@@ -427,6 +433,10 @@ const AvailableAttr *DeclAttributes::getUnavailable(
       if (!AvAttr->isActivePlatform(ctx) &&
           !AvAttr->isLanguageVersionSpecific() &&
           !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      if (ignoreAppExtensions &&
+          isApplicationExtensionPlatform(AvAttr->Platform))
         continue;
 
       // Unconditional unavailable.

@@ -42,6 +42,8 @@ void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
+std::atomic<bool> _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly;
+SWIFT_RUNTIME_EXPORT
 size_t swift_retainCount(HeapObject *object);
 
 // liboainject tries to patch the function pointers and call the functions below

@@ -514,6 +514,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
 
     if (impact & RuntimeEffect::MetaData) {
+      if (isa<ReleaseValueInst>(inst)) {
+        // Move-only value types for which the deinit is not de-virtualized.
+        diagnose(loc, diag::embedded_swift_value_deinit, impactType.getASTType());
+        return true;
+      }
       if (!allowedMetadataUseInEmbeddedSwift(inst)) {
         PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
         if (impactType) {

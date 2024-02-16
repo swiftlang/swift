@@ -50,11 +50,6 @@ static bool canDeriveConformance(DeclContext *DC,
                DC, structDecl, protocol).empty())
       return false;
 
-    // If the struct is actor-isolated, we cannot derive Equatable/Hashable
-    // conformance if any of the stored properties are mutable.
-    if (memberwiseAccessorsRequireActorIsolation(structDecl))
-      return false;
-
     return true;
   }
 

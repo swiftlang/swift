@@ -2,7 +2,7 @@
 // RUN:   -parse-stdlib -module-name Ghost \
 // RUN:   -enable-experimental-feature NoncopyableGenerics
 
-// REQUIRES: noncopyable_generics
+
 
 // This test covers only rudimentary typechecking when only the Builtin module
 // is available. It's not a fully-supported configuration!

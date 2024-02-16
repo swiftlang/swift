@@ -137,3 +137,27 @@ struct Wrapper : ~Escapable {
     return view
   } 
 }
+
+public struct GenericBufferView<Element> : ~Escapable {
+  public typealias Index = Int
+  public typealias Pointer = UnsafePointer<Element>
+
+  public let baseAddress: Pointer
+  public let count: Int
+
+  public init<Storage>(unsafeBuffer: UnsafeBufferPointer<Element>,
+                       storage: borrowing Storage)
+    -> _borrow(storage) Self {
+    let baseAddress = unsafeBuffer.baseAddress!
+    self = GenericBufferView<Element>(baseAddress: baseAddress,
+                                      count: unsafeBuffer.count)
+    return self
+  }
+  // unsafe private API
+  @_unsafeNonescapableResult
+  init(baseAddress: Pointer, count: Int) {
+    precondition(count >= 0, "Count must not be negative")
+    self.baseAddress = baseAddress
+    self.count = count
+  } 
+}

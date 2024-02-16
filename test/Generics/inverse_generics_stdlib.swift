@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: noncopyable_generics
+
 
 /// This test specifically covers constructs that are only valid in the stdlib.
 

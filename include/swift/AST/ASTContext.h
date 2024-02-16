@@ -1250,6 +1250,13 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
+  /// Remove an externally-sourced module from the set of known loaded modules
+  /// in this context. Modules are added to the cache before being loaded to
+  /// avoid loading a module twice when there is a cyclic dependency between an
+  /// overlay and its Clang module. If a module import fails, the non-imported
+  /// module should be removed from the cache again.
+  void removeLoadedModule(Identifier RealName);
+
   /// Change the behavior of all loaders to ignore swiftmodules next to
   /// swiftinterfaces.
   void setIgnoreAdjacentModules(bool value);

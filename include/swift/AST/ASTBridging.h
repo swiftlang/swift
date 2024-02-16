@@ -22,6 +22,7 @@
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -1037,6 +1038,26 @@ BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl);
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
+struct BridgedCallArgument {
+  BridgedSourceLoc labelLoc;
+  BridgedIdentifier label;
+  BridgedExpr argExpr;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::Argument unbridged() const {
+    return swift::Argument(labelLoc.unbridged(), label.unbridged(),
+                           argExpr.unbridged());
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedArgumentList.createParsed(_:lParenLoc:args:rParenLoc:"
+           "firstTrailingClosureIndex:)")
+BridgedArgumentList BridgedArgumentList_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cArgs, BridgedSourceLoc cRParenLoc,
+    size_t cFirstTrailingClosureIndex);
+
 SWIFT_NAME("BridgedArrayExpr.createParsed(_:lSquareLoc:elements:commaLocs:"
            "rSquareLoc:)")
 BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
@@ -1075,13 +1096,12 @@ BridgedBorrowExpr BridgedBorrowExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedCallExpr.createParsed(_:fn:args:)")
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
-                                             BridgedTupleExpr args);
+                                             BridgedArgumentList args);
 
-SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:body:)")
-BridgedClosureExpr
-BridgedClosureExpr_createParsed(BridgedASTContext cContext,
-                                BridgedDeclContext cDeclContext,
-                                BridgedBraceStmt body);
+SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:parameterList:body:)")
+BridgedClosureExpr BridgedClosureExpr_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedParameterList cParamList, BridgedBraceStmt body);
 
 SWIFT_NAME("BridgedCoerceExpr.createParsed(_:asLoc:type:)")
 BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,

@@ -530,6 +530,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       // If there is a superclass constraint, we mangle it specially.
       auto result = Dem.createNode(Node::Kind::ProtocolListWithClass);
       auto superclassNode = _swift_buildDemanglingForMetadata(superclass, Dem);
+      if (!superclassNode)
+        return nullptr;
 
       result->addChild(proto_list, Dem);
       result->addChild(superclassNode, Dem);
@@ -573,6 +575,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
     auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType,
                                                       Dem);
+    if (!instance)
+      return nullptr;
     auto node = Dem.createNode(Node::Kind::ExistentialMetatype);
     node->addChild(instance, Dem);
     return node;
@@ -604,6 +608,11 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       auto param = func->getParameter(i);
       auto flags = func->getParameterFlags(i);
       auto input = _swift_buildDemanglingForMetadata(param, Dem);
+
+      // If we failed to build the demangling for an input, we have to fail
+      // building the demangling for the function type too.
+      if (!input)
+        return nullptr;
 
       auto wrapInput = [&](Node::Kind kind) {
         auto parent = Dem.createNode(kind);
@@ -691,6 +700,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     NodePointer resultTy = _swift_buildDemanglingForMetadata(func->ResultType,
                                                              Dem);
+    if (!resultTy)
+      return nullptr;
+
     NodePointer result = Dem.createNode(Node::Kind::ReturnType);
     result->addChild(resultTy, Dem);
     
@@ -698,6 +710,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     if (func->hasGlobalActor()) {
       auto globalActorTypeNode =
           _swift_buildDemanglingForMetadata(func->getGlobalActor(), Dem);
+      if (!globalActorTypeNode)
+        return nullptr;
       NodePointer globalActorNode =
           Dem.createNode(Node::Kind::GlobalActorFunctionType);
       globalActorNode->addChild(globalActorTypeNode, Dem);
@@ -731,6 +745,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       if (auto thrownError = func->getThrownError()) {
         auto thrownErrorTypeNode =
           _swift_buildDemanglingForMetadata(thrownError, Dem);
+        if (!thrownErrorTypeNode)
+          return nullptr;
         NodePointer thrownErrorNode =
             Dem.createNode(Node::Kind::TypedThrowsAnnotation);
         thrownErrorNode->addChild(thrownErrorTypeNode, Dem);
@@ -790,6 +806,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       // Add the element type child.
       auto eltType =
         _swift_buildDemanglingForMetadata(tuple->getElement(i).Type, Dem);
+      if (!eltType)
+        return nullptr;
 
       if (eltType->getKind() == Node::Kind::Type) {
         elt->addChild(eltType, Dem);

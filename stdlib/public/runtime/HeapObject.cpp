@@ -111,19 +111,31 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
 
 #define CALL_IMPL(name, args) do { \
-    void *fptr; \
-    memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
-    extern char _ ## name ## _as_char asm("__" #name "_"); \
-    fptr = __ptrauth_swift_runtime_function_entry_strip(fptr); \
-    if (SWIFT_UNLIKELY(fptr != &_ ## name ## _as_char)) \
-      return _ ## name args; \
-    return _ ## name ## _ args; \
+  if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
+    return _ ## name args; \
+  return _ ## name ## _ args; \
 } while(0)
 
+#define CALL_IMPL_CHECK(name, args) do { \
+  void *fptr; \
+  memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
+  extern char _ ## name ## _as_char asm("__" #name "_"); \
+  fptr = __ptrauth_swift_runtime_function_entry_strip(fptr); \
+  if (SWIFT_UNLIKELY(fptr != &_ ## name ## _as_char)) { \
+    if (SWIFT_UNLIKELY(!_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) { \
+      _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.store(true, std::memory_order_relaxed); \
+    } \
+    return _ ## name args; \
+  } \
+  return _ ## name ## _ args; \
+  } while(0)
 #else
 
 // If retain/release etc. aren't overridable, just call the real implementation.
 #define CALL_IMPL(name, args) \
+    return _ ## name ## _ args;
+
+#define CALL_IMPL_CHECK(name, args) \
     return _ ## name ## _ args;
 
 #endif
@@ -231,6 +243,9 @@ HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
     size_t requiredAlignmentMask) = _swift_allocObject_;
 
 SWIFT_RUNTIME_EXPORT
+std::atomic<bool> _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly = false;
+
+SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
     _swift_retain_;
 
@@ -280,7 +295,7 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
 HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
                                      size_t requiredSize,
                                      size_t requiredAlignmentMask) {
-  CALL_IMPL(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
+  CALL_IMPL_CHECK(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
 }
 
 HeapObject *

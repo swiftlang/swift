@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: GH_ISSUE_70246
 
-// REQUIRES: noncopyable_generics
+
 
 import MoveOnlyCxxValueType
 import StdlibUnittest

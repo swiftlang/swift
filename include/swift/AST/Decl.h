@@ -1289,7 +1289,8 @@ public:
   getSemanticAvailableRangeAttr() const;
 
   /// Retrieve the @available attribute that makes this declaration unavailable,
-  /// if any.
+  /// if any. If \p ignoreAppExtensions is true then attributes for app
+  /// extension platforms are ignored.
   ///
   /// This attribute may come from an enclosing decl since availability is
   /// inherited. The second member of the returned pair is the decl that owns
@@ -1298,7 +1299,7 @@ public:
   /// Note that this notion of unavailability is broader than that which is
   /// checked by \c AvailableAttr::isUnavailable.
   llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticUnavailableAttr() const;
+  getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Returns true if this declaration should be considered available during
   /// SIL/IR lowering. A declaration would not be available during lowering if,

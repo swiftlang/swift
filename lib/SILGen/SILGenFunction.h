@@ -1187,6 +1187,10 @@ public:
       unsigned numIgnoredTrailingParameters,
       llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
 
+  /// Set up the ExpectedExecutor field for the current function and emit
+  /// whatever hops or assertions are locally expected.
+  void emitExpectedExecutor();
+
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
   void bindParameterForForwarding(ParamDecl *param,
@@ -1300,7 +1304,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   ManagedValue emitInjectEnum(SILLocation loc,
-                              ArgumentSource &&payload,
+                              MutableArrayRef<ArgumentSource> payload,
                               SILType enumTy,
                               EnumElementDecl *element,
                               SGFContext C);
@@ -1561,6 +1565,22 @@ public:
                                    const Conversion &conversion,
                                    SGFContext C,
                                    ValueProducerRef produceValue);
+
+  /// Call the produceValue function and convert the result to the given
+  /// original abstraction pattern.
+  ///
+  /// The SGFContext provided to the produceValue function includes the
+  /// conversion, if it's non-trivial, and thus permits it to be peepholed
+  /// and combined with other conversions.  This can result in substantially
+  /// more efficient code than just emitting the value and reabstracting
+  /// it afterwards.
+  ///
+  /// If the provided SGFContext includes an initialization, the result
+  /// will always be ManagedValue::forInContext().
+  ManagedValue emitAsOrig(SILLocation loc, AbstractionPattern origType,
+                          CanType substType, SILType expectedTy,
+                          SGFContext C,
+                          ValueProducerRef produceValue);
 
   /// Emit the given expression as an r-value that follows the
   /// abstraction patterns of the original type.

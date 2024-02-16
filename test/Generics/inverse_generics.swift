@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: noncopyable_generics
+
 
 // Check support for explicit conditional conformance
 public struct ExplicitCond<T: ~Copyable>: ~Copyable {}

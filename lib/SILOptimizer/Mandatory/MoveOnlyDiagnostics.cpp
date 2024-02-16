@@ -824,23 +824,62 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
         astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
         astContext.LangOpts.hasFeature(
             Feature::MoveOnlyPartialReinitialization));
-    switch (kind) {
-    case PartialMutation::Kind::Consume:
-      diagnose(astContext, user,
-               diag::sil_movechecking_cannot_destructure_has_deinit, varName);
-      break;
-    case PartialMutation::Kind::Reinit:
-      diagnose(astContext, user,
-               diag::sil_movechecking_cannot_partially_reinit_has_deinit,
-               varName);
-      break;
-    }
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::sil_movechecking_cannot_destructure_has_deinit;
+      case PartialMutation::Kind::Reinit:
+        return diag::sil_movechecking_cannot_partially_reinit_has_deinit;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName);
     registerDiagnosticEmitted(address);
-    auto deinitLoc = error.getNominal().getValueTypeDestructor()->getLoc(
-        /*SerializedOK=*/false);
+    auto deinitLoc =
+        error.getDeinitingNominal().getValueTypeDestructor()->getLoc(
+            /*SerializedOK=*/false);
     if (!deinitLoc)
       return;
     astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
+    return;
+  }
+  case PartialMutationError::Kind::NonfrozenImportedType: {
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
+    auto &nominal = error.getNonfrozenImportedNominal();
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::sil_movechecking_cannot_destructure_imported_nonfrozen;
+      case PartialMutation::Kind::Reinit:
+        return diag::sil_movechecking_cannot_partially_reinit_nonfrozen;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName,
+             nominal.getDeclaredInterfaceType(), nominal.getModuleContext());
+    registerDiagnosticEmitted(address);
+    return;
+  }
+  case PartialMutationError::Kind::NonfrozenUsableFromInlineType: {
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
+    auto &nominal = error.getNonfrozenUsableFromInlineNominal();
+    auto diagnostic = [&]() {
+      switch (kind) {
+      case PartialMutation::Kind::Consume:
+        return diag::
+            sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient;
+      case PartialMutation::Kind::Reinit:
+        return diag::
+            sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient;
+      }
+    }();
+    diagnose(astContext, user, diagnostic, varName,
+             nominal.getDeclaredInterfaceType());
+    registerDiagnosticEmitted(address);
     return;
   }
   }
