@@ -1095,8 +1095,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (!isa<ClassDecl>(this)) {
       bool missingOne = false;
       for (auto ip : InvertibleProtocolSet::full()) {
-        auto invertible = getMarking(ip);
-        if (!invertible.getInverse() || bool(invertible.getPositive()))
+        if (!hasInverseMarking(ip))
           addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
         else
           missingOne = true;
