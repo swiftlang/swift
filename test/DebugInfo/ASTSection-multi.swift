@@ -42,8 +42,11 @@
 // RUN:                     %t/a3.o %t/a3-mod.o
 
 // RUN: %lldb-moduleimport-test -verbose %t/a.out | %FileCheck %s
-// CHECK: Importing a0... ok!
-// CHECK: Importing a1... ok!
-// CHECK: Importing a2... ok!
-// CHECK: Importing a3... ok!
+// CHECK-DAG: Importing a0...
+// CHECK-DAG: Import successful!
+// CHECK-DAG: Importing a1...
+// CHECK-DAG: Import successful!
+// CHECK-DAG: Importing a2...
+// CHECK-DAG: Import successful!
+// CHECK-DAG: Importing a3...
 
