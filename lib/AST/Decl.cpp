@@ -6726,21 +6726,6 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
     return false;
   };
 
-  auto resolveRequirement = [&](unsigned reqIdx) -> std::optional<Requirement> {
-    WhereClauseOwner owner(const_cast<NominalTypeDecl *>(this));
-    auto req = ctx.evaluator(
-        RequirementRequest{owner, reqIdx, TypeResolutionStage::Structural},
-        [&]() {
-          return Requirement(RequirementKind::SameType, ErrorType::get(ctx),
-                             ErrorType::get(ctx));
-        });
-
-    if (req.hasError())
-      return std::nullopt;
-
-    return req;
-  };
-
   llvm::SmallSet<GenericTypeParamDecl *, 4> params;
 
   // Scan the inheritance clauses of generic parameters only for an inverse.
@@ -6765,28 +6750,23 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
     if (requirementRepr.getKind() != RequirementReprKind::TypeConstraint)
       continue;
 
+    auto *subjectRepr =
+        dyn_cast<IdentTypeRepr>(requirementRepr.getSubjectRepr());
+
+    if (!(subjectRepr && subjectRepr->isBound()))
+      continue;
+
+    auto *subjectGP =
+        dyn_cast<GenericTypeParamDecl>(subjectRepr->getBoundDecl());
+    if (!subjectGP || !params.contains(subjectGP))
+      continue;
+
     auto *constraintRepr =
         dyn_cast<InverseTypeRepr>(requirementRepr.getConstraintRepr());
     if (!constraintRepr || constraintRepr->isInvalid())
       continue;
 
-    auto req = resolveRequirement(i);
-    if (!req)
-      continue;
-
-    if (req->getKind() != RequirementKind::Conformance)
-      continue;
-
-    auto subject = req->getFirstType();
-    if (!subject->isTypeParameter())
-      continue;
-
-    // Skip outer params and implicit ones.
-    auto *param = subject->getRootGenericParam()->getDecl();
-    if (!param || !params.contains(param))
-      continue;
-
-    if (isInverseTarget(req->getSecondType()))
+    if (constraintRepr->isInverseOf(target, getDeclContext()))
       return InverseMarking::Mark(InverseMarking::Kind::Inferred,
                                   constraintRepr->getLoc());
   }
