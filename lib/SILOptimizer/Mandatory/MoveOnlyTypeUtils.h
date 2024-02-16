@@ -141,9 +141,14 @@ inline Feature partialMutationFeature(PartialMutation::Kind kind) {
 ///
 /// Emulates the following enum with associated value:
 ///
-/// enum class PartialMutationError {
-/// case featureDisabled(SILType)
-/// case hasDeinit(SILType, NominalTypeDecl)
+/// struct PartialMutationError {
+///   let type: SILType
+///   enum Kind {
+///     case featureDisabled
+///     case hasDeinit(NominalTypeDecl)
+///     case nonfrozenImportedType(NominalTypeDecl)
+///     case nonfrozenUsableFromInlineType(NominalTypeDecl)
+///   }
 /// }
 class PartialMutationError {
   struct FeatureDisabled {
@@ -152,11 +157,18 @@ class PartialMutationError {
   struct HasDeinit {
     NominalTypeDecl &nominal;
   };
-  TaggedUnion<FeatureDisabled, HasDeinit> kind;
+  struct NonfrozenImportedType {
+    NominalTypeDecl &nominal;
+  };
+  struct NonfrozenUsableFromInlineType {
+    NominalTypeDecl &nominal;
+  };
+  using Payload = TaggedUnion<FeatureDisabled, HasDeinit, NonfrozenImportedType,
+                              NonfrozenUsableFromInlineType>;
+  Payload payload;
 
-  PartialMutationError(SILType type, FeatureDisabled fd)
-      : kind({fd}), type(type) {}
-  PartialMutationError(SILType type, HasDeinit r) : kind({r}), type(type) {}
+  PartialMutationError(SILType type, Payload payload)
+      : payload(payload), type(type) {}
 
 public:
   /// The type within the aggregate responsible for the error.
@@ -180,12 +192,36 @@ public:
     /// range and the full value.  It is the \p nominal field of
     /// PartialMutationError.
     HasDeinit,
+    /// A partially consumed/reinitialized aggregate is defined in a different
+    /// module and isn't frozen.
+    ///
+    /// In the case that the other module was built with library evolution, it
+    /// isn't legal (or valid SIL) to directly modify the aggregate's fields.
+    /// To have consistent semantics regardless of whether that other module was
+    /// built with library evolution, prevent the aggregate from being partially
+    /// mutated.
+    NonfrozenImportedType,
+    /// A partially consumed/reinitialized aggregate is defined in the same
+    /// module, but the function where it is used is @_alwaysEmitIntoClient.
+    ///
+    /// In this case, if the module were built with library evolution, it
+    /// wouldn't be legal (or valid SIL) to directly modify the aggregate's
+    /// fields within the function when it was included into some client
+    /// library.  To have consistent semantics regardless of having been built
+    /// with library evolution, prevent the aggregate from being partially
+    /// mutated.
+    NonfrozenUsableFromInlineType,
   };
 
   operator Kind() {
-    if (kind.isa<FeatureDisabled>())
+    if (payload.isa<FeatureDisabled>())
       return Kind::FeatureDisabled;
-    return Kind::HasDeinit;
+    else if (payload.isa<HasDeinit>())
+      return Kind::HasDeinit;
+    else if (payload.isa<NonfrozenImportedType>())
+      return Kind::NonfrozenImportedType;
+    assert(payload.isa<NonfrozenUsableFromInlineType>());
+    return Kind::NonfrozenUsableFromInlineType;
   }
 
   static PartialMutationError featureDisabled(SILType type,
@@ -198,8 +234,28 @@ public:
     return PartialMutationError(type, HasDeinit{nominal});
   }
 
-  NominalTypeDecl &getNominal() { return kind.get<HasDeinit>().nominal; };
-  PartialMutation::Kind getKind() { return kind.get<FeatureDisabled>().kind; };
+  static PartialMutationError nonfrozenImportedType(SILType type,
+                                                    NominalTypeDecl &nominal) {
+    return PartialMutationError(type, NonfrozenImportedType{nominal});
+  }
+
+  static PartialMutationError
+  nonfrozenUsableFromInlineType(SILType type, NominalTypeDecl &nominal) {
+    return PartialMutationError(type, NonfrozenUsableFromInlineType{nominal});
+  }
+
+  PartialMutation::Kind getKind() {
+    return payload.get<FeatureDisabled>().kind;
+  }
+  NominalTypeDecl &getDeinitingNominal() {
+    return payload.get<HasDeinit>().nominal;
+  }
+  NominalTypeDecl &getNonfrozenImportedNominal() {
+    return payload.get<NonfrozenImportedType>().nominal;
+  }
+  NominalTypeDecl &getNonfrozenUsableFromInlineNominal() {
+    return payload.get<NonfrozenUsableFromInlineType>().nominal;
+  }
 };
 } // namespace siloptimizer
 } // namespace swift

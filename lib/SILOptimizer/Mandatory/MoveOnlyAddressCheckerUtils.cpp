@@ -1682,6 +1682,41 @@ struct CopiedLoadBorrowEliminationVisitor
 //                   MARK: Partial Consume/Reinit Checking
 //===----------------------------------------------------------------------===//
 
+static bool hasExplicitFixedLayoutAnnotation(NominalTypeDecl *nominal) {
+  return nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+         nominal->getAttrs().hasAttribute<FrozenAttr>();
+}
+
+static std::optional<PartialMutationError>
+shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
+                                      SILFunction *fn) {
+  // A non-frozen type can't be partially mutated within code built in its
+  // defining module if that code will be emitted into a client.
+  if (fn->getLinkage() == SILLinkage::PublicNonABI &&
+      nominal->isUsableFromInline() &&
+      !hasExplicitFixedLayoutAnnotation(nominal)) {
+    return {PartialMutationError::nonfrozenUsableFromInlineType(ty, *nominal)};
+  }
+
+  // Otherwise, a type can be mutated partially in its defining module.
+  if (nominal->getModuleContext() == fn->getModule().getSwiftModule())
+    return std::nullopt;
+
+  // It's defined in another module and used here; it has to be visible.
+  assert(nominal
+             ->getFormalAccessScope(
+                 /*useDC=*/fn->getDeclContext(),
+                 /*treatUsableFromInlineAsPublic=*/true)
+             .isPublicOrPackage());
+
+  // Partial mutation is supported only for frozen/fixed-layout types from
+  // other modules.
+  if (hasExplicitFixedLayoutAnnotation(nominal))
+    return std::nullopt;
+
+  return {PartialMutationError::nonfrozenImportedType(ty, *nominal)};
+}
+
 /// Whether an error should be emitted in response to a partial consumption.
 static llvm::Optional<PartialMutationError>
 shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
@@ -1719,13 +1754,17 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
 
   LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
 
-  // Otherwise, walk the type looking for the deinit.
+  // Otherwise, walk the type looking for the deinit and visibility.
   while (iterType != targetType) {
     // If we have a nominal type as our parent type, see if it has a
     // deinit. We know that it must be non-copyable since copyable types
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
     if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+      if (auto error = shouldEmitPartialMutationErrorForType(
+              iterType, nom, user->getFunction())) {
+        return error;
+      }
       if (nom->getValueTypeDestructor()) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
