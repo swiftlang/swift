@@ -292,8 +292,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     SmallVector<Requirement, 2> reqs;
     SmallVector<InverseRequirement, 2> inverseReqs;
     genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
-    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-    if (!reqs.empty())
+    //assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+    if (!reqs.empty() || !inverseReqs.empty())
       return {Unsupported, UnrepresentableGenericRequirements};
   }
 

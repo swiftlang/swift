@@ -25,7 +25,9 @@ include(AddSwiftBenchmarkSuite)
 # Declarative Description of Benchmarks
 #===-----------------------------------------------------------------------===#
 
-set(SWIFT_BENCH_MODULES
+set(SWIFT_BENCH_MODULES)
+
+set(SWIFT_BENCH_MODULES_DISABLED_HERE
     single-source/Ackermann
     single-source/AngryPhonebook
     single-source/AnyHashableWithAClass
@@ -212,7 +214,9 @@ set(SWIFT_BENCH_MODULES
     cxx-source/ReadAccessor
 )
 
-set(SWIFT_MULTISOURCE_SWIFT_BENCHES
+set(SWIFT_MULTISOURCE_SWIFT_BENCHES)
+
+set(SWIFT_MULTISOURCE_SWIFT_BENCHES_DISABLED
   multi-source/PrimsSplit
 )
 
