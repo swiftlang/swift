@@ -1295,10 +1295,11 @@ extension Collection {
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
-    while try start != endIndex && predicate(self[start]) {
+    let end = endIndex
+    while try start != end && predicate(self[start]) {
       formIndex(after: &start)
     } 
-    return self[start..<endIndex]
+    return self[start..<end]
   }
 
   /// Returns a subsequence, up to the specified maximum length, containing
