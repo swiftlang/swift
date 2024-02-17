@@ -73,7 +73,7 @@ extension AsyncFilterSequence: AsyncSequence {
   ///
   /// The filter sequence produces whatever type of error its
   /// base sequence does.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -121,7 +121,7 @@ extension AsyncFilterSequence: AsyncSequence {
     /// `next(isolation:)` evaluates the result with the `predicate` closure. If
     /// the closure returns `true`, `next(isolation:)` returns the received
     /// element; otherwise it awaits the next element from the base iterator.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while true {

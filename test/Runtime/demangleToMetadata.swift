@@ -536,13 +536,13 @@ enum MyBigError: Error {
   case epicFail
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 func getFnTypeWithThrownError<E: Error>(_: E.Type) -> Any.Type {
   typealias Fn = (Int) throws(E) -> Void
   return Fn.self
 }
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
   DemangleToMetadataTests.test("typed throws") {
     typealias Fn = (Int) throws(MyBigError) -> Void
     expectEqual("ySi4main10MyBigErrorOYKc", _mangledTypeName(Fn.self)!)

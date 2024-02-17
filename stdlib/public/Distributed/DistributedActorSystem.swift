@@ -467,7 +467,7 @@ extension DistributedActorSystem {
     let targetNameUTF8 = Array(targetName.utf8)
 
     let concreteTargetNameTypeNamePair: _SwiftNamePair?
-    if #available(SwiftStdlib 5.11, *) {
+    if #available(SwiftStdlib 6.0, *) {
       let dataAndLength = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         _getConcreteAccessibleWitnessName(on: actor,
           targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))

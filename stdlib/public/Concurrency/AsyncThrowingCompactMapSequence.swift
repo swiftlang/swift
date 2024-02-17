@@ -160,7 +160,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     /// this method continues to wait for further elements until it gets one
     /// that transforms to a non-`nil` value. If calling the closure throws an
     /// error, the sequence ends and `next()` rethrows the error.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> ElementOfResult? {
       while !finished {

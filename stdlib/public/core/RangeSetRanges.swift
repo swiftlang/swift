@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet {
   /// A collection of the ranges that make up a range set.
   public struct Ranges {
@@ -60,7 +60,7 @@ extension RangeSet {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges {
   @usableFromInline
   internal func _contains(_ bound: Bound) -> Bool {
@@ -267,13 +267,13 @@ extension RangeSet.Ranges {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: Sequence {
   public typealias Element = Range<Bound>
   public typealias Iterator = IndexingIterator<Self>
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: Collection {
   public typealias Index = Int
   public typealias Indices = Range<Index>
@@ -296,27 +296,27 @@ extension RangeSet.Ranges: Collection {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: RandomAccessCollection {}
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: Equatable {
   public static func == (left: Self, right: Self) -> Bool {
     left._storage == right._storage
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: Hashable where Bound: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_storage)
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: Sendable where Bound: Sendable {}
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet.Ranges: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()

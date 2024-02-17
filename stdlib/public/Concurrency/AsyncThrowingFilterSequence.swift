@@ -145,7 +145,7 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     /// otherwise it awaits the next element from the base iterator. If calling
     /// the closure throws an error, the sequence ends and `next(isolation:)`
     /// rethrows the error.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while !finished {

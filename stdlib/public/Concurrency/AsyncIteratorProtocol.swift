@@ -90,7 +90,7 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
   associatedtype Element
 
   /// The type of failure produced by iteration.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   associatedtype Failure: Error = any Error
 
   /// Asynchronously advances to the next element and returns it, or ends the
@@ -105,7 +105,7 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
   ///
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element?
 }
 
@@ -113,7 +113,7 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
 extension AsyncIteratorProtocol {
   /// Default implementation of `next()` in terms of `next()`, which is
   /// required to maintain backward compatibility with existing async iterators.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @inlinable
   public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
     do {

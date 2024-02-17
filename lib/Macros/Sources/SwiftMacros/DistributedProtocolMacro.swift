@@ -37,7 +37,7 @@ public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
       .map { req in
         """
         \(req) {
-            if #available(SwiftStdlib 5.11, *) {
+            if #available(SwiftStdlib 6.0, *) {
               Distributed._distributedStubFatalError()
             } else {
               fatalError()
@@ -76,7 +76,7 @@ public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
       .map { req in
         """
         \(req) {
-            if #available(SwiftStdlib 5.11, *) {
+            if #available(SwiftStdlib 6.0, *) {
               Distributed._distributedStubFatalError()
             } else {
               fatalError()

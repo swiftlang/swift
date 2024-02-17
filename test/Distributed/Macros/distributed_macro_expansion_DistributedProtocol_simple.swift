@@ -30,7 +30,7 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 
 // CHECK: extension Greeter {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 5.11, *) {
+// CHECK:     if #available (SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()

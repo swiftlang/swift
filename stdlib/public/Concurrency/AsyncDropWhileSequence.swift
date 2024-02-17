@@ -83,7 +83,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
   ///
   /// The drop-while sequence produces whatever type of error its base
   /// sequence produces.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -136,7 +136,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
     /// method returns that value. After that, the iterator returns values
     /// received from its base iterator as-is, and never executes the predicate
     /// closure again.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while let predicate = self.predicate {

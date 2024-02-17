@@ -26,7 +26,7 @@
 ///
 ///     numbers.moveSubranges(negativeSubranges, to: 0)
 ///     // numbers == [-5, -3, -9, 10, 12, 14, 15]
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 public struct RangeSet<Bound: Comparable> {
   @usableFromInline
   internal var _ranges: Ranges
@@ -149,26 +149,26 @@ public struct RangeSet<Bound: Comparable> {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet: Equatable {
   public static func == (left: Self, right: Self) -> Bool {
     left._ranges == right._ranges
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet: Hashable where Bound: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self._ranges)
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet: Sendable where Bound: Sendable {}
 
 // MARK: - Collection APIs
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet {
   /// Creates a new range set containing ranges that contain only the
   /// specified indices in the given collection.
@@ -246,7 +246,7 @@ extension RangeSet {
 
 // These methods only depend on the ranges that comprise the range set, so
 // we can provide them even when we can't provide `SetAlgebra` conformance.
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet {
   /// Adds the contents of the given range set to this range set.
   ///
@@ -398,7 +398,7 @@ extension RangeSet {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     return _ranges.description

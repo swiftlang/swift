@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 5.11 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
-// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 5.11 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
+// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 6.0 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 6.0 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
 // RUN: %target-swift-emit-ir -target %target-triple -min-runtime-version 5.9 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck --check-prefix=GXX %s
 // RUN: %target-swift-emit-ir -target %target-triple -min-runtime-version 5.9 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=GXX %s
 

@@ -74,7 +74,7 @@ extension AsyncPrefixSequence: AsyncSequence {
   ///
   /// The prefix sequence produces whatever type of error its
   /// base sequence does.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -115,7 +115,7 @@ extension AsyncPrefixSequence: AsyncSequence {
     /// `next(isolation:)` on its base iterator and passes through the
     /// result. After reaching the maximum number of elements, subsequent calls
     /// to `next(isolation:)` return `nil`.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       if remaining != 0 {

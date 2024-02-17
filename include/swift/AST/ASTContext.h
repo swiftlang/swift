@@ -990,10 +990,10 @@ public:
     return getSwiftAvailability(5, 10);
   }
 
-  /// Get the runtime availability of features introduced in the Swift 5.11
+  /// Get the runtime availability of features introduced in the Swift 6.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift511Availability() const {
-    return getSwiftAvailability(5, 11);
+  inline AvailabilityContext getSwift60Availability() const {
+    return getSwiftAvailability(6, 0);
   }
 
   /// Get the runtime availability for a particular version of Swift (5.0+).
