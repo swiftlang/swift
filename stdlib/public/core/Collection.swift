@@ -1326,9 +1326,10 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
-    let end = index(startIndex,
-      offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
-    return self[startIndex..<end]
+    let start = startIndex
+    let limit = endIndex
+    let end = index(start, offsetBy: maxLength, limitedBy: limit) ?? limit
+    return self[start..<end]
   }
   
   /// Returns a subsequence containing the initial elements until `predicate`
