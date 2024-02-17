@@ -1345,11 +1345,13 @@ extension Collection {
   public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
-    var end = startIndex
-    while try end != endIndex && predicate(self[end]) {
+    let start = startIndex
+    let limit = endIndex
+    var end = start
+    while try end != limit && predicate(self[end]) {
       formIndex(after: &end)
     }
-    return self[startIndex..<end]
+    return self[start..<end]
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the
