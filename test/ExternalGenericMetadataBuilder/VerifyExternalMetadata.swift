@@ -3,7 +3,6 @@
 // RUN: %target-codesign %t/VerifyExternalMetadata
 //
 // RUN: %host-build-swift -Xfrontend -disable-availability-checking -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -Xlinker -rpath -Xlinker %swift-lib-dir -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
-// no: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %S/Inputs/buildMetadataJSON.swift -o %t/buildMetadataJSON
 // RUN: %target-codesign %t/buildMetadataJSON
 //
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/json2c.swift -o %t/json2c
@@ -14,8 +13,10 @@
 // RUN: %target-run %t/json2c %t/libswiftPrespecialized.json > %t/libswiftPrespecialized.c
 // RUN: %clang -isysroot %sdk -target %target-triple -bundle %t/libswiftPrespecialized.c -L%stdlib_dir -lswiftCore -bundle_loader %t/VerifyExternalMetadata -o %t/libswiftPrespecialized.bundle
 //
-//
-// RUN: env SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING=y SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH=%t/libswiftPrespecialized.bundle %target-run %t/VerifyExternalMetadata
+// Set a custom library path because we need to ensure we don't load an arm64e
+// dylib into an arm64 test, since the prespecialized metadata depends on the
+// exact contents of the library.
+// RUN: env SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING=y SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH=%t/libswiftPrespecialized.bundle %target-run env DYLD_LIBRARY_PATH=%stdlib_dir/%target-arch %t/VerifyExternalMetadata
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx && CPU=arm64
@@ -36,6 +37,21 @@ public struct GenericField<T, U> {
   var int: Int
 }
 
+public struct Box<T> {
+  var field: T
+}
+
+public struct Box3<T, U, V> {
+  var field1: T
+  var field2: U
+  var field3: V
+}
+
+// The protocol conformance puts a symbol into __DATA_CONST which the builder
+// can use as the base symbol for references to other data.
+public protocol PublicProto {}
+extension Box3: PublicProto {}
+
 let args = CommandLine.arguments
 
 if args.count > 1 && args[1] == "getJSON" {
@@ -44,6 +60,9 @@ if args.count > 1 && args[1] == "getJSON" {
     GenericField<GenericField<Int8, Int16>,
                  Array<GenericStruct<Double, String, Float>>>.self,
     Array<Array<Array<Array<Array<Array<Array<Double>>>>>>>.self,
+    Box<Int>.self,
+    Box<String>.self,
+    Box3<Int, Int, Int>.self,
   ]
   let typeNames = types.map { _mangledTypeName($0)! }
   let jsonNames = typeNames.map { [ "name": $0 ] }
