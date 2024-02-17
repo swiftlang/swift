@@ -32,7 +32,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   if !context.options.hasFeature(.NonescapableTypes) {
     return
   }
-  log("Diagnosing lifetime dependence in \(function.name)")
+  log(" --- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
 
   for argument in function.arguments where !argument.type.isEscapable {

@@ -31,7 +31,7 @@ private func log(_ message: @autoclosure () -> String) {
 let lifetimeDependenceScopeFixupPass = FunctionPass(
   name: "lifetime-dependence-scope-fixup")
 { (function: Function, context: FunctionPassContext) in
-  log("Scope fixup for lifetime dependence in \(function.name)")
+  log(" --- Scope fixup for lifetime dependence in \(function.name)")
 
   for instruction in function.instructions {
     guard let markDep = instruction as? MarkDependenceInst else {
