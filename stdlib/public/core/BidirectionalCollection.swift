@@ -379,11 +379,9 @@ extension BidirectionalCollection {
   public __consuming func dropLast(_ k: Int) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
-    let end = index(
-      endIndex,
-      offsetBy: -k,
-      limitedBy: startIndex) ?? startIndex
-    return self[startIndex..<end]
+    let start = startIndex
+    let end = index(endIndex, offsetBy: -k, limitedBy: start) ?? start
+    return self[start..<end]
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the
