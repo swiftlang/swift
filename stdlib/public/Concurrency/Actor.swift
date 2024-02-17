@@ -76,8 +76,12 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 #if $Macros
 /// Produce a reference to the actor to which the enclosing code is
 /// isolated, or `nil` if the code is nonisolated.
+///
+/// If the type annotation provided for `#isolation` is not `(any Actor)?`,
+/// the type must match the enclosing actor type. If no type annotation is
+/// provided, the type defaults to `(any Actor)?`.
 @available(SwiftStdlib 5.1, *)
 @freestanding(expression)
-public macro isolation() -> (any Actor)? = Builtin.IsolationMacro
+public macro isolation<T>() -> T = Builtin.IsolationMacro
 #endif
 
