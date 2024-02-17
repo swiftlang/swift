@@ -3369,8 +3369,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
 }
 
 void ASTMangler::appendInverseRequirement(const InverseRequirement &req,
-                                          GenericSignature sig,
-                                          bool lhsBaseIsProtocolSelf) {
+                                          GenericSignature sig) {
   appendOperator("R");
 
   assert(req.protocol->getInvertibleProtocolKind());

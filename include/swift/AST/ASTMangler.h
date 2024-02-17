@@ -547,8 +547,7 @@ protected:
   ///
   /// \param req The inverse requirement to mangle.
   void appendInverseRequirement(const InverseRequirement &req,
-                                GenericSignature sig,
-                                bool lhsBaseIsProtocolSelf = false);
+                                GenericSignature sig);
 
   void appendGenericSignatureParts(GenericSignature sig,
                                    ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
