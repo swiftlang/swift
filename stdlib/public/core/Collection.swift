@@ -1247,8 +1247,9 @@ extension Collection {
   @inlinable
   public __consuming func dropFirst(_ k: Int = 1) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(startIndex, offsetBy: k, limitedBy: endIndex) ?? endIndex
-    return self[start..<endIndex]
+    let end = endIndex
+    let start = index(startIndex, offsetBy: k, limitedBy: end) ?? end
+    return self[start..<end]
   }
 
   /// Returns a subsequence containing all but the specified number of final
