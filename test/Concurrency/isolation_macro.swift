@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -dump-ast %s -enable-experimental-feature OptionalIsolatedParameters | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
 // Diagnostics testing
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature OptionalIsolatedParameters -DTEST_DIAGNOSTICS %s > %t/diagnostics.txt 2>&1
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -DTEST_DIAGNOSTICS %s > %t/diagnostics.txt 2>&1
 // RUN: %FileCheck %s --check-prefix CHECK-DIAGS < %t/diagnostics.txt
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: swift_swift_parser
 
 // CHECK-LABEL: nonisolatedFunc()

@@ -1132,10 +1132,6 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     case BuiltinMacroKind::IsolationMacro:
-      if (!ctx.LangOpts.hasFeature(Feature::OptionalIsolatedParameters)) {
-        ctx.Diags.diagnose(loc, diag::isolation_macro_experimental);
-      }
-
       // Create a buffer full of scratch space; this will be populated
       // much later.
       std::string scratchSpace(128, ' ');
