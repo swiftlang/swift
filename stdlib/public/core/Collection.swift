@@ -1379,10 +1379,10 @@ extension Collection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
+    let end = endIndex
     let amount = Swift.max(0, count - maxLength)
-    let start = index(startIndex,
-      offsetBy: amount, limitedBy: endIndex) ?? endIndex
-    return self[start..<endIndex]
+    let start = index(startIndex, offsetBy: amount, limitedBy: end) ?? end
+    return self[start..<end]
   }
 
   /// Returns a subsequence from the start of the collection up to, but not
