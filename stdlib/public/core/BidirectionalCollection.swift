@@ -411,11 +411,10 @@ extension BidirectionalCollection {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let start = index(
-      endIndex,
-      offsetBy: -maxLength,
-      limitedBy: startIndex) ?? startIndex
-    return self[start..<endIndex]
+    let end = endIndex
+    let limit = startIndex
+    let start = index(end, offsetBy: -maxLength, limitedBy: limit) ?? limit
+    return self[start..<end]
   }
 }
 
