@@ -36,15 +36,6 @@
 
 // Standard Library Symbols
 
-// Swift._getRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss15_getRetainCountySuyXlF
-
-// Swift._getWeakRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss19_getWeakRetainCountySuyXlF
-
-// Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss22_getUnownedRetainCountySuyXlF
-
 // Swift.String.init<A, B where A: Swift._UnicodeEncoding, B: Swift.Sequence, A.CodeUnit == B.Element>(validating: B, as: A.Type) -> Swift.String?
 Added: _$sSS10validating2asSSSgq__xmtcs16_UnicodeEncodingRzSTR_7ElementQy_8CodeUnitRtzr0_lufC
 
