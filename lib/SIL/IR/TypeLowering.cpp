@@ -28,6 +28,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -302,8 +303,8 @@ namespace {
 
     RecursiveProperties
     getOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
-      return mergeIsTypeExpansionSensitive(isSensitive,
-                                           RecursiveProperties::forOpaque());
+      return mergeIsTypeExpansionSensitive(
+          isSensitive, RecursiveProperties::forOpaque(IsNotTrivial));
     }
 
     RetTy visit(CanType substType, AbstractionPattern origType,
@@ -691,6 +692,11 @@ namespace {
               type, getReferenceRecursiveProperties(isSensitive));
         }
       }
+      if (isBitwiseCopyable(type, origType)) {
+        auto properties = getTrivialRecursiveProperties(isSensitive);
+        properties.setAddressOnly();
+        return asImpl().handleAddressOnly(type, properties);
+      }
       return asImpl().handleAddressOnly(
           type, getOpaqueRecursiveProperties(isSensitive));
     }
@@ -852,6 +858,11 @@ namespace {
         return asImpl().handleTrivial(type, props);
       }
       return asImpl().handleNonTrivialAggregate(type, props);
+    }
+
+    bool isBitwiseCopyable(CanType ty, AbstractionPattern origTy) {
+      return origTy.conformsToKnownProtocol(ty,
+                                            KnownProtocolKind::BitwiseCopyable);
     }
   };
 
@@ -2317,8 +2328,8 @@ namespace {
                                                                     properties);
     }
 
-    bool handleResilience(CanType type, NominalTypeDecl *D,
-                          RecursiveProperties &properties) {
+    bool handleResilience(CanType type, AbstractionPattern origType,
+                          NominalTypeDecl *D, RecursiveProperties &properties) {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
@@ -2334,7 +2345,8 @@ namespace {
         // the isResilient() flag above.
         if (!sameModule || Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
-          properties.addSubobject(RecursiveProperties::forOpaque());
+          auto isTrivial = IsTrivial_t(isBitwiseCopyable(type, origType));
+          properties.addSubobject(RecursiveProperties::forOpaque(isTrivial));
           return true;
         }
       }
@@ -2370,7 +2382,7 @@ namespace {
         return handleInfinite(structType, properties);
       }
 
-      if (handleResilience(structType, D, properties)) {
+      if (handleResilience(structType, origType, D, properties)) {
         return handleAddressOnly(structType, properties);
       }
 
@@ -2473,7 +2485,7 @@ namespace {
         return handleInfinite(enumType, properties);
       }
 
-      if (handleResilience(enumType, D, properties))
+      if (handleResilience(enumType, origType, D, properties))
         return handleAddressOnly(enumType, properties);
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
@@ -3053,8 +3065,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (substType->hasTypeParameter())
     return;
 
-  auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
-
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
     if (module && module->isBuiltFromInterface()) {
@@ -3062,7 +3072,14 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       // may not have been enabled in them.
       return;
     }
+    if (auto *sourceFile = nominal->getParentSourceFile()) {
+      if (sourceFile->Kind == SourceFileKind::SIL) {
+        return;
+      }
+    }
   }
+
+  auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
 
   if (lowering.isTrivial() && !conformance) {
     // A trivial type can lack a conformance in a few cases:
@@ -3212,30 +3229,17 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       assert(false);
     }
   }
-
   if (!lowering.isTrivial() && conformance &&
       !conformance.hasUnavailableConformance()) {
-    // A non-trivial type can have a conformance in a few cases:
-    // (1) containing or being a conforming archetype
-    // (2) is resilient with minimal expansion
-    // (3) containing or being ~Escapable
-    // (4) containing or being an opaque archetype
+    // A non-trivial type can have a conformance in the following cases:
+    // (1) containing or being ~Escapable
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
-          // A resilient type that's with minimal expansion may be non-trivial
-          // but still conform (case (2)).
-          auto *nominal = ty.getAnyNominal();
-          if (nominal && nominal->isResilient() &&
-              forExpansion.getResilienceExpansion() ==
-                  ResilienceExpansion::Minimal) {
-            return true;
-          }
-          // A type that may not be escapable is non-trivial but can conform
-          // (case (3)).
-          if (nominal &&
-              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
+          // A type that's ~Escapable is non-trivial but may still conform
+          // (case (1)).
+          if (!origType.isEscapable(substType)) {
             return true;
           }
           // Walk into every aggregate.
@@ -3248,28 +3252,9 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 
-          // A resilient type that's with minimal expansion may be non-trivial
-          // but still conform (case (2)).
-          auto *nominal = ty.getAnyNominal();
-          if (nominal && nominal->isResilient() &&
-              forExpansion.getResilienceExpansion() ==
-                  ResilienceExpansion::Minimal) {
-            return false;
-          }
-
-          // A type that may not be escapable is non-trivial but can conform
-          // (case (3)).
-          if (nominal &&
-              nominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
-            return false;
-          }
-
-          // An archetype may conform but be non-trivial (case (1)).
-          if (origTy.isTypeParameter())
-            return false;
-
-          // An opaque archetype may conform but be non-trivial (case (4)).
-          if (isa<OpaqueTypeArchetypeType>(ty)) {
+          // A type that's ~Escapable is non-trivial but may still conform
+          // (case (1)).
+          if (!origType.isEscapable(substType)) {
             return false;
           }
 

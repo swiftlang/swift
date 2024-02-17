@@ -138,14 +138,9 @@ extension GENC: Copyable where T: Copyable {}
 
 extension GENE: Escapable where T: Escapable {}
 
-// TODO: We should have 'isTrivial: true' for the following four tests: gsnc_argument, gsne_argument, genc_argument,
-// gene_argument. This requires fixing Typelowering visitAnyStructType and visitAnyEnumType to apply the current
-// abstraction pattern for each stored property that refers to an archetype. Similar how TypeLowering handles the
-// aggregate type by calling AbstractionPattern::conformsToKnownProtocol.
-//
 // CHECK-LABEL: begin running test 1 of 1 on gsnc_argument: print-type-lowering with: @argument[0]
 // CHECK: Type Lowering for lowered type: $*GSNC<T>.
-// CHECK: isTrivial: false.
+// CHECK: isTrivial: true.
 // CHECK-LABEL: end running test 1 of 1 on gsnc_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsnc_argument : $@convention(thin) <T: _BitwiseCopyable> (@in_guaranteed GSNC<T>) -> () {
 bb0(%0 : $*GSNC<T>):
@@ -155,7 +150,7 @@ bb0(%0 : $*GSNC<T>):
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on gsne_argument: print-type-lowering with: @argument[0]
-// CHECK: isTrivial: false.
+// CHECK: isTrivial: true.
 // CHECK-LABEL: end running test 1 of 1 on gsne_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsne_argument : $@convention(thin) <T: _BitwiseCopyable> (@in_guaranteed GSNE<T>) -> () {
 bb0(%0 : $*GSNE<T>):
@@ -165,7 +160,7 @@ bb0(%0 : $*GSNE<T>):
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on genc_argument: print-type-lowering with: @argument[0]
-// CHECK: isTrivial: false.
+// CHECK: isTrivial: true.
 // CHECK-LABEL: end running test 1 of 1 on genc_argument: print-type-lowering with: @argument[0]
 sil [ossa] @genc_argument : $@convention(thin) <T: _BitwiseCopyable> (@in_guaranteed GENC<T>) -> () {
 bb0(%0 : $*GENC<T>):
@@ -175,7 +170,7 @@ bb0(%0 : $*GENC<T>):
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on gene_argument: print-type-lowering with: @argument[0]
-// CHECK: isTrivial: false.
+// CHECK: isTrivial: true.
 // CHECK-LABEL: end running test 1 of 1 on gene_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gene_argument : $@convention(thin) <T: _BitwiseCopyable> (@in_guaranteed GENE<T>) -> () {
 bb0(%0 : $*GENE<T>):
@@ -188,11 +183,8 @@ struct Bitwise<T: _BitwiseCopyable>: _BitwiseCopyable {
   var x: T
 }
 
-// TODO: This should return 'isTrivial: true'. This is particularly inexcusable because the 'Bitwise' cannot be
-// nontrivial over any 'T', *and* the declaration itself is declared BitwiseCopyable.
-//
 // CHECK-LABEL: begin running test 1 of 1 on bitwise_argument: print-type-lowering with: @argument[0]
-// CHECK: isTrivial: false.
+// CHECK: isTrivial: true.
 // CHECK-LABEL: end running test 1 of 1 on bitwise_argument: print-type-lowering with: @argument[0]
 sil [ossa] @bitwise_argument : $@convention(thin) <T: _BitwiseCopyable> (@in_guaranteed Bitwise<T>) -> () {
 bb0(%0 : $*Bitwise<T>):

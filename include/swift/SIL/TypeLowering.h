@@ -237,9 +237,15 @@ public:
               IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
     }
 
-    static constexpr RecursiveProperties forOpaque() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical, HasNoPack};
+    static constexpr RecursiveProperties forOpaque(IsTrivial_t isTrivial) {
+      return {isTrivial,
+              IsNotFixedABI,
+              IsAddressOnly,
+              IsNotResilient,
+              IsNotTypeExpansionSensitive,
+              DoesNotHaveRawPointer,
+              IsLexical,
+              HasNoPack};
     }
 
     static constexpr RecursiveProperties forResilient() {
