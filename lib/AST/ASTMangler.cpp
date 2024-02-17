@@ -2414,8 +2414,20 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName,
     SmallVector<InverseRequirement, 2> inverseReqs;
     sig->getRequirementsWithInverses(reqs, inverseReqs);
 
+    bool hasUniqueRequirement = false;
+
+    // Note: We want to ask this on the filtered list of requirements not
+    // directly call 'requirementsNotSatisfiedBy' because it may come with
+    // positive inverse requirements
+    for (auto req : reqs) {
+      if (!nominalSig->isRequirementSatisfied(req)) {
+        hasUniqueRequirement = true;
+        break;
+      }
+    }
+
     if (!shouldMangleInverseGenerics) {
-      return mangleExtension(/* genericSignatureRequiredMangling */ !reqs.empty());
+      return mangleExtension(/* genericSignatureRequiredMangling */ hasUniqueRequirement);
     }
 
     // If the extension's generic signature == the extended type's generic
@@ -2436,7 +2448,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName,
     return mangleExtension(
       /* genericSignatureRequiredMangling */
       !sig->areAllRequirementsPositiveInverseRequirementsSatisfying(nominalSig) &&
-      !reqs.empty() &&
+      !hasUniqueRequirement &&
       inverseReqs.empty());
   }
 
@@ -2637,11 +2649,31 @@ void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
 }
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
-                                      bool shouldTreatAsConstrainedExtension) {
+                                      bool shouldMangleInverseGenerics) {
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
+  // If we're mangling an entity in a generic type context and it has inverse
+  // requirements, then append the generic type and follow it with the mangling
+  // of a constrained extension. We do this to preserve the invariant that
+  // anything defined in an extension with the same signature as the nominal
+  // will have the same mangling. In order to achieve this with inverse generics
+  // we must mangle entities within type's who have inverse generics to be
+  // different than those in type's without them.
+  //
+  // For example:
+  //
+  //     struct X<Y: ~Copyable> {
+  //       func foo() {} // In order for this to have the same mangling as the
+  //                        one in the extension, we need to treat it as if it
+  //                        were in the extension.
+  //     }
+  //
+  //     extension X where Y: ~Copyable {
+  //       func foo() {}
+  //     }
+  //
   SWIFT_DEFER {
-    if (shouldTreatAsConstrainedExtension) {
+    if (shouldMangleInverseGenerics) {
       auto sig = decl->getGenericSignature();
 
       if (!sig) {
@@ -3617,11 +3649,16 @@ void ASTMangler::appendDeclType(const ValueDecl *decl,
   } else {
     appendType(type, sig, decl);
   }
-  
+
   // Mangle the generic signature, if any.
-  if (genericSig && appendGenericSignature(genericSig, parentGenericSig)) {
+  if (genericSig) {
+    auto result = appendGenericSignature(genericSig, parentGenericSig,
+                           /* skipEquivalenceCheck */ false,
+                           /* shouldMangleInverseGenerics */
+                            !decl->getAttrs().hasAttribute<PreInverseGenericsAttr>());
+
     // The 'F' function mangling doesn't need a 'u' for its generic signature.
-    if (functionMangling == NoFunctionMangling)
+    if (result && functionMangling == NoFunctionMangling)
       appendOperator("u");
   }
 }

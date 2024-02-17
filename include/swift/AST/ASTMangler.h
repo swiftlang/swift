@@ -460,7 +460,7 @@ protected:
                           bool allowStandardSubstitution = true);
 
   void appendAnyGenericType(const GenericTypeDecl *decl,
-                            bool shouldTreatAsConstrainedExtension = false);
+                            bool shouldMangleInverseGenerics = false);
 
   enum FunctionManglingKind {
     NoFunctionMangling,
@@ -510,6 +510,16 @@ protected:
   ///
   /// \param contextSig The signature of the known context. This function
   /// will only mangle the difference between \c sig and \c contextSig.
+  ///
+  /// \param skipEquivalenceCheck Whether we should skip the sig == contextSig
+  /// check. Skipping this check means we will mangle the signature regardless
+  /// of if the surrounding context has the same signature. This should
+  /// generally always be false, but there are inverse generic mangling concerns
+  /// that need to force signature mangling.
+  ///
+  /// \param shouldMangleInverseGenerics Whether we should append inverse
+  /// generic requirements to the signature mangling. If @_preInverseGenerics is
+  /// present do not mangle them in addition to other requirements.
   ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
