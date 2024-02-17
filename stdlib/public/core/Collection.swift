@@ -1275,10 +1275,11 @@ extension Collection {
   public __consuming func dropLast(_ k: Int = 1) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
+    let start = startIndex
+    let limit = endIndex
     let amount = Swift.max(0, count - k)
-    let end = index(startIndex,
-      offsetBy: amount, limitedBy: endIndex) ?? endIndex
-    return self[startIndex..<end]
+    let end = index(start, offsetBy: amount, limitedBy: limit) ?? limit
+    return self[start..<end]
   }
     
   /// Returns a subsequence by skipping elements while `predicate` returns
