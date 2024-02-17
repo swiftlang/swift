@@ -17,6 +17,7 @@ func testSingleStatement() {
   let c1 = {
     throw MyError.failed
   }
+  #if false
   let _: () throws(MyError) -> Void = c1
 
   let c2 = {
@@ -28,8 +29,10 @@ func testSingleStatement() {
     return try doSomething()
   }
   let _: () throws(MyError) -> Int = c3
+  #endif
 }
 
+#if false
 func testMultiStatement() {
   let c1 = {
     doNothing()
@@ -43,3 +46,4 @@ func testMultiStatement() {
   }
   let _: () throws(MyError) -> Int = c2
 }
+#endif

@@ -13840,11 +13840,11 @@ ConstraintSystem::simplifyCaughtErrorConstraint(
     CatchNode catchNode,
     TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
-  Type caughtErrorType = inferCaughtErrorType(catchNode);
-  if (caughtErrorType->isEqual(type))
+  // Keep the constraint around until it simplifies beyond a type variable.
+  Type simplified = simplifyType(type);
+  if (simplified->is<TypeVariableType>())
     return SolutionKind::Unsolved;
 
-  addConstraint(ConstraintKind::Bind, type, caughtErrorType, locator);
   return SolutionKind::Solved;
 }
 

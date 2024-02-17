@@ -287,23 +287,6 @@ static bool isViableElement(ASTNode element,
 using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
                                /*isDiscarded=*/bool, ConstraintLocator *>;
 
-static TypeVariableType *assignClosureThrownErrorType(
-    ConstraintSystem &cs, ClosureExpr *closure) {
-  // FIXME: Remove this once the inference is working in general.
-  if (!cs.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows))
-    return nullptr;
-
-  auto closureType = cs.getClosureType(closure);
-  auto thrownType = closureType->getEffectiveThrownErrorTypeOrNever();
-  auto computedThrownType = cs.inferCaughtErrorType(closure);
-  cs.addConstraint(
-      ConstraintKind::Conversion, computedThrownType, thrownType, 
-      cs.getConstraintLocator(closure,
-                              ConstraintLocator::ClosureThrownError));
-
-  return computedThrownType->getAs<TypeVariableType>();
-}
-
 static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
                               ConstraintLocator *locator, bool isIsolated,
@@ -339,6 +322,17 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     // its individual elements are allowed access to type information
     // from the outside e.g. parameters/result type.
     isIsolated = true;
+  }
+
+  if (auto syntacticElement =
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
+    // If we are at a do..catch, and we're inferring a throw error type for
+    // the do..catch, we're now in a position to finalize the thrown type.
+    if (auto doCatch = dyn_cast_or_null<DoCatchStmt>(
+                         syntacticElement->getElement().dyn_cast<Stmt *>())) {
+      if (cs.getCaughtErrorType(doCatch)->is<TypeVariableType>())
+        isIsolated = true;
+    }
   }
 
   if (locator->isForSingleValueStmtConjunction()) {
@@ -384,19 +378,17 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
         cs, element, context, elementLoc, isDiscarded));
   }
 
-  for (auto *externalVar : paramCollector.getTypeVars())
-    referencedVars.push_back(externalVar);
-
-#if false
   // If the body of the closure is being used to infer the thrown error type
   // of that closure, introduce a constraint to do so.
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-    if (auto thrownErrorTypeVar = assignClosureThrownErrorType(cs, closure))
-      referencedVars.push_back(thrownErrorTypeVar);
+    if (auto thrownError = cs.getCaughtErrorType(closure))
+      paramCollector.inferTypeVars(thrownError);
   }
-#endif
-  
+
+  for (auto *externalVar : paramCollector.getTypeVars())
+    referencedVars.push_back(externalVar);
+
   // It's possible that there are no viable elements in the body,
   // because e.g. whole body is an `#if` statement or it only has
   // declarations that are checked during solution application.
@@ -1055,12 +1047,18 @@ private:
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
     SmallVector<ElementInfo, 4> elements;
 
+    auto myLocator = locator;
+    if (cs.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows)) {
+      myLocator = cs.getConstraintLocator(
+          locator, LocatorPathElt::SyntacticElement(doStmt));
+    }
+
     // First, let's record a body of `do` statement. Note we need to add a
     // SyntaticElement locator path element here to avoid treating the inner
     // brace conjunction as being isolated if 'doLoc' is for an isolated
     // conjunction (as is the case with 'do' expressions).
     auto *doBodyLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::SyntacticElement(doStmt->getBody()));
+        myLocator, LocatorPathElt::SyntacticElement(doStmt->getBody()));
     elements.push_back(makeElement(doStmt->getBody(), doBodyLoc));
 
     // After that has been type-checked, let's switch to
@@ -1068,7 +1066,7 @@ private:
     for (auto *catchStmt : doStmt->getCatches())
       elements.push_back(makeElement(catchStmt, locator));
 
-    createConjunction(elements, locator);
+    createConjunction(elements, myLocator);
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
@@ -1156,7 +1154,7 @@ private:
       }
 
       if (closure) {
-        assignClosureThrownErrorType(cs, closure);
+        cs.finalizeCaughtErrorType(closure);
       }
 
       return;

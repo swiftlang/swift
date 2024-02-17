@@ -865,8 +865,12 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
   if (!ty)
     return;
 
+  inferTypeVars(ty);
+}
+
+void TypeVarRefCollector::inferTypeVars(Type type) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-  ty->getTypeVariables(typeVars);
+  type->getTypeVariables(typeVars);
   TypeVars.insert(typeVars.begin(), typeVars.end());
 }
 
@@ -915,10 +919,12 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
     if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
         !Locator->directlyAt<ClosureExpr>()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
-      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
+      auto closureType = CS.getClosureType(CE);
+      closureType->getResult()->getTypeVariables(typeVars);
 
-      FIXME if we're doing full typed throws, also look at the thrown
-        error type here?
+      if (auto thrownErrorType = closureType->getThrownError())
+        thrownErrorType->getTypeVariables(typeVars);
+
       TypeVars.insert(typeVars.begin(), typeVars.end());
     }
   }

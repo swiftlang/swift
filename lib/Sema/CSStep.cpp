@@ -970,6 +970,18 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (HadFailure)
       return done(/*isSuccess=*/false);
 
+    auto locator = Conjunction->getLocator();
+    if (auto syntacticElement =
+          locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
+      // If we are at a do..catch, and we're inferring a throw error type for
+      // the do..catch, we're now in a position to finalize the thrown type.
+      if (auto doCatch = dyn_cast_or_null<DoCatchStmt>(
+                           syntacticElement->getElement().dyn_cast<Stmt *>())) {
+        if (CS.getCaughtErrorType(doCatch)->is<TypeVariableType>())
+          CS.finalizeCaughtErrorType(doCatch);
+      }
+    }
+
     // If this was an isolated conjunction solver needs to do
     // the following:
     //
@@ -1084,6 +1096,20 @@ void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
 void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
   CS.applySolution(solution);
 
+  // If we are at a closure, and the closure type has a type variable for
+  // its thrown error type, we're now in a position to finalize that type.
+  auto locator = Conjunction->getLocator();
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto closureTy =
+        CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
+    if (auto thrownError = closureTy->getEffectiveThrownErrorTypeOrNever()) {
+      if (thrownError->is<TypeVariableType>()) {
+        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+        CS.finalizeCaughtErrorType(closure);
+      }
+    }
+  }
+
   if (!CS.shouldAttemptFixes())
     return;
 
@@ -1096,7 +1122,6 @@ void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
   // has failed, let's bind all of unresolved type variables
   // in its interface type to holes to avoid extraneous
   // fixes produced by outer context.
-  auto locator = Conjunction->getLocator();
   if (locator->directlyAt<ClosureExpr>()) {
     auto closureTy =
         CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));

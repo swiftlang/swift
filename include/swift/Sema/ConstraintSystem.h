@@ -3434,17 +3434,13 @@ public:
       PotentialThrowSite::Kind kind, Type type,
       ConstraintLocatorBuilder locator);
 
-  /// Determine the caught error type for the given catch node.
+  /// Retrieve the caught error type for the given catch node, which could be
+  /// a type variable if the caught error type is going to be inferred.
   Type getCaughtErrorType(CatchNode node);
 
-  /// Infer the caught error type for this catch node, or introduce an
-  /// appropriate type variable to describe that caught error type if
-  /// it cannot be computed yet.
-  Type inferCaughtErrorType(CatchNode node);
-
-  /// Return the type variable that represents the inferred thrown error
-  /// type for this closure, or NULL if the thrown error type is not inferred.
-  TypeVariableType *getInferredThrownError(ClosureExpr *closure);
+  /// Finalize the caught error type type once all of the potential throw
+  /// sites are known.
+  void finalizeCaughtErrorType(CatchNode node);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
@@ -6473,6 +6469,9 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+
+  /// Infer the referenced type variables from a type.
+  void inferTypeVars(Type type);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
