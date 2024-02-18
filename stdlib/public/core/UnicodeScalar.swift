@@ -380,50 +380,86 @@ extension UInt64 {
   }
 }
 
+/// Extends `UInt8` to allow direct comparisons with double quoted literals.
+extension UInt8 {
+  /// Returns a Boolean indicating whether the `UInt8` is equal to the provided Unicode scalar.
+  ///
+  /// - Parameters:
+  ///   - i: The `UInt8` value to compare.
+  ///   - s: The Unicode scalar to compare against.
+  /// - Returns: `true` when the `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
+  @_transparent @_alwaysEmitIntoClient
+  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+
+  /// Returns a Boolean indicating whether the `UInt8` is not equal to the provided Unicode scalar.
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+
+  /// Enables pattern matching of Unicode scalars in switch statements.
+  @_transparent @_alwaysEmitIntoClient
+  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+}
+
+/// Extends `Optional<UInt8>` to allow direct comparisons with double quoted literals.
+extension UInt8? {
+  /// Returns a Boolean value indicating whether the optional `UInt8` is equal to the provided Unicode scalar.
+  ///
+  /// - Parameters:
+  ///   - i: The optional `UInt8` value to compare.
+  ///   - s: The Unicode scalar to compare against.
+  /// - Returns: `true` if the optional `UInt8` is equal to the provided Unicode scalar; otherwise, `false`.
+  @_transparent @_alwaysEmitIntoClient
+  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+
+  /// Returns a Boolean value indicating whether the optional `UInt8` is not equal to the provided Unicode scalar.
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+
+  /// Allows pattern matching of Unicode scalars in switch statements.
+  @_transparent @_alwaysEmitIntoClient
+  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+}
+
+/// Extends `Array` where Element is a FixedWidthInteger, providing initialization from a string of Unicode scalars.
+@_unavailableInEmbedded
+extension Array where Element: FixedWidthInteger {
+  /// Initializes an array of Integers with Unicode scalars represented by the provided string.
+  ///
+  /// - Parameter scalars: A string containing Unicode scalars.
+  @inlinable @_alwaysEmitIntoClient @_unavailableInEmbedded
+  public init(scalars: String) {
+    #if os(Linux) || os(iOS) || os(tvOS)
+    // How to avoid the function body being type checked for embedded?
+    self.init(scalars.unicodeScalars.map { Element(unicode: $0) })
+    #else
+    self.init(scalars.utf16.map { Element($0) })
+    #endif
+  }
+}
+
+/// Extends `FixedWidthInteger` providing initialization from a Unicode scalar.
 extension FixedWidthInteger {
-  /// Construct with value `v.value`.
+  /// Initializes a FixedWidthInteger with the value of the provided Unicode scalar.
+  ///
+  /// - Parameter unicode: The Unicode scalar to initialize from.
+  /// - Note: Construct with value `v.value`.
   @inlinable @_alwaysEmitIntoClient
   public init(unicode v: Unicode.Scalar) {
     _precondition(v.value <= Self.max,
-        "Code point value does not fit into type")
+                  "Code point value does not fit into type")
     self = Self(v.value)
-  }
-}
-
-/// Allows direct comparisons between UInt8 and double quoted literals.
-extension UInt8 {
-  /// Basic equality operator
-  @_transparent @_alwaysEmitIntoClient
-  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    return i == UInt8(ascii: s)
-  }
-  /// Basic inequality operator
-  @_transparent @_alwaysEmitIntoClient
-  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    return i != UInt8(ascii: s)
-  }
-  /// Used in switch statements
-  @_transparent @_alwaysEmitIntoClient
-  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    return i == UInt8(ascii: s)
-  }
-}
-
-extension UInt8? {
-  /// Optional equality operator
-  @_transparent @_alwaysEmitIntoClient
-  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
-    return i == UInt8(ascii: s)
-  }
-  /// Optional inequality operator
-  @_transparent @_alwaysEmitIntoClient
-  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
-    return i != UInt8(ascii: s)
-  }
-  /// Used in switch statements
-  @_transparent @_alwaysEmitIntoClient
-  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
-    return i == UInt8(ascii: s)
   }
 }
 
