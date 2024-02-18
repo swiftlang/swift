@@ -375,6 +375,10 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return diagnostics.checkFunctionResult(operand: operand)
   }
 
+  mutating func yieldedDependence(result: Operand) -> WalkResult {
+    return diagnostics.checkFunctionResult(operand: result)
+  }
+
   // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker
   // returns .abortWalk, and we want a more useful crash report.
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
