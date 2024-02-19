@@ -353,7 +353,7 @@ func test_indirect_regions(a : A, b : Bool) async {
     }
 
     if (b) {
-        await a.foo(ns5_0) // expected-tns-warning {{transferring non-Sendable value 'ns5_0' could yield races with later accesses}}
+        await a.foo(ns5_0) // expected-tns-warning {{transferring 'ns5_0' could cause a race}}
         // expected-tns-note @-1 {{'ns5_0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
         // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
@@ -363,7 +363,7 @@ func test_indirect_regions(a : A, b : Bool) async {
           print(ns5_1) // expected-tns-note {{access here could race}}
         }
     } else {
-        await a.foo(ns5_1) // expected-tns-warning {{transferring non-Sendable value 'ns5_1' could yield races with later accesses}}
+        await a.foo(ns5_1) // expected-tns-warning {{transferring 'ns5_1' could cause a race}}
         // expected-tns-note @-1 {{'ns5_1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
         // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
