@@ -637,3 +637,18 @@ struct TestKeyPathWithSomeType : DefineSomeType {
 
   }
 }
+
+// apple/swift#71423
+protocol CodingKey {}
+
+struct URICoderCodingKey : CodingKey {}
+
+struct CodingStackEntry {
+   var key: URICoderCodingKey
+}
+
+struct Test {
+  var codingStack: [CodingStackEntry]
+  var codingPath: [any CodingKey] { codingStack.map(\.key) }
+  // CHECK: keypath $KeyPath<CodingStackEntry, URICoderCodingKey>, (root $CodingStackEntry; stored_property #CodingStackEntry.key : $URICoderCodingKey)
+}
