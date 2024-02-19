@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %S/Inputs/overlay_extension_initializer.swift -Xcc -isystem -Xcc %S/Inputs/custom-modules -module-name ImageInitializers -o %t
-// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -I %t -typecheck -primary-file %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -I %t -typecheck -primary-file %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
