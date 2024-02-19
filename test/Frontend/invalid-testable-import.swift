@@ -4,4 +4,8 @@
 
 @testable import single_int // CHECK: module 'single_int' was not compiled for testing
 
-x = 8 // CHECK-NOT: cannot find 'x' in scope
+x = 8
+
+
+
+// CHECK-NOT: cannot find 'x' in scope

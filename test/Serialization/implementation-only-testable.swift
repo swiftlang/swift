@@ -51,6 +51,9 @@ internal func dependsOnHiddenType() -> HiddenType { fatalError() }
 /// Note that the import doesn't have to be testable, only the imported module
 /// needs to enable testing. We may want to improve upon this in the future.
 import TestedLib
+
+
+
 // CHECK-NOT-LOADED-NOT: remark: loaded module 'HiddenDep'
 
 //--- ClientTestableImport.swift

@@ -35,6 +35,11 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP-NOT %s
-// VISIBLE-DEP-NOT-NOT: loaded module 'SPIDependency'
 
 import Lib
+
+
+
+
+
+// VISIBLE-DEP-NOT-NOT: loaded module 'SPIDependency'
