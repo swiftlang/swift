@@ -950,31 +950,30 @@ public:
 
   struct UseDiagnosticInfo {
     UseDiagnosticInfoKind kind;
-    std::optional<ActorIsolation> transferredIsolation;
+    std::optional<ApplyIsolationCrossing> transferredIsolationCrossing = {};
 
     static UseDiagnosticInfo forMiscUse() {
-      return {UseDiagnosticInfoKind::MiscUse, {}};
+      return {UseDiagnosticInfoKind::MiscUse};
     }
 
     static UseDiagnosticInfo
-    forFunctionArgumentApply(ActorIsolation isolation) {
+    forFunctionArgumentApply(ApplyIsolationCrossing isolation) {
       return {UseDiagnosticInfoKind::FunctionArgumentApply, isolation};
     }
 
     static UseDiagnosticInfo
-    forFunctionArgumentClosure(ActorIsolation isolation) {
+    forFunctionArgumentClosure(ApplyIsolationCrossing isolation) {
       return {UseDiagnosticInfoKind::FunctionArgumentClosure, isolation};
     }
 
     static UseDiagnosticInfo forFunctionArgumentApplyStronglyTransferred() {
-      return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred,
-              {}};
+      return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred};
     }
 
   private:
     UseDiagnosticInfo(UseDiagnosticInfoKind kind,
-                      std::optional<ActorIsolation> isolation)
-        : kind(kind), transferredIsolation(isolation) {}
+                      std::optional<ApplyIsolationCrossing> isolation = {})
+        : kind(kind), transferredIsolationCrossing(isolation) {}
   };
 
 private:
@@ -1015,8 +1014,8 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
       loc = std::get<0>(p).getLoc();
-      diagnosticInfo = UseDiagnosticInfo::forFunctionArgumentClosure(
-          std::get<2>(p).getCalleeIsolation());
+      diagnosticInfo =
+          UseDiagnosticInfo::forFunctionArgumentClosure(std::get<2>(p));
       return true;
     }
   }
@@ -1034,11 +1033,11 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   auto loc = info.transferredOperand->getUser()->getLoc();
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
-    std::optional<ActorIsolation> isolation = {};
+    std::optional<ApplyIsolationCrossing> isolation = {};
 
     // First try to get the apply from the isolation crossing.
     if (auto value = sourceApply->getIsolationCrossing())
-      isolation = value->getCalleeIsolation();
+      isolation = value;
 
     // If we could not infer an isolation...
     if (!isolation) {
@@ -1105,7 +1104,8 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
     case UseDiagnosticInfoKind::FunctionArgumentApply: {
       diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
                     op->get()->getType().getASTType(),
-                    diagnosticInfo.transferredIsolation.value())
+                    diagnosticInfo.transferredIsolationCrossing.value()
+                        .getCalleeIsolation())
           .highlight(op->getUser()->getLoc().getSourceRange());
       // Only emit the note if our value is different from the function
       // argument.
@@ -1124,7 +1124,8 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
     case UseDiagnosticInfoKind::FunctionArgumentClosure: {
       diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
                     op->get()->getType().getASTType(),
-                    diagnosticInfo.transferredIsolation.value())
+                    diagnosticInfo.transferredIsolationCrossing.value()
+                        .getCalleeIsolation())
           .highlight(op->getUser()->getLoc().getSourceRange());
       // Only emit the note if our value is different from the function
       // argument.
