@@ -242,3 +242,24 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
     }
 }
 
+enum E<T>: ~Copyable {
+    case a(T)
+}
+
+extension E {
+    func f() {
+        switch self {
+        case .a:
+            print("a")
+        }
+    }
+
+    func g() {
+        switch self {
+        case .a(_borrowing t): // expected-warning{{}}
+            print("a")
+        }
+    }
+}
+
+E.a(1).f()
