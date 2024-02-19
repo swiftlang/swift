@@ -318,6 +318,47 @@ void RequireLiveness::process(Collection requireInstList) {
 }
 
 //===----------------------------------------------------------------------===//
+//            MARK: Forward Declaration Of TransferNonSendableImpl
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct TransferredNonTransferrableInfo {
+  /// The use that actually caused the transfer.
+  Operand *transferredOperand;
+
+  /// The non-transferrable value that is in the same region as \p
+  /// transferredOperand.get().
+  SILValue nonTransferrableValue;
+
+  TransferredNonTransferrableInfo(Operand *transferredOperand,
+                                  SILValue nonTransferrableValue)
+      : transferredOperand(transferredOperand),
+        nonTransferrableValue(nonTransferrableValue) {}
+};
+
+class TransferNonSendableImpl {
+  RegionAnalysisFunctionInfo *regionInfo;
+  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+      transferOpToRequireInstMultiMap;
+  SmallVector<TransferredNonTransferrableInfo, 8> transferredNonTransferrable;
+
+public:
+  TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
+      : regionInfo(regionInfo) {}
+
+  void emitDiagnostics();
+
+private:
+  void runDiagnosticEvaluator();
+
+  void emitUseAfterTransferDiagnostics();
+  void emitTransferredNonTransferrableDiagnostics();
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                MARK: UseAfterTransfer Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
@@ -752,25 +793,159 @@ void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
   autoClosureExpr->walk(walker);
 }
 
+// Top level entrypoint for use after transfer diagnostics.
+void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
+  auto *function = regionInfo->getFunction();
+  BasicBlockData<BlockLivenessInfo> blockLivenessInfo(function);
+  // We use a generation counter so we can lazily reset blockLivenessInfo
+  // since we cannot clear it without iterating over it.
+  unsigned blockLivenessInfoGeneration = 0;
+
+  if (transferOpToRequireInstMultiMap.empty())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs()
+             << "Visiting found transfer+[requireInsts] for diagnostics.\n");
+  auto &astContext = regionInfo->getFunction()->getASTContext();
+  for (auto [transferOp, requireInsts] :
+       transferOpToRequireInstMultiMap.getRange()) {
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Transfer Op. Number: " << transferOp->getOperandNumber()
+               << ". User: " << *transferOp->getUser());
+
+    UseAfterTransferDiagnosticInferrer diagnosticInferrer(
+        regionInfo->getValueMap());
+    diagnosticInferrer.init(transferOp);
+
+    // If we were supposed to emit an error and we failed to do so, emit a
+    // hard error so that the user knows to file a bug.
+    //
+    // DISCUSSION: We do this rather than asserting since users often times do
+    // not know what to do if the compiler crashes. This at least shows up in
+    // editor UIs providing a more actionable error message.
+    auto applyUses = diagnosticInferrer.getApplyUses();
+    if (applyUses.empty()) {
+      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
+      continue;
+    }
+
+    // Then look for our requires before we emit any error. We want to emit a
+    // single we don't understand error if we do not find the require.
+    bool didEmitRequireNote = false;
+    InstructionSet requireInstsUnique(function);
+    RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
+                             blockLivenessInfo);
+    ++blockLivenessInfoGeneration;
+    liveness.process(requireInsts);
+
+    SmallVector<SILInstruction *, 8> requireInstsForError;
+    for (auto *require : requireInsts) {
+      // We can have multiple of the same require insts if we had a require
+      // and an assign from the same instruction. Our liveness checking
+      // above doesn't care about that, but we still need to make sure we do
+      // not emit twice.
+      if (!requireInstsUnique.insert(require))
+        continue;
+
+      // If this was not a last require, do not emit an error.
+      if (!liveness.finalRequires.contains(require))
+        continue;
+
+      requireInstsForError.push_back(require);
+      didEmitRequireNote = true;
+    }
+
+    // If we did not emit a require, emit an "unknown pattern" error that
+    // tells the user to file a bug. This importantly ensures that we can
+    // guarantee that we always find the require if we successfully compile.
+    if (!didEmitRequireNote) {
+      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
+      continue;
+    }
+
+    using UseDiagnosticInfoKind =
+        UseAfterTransferDiagnosticInferrer::UseDiagnosticInfoKind;
+    for (auto &info : applyUses) {
+      switch (info.getKind()) {
+      case UseDiagnosticInfoKind::Invalid:
+        llvm_unreachable("Should never see this!");
+      case UseDiagnosticInfoKind::NamedIsolationCrossing: {
+        auto isolation = info.getIsolationCrossing();
+        // Emit the short error.
+        diagnoseError(astContext, info.getLoc(),
+                      diag::regionbasedisolation_named_transfer_yields_race,
+                      info.getIdentifier())
+            .highlight(info.getLoc().getSourceRange());
+        // Then emit the note with greater context.
+        diagnoseNote(astContext, info.getLoc(),
+                     diag::regionbasedisolation_named_info_transfer_yields_race,
+                     info.getIdentifier(), isolation.getCallerIsolation(),
+                     isolation.getCalleeIsolation());
+        // Then emit the note about where the variable is defined.
+        diagnoseNote(astContext, info.getIdentifiedLoc(),
+                     diag::variable_defined_here, false /*variable*/);
+        // Later emit notes about the require uses.
+        break;
+      }
+      case UseDiagnosticInfoKind::TypedIsolationCrossing: {
+        auto isolation = info.getIsolationCrossing();
+        diagnoseError(
+            astContext, info.getLoc(),
+            diag::regionbasedisolation_transfer_yields_race_with_isolation,
+            info.getInferredType(), isolation.getCallerIsolation(),
+            isolation.getCalleeIsolation())
+            .highlight(info.getLoc().getSourceRange());
+        break;
+      }
+      case UseDiagnosticInfoKind::TypedRaceWithoutKnownIsolationCrossing:
+        diagnoseError(
+            astContext, info.getLoc(),
+            diag::regionbasedisolation_transfer_yields_race_no_isolation,
+            info.getInferredType())
+            .highlight(info.getLoc().getSourceRange());
+        break;
+      case UseDiagnosticInfoKind::UseOfStronglyTransferredValue:
+        diagnoseError(
+            astContext, info.getLoc(),
+            diag::
+                regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
+            info.getInferredType())
+            .highlight(info.getLoc().getSourceRange());
+        break;
+      case UseDiagnosticInfoKind::AssignmentIntoTransferringParameter:
+        diagnoseError(
+            astContext, info.getLoc(),
+            diag::
+                regionbasedisolation_transfer_yields_race_transferring_parameter,
+            info.getInferredType())
+            .highlight(info.getLoc().getSourceRange());
+        break;
+      case UseDiagnosticInfoKind::TypedIsolationCrossingDueToCapture:
+        auto isolation = info.getIsolationCrossing();
+        diagnoseError(astContext, info.getLoc(),
+                      diag::regionbasedisolation_isolated_capture_yields_race,
+                      info.getInferredType(), isolation.getCalleeIsolation(),
+                      isolation.getCallerIsolation())
+            .highlight(info.getLoc().getSourceRange());
+        break;
+      }
+    }
+
+    // Now actually emit the require notes.
+    while (!requireInstsForError.empty()) {
+      auto *require = requireInstsForError.pop_back_val();
+      diagnoseNote(require, diag::regionbasedisolation_maybe_race)
+          .highlight(require->getLoc().getSourceRange());
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //            MARK: Transfer NonTransferrable Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-struct TransferredNonTransferrableInfo {
-  /// The use that actually caused the transfer.
-  Operand *transferredOperand;
-
-  /// The non-transferrable value that is in the same region as \p
-  /// transferredOperand.get().
-  SILValue nonTransferrableValue;
-
-  TransferredNonTransferrableInfo(Operand *transferredOperand,
-                                  SILValue nonTransferrableValue)
-      : transferredOperand(transferredOperand),
-        nonTransferrableValue(nonTransferrableValue) {}
-};
 
 class TransferNonTransferrableDiagnosticInferrer {
 public:
@@ -919,8 +1094,85 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   return true;
 }
 
+// Top level emission for transfer non transferable diagnostic.
+void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
+  if (transferredNonTransferrable.empty())
+    return;
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
+
+  using UseDiagnosticInfoKind =
+      TransferNonTransferrableDiagnosticInferrer::UseDiagnosticInfoKind;
+
+  auto &astContext = regionInfo->getFunction()->getASTContext();
+  for (auto info : transferredNonTransferrable) {
+    auto *op = info.transferredOperand;
+    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info);
+    if (!diagnosticInferrer.run())
+      continue;
+
+    auto diagnosticInfo = diagnosticInferrer.getDiagnostic();
+    auto loc = diagnosticInferrer.getLoc();
+    switch (diagnosticInfo.kind) {
+    case UseDiagnosticInfoKind::Invalid:
+      llvm_unreachable("Should never see this");
+    case UseDiagnosticInfoKind::MiscUse:
+      diagnoseError(astContext, loc,
+                    diag::regionbasedisolation_selforargtransferred);
+      break;
+    case UseDiagnosticInfoKind::FunctionArgumentApply: {
+      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
+                    op->get()->getType().getASTType(),
+                    diagnosticInfo.transferredIsolation.value())
+          .highlight(op->getUser()->getLoc().getSourceRange());
+      // Only emit the note if our value is different from the function
+      // argument.
+      auto rep = regionInfo->getValueMap()
+                     .getTrackableValue(op->get())
+                     .getRepresentative();
+      if (rep.maybeGetValue() == info.nonTransferrableValue)
+        continue;
+      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
+      diagnoseNote(
+          astContext, fArg->getDecl()->getLoc(),
+          diag::regionbasedisolation_isolated_since_in_same_region_basename,
+          "task isolated", fArg->getDecl()->getBaseName());
+      break;
+    }
+    case UseDiagnosticInfoKind::FunctionArgumentClosure: {
+      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
+                    op->get()->getType().getASTType(),
+                    diagnosticInfo.transferredIsolation.value())
+          .highlight(op->getUser()->getLoc().getSourceRange());
+      // Only emit the note if our value is different from the function
+      // argument.
+      auto rep = regionInfo->getValueMap()
+                     .getTrackableValue(op->get())
+                     .getRepresentative();
+      if (rep.maybeGetValue() == info.nonTransferrableValue)
+        continue;
+      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
+      diagnoseNote(
+          astContext, fArg->getDecl()->getLoc(),
+          diag::regionbasedisolation_isolated_since_in_same_region_basename,
+          "task isolated", fArg->getDecl()->getBaseName());
+      break;
+    }
+    case UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred: {
+      diagnoseError(
+          astContext, loc,
+          diag::regionbasedisolation_arg_passed_to_strongly_transferred_param,
+          op->get()->getType().getASTType())
+          .highlight(op->getUser()->getLoc().getSourceRange());
+      break;
+    }
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
-//                         MARK: Diagnostic Emission
+//                         MARK: Diagnostic Evaluator
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -1012,29 +1264,6 @@ struct DiagnosticEvaluator final
 
 } // namespace
 
-namespace {
-
-class TransferNonSendableImpl {
-  RegionAnalysisFunctionInfo *regionInfo;
-  SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
-      transferOpToRequireInstMultiMap;
-  SmallVector<TransferredNonTransferrableInfo, 8> transferredNonTransferrable;
-
-public:
-  TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
-      : regionInfo(regionInfo) {}
-
-  void run();
-
-private:
-  void runDiagnosticEvaluator();
-
-  void emitUseAfterTransferDiagnostics();
-  void emitTransferredNonTransferrableDiagnostics();
-};
-
-} // namespace
-
 void TransferNonSendableImpl::runDiagnosticEvaluator() {
   // Then for each block...
   LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
@@ -1065,233 +1294,14 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
   transferOpToRequireInstMultiMap.setFrozen();
 }
 
-void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
-  auto *function = regionInfo->getFunction();
-  BasicBlockData<BlockLivenessInfo> blockLivenessInfo(function);
-  // We use a generation counter so we can lazily reset blockLivenessInfo
-  // since we cannot clear it without iterating over it.
-  unsigned blockLivenessInfoGeneration = 0;
-
-  if (transferOpToRequireInstMultiMap.empty())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs()
-             << "Visiting found transfer+[requireInsts] for diagnostics.\n");
-  auto &astContext = regionInfo->getFunction()->getASTContext();
-  for (auto [transferOp, requireInsts] :
-       transferOpToRequireInstMultiMap.getRange()) {
-
-    LLVM_DEBUG(llvm::dbgs()
-               << "Transfer Op. Number: " << transferOp->getOperandNumber()
-               << ". User: " << *transferOp->getUser());
-
-    UseAfterTransferDiagnosticInferrer diagnosticInferrer(
-        regionInfo->getValueMap());
-    diagnosticInferrer.init(transferOp);
-
-    // If we were supposed to emit an error and we failed to do so, emit a
-    // hard error so that the user knows to file a bug.
-    //
-    // DISCUSSION: We do this rather than asserting since users often times do
-    // not know what to do if the compiler crashes. This at least shows up in
-    // editor UIs providing a more actionable error message.
-    auto applyUses = diagnosticInferrer.getApplyUses();
-    if (applyUses.empty()) {
-      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
-      continue;
-    }
-
-    // Then look for our requires before we emit any error. We want to emit a
-    // single we don't understand error if we do not find the require.
-    bool didEmitRequireNote = false;
-    InstructionSet requireInstsUnique(function);
-    RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
-                             blockLivenessInfo);
-    ++blockLivenessInfoGeneration;
-    liveness.process(requireInsts);
-
-    SmallVector<SILInstruction *, 8> requireInstsForError;
-    for (auto *require : requireInsts) {
-      // We can have multiple of the same require insts if we had a require
-      // and an assign from the same instruction. Our liveness checking
-      // above doesn't care about that, but we still need to make sure we do
-      // not emit twice.
-      if (!requireInstsUnique.insert(require))
-        continue;
-
-      // If this was not a last require, do not emit an error.
-      if (!liveness.finalRequires.contains(require))
-        continue;
-
-      requireInstsForError.push_back(require);
-      didEmitRequireNote = true;
-    }
-
-    // If we did not emit a require, emit an "unknown pattern" error that
-    // tells the user to file a bug. This importantly ensures that we can
-    // guarantee that we always find the require if we successfully compile.
-    if (!didEmitRequireNote) {
-      diagnoseError(transferOp, diag::regionbasedisolation_unknown_pattern);
-      continue;
-    }
-
-    using UseDiagnosticInfoKind =
-        UseAfterTransferDiagnosticInferrer::UseDiagnosticInfoKind;
-    for (auto &info : applyUses) {
-      switch (info.getKind()) {
-      case UseDiagnosticInfoKind::Invalid:
-        llvm_unreachable("Should never see this!");
-      case UseDiagnosticInfoKind::NamedIsolationCrossing: {
-        auto isolation = info.getIsolationCrossing();
-        // Emit the short error.
-        diagnoseError(astContext, info.getLoc(),
-                      diag::regionbasedisolation_named_transfer_yields_race,
-                      info.getIdentifier())
-            .highlight(info.getLoc().getSourceRange());
-        // Then emit the note with greater context.
-        diagnoseNote(astContext, info.getLoc(),
-                     diag::regionbasedisolation_named_info_transfer_yields_race,
-                     info.getIdentifier(), isolation.getCallerIsolation(),
-                     isolation.getCalleeIsolation());
-        // Then emit the note about where the variable is defined.
-        diagnoseNote(astContext, info.getIdentifiedLoc(),
-                     diag::variable_defined_here, false /*variable*/);
-        // Later emit notes about the require uses.
-        break;
-      }
-      case UseDiagnosticInfoKind::TypedIsolationCrossing: {
-        auto isolation = info.getIsolationCrossing();
-        diagnoseError(
-            astContext, info.getLoc(),
-            diag::regionbasedisolation_transfer_yields_race_with_isolation,
-            info.getInferredType(), isolation.getCallerIsolation(),
-            isolation.getCalleeIsolation())
-            .highlight(info.getLoc().getSourceRange());
-        break;
-      }
-      case UseDiagnosticInfoKind::TypedRaceWithoutKnownIsolationCrossing:
-        diagnoseError(
-            astContext, info.getLoc(),
-            diag::regionbasedisolation_transfer_yields_race_no_isolation,
-            info.getInferredType())
-            .highlight(info.getLoc().getSourceRange());
-        break;
-      case UseDiagnosticInfoKind::UseOfStronglyTransferredValue:
-        diagnoseError(
-            astContext, info.getLoc(),
-            diag::
-                regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
-            info.getInferredType())
-            .highlight(info.getLoc().getSourceRange());
-        break;
-      case UseDiagnosticInfoKind::AssignmentIntoTransferringParameter:
-        diagnoseError(
-            astContext, info.getLoc(),
-            diag::
-                regionbasedisolation_transfer_yields_race_transferring_parameter,
-            info.getInferredType())
-            .highlight(info.getLoc().getSourceRange());
-        break;
-      case UseDiagnosticInfoKind::TypedIsolationCrossingDueToCapture:
-        auto isolation = info.getIsolationCrossing();
-        diagnoseError(astContext, info.getLoc(),
-                      diag::regionbasedisolation_isolated_capture_yields_race,
-                      info.getInferredType(), isolation.getCalleeIsolation(),
-                      isolation.getCallerIsolation())
-            .highlight(info.getLoc().getSourceRange());
-        break;
-      }
-    }
-
-    // Now actually emit the require notes.
-    while (!requireInstsForError.empty()) {
-      auto *require = requireInstsForError.pop_back_val();
-      diagnoseNote(require, diag::regionbasedisolation_maybe_race)
-          .highlight(require->getLoc().getSourceRange());
-    }
-  }
-}
-
-void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
-  if (transferredNonTransferrable.empty())
-    return;
-
-  LLVM_DEBUG(
-      llvm::dbgs() << "Emitting transfer non transferrable diagnostics.\n");
-
-  using UseDiagnosticInfoKind =
-      TransferNonTransferrableDiagnosticInferrer::UseDiagnosticInfoKind;
-
-  auto &astContext = regionInfo->getFunction()->getASTContext();
-  for (auto info : transferredNonTransferrable) {
-    auto *op = info.transferredOperand;
-    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info);
-    if (!diagnosticInferrer.run())
-      continue;
-
-    auto diagnosticInfo = diagnosticInferrer.getDiagnostic();
-    auto loc = diagnosticInferrer.getLoc();
-    switch (diagnosticInfo.kind) {
-    case UseDiagnosticInfoKind::Invalid:
-      llvm_unreachable("Should never see this");
-    case UseDiagnosticInfoKind::MiscUse:
-      diagnoseError(astContext, loc,
-                    diag::regionbasedisolation_selforargtransferred);
-      break;
-    case UseDiagnosticInfoKind::FunctionArgumentApply: {
-      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
-                    op->get()->getType().getASTType(),
-                    diagnosticInfo.transferredIsolation.value())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      // Only emit the note if our value is different from the function
-      // argument.
-      auto rep = regionInfo->getValueMap()
-                     .getTrackableValue(op->get())
-                     .getRepresentative();
-      if (rep.maybeGetValue() == info.nonTransferrableValue)
-        continue;
-      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
-      diagnoseNote(
-          astContext, fArg->getDecl()->getLoc(),
-          diag::regionbasedisolation_isolated_since_in_same_region_basename,
-          "task isolated", fArg->getDecl()->getBaseName());
-      break;
-    }
-    case UseDiagnosticInfoKind::FunctionArgumentClosure: {
-      diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
-                    op->get()->getType().getASTType(),
-                    diagnosticInfo.transferredIsolation.value())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      // Only emit the note if our value is different from the function
-      // argument.
-      auto rep = regionInfo->getValueMap()
-                     .getTrackableValue(op->get())
-                     .getRepresentative();
-      if (rep.maybeGetValue() == info.nonTransferrableValue)
-        continue;
-      auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
-      diagnoseNote(
-          astContext, fArg->getDecl()->getLoc(),
-          diag::regionbasedisolation_isolated_since_in_same_region_basename,
-          "task isolated", fArg->getDecl()->getBaseName());
-      break;
-    }
-    case UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred: {
-      diagnoseError(
-          astContext, loc,
-          diag::regionbasedisolation_arg_passed_to_strongly_transferred_param,
-          op->get()->getType().getASTType())
-          .highlight(op->getUser()->getLoc().getSourceRange());
-      break;
-    }
-    }
-  }
-}
+//===----------------------------------------------------------------------===//
+//                         MARK: Top Level Entrypoint
+//===----------------------------------------------------------------------===//
 
 /// Once we have reached a fixpoint, this routine runs over all blocks again
 /// reporting any failures by applying our ops to the converged dataflow
 /// state.
-void TransferNonSendableImpl::run() {
+void TransferNonSendableImpl::emitDiagnostics() {
   auto *function = regionInfo->getFunction();
   LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
                           << function->getName() << "\n");
@@ -1300,10 +1310,6 @@ void TransferNonSendableImpl::run() {
   emitTransferredNonTransferrableDiagnostics();
   emitUseAfterTransferDiagnostics();
 }
-
-//===----------------------------------------------------------------------===//
-//                         MARK: Top Level Entrypoint
-//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -1323,7 +1329,7 @@ class TransferNonSendable : public SILFunctionTransform {
                << "===> PROCESSING: " << function->getName() << '\n');
 
     TransferNonSendableImpl impl(functionInfo);
-    impl.run();
+    impl.emitDiagnostics();
   }
 };
 
