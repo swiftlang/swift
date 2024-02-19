@@ -104,17 +104,10 @@ extension ProtocolDeclSyntax {
   }
 
   fileprivate func distributedRequirementStubs(access: String) -> String {
-    let accessControlString: String =
-      if access.isEmpty {
-        ""
-      } else {
-        "\(access) "
-      }
-
     return protocolRequirements
       .map { req in
         """
-        \(accessControlString)\(req) {
+        \(access)\(req) {
             if #available(SwiftStdlib 5.11, *) {
               Distributed._distributedStubFatalError()
             } else {
@@ -135,7 +128,11 @@ extension ProtocolDeclSyntax {
              .keyword(.internal),
              .keyword(.fileprivate),
              .keyword(.private):
-          return "\(token.tokenKind.defaultText ?? "")"
+          if let text = token.tokenKind.defaultText {
+            return "\(text) "
+          } else {
+            return ""
+          }
         default: continue
         }
       }

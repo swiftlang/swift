@@ -44,6 +44,37 @@ protocol G0<ActorSystem>: DistributedActor where ActorSystem: DistributedActorSy
 // CHECK:   }
 // CHECK: }
 
+@_DistributedProtocol
+public protocol G1<ActorSystem>: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
+  distributed func get() -> String
+}
+
+// @_DistributedProtocol ->
+
+// CHECK: public distributed actor $G1<ActorSystem>: G1,
+// CHECK:   Distributed._DistributedActorStub
+// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>,
+// CHECK:         ActorSystem.ActorID: Codable
+// CHECK: {
+// CHECK:   public distributed func get() -> String {
+// CHECK:     if #available (SwiftStdlib 5.11, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError("distributed method stud: \(#function)")
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
+
+// CHECK: extension G1 where Self: Distributed._DistributedActorStub {
+// CHECK:   public distributed func get() -> String {
+// CHECK:     if #available (SwiftStdlib 5.11, *) {
+// CHECK:       Distributed._distributedStubFatalError()
+// CHECK:     } else {
+// CHECK:       fatalError("distributed method stud: \(#function)")
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
+
 
 @_DistributedProtocol
 protocol Base<ActorSystem>: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
