@@ -7089,12 +7089,15 @@ void SILVTable::verify(const SILModule &M) const {
 
     if (M.getStage() != SILStage::Lowered &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
-              baseInfo.getSILType().castTo<SILFunctionType>(),
               entry.getImplementation()->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.getImplementation());
     }

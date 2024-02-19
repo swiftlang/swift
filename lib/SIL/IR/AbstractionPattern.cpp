@@ -1355,6 +1355,56 @@ CanType AbstractionPattern::getObjCMethodAsyncCompletionHandlerForeignType(
   return foreignCHTy;
 }
 
+unsigned AbstractionPattern::getLoweredParamIndex(unsigned formalIndex) const {
+  switch (getKind()) {
+  // In the most general abstraction pattern, tuple parameters are
+  // not expanded, so the lowered parameter index matches the formal
+  // index.
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return formalIndex;
+
+  case Kind::Type: {
+    // Total the flattened value count of the parameters prior to the
+    // given formal index.
+    unsigned loweredIndex = 0;
+    for (auto i : range(formalIndex)) {
+      loweredIndex += getFunctionParamType(i).getFlattenedValueCount();
+    }
+    return loweredIndex;
+  }
+
+  default:
+    // FIXME: to implement this, we'd need to adjust for the implicit
+    // rearrangement and hidden arguments that we can get from import.
+    // It's definitely doable, but it's currently unnecessary given the
+    // limited situations in which we use this method.  I'm very sorry
+    // if you hit this time bomb.
+    llvm_unreachable("not yet implemented");
+  }
+}
+
+unsigned AbstractionPattern::getFlattenedValueCount() const {
+  // The count is always 1 unless the original type is a tuple.
+  if (!isTuple())
+    return 1;
+
+  // Add up the elements.
+  unsigned count = 0;
+  for (auto elt : getTupleElementTypes()) {
+    // Expansion components turn into a single pack parameter.
+    if (elt.isPackExpansion()) {
+      count++;
+
+    // Recursively expand scalar components.
+    } else {
+      count += elt.getFlattenedValueCount();
+    }
+  }
+  return count;
+}
+
 AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {

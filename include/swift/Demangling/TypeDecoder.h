@@ -866,6 +866,7 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
+        ++firstChildIdx;
       }
 
       FunctionMetadataDifferentiabilityKind diffKind;
