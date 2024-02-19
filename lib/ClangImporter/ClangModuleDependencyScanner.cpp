@@ -491,8 +491,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // ... and all module dependencies.
   llvm::StringSet<> alreadyAddedModules;
-  for (const auto &moduleDep : clangModuleDependencies->ModuleGraph)
-    targetModule.addBridgingModuleDependency(moduleDep.ID.ModuleName,
+  for (const auto &moduleDep : clangModuleDependencies->ClangModuleDeps)
+    targetModule.addBridgingModuleDependency(moduleDep.ModuleName,
                                              alreadyAddedModules);
 
   if (auto TreeID = clangModuleDependencies->IncludeTreeID)
