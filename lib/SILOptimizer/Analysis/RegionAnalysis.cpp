@@ -20,6 +20,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"

@@ -12,9 +12,10 @@
 
 #define DEBUG_TYPE "bit-dataflow"
 #include "swift/SIL/BitDataflow.h"
+#include "swift/Basic/SmallBitVector.h"
+#include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/MemoryLocations.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
