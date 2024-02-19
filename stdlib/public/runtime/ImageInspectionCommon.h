@@ -52,7 +52,7 @@
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 3;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 4;
 }
 
 struct SectionInfo {
