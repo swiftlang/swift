@@ -158,9 +158,10 @@ func callNestedExpansionMember() {
   NestedMacroExpansion.member()
 }
 
-@attached(peer, names: arbitrary) // introduces `__GenerateStubsForProtocolRequirements
+@attached(peer, names: prefixed(`__`)) // introduces `__GenerateStubsForProtocolRequirements
 @attached(extension, names: arbitrary) // introduces `extension GenerateStubsForProtocolRequirements`
 macro GenerateStubsForProtocolRequirements() = #externalMacro(module: "MacroDefinition", type: "GenerateStubsForProtocolRequirementsMacro")
+
 protocol _TestStub {} // used by 'GenerateStubsForProtocolRequirements'
 
 @GenerateStubsForProtocolRequirements
