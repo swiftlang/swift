@@ -56,14 +56,6 @@ extension ForwardingInstruction {
   public var preservesReferenceCounts: Bool {
     bridged.ForwardingInst_preservesOwnership()
   }
-
-  // Most forwarding instructions can forward owned and guaranteed values.
-  // Therefore define a default implementation of `true`.
-  public var canForwardGuaranteedValues: Bool { true }
-
-  // Most forwarding instructions can forward owned and guaranteed values.
-  // Therefore define a default implementation of `true`.
-  public var canForwardOwnedValues: Bool { true }
 }
 
 // An instruction that forwards a single value to a single result.
@@ -110,52 +102,6 @@ extension ForwardingInstruction {
 
 extension ConversionInstruction {
   public var singleForwardedOperand: Operand? { operand }
-}
-
-extension EnumInst {
-  public var singleForwardedOperand: Operand? {
-    return operand // nil for an enum with no payload
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Instructions with multiple forwarded operands have nil singleForwardedOperand.
-
-extension StructInst {
-  public var singleForwardedOperand: Operand? { nil }
-}
-
-extension TupleInst {
-  public var singleForwardedOperand: Operand? { nil }
-}
-
-extension LinearFunctionInst {
-  public var singleForwardedOperand: Operand? { nil }
-}
-
-extension DifferentiableFunctionInst {
-  public var singleForwardedOperand: Operand? { nil }
-}
-
-// -----------------------------------------------------------------------------
-// Instructions with a singleForwardedOperand and additional operands.
-
-extension MarkDependenceInst {
-  public var singleForwardedOperand: Operand? {
-    return valueOperand
-  }
-}
-
-extension RefToBridgeObjectInst {
-  public var singleForwardedOperand: Operand? {
-    return convertedOperand
-  }
-}
-
-extension TuplePackExtractInst {
-  public var singleForwardedOperand: Operand? {
-    return tupleOperand
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -214,75 +160,243 @@ public struct ForwardedResults : Collection {
 }
 
 //===----------------------------------------------------------------------===//
-//                     preservesRepresentation
+//                         conforming instructions
 //===----------------------------------------------------------------------===//
 
-extension ForwardingInstruction {
-  // Conservatively assume that a conversion changes representation.
-  // Operations can be added as needed to participate in SIL opaque values.
-  // See ForwardingOperation::hasSameRepresentation().
-  public var preservesRepresentation: Bool { false }
+// -----------------------------------------------------------------------------
+// Instructions with multiple forwarded operands have nil singleForwardedOperand.
+
+extension StructInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { nil }
+
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension ConvertFunctionInst {
+extension TupleInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { nil }
+
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension DestructureTupleInst {
+extension LinearFunctionInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { nil }
+
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension DestructureStructInst {
+extension DifferentiableFunctionInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { nil }
+
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension InitExistentialRefInst {
+// -----------------------------------------------------------------------------
+// Instructions with a singleForwardedOperand and additional operands.
+
+extension MarkDependenceInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? {
+    return valueOperand
+  }
+
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension ObjectInst {
+extension RefToBridgeObjectInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? {
+    return convertedOperand
+  }
+
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
 
-extension OpenExistentialBoxValueInst {
-  public var preservesRepresentation: Bool { true }
-}
+extension TuplePackExtractInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? { return tupleOperand }
 
-extension OpenExistentialRefInst {
   public var preservesRepresentation: Bool { true }
-}
-
-extension OpenExistentialValueInst {
-  public var preservesRepresentation: Bool { true }
-}
-
-extension MarkUnresolvedNonCopyableValueInst {
-  public var preservesRepresentation: Bool { true }
-}
-
-extension MarkUninitializedInst {
-  public var preservesRepresentation: Bool { true }
-}
-
-extension StructExtractInst {
-  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
 }
 
-extension TupleExtractInst {
+// -----------------------------------------------------------------------------
+// conversion instructions
+
+extension MarkUnresolvedNonCopyableValueInst : ConversionInstruction {
   public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension MarkUninitializedInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { false }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension ConvertFunctionInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension ThinToThickFunctionInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension CopyableToMoveOnlyWrapperValueInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension MoveOnlyWrapperToCopyableValueInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension UpcastInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension UncheckedRefCastInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension UnconditionalCheckedCastInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension BridgeObjectToRefInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension UncheckedValueCastInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+// -----------------------------------------------------------------------------
+// other forwarding instructions
+
+extension EnumInst : ForwardingInstruction {
+  public var singleForwardedOperand: Operand? {
+    return operand // nil for an enum with no payload
+  }
+
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension DestructureTupleInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension DestructureStructInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension InitExistentialRefInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension OpenExistentialRefInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension OpenExistentialValueInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension OpenExistentialBoxValueInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension StructExtractInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
 }
 
-extension CopyableToMoveOnlyWrapperValueInst {
+extension TupleExtractInst : ForwardingInstruction {
   public var preservesRepresentation: Bool { true }
-}
-
-extension MoveOnlyWrapperToCopyableValueInst {
-  public var preservesRepresentation: Bool { true }
-}
-
-extension TuplePackExtractInst {
-  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
+}
+
+extension DifferentiableFunctionExtractInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
+}
+
+extension CheckedCastBranchInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension UncheckedEnumDataInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension SwitchEnumInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension MarkUnresolvedReferenceBindingInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension MoveOnlyWrapperToCopyableBoxInst : ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension LinearFunctionExtractInst: ForwardingInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
 }
