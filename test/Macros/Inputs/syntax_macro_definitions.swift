@@ -2199,7 +2199,55 @@ public struct SingleMemberStubMacro: DeclarationMacro {
   }
 }
 
-public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
+public struct GenerateStubsForProtocolRequirementsMacro: PeerMacro, ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
+      return []
+    }
+
+    let requirements =
+      proto.memberBlock.members.map { member in member.trimmed }
+    let requirementStubs = requirements
+      .map { req in
+        "\(req) { fatalError() }"
+      }
+      .joined(separator: "\n    ")
+
+    let extensionDecl: DeclSyntax =
+      """
+      extension \(proto.name) where Self: _TestStub {
+        \(raw: requirementStubs)
+      }
+      """
+    return [extensionDecl.cast(ExtensionDeclSyntax.self)]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
+      return []
+    }
+
+    return [
+      """
+      struct __\(proto.name): \(proto.name), _TestStub {
+        init() {} 
+      }
+      """
+    ]
+  }
+}
+
+  public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext

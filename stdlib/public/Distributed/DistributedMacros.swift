@@ -17,6 +17,7 @@ import _Concurrency
 
 #if $Macros
 
+// FIXME: the fact tha this is peer and extension makes the extension's methods not found as witnesses
 @attached(peer, names: prefixed(`$`)) // provides $Greeter concrete stub type
 @attached(extension, names: arbitrary) // provides extension for Greeter & _DistributedActorStub
 public macro _DistributedProtocol() =
