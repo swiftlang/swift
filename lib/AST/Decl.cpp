@@ -6676,6 +6676,16 @@ bool NominalTypeDecl::hasMarking(InvertibleProtocolKind target) const {
 }
 
 InverseMarking::Mark
+AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  auto &ctx = getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::Mark();
+
+  return findInverseInInheritance(getInherited(), target);
+}
+
+InverseMarking::Mark
 NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   switch (target) {
   case InvertibleProtocolKind::Copyable:
@@ -6719,12 +6729,6 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   auto *gpList = getParsedGenericParams();
   if (!gpList)
     return InverseMarking::Mark();
-
-  auto isInverseTarget = [&](Type t) -> bool {
-    if (auto pct = t->getAs<ProtocolCompositionType>())
-      return pct->getInverses().contains(target);
-    return false;
-  };
 
   llvm::SmallSet<GenericTypeParamDecl *, 4> params;
 

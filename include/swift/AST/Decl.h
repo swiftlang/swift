@@ -3933,6 +3933,10 @@ public:
         TypeDecl::getOverriddenDecl());
   }
 
+  /// Determine whether this type has ~<target>` stated as
+  /// one of its inherited types.
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
+
   /// Retrieve the set of associated types overridden by this associated
   /// type.
   llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
