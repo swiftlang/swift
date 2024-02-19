@@ -738,7 +738,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer {
+extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
   ///
@@ -787,7 +787,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
   @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
   @usableFromInline
