@@ -193,10 +193,9 @@ extension Cond: Copyable where T: Copyable {}
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
 struct ImplicitCond<T: ~Escapable & ~Copyable> {}
 
-// FIXME: At the moment, Sendable in the stdlib requires Escapable.
 // CHECK-LABEL: StructDecl name=ImplicitCond
 // CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable"
-// CHECK-NEXT:      (assoc_conformance type="Self" proto="Escapable"
+// CHECK-NOT:      (assoc_conformance type="Self" proto="Escapable"
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
 // CHECK: Generic signature: <T>
