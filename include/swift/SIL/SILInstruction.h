@@ -6375,7 +6375,7 @@ class EndInitLetRefInst
 /// static initializer list.
 class ObjectInst final : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
-                             OwnershipForwardingSingleValueInstruction> {
+                             SingleValueInstruction> {
   friend SILBuilder;
 
   unsigned numBaseElements;
@@ -6383,17 +6383,14 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
   ObjectInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
-             unsigned NumBaseElements,
-             ValueOwnershipKind forwardingOwnershipKind)
-      : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty,
-                                            forwardingOwnershipKind),
+             unsigned NumBaseElements)
+      : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty),
         numBaseElements(NumBaseElements) {}
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements,
-                            unsigned NumBaseElements, SILModule &M,
-                            ValueOwnershipKind forwardingOwnershipKind);
+                            unsigned NumBaseElements, SILModule &M);
 
 public:
   unsigned getNumBaseElements() const { return numBaseElements; }
@@ -11016,7 +11013,6 @@ public:
 inline bool
 OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   switch (kind) {
-  case SILInstructionKind::ObjectInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:

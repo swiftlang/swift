@@ -113,6 +113,7 @@ SHOULD_NEVER_VISIT_INST(HasSymbol)
 SHOULD_NEVER_VISIT_INST(IntegerLiteral)
 SHOULD_NEVER_VISIT_INST(Metatype)
 SHOULD_NEVER_VISIT_INST(ObjCProtocol)
+SHOULD_NEVER_VISIT_INST(Object)
 SHOULD_NEVER_VISIT_INST(RetainValue)
 SHOULD_NEVER_VISIT_INST(RetainValueAddr)
 SHOULD_NEVER_VISIT_INST(StringLiteral)
@@ -362,7 +363,6 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
     return i->getForwardingOwnershipKind().getForwardingOperandOwnership(      \
         /*allowUnowned*/ false);                                               \
   }
-FORWARDING_OWNERSHIP(Object)
 FORWARDING_OWNERSHIP(OpenExistentialRef)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)

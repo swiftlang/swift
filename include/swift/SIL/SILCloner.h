@@ -2163,10 +2163,7 @@ SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
   recordClonedInstruction(
       Inst,
       getBuilder().createObject(getOpLocation(Inst->getLoc()), Inst->getType(),
-                                Elements, Inst->getBaseElements().size(),
-                                getBuilder().hasOwnership()
-                                    ? Inst->getForwardingOwnershipKind()
-                                    : ValueOwnershipKind(OwnershipKind::None)));
+                                Elements, Inst->getBaseElements().size()));
 }
 
 template<typename ImplClass>
