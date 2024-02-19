@@ -159,6 +159,7 @@ namespace swift {
     bool IsOSSA = false;
     bool SkipNonExportableDecls = false;
     bool ExplicitModuleBuild = false;
+    bool EnableSerializationRemarks = false;
   };
 
 } // end namespace swift
