@@ -501,33 +501,26 @@ public:
       : valueMap(valueMap) {}
   void init(const Operand *op);
 
-  void addApplyUse(UseDiagnosticInfo diagnosticInfo) {
+  void appendUseInfo(UseDiagnosticInfo diagnosticInfo) {
     applyUses.emplace_back(diagnosticInfo);
   }
 
   ArrayRef<UseDiagnosticInfo> getApplyUses() const { return applyUses; }
 
 private:
-  /// Init for an apply that does not have an associated apply expr.
-  ///
-  /// This should only occur when writing SIL test cases today. In the future,
-  /// we may represent all of the actor isolation information at the SIL level,
-  /// but we are not there yet today.
-  void initForApply(ApplyIsolationCrossing isolationCrossing);
   bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
 
   void initForApply(const Operand *op, ApplyExpr *expr);
-  void initForApply(SILLocation valueLoc, Identifier valueName,
-                    ApplyIsolationCrossing isolationCrossing);
   void initForAutoclosure(const Operand *op, AutoClosureExpr *expr);
 
   void initForAssignmentToTransferringParameter(const Operand *op) {
-    addApplyUse(UseDiagnosticInfo::forTypedAssignmentIntoTransferringParameter(
-        baseLoc, op->get()->getType().getASTType()));
+    appendUseInfo(
+        UseDiagnosticInfo::forTypedAssignmentIntoTransferringParameter(
+            baseLoc, op->get()->getType().getASTType()));
   }
 
   void initForUseOfStronglyTransferredValue(const Operand *op) {
-    addApplyUse(UseDiagnosticInfo::forTypedUseOfStronglyTransferredValue(
+    appendUseInfo(UseDiagnosticInfo::forTypedUseOfStronglyTransferredValue(
         baseLoc, op->get()->getType().getASTType()));
   }
 
@@ -565,7 +558,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
   unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
-      addApplyUse(UseDiagnosticInfo::forTypedIsolationCrossingDueToCapture(
+      appendUseInfo(UseDiagnosticInfo::forTypedIsolationCrossingDueToCapture(
           RegularLocation(std::get<0>(p).getLoc()), baseInferredType,
           std::get<2>(p)));
       return true;
@@ -573,19 +566,6 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
   }
 
   return false;
-}
-
-void UseAfterTransferDiagnosticInferrer::initForApply(
-    ApplyIsolationCrossing isolationCrossing) {
-  addApplyUse(UseDiagnosticInfo::forTypedIsolationCrossing(
-      baseLoc, baseInferredType, isolationCrossing));
-}
-
-void UseAfterTransferDiagnosticInferrer::initForApply(
-    SILLocation valueLoc, Identifier valueName,
-    ApplyIsolationCrossing isolationCrossing) {
-  addApplyUse(UseDiagnosticInfo::forNamedIsolationCrossing(
-      baseLoc, valueLoc, valueName, isolationCrossing));
 }
 
 void UseAfterTransferDiagnosticInferrer::initForApply(const Operand *op,
@@ -617,7 +597,7 @@ void UseAfterTransferDiagnosticInferrer::initForApply(const Operand *op,
 
   auto inferredArgType =
       foundExpr ? foundExpr->findOriginalType() : baseInferredType;
-  addApplyUse(UseDiagnosticInfo::forTypedIsolationCrossing(
+  appendUseInfo(UseDiagnosticInfo::forTypedIsolationCrossing(
       baseLoc, inferredArgType, isolationCrossing));
 }
 
@@ -663,7 +643,7 @@ struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
       if (!visitedCallExprDeclRefExprs.count(declRef)) {
         if (declRef->getDecl() == targetDecl) {
           visitedCallExprDeclRefExprs.insert(declRef);
-          foundTypeInfo.addApplyUse(
+          foundTypeInfo.appendUseInfo(
               UseDiagnosticInfo::forTypeIsolationCrossingWithUnknownIsolation(
                   foundTypeInfo.baseLoc, declRef->findOriginalType()));
           return Action::Continue(expr);
@@ -681,7 +661,7 @@ struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
             if (declRef->getDecl() == targetDecl) {
               // Found our target!
               visitedCallExprDeclRefExprs.insert(declRef);
-              foundTypeInfo.addApplyUse(
+              foundTypeInfo.appendUseInfo(
                   UseDiagnosticInfo::forTypedIsolationCrossing(
                       foundTypeInfo.baseLoc, declRef->findOriginalType(),
                       *isolationCrossing));
@@ -752,14 +732,14 @@ void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
     if (auto rootValue =
             inferrer.inferByWalkingUsesToDefsReturningRoot(op->get())) {
       if (auto *svi = dyn_cast<SingleValueInstruction>(rootValue)) {
-        return addApplyUse(UseDiagnosticInfo::forNamedIsolationCrossing(
+        return appendUseInfo(UseDiagnosticInfo::forNamedIsolationCrossing(
             baseLoc, svi->getLoc(),
             astContext.getIdentifier(inferrer.getName()),
             *sourceApply->getIsolationCrossing()));
       }
 
       if (auto *fArg = dyn_cast<SILFunctionArgument>(rootValue)) {
-        return addApplyUse(UseDiagnosticInfo::forNamedIsolationCrossing(
+        return appendUseInfo(UseDiagnosticInfo::forNamedIsolationCrossing(
             baseLoc, RegularLocation(fArg->getDecl()->getLoc()),
             astContext.getIdentifier(inferrer.getName()),
             *sourceApply->getIsolationCrossing()));
@@ -772,7 +752,8 @@ void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
 
   if (auto fas = FullApplySite::isa(nonConstOp->getUser())) {
     if (auto isolationCrossing = fas.getIsolationCrossing()) {
-      return initForApply(*isolationCrossing);
+      return appendUseInfo(UseDiagnosticInfo::forTypedIsolationCrossing(
+          baseLoc, baseInferredType, *isolationCrossing));
     }
   }
 
