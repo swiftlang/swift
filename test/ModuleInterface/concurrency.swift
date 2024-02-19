@@ -32,6 +32,7 @@ public protocol UnsafeMainProtocol {
 
 public struct InferredUnsafeMainActor: UnsafeMainProtocol {
   public func requirement() {}
+  @preconcurrency public func explicitPreconcurrency() {}
 }
 
 @preconcurrency @MainActor
@@ -41,6 +42,7 @@ public protocol PreconcurrencyMainProtocol {
 
 public struct InferredPreconcurrencyMainActor: PreconcurrencyMainProtocol {
   public func requirement() {}
+  @preconcurrency public func explicitPreconcurrency() {}
 }
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -I %t
@@ -67,6 +69,7 @@ func callFn() async {
 
 // CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredUnsafeMainActor :
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
+// CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
 
 // CHECK:      @preconcurrency @_Concurrency.MainActor public protocol PreconcurrencyMainProtocol {
@@ -75,6 +78,7 @@ func callFn() async {
 
 // CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredPreconcurrencyMainActor :
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
+// CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
 
 
