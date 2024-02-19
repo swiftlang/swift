@@ -4901,14 +4901,6 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
-InverseMarking::Mark
-TypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
-  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->hasInverseMarking(target);
-
-  return InverseMarking::Mark(InverseMarking::Kind::None);
-}
-
 static TypeDecl::CanBeInvertible::Result
 conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
@@ -4935,7 +4927,7 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   return TypeDecl::CanBeInvertible::Always;
 }
 
-TypeDecl::CanBeInvertible::Result TypeDecl::canBeCopyable() const {
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeCopyable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     return !hasInverseMarking(InvertibleProtocolKind::Copyable)
                ? CanBeInvertible::Always
@@ -4945,7 +4937,7 @@ TypeDecl::CanBeInvertible::Result TypeDecl::canBeCopyable() const {
   return conformanceExists(this, InvertibleProtocolKind::Copyable);
 }
 
-TypeDecl::CanBeInvertible::Result TypeDecl::canBeEscapable() const {
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     return !hasInverseMarking(InvertibleProtocolKind::Escapable)
                ? CanBeInvertible::Always
