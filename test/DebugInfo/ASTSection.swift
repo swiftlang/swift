@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 // RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSection | %FileCheck %s
 // RUN: %lldb-moduleimport-test -filter mips64-unknown-hurd -verbose %t/ASTSection | %FileCheck %s --check-prefix=LINETABLE-CHECK

@@ -5,8 +5,6 @@
 
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 // RUN: echo "public let a0 = 0"  >%t/a0.swift
 // RUN: %target-build-swift %t/a0.swift -emit-module -emit-module-path %t/a0.swiftmodule -I %s/Inputs
 // RUN: %target-swift-modulewrap %t/a0.swiftmodule -o %t/a0-mod.o

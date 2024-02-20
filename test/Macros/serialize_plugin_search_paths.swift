@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 // RUN: %target-build-swift %s -g -o %t/a.out \
 // RUN:   -emit-executable -emit-module \
 // RUN:   -Xfrontend -serialize-debugging-options \

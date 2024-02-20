@@ -3,8 +3,6 @@
 
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 // RUN: cp %S/Inputs/serialized-objc-header.h %t
 // RUN: %target-build-swift -emit-executable %S/ASTSection.swift -g -o %t/ASTSection-with-ObjC -import-objc-header %t/serialized-objc-header.h -DOBJC -module-name ASTSection -emit-module
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSection-with-ObjC | %FileCheck %s

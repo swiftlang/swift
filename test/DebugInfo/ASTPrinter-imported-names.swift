@@ -7,8 +7,6 @@
 // RUN: %lldb-moduleimport-test -qualify-types \
 // RUN:   -type-from-mangled=%t/list %t/a.out | %FileCheck %s
 
-// XFAIL: noncopyable_generics
-
 // This name should come out fully qualified.
 // CHECK: ClangModule.Foo
 import ClangModule

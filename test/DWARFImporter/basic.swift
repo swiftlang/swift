@@ -3,8 +3,6 @@
 
 // RUN: %empty-directory(%t)
 
-// XFAIL: noncopyable_generics
-
 // RUN: cp %S/Inputs/objc-header.h %S/Inputs/module.modulemap  %t
 // RUN: %target-build-swift -emit-executable %s -g -o %t/a.out \
 // RUN:   -module-name basic -emit-module -I%t
