@@ -18,12 +18,12 @@ import SwiftShims
 /// Converts description definitions to a debugger Type Summary.
 ///
 /// This macro converts compatible description implementations written in Swift
-/// to a debugger format known as a Type Summary. A Type Summary is the
-/// debugger's equivalent to `debugDescription`, with the distinction that it
-/// does not execute code inside the debugged process. By avoiding code
-/// execution, descriptions can be produced faster, without potential side
-/// effects, and shown in situations where code execution is not performed, such
-/// as the variable list of an IDE.
+/// to an LLDB format known as a Type Summary. A Type Summary is the LLDB's
+/// equivalent to `debugDescription`, with the distinction that it does not
+/// execute code inside the debugged process. By avoiding code execution,
+/// descriptions can be produced faster, without potential side effects, and
+/// shown in situations where code execution is not performed, such as the
+/// variable list of an IDE.
 ///
 /// Consider this an example. This `Team` struct has a `debugDescription` which
 /// summarizes some key details, such as the team's name. The debugger only
