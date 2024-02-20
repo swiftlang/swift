@@ -32,6 +32,7 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -3219,30 +3220,6 @@ public:
     };
   };
 
-  /// "Does a conformance for Copyable exist for this type declaration?"
-  ///
-  /// This doesn't mean that all instance of this type are Copyable, because
-  /// if a conditional conformance to Copyable exists, this method will return
-  /// true.
-  ///
-  /// If you need a more precise answer, ask this Decl's corresponding
-  /// Type if it `isCopyable` instead of using this.
-  CanBeInvertible::Result canBeCopyable() const;
-
-  /// "Does a conformance for Escapable exist for this type declaration?"
-  ///
-  /// This doesn't mean that all instance of this type are Escapable, because
-  /// if a conditional conformance to Escapable exists, this method will return
-  /// true.
-  ///
-  /// If you need a more precise answer, ask this Decl's corresponding
-  /// Type if it `isEscapable` instead of using this.
-  CanBeInvertible::Result canBeEscapable() const;
-
-  /// Determine how the given invertible protocol was written on this TypeDecl,
-  /// if at all.
-  InverseMarking getMarking(InvertibleProtocolKind ip) const;
-
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
            D->getKind() <= DeclKind::Last_TypeDecl;
@@ -3260,7 +3237,7 @@ public:
   }
 };
 
-/// A type declaration that can have generic parameters attached to it. Because
+/// A type declaration that  have generic parameters attached to it. Because
 /// it has these generic parameters, it is always a DeclContext.
 class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
@@ -3935,6 +3912,10 @@ public:
         TypeDecl::getOverriddenDecl());
   }
 
+  /// Determine whether this type has ~<target>` stated as
+  /// one of its inherited types.
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
+
   /// Retrieve the set of associated types overridden by this associated
   /// type.
   llvm::TinyPtrVector<AssociatedTypeDecl *> getOverriddenDecls() const;
@@ -4371,6 +4352,34 @@ public:
   /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
   /// Returns null if the type is a class, or does not have a declared `deinit`.
   DestructorDecl *getValueTypeDestructor();
+
+  /// "Does a conformance for Copyable exist for this type declaration?"
+  ///
+  /// This doesn't mean that all instance of this type are Copyable, because
+  /// if a conditional conformance to Copyable exists, this method will return
+  /// true.
+  ///
+  /// If you need a more precise answer, ask this Decl's corresponding
+  /// Type if it `isCopyable` instead of using this.
+  CanBeInvertible::Result canBeCopyable() const;
+
+  /// "Does a conformance for Escapable exist for this type declaration?"
+  ///
+  /// This doesn't mean that all instance of this type are Escapable, because
+  /// if a conditional conformance to Escapable exists, this method will return
+  /// true.
+  ///
+  /// If you need a more precise answer, ask this Decl's corresponding
+  /// Type if it `isEscapable` instead of using this.
+  CanBeInvertible::Result canBeEscapable() const;
+
+  /// Determine whether this type has `: <target>` stated explicitly in
+  /// its inheritance clause.
+  bool hasMarking(InvertibleProtocolKind target) const;
+
+  /// Determine whether this type has ~<target>` stated on
+  /// itself, one of its inherited types or `Self` requirements.
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5226,6 +5235,10 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
+
+  /// Determine whether this protocol has ~<target>` stated on
+  /// itself, one of its inherited types or `Self` requirements.
+  InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
 
   /// Determine whether this protocol requires conformance to `IP`, without
   /// querying a generic signature.

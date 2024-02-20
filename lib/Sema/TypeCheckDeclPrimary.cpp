@@ -2064,15 +2064,14 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (EnabledNoncopyableGenerics) {
       if (auto kp = otherProto->getKnownProtocolKind()) {
         if (auto ip = getInvertibleProtocolKind(*kp)) {
-          auto inverse = proto->getMarking(*ip).getInverse();
-          if (!inverse.isPresent())
+          auto inverse = proto->hasInverseMarking(*ip);
+          if (!inverse)
             continue; // no ~IP annotation
 
           auto &Diags = proto->getASTContext().Diags;
           Diags.diagnose(inverse.getLoc(),
                          diag::inverse_generic_but_also_conforms,
-                         proto->getSelfInterfaceType(),
-                         getProtocolName(*kp));
+                         proto->getSelfInterfaceType(), getProtocolName(*kp));
           continue;
         }
       }
@@ -3220,11 +3219,11 @@ public:
     auto &ctx = decl->getASTContext();
 
     for (auto ip : InvertibleProtocolSet::full()) {
-      auto marking = decl->getMarking(ip);
+      auto inverseMarking = decl->hasInverseMarking(ip);
 
       // Inferred inverses are already ignored for classes.
       // FIXME: we can also diagnose @_moveOnly here if we use `isAnyExplicit`
-      if (!marking.getInverse().is(InverseMarking::Kind::Explicit))
+      if (!inverseMarking.is(InverseMarking::Kind::Explicit))
         continue;
 
       // Allow ~Copyable when MoveOnlyClasses is enabled
@@ -3233,7 +3232,7 @@ public:
         continue;
 
 
-      ctx.Diags.diagnose(marking.getInverse().getLoc(),
+      ctx.Diags.diagnose(inverseMarking.getLoc(),
                          diag::inverse_on_class,
                          getProtocolName(getKnownProtocolKind(ip)));
     }

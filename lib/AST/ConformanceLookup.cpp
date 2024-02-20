@@ -415,8 +415,7 @@ getBuiltinInvertibleProtocolConformance(NominalTypeDecl *nominal,
   case InvertibleProtocolKind::Copyable:
     // If move-only classes is enabled, we'll check the markings.
     if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
-      auto marking = nominal->getMarking(*ip);
-      switch (marking.getInverse().getKind()) {
+      switch (nominal->hasInverseMarking(*ip).getKind()) {
       case InverseMarking::Kind::LegacyExplicit:
       case InverseMarking::Kind::Explicit:
         // An inverse ~Copyable prevents conformance.

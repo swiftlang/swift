@@ -429,28 +429,6 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine the kind of invertible protocol markings for this declaration,
-/// for example, if a conformance to IP or ~IP was written on it in the
-/// inheritance clause and/or where clause.
-class InvertibleAnnotationRequest
-    : public SimpleRequest<InvertibleAnnotationRequest,
-                           InverseMarking(TypeDecl *, InvertibleProtocolKind),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  InverseMarking evaluate(Evaluator &evaluator,
-                          TypeDecl *decl, InvertibleProtocolKind ip) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
-};
-
 /// Determine whether the given declaration is 'dynamic''.
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,
