@@ -253,6 +253,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
+  serializationOpts.EnableSerializationRemarks =
+      getLangOptions().EnableModuleSerializationRemarks;
+
   return serializationOpts;
 }
 

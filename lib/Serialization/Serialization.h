@@ -112,6 +112,10 @@ class Serializer : public SerializerBase {
 
   SmallVector<DeclID, 16> exportedPrespecializationDecls;
 
+  /// Will be set to true if any serialization step failed, for example due to
+  /// an error in the AST.
+  bool hadError = false;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
@@ -570,6 +574,19 @@ public:
   void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
   bool allowCompilerErrors() const;
+
+private:
+  /// If the declaration is invalid, records that an error occurred and returns
+  /// true if the decl should be skipped.
+  bool skipDeclIfInvalid(const Decl *decl);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, TypeRepr *tyRepr);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, SourceLoc loc);
 };
 
 } // end namespace serialization
