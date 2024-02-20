@@ -75,7 +75,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }
-  _ = useDefVisitor.walkUp(value: value, nil)
+  _ = useDefVisitor.walkUp(valueOrAddress: value)
   return introducers
 }
 
@@ -330,7 +330,11 @@ extension LifetimeDependence.Scope {
     case let .base(accessBase):
       switch accessBase {
       case let .box(projectBox):
-        self = .owned(projectBox.operand.value)
+        // Note: the box may be in a borrow scope.
+        if let scope = Self(base: projectBox.operand.value, context) {
+          self = scope
+        }
+        return nil
       case let .stack(allocStack):
         if let scope = Self(allocation: allocStack, context) {
           self = scope
@@ -548,6 +552,9 @@ extension LifetimeDependence {
 /// that introduces an immutable variable: move_value [var_decl] or
 /// begin_borrow [var_decl], and to stop at an access of a mutable
 /// variable: begin_access.
+///
+/// Start walking:
+///     walkUp(valueOrAddress: Value) -> WalkResult
 struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
   let context: Context
   // This visited set is only really needed for instructions with
