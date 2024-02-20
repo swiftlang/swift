@@ -2419,7 +2419,9 @@ void EnumTypeLayoutEntry::computeProperties() {
 
 EnumTypeLayoutEntry::CopyDestroyStrategy
 EnumTypeLayoutEntry::copyDestroyKind(IRGenModule &IGM) const {
-  if (isTriviallyDestroyable()) {
+  if (ty.isMoveOnly()) {
+    return Normal;
+  } else if (isTriviallyDestroyable()) {
     return TriviallyDestroyable;
   } else if (isSingleton()) {
     return ForwardToPayload;
