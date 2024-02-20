@@ -46,16 +46,17 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
   }
 }
 
-// Extend all access scopes that enclose `dependence`. If dependence is on an access scope in the caller, then return
-// the function argument that represents the dependence scope.
+/// Extend all access scopes that enclose `dependence`. If dependence is on an access scope in the caller, then return
+/// the function argument that represents the dependence scope.
 private func extendAccessScopes(dependence: LifetimeDependence, _ context: FunctionPassContext) -> FunctionArgument? {
   log("Scope fixup for lifetime dependent instructions: \(dependence)")
 
   guard case .access(let bai) = dependence.scope else {
     return nil
   }
+  let function = bai.parentFunction
   var range = InstructionRange(begin: bai, context)
-  var walker = LifetimeDependenceScopeFixupWalker(bai.parentFunction, context) {
+  var walker = LifetimeDependenceScopeFixupWalker(function, context) {
     range.insert($0.instruction)
     return .continueWalk
   }
@@ -63,6 +64,13 @@ private func extendAccessScopes(dependence: LifetimeDependence, _ context: Funct
   _ = walker.walkDown(root: dependence.dependentValue)
   defer {range.deinitialize()}
 
+  // Lifetime dependenent uses may no be dominated by the access. The dependent value may be used by a phi or stored
+  // into a memory location. The access may be conditional relative to such uses. If this is the case, then the
+  // instruction range must include the function entry.
+  let firstInst = function.entryBlock.instructions.first!
+  if firstInst != bai, range.contains(firstInst) {
+    return nil
+  }
   if let arg = extendAccessScope(beginAccess: bai, range: &range, context) {
     // If the dependent value is returned, then return the FunctionArgument that it depends on.
     return walker.dependsOnCaller ? arg : nil
