@@ -103,6 +103,37 @@ enum class MacroWalking {
   None
 };
 
+/// A scheme for walking a `MemberTypeRepr`.
+enum class MemberTypeReprWalkingScheme {
+  /// Walk in source order, such that each subsequent dot-separated component is
+  /// a child of the previous one. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// A
+  /// ╰─B
+  ///   ├─T
+  ///   │ ╰─U
+  ///   ╰─C
+  /// ```
+  SourceOrderRecursive,
+
+  /// Walk in AST order (that is, according to how member type
+  /// representations are modeled in the AST, such that each previous
+  /// dot-separated component is a child of the subsequent one), base before
+  /// generic arguments. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// C
+  /// ╰─B
+  ///   ├─A
+  ///   ╰─U
+  ///     ╰─T
+  /// ```
+  ASTOrderRecursive
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -561,6 +592,11 @@ public:
   ///
   virtual PostWalkAction walkToTypeReprPost(TypeRepr *T) {
     return Action::Continue();
+  }
+
+  /// This method configures how to walk `MemberTypeRepr` nodes.
+  virtual MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const {
+    return MemberTypeReprWalkingScheme::ASTOrderRecursive;
   }
 
   /// This method configures whether the walker should explore into the generic

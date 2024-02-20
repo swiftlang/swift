@@ -1690,6 +1690,14 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
+    auto *bitwiseCopyableProtocol =
+        IGM.getSwiftModule()->getASTContext().getProtocol(
+            KnownProtocolKind::BitwiseCopyable);
+    if (bitwiseCopyableProtocol &&
+        IGM.getSwiftModule()->lookupConformance(D->getDeclaredInterfaceType(),
+                                                bitwiseCopyableProtocol)) {
+      return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
+    }
     return &getResilientStructTypeInfo(copyable, structAccessible);
   }
 

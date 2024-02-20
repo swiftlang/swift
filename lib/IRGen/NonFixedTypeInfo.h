@@ -26,6 +26,7 @@
 #include "Address.h"
 #include "GenOpaque.h"
 #include "IndirectTypeInfo.h"
+#include "Outlining.h"
 
 namespace swift {
 namespace irgen {
@@ -128,6 +129,76 @@ public:
   }
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
     return nullptr;
+  }
+};
+
+class BitwiseCopyableTypeInfo
+    : public WitnessSizedTypeInfo<BitwiseCopyableTypeInfo> {
+  using Self = BitwiseCopyableTypeInfo;
+  using Super = WitnessSizedTypeInfo<Self>;
+  BitwiseCopyableTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
+      : Super(type, Alignment(1), IsNotTriviallyDestroyable,
+              IsNotBitwiseTakable, IsCopyable, abiAccessible) {}
+
+public:
+  static BitwiseCopyableTypeInfo *create(llvm::Type *type,
+                                         IsABIAccessible_t abiAccessible) {
+    return new Self(type, abiAccessible);
+  }
+
+  void bitwiseCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                   SILType T, bool isOutlined) const {
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void destroy(IRGenFunction &IGF, Address address, SILType T,
+               bool isOutlined) const override {
+    // BitwiseCopyable types are trivial, so destroy is a no-op.
+  }
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr, SILType T,
+                                       bool isOutlined) const override {
+    return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T, bool isOutlined) const override {
+    emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases,
+                                      enumAddr);
+  }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We'll need formal type metadata for this archetype.
+    collector.collectTypeMetadataForLayout(T);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
   }
 };
 }

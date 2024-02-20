@@ -24,7 +24,17 @@
 namespace swift {
 namespace runtime {
 
-SWIFT_RUNTIME_STDLIB_SPI const AccessibleFunctionRecord *
+SWIFT_RUNTIME_STDLIB_SPI
+const AccessibleFunctionRecord *swift_findAccessibleFunctionForConcreteType(
+    bool findConcreteWitness,
+    // concrete target type, when performing a protocol method call
+    const char *targetActorTypeNameStart, size_t targetActorTypeNameLength,
+    // method (concrete method name, or protocol method name)
+    const char *targetNameStart, size_t targetNameLength);
+
+// DEPRECATED: Prefer 'swift_findAccessibleFunctionForConcreteType'
+SWIFT_RUNTIME_STDLIB_SPI
+const AccessibleFunctionRecord *
 swift_findAccessibleFunction(const char *targetNameStart,
                              size_t targetNameLength);
 

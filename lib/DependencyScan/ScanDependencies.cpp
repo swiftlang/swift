@@ -415,6 +415,97 @@ static llvm::Error resolveExplicitModuleInputs(
   return llvm::Error::success();
 }
 
+static llvm::Error pruneUnusedVFSOverlays(
+    ModuleDependencyID moduleID, const ModuleDependencyInfo &resolvingDepInfo,
+    const std::set<ModuleDependencyID> &dependencies,
+    ModuleDependenciesCache &cache, CompilerInstance &instance) {
+  auto isVFSOverlayFlag = [](StringRef arg) {
+    return arg == "-ivfsoverlay" || arg == "-vfsoverlay";
+  };
+  auto isXCCArg = [](StringRef arg) {
+    return arg == "-Xcc";
+  };
+
+  // Pruning of unused VFS overlay options for Clang dependencies
+  // is performed by the Clang dependency scanner.
+  if (!resolvingDepInfo.isSwiftModule())
+    return llvm::Error::success();
+
+  // If this Swift dependency contains any VFS overlay paths,
+  // then attempt to prune the ones not used by any of the Clang dependencies.
+  if (!llvm::any_of(resolvingDepInfo.getCommandline(),
+                    [&isVFSOverlayFlag](const std::string &arg) {
+                      return isVFSOverlayFlag(arg);
+                    }))
+    return llvm::Error::success();
+
+  // 1. For each Clang dependency, gather its ivfsoverlay path arguments
+  // to keep track of which overlays are actually used and were not
+  // pruned by the Clang dependency scanner.
+  llvm::StringSet<> usedVFSOverlayPaths;
+  for (const auto &depModuleID : dependencies) {
+    const auto optionalDepInfo = cache.findDependency(depModuleID);
+    assert(optionalDepInfo.has_value());
+    const auto depInfo = optionalDepInfo.value();
+    if (auto clangDepDetails = depInfo->getAsClangModule()) {
+      const auto &depCommandLine = clangDepDetails->buildCommandLine;
+      // true if the previous argument was the dash-option of an option pair
+      bool getNext = false;
+      for (const auto &A : depCommandLine) {
+        StringRef arg(A);
+        if (isXCCArg(arg))
+          continue;
+        if (getNext) {
+          getNext = false;
+          usedVFSOverlayPaths.insert(arg);
+        } else if (isVFSOverlayFlag(arg))
+          getNext = true;
+      }
+    }
+  }
+
+  // 2. Each -Xcc VFS overlay path on the resolving command-line which is not used by
+  // any of the Clang dependencies can be removed from the command-line.
+  const std::vector<std::string> &currentCommandLine =
+      resolvingDepInfo.getCommandline();
+  std::vector<std::string> resolvedCommandLine;
+  size_t skip = 0;
+  for (auto it = currentCommandLine.begin(), end = currentCommandLine.end();
+       it != end; it++) {
+    if (skip) {
+      skip--;
+      continue;
+    }
+    // If this VFS overlay was not used across any of the dependencies, skip it.
+    if ((it+1) != end && isXCCArg(*it) && isVFSOverlayFlag(*(it + 1))) {
+      assert(it + 2 != end); // Extra -Xcc
+      assert(it + 3 != end); // Actual VFS overlay path argument
+      if (!usedVFSOverlayPaths.contains(*(it + 3))) {
+        skip = 3;
+        continue;
+      }
+    }
+    resolvedCommandLine.push_back(*it);
+  }
+
+  // 3. Update the dependency in the cache if the command-line has been modified.
+  if (currentCommandLine.size() != resolvedCommandLine.size()) {
+    auto dependencyInfoCopy = resolvingDepInfo;
+    dependencyInfoCopy.updateCommandLine(resolvedCommandLine);
+
+    // Update the CAS cache key for the new command-line
+    if (instance.getInvocation().getCASOptions().EnableCaching) {
+      auto &CAS = cache.getScanService().getSharedCachingFS().getCAS();
+      auto Key = updateModuleCacheKey(dependencyInfoCopy, cache, CAS);
+      if (!Key)
+        return Key.takeError();
+    }
+    cache.updateDependency(moduleID, dependencyInfoCopy);
+  }
+
+  return llvm::Error::success();
+}
+
 namespace {
 std::string quote(StringRef unquoted) {
   llvm::SmallString<128> buffer;
@@ -1658,7 +1749,7 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
   }
 }
 
-static void resolveDependencyInputCommandLineArguments(
+static void resolveDependencyCommandLineArguments(
     CompilerInstance &instance, ModuleDependenciesCache &cache,
     const std::vector<ModuleDependencyID> &topoSortedModuleList) {
   auto moduleTransitiveClosures =
@@ -1674,6 +1765,11 @@ static void resolveDependencyInputCommandLineArguments(
     auto deps = optionalDeps.value();
     if (auto E = resolveExplicitModuleInputs(modID, *deps, dependencyClosure,
                                              cache, instance))
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                   toString(std::move(E)));
+
+    if (auto E = pruneUnusedVFSOverlays(modID, *deps, dependencyClosure,
+                                        cache, instance))
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    toString(std::move(E)));
   }
@@ -1756,8 +1852,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
-  resolveDependencyInputCommandLineArguments(instance, cache,
-                                             topologicallySortedModuleList);
+  resolveDependencyCommandLineArguments(instance, cache,
+                                        topologicallySortedModuleList);
 
   updateDependencyTracker(instance, cache, allModules);
   return generateFullDependencyGraph(instance, cache,

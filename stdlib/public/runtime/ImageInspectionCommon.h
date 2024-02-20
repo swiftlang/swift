@@ -40,6 +40,7 @@
 /// The Mach-O section name for the section containing accessible functions.
 /// This lives within SEG_TEXT.
 #define MachOAccessibleFunctionsSection "__swift5_acfuncs"
+#define MachOAccessibleProtocolFunctionsSection "__swift5_acpfuns"
 
 #define MachOTextSegment "__TEXT"
 
@@ -51,7 +52,7 @@
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 3;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 4;
 }
 
 struct SectionInfo {

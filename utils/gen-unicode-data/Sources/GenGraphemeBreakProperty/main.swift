@@ -48,6 +48,16 @@ extension Unicode {
   }
 }
 
+struct GraphemeBreakEntry : Comparable {
+  static func < (lhs: GraphemeBreakEntry, rhs: GraphemeBreakEntry) -> Bool {
+    return lhs.index < rhs.index
+  }
+  
+  let index: Int
+  let range: ClosedRange<UInt32>
+  let property: Unicode.GraphemeBreakProperty
+}
+
 // Given a path to one of the Unicode data files, reads it and returns the
 // unflattened list of scalar & grapheme break property.
 //
@@ -115,7 +125,7 @@ func getGraphemeBreakPropertyData(
 
 // Takes the flattened data and writes it as a static C array.
 func emit(
-  _ data: [(ClosedRange<UInt32>, Unicode.GraphemeBreakProperty)],
+  _ data: [GraphemeBreakEntry],
   into result: inout String
 ) {
   result += """
@@ -125,7 +135,9 @@ func emit(
 
   """
 
-  formatCollection(data, into: &result) { (range, gbp) -> String in
+  formatCollection(data, into: &result) { (entry) -> String in
+    let range = entry.range
+    let gbp = entry.property
     // Our value uses the 21 bits to represent the scalar, 8 bits to represent
     // the range's count, and finally the last three bits to represent the
     // grapheme break property enum.
@@ -168,13 +180,13 @@ func generateGraphemeBreakProperty() {
   var result = readFile("Input/GraphemeData.h")
 
   let baseData = getGraphemeBreakPropertyData(
-    for: "Data/GraphemeBreakProperty.txt"
+    for: "Data/15/GraphemeBreakProperty.txt"
   )
-  let emojiData = getGraphemeBreakPropertyData(for: "Data/emoji-data.txt")
+  let emojiData = getGraphemeBreakPropertyData(for: "Data/15/emoji-data.txt")
 
   let flattened = flatten(baseData + emojiData)
 
-  var data: [(ClosedRange<UInt32>, Unicode.GraphemeBreakProperty)] = []
+  var data: [GraphemeBreakEntry] = []
 
   for (range, gbp) in flattened {
     guard range.count < 0x200 else {
@@ -185,14 +197,24 @@ func generateGraphemeBreakProperty() {
       continue
     }
 
-    data.append((range, gbp))
+    data.append(GraphemeBreakEntry(
+      index: data.count,
+      range: range,
+      property: gbp
+    ))
   }
 
+  data = eytzingerize(data, dummy: GraphemeBreakEntry(
+    index: 0,
+    range: 0...0,
+    property: .control
+  ))
+  
   emit(data, into: &result)
   
   // Handle the CLDR grapheme breaking rules:
   
-  let indicSyllabicCategory = readFile("Data/IndicSyllabicCategory.txt")
+  let indicSyllabicCategory = readFile("Data/15/IndicSyllabicCategory.txt")
   
   let consonants = getLinkingConsonant(from: indicSyllabicCategory)
   

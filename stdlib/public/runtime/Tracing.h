@@ -87,6 +87,17 @@ accessible_function_scan_begin(llvm::StringRef name) {
   return {id};
 }
 
+static inline ScanTraceState
+accessible_protocol_requirement_function_scan_begin(llvm::StringRef name) {
+  ENSURE_LOG(ScanLog);
+
+  auto id = os_signpost_id_generate(ScanLog);
+  os_signpost_interval_begin(ScanLog, id, SWIFT_LOG_SECTION_SCAN,
+                             "distributed accessible function scan for '%.*s'",
+                             (int)name.size(), name.data());
+  return {id};
+}
+
 static inline ScanTraceState metadata_scan_begin(Demangle::NodePointer node) {
   ENSURE_LOG(ScanLog);
 
@@ -159,6 +170,11 @@ struct ScanTraceState {
 
 static inline ScanTraceState
 accessible_function_scan_begin(llvm::StringRef name) {
+  return {};
+}
+
+static inline ScanTraceState
+accessible_protocol_requirement_function_scan_begin(llvm::StringRef name) {
   return {};
 }
 

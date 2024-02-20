@@ -125,9 +125,18 @@ void swift_addNewDSOImage(swift::MetadataSections *sections) {
   const auto &accessible_funcs_section = sections->swift5_accessible_functions;
   const void *functions =
       reinterpret_cast<void *>(accessible_funcs_section.start);
-  if (accessible_funcs_section.length)
+  if (accessible_funcs_section.length) {
     swift::addImageAccessibleFunctionsBlockCallback(
         baseAddress, functions, accessible_funcs_section.length);
+  }
+
+  const auto &dist_accessible_funcs_section = sections->swift5_accessible_protocol_requirement_functions;
+  const void *dist_functions =
+      reinterpret_cast<void *>(dist_accessible_funcs_section.start);
+  if (dist_accessible_funcs_section.length) {
+    swift::addImageAccessibleProtocolFunctionsBlockCallback(
+        baseAddress, dist_functions, dist_accessible_funcs_section.length);
+  }
 
   // Register this section for future enumeration by clients. This should occur
   // after this function has done all other relevant work to avoid a race

@@ -206,33 +206,46 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
-                                      SILLocation loc,
-                                      SubstitutionMap substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  assert(args.size() >= 2 && "assign should have two arguments");
+static ManagedValue emitBuiltinStore(SILGenFunction &SGF, SILLocation loc,
+                                     SubstitutionMap substitutions,
+                                     ArrayRef<ManagedValue> args, SGFContext C,
+                                     bool isStrict, bool isInvariant,
+                                     llvm::MaybeAlign alignment) {
+  assert(args.size() >= 2 && "should have two arguments");
   assert(substitutions.getReplacementTypes().size() == 1 &&
-         "assign should have a single substitution");
+         "should have a single substitution");
 
   // The substitution determines the type of the thing we're destroying.
-  CanType assignFormalType =
-    substitutions.getReplacementTypes()[0]->getCanonicalType();
-  SILType assignType = SGF.getLoweredType(assignFormalType);
-  
+  CanType formalTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+  SILType loweredTy = SGF.getLoweredType(formalTy);
+
   // Convert the destination pointer argument to a SIL address.
-  SILValue addr = SGF.B.createPointerToAddress(loc,
-                                               args.back().getUnmanagedValue(),
-                                               assignType.getAddressType(),
-                                               /*isStrict*/ true,
-                                               /*isInvariant*/ false);
-  
-  // Build the value to be assigned, reconstructing tuples if needed.
-  auto src = RValue(SGF, args.slice(0, args.size() - 1), assignFormalType);
-  
+  SILValue addr = SGF.B.createPointerToAddress(
+      loc, args.back().getUnmanagedValue(), loweredTy.getAddressType(),
+      isStrict, isInvariant, alignment);
+
+  // Build the value to be stored, reconstructing tuples if needed.
+  auto src = RValue(SGF, args.slice(0, args.size() - 1), formalTy);
+
   std::move(src).ensurePlusOne(SGF, loc).assignInto(SGF, loc, addr);
 
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
+}
+
+static ManagedValue emitBuiltinAssign(SILGenFunction &SGF, SILLocation loc,
+                                      SubstitutionMap substitutions,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/true,
+                          /*isInvariant=*/false, llvm::MaybeAlign());
+}
+
+static ManagedValue emitBuiltinStoreRaw(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/false,
+                          /*isInvariant=*/false, llvm::MaybeAlign(1));
 }
 
 /// Emit Builtin.initialize by evaluating the operand directly into

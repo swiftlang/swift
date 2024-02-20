@@ -136,42 +136,52 @@ public:
     /// abstracted is needed for out-of-process work.
 
     template <typename U>
-    void writePointer(StoredPointer *to, Buffer<U> target) {
+    BuilderErrorOr<std::monostate> writePointer(StoredPointer *to,
+                                                Buffer<U> target) {
       checkPtr(to);
       *to = reinterpret_cast<StoredPointer>(target.ptr);
+      return {{}};
     }
 
     template <typename U>
-    void writePointer(U **to, Buffer<U> target) {
+    BuilderErrorOr<std::monostate> writePointer(U **to, Buffer<U> target) {
       checkPtr(to);
       *to = target.ptr;
+      return {{}};
     }
 
     template <typename U>
-    void writePointer(const U **to, Buffer<U> target) {
+    BuilderErrorOr<std::monostate> writePointer(const U **to,
+                                                Buffer<U> target) {
       checkPtr(to);
       *to = target.ptr;
+      return {{}};
     }
 
-    void writePointer(const Metadata **to, GenericArgument target) {
+    BuilderErrorOr<std::monostate> writePointer(const Metadata **to,
+                                                GenericArgument target) {
       checkPtr(to);
       *to = reinterpret_cast<const Metadata *>(target);
+      return {{}};
     }
 
     template <typename To, typename From>
-    void writePointer(To *to, Buffer<From> target) {
+    BuilderErrorOr<std::monostate> writePointer(To *to, Buffer<From> target) {
       checkPtr((void *)to);
       *to = target.ptr;
+      return {{}};
     }
 
     template <typename U>
-    void writeFunctionPointer(U *to, Buffer<const char> target) {
+    BuilderErrorOr<std::monostate>
+    writeFunctionPointer(U *to, Buffer<const char> target) {
       checkPtr((void *)to);
       // This weird double cast handles the case where the function pointer
       // type has a custom __ptrauth attribute, which the compiler doesn't like
       // casting to.
       auto castTarget = (const decltype(&**to))(void *)target.ptr;
       *to = castTarget;
+      return {{}};
     }
   };
 

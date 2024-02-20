@@ -70,7 +70,7 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
 /// Synthesizes the
 ///
 /// \verbatim
-/// static resolve(_ address: ActorAddress,
+/// static resolve(id: ActorID,
 ///                using system: DistributedActorSystem) throws -> Self {
 ///   <filled in by SILGenDistributed>
 /// }
@@ -522,50 +522,6 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
 
-/// Asserts that the synthesized fields appear in the expected order.
-///
-/// The `id` and `actorSystem` MUST be the first two fields of a distributed actor,
-/// because we assume their location in IRGen, and also when we allocate a distributed remote actor,
-/// we're able to allocate memory ONLY for those and without allocating any of the storage for the actor's
-/// properties.
-///         [id, actorSystem]
-/// followed by the executor fields for a default distributed actor.
-///
-static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, ValueDecl *derivedValue) {
-#ifndef NDEBUG
-  if (derivedValue) {
-    auto Nominal = derived.Nominal;
-    auto &Context = derived.Context;
-    if (auto id = Nominal->getDistributedActorIDProperty()) {
-      if (auto system = Nominal->getDistributedActorSystemProperty()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
-          if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
-            int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
-            int idx = 0;
-            for (auto member: Nominal->getMembers()) {
-              if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
-                if (binding->getSingleVar()->getName() == Context.Id_id) {
-                  idIdx = idx;
-                } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
-                  actorSystemIdx = idx;
-                } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
-                  unownedExecutorIdx = idx;
-                }
-                idx += 1;
-              }
-            }
-            if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
-              // we have found all the necessary fields, let's assert their order
-              assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
-            }
-          }
-        }
-      }
-    }
-  }
-#endif
-}
-
 // !!!!!!!!!!!!! IMPORTANT WHEN MAKING CHANGES TO REQUIREMENTS !!!!!!!!!!!!!!!!!
 // !! Remember to update DerivedConformance::getDerivableRequirement          !!
 // !! any time the signatures or list of derived requirements change.         !!
@@ -582,7 +538,9 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
     }
 
-    assertRequiredSynthesizedPropertyOrder(*this, derivedValue);
+    if (derivedValue) {
+      assertRequiredSynthesizedPropertyOrder(Context, Nominal);
+    }
     return derivedValue;
   }
 

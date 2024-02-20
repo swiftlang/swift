@@ -669,8 +669,12 @@ extension _GraphemeBreakingState {
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    let y = Unicode._GraphemeBreakProperty(from: scalar2)
-
+    
+    // GB4 handled here because we don't need to know `y` for this csae
+    if x == .control {
+      return true
+    }
+    
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
     // happen to see a rhs .extend or .zwj, then it's a signal that we should
@@ -684,6 +688,8 @@ extension _GraphemeBreakingState {
       self.isInEmojiSequence = enterEmojiSequence
       self.isInIndicSequence = enterIndicSequence
     }
+    
+    let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
     switch (x, y) {
 
@@ -692,9 +698,7 @@ extension _GraphemeBreakingState {
     case (.any, .any):
       return true
 
-    // GB4
-    case (.control, _):
-      return true
+    // (GB4 is handled above)
 
     // GB5
     case (_, .control):

@@ -652,6 +652,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       createStructType(*this, "swift.accessible_function",
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
+  AccessibleProtocolRequirementFunctionRecordTy =
+      createStructType(*this, "swift.distributed_accessible_function",
+                       {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
+                        RelativeAddressTy, Int32Ty,
+                        // Extra fields, after AccessibleFunctionRecordTy fields
+                        RelativeAddressTy, RelativeAddressTy});
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
@@ -2226,3 +2232,8 @@ bool swift::writeEmptyOutputFilesFor(
   }
   return false;
 }
+IRGenModule::AccessibleProtocolFunctionsData::AccessibleProtocolFunctionsData(
+    SILFunction *function, const std::optional<std::string> &mangledRecordName,
+    const std::optional<std::string> &concreteMangledTypeName)
+    : function(function), mangledRecordName(mangledRecordName),
+      concreteMangledTypeName(concreteMangledTypeName) {}

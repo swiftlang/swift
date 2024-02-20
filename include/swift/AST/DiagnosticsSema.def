@@ -5558,8 +5558,6 @@ ERROR(isolated_attr_global_actor_type,none,
 ERROR(isolated_attr_bad_convention,none,
       "'@isolated(%0)' function type cannot have %1 convention",
       (StringRef, StringRef))
-ERROR(isolation_macro_experimental,none,
-      "#isolation macro is experimental", ())
 
 NOTE(in_derived_conformance, none,
      "in derived conformance to %0",

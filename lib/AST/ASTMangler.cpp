@@ -922,6 +922,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DistributedThunk: return appendOperator("TE");
     case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
+    case SymbolKind::AccessibleProtocolRequirementFunctionRecord:
+    return appendOperator("HpF");
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");

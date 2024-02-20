@@ -1709,8 +1709,9 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
 
   auto *E = RS->getResult();
 
-  // In an initializer, the only expression allowed is "nil", which indicates
-  // failure from a failable initializer.
+  // In an initializer, the only expressions allowed are "nil", which indicates
+  // failure from a failable initializer or "self" in the case of ~Escapable
+  // initializers with explicit lifetime dependence.
   if (auto *ctor =
           dyn_cast_or_null<ConstructorDecl>(fn->getAbstractFunctionDecl())) {
 

@@ -26,12 +26,11 @@ namespace swift {
 
 class ASTContext;
 class TypeRepr;
-class IdentTypeRepr;
+class MemberTypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 class SILTypeResolutionContext;
-class GenericIdentTypeRepr;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -625,7 +624,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  IdentTypeRepr *repr) const;
+                                  MemberTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -667,12 +666,10 @@ public:
                                     ArrayRef<Type> genericArgs) const;
 };
 
-void diagnoseInvalidGenericArguments(SourceLoc loc,
-                                     ValueDecl *decl,
-                                     unsigned argCount,
-                                     unsigned paramCount,
+void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
+                                     unsigned argCount, unsigned paramCount,
                                      bool hasParameterPack,
-                                     GenericIdentTypeRepr *generic);
+                                     SourceRange angleBrackets);
 
 /// \param repr the repr for the type of the parameter.
 /// \param ty the non-error resolved type of the repr.

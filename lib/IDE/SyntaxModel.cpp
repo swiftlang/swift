@@ -402,7 +402,13 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
   PreWalkAction walkToDeclPre(Decl *D) override;
   PostWalkAction walkToDeclPost(Decl *D) override;
+
+  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
+    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
+
   bool shouldWalkIntoGenericParams() override { return true; }
 
 private:
@@ -1122,12 +1128,12 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
     if (!handleAttrs(AttrT->getAttrs()))
       return Action::SkipNode();
 
-  } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
-    if (!passTokenNodesUntil(IdT->getStartLoc(),
-                             ExcludeNodeAtLocation).shouldContinue)
+  } else if (auto *DeclRefT = dyn_cast<DeclRefTypeRepr>(T)) {
+    if (!passTokenNodesUntil(DeclRefT->getLoc(), ExcludeNodeAtLocation)
+             .shouldContinue)
       return Action::SkipNode();
     if (TokenNodes.empty() ||
-        TokenNodes.front().Range.getStart() != IdT->getStartLoc())
+        TokenNodes.front().Range.getStart() != DeclRefT->getLoc())
       return Action::SkipNode();
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
       return Action::SkipNode();

@@ -2236,57 +2236,47 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   assert(ParentNameLoc.isValid());
   assert(NameLoc.isValid());
 
-  // The base component is the parent type.
-  auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
-                                                 Parent->createNameRef());
-  ParentComp->setValue(Parent, nullptr);
+  // The base is the parent type.
+  auto *BaseTR =
+      new (C) SimpleIdentTypeRepr(ParentNameLoc, Parent->createNameRef());
+  BaseTR->setValue(Parent, nullptr);
 
-  // The member component is the member we just found.
-  auto *MemberComp =
-      new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
-  MemberComp->setValue(Decl, nullptr);
+  auto *MemberTR =
+      MemberTypeRepr::create(C, BaseTR, NameLoc, Decl->createNameRef());
+  MemberTR->setValue(Decl, nullptr);
 
-  auto *TR = MemberTypeRepr::create(C, ParentComp, {MemberComp});
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(MemberTR);
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
-  // Add a new component for the member we just found.
-  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
-  NewComp->setValue(Decl, nullptr);
+  auto *MemberTR =
+      MemberTypeRepr::create(C, ParentTR, NameLoc, Decl->createNameRef());
+  MemberTR->setValue(Decl, nullptr);
 
-  TypeRepr *TR = nullptr;
-  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(ParentTR)) {
-    // Create a new list of components.
-    SmallVector<IdentTypeRepr *, 4> Components;
-    if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
-      auto MemberComps = MemberTR->getMemberComponents();
-      Components.append(MemberComps.begin(), MemberComps.end());
-    }
-
-    Components.push_back(NewComp);
-    TR = MemberTypeRepr::create(C, DeclRefTR->getBaseComponent(), Components);
-  } else {
-    TR = MemberTypeRepr::create(C, ParentTR, NewComp);
-  }
-
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(MemberTR);
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
                                              ArrayRef<TypeRepr *> Args,
                                              SourceRange AngleLocs,
                                              ASTContext &C) {
-  auto *lastComp = ParentTR->getLastComponent();
+  DeclRefTypeRepr *specializedTR = nullptr;
 
-  if (!isa<SimpleIdentTypeRepr>(lastComp) || !lastComp->getBoundDecl())
+  auto *boundDecl = ParentTR->getBoundDecl();
+  if (!boundDecl || ParentTR->hasGenericArgList()) {
     return nullptr;
+  }
 
-  if (isa<TypeAliasDecl>(lastComp->getBoundDecl())) {
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+  if (isa<IdentTypeRepr>(ParentTR)) {
+    specializedTR = GenericIdentTypeRepr::create(
+        C, ParentTR->getNameLoc(), ParentTR->getNameRef(), Args, AngleLocs);
+    specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
+  } else {
+    auto *const memberTR = cast<MemberTypeRepr>(ParentTR);
+    if (isa<TypeAliasDecl>(boundDecl)) {
       // If any of our parent types are unbound, bail out and let
       // the constraint solver can infer generic parameters for them.
       //
@@ -2299,50 +2289,30 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
       //
       // FIXME: Once we can model generic typealiases properly, rip
       // this out.
-      auto isUnboundGenericComponent = [](IdentTypeRepr *ITR) -> bool {
-        if (isa<SimpleIdentTypeRepr>(ITR)) {
-          auto *decl = dyn_cast_or_null<GenericTypeDecl>(ITR->getBoundDecl());
+      MemberTypeRepr *currTR = memberTR;
+      while (auto *declRefBaseTR =
+                 dyn_cast<DeclRefTypeRepr>(currTR->getBase())) {
+        if (!declRefBaseTR->hasGenericArgList()) {
+          auto *decl =
+              dyn_cast_or_null<GenericTypeDecl>(declRefBaseTR->getBoundDecl());
           if (decl && decl->isGeneric())
-            return true;
+            return nullptr;
         }
 
-        return false;
-      };
-
-      for (auto *comp : memberTR->getMemberComponents().drop_back()) {
-        if (isUnboundGenericComponent(comp))
-          return nullptr;
-      }
-
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
-        if (isUnboundGenericComponent(identBase))
-          return nullptr;
+        currTR = dyn_cast<MemberTypeRepr>(declRefBaseTR);
+        if (!currTR) {
+          break;
+        }
       }
     }
+
+    specializedTR =
+        MemberTypeRepr::create(C, memberTR->getBase(), ParentTR->getNameLoc(),
+                               ParentTR->getNameRef(), Args, AngleLocs);
+    specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   }
 
-  auto *genericComp = GenericIdentTypeRepr::create(
-      C, lastComp->getNameLoc(), lastComp->getNameRef(), Args, AngleLocs);
-  genericComp->setValue(lastComp->getBoundDecl(), lastComp->getDeclContext());
-
-  TypeRepr *TR = nullptr;
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
-    auto oldMemberComps = memberTR->getMemberComponents().drop_back();
-
-    // Create a new list of member components, replacing the last one with the
-    // new specialized one.
-    SmallVector<IdentTypeRepr *, 2> newMemberComps;
-    newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
-    newMemberComps.push_back(genericComp);
-
-    TR =
-        MemberTypeRepr::create(C, memberTR->getBaseComponent(), newMemberComps);
-  } else {
-    TR = genericComp;
-  }
-
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(specializedTR);
 }
 
 // Create an implicit TypeExpr, with location information even though it

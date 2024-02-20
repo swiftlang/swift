@@ -18,6 +18,7 @@
 #include "GenKeyPath.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -2474,6 +2475,37 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
+
+    if (auto val = CurSILFn->getLocation().castToASTNode<ValueDecl>()) {
+      if (auto attr =
+              val->getAttrs().getAttribute<DistributedThunkTargetAttr>()) {
+
+        // the original `distributed func`
+        auto func = attr->getTargetFunction();
+
+        auto distributedRequirements = func->getDistributedMethodWitnessedProtocolRequirements();
+        if (distributedRequirements.size() == 1) {
+          auto protocolFunc = distributedRequirements.front();
+          Mangle::ASTMangler mangler;
+          // The mangled name of the requirement is the name of the record
+          auto mangledProtocolFuncName =
+            mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
+
+          std::optional<std::string> mangledActorTypeName;
+          if (isa<ClassDecl>(func->getDeclContext()->getAsDecl())) {
+            // a concrete type, not a "distributed" protocol
+            mangledActorTypeName = mangler.mangleAnyDecl(
+                func->getDeclContext()->getSelfNominalTypeDecl(),
+                /*prefix=*/true);
+          }
+
+          IGM.addAccessibleFunctionDistributedAliased(
+              /*mangledRecordName=*/mangledProtocolFuncName,
+              /*mangledActorTypeName=*/mangledActorTypeName,
+              CurSILFn);
+        }
+      }
+    }
   }
 
   // Configure the dominance resolver.

@@ -1997,14 +1997,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!AE->isFolded()) return nullptr;
 
     auto diagnoseMissingParens = [](ASTContext &ctx, TypeRepr *tyR) {
-      bool isVoid = false;
-      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getNameRef().isSimpleName(ctx.Id_Void)) {
-          isVoid = true;
-        }
-      }
-
-      if (isVoid) {
+      if (tyR->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
         ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .fixItReplace(tyR->getStartLoc(), "()");
       } else {
