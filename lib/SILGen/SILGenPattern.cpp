@@ -1398,6 +1398,28 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
   }
 }
 
+namespace {
+class EndAccessCleanup final : public Cleanup {
+  SILValue beginAccess;
+public:
+  EndAccessCleanup(SILValue beginAccess)
+    : beginAccess(beginAccess)
+  {}
+  
+  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
+  override {
+    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
+  }
+  
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "EndAccessCleanup\n";
+    if (beginAccess) {
+      beginAccess->print(llvm::errs());
+    }
+  }
+};
+}
+
 /// Bind a borrow binding into the current scope.
 void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
                                       ConsumableManagedValue value) {
@@ -1419,6 +1441,14 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   if (bindValue.getType().isObject()) {
     // Create a notional copy for the borrow checker to use.
     bindValue = bindValue.copy(SGF, pattern);
+  } else {
+    // Treat use of an address value in-place as a separate nested read access.
+    auto access = SGF.B.createBeginAccess(pattern, bindValue.getValue(),
+                                          SILAccessKind::Read,
+                                          SILAccessEnforcement::Static,
+                                          false, false);
+    SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+    bindValue = ManagedValue::forBorrowedAddressRValue(access);
   }
   // We mark the borrow check as "strict" because we don't want to allow
   // consumes through the binding, even if the original value manages to be
@@ -1789,15 +1819,12 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
         return getManagedSubobject(SGF, member, fieldTL,
                                    src.getFinalConsumption());
       }
-      case CastConsumptionKind::CopyOnSuccess: {
+      case CastConsumptionKind::CopyOnSuccess:
+      case CastConsumptionKind::BorrowAlways: {
         // We translate copy_on_success => borrow_always.
         auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
         return {SGF.B.createLoadBorrow(loc, memberMV),
                 CastConsumptionKind::BorrowAlways};
-      }
-      case CastConsumptionKind::BorrowAlways: {
-        llvm_unreachable(
-            "Borrow always can only occur along object only code paths");
       }
       }
       llvm_unreachable("covered switch");
@@ -3201,26 +3228,6 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // Now that we have initialized our arguments, branch to the shared dest.
   SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
 }
-
-class EndAccessCleanup final : public Cleanup {
-  SILValue beginAccess;
-public:
-  EndAccessCleanup(SILValue beginAccess)
-    : beginAccess(beginAccess)
-  {}
-  
-  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
-  override {
-    SGF.B.createEndAccess(loc, beginAccess, /*aborted*/ false);
-  }
-  
-  void dump(SILGenFunction &SGF) const override {
-    llvm::errs() << "EndAccessCleanup\n";
-    if (beginAccess) {
-      beginAccess->print(llvm::errs());
-    }
-  }
-};
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";

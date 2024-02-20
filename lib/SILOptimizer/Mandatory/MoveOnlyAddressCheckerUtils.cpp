@@ -1128,11 +1128,10 @@ void UseState::initializeLiveness(
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
-  // Assume a strict check of a temporary is initialized before the check.
-  if (auto *asi = dyn_cast<BeginAccessInst>(address->getOperand());
-      asi && address->isStrict()) {
+  // Assume a strict-checked value initialized before the check.
+  if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked begin_access as init!\n");
+               << "Adding strict marker as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
