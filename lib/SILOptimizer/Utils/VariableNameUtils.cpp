@@ -180,6 +180,19 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
       }
     }
 
+    // Look through a function conversion thunk if we have one.
+    if (auto *pai = dyn_cast<PartialApplyInst>(searchValue)) {
+      if (auto *fn = pai->getCalleeFunction()) {
+        if (fn->isThunk() && ApplySite(pai).getNumArguments() == 1) {
+          SILValue value = ApplySite(pai).getArgument(0);
+          if (value->getType().isFunction()) {
+            searchValue = value;
+            continue;
+          }
+        }
+      }
+    }
+
     // If we do not do an exact match, see if we can find a debug_var inst. If
     // we do, we always break since we have a root value.
     if (auto *use = getAnyDebugUse(searchValue)) {
@@ -197,7 +210,8 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
     if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
         isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
         isa<MarkUnresolvedNonCopyableValueInst>(searchValue) ||
-        isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue)) {
+        isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
+        isa<ConvertFunctionInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }

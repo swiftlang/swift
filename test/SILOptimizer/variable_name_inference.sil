@@ -19,6 +19,7 @@ class ContainsKlass {
 sil @getKlass : $@convention(thin) () -> @owned Klass
 sil @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
 sil @useIndirect : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @sideEffect : $@convention(thin) () -> ()
 
 //===----------------------------------------------------------------------===//
 //                                MARK: Tests
@@ -112,4 +113,38 @@ bb0:
   destroy_value %3 : $ContainsKlass
   %13 = tuple ()
   return %13 : $()
+}
+
+sil [thunk] @test_reabstraction_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on handle_function_conversion_reabstraction_thunks: variable-name-inference with: @trace[0]
+// CHECK: Name: 'namedClosure'
+// CHECK: Root: %0 = alloc_stack [lexical] $@callee_guaranteed () -> (), var, name "namedClosure"
+// CHECK: end running test {{.*}} of {{.*}} on handle_function_conversion_reabstraction_thunks: variable-name-inference with: @trace[0]
+sil [ossa] @handle_function_conversion_reabstraction_thunks : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %namedStack = alloc_stack [lexical] $@callee_guaranteed () -> (), var, name "namedClosure"
+  %f = function_ref @sideEffect : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] %f() : $@convention(thin) () -> ()
+  store %pa to [init] %namedStack : $*@callee_guaranteed () -> ()
+
+  %temp = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %access = begin_access [read] [static] %namedStack : $*@callee_guaranteed () -> ()
+  %load = load [copy] %access : $*@callee_guaranteed () -> ()
+  end_access %access : $*@callee_guaranteed () -> ()
+
+  %reabstract = function_ref @test_reabstraction_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+  %reabstract_partially_applied = partial_apply [callee_guaranteed] %reabstract(%load) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+  %cvt = convert_function %reabstract_partially_applied : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  store %cvt to [init] %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  debug_value [trace] %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+
+  destroy_addr %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  dealloc_stack %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  destroy_addr %namedStack : $*@callee_guaranteed () -> ()
+  dealloc_stack %namedStack : $*@callee_guaranteed () -> ()
+
+  %9999 = tuple ()
+  return %9999 : $()
 }
