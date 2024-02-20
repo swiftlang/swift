@@ -1,4 +1,4 @@
-// XFAIL: OS=windows-msvc
+// REQUIRES: swift_in_compiler
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature SymbolLinkageMarkers -emit-module-path %t/a.swiftmodule -module-name a %s
