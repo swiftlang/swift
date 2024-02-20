@@ -242,14 +242,7 @@ void swift_distributed_execute_target(
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
-  accessorEntry(calleeContext,
-                argumentDecoder,
-                argumentTypes,
-                resultBuffer,
-                substitutions,
-                witnessTables,
-                numWitnessTables,
-                actor,
-                decoderType,
-                decoderWitnessTable);
+  accessorEntry(calleeContext, argumentDecoder, argumentTypes, resultBuffer,
+                substitutions, witnessTables, numWitnessTables, actor,
+                decoderType, decoderWitnessTable);
 }
