@@ -251,6 +251,5 @@ void swift_distributed_execute_target(
                 numWitnessTables,
                 actor,
                 decoderType,
-                decoderWitnessTable
-                );
+                decoderWitnessTable);
 }
