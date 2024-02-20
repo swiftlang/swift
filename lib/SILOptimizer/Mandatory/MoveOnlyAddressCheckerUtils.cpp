@@ -1128,13 +1128,20 @@ void UseState::initializeLiveness(
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
-  // Assume a strict check of a temporary is initialized before the check.
-  if (auto *asi = dyn_cast<BeginAccessInst>(address->getOperand());
-      asi && address->isStrict()) {
+  // Assume a strict-checked value initialized before the check.
+  if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked begin_access as init!\n");
+               << "Adding strict marker as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+  
+  // Assume a value wrapped in a MoveOnlyWrapper is initialized.
+  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding copyable_to_move_only_wrapper as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());    
   }
 
   // Now that we have finished initialization of defs, change our multi-maps
@@ -2570,9 +2577,14 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
-    llvm::errs() << "Found a write classified as a liveness use?!\n";
-    llvm::errs() << "Use: " << *user;
-    llvm_unreachable("standard failure");
+    // TODO: `unchecked_take_enum_addr` should inherently be understood as
+    // non-side-effecting when it's nondestructive.
+    auto ue = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
+    if (!ue || ue->isDestructive()) {
+      llvm::errs() << "Found a write classified as a liveness use?!\n";
+      llvm::errs() << "Use: " << *user;
+      llvm_unreachable("standard failure");
+    }
   }
 #endif
   useState.recordLivenessUse(user, *leafRange);
