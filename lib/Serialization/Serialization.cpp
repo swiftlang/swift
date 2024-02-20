@@ -76,8 +76,6 @@
 
 #define DEBUG_TYPE "Serialization"
 
-#pragma clang optimize off
-
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;

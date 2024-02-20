@@ -236,9 +236,119 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
         break
     }
 
-    switch bas { // expected-note{{used here}}
-    case _borrowing x: // expected-warning{{}}
+    switch bas {
+    case _borrowing x: // expected-warning{{}} expected-note{{used here}}
         break
     }
+}
+
+enum E<T>: ~Copyable {
+    case a(T)
+}
+
+extension E {
+    func f() {
+        switch self {
+        case .a:
+            print("a")
+        }
+    }
+
+    func g() {
+        switch self {
+        case .a(_borrowing t): // expected-warning{{}}
+            print("a")
+        }
+    }
+}
+
+struct Box: ~Copyable {
+    let ptr: UnsafeMutablePointer<Int>
+}
+
+struct ChonkyBox: ~Copyable {
+    let container: Any
+}
+
+enum List<Element>: ~Copyable {
+    case end
+    case more(Element, Box)
+}
+
+enum ChonkyList<Element>: ~Copyable {
+    case end
+    case more(Element, ChonkyBox)
+}
+
+extension List {
+    var isEmpty: Bool {
+        switch self {
+        case .end: true
+        case .more: false
+        }
+    }
+
+    var peek: Box {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_, _borrowing box):
+                yield box
+            }
+        }
+    }
+
+/*
+    TODO: type mismatch because of `@moveOnly` wrapper. yield needs to peel it
+    off
+
+    var head: Element {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_borrowing head, _):
+                yield head
+            }
+        }
+    }
+*/
+}
+
+extension ChonkyList {
+    var isEmpty: Bool {
+        switch self {
+        case .end: true
+        case .more: false
+        }
+    }
+
+    var peek: ChonkyBox {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_, _borrowing box):
+                yield box
+            }
+        }
+    }
+
+/*
+    TODO: type mismatch because of `@moveOnly` wrapper. yield needs to peel it
+    off
+
+    var head: Element {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_borrowing head, _):
+                yield head
+            }
+        }
+    }
+*/
 }
 

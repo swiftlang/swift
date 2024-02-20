@@ -114,7 +114,13 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
   unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
+  LLVM_DEBUG(llvm::dbgs() << "computing element offset for root:\n";
+             rootAddress->print(llvm::dbgs()));
+
   while (1) {
+    LLVM_DEBUG(llvm::dbgs() << "projection: ";
+               projectionDerivedFromRoot->print(llvm::dbgs()));
+
     // If we got to the root, we're done.
     if (rootAddress == projectionDerivedFromRoot)
       return {SubElementOffset(finalSubElementOffset)};
@@ -193,6 +199,16 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
     if (auto *initData =
             dyn_cast<InitEnumDataAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = initData->getOperand();
+      continue;
+    }
+    
+    // Look through wrappers.
+    if (auto c2m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = c2m->getOperand();
+      continue;
+    }
+    if (auto m2c = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = m2c->getOperand();
       continue;
     }
 

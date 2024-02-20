@@ -16,7 +16,8 @@ import SwiftOperators
 import SwiftSyntaxBuilder
 
 /// Introduces:
-/// - `distributed actor $MyDistributedActor<ActorSystem>`
+/// - `distributed actor $MyDistributedActor<ActorSystem>: $MyDistributedActor, _DistributedActorStub where ...`
+/// - `extension MyDistributedActor where Self: _DistributedActorStub {}`
 public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -48,7 +49,7 @@ public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
 
     let extensionDecl: DeclSyntax =
       """
-      extension \(proto.name) {
+      extension \(proto.name.trimmed) where Self: Distributed._DistributedActorStub {
         \(raw: requirementStubs)
       }
       """
@@ -68,33 +69,10 @@ public struct DistributedProtocolMacro: ExtensionMacro, PeerMacro {
     let serializationRequirementType =
       "Codable"
 
-    let requirements =
-      proto.memberBlock.members.map { member in
-        member.trimmed
-      }
-    let requirementStubs = requirements
-      .map { req in
-        """
-        \(req) {
-            if #available(SwiftStdlib 5.11, *) {
-              Distributed._distributedStubFatalError()
-            } else {
-              fatalError()
-            }
-        }
-        """
-      }.joined(separator: "\n    ")
-
-    let extensionDecl: DeclSyntax =
-      """
-      extension \(proto.name) where Self: _DistributedActorStub {
-        \(raw: requirementStubs)
-      }
-      """
-    
     let stubActorDecl: DeclSyntax =
       """
-      distributed actor $\(proto.name)<ActorSystem>: \(proto.name), _DistributedActorStub
+      distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
+        Distributed._DistributedActorStub
         where ActorSystem: DistributedActorSystem<any \(raw: serializationRequirementType)>, 
           ActorSystem.ActorID: \(raw: serializationRequirementType) 
       { }

@@ -11,29 +11,26 @@
 
 import Distributed
 
-// FIXME: the errors below are bugs: the added methods should be considered witnesses rdar://123012943
-// expected-note@+1{{in expansion of macro '_DistributedProtocol' on protocol 'Greeter' here}}
 @_DistributedProtocol
 protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
-  // FIXME: this is a bug
-  // expected-note@+1{{protocol requires function 'greet(name:)' with type '(String) -> String'}}
   distributed func greet(name: String) -> String
 }
 
 // @_DistributedProtocol ->
 
-// CHECK: distributed actor $Greeter<ActorSystem>: Greeter, _DistributedActorStub
-// CHECK:   where ActorSystem: DistributedActorSystem<any Codable>,
-// CHECK:   ActorSystem.ActorID: Codable
-// CHECK: {
-// CHECK: }
+// CHECK: distributed actor $Greeter<ActorSystem>: Greeter,
+// CHECK-NEXT: Distributed._DistributedActorStub
+// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>,
+// CHECK-NEXT: ActorSystem.ActorID: Codable
+// CHECK-NEXT: {
+// CHECK-NEXT: }
 
-// CHECK: extension Greeter {
-// CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available (SwiftStdlib 5.11, *) {
-// CHECK:       Distributed._distributedStubFatalError()
-// CHECK:     } else {
-// CHECK:       fatalError()
-// CHECK:     }
-// CHECK:   }
-// CHECK: }
+// CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
+// CHECK-NEXT:   distributed func greet(name: String) -> String {
+// CHECK-NEXT:     if #available (SwiftStdlib 5.11, *) {
+// CHECK-NEXT:       Distributed._distributedStubFatalError()
+// CHECK-NEXT:     } else {
+// CHECK-NEXT:       fatalError()
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT: }

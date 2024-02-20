@@ -1316,7 +1316,11 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public func storeBytes<T : _BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
+#if $BuiltinStoreRaw
     Builtin.storeRaw(value, (self + offset)._rawValue)
+#else
+    fatalError("Unsupported swift compiler!")
+#endif
   }
 #endif
   @inlinable
