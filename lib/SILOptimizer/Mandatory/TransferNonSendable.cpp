@@ -1074,11 +1074,10 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
 
 bool TransferNonTransferrableDiagnosticInferrer::run() {
   // We need to find the isolation info.
+  auto *op = info.transferredOperand;
   auto loc = info.transferredOperand->getUser()->getLoc();
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
-    auto *op = info.transferredOperand;
-
     std::optional<ApplyIsolationCrossing> isolation = {};
 
     // First try to get the apply from the isolation crossing.
@@ -1139,6 +1138,15 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
     }
   }
 
+  // See if we are in SIL and have an apply site specified isolation.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (auto isolation = fas.getIsolationCrossing()) {
+      diagnosticInfo = UseDiagnosticInfo::forFunctionArgumentApply(
+          *isolation, op->get()->getType().getASTType());
+      return true;
+    }
+  }
+
   diagnosticInfo = UseDiagnosticInfo::forMiscUse();
   return true;
 }
@@ -1183,10 +1191,12 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
       if (rep.maybeGetValue() == info.nonTransferrableValue)
         continue;
       auto *fArg = cast<SILFunctionArgument>(info.nonTransferrableValue);
-      diagnoseNote(
-          astContext, fArg->getDecl()->getLoc(),
-          diag::regionbasedisolation_isolated_since_in_same_region_basename,
-          "task isolated", fArg->getDecl()->getBaseName());
+      if (fArg->getDecl()) {
+        diagnoseNote(
+            astContext, fArg->getDecl()->getLoc(),
+            diag::regionbasedisolation_isolated_since_in_same_region_basename,
+            "task isolated", fArg->getDecl()->getBaseName());
+      }
       break;
     }
     case UseDiagnosticInfoKind::FunctionArgumentClosure: {
