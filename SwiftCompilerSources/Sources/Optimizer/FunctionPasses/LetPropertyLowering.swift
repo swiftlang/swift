@@ -156,7 +156,7 @@ private func constructLetInitRegion(
       initRegion.insert(inst)
 
     case let beginAccess as BeginAccessInst
-         where beginAccess.accessKind == .Deinit &&
+         where beginAccess.accessKind == .deinit &&
                beginAccess.address.isLetFieldAddress(of: markUninitialized):
       // Include let-field partial de-initializations in the region.
       initRegion.insert(inst)

@@ -983,12 +983,18 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-public typealias AccessKind = BridgedInstruction.AccessKind
-
-
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
+  // The raw values must match SILAccessKind.
+  public enum AccessKind: Int {
+    case `init` = 0
+    case read = 1
+    case modify = 2
+    case `deinit` = 3
+  }
+  public var accessKind: AccessKind {
+    AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
+  }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
 
