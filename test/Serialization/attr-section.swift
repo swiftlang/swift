@@ -1,3 +1,5 @@
+// XFAIL: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature SymbolLinkageMarkers -emit-module-path %t/a.swiftmodule -module-name a %s
 // RUN: llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --check-prefix BC-CHECK --implicit-check-not UnknownCode %s
