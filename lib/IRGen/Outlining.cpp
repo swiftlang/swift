@@ -443,6 +443,17 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
       true /*setIsNoInline*/);
 }
 
+void TypeInfo::callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                                   Atomicity atomicity) const {
+  llvm::Type *llvmType = addr.getAddress()->getType();
+  auto *outlinedF = cast<llvm::Function>(
+      IGF.IGM.getOrCreateReleaseFunction(*this, T, llvmType, atomicity));
+  llvm::Value *args[] = {addr.getAddress()};
+  llvm::CallInst *call =
+      IGF.Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+}
+
 llvm::Constant *
 IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
                                         SILType t,

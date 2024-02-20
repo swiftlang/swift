@@ -583,6 +583,9 @@ public:
                         IsTake_t isTake) const;
 
   void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                           Atomicity atomicity) const;
 };
 
 } // end namespace irgen
