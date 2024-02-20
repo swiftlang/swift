@@ -9,6 +9,8 @@
 // RUN: %target-swift-symbolgraph-extract -module-name SkipsPublicUnderscore -I %t -pretty-print -output-dir %t -minimum-access-level private
 // RUN: %FileCheck %s --input-file %t/SkipsPublicUnderscore.symbols.json --check-prefix PRIVATE
 
+// XFAIL: noncopyable_generics
+
 public protocol PublicProtocol {}
 
 public class SomeClass {

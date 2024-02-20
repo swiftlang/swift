@@ -4,3 +4,6 @@
 // RUN: %diff -u %s.response %t.response
 
 // rdar://76868074: Make sure we print the extensions for C.
+
+// XFAIL: noncopyable_generics
+

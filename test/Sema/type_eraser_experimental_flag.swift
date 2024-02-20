@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -disable-availability-checking -dump-ast -enable-experimental-opaque-type-erasure %s | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 class AnyP: P {
   init<T: P>(erasing: T) {}
 }

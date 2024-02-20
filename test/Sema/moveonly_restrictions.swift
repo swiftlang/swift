@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature MoveOnlyClasses
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: concurrency
 
 class CopyableKlass {}

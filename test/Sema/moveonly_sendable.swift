@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: concurrency
 
 

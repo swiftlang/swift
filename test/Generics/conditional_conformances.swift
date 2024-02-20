@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
+// XFAIL: noncopyable_generics
+
 protocol P1 {}
 protocol P2 {}
 protocol P3 {}

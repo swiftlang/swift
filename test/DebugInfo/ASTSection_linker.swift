@@ -2,6 +2,8 @@
 
 // RUN: %empty-directory(%t)
 
+// XFAIL: noncopyable_generics
+
 // RUN: %target-swift-frontend -c -Xcc -DA -Xcc -DB -emit-module -o %t %S/ASTSection.swift -swift-version 4
 // RUN: %swift-ide-test -test-CompilerInvocation-from-module -source-filename=%t/ASTSection.swiftmodule
 

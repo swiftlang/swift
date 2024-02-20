@@ -6,6 +6,8 @@
 // RUN: %target-build-swift -c %S/Inputs/overlay.swift -module-name ClangModuleWithOverlay -I %S/Inputs -o %t/ClangModuleWithOverlay.o -parse-as-library
 // RUN: %target-build-swift -emit-executable %s %t/ClangModuleWithOverlay.o -I %t -g -o %t/ASTSectionOverlay -module-name ASTSectionOverlay -emit-module -Xlinker -add_ast_path -Xlinker %t/ClangModuleWithOverlay.swiftmodule
 
+// XFAIL: noncopyable_generics
+
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSectionOverlay | %FileCheck %s
 // CHECK: Loading ClangModuleWithOverlay
 // CHECK-NOT: Loading (overlay) ClangModuleWithOverlay

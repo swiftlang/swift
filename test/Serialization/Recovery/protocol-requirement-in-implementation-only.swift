@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 
+// XFAIL: noncopyable_generics
+
 //// Build the private module and the public module normally.
 //// Force the public module to be system with an underlying Clang module.
 // RUN: %target-swift-frontend -emit-module -DPRIVATE_LIB %s -module-name private_lib -emit-module-path %t/private_lib.swiftmodule

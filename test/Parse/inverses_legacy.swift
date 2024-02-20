@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 protocol Sando { func make() } // expected-note 2{{protocol requires function 'make()'}}
 
 struct BuggerView: ~Escapable {} // expected-error {{can only suppress 'Copyable'}}

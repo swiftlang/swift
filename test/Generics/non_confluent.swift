@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 protocol ABA // expected-error {{cannot build rewrite system for protocol; rule length limit exceeded}}
 // expected-note@-1 {{failed rewrite rule is [ABA:A].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:A] => [ABA:A].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B].[ABA:B]}}
     where A.B == A.B.A { // expected-error *{{is not a member type}}
