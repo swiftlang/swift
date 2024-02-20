@@ -236,8 +236,8 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
         break
     }
 
-    switch bas {
-    case _borrowing x: // expected-warning{{}} expected-note{{used here}}
+    switch bas { // expected-note{{used here}}
+    case _borrowing x: // expected-warning{{}}
         break
     }
 }
