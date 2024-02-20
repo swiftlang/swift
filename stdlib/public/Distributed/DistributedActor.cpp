@@ -152,9 +152,7 @@ using TargetExecutorSignature =
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
                         /*decoderType=*/Metadata *,
-                        /*actorType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **,
-                        /*distributedActorWitnessTable=*/void **),
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -181,9 +179,7 @@ using DistributedAccessorSignature =
                         /*numWitnessTables=*/size_t,
                         /*actor=*/HeapObject *,
                         /*decoderType=*/Metadata *,
-                        /*actorType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **,
-                        /*actorWitnessTable=*/void **),
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -211,20 +207,16 @@ SWIFT_CC(swiftasync)
 void swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
-    HeapObject *argumentDecoder, const Metadata *const *argumentTypes,
-    void *resultBuffer, void *substitutions, void **witnessTables,
-    size_t numWitnessTables, Metadata *decoderType, Metadata *actorType,
-    void **decoderWitnessTable, void **actorWitnessTable) {
-  std::string targetName(targetNameStart, targetNameLength);
-
-  auto actorTy = swift_getObjectType(actor);
-  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
-
-  auto *accessor = findDistributedProtocolMethodAccessor(
-      /*findConcreteWitness=*/false,
-      actorTyNamePair.data, actorTyNamePair.length,
-      targetNameStart, targetNameLength);
-
+    HeapObject *argumentDecoder,
+    const Metadata *const *argumentTypes,
+    void *resultBuffer,
+    void *substitutions,
+    void **witnessTables,
+    size_t numWitnessTables,
+    Metadata *decoderType,
+    void **decoderWitnessTable
+    ) {
+  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
         swift_distributed_makeDistributedTargetAccessorNotFoundError();
@@ -250,16 +242,7 @@ void swift_distributed_execute_target(
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
-  accessorEntry(calleeContext,
-                argumentDecoder,
-                argumentTypes,
-                resultBuffer,
-                substitutions,
-                witnessTables,
-                numWitnessTables,
-                actor,
-                decoderType,
-                actorType,
-                decoderWitnessTable,
-                actorWitnessTable);
+  accessorEntry(calleeContext, argumentDecoder, argumentTypes, resultBuffer,
+                substitutions, witnessTables, numWitnessTables, actor,
+                decoderType, decoderWitnessTable);
 }
