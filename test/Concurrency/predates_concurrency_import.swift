@@ -6,15 +6,14 @@
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 @preconcurrency import NonStrictModule
 @_predatesConcurrency import StrictModule // expected-warning{{'@_predatesConcurrency' has been renamed to '@preconcurrency'}}
 @preconcurrency import OtherActors
-// expected-remark@-1{{'@preconcurrency' attribute on module 'OtherActors' is unused}}{{1-17=}}
+// expected-warning@-1{{'@preconcurrency' attribute on module 'OtherActors' has no effect}}{{1-17=}}
 
 func acceptSendable<T: Sendable>(_: T) { }
 

@@ -71,8 +71,10 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
 
     ModuleDecl::ImportFilter filter = {ModuleDecl::ImportFilterKind::Default,
                                        ModuleDecl::ImportFilterKind::Exported};
-    if (Opts.PrintPrivateInterfaceContent)
+    if (!Opts.printPublicInterface())
       filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+    if (Opts.printPackageInterface())
+      filter |= ModuleDecl::ImportFilterKind::PackageOnly;
 
     SmallVector<ImportedModule> imports;
     M->getImportedModules(imports, filter);
@@ -99,7 +101,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         << Opts.IgnorableFlags << "\n";
   }
 
-  auto hasPrivateIgnorableFlags = Opts.PrintPrivateInterfaceContent && !Opts.IgnorablePrivateFlags.empty();
+  auto hasPrivateIgnorableFlags = !Opts.printPublicInterface() && !Opts.IgnorablePrivateFlags.empty();
   if (hasPrivateIgnorableFlags) {
     out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY ": "
         << Opts.IgnorablePrivateFlags << "\n";
@@ -233,6 +235,7 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M,
                          const llvm::SmallSet<StringRef, 4>
                            &AliasModuleNamesTargets) {
+  auto &ctx = M->getASTContext();
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
@@ -240,11 +243,11 @@ static void printImports(raw_ostream &out,
       ModuleDecl::ImportFilterKind::Default};
 
   // With -experimental-spi-imports:
-  // When printing the private swiftinterface file, print implementation-only
-  // imports only if they are also SPI. First, list all implementation-only
-  // imports and filter them later.
+  // When printing the private or package swiftinterface file, print implementation-only
+  // imports only if they are also SPI. First, list all implementation-only imports and
+  // filter them later.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> ioiImportSet;
-  if (Opts.PrintPrivateInterfaceContent && Opts.ExperimentalSPIImports) {
+  if (!Opts.printPublicInterface() && Opts.ExperimentalSPIImports) {
 
     SmallVector<ImportedModule, 4> ioiImports, allImports;
     M->getImportedModules(ioiImports,
@@ -265,7 +268,7 @@ static void printImports(raw_ostream &out,
 
   /// Collect @_spiOnly imports that are not imported elsewhere publicly.
   llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> spiOnlyImportSet;
-  if (Opts.PrintPrivateInterfaceContent) {
+  if (!Opts.printPublicInterface()) {
     SmallVector<ImportedModule, 4> spiOnlyImports, otherImports;
     M->getImportedModules(spiOnlyImports,
                           ModuleDecl::ImportFilterKind::SPIOnly);
@@ -290,7 +293,7 @@ static void printImports(raw_ostream &out,
     M->getMissingImportedModules(allImports);
 
   ImportedModule::removeDuplicates(allImports);
-  diagnoseScopedImports(M->getASTContext().Diags, allImports);
+  diagnoseScopedImports(ctx.Diags, allImports);
 
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
@@ -310,7 +313,7 @@ static void printImports(raw_ostream &out,
     // 'import Builtin' in the interface. '-parse-stdlib' still implicitly
     // imports it however...
     if (importedModule->isBuiltinModule() &&
-        !M->getASTContext().LangOpts.hasFeature(Feature::BuiltinModule)) {
+        !ctx.LangOpts.hasFeature(Feature::BuiltinModule)) {
       continue;
     }
 
@@ -332,8 +335,8 @@ static void printImports(raw_ostream &out,
     if (publicImportSet.count(import))
       out << "@_exported ";
 
-    if (Opts.PrintPrivateInterfaceContent) {
-      // An import visible in the private swiftinterface only.
+    if (!Opts.printPublicInterface()) {
+      // An import visible in the private or package swiftinterface only.
       //
       // In the long term, we want to print this attribute for consistency and
       // to enforce exportability analysis of generated code.
@@ -348,7 +351,7 @@ static void printImports(raw_ostream &out,
         out << "@_spi(" << spiName << ") ";
     }
 
-    if (M->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
+    if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
       out << "public ";
     }
 
@@ -504,7 +507,7 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
+              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -620,7 +623,7 @@ public:
       return;
 
     // Skip SPI extensions in the public interface.
-    if (!printOptions.PrintSPIs && extension->isSPI())
+    if (printOptions.printPublicInterface() && extension->isSPI())
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
@@ -690,7 +693,7 @@ public:
       proto->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // If 'nominal' is an actor, we do not synthesize its conformance
         // to the Actor protocol through a dummy extension.
@@ -699,9 +702,16 @@ public:
         // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
-        if (inherited->isSPI() && !printOptions.PrintSPIs)
+        // Do not synthesize an extension to print a conformance to an
+        // invertible protocol, as their conformances are always re-inferred
+        // using the interface itself.
+        if (auto kp = inherited->getKnownProtocolKind())
+          if (getInvertibleProtocolKind(*kp))
+            return TypeWalker::Action::SkipNode;
+
+        if (inherited->isSPI() && printOptions.printPublicInterface())
           return TypeWalker::Action::Continue;
 
         if (isPublicOrUsableFromInline(inherited) &&
@@ -711,7 +721,7 @@ public:
               inherited, availability, isUnchecked, otherAttrs);
           printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
                                     protoAndAvailability);
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
         }
 
         return TypeWalker::Action::Continue;
@@ -735,7 +745,9 @@ public:
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
-        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked)));
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
+        /*isRetroactive=*/false,
+        /*isPreconcurrency=*/false)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);
@@ -780,7 +792,7 @@ public:
       return false;
     assert(nominal->isGenericContext());
 
-    if (printOptions.PrintSPIs)
+    if (!printOptions.printPublicInterface())
       out << "@_spi(" << DummyProtocolName << ")\n";
     out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
@@ -821,23 +833,17 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
   printImports(out, Opts, M, aliasModuleNamesTargets);
 
-  static bool forceUseExportedModuleNameInPublicOnly =
-    getenv("SWIFT_DEBUG_USE_EXPORTED_MODULE_NAME_IN_PUBLIC_ONLY");
-  bool useExportedModuleNameInPublicOnly =
-    M->getASTContext().LangOpts.hasFeature(Feature::ModuleInterfaceExportAs) ||
-    forceUseExportedModuleNameInPublicOnly;
-  bool useExportedModuleNames = !(useExportedModuleNameInPublicOnly &&
-                                  Opts.PrintPrivateInterfaceContent);
+  bool useExportedModuleNames = Opts.printPublicInterface();
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
-      Opts.PrintPrivateInterfaceContent,
+      Opts.InterfaceContentMode,
       useExportedModuleNames,
       Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;
-  M->getTopLevelDecls(topLevelDecls);
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
     InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
 

@@ -177,6 +177,7 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
     PrintOptions Options = PrintOptions::printTypeInterface(
         Ty.getPointer(),
         Ty->getASTContext().TypeCheckerOpts.PrintFullConvention);
+    Options.CurrentModule = M;
     ND->print(Printer, Options);
     printTypeNameToString(Ty, TypeName);
     return false;
@@ -665,10 +666,14 @@ void swift::ide::printModuleInterface(
         // An imported namespace decl will contain members from all redecls, so
         // make sure we add all the redecls.
         for (auto redecl : namespaceDecl->redecls()) {
+          if (redecl->decls_empty())
+            continue;
           // Namespace redecls may exist across mutliple modules. We want to
           // add the decl "D" to every module that has a redecl. But we only
           // want to add "D" once to prevent duplicate printing.
           clang::SourceLocation loc = redecl->getLocation();
+          assert(loc.isValid() &&
+                 "expected a valid SourceLocation for a non-empty namespace");
           auto *owningModule = Importer.getClangOwningModule(redecl);
           auto found = ClangDecls.find(owningModule);
           if (found != ClangDecls.end() &&

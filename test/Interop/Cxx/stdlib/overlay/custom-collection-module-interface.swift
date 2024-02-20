@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-cache-path %t | %FileCheck %s
 
 // CHECK: struct SimpleArrayWrapper : CxxRandomAccessCollection {
 // CHECK:   typealias Element = UnsafePointer<Int32>.Pointee
@@ -18,14 +19,14 @@
 // CHECK:   typealias RawIterator = SimpleCollectionReadOnly.iterator
 // CHECK: }
 
-// CHECK: struct HasInheritedTemplatedConstRACIterator<Int32> : CxxRandomAccessCollection {
-// CHECK:   typealias Element = InheritedTemplatedConstRACIterator<Int32>.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIterator<Int32>>
-// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIterator<Int32>
+// CHECK: struct HasInheritedTemplatedConstRACIterator<CInt> : CxxRandomAccessCollection {
+// CHECK:   typealias Element = InheritedTemplatedConstRACIterator<CInt>.Pointee
+// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIterator<CInt>>
+// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIterator<CInt>
 // CHECK: }
 
-// CHECK: struct HasInheritedTemplatedConstRACIteratorOutOfLineOps<Int32> : CxxRandomAccessCollection {
-// CHECK:   typealias Element = InheritedTemplatedConstRACIteratorOutOfLineOps<Int32>.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIteratorOutOfLineOps<Int32>>
-// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIteratorOutOfLineOps<Int32>
+// CHECK: struct HasInheritedTemplatedConstRACIteratorOutOfLineOps<CInt> : CxxRandomAccessCollection {
+// CHECK:   typealias Element = InheritedTemplatedConstRACIteratorOutOfLineOps<CInt>.Pointee
+// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIteratorOutOfLineOps<CInt>>
+// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIteratorOutOfLineOps<CInt>
 // CHECK: }

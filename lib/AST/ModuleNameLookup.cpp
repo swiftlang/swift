@@ -165,6 +165,11 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
           return true;
         if (respectAccessControl &&
+            // NL_IgnoreAccessControl applies only to the current module.
+            !((options & NL_IgnoreAccessControl) &&
+                moduleScopeContext &&
+                moduleScopeContext->getParentModule() ==
+                    VD->getDeclContext()->getParentModule()) &&
             !VD->isAccessibleFrom(moduleScopeContext, false,
                                   includeUsableFromInline))
           return true;

@@ -449,7 +449,7 @@ func destroyNonPODArray(_ array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
-// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins15destroyGenArray_5count_yBp_BwxtlF"(ptr %0, i64 %1, ptr noalias nocapture %2, ptr %T)
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins15destroyGenArray_5count_yBp_BwxtlF"(ptr %0, i64 %1, ptr noalias %2, ptr %T)
 // CHECK-NOT:   loop:
 // CHECK:         call void @swift_arrayDestroy
 func destroyGenArray<T>(_ array: Builtin.RawPointer, count: Builtin.Word, _: T) {
@@ -527,7 +527,7 @@ func copyNonPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count:
   Builtin.assignTakeArray(W.self, dest, src, count)
 }
 
-// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyGenArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2, ptr noalias nocapture %3, ptr %T)
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyGenArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2, ptr noalias %3, ptr %T)
 // CHECK-NOT:   loop:
 // CHECK:        call void @swift_arrayInitWithCopy
 // CHECK-NOT:   loop:
@@ -827,5 +827,19 @@ func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
   return Builtin.convertTaskToJob(task)
 }
 
+// CHECK-LABEL: define {{.*}} swiftcc i32 @"$s8builtins10getEnumTagys6UInt32VxlF"(ptr {{.*}} %0, ptr %T)
+// CHECK: %GetEnumTag = load ptr, ptr {{%.*}}
+// CHECK: [[TAG:%.*]] = call i32 %GetEnumTag(ptr {{.*}} %0, ptr %T)
+// CHECK: ret i32 [[TAG]]
+func getEnumTag<T>(_ x: T) -> UInt32 {
+  UInt32(Builtin.getEnumTag(x))
+}
+
+// CHECK-LABEL: define {{.*}} swiftcc void @"$s8builtins13injectEnumTag_3tagyxz_s6UInt32VtlF"(ptr %0, i32 %1, ptr %T)
+// CHECK: %DestructiveInjectEnumTag = load ptr, ptr {{%.*}}
+// CHECK: call void %DestructiveInjectEnumTag(ptr {{.*}} %0, i32 %1, ptr %T)
+func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
+  Builtin.injectEnumTag(&x, tag._value)
+}
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

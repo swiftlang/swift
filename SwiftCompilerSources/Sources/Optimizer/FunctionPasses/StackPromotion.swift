@@ -68,6 +68,12 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
     return false
   }
 
+  // Usually resilient classes cannot be promoted anyway, because their initializers are
+  // not visible and let the object appear to escape.
+  if allocRef.type.nominal.isResilient(in: allocRef.parentFunction) {
+    return false
+  }
+
   // The most important check: does the object escape the current function?
   if allocRef.isEscaping(context) {
     return false
@@ -267,7 +273,7 @@ private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
     // instructions (for which the `visitUse` closure is not called).
     result.insert(operandsDefinitionBlock)
 
-    // We need to explicitly add predecessor blocks of phi-arguments becaues they
+    // We need to explicitly add predecessor blocks of phis becaues they
     // are not necesesarily visited during the down-walk in `isEscaping()`.
     // This is important for the special case where there is a back-edge from the
     // inner range to the inner rage's begin-block:
@@ -278,8 +284,8 @@ private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
     //     %k = alloc_ref $Klass   // innerInstRange.begin
     //     cond_br bb2, bb1(%k)    // back-edge to bb1 == innerInstRange.blockRange.begin
     //
-    if value is BlockArgument {
-      result.insert(contentsOf: operandsDefinitionBlock.predecessors)
+    if let phi = Phi(value) {
+      result.insert(contentsOf: phi.predecessors)
     }
     return .continueWalk
   }

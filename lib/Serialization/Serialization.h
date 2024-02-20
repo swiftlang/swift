@@ -18,6 +18,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
 #include "ModuleFormat.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
@@ -110,6 +111,10 @@ class Serializer : public SerializerBase {
       serialization::NUM_SPECIAL_IDS - 1;
 
   SmallVector<DeclID, 16> exportedPrespecializationDecls;
+
+  /// Will be set to true if any serialization step failed, for example due to
+  /// an error in the AST.
+  bool hadError = false;
 
   /// Helper for serializing entities in the AST block object graph.
   ///
@@ -289,7 +294,7 @@ public:
   // constructed, and then converted to a `DerivativeFunctionConfigTableData`.
   using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
       Identifier,
-      llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+      swift::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of the fingerprint associated with a serialized
@@ -569,6 +574,19 @@ public:
   void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
   bool allowCompilerErrors() const;
+
+private:
+  /// If the declaration is invalid, records that an error occurred and returns
+  /// true if the decl should be skipped.
+  bool skipDeclIfInvalid(const Decl *decl);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, TypeRepr *tyRepr);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, SourceLoc loc);
 };
 
 } // end namespace serialization

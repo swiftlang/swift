@@ -100,7 +100,7 @@ func inout_func(_ n: inout Int) {}
 // CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : @guaranteed $D):
 func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box ${ var D }
-  // CHECK: [[D2L:%[0-9]+]] = begin_borrow [lexical] [[D2]]
+  // CHECK: [[D2L:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[D2]]
   // CHECK: [[RESULT:%.*]] = project_box [[D2L]]
   // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
   // CHECK: [[SB:%.*]] = store_borrow [[D]] to [[MATERIALIZED_BORROWED_D]]
@@ -528,7 +528,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
 // CHECK: bb0([[P:%[0-9]+]] : $*any P1):
 func testExistentials2(_ p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box ${ var any P1 }
-  // CHECK: [[P1AL:%[0-9]+]] = begin_borrow [lexical] [[P1A]]
+  // CHECK: [[P1AL:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[P1A]]
   // CHECK: [[PB:%.*]] = project_box [[P1AL]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
@@ -558,7 +558,7 @@ func testExistentialsGetters(_ p1: P1) {
 func testExistentialSetters(_ p1: P1, b: Bool) {
   var p1 = p1
   // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var any P1 }
-  // CHECK: [[PLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[PBOX]]
+  // CHECK: [[PLIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[PBOX]]
   // CHECK: [[PBP:%[0-9]+]] = project_box [[PLIFETIME]]
   // CHECK-NEXT: copy_addr [[P]] to [init] [[PBP]] : $*any P1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
@@ -592,7 +592,7 @@ struct HasAP1 {
 func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   var hasAP1 = hasAP1
   // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box ${ var HasAP1 }
-  // CHECK: [[HASP1_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[HASP1_BOX]]
+  // CHECK: [[HASP1_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[HASP1_BOX]]
   // CHECK: [[PBHASP1:%[0-9]+]] = project_box [[HASP1_LIFETIME]]
   // CHECK-NEXT: copy_addr [[HASP1]] to [init] [[PBHASP1]] : $*HasAP1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBHASP1]]
@@ -618,7 +618,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
                                             immediate: P1) {
   var immediate = immediate
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var any P1 }
-  // CHECK: [[IMMEDIATE_LIFETIME:%.*]] = begin_borrow [lexical] [[IMMEDIATE_BOX]]
+  // CHECK: [[IMMEDIATE_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[IMMEDIATE_BOX]]
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_LIFETIME]]
   // CHECK: [[VALUE:%.*]] = open_existential_addr immutable_access %0
   // CHECK: [[METHOD:%.*]] = function_ref
@@ -661,7 +661,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
                                            immediate: CP1) {
   var immediate = immediate
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var any CP1 }
-  // CHECK: [[IMMEDIATE_LIFETIME:%.*]] = begin_borrow [lexical] [[IMMEDIATE_BOX]]
+  // CHECK: [[IMMEDIATE_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[IMMEDIATE_BOX]]
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_LIFETIME]]
 
   // CHECK-NOT: copy_value [[ARG0]]
@@ -702,7 +702,7 @@ extension InitRequirement {
   init(d: D) {
     // CHECK:      [[SELF_BOX:%.*]] = alloc_box
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
+    // CHECK-NEXT: [[SELF_BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_BOX_LIFETIME]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
     // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -726,7 +726,7 @@ extension InitRequirement {
   init(d2: D) {
     // CHECK:      [[SELF_BOX:%.*]] = alloc_box
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
     // CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -749,7 +749,7 @@ extension InitRequirement {
   init(c2: C) {
     // CHECK:      [[SELF_BOX:%.*]] = alloc_box
     // CHECK-NEXT: [[UNINIT_SELF:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[UNINIT_SELF]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[UNINIT_SELF]]
     // CHECK-NEXT: [[SELF_BOX_ADDR:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $Self
     // CHECK-NEXT: [[SELF_TYPE:%.*]] = metatype $@thick Self.Type
@@ -834,7 +834,7 @@ extension ProtoDelegatesToObjC where Self : ObjCInitClass {
   init(string: String) {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : ObjCInitClass, τ_0_0 : ProtoDelegatesToObjC> { var τ_0_0 } <Self>
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK:   [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:   [[SELF_META_C:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick ObjCInitClass.Type
     // CHECK:   [[OBJC_INIT:%[0-9]+]] = class_method [[SELF_META_C]] : $@thick ObjCInitClass.Type, #ObjCInitClass.init!allocator
@@ -859,7 +859,7 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : RequiredInitClass, τ_0_0 : ProtoDelegatesToRequired> { var τ_0_0 } <Self>
   // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[SELF_META_AS_CLASS_META:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick RequiredInitClass.Type
   // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF_META_AS_CLASS_META]] : $@thick RequiredInitClass.Type, #RequiredInitClass.init!allocator : (RequiredInitClass.Type) -> () -> RequiredInitClass, $@convention(method) (@thick RequiredInitClass.Type) -> @owned RequiredInitClass

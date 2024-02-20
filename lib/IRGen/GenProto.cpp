@@ -547,6 +547,17 @@ private:
   // Did the convention decide that the parameter at the given index
   // was a class-pointer source?
   bool isClassPointerSource(unsigned paramIndex);
+
+  // If we are building a protocol witness thunks for
+  // `DistributedActorSystem.remoteCall` or
+  // `DistributedTargetInvocationEncoder.record{Argument, ReturnType}`
+  // `DistributedTargetInvocationDecoder.decodeNextArgument`
+  // `DistributedTargetInvocationResultHandler.onReturn`
+  // requirements we need to supply witness tables associated with `Res`,
+  // `Argument`, `R` generic parameters which are not expressible on the
+  // protocol requirement because they come from `SerializationRequirement`
+  // associated type.
+  void injectAdHocDistributedRequirements();
 };
 
 } // end anonymous namespace
@@ -720,6 +731,63 @@ bool EmitPolymorphicParameters::isClassPointerSource(unsigned paramIndex) {
     }
   }
   return false;
+}
+
+void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
+  // FIXME: We need a better way to recognize that function is
+  // a thunk for witness of `remoteCall` requirement.
+  if (!Fn.hasLocation())
+    return;
+
+  auto loc = Fn.getLocation();
+
+  auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
+  if (!(funcDecl && funcDecl->isGeneric()))
+    return;
+
+  if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+    return;
+
+  Type genericParam;
+
+  auto sig = funcDecl->getGenericSignature();
+
+  // DistributedActorSystem.remoteCall
+  if (funcDecl->isDistributedActorSystemRemoteCall(
+          /*isVoidReturn=*/false)) {
+    genericParam = funcDecl->getResultInterfaceType();
+  } else {
+    // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+    // DistributedTargetInvocationDecoder.decodeNextArgument
+    // DistributedTargetInvocationResultHandler.onReturn
+    genericParam = sig.getInnermostGenericParams().front();
+  }
+
+  if (!genericParam)
+    return;
+
+  auto protocols = sig->getRequiredProtocols(genericParam);
+  if (protocols.empty())
+    return;
+
+  auto archetypeTy = getTypeInContext(genericParam->getCanonicalType());
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(archetypeTy);
+
+  for (auto *proto : protocols) {
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+
+    // Lookup the witness table for this protocol dynamically via
+    // swift_conformsToProtocol(<<archetype>>, <<protocol>>)
+    auto *witnessTable = IGF.Builder.CreateCall(
+        IGM.getConformsToProtocolFunctionPointer(),
+        {metadata, IGM.getAddrOfProtocolDescriptor(proto)});
+
+    IGF.setUnscopedLocalTypeData(
+        archetypeTy,
+        LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
+        witnessTable);
+  }
 }
 
 namespace {
@@ -989,7 +1057,7 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (assocProtocol->isObjC())
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(assocProtocol))
       continue;
 
     auto assocConformance =
@@ -1933,6 +2001,24 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   return fn;
 }
 
+/// Produce a reference for the conforming entity of a protocol conformance
+/// descriptor, which is usually the conforming concrete type.
+static TypeEntityReference getConformingEntityReference(
+    IRGenModule &IGM, const RootProtocolConformance *conformance) {
+  // This is a conformance of a protocol to another protocol. Module it as
+  // an extension.
+  if (isa<NormalProtocolConformance>(conformance) &&
+      cast<NormalProtocolConformance>(conformance)->isConformanceOfProtocol()) {
+    auto ext = cast<ExtensionDecl>(conformance->getDeclContext());
+    auto linkEntity = LinkEntity::forExtensionDescriptor(ext);
+    IGM.IRGen.noteUseOfExtensionDescriptor(ext);
+    return IGM.getContextDescriptorEntityReference(linkEntity);
+  }
+
+  return IGM.getTypeEntityReference(
+             conformance->getDeclContext()->getSelfNominalTypeDecl());
+}
+
 namespace {
   /// Builds a protocol conformance descriptor.
   class ProtocolConformanceDescriptorBuilder {
@@ -1984,8 +2070,7 @@ namespace {
     void addConformingType() {
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
-      auto ref = IGM.getTypeEntityReference(
-                   Conformance->getDeclContext()->getSelfNominalTypeDecl());
+      auto ref = getConformingEntityReference(IGM, Conformance);
       B.addRelativeAddress(ref.getValue());
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
@@ -2000,6 +2085,7 @@ namespace {
       if (auto conf = dyn_cast<NormalProtocolConformance>(Conformance)) {
         Flags = Flags.withIsRetroactive(conf->isRetroactive());
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
+        Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2027,9 +2113,22 @@ namespace {
       if (!normal)
         return;
 
+      llvm::Optional<Requirement> scratchRequirement;
       auto condReqs = normal->getConditionalRequirements();
-      if (condReqs.empty())
-        return;
+      if (condReqs.empty()) {
+        // For a protocol P that conforms to another protocol, introduce a
+        // conditional requirement for that P's Self: P. This aligns with
+        // SILWitnessTable::enumerateWitnessTableConditionalConformances().
+        if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
+          auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
+          scratchRequirement.emplace(RequirementKind::Conformance, selfType,
+                                     selfProto->getDeclaredInterfaceType());
+          condReqs = *scratchRequirement;
+        }
+
+        if (condReqs.empty())
+          return;
+      }
 
       Flags = Flags.withNumConditionalRequirements(condReqs.size());
 
@@ -2381,7 +2480,12 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
     break;
   case SILLinkage::Public:
-  default:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::HiddenExternal:
     if (IGM.getOptions().InternalizeAtLink) {
       vis = VCallVisibility::VCallVisibilityLinkageUnit;
     }
@@ -2538,6 +2642,10 @@ void EmitPolymorphicParameters::emit(EntryPointArgumentEmission &emission,
 
   // Bind all the fulfillments we can from the formal parameters.
   bindParameterSources(getParameter);
+
+  // Inject ad-hoc requirements related to `SerializationRequirement`
+  // associated type.
+  injectAdHocDistributedRequirements();
 }
 
 MetadataResponse

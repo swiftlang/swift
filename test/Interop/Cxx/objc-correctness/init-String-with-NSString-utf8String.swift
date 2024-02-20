@@ -7,7 +7,7 @@ import CxxStdlib
 
 // CHECK: @"\01L_selector(UTF8String)"
 // CHECK: @objc_msgSend
-// CHECK: call swiftcc void @"$sSo3stdO3__1O0067basic_stringInt8char_traitsInt8allocatorInt8_FABErpaBGcqaGHerapGgqaV9CxxStdlibEyAFSPys4Int8VGSgcfC"
+// CHECK: call swiftcc void @"$sSo3stdO3__1O0071basic_stringCCharchar_traitsCCharallocatorCChar_mHGHsqaGJcraCCfsaqChraaV9CxxStdlibEyAFSPys4Int8VGSgcfC"
 
 let ObjCStr: NSString = "hello"
 let CxxStr = std.string(ObjCStr.utf8String) // Should not crash here

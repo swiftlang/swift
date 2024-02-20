@@ -36,6 +36,25 @@ enum class CustomSyntaxAttributeKind {
   Available,
   FreestandingMacro,
   AttachedMacro,
+  StorageRestrictions
+};
+
+/// A bit of a hack. When completing inside the '@storageRestrictions'
+/// attribute, we use the \c ParamIndex field to communicate where inside the
+/// attribute we are performing the completion.
+enum class StorageRestrictionsCompletionKind : int {
+  /// We are completing directly after the '(' and require a 'initializes' or
+  /// 'accesses' label.
+  Label,
+  /// We are completing in a context that only allows arguments (ie. accessed or
+  /// initialized variables) and doesn't permit an argument label.
+  Argument,
+  /// Completion in a context that allows either an argument or the
+  /// 'initializes' label.
+  ArgumentOrInitializesLabel,
+  /// Completion in a context that allows either an argument or the
+  /// 'accesses' label.
+  ArgumentOrAccessesLabel
 };
 
 /// Parser's interface to code completion.
@@ -151,10 +170,6 @@ public:
   /// is completing after set as its base.
   virtual void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace){};
 
-  /// Complete a given expr-postfix, given that there is a following
-  /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
-
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///
@@ -165,6 +180,13 @@ public:
 
   /// Complete the beginning of the type of result of func/var/let/subscript.
   virtual void completeTypeDeclResultBeginning() {};
+
+  /// Same as `completeTypeSimpleOrComposition` but also allows `repeat`.
+  virtual void completeTypeBeginning(){};
+
+  /// Same as `completeTypeSimpleBeginning` but also allows `any`, `some` and
+  /// `each`.
+  virtual void completeTypeSimpleOrComposition(){};
 
   /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
@@ -224,7 +246,7 @@ public:
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
 
-  virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
+  virtual void completeCallArg(CodeCompletionExpr *E) {};
 
   virtual bool canPerformCompleteLabeledTrailingClosure() const {
     return false;

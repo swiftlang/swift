@@ -60,7 +60,7 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
 }
 
 static bool isAnyObjectOrAny(Type type) {
-  return type->isAnyObject() || type->isAny();
+  return type->isAnyObject() || type->isMarkerExistential();
 }
 
 // For a given Decl and Type, if the type is not an optional return
@@ -247,8 +247,10 @@ private:
         continue;
       if (isa<AccessorDecl>(VD))
         continue;
-      if (!AllowDelayed && owningPrinter.delayedMembers.count(VD)) {
-        os << "// '" << VD->getName() << "' below\n";
+      if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
+        os << "// '" << VD->getName()
+           << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
+                                                       : "' below\n");
         continue;
       }
       if (VD->getAttrs().hasAttribute<OptionalAttr>() !=
@@ -381,10 +383,16 @@ private:
           printMembers(SD->getMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-            auto sign = ed->getGenericSignature();
-            // FIXME: support requirements.
-            if (!sign.getRequirements().empty())
-              continue;
+            SmallVector<Requirement, 2> reqs;
+            SmallVector<InverseRequirement, 2> inverseReqs;
+            if (auto sig = ed->getGenericSignature()) {
+              sig->getRequirementsWithInverses(reqs, inverseReqs);
+              assert(inverseReqs.empty() &&
+                     "Non-copyable generics not supported here!");
+              // FIXME: support requirements.
+              if (!reqs.empty())
+                continue;
+            }
             printMembers(ed->getMembers());
           }
         },
@@ -1328,12 +1336,6 @@ private:
       printAvailability(AFD);
     }
 
-    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
-      printSwift3ObjCDeprecatedInference(accessor->getStorage());
-    } else {
-      printSwift3ObjCDeprecatedInference(AFD);
-    }
-
     os << ";\n";
 
     if (makeNewUnavailable) {
@@ -1414,8 +1416,7 @@ private:
 
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(
-        FD, FD->getAttrs().getAttribute<CDeclAttr>()->Name, resultTy);
+    printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
@@ -1425,12 +1426,12 @@ private:
     FunctionSwiftABIInformation(AbstractFunctionDecl *FD,
                                 LoweredFunctionSignature signature)
         : signature(signature) {
-      isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
+      isCDecl = !FD->getCDeclName().empty();
       if (!isCDecl) {
         auto mangledName = SILDeclRef(FD).mangle();
         symbolName = FD->getASTContext().AllocateCopy(mangledName);
       } else {
-        symbolName = FD->getAttrs().getAttribute<CDeclAttr>()->Name;
+        symbolName = FD->getCDeclName();
       }
     }
 
@@ -1776,36 +1777,6 @@ private:
     }
   }
 
-  void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
-    const LangOptions &langOpts = getASTContext().LangOpts;
-    if (!langOpts.EnableSwift3ObjCInference ||
-        langOpts.WarnSwift3ObjCInference == Swift3ObjCInferenceWarnings::None) {
-      return;
-    }
-    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
-    if (!attr || !attr->isSwift3Inferred())
-      return;
-
-    os << " SWIFT_DEPRECATED_OBJC(\"Swift ";
-    if (isa<VarDecl>(VD))
-      os << "property";
-    else if (isa<SubscriptDecl>(VD))
-      os << "subscript";
-    else if (isa<ConstructorDecl>(VD))
-      os << "initializer";
-    else
-      os << "method";
-    os << " '";
-    auto nominal = VD->getDeclContext()->getSelfNominalTypeDecl();
-    printEncodedString(os, nominal->getName().str(), /*includeQuotes=*/false);
-    os << ".";
-    SmallString<32> scratch;
-    printEncodedString(os, VD->getName().getString(scratch),
-                       /*includeQuotes=*/false);
-    os << "' uses '@objc' inference deprecated in Swift 4; add '@objc' to "
-       <<   "provide an Objective-C entrypoint\")";
-  }
-
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
       if (FD->getDeclContext()->isTypeContext())
@@ -2041,8 +2012,6 @@ private:
       std::tie(objTy, kind) = getObjectTypeAndOptionality(VD, ty);
       print(objTy, kind, objCName.str().str());
     }
-
-    printSwift3ObjCDeprecatedInference(VD);
 
     printAvailability(VD);
 
@@ -2378,7 +2347,7 @@ private:
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
-    if (ty->isAny()) {
+    if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
@@ -2825,8 +2794,10 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   // Clang decls don't need to be explicitly exposed.
   if (VD->hasClangNode())
     return true;
-  if (VD->getAttrs().hasAttribute<ExposeAttr>())
-    return true;
+  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
+    if (EA->getExposureKind() == ExposureKind::Cxx)
+      return true;
+  }
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
@@ -2856,12 +2827,16 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   return false;
 }
 
-/// Skip \c \@objcImplementation \c extension member implementations and
-/// overrides. They are already declared in handwritten headers, and they may
-/// have attributes that aren't allowed in a category.
+/// Skip \c \@objcImplementation functions, \c extension member
+/// implementations, and overrides. They are already declared in handwritten
+/// headers, and they may have attributes that aren't allowed in a category.
 ///
 /// \return true if \p VD should \em not be included in the header.
 static bool excludeForObjCImplementation(const ValueDecl *VD) {
+  // If it's an ObjC implementation (and not an extension, which might have
+  // members that need printing), skip it; it's declared elsewhere.
+  if (VD->isObjCImplementation() && ! isa<ExtensionDecl>(VD))
+    return true;
   // Exclude member implementations; they are declared elsewhere.
   if (VD->isObjCMemberImplementation())
     return true;

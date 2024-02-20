@@ -14,6 +14,9 @@ import SIL
 
 extension ApplyInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
+    if tryTransformThickToThinCallee(of: self, context) {
+      return
+    }
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
 }
@@ -28,4 +31,30 @@ extension BeginApplyInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
+}
+
+/// Optimizes a thick function call if the callee is a `thin_to_thick_function` instruction:
+///
+///   %2 = thin_to_thick_function %1
+///   %3 = apply %2(...) : @callee_guaranteed
+/// ->
+///   %2 = thin_to_thick_function %1
+///   %3 = apply %1(...): @convention(thin)
+///
+private func tryTransformThickToThinCallee(of apply: ApplyInst, _ context: SimplifyContext) -> Bool {
+  if let tttf = apply.callee as? ThinToThickFunctionInst,
+     !apply.callee.type.isCalleeConsumedFunction
+  {
+    let builder = Builder(before: apply, context)
+    let newApply = builder.createApply(function: tttf.operand.value,
+                                       apply.substitutionMap,
+                                       arguments: Array(apply.arguments),
+                                       isNonThrowing: apply.isNonThrowing,
+                                       isNonAsync: apply.isNonAsync,
+                                       specializationInfo: apply.specializationInfo)
+    apply.uses.replaceAll(with: newApply, context)
+    context.erase(instruction: apply)
+    return true
+  }
+  return false
 }

@@ -14,6 +14,7 @@
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSection | %FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
 
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
-// CHECK: Importing ASTSection... ok!
+// CHECK: Importing ASTSection...
+// CHECK: Import successful!
 
 // LINETABLE-CHECK-NOT: ASTSection

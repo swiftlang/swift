@@ -221,7 +221,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   auto &eval = CI.getASTContext().evaluator;
   auto desc = getDescriptor();
   desc.out = &outFile->getOS();
-  auto generatedMod = llvm::cantFail(eval(OptimizedIRRequest{desc}));
+  auto generatedMod = evaluateOrFatal(eval, OptimizedIRRequest{desc});
   if (!generatedMod)
     return 1;
 

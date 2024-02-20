@@ -17,6 +17,8 @@ struct M {
 #else
     private var x: Int = 0
 #endif
+
+    borrowing func borrow() {}
 }
 
 func borrow(_: borrowing M) {}
@@ -154,6 +156,18 @@ func p(x: inout M) {
     x = M()
 
     clodger({ consume(x); x = M() })
+}
+
+func takesClosureWithArg(_: (Int) -> ()) {}
+
+func invokesWithClosureWithArg() {
+    let m = M()
+
+    takesClosureWithArg { _ in
+      m.borrow()
+    }
+
+    m.borrow()
 }
 
 // need test cases for:

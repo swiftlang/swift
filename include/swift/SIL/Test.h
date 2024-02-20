@@ -15,7 +15,7 @@
 // - #include "swift/SIL/Test.h"
 // - namespace swift::test {
 //   static FunctionTest MyNewTest(
-//     "my-new-test",
+//     "my_new_test",
 //     [](auto &function, auto &arguments, auto &test) {
 //   });
 //   } // end namespace swift::test
@@ -26,13 +26,14 @@
 // of a function.  The goal is to get the same effect as calling a function and
 // checking its output.
 //
-// This is done via the specify_test instruction.  Using one or more
-// instances of it in your test case's SIL function, you can specify which test
-// (instance of FunctionTest) should be run and what arguments should be
-// provided to it.  The test grabs the arguments it expects out of the
-// test::Arguments instance it is provided.  It calls some function or
-// functions.  It then prints out interesting results.  These results can then
-// be FileCheck'd.
+// This is done via the specify_test instruction.  Using one or more instances
+// of it in your test case's SIL function, you can specify which test (instance
+// of FunctionTest) should be run and what arguments should be provided to it.
+// For full details of the specify_test instruction's grammar, see SIL.rst.
+//
+// The test grabs the arguments it expects out of the test::Arguments instance
+// it is provided.  It calls some function or functions.  It then prints out
+// interesting results.  These results can then be FileCheck'd.
 //
 // CASE STUDY:
 // Here's an example of how it works:
@@ -43,8 +44,8 @@
 //    and
 //
 //    static FunctionTest MyNeatoUtilityTest(
-//      "my-neato-utility",
-//      [](auto *test, auto *function, auto &arguments) {
+//      "my_neato_utility",
+//      [](auto &function, auto &arguments, auto &test) {
 //         // The code here is described in detail below.
 //         // See 4).
 //         auto count = arguments.takeUInt();
@@ -53,7 +54,7 @@
 //         // See 5)
 //         myNeatoUtility(count, target, callee);
 //         // See 6)
-//         getFunction()->dump();
+//         function.dump();
 //      });
 // 1) A test test/SILOptimizer/interesting_functionality_unit.sil runs the
 //    TestRunner pass:
@@ -62,13 +63,14 @@
 //    specify_test instruction.
 //      sil @f : $() -> () {
 //      ...
-//      specify_test "my-neato-utility 43 @trace[2] @function[other_fun]"
+//      specify_test "my_neato_utility 43 %2 @function[other_fun]"
 //      ...
 //      }
 // 3) TestRunner finds the FunctionTest instance MyNeatoUtilityTest registered
-//    under the name "my-neato-utility", and calls ::run() on it, passing an
-//    the pass, the function AND most importantly an test::Arguments instance
-//    that contains
+//    under the name "my_neato_utility", and calls ::run() on it, passing first
+//    the function, last the test::FunctionTest instance, AND in the middle,
+//    most importantly a test::Arguments instance that contains
+//
 //      (43 : unsigned long, someValue : SILValue, other_fun : SILFunction *)
 //
 // 4) MyNeatoUtilityTest calls takeUInt(), takeValue(), and takeFunction() on
@@ -84,7 +86,7 @@
 //      myNeatoUtility(count, target, callee);
 // 6) MyNeatoUtilityTest then dumps out the current function, which was modified
 //    in the process.
-//      getFunction()->dump();
+//      function.dump()
 // 7) The test file test/SILOptimizer/interesting_functionality_unit.sil matches
 // the
 //    expected contents of the modified function:
@@ -93,8 +95,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SIL_TEST_H
+#define SWIFT_SIL_TEST_H
+
 #include "swift/SIL/ParseTestSpecification.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "swift/SIL/SILBridging.h"
 
 namespace swift {
 
@@ -115,6 +120,9 @@ class TestRunner;
 /// Tests are instantiated once at program launch.  At that time, they are
 /// stored in a registry name -> test.  When an specify_test instruction
 /// naming a particular test is processed, that test is run.
+///
+/// This is a value type because we have no persistent location in which to
+/// store SwiftCompilerSources tests.
 class FunctionTest final {
 public:
   /// Wraps a test lambda.
@@ -124,12 +132,13 @@ public:
   /// - Arguments & - the resolved list of args specified by the instruction
   /// - FunctionTest & - the test being run; used to find less commonly used
   ///                    values such as the results of analyses
-  using Invocation =
-      llvm::function_ref<void(SILFunction &, Arguments &, FunctionTest &)>;
+  using Invocation = void (*)(SILFunction &, Arguments &, FunctionTest &);
+
+  using NativeSwiftInvocation = void *;
 
 private:
   /// The lambda to be run.
-  Invocation invocation;
+  TaggedUnion<Invocation, NativeSwiftInvocation> invocation;
 
 public:
   /// Creates a test that will run \p invocation and stores it in the global
@@ -145,6 +154,11 @@ public:
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
+  /// Creates a test that will run \p invocation and stores it in the global
+  /// registry.
+  static void createNativeSwiftFunctionTest(StringRef name,
+                                            NativeSwiftInvocation invocation);
+
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
 
@@ -158,6 +172,8 @@ public:
   ///       depend on it.  See `Layering` below for more details.
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
+
+  SwiftPassInvocation *getSwiftPassInvocation();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -177,7 +193,7 @@ private:
            SILFunctionTransform &pass, Dependencies &dependencies);
 
   /// Retrieve the test with named \p name from the global registry.
-  static FunctionTest *get(StringRef name);
+  static FunctionTest get(StringRef name);
 
   /// The instance of the TestRunner pass currently running this test.  Only
   /// non-null when FunctionTest::run is executing.
@@ -237,12 +253,18 @@ private:
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual SILPassManager *getPassManager() = 0;
+    virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
     virtual ~Dependencies(){};
   };
 
   /// The vendor for dependencies provided to the test by TestRunner.  Only
   /// non-null when FunctionTest::run is executing.
   Dependencies *dependencies;
+
+public:
+  /// Creates a test that will run \p invocation.  For use by
+  /// createNativeSwiftFunctionTest.
+  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
 };
 
 /// Thunks for delaying template instantiation.
@@ -282,3 +304,5 @@ Analysis *FunctionTest::getAnalysis() {
 }
 } // namespace test
 } // namespace swift
+
+#endif

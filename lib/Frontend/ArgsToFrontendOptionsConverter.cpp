@@ -253,32 +253,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkBuildFromInterfaceOnlyOptions())
     return true;
 
-  Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
-  Opts.EnableCaching = Args.hasArg(OPT_cache_compile_job);
-  Opts.EnableCachingRemarks = Args.hasArg(OPT_cache_remarks);
-  Opts.CacheSkipReplay = Args.hasArg(OPT_cache_disable_replay);
-  Opts.CASOpts.CASPath =
-      Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
-  Opts.CASOpts.PluginPath = Args.getLastArgValue(OPT_cas_plugin_path);
-  for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
-    StringRef Name, Value;
-    std::tie(Name, Value) = Opt.split('=');
-    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
-                                            std::string(Value));
-  }
-
-  Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
-  Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
-  Opts.InputFileKey = Args.getLastArgValue(OPT_input_file_key);
-
-  if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
-      Opts.ClangIncludeTrees.empty() &&
-      FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
-    if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
-        Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-        return true;
-    }
-  }
+  Opts.DeterministicCheck |= Args.hasArg(OPT_enable_deterministic_check);
+  Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
     if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
@@ -319,8 +295,28 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
-  Opts.SerializeExternalDeclsOnly |=
-      Args.hasArg(OPT_experimental_serialize_external_decls_only);
+  if (Args.hasArg(OPT_enable_library_evolution)) {
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+
+    Opts.SkipNonExportableDecls |=
+        Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+        Args.hasArg(
+            OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  } else {
+    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
+      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                     "-experimental-skip-non-exportable-decls",
+                     "-enable-library-evolution");
+  }
+
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (Opts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.SkipNonExportableDecls = false;
+
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
@@ -382,6 +378,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
+
+  Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
 
   return false;
 }
@@ -728,12 +726,12 @@ bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
 bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     const {
   if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasDependenciesPath()) {
+      Opts.InputsAndOutputs.hasDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
   if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
-      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+      && Opts.InputsAndOutputs.hasReferenceDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
@@ -764,6 +762,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_abi_descriptor);
     return true;
   }
+  if (!FrontendOptions::canActionEmitAPIDescriptor(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasAPIDescriptorOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_api_descriptor);
+    return true;
+  }
   if (!FrontendOptions::canActionEmitConstValues(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasConstValuesOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_const_values);
@@ -782,7 +785,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
    }
   if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
       (Opts.InputsAndOutputs.hasModuleInterfaceOutputPath() ||
-       Opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath())) {
+       Opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath() ||
+        Opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath())) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }

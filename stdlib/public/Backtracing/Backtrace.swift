@@ -435,7 +435,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           _dyld_process_info_for_each_segment(dyldInfo, machHeaderAddress) {
             address, size, name in
 
-            if let name = String(validatingUTF8: name!), name == "__TEXT" {
+            if let name = String(validatingCString: name!), name == "__TEXT" {
               endOfText = address + size
             }
           }
@@ -613,6 +613,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///                         running on, add virtual frames to show inline
   ///                         function calls.
   ///
+  /// @param showSourceLocation If `true`, look up the source location for
+  ///                           each address.
+  ///
   /// @param useSymbolCache   If the system we are on has a symbol cache,
   ///                         says whether or not to use it.
   ///
@@ -620,13 +623,17 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   public func symbolicated(with images: [Image]? = nil,
                            sharedCacheInfo: SharedCacheInfo? = nil,
                            showInlineFrames: Bool = true,
+                           showSourceLocations: Bool = true,
                            useSymbolCache: Bool = true)
     -> SymbolicatedBacktrace? {
-    return SymbolicatedBacktrace.symbolicate(backtrace: self,
-                                             images: images,
-                                             sharedCacheInfo: sharedCacheInfo,
-                                             showInlineFrames: showInlineFrames,
-                                             useSymbolCache: useSymbolCache)
+    return SymbolicatedBacktrace.symbolicate(
+      backtrace: self,
+      images: images,
+      sharedCacheInfo: sharedCacheInfo,
+      showInlineFrames: showInlineFrames,
+      showSourceLocations: showSourceLocations,
+      useSymbolCache: useSymbolCache
+    )
   }
 
   /// Provide a textual version of the backtrace.

@@ -247,7 +247,7 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+bool maySynchronize(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could be a barrier to hoisting
 /// destroys.
@@ -1271,7 +1271,9 @@ struct AccessPathWithBase {
 //
 // The "product leaves" are the leaves obtained by only looking through type
 // products (structs and tuples) and NOT type sums (enums).
-void visitProductLeafAccessPathNodes(
+//
+// Returns false if the access path couldn't be computed.
+bool visitProductLeafAccessPathNodes(
     SILValue address, TypeExpansionContext tec, SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 
@@ -1591,6 +1593,9 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
+  // This extracts out the block storage from an alloc_stack. We do not want
+  // to treat it as any more than a cast of the underlying value.
+  case SILInstructionKind::ProjectBlockStorageInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
@@ -1639,6 +1644,8 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
 }

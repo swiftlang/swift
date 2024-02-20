@@ -558,36 +558,44 @@ void RValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, SGF);
 }
 
-static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
-                            CanType type, ArrayRef<ManagedValue> &srcValues,
-                            SILValue destAddr) {
-  // Recurse into tuples.
-  auto srcTupleType = dyn_cast<TupleType>(type);
-  if (srcTupleType && !srcTupleType.containsPackExpansionType()) {
-    assert(destAddr->getType().castTo<TupleType>()->getNumElements()
-             == srcTupleType->getNumElements());
-    for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
-      auto eltDestAddr = SGF.B.createTupleElementAddr(loc, destAddr, eltIndex);
-      assignRecursive(SGF, loc, srcTupleType.getElementType(eltIndex),
-                      srcValues, eltDestAddr);
-    }
-    return;
-  }
-
-  // Otherwise, pull the front value off the list.
-  auto srcValue = srcValues.front();
-  srcValues = srcValues.slice(1);
-
-  srcValue.assignInto(SGF, loc, destAddr);
-}
-
 void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         SILValue destAddr) && {
   assert(isComplete() && "rvalue is not complete");
   assert(isPlusOneOrTrivial(SGF) && "Can not assign borrowed RValues");
-  ArrayRef<ManagedValue> srcValues = values;
-  assignRecursive(SGF, loc, type, srcValues, destAddr);
-  assert(srcValues.empty() && "didn't claim all elements!");
+  ArrayRef<ManagedValue> srcMvValues = values;
+
+  SWIFT_DEFER { assert(srcMvValues.empty() && "didn't claim all elements!"); };
+
+  // If we do not have a tuple, just bail early.
+  auto srcTupleType = dyn_cast<TupleType>(type);
+  if (!srcTupleType || srcTupleType.containsPackExpansionType()) {
+    // Otherwise, pull the front value off the list.
+    auto srcValue = srcMvValues.front();
+    srcMvValues = srcMvValues.slice(1);
+    srcValue.assignInto(SGF, loc, destAddr);
+    return;
+  }
+
+  assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
+         srcTupleType->getNumElements());
+
+  // If there are sourced managed values, initialize the address with a tuple.
+  if (srcMvValues.size()) {
+    if (SGF.useLoweredAddresses()) {
+      // Without opaque values, a tuple_addr_constructor is used to initialize
+      // the memory all at once.
+      SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+                                       IsNotInitialization);
+    } else {
+      // With opaque values, a tuple can always be formed and assigned to the
+      // memory.
+      auto tupleTy = destAddr->getType().getObjectType();
+      auto tuple = SGF.B.createTuple(loc, tupleTy, srcMvValues);
+      SGF.B.createAssign(loc, tuple.forward(SGF), destAddr,
+                         AssignOwnershipQualifier::Unknown);
+    }
+  }
+  srcMvValues = ArrayRef<ManagedValue>();
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {

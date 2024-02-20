@@ -499,7 +499,7 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
 }
 
 bool SDKNodeDecl::isNonOptionalProtocolRequirement() const {
-  return isProtocolRequirement() && !hasDeclAttribute(DAK_Optional);
+  return isProtocolRequirement() && !hasDeclAttribute(DeclAttrKind::Optional);
 }
 
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
@@ -707,33 +707,35 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 
       case KeyKind::KK_typeAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(Seq->begin(), Seq->end(),
-                       std::back_inserter(Info.TypeAttrs),
-          [&](llvm::yaml::Node &N) {
-            auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
-  #include "swift/AST/Attr.def"
-            .Default(TypeAttrKind::TAK_Count);
-            if (Result == TAK_Count)
-              Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
-                           GetScalarString(&N));
-            return Result;
-          });
+        for (auto &N : *Seq) {
+          auto Result = llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(
+                            GetScalarString(&N))
+#define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
+#include "swift/AST/TypeAttr.def"
+                            .Default(llvm::None);
+
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.TypeAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_declAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-          [&](llvm::yaml::Node &N) {
-            auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
-  #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
-  #include "swift/AST/Attr.def"
-            .Default(DeclAttrKind::DAK_Count);
-            if (Result == DAK_Count)
-              Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
-                           GetScalarString(&N));
-            return Result;
-          });
+        for (auto &N : *Seq) {
+          auto Result = llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(
+                            GetScalarString(&N))
+#define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::NAME)
+#include "swift/AST/DeclAttr.def"
+                            .Default(llvm::None);
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.DeclAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_accessors: {
@@ -1378,7 +1380,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     ParamValueOwnership(Info.ValueOwnership),
     HasDefaultArg(Info.hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
-    TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
+    TypeAttrs.push_back(TypeAttrKind::NoEscape);
   // If this is a nominal type, get its Usr.
   if (auto *ND = Ty->getAnyNominal()) {
     Usr = calculateUsr(Ctx, ND);
@@ -1396,9 +1398,9 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
       Results.emplace_back(DeclAttrKind::KIND_NAME);
     // These attributes may be semantically applicable to the current decl but absent from
     // the actual AST. Populating them to the nodes ensure we don't have false positives.
-    HANDLE(isObjC(), DAK_ObjC)
-    HANDLE(isFinal(), DAK_Final)
-    HANDLE(isDynamic(), DAK_Dynamic)
+    HANDLE(isObjC(), ObjC)
+    HANDLE(isFinal(), Final)
+    HANDLE(isDynamic(), Dynamic)
 #undef HANDLE
   }
   return Results;
@@ -2225,16 +2227,20 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
-#include "swift/AST/Attr.def"
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
+#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::C);
+#include "swift/AST/TypeAttr.def"
   }
 };
 
 template<>
 struct ScalarEnumerationTraits<DeclAttrKind> {
   static void enumeration(Output &out, DeclAttrKind &value) {
-#define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::DAK_##Name);
-#include "swift/AST/Attr.def"
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
+#define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::Name);
+#include "swift/AST/DeclAttr.def"
   }
 };
 
@@ -2439,10 +2445,10 @@ class ConstExtractor: public ASTWalker {
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     if (handleSimpleReference(E)) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     return Action::Continue(E);
   }
@@ -2737,7 +2743,7 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
         if (parent->getDeclKind() != DeclKind::Class) {
           break;
         }
-        if (hasDeclAttribute(DeclAttrKind::DAK_Final)) {
+        if (hasDeclAttribute(DeclAttrKind::Final)) {
           break;
         }
         auto result = isFromExtensionChanged(*this, *Right);
@@ -2769,12 +2775,11 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
 
 static StringRef getAttrName(DeclAttrKind Kind) {
   switch (Kind) {
-#define DECL_ATTR(NAME, CLASS, ...)                                           \
-  case DAK_##CLASS:                                                           \
-      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
-#include "swift/AST/Attr.def"
-  case DAK_Count:
-    llvm_unreachable("unrecognized attribute kind.");
+#define DECL_ATTR(NAME, CLASS, ...)                                            \
+  case DeclAttrKind::CLASS:                                                    \
+    return DeclAttribute::isDeclModifier(DeclAttrKind::CLASS) ? #NAME          \
+                                                              : "@" #NAME;
+#include "swift/AST/DeclAttr.def"
   }
   llvm_unreachable("covered switch");
 }

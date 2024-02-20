@@ -31,6 +31,7 @@ bool ForwardingOperation::preservesOwnership() {
   return ForwardingInstruction::get(forwardingInst)->preservesOwnership();
 }
 
+// See ForwardingInstruction.swift preservesRepresentation().
 bool ForwardingOperation::hasSameRepresentation() const {
   switch (forwardingInst->getKind()) {
   // Explicitly list instructions which definitely involve a representation
@@ -42,6 +43,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
     return false;
 
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::InitExistentialRefInst:
@@ -50,10 +52,11 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::TuplePackExtractInst:
     return true;
   }
 }
@@ -63,8 +66,8 @@ bool ForwardingOperation::isAddressOnly() const {
     return singleForwardingOp->get()->getType().isAddressOnly(
         *forwardingInst->getFunction());
   }
-  // All ForwardingInstructions that forward all operands are currently a
-  // single value instruction.
+  // All ForwardingInstructions that forward all operands or no operands are
+  // currently a single value instruction.
   auto *aggregate =
       cast<OwnershipForwardingSingleValueInstruction>(forwardingInst);
   // If any of the operands are address-only, then the aggregate must be.

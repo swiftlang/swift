@@ -39,6 +39,8 @@
 // CHECK-NEXT:  #include <string.h>
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 // CHECK-NEXT:  #if defined(__arm64e__) && __has_include(<ptrauth.h>)
 // CHECK-NEXT:  # include <ptrauth.h>
 // CHECK-NEXT:  #else
@@ -52,6 +54,7 @@
 // CHECK-NEXT:  # endif
 // CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)

@@ -57,7 +57,7 @@ TypeRefinementContext::createRoot(SourceFile *SF,
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(*SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
       parentContext = parentTRC->findMostRefinedSubContext(
-          parentExpansion.getStartLoc(), Ctx.SourceMgr);
+          parentExpansion.getStartLoc(), Ctx);
       availabilityContext = parentContext->getAvailabilityInfo();
     }
   }
@@ -186,29 +186,20 @@ static bool rangeContainsTokenLocWithGeneratedSource(
 
 TypeRefinementContext *
 TypeRefinementContext::findMostRefinedSubContext(SourceLoc Loc,
-                                                 SourceManager &SM) {
+                                                 ASTContext &Ctx) {
   assert(Loc.isValid());
-  
+
   if (SrcRange.isValid() &&
-      !rangeContainsTokenLocWithGeneratedSource(SM, SrcRange, Loc))
+      !rangeContainsTokenLocWithGeneratedSource(Ctx.SourceMgr, SrcRange, Loc))
     return nullptr;
 
-  // If this context is for a declaration, ensure that we've expanded the
-  // children of the declaration.
-  if (Node.getReason() == Reason::Decl ||
-      Node.getReason() == Reason::DeclImplicit) {
-    if (auto decl = Node.getAsDecl()) {
-      ASTContext &ctx = decl->getASTContext();
-      (void)evaluateOrDefault(
-          ctx.evaluator, ExpandChildTypeRefinementContextsRequest{decl, this},
-          false);
-    }
-  }
+  auto expandedChildren = evaluateOrDefault(
+      Ctx.evaluator, ExpandChildTypeRefinementContextsRequest{this}, {});
 
   // For the moment, we perform a linear search here, but we can and should
   // do something more efficient.
-  for (TypeRefinementContext *Child : Children) {
-    if (auto *Found = Child->findMostRefinedSubContext(Loc, SM)) {
+  for (TypeRefinementContext *Child : expandedChildren) {
+    if (auto *Found = Child->findMostRefinedSubContext(Loc, Ctx)) {
       return Found;
     }
   }
@@ -432,4 +423,19 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 void swift::simple_display(
     llvm::raw_ostream &out, const TypeRefinementContext *trc) {
   out << "TRC @" << trc;
+}
+
+llvm::Optional<std::vector<TypeRefinementContext *>>
+ExpandChildTypeRefinementContextsRequest::getCachedResult() const {
+  auto *TRC = std::get<0>(getStorage());
+  if (TRC->getNeedsExpansion())
+    return llvm::None;
+  return TRC->Children;
+}
+
+void ExpandChildTypeRefinementContextsRequest::cacheResult(
+    std::vector<TypeRefinementContext *> children) const {
+  auto *TRC = std::get<0>(getStorage());
+  TRC->Children = children;
+  TRC->setNeedsExpansion(false);
 }

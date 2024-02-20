@@ -25,7 +25,8 @@ using namespace swift::test;
 namespace {
 
 class Registry {
-  DenseMap<StringRef, FunctionTest *> registeredTests;
+  StringMap<FunctionTest> registeredTests;
+  SwiftNativeFunctionTestThunk thunk;
 
 public:
   static Registry &get() {
@@ -33,26 +34,33 @@ public:
     return registry;
   }
 
-  void registerFunctionTest(FunctionTest *test, StringRef name) {
+  void registerFunctionTest(FunctionTest test, StringRef name) {
     auto inserted = registeredTests.insert({name, test}).second;
     assert(inserted);
     (void)inserted;
   }
 
-  FunctionTest *getFunctionTest(StringRef name) {
-    auto *res = registeredTests[name];
-    if (!res) {
+  void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
+    this->thunk = thunk;
+  }
+
+  SwiftNativeFunctionTestThunk getFunctionTestThunk() { return thunk; }
+
+  FunctionTest getFunctionTest(StringRef name) {
+    auto iter = registeredTests.find(name);
+    if (iter == registeredTests.end()) {
       llvm::errs() << "Found no test named " << name << "!\n";
       print(llvm::errs());
     }
-    return res;
+    return iter->getValue();
   }
 
   void print(raw_ostream &OS) const {
     OS << "test::Registry(" << this << ") with " << registeredTests.size()
        << " entries: {{\n";
-    for (auto pair : registeredTests) {
-      OS << "\t" << pair.getFirst() << " -> " << pair.getSecond() << "\n";
+    for (auto &stringMapEntry : registeredTests) {
+      OS << "\t" << stringMapEntry.getKey() << " -> "
+         << &stringMapEntry.getValue() << "\n";
     }
     OS << "}} test::Registry(" << this << ")\n";
   }
@@ -62,13 +70,25 @@ public:
 
 } // end anonymous namespace
 
+void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
+  Registry::get().registerFunctionTestThunk(thunk);
+}
+
 FunctionTest::FunctionTest(StringRef name, Invocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
       dependencies(nullptr) {
-  Registry::get().registerFunctionTest(this, name);
+  Registry::get().registerFunctionTest(*this, name);
+}
+FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
+    : invocation(invocation), pass(nullptr), function(nullptr),
+      dependencies(nullptr) {}
+
+void FunctionTest::createNativeSwiftFunctionTest(
+    StringRef name, NativeSwiftInvocation invocation) {
+  Registry::get().registerFunctionTest({name, invocation}, name);
 }
 
-FunctionTest *FunctionTest::get(StringRef name) {
+FunctionTest FunctionTest::get(StringRef name) {
   return Registry::get().getFunctionTest(name);
 }
 
@@ -77,7 +97,15 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
   this->pass = &pass;
   this->function = &function;
   this->dependencies = &dependencies;
-  invocation(function, arguments, *this);
+  if (invocation.isa<Invocation>()) {
+    auto fn = invocation.get<Invocation>();
+    fn(function, arguments, *this);
+  } else {
+    llvm::outs().flush();
+    auto *fn = invocation.get<NativeSwiftInvocation>();
+    Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
+                                           {getSwiftPassInvocation()});
+  }
   this->pass = nullptr;
   this->function = nullptr;
   this->dependencies = nullptr;
@@ -89,4 +117,8 @@ DominanceInfo *FunctionTest::getDominanceInfo() {
 
 SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
+}
+
+SwiftPassInvocation *FunctionTest::getSwiftPassInvocation() {
+  return dependencies->getSwiftPassInvocation();
 }

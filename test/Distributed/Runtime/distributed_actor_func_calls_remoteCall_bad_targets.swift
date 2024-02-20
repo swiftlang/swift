@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -50,7 +50,7 @@ func test() async throws {
 
   do {
     // CHECK: >> remoteCall: on:main.Greeter, target:BADMODULE.Greeter.greet(name:)
-    let call = try await system.remoteCall(
+    _ = try await system.remoteCall(
       on: local,
       target: badTarget,
       invocation: &invocation,

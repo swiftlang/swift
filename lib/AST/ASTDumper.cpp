@@ -309,6 +309,8 @@ static StringRef getDumpString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
     case DefaultArgumentKind::StoredProperty: return "stored property";
+    case DefaultArgumentKind::ExpressionMacro:
+    return "expression macro";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -418,6 +420,7 @@ static StringRef getDumpString(ValueOwnership ownership) {
 
   llvm_unreachable("Unhandled ValueOwnership in switch.");
 }
+
 static StringRef getDumpString(ForeignErrorConvention::IsOwned_t owned) {
   switch (owned) {
   case swift::ForeignErrorConvention::IsNotOwned:
@@ -439,12 +442,16 @@ static StringRef getDumpString(RequirementKind kind) {
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
 }
+static StringRef getDumpString(StringRef s) {
+  return s;
+}
 static unsigned getDumpString(unsigned value) {
   return value;
 }
 static size_t getDumpString(size_t value) {
   return value;
 }
+static void *getDumpString(void *value) { return value; }
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -893,6 +900,33 @@ namespace {
       printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
                           Color);
     }
+
+    void printThrowDest(ThrownErrorDestination throws, bool wantNothrow) {
+      if (!throws) {
+        if (wantNothrow)
+          printFlag("nothrow", ExprModifierColor);
+
+        return;
+      }
+
+      auto thrownError = throws.getThrownErrorType();
+      auto contextError = throws.getContextErrorType();
+      if (thrownError->isEqual(contextError)) {
+        // No translation of the thrown error type is required, so ony print
+        // the thrown error type.
+        Type errorExistentialType =
+            contextError->getASTContext().getErrorExistentialType();
+        if (errorExistentialType && thrownError->isEqual(errorExistentialType))
+          printFlag("throws", ExprModifierColor);
+        else {
+          printFlag("throws(" + thrownError.getString() + ")", ExprModifierColor);
+        }
+        return;
+      }
+
+      printFlag("throws(" + thrownError.getString() + " to " +
+                contextError.getString() + ")", ExprModifierColor);
+    }
   };
 
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef>,
@@ -901,7 +935,7 @@ namespace {
     using PrintBase::PrintBase;
 
     void printCommon(Pattern *P, const char *Name, StringRef Label) {
-     printHead(Name, PatternColor, Label);
+      printHead(Name, PatternColor, Label);
 
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
@@ -963,6 +997,22 @@ namespace {
     }
     void visitExprPattern(ExprPattern *P, StringRef label) {
       printCommon(P, "pattern_expr", label);
+      switch (P->getCachedMatchOperandOwnership()) {
+      case ValueOwnership::Default:
+        break;
+      case ValueOwnership::Shared:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                      "ownership");
+        break;
+      case ValueOwnership::InOut:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                      "ownership");
+        break;
+      case ValueOwnership::Owned:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                      "ownership");
+        break;
+      }
       if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
@@ -970,7 +1020,8 @@ namespace {
       printFoot();
     }
     void visitBindingPattern(BindingPattern *P, StringRef label) {
-      printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", label);
+      printCommon(P, "pattern_binding", label);
+      printField(P->getIntroducerStringRef(), "kind");
       printRec(P->getSubPattern());
       printFoot();
     }
@@ -1143,9 +1194,13 @@ namespace {
       printCommon(PD, "protocol", label);
 
       if (PD->isRequirementSignatureComputed()) {
-        auto requirements = PD->getRequirementSignatureAsGenericSignature();
-        std::string reqSigStr = requirements->getAsString();
-        printFieldQuoted(reqSigStr, "requirement_signature");
+        auto reqSig = PD->getRequirementSignature();
+
+        std::string reqSigStr;
+        llvm::raw_string_ostream out(reqSigStr);
+        reqSig.print(PD, out);
+
+        printFieldQuoted(out.str(), "requirement_signature");
       } else {
         printFlag("uncomputed_requirement_signature");
       }
@@ -1429,8 +1484,10 @@ namespace {
         });
       }
 
-      printFlag(D->getAttrs().hasAttribute<NonisolatedAttr>(), "nonisolated",
-                ExprModifierColor);
+      if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
+        printFlag(attr->isUnsafe() ? "nonisolated(unsafe)" : "nonisolated",
+                  ExprModifierColor);
+      }
       printFlag(D->isDistributed(), "distributed", ExprModifierColor);
       printFlag(D->isDistributedThunk(), "distributed_thunk",ExprModifierColor);
     }
@@ -1448,6 +1505,10 @@ namespace {
             printRec(opaque, "opaque_result_decl");
           }
         }
+      }
+
+      if (auto thrownTypeRepr = D->getThrownTypeRepr()) {
+        printRec(thrownTypeRepr, "thrown_type");
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
@@ -1480,17 +1541,6 @@ namespace {
             printFieldQuoted(fec->getResultType(), "resulttype");
           printFoot();
         });
-      }
-
-      if (D->hasSingleExpressionBody()) {
-        // There won't be an expression if this is an initializer that was
-        // originally spelled "init?(...) { nil }", because "nil" is modeled
-        // via FailStmt in this context.
-        if (auto *Body = D->getSingleExpressionBody()) {
-          printRec(Body);
-
-          return;
-        }
       }
 
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
@@ -1682,8 +1732,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "(file)";
     break;
 
-  case DeclContextKind::SerializedLocal:
-    os << "local context";
+  case DeclContextKind::SerializedAbstractClosure:
+    os << "serialized abstract closure";
     break;
 
   case DeclContextKind::AbstractClosureExpr: {
@@ -1732,6 +1782,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     os << "top-level code";
     break;
 
@@ -1978,6 +2029,22 @@ public:
         printFlag(LabelItem.isDefault(), "default");
         
         if (auto *CasePattern = LabelItem.getPattern()) {
+          switch (CasePattern->getOwnership()) {
+          case ValueOwnership::Default:
+            break;
+          case ValueOwnership::Shared:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                          "ownership");
+            break;
+          case ValueOwnership::InOut:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                          "ownership");
+            break;
+          case ValueOwnership::Owned:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                          "ownership");
+            break;
+          }
           printRec(CasePattern);
         }
         if (auto *Guard = LabelItem.getGuardExpr()) {
@@ -2017,6 +2084,7 @@ public:
 
   void visitDoCatchStmt(DoCatchStmt *S, StringRef label) {
     printCommon(S, "do_catch_stmt", label);
+    printThrowDest(S->rethrows(), /*wantNothrow=*/true);
     printRec(S->getBody(), "body");
     printRecRange(S->getCatches(), Ctx, "catch_stmts");
     printFoot();
@@ -2204,6 +2272,7 @@ public:
 
   void visitDeclRefExpr(DeclRefExpr *E, StringRef label) {
     printCommon(E, "declref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
@@ -2275,6 +2344,7 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E, StringRef label) {
     printCommon(E, "member_ref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
@@ -2286,6 +2356,7 @@ public:
   }
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, StringRef label) {
     printCommon(E, "dynamic_member_ref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
 
@@ -2385,6 +2456,7 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E, StringRef label) {
     printCommon(E, "subscript_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
@@ -2406,6 +2478,7 @@ public:
   }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E, StringRef label) {
     printCommon(E, "dynamic_subscript_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
 
@@ -2590,6 +2663,11 @@ public:
     printRec(E->getSubExpr());
     printFoot();
   }
+  void visitUnreachableExpr(UnreachableExpr *E, StringRef label) {
+    printCommon(E, "unreachable", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E, StringRef label) {
     printCommon(E, "differentiable_function", label);
     printRec(E->getSubExpr());
@@ -2615,6 +2693,13 @@ public:
   void visitLinearToDifferentiableFunctionExpr(
       LinearToDifferentiableFunctionExpr *E, StringRef label) {
     printCommon(E, "linear_to_differentiable_function", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
+
+  void visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
+                                      StringRef label) {
+    printCommon(E, "actor_isolation_erasure_expr", label);
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2651,12 +2736,22 @@ public:
 
   void visitForceTryExpr(ForceTryExpr *E, StringRef label) {
     printCommon(E, "force_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E, StringRef label) {
     printCommon(E, "optional_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2698,6 +2793,11 @@ public:
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::Erased:
+      printFlag(true, "dynamically_isolated", CapturesColor);
       break;
 
     case ActorIsolation::ActorInstance:
@@ -2706,7 +2806,6 @@ public:
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       printFieldQuoted(isolation.getGlobalActor().getString(),
                        "global_actor_isolated", CapturesColor);
       break;
@@ -2794,7 +2893,7 @@ public:
   void printApplyExpr(ApplyExpr *E, const char *NodeName, StringRef label) {
     printCommon(E, NodeName, label);
     if (E->isThrowsSet()) {
-      printFlag(E->throws() ? "throws" : "nothrow", ExprModifierColor);
+      printThrowDest(E->throws(), /*wantNothrow=*/true);
     }
     printFieldQuotedRaw([&](raw_ostream &OS) {
       auto isolationCrossing = E->getIsolationCrossing();
@@ -3065,6 +3164,15 @@ public:
     printFoot();
   }
 
+  void visitCurrentContextIsolationExpr(
+      CurrentContextIsolationExpr *E, StringRef label) {
+    printCommon(E, "current_context_isolation_expr", label);
+    if (auto actor = E->getActor())
+      printRec(actor);
+
+    printFoot();
+  }
+
   void visitKeyPathDotExpr(KeyPathDotExpr *E, StringRef label) {
     printCommon(E, "key_path_dot_expr", label);
     printFoot();
@@ -3188,8 +3296,8 @@ public:
     printRec(T->getTypeRepr());
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T, StringRef label) {
-    printCommon("type_ident", label);
+  void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
+    printCommon(isa<IdentTypeRepr>(T) ? "type_ident" : "type_member", label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())
@@ -3197,21 +3305,12 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
-      for (auto genArg : GenIdT->getGenericArgs()) {
-        printRec(genArg);
-      }
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      printRec(memberTR->getBase());
     }
 
-    printFoot();
-  }
-
-  void visitMemberTypeRepr(MemberTypeRepr *T, StringRef label) {
-    printCommon("type_member", label);
-
-    printRec(T->getBaseComponent());
-    for (auto *comp : T->getMemberComponents()) {
-      printRec(comp);
+    for (auto *genArg : T->getGenericArgs()) {
+      printRec(genArg);
     }
 
     printFoot();
@@ -3329,8 +3428,21 @@ public:
     printFoot();
   }
 
+  void visitTransferringTypeRepr(TransferringTypeRepr *T, StringRef label) {
+    printCommon("transferring", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, StringRef label) {
     printCommon("_const", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
+  void visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T,
+                                    StringRef label) {
+    printCommon("_resultDependsOn", label);
     printRec(T->getBase());
     printFoot();
   }
@@ -3410,8 +3522,24 @@ public:
       });
     }
 
-    printRecRange(T->getGenericArguments(), "generic_arguments");
+    for (auto arg : T->getGenericArguments())
+      printRec(arg);
 
+    printFoot();
+  }
+
+  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
+                                            StringRef label) {
+    printCommon("type_lifetime_dependent_return", label);
+    for (auto &dep : T->getLifetimeDependencies()) {
+      printFieldRaw(
+          [&](raw_ostream &out) {
+            out << dep.getLifetimeDependenceKindString() << "(";
+            out << dep.getParamString() << ")";
+          },
+          "");
+    }
+    printRec(T->getBase());
     printFoot();
   }
 };
@@ -3545,6 +3673,7 @@ public:
             });
             return false;
           });
+
           normal->forEachValueWitness([&](const ValueDecl *req,
                                           Witness witness) {
             printRecArbitrary([&](StringRef label) {
@@ -3562,9 +3691,17 @@ public:
             });
           });
 
-          for (auto sigConf : normal->getSignatureConformances()) {
-            printRec(sigConf, visited);
-          }
+          normal->forEachAssociatedConformance(
+              [&](Type t, ProtocolDecl *proto, unsigned index) {
+                printRecArbitrary([&](StringRef label) {
+                  printHead("assoc_conformance", ASTNodeColor, label);
+                  printFieldQuoted(t, "type", TypeColor);
+                  printFieldQuoted(proto->getName(), "proto");
+                  printRec(normal->getAssociatedConformance(t, proto), visited);
+                  printFoot();
+                });
+                return false;
+              });
         }
 
         if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
@@ -3658,35 +3795,31 @@ public:
       return;
     }
 
-    printFieldQuotedRaw([&](raw_ostream &out) { genericSig->print(out); },
-                        "generic_signature");
-
-    auto printSubstitution = [&](GenericTypeParamType * genericParam,
-                                 Type replacementType) {
-      printFieldQuotedRaw([&](raw_ostream &out) {
-        genericParam->print(out);
-        out << " -> ";
-        if (replacementType) {
-          PrintOptions opts;
-          opts.PrintForSIL = true;
-          opts.PrintTypesForDebugging = true;
-          replacementType->print(out, opts);
-        }
-        else
-          out << "<unresolved concrete type>";
-      }, "");
-    };
+    printFieldRaw([&](raw_ostream &out) { genericSig->print(out); },
+                  "generic_signature");
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
     static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
     for (unsigned i : indices(genericParams)) {
       if (style == SubstitutionMap::DumpStyle::Minimal) {
-        printSubstitution(genericParams[i], replacementTypes[i]);
+        printFieldRaw([&](raw_ostream &out) {
+          genericParams[i]->print(out);
+          out << " -> ";
+          if (replacementTypes[i])
+            out << replacementTypes[i];
+          else
+            out << "<unresolved concrete type>";
+        }, "");
       } else {
         printRecArbitrary([&](StringRef label) {
           printHead("substitution", ASTNodeColor, label);
-          printSubstitution(genericParams[i], replacementTypes[i]);
+          printFieldRaw([&](raw_ostream &out) {
+            genericParams[i]->print(out);
+            out << " -> ";
+          }, "");
+          if (replacementTypes[i])
+            printRec(replacementTypes[i]);
           printFoot();
         });
       }
@@ -3882,14 +4015,16 @@ namespace {
 
       printFieldQuoted(T->getDecl()->printRef(), "decl");
       if (auto underlying = T->getSinglyDesugaredType()) {
-        printField(underlying, "underlying", TypeColor);
+        printRec(underlying, "underlying");
       } else {
+        // This can't actually happen
         printFlag("unresolved_underlying");
       }
 
       if (T->getParent())
         printRec(T->getParent(), "parent");
-      printRecRange(T->getDirectGenericArgs(), "direct_generic_args");
+      for (auto arg : T->getDirectGenericArgs())
+        printRec(arg);
 
       printFoot();
     }
@@ -4182,6 +4317,9 @@ namespace {
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext());
       printAnyFunctionParamsRec(T->getParams(), "input");
       printRec(T->getResult(), "output");
+      if (Type thrownError = T->getThrownError()) {
+        printRec(thrownError, "thrown_error");
+      }
     }
 
     void visitFunctionType(FunctionType *T, StringRef label) {
@@ -4275,6 +4413,17 @@ namespace {
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
 
+      for (auto ip : T->getInverses()) {
+        switch (ip) {
+        case InvertibleProtocolKind::Copyable:
+          printFlag("inverse_copyable");
+          break;
+        case InvertibleProtocolKind::Escapable:
+          printFlag("inverse_escapable");
+          break;
+        }
+      }
+
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
@@ -4353,6 +4502,13 @@ namespace {
     void visitTypeVariableType(TypeVariableType *T, StringRef label) {
       printCommon("type_variable_type", label);
       printField(T->getID(), "id");
+      printFoot();
+    }
+
+    void visitErrorUnionType(ErrorUnionType *T, StringRef label) {
+      printCommon("error_union_type", label);
+      for (auto term : T->getTerms())
+        printRec(term);
       printFoot();
     }
 

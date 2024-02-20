@@ -16,6 +16,7 @@ if exists("b:current_syntax")
 endif
 
 syn keyword swiftKeyword
+      \ await
       \ break
       \ case
       \ catch
@@ -47,6 +48,7 @@ syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
 syn keyword swiftDefinitionModifier
+      \ async
       \ convenience
       \ dynamic
       \ fileprivate
@@ -59,6 +61,7 @@ syn keyword swiftDefinitionModifier
       \ prefix
       \ private
       \ public
+      \ reasync
       \ required
       \ rethrows
       \ static
@@ -177,9 +180,9 @@ syn region swiftString contains=swiftInterpolationRegion
       \ start=/"/ skip=/\\\\\|\\"/ end=/"/
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
-syn region swiftComment contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftComment contains=swiftComment,swiftTodo
       \ start="/\*" end="\*/"
-syn region swiftLineComment contains=swiftComment,swiftTodo
+syn region swiftLineComment contains=swiftTodo
       \ start="//" end="$"
 
 syn match swiftDecimal

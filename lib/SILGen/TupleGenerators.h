@@ -32,14 +32,18 @@ namespace Lowering {
 class PackGeneratorRef {
   struct VTable {
     ManagedValue (*claimNext)(void *impl);
+    SILArgumentConvention (*getCurrentConvention)(void *impl);
     void (*finishCurrent)(void *impl, ManagedValue packAddr);
   };
 
   template <class Impl>
   struct VTableImpl {
     static constexpr VTable vtable = {
-      [](void *impl) {
+      [](void *impl) -> ManagedValue {
         return static_cast<Impl*>(impl)->claimNext();
+      },
+      [](void *impl) -> SILArgumentConvention {
+        return static_cast<Impl*>(impl)->getCurrentConvention();
       },
       [](void *impl, ManagedValue packAddr) {
         static_cast<Impl*>(impl)->finishCurrent(packAddr);
@@ -58,6 +62,9 @@ public:
 
   ManagedValue claimNext() {
     return vtable->claimNext(pointer);
+  }
+  SILArgumentConvention getCurrentConvention() {
+    return vtable->getCurrentConvention(pointer);
   }
   void finishCurrent(ManagedValue packAddr) {
     vtable->finishCurrent(pointer, packAddr);
@@ -279,12 +286,9 @@ public:
                         ManagedValue elt);
 };
 
-/// A generator for visiting the addresses of the elements of
-/// a tuple.  Unlike the other tuple generators, this does not
-/// require the original abstraction pattern to be a tuple pattern:
-/// like forEachExpandedTupleElement, it permits an opaque
-/// abstraction pattern.
-class TupleElementAddressGenerator {
+/// A generator for visiting the substituted elements of a tuple
+/// (unlike TupleElementGenerator, which visits the orig elements).
+class TupleSubstElementGenerator {
   struct OpaquePatternStorage {
     AbstractionPattern origType;
     CanTupleType substType;
@@ -296,9 +300,6 @@ class TupleElementAddressGenerator {
                     : Members::indexOf<TupleElementGenerator>();
   }
   ExternalUnion<bool, Members, getIndexForKind> origElt;
-
-  /// The address of the tuple value.
-  ManagedValue tupleAddr;
 
   /// If the substituted tuple type contains pack expansions, this is
   /// the induced pack type for the element sequence.
@@ -341,12 +342,9 @@ class TupleElementAddressGenerator {
   }
 
 public:
-  TupleElementAddressGenerator(const ASTContext &ctx,
-                               ManagedValue tupleAddr,
-                               AbstractionPattern origType,
-                               CanTupleType substType)
-      : tupleAddr(tupleAddr) {
-
+  TupleSubstElementGenerator(const ASTContext &ctx,
+                             AbstractionPattern origType,
+                             CanTupleType substType) {
     if (substType->containsPackExpansionType()) {
       inducedPackType = CanPackType::get(ctx, substType.getElementTypes());
     }
@@ -420,6 +418,13 @@ public:
     return inducedPackType;
   }
 
+  /// Return the induced pack type if the substituted tuple contains
+  /// pack expansions or null if it does not.  Suitable for use with
+  /// e.g. enterDestroyRemainingTupleComponentsCleanup.
+  CanPackType getInducedPackTypeIfPresent() const {
+    return inducedPackType;
+  }
+
   /// Given that we just processed an input, advance to the next,
   /// if there is on.
   ///
@@ -443,6 +448,26 @@ public:
       auto &gen = origElt.get<TupleElementGenerator>(isOrigTypeOpaque);
       gen.finish();
     }
+  }
+};
+
+/// A generator for visiting the addresses of the elements of
+/// a tuple.  Unlike the other tuple generators, this does not
+/// require the original abstraction pattern to be a tuple pattern:
+/// like forEachExpandedTupleElement, it permits an opaque
+/// abstraction pattern.
+class TupleElementAddressGenerator : public TupleSubstElementGenerator {
+  /// The address of the tuple value.
+  ManagedValue tupleAddr;
+
+public:
+  TupleElementAddressGenerator(const ASTContext &ctx,
+                               ManagedValue tupleAddr,
+                               AbstractionPattern origType,
+                               CanTupleType substType)
+    : TupleSubstElementGenerator(ctx, origType, substType),
+      tupleAddr(tupleAddr) {
+    assert(tupleAddr.getType().isAddress());
   }
 
   /// Project out the current tuple element.  Call this exactly once

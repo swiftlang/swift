@@ -54,7 +54,7 @@ public func markerInDictionary() -> Any {
 }
 
 // Note: no witness tables
-// CHECK: swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(ptr noalias nocapture %0, ptr %T)
+// CHECK: swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(ptr noalias %0, ptr %T)
 public func generic<T: P>(_: T) { }
 
 public struct GenericType<T: Hashable & P> { }

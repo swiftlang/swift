@@ -44,6 +44,11 @@ import SIL
 let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals") {
   (function: Function, context: FunctionPassContext) in
 
+  if context.hadError {
+    // In case of a preceding error, there is no guarantee that the SIL is valid.
+    return
+  }
+
   if !function.isGlobalInitOnceFunction {
     return
   }
@@ -52,7 +57,9 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
   // Merge such individual stores to a single store of the whole struct.
   mergeStores(in: function, context)
 
-  guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function) else {
+  // The initializer must not contain a `global_value` because `global_value` needs to
+  // initialize the class metadata at runtime.
+  guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function, allowGlobalValue: false) else {
     return
   }
 
@@ -76,76 +83,6 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
   context.removeTriviallyDeadInstructionsIgnoringDebugUses(in: function)
 }
 
-/// Analyses the global initializer function and returns the `alloc_global` and `store`
-/// instructions which initialize the global.
-///
-/// The function's single basic block must contain following code pattern:
-/// ```
-///   alloc_global @the_global
-///   %a = global_addr @the_global
-///   %i = some_const_initializer_insts
-///   store %i to %a
-/// ```
-private func getGlobalInitialization(of function: Function) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
-
-  guard let block = function.singleBlock else {
-    return nil
-  }
-
-  var allocInst: AllocGlobalInst? = nil
-  var globalAddr: GlobalAddrInst? = nil
-  var store: StoreInst? = nil
-
-  for inst in block.instructions {
-    switch inst {
-    case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst,
-         is BeginAccessInst,
-         is EndAccessInst:
-      break
-    case let agi as AllocGlobalInst:
-      if allocInst != nil {
-        return nil
-      }
-      allocInst = agi
-    case let ga as GlobalAddrInst:
-      if let agi = allocInst, agi.global == ga.global {
-        globalAddr = ga
-      }
-    case let si as StoreInst:
-      if store != nil {
-        return nil
-      }
-      guard let ga = globalAddr else {
-        return nil
-      }
-      if si.destination != ga {
-        return nil
-      }
-      store = si
-    default:
-      if !inst.isValidInStaticInitializerOfGlobal {
-        return nil
-      }
-    }
-  }
-  if let store = store {
-    return (allocInst: allocInst!, storeToGlobal: store)
-  }
-  return nil
-}
-
-private extension Function {
-  var singleBlock: BasicBlock? {
-    let block = entryBlock
-    if block.next != nil {
-      return nil
-    }
-    return block
-  }
-}
-
 /// Merges stores to individual struct fields to a single store of the whole struct.
 ///
 ///   store %element1 to %element1Addr
@@ -156,8 +93,8 @@ private extension Function {
 private func mergeStores(in function: Function, _ context: FunctionPassContext) {
   for inst in function.instructions {
     if let store = inst as? StoreInst {
-      if let elementStores = getSequenceOfElementStores(firstStore: store) {
-        merge(elementStores: elementStores, context)
+      if let (elementStores, lastStore) = getSequenceOfElementStores(firstStore: store) {
+        merge(elementStores: elementStores, lastStore: lastStore, context)
       }
     }
   }
@@ -171,12 +108,18 @@ private func mergeStores(in function: Function, _ context: FunctionPassContext) 
 ///   %addr_n = struct_element_addr %structAddr, #field_n
 ///   store %element_n to %addr_n
 ///
-private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
+private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], lastStore: StoreInst)? {
   guard let elementAddr = firstStore.destination as? StructElementAddrInst else {
     return nil
   }
   let structAddr = elementAddr.struct
-  let numElements = structAddr.type.getNominalFields(in: firstStore.parentFunction).count
+  if structAddr.type.isMoveOnly {
+    return nil
+  }
+  guard let fields = structAddr.type.getNominalFields(in: firstStore.parentFunction) else {
+    return nil
+  }
+  let numElements = fields.count
   var elementStores = Array<StoreInst?>(repeating: nil, count: numElements)
   var numStoresFound = 0
 
@@ -195,7 +138,7 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
       numStoresFound += 1
       if numStoresFound == numElements {
         // If we saw  `numElements` distinct stores, it implies that all elements in `elementStores` are not nil.
-        return elementStores.map { $0! }
+        return (elementStores.map { $0! }, lastStore: store)
       }
     default:
       if inst.mayReadOrWriteMemory {
@@ -206,8 +149,7 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
   return nil
 }
 
-private func merge(elementStores: [StoreInst], _ context: FunctionPassContext) {
-  let lastStore = elementStores.last!
+private func merge(elementStores: [StoreInst], lastStore: StoreInst, _ context: FunctionPassContext) {
   let builder = Builder(after: lastStore, context)
 
   let structAddr = (lastStore.destination as! StructElementAddrInst).struct

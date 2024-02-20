@@ -88,15 +88,23 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
     return true;
   }
 
-  // The sibling argument is the code completion expression, this allows e.g.
-  // non-default literal values in sibling arguments.
-  // E.g. we allow a 1 to be a double in
-  // foo(1, #^COMPLETE^#)
   if (auto parent = cs.getParentExpr(expr)) {
+    // The sibling argument is the code completion expression, this allows e.g.
+    // non-default literal values in sibling arguments.
+    // E.g. we allow a 1 to be a double in
+    // foo(1, #^COMPLETE^#)
     if (exprHasCodeCompletionAsArgument(parent, cs)) {
       return true;
     }
+    // If we are completing a member of a literal, consider completion results
+    // for all possible literal types. E.g. show completion results for `let a:
+    // Double = 1.#^COMPLETE^#
+    if (isa_and_nonnull<CodeCompletionExpr>(parent) &&
+        kind == SK_NonDefaultLiteral) {
+      return true;
+    }
   }
+
   return false;
 }
 
@@ -336,9 +344,16 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
-          
-        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
-        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
+
+        int np1 =
+            llvm::count_if(sig1->getRequiredProtocols(p1), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+        int np2 =
+            llvm::count_if(sig2->getRequiredProtocols(p2), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+
         int aDelta = np1 - np2;
           
         if (aDelta)
@@ -417,16 +432,18 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
-                                  bool isDynamicOverloadComparison = false) {
+                                  bool isDynamicOverloadComparison = false,
+                                  bool allowMissingConformances = true) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
-                               dc, decl1, decl2, isDynamicOverloadComparison},
+                               dc, decl1, decl2, isDynamicOverloadComparison,
+                               allowMissingConformances},
                            false);
 }
 
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
-    bool isDynamicOverloadComparison) const {
+    bool isDynamicOverloadComparison, bool allowMissingConformances) const {
   auto &C = decl1->getASTContext();
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, ConstraintSystemOptions());
@@ -759,9 +776,16 @@ bool CompareDeclSpecializationRequest::evaluate(
     // Solve the system.
     auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-    // Ban value-to-optional conversions.
-    if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-      return completeResult(true);
+    if (solution) {
+      auto score = solution->getFixedScore();
+
+      // Ban value-to-optional conversions and
+      // missing conformances if they are disallowed.
+      if (score.Data[SK_ValueToOptional] == 0 &&
+          (allowMissingConformances ||
+           score.Data[SK_MissingSynthesizableConformance] == 0))
+        return completeResult(true);
+    }
   }
 
   // If the first function has fewer effective parameters than the
@@ -1121,12 +1145,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
     if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
     if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }
@@ -1354,7 +1380,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sane) would help us do much better here.
+    // (when it's sound) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
       identical = false;
       continue;

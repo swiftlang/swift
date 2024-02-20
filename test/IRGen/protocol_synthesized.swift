@@ -6,8 +6,12 @@
 // to emit a GenericWitnessTable in the ProtocolConformanceDescriptor so that
 // the initializer for the protocol witness table actually runs.
 // (see rdar://97290618)
+// UNSUPPORTED: CPU=wasm32
 
 import SynthesizedProtocol
+
+enum Never { }
+protocol Error { }
 
 // CHECK: @"$sSo5Flagsas9OptionSetSCMc" = linkonce_odr hidden constant { i32, i32, i32, i32, i16, i16, i32, i32 } { i32 {{(trunc \(i64 )?}}sub ({{i(32|64)}} ptrtoint (ptr @"$ss9OptionSetMp" to {{i(32|64)}}), {{i(32|64)}} ptrtoint (ptr @"$sSo5Flagsas9OptionSetSCMc" to {{i(32|64)}})){{( to i32\))?}}, i32 {{(trunc \(i64 )?}}sub ({{i(32|64)}} ptrtoint (ptr @"$sSo5FlagsaMn" to {{i(32|64)}}), {{i(32|64)}} ptrtoint (ptr getelementptr inbounds ({ i32, i32, i32, i32, i16, i16, i32, i32 }, ptr @"$sSo5Flagsas9OptionSetSCMc", i32 0, i32 1) to {{i(32|64)}})){{( to i32\))?}}, i32 {{(trunc \(i64 )?}}sub ({{i(32|64)}} ptrtoint (ptr @"$sSo5Flagsas9OptionSetSCWP" to {{i(32|64)}}), {{i(32|64)}} ptrtoint (ptr getelementptr inbounds ({ i32, i32, i32, i32, i16, i16, i32, i32 }, ptr @"$sSo5Flagsas9OptionSetSCMc", i32 0, i32 2) to {{i(32|64)}})){{( to i32\))?}}, i32 131200, i16 3, i16 1, i32 {{(trunc \(i64 )?}}sub ({{i(32|64)}} ptrtoint (ptr @"$sSo5Flagsas9OptionSetSCWI" to {{i(32|64)}}), {{i(32|64)}} ptrtoint (ptr getelementptr inbounds ({ i32, i32, i32, i32, i16, i16, i32, i32 }, ptr @"$sSo5Flagsas9OptionSetSCMc", i32 0, i32 6) to {{i(32|64)}})){{( to i32\))?}}, i32 {{(trunc \(i64 )?}}sub ({{i(32|64)}} ptrtoint (ptr @"$sSo5Flagsas9OptionSetSCMcMK" to {{i(32|64)}}), {{i(32|64)}} ptrtoint (ptr getelementptr inbounds ({ i32, i32, i32, i32, i16, i16, i32, i32 }, ptr @"$sSo5Flagsas9OptionSetSCMc", i32 0, i32 7) to {{i(32|64)}})) {{(to i32\) )?}}}, section "{{[^"]*}}"{{(, comdat)?}},{{.*}} align 4
 

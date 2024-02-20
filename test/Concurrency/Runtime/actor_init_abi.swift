@@ -17,7 +17,7 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(MysteryInit) | %FileCheck --check-prefix=CHECK-DELEGATES %s
 
-// ------> do a little internal sanity check on this test itself
+// ------> do a little internal soundness check on this test itself
 // RUN: %target-run %t/main %t/%target-library-name(MysteryInit) | not %FileCheck --check-prefix=CHECK-NO-DELEGATES %s
 
 // ------> now recompile that library's init so it DOES NOT delegate, without recompiling executable

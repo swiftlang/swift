@@ -97,14 +97,14 @@ do {
   let _: [Int].#^SUGARED_ARRAY_MEMBER_DOT?check=ARRAY^#
 
   // ARRAY-LABEL: Begin completions, 8 items
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#Range<Int>#]; name=Indices
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Iterator[#IndexingIterator<Array<Element>>#]; name=Iterator
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#Element#]; name=Element
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#ArraySlice<Element>#]; name=SubSequence
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: ArrayLiteralElement[#Element#]; name=ArrayLiteralElement
-  // ARRAY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning:'IndexDistance' is deprecated: all index distances are now of type Int
-  // ARRAY-NEXT: Keyword/None: Type[#{{Array<Int>|\[Int\]}}.Type#]; name=Type
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#Range<Int>#]; name=Indices
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Iterator[#IndexingIterator<Array<Element>>#]; name=Iterator
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#Element#]; name=Element
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: ArrayLiteralElement[#Element#]; name=ArrayLiteralElement
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#ArraySlice<Element>#]; name=SubSequence
+  // ARRAY-DAG: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning:'IndexDistance' is deprecated: all index distances are now of type Int
+  // ARRAY-DAG: Keyword/None: Type[#{{Array<Int>|\[Int\]}}.Type#]; name=Type
 
   let _: Dictionary<Int, Int>.#^DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
   let _: [Int : Int].#^SUGARED_DICTIONARY_MEMBER_DOT?check=DICTIONARY^#

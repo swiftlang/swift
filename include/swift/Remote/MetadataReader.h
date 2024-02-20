@@ -24,6 +24,7 @@
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/TypeIdentity.h"
@@ -512,6 +513,44 @@ public:
                           Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
                           resolved.getResolvedAddress().getAddressData());
       }
+      case Demangle::SymbolicReferenceKind::ObjectiveCProtocol: {
+        // 'resolved' points to a struct of two relative addresses.
+        // The second entry is a relative address to the mangled protocol
+        // without symbolic references.
+        auto addr =
+            resolved.getResolvedAddress().getAddressData() + sizeof(int32_t);
+        int32_t offset;
+        Reader->readInteger(RemoteAddress(addr), &offset);
+        auto addrOfTypeRef = addr + offset;
+        resolved = Reader->getSymbol(RemoteAddress(addrOfTypeRef));
+
+        // Dig out the protocol from the protocol list.
+        auto protocolList = readMangledName(resolved.getResolvedAddress(),
+                                            MangledNameKind::Type, dem);
+        assert(protocolList && protocolList->getNumChildren());
+        if (!protocolList || !protocolList->getNumChildren())
+          return nullptr;
+        auto child = protocolList->getFirstChild();
+        assert(child && child->getNumChildren());
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        child = child->getFirstChild();
+        assert(child && child->getNumChildren());
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        assert(child && child->getNumChildren());
+        child = child->getFirstChild();
+        if (!child || !child->getNumChildren())
+          return nullptr;
+        child = child->getFirstChild();
+        assert(child && child->getKind() == Node::Kind::Protocol);
+        if (!child || child->getKind() != Node::Kind::Protocol)
+          return nullptr;
+        auto protocol = child;
+        auto protocolType = dem.createNode(Node::Kind::Type);
+        protocolType->addChild(protocol, dem);
+        return protocolType;
+      }
       }
 
       return nullptr;
@@ -589,7 +628,7 @@ public:
 
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
-  llvm::Optional<unsigned> readInstanceStartAndAlignmentFromClassMetadata(
+  llvm::Optional<unsigned> readInstanceStartFromClassMetadata(
       StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
@@ -619,8 +658,11 @@ public:
 
       auto classMeta = cast<TargetClassMetadata>(meta);
       while (stripSignedPointer(classMeta->Superclass)) {
-        classMeta = cast<TargetClassMetadata>(
-            readMetadata(stripSignedPointer(classMeta->Superclass)));
+        meta = readMetadata(stripSignedPointer(classMeta->Superclass));
+        if (!meta || meta->getKind() != MetadataKind::Class)
+          return llvm::None;
+
+        classMeta = cast<TargetClassMetadata>(meta);
 
         // Subtract the size contribution of the isa and retain counts from
         // the super class.
@@ -943,20 +985,18 @@ public:
       if (!Result)
         return BuiltType();
 
-      auto flags = FunctionTypeFlags()
-                       .withConvention(Function->getConvention())
-                       .withAsync(Function->isAsync())
-                       .withThrows(Function->isThrowing())
-                       .withParameterFlags(Function->hasParameterFlags())
-                       .withEscaping(Function->isEscaping())
-                       .withDifferentiable(Function->isDifferentiable());
+      auto flags = FunctionTypeFlags::fromIntValue(Function->Flags.getIntValue());
+      auto extFlags = ExtendedFunctionTypeFlags();
+      if (flags.hasExtendedFlags())
+        extFlags = ExtendedFunctionTypeFlags::fromIntValue(
+                      Function->getExtendedFlags().getIntValue());
 
       BuiltType globalActor = BuiltType();
       if (Function->hasGlobalActor()) {
         globalActor = readTypeFromMetadata(Function->getGlobalActor(), false,
                                            recursion_limit);
-        if (globalActor)
-          flags = flags.withGlobalActor(true);
+        if (!globalActor)
+          return BuiltType();
       }
 
       FunctionMetadataDifferentiabilityKind diffKind;
@@ -974,8 +1014,16 @@ public:
       #undef CASE
       }
 
+      BuiltType thrownError = BuiltType();
+      if (Function->hasThrownError()) {
+        thrownError = readTypeFromMetadata(Function->getThrownError(), false,
+                                           recursion_limit);
+        if (!thrownError)
+          return BuiltType();
+      }
+
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind, globalActor);
+          Parameters, Result, flags, extFlags, diffKind, globalActor, thrownError);
       TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }
@@ -3089,7 +3137,8 @@ private:
         break;
         
       case GenericParamKind::TypePack:
-        assert(false && "Packs not supported here yet");
+        // assert(false && "Packs not supported here yet");
+        return {};
 
       default:
         // We don't know about this kind of parameter.
@@ -3384,11 +3433,6 @@ private:
 #   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
-  }
-
-  template <class T>
-  static constexpr T roundUpToAlignment(T offset, T alignment) {
-    return (offset + alignment - 1) & ~(alignment - 1);
   }
 };
 

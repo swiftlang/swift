@@ -242,6 +242,12 @@ class CG2<T, U> {
   }
 }
 
+struct ReallyLongGeneric<T, U, V, W> {}
+
+extension ReallyLongGeneric where T == U, U == V.Element, V == W, W: Collection {
+  struct Nested {}
+}
+
 DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(EG<Int, String>.NestedSG<Double>.self,
     _typeByName("4main2EGO8NestedSGVySiSS_SdG")!)
@@ -252,6 +258,10 @@ DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(
     CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
     _typeByName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
+  expectEqual(
+    ReallyLongGeneric<Int, Int, [Int], [Int]>.Nested.self,
+    _typeByName("4main17ReallyLongGenericVAAE6NestedVyS2iSaySiGAF_G")!
+  )
 }
 
 DemangleToMetadataTests.test("demangle built-in types") {
@@ -502,7 +512,7 @@ if #available(SwiftStdlib 5.3, *) {
   }
 
   DemangleToMetadataTests.test("Check _mangledTypeName, _typeName use appropriate cache keys") {
-    // sanity check that name functions use the right keys to store cached names:
+    // soundness check that name functions use the right keys to store cached names:
     for _ in 1...2 {
       expectEqual("Si", _mangledTypeName(Int.self)!)
       expectEqual("Swift.Int", _typeName(Int.self, qualified: true))
@@ -519,6 +529,33 @@ if #available(SwiftStdlib 5.3, *) {
 if #available(SwiftStdlib 5.1, *) {
   DemangleToMetadataTests.test("Concurrency standard substitutions") {
     expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
+
+enum MyBigError: Error {
+  case epicFail
+}
+
+@available(SwiftStdlib 5.11, *)
+func getFnTypeWithThrownError<E: Error>(_: E.Type) -> Any.Type {
+  typealias Fn = (Int) throws(E) -> Void
+  return Fn.self
+}
+
+if #available(SwiftStdlib 5.11, *) {
+  DemangleToMetadataTests.test("typed throws") {
+    typealias Fn = (Int) throws(MyBigError) -> Void
+    expectEqual("ySi4main10MyBigErrorOYKc", _mangledTypeName(Fn.self)!)
+    expectEqual(Fn.self, _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+
+    expectEqual(getFnTypeWithThrownError(MyBigError.self), _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+    // throws(any Error) -> throws
+    expectEqual(getFnTypeWithThrownError((any Error).self), _typeByName("ySiKc")!)
+
+    // throws(Never) -> non-throwing
+    expectEqual(getFnTypeWithThrownError(Never.self), _typeByName("ySic")!)
   }
 }
 

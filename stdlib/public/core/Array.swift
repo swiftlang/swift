@@ -806,6 +806,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   
   /// The number of elements in the array.
   @inlinable
+  @_semantics("array.get_count")
   public var count: Int {
     return _getCount()
   }

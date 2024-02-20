@@ -149,7 +149,7 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
 /// The name of the Builtin type for Job
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
     "Builtin.Job"};
-/// The name of the Builtin type for ExecutorRef
+/// The name of the Builtin type for SerialExecutorRef
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_EXECUTOR = {
     "Builtin.Executor"};
 /// The name of the Builtin type for DefaultActorStorage

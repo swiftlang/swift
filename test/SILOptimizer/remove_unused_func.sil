@@ -25,6 +25,30 @@ sil_global @globalFunctionPointer : $@callee_guaranteed () -> () = {
   %initval = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
 }
 
+// CHECK-LABEL: sil_global private @self_referencing_private_global
+sil_global private @self_referencing_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil_global private @referencing_other_private_global
+sil_global private @referencing_other_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil_global @referencing_private_globals
+sil_global @referencing_private_globals : $Builtin.RawPointer = {
+  %0 = global_addr @referencing_other_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
+// KEEP-NOT: @dead_self_referencing_private_global
+sil_global private @dead_self_referencing_private_global : $Builtin.RawPointer = {
+  %0 = global_addr @dead_self_referencing_private_global : $*Builtin.RawPointer
+  %initval = address_to_pointer %0 : $*Builtin.RawPointer to $Builtin.RawPointer
+}
+
 // CHECK-LABEL: sil private @alivePrivateFunc
 sil private @alivePrivateFunc : $@convention(thin) () -> () {
 bb0:

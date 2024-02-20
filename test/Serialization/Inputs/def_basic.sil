@@ -11,6 +11,25 @@ sil_global public @public_global : $Builtin.Word
 sil_global @staticProp : $Int
 sil [transparent] [serialized] @globalinit_func0 : $@convention(thin) () -> ()
 
+// CHECK-LABEL: sil_global {{.*}}@static_global_vector : $Int32 = {
+// CHECK:         %initval = vector (%1 : $Int32, %3 : $Int32)
+// CHECK-NEXT:  }       
+sil_global [serialized] @static_global_vector : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %initval = vector (%1 : $Int32, %3 : $Int32)
+}
+
+// CHECK-LABEL: sil_global {{.*}}@static_global_uninitialized_vector : $Int = {
+// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
+// CHECK-NEXT:  }       
+sil_global [serialized] @static_global_uninitialized_vector : $Int = {
+  %0 = integer_literal $Builtin.Word, 10
+  %initval = alloc_vector $Int, %0 : $Builtin.Word
+}
+
 // We should not serialize this.
 // CHECK-NOT: sil public_external @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
 sil @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
@@ -36,9 +55,10 @@ bb0:
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @staticProp : $*Int
+  // CHECK: [[O:%.*]] = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $Builtin.SILToken
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $Builtin.SILToken
+  // CHECK: global_addr @staticProp : $*Int depends_on [[O]]
+  %6 = global_addr @staticProp : $*Int depends_on %5
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -519,6 +539,17 @@ bb0:
   // CHECK: %0 = global_value @static_global_object : $GlobalObject
   %0 = global_value @static_global_object : $GlobalObject
   return %0 : $GlobalObject
+}
+
+// CHECK-LABEL: @alloc_vector : $@convention(thin) () -> () {
+sil [transparent] [serialized] @alloc_vector : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 42
+  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
+  %1 = alloc_vector $Int, %0 : $Builtin.Word
+  dealloc_stack %1 : $*Int
+  %3 = tuple ()
+  return %3 : $()
 }
 
 protocol SomeProtocol {
@@ -1035,8 +1066,8 @@ sil [transparent] [serialized] @test_mark_fn_escape : $@convention(thin) () -> (
   %c = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %ca = project_box %c : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
-  //mark_function_escape %ba : $*Int
-  //mark_function_escape %ba : $*Int, %ca : $*Int
+  // mark_function_escape %ba : $*Int
+  // mark_function_escape %ba : $*Int, %ca : $*Int
 
   %28 = tuple ()
   return %28 : $()
@@ -1540,6 +1571,7 @@ bb0:
   %60 = function_ref @global_code : $@convention(thin) () -> ()
   %61 = function_ref @base_addr : $@convention(thin) () -> ()
   %62 = function_ref @global_object : $@convention(thin) () -> GlobalObject
+  %62a = function_ref @alloc_vector : $@convention(thin) () -> ()
   %63 = function_ref @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type)
   %67 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
   %69 = function_ref @test_unreachable : $@convention(thin) () -> ()
@@ -1601,6 +1633,9 @@ bb0:
   %153 = function_ref @weak_unowned: $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
   %154 = function_ref @test_access : $@convention(thin) (@guaranteed A) -> ()
   %155 = function_ref @test_builtin_access : $@convention(thin) (@guaranteed A) -> ()
+
+  %160 = global_addr @static_global_vector : $*Int32
+  %161 = global_addr @static_global_uninitialized_vector : $*Int
 
   %r = tuple ()
   return %r : $()

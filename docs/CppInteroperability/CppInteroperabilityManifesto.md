@@ -2928,7 +2928,7 @@ non-throwing Swift functions. If a C++ function called from Swift throws an
 exception that is not caught within the C++ code, the program will terminate.
 
 This approach is similar to that taken by the [Python interop
-library](https://github.com/pvieito/PythonKit/blob/main/PythonKit/Python.swift),
+library](https://github.com/pvieito/PythonKit/blob/master/PythonKit/Python.swift),
 which also terminates the program by default if a Python exception is raised and
 not caught within the Python code.
 

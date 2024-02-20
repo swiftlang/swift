@@ -348,13 +348,13 @@ swift::rewriting::buildTypeDifference(
   auto resultSymbol = [&]() {
     switch (symbol.getKind()) {
     case Symbol::Kind::Superclass:
-      return Symbol::forSuperclass(CanType(resultType),
+      return Symbol::forSuperclass(resultType->getCanonicalType(),
                                    resultSubstitutions, ctx);
     case Symbol::Kind::ConcreteType:
-      return Symbol::forConcreteType(CanType(resultType),
+      return Symbol::forConcreteType(resultType->getCanonicalType(),
                                      resultSubstitutions, ctx);
     case Symbol::Kind::ConcreteConformance:
-      return Symbol::forConcreteConformance(CanType(resultType),
+      return Symbol::forConcreteConformance(resultType->getCanonicalType(),
                                             resultSubstitutions,
                                             symbol.getProtocol(),
                                             ctx);

@@ -4,4 +4,6 @@
 // RUN: not %target-swift-frontend -parse-stdlib -target arm64-apple-macos11 -emit-ir %s -enable-objc-interop -enable-experimental-feature Embedded 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -parse-stdlib -target arm64-apple-macos11 -emit-ir %s -disable-objc-interop -enable-experimental-feature Embedded
 
+// REQUIRES: swift_in_compiler
+
 // CHECK: error: Objective-C interoperability cannot be enabled with embedded Swift.

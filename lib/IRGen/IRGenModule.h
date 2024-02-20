@@ -305,6 +305,10 @@ private:
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
   /// The queue of opaque type descriptors to emit.
   llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
+  /// The set of extension contenxts enqueued for lazy emission.
+  llvm::DenseMap<ExtensionDecl*, LazyOpaqueInfo> LazyExtensions;
+  /// The queue of opaque type descriptors to emit.
+  llvm::TinyPtrVector<ExtensionDecl*> LazyExtensionDescriptors;
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
@@ -326,6 +330,10 @@ private:
 
   /// The queue of lazy witness tables to emit.
   llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
+
+  llvm::SmallVector<CanType, 4> LazyClassMetadata;
+
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
 
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
 
@@ -476,6 +484,7 @@ public:
     }
   }
 
+  void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
@@ -499,7 +508,7 @@ public:
   }
   
   void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
-
+  void noteUseOfExtensionDescriptor(ExtensionDecl *ext);
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
   void noteUseOfFieldDescriptors(CanType type) {
@@ -652,6 +661,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
+  llvm::Type *PtrTy;                   /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -761,7 +771,11 @@ public:
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
+  llvm::StructType
+      *AccessibleProtocolRequirementFunctionRecordTy; // { i32*, i32*, i32*,
+                                                      // i32, i32*, i32*}
 
+  // clang-format off
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
   llvm::StructType *SwiftTaskTy;
@@ -775,6 +789,8 @@ public:
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;
@@ -785,6 +801,7 @@ public:
   llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+  // clang-format on
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -916,8 +933,19 @@ public:
 
   bool shouldPrespecializeGenericMetadata();
   
-  bool canMakeStaticObjectsReadOnly();
-  
+  bool canMakeStaticObjectReadOnly(SILType objectType);
+
+  ClassDecl *getStaticArrayStorageDecl();
+
+#define FEATURE(N, V)                                           \
+  bool is##N##FeatureAvailable(const ASTContext &context);      \
+  inline bool is##N##FeatureAvailable() {                       \
+    return is##N##FeatureAvailable(Context);                    \
+  }
+  #include "swift/AST/FeatureAvailability.def"
+
+  bool canUseObjCSymbolicReferences();
+
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
@@ -1091,7 +1119,8 @@ public:
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false);
+                                        bool willBeRelativelyAddressed = false,
+                                        bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
@@ -1123,12 +1152,21 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
   void addAccessibleFunction(SILFunction *func);
+  void addAccessibleFunctionDistributedAliased(
+      std::string mangledRecordName,
+      std::optional<std::string> mangledActorTypeName,
+      SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
   llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
 
   void emitAccessibleFunctions();
+  void emitAccessibleFunction(StringRef sectionName,
+                              std::string mangledRecordName,
+                              std::optional<std::string> mangledActorName,
+                              std::string mangledFunctionName,
+                              SILFunction *func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1149,7 +1187,8 @@ public:
                                             ArrayRef<llvm::Type*> paramTypes,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false,
-                        bool forPrologue = false);
+                        bool forPrologue = false,
+                        bool isPerformanceConstraint = false);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1177,6 +1216,11 @@ public:
                               SILType objectType, const TypeInfo &objectTI,
                               const OutliningMetadataCollector &collector);
 
+  llvm::Constant *getOrCreateOutlinedEnumTagStoreFunction(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
+  llvm::Constant *getOrCreateOutlinedDestructiveProjectDataForLoad(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
+
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
@@ -1201,6 +1245,8 @@ private:
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    GlobalOSLogStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1263,9 +1309,29 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
+
+  struct AccessibleProtocolFunctionsData {
+    SILFunction *function;
+    /// Mangled name of the requirement function.
+    std::optional<std::string> mangledRecordName;
+    std::optional<std::string> concreteMangledTypeName;
+    AccessibleProtocolFunctionsData(
+        SILFunction *function,
+        const std::optional<std::string> &mangledRecordName,
+        const std::optional<std::string> &concreteMangledTypeName);
+  };
+  /// List of all functions which are protocol *requirements* which may be
+  /// looked up by name at runtime. The record can be used to pair
+  /// a concrete implementation type with the protocol (record) name,
+  /// in order to locate the *witness* function name on this specific type.
+  ///
+  /// The witness function name can then be used to look up the witness at
+  /// runtime by inspecting `AccessibleFunctions`.
+  SmallVector<AccessibleProtocolFunctionsData, 4> AccessibleProtocolFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1278,6 +1344,7 @@ private:
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
+  llvm::DenseMap<ProtocolDecl *, llvm::Constant *> ObjCProtocolSymRefs;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
 
@@ -1301,6 +1368,7 @@ private:
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
+  llvm::Constant *getObjCProtocolRefSymRefDescriptor(ProtocolDecl *protocol);
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
@@ -1401,6 +1469,14 @@ public:
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
+
+  /// Returns the special builtin types that should be emitted in the stdlib
+  /// module.
+  llvm::ArrayRef<CanType> getOrCreateSpecialStlibBuiltinTypes();
+
+private:
+  /// The special builtin types that should be emitted in the stdlib module.
+  llvm::SmallVector<CanType, 7> SpecialStdlibBuiltinTypes;
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -1565,6 +1641,11 @@ public:
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
+  llvm::Function *getOrCreateValueWitnessFunction(ValueWitness index,
+                                                  FixedPacking packing,
+                                                  CanType abstractType,
+                                                  SILType concreteType,
+                                                  const TypeInfo &type);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
@@ -1589,6 +1670,9 @@ public:
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
       SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+
+  TypeEntityReference
+  getContextDescriptorEntityReference(const LinkEntity &entity);
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
@@ -1722,6 +1806,7 @@ public:
   llvm::Constant *getGlobalInitValue(SILGlobalVariable *var,
                                      llvm::Type *storageType,
                                      Alignment alignment);
+  llvm::Constant *getConstantValue(Explosion &&initExp, Size::int_type paddingBytes);
   llvm::Function *getAddrOfWitnessTableLazyAccessFunction(
                                                const NormalProtocolConformance *C,
                                                CanType conformingType,

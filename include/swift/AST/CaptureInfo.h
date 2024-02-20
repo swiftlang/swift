@@ -25,12 +25,18 @@
 
 namespace swift {
 class CapturedValue;
-}
+} // namespace swift
+
+namespace swift {
+namespace Lowering {
+class TypeConverter;
+} // namespace Lowering
+} // namespace swift
 
 namespace llvm {
 class raw_ostream;
 template <> struct DenseMapInfo<swift::CapturedValue>;
-}
+} // namespace llvm
 
 namespace swift {
 class ValueDecl;
@@ -41,6 +47,8 @@ class VarDecl;
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
 class CapturedValue {
+  friend class Lowering::TypeConverter;
+
 public:
   using Storage =
       llvm::PointerIntPair<llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*>, 2,
@@ -69,9 +77,17 @@ public:
   CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
       : Value(Val, Flags), Loc(Loc) {}
 
-  CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
+private:
+  // This is only used in TypeLowering when forming Lowered Capture
+  // Info. OpaqueValueExpr captured value should never show up in the AST
+  // itself.
+  //
+  // NOTE: AbstractClosureExpr::getIsolationCrossing relies upon this and
+  // asserts that it never sees one of these.
+  explicit CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
       : Value(Val, Flags), Loc(SourceLoc()) {}
 
+public:
   static CapturedValue getDynamicSelfMetadata() {
     return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }

@@ -64,6 +64,15 @@ bool SILFunctionArgument::isIndirectResult() const {
   return getIndex() < numIndirectResults;
 }
 
+bool SILFunctionArgument::isIndirectErrorResult() const {
+  auto numIndirectResults =
+      getFunction()->getConventions().getNumIndirectSILResults();
+  auto numIndirectErrorResults =
+      getFunction()->getConventions().getNumIndirectSILErrorResults();
+  return ((getIndex() >= numIndirectResults) &&
+          (getIndex() < numIndirectResults + numIndirectErrorResults));
+}
+
 SILArgumentConvention SILFunctionArgument::getArgumentConvention() const {
   return getFunction()->getConventions().getSILArgumentConvention(getIndex());
 }
@@ -79,9 +88,12 @@ SILArgumentConvention
 SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   assert(index < getNumSILArguments());
 
+  auto numIndirectResults = getNumIndirectSILResults()
+    + getNumIndirectSILErrorResults();
+
   // If the argument is a parameter, index into the parameters.
-  if (index >= getNumIndirectSILResults()) {
-    auto param = funcTy->getParameters()[index - getNumIndirectSILResults()];
+  if (index >= numIndirectResults) {
+    auto param = funcTy->getParameters()[index - numIndirectResults];
     return SILArgumentConvention(param.getConvention());
   }
 
@@ -109,7 +121,8 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
     }
     index--;
   }
-  llvm_unreachable("mismatch with getNumIndirectSILResults()?");
+  assert(hasIndirectSILErrorResults());
+  return SILArgumentConvention::Indirect_Out;
 }
 
 //===----------------------------------------------------------------------===//
@@ -299,6 +312,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     llvm_unreachable("Have terminator that implies no successors?!");
   case TermKind::TryApplyInst:

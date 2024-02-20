@@ -8,6 +8,7 @@ add_gyb_target(generated_sorted_cf_database
 add_swift_host_library(swiftClangImporter STATIC
   CFTypeInfo.cpp
   ClangAdapter.cpp
+  ClangClassTemplateNamePrinter.cpp
   ClangDerivedConformances.cpp
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp

@@ -49,7 +49,6 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
   // dimension, which we accept and pass along to the clang DependencyCollector.
   clangCollector->maybeAddDependency(File, /*FromModule=*/false,
                                      IsSystem, /*IsModuleFile=*/false,
-                                     /* FileManager=*/ nullptr,
                                      /*IsMissing=*/false);
 }
 
@@ -60,6 +59,11 @@ void DependencyTracker::addIncrementalDependency(StringRef File,
   }
 }
 
+void DependencyTracker::addMacroPluginDependency(StringRef File,
+                                                 Identifier ModuleName) {
+  macroPluginDeps.insert({ModuleName, std::string(File)});
+}
+
 ArrayRef<std::string>
 DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
@@ -68,6 +72,11 @@ DependencyTracker::getDependencies() const {
 ArrayRef<DependencyTracker::IncrementalDependency>
 DependencyTracker::getIncrementalDependencies() const {
   return incrementalDeps;
+}
+
+ArrayRef<DependencyTracker::MacroPluginDependency>
+DependencyTracker::getMacroPluginDependencies() const {
+  return macroPluginDeps.getArrayRef();
 }
 
 std::shared_ptr<clang::DependencyCollector>

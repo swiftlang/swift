@@ -12,7 +12,6 @@
 
 #include "ToolChains.h"
 
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"

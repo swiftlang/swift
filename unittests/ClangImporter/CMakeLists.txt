@@ -8,6 +8,7 @@ add_swift_unittest(SwiftClangImporterTests
 target_link_libraries(SwiftClangImporterTests
     PRIVATE
     swiftClangImporter
+    swiftSema
     swiftParse
     swiftAST
 )

@@ -11,9 +11,9 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-library-evolution -enable-testing %s
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
-// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd -tbd-install_name specialization
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd -tbd-install_name specialization
+// RUN: %llvm-readtapi --compare %t/typecheck.tbd %t/emit-ir.tbd
 
 // rdar://problem/40738913
 

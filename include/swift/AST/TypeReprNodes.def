@@ -73,9 +73,12 @@ ABSTRACT_TYPEREPR(Specifier, TypeRepr)
   SPECIFIER_TYPEREPR(Ownership, SpecifierTypeRepr)
   SPECIFIER_TYPEREPR(Isolated, SpecifierTypeRepr)
   SPECIFIER_TYPEREPR(CompileTimeConst, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(ResultDependsOn, SpecifierTypeRepr)
+  SPECIFIER_TYPEREPR(Transferring, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
 TYPEREPR(Self, TypeRepr)
+TYPEREPR(LifetimeDependentReturn, TypeRepr)
 LAST_TYPEREPR(Self)
 
 #undef SPECIFIER_TYPEREPR

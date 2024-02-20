@@ -35,10 +35,6 @@
 #include <atomic>
 #include <new>
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
-#include <mutex>
-#endif
-
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
@@ -209,7 +205,7 @@ public:
     /// object itself.
     OpaqueValue *storage;
 
-    const Metadata *successType;
+    ResultTypeInfo successType;
 
     /// The completed task, if necessary to keep alive until consumed by next().
     ///
@@ -234,7 +230,7 @@ public:
       };
     }
 
-    static PollResult getEmpty(const Metadata *successType) {
+    static PollResult getEmpty(ResultTypeInfo successType) {
       return PollResult{
           /*status*/PollStatus::Empty,
           /*storage*/nullptr,
@@ -248,7 +244,7 @@ public:
       return PollResult{
           /*status*/PollStatus::Error,
           /*storage*/reinterpret_cast<OpaqueValue *>(error),
-          /*successType*/nullptr,
+          /*successType*/ResultTypeInfo(),
           /*task*/nullptr
       };
     }
@@ -310,7 +306,7 @@ protected:
   void unlock() const {}
 #else
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
-  mutable std::mutex mutex_;
+  mutable Mutex mutex_;
 
   void lock() const { mutex_.lock(); }
   void unlock() const { mutex_.unlock(); }
@@ -330,9 +326,9 @@ protected:
   /// AsyncTask.
   NaiveTaskGroupQueue<ReadyQueueItem> readyQueue;
 
-  const Metadata *successType;
+  ResultTypeInfo successType;
 
-  explicit TaskGroupBase(const Metadata* T, uint64_t initialStatus)
+  explicit TaskGroupBase(ResultTypeInfo T, uint64_t initialStatus)
     : TaskGroupTaskStatusRecord(),
       status(initialStatus),
       waitQueue(nullptr),
@@ -579,6 +575,7 @@ struct TaskGroupStatus {
         "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
         group->isDiscardingResults() ? "Discarding" : "", group, status.to_string(group).c_str());
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
     if (_swift_shouldReportFatalErrorsToDebugger()) {
       RuntimeErrorDetails details = {
           .version = RuntimeErrorDetails::currentVersion,
@@ -588,6 +585,7 @@ struct TaskGroupStatus {
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
     }
+#endif
 
 #if defined(_WIN32)
     #define STDERR_FILENO 2
@@ -596,7 +594,10 @@ struct TaskGroupStatus {
     write(STDERR_FILENO, message, strlen(message));
 #endif
 #if defined(SWIFT_STDLIB_HAS_ASL)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
@@ -664,7 +665,7 @@ void TaskGroupBase::runWaitingTask(PreparedWaitingTask prepared) {
 #endif
   if (auto waitingTask = prepared.waitingTask) {
     // TODO: allow the caller to suggest an executor
-    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
+    waitingTask->flagAsAndEnqueueOnExecutor(SerialExecutorRef::generic());
   }
 }
 
@@ -768,7 +769,7 @@ class AccumulatingTaskGroup: public TaskGroupBase {
 
 public:
 
-  explicit AccumulatingTaskGroup(const Metadata *T)
+  explicit AccumulatingTaskGroup(ResultTypeInfo T)
     : TaskGroupBase(T, TaskGroupStatus::initial().status) {}
 
   virtual void destroy() override;
@@ -815,7 +816,7 @@ class DiscardingTaskGroup: public TaskGroupBase {
 
 public:
 
-  explicit DiscardingTaskGroup(const Metadata *T)
+  explicit DiscardingTaskGroup(ResultTypeInfo T)
     : TaskGroupBase(T, TaskGroupStatus::initial().status) {}
 
   virtual void destroy() override;
@@ -957,6 +958,10 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  ResultTypeInfo resultType;
+  resultType.metadata = T;
+
   TaskGroupFlags groupFlags(rawGroupFlags);
   SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
                                swift_task_getCurrent(),
@@ -964,9 +969,9 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
 
   TaskGroupBase *impl;
   if (groupFlags.isDiscardResults()) {
-    impl = ::new(group) DiscardingTaskGroup(T);
+    impl = ::new(group) DiscardingTaskGroup(resultType);
   } else {
-    impl = ::new(group) AccumulatingTaskGroup(T);
+    impl = ::new(group) AccumulatingTaskGroup(resultType);
   }
 
   TaskGroupTaskStatusRecord *record = impl->getTaskRecord();
@@ -981,6 +986,9 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
     }
     return true;
   });
+#else
+  swift_unreachable("task groups not supported yet in embedded Swift");
+#endif
 }
 
 // =============================================================================
@@ -1104,21 +1112,19 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
-    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
     // TODO: figure out a way to try to optimistically take the
     // value out of the finished task's future, if there are no
     // remaining references to it.
-    successType->vw_initializeWithCopy(destPtr, result.storage);
-    successType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
+    result.successType.vw_initializeWithCopy(destPtr, result.storage);
+    result.successType.vw_storeEnumTagSinglePayload(destPtr, 0, 1);
     return;
   }
 
   case PollStatus::Empty: {
     // Initialize the result as a .none Optional<Success>.
-    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
-    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    result.successType.vw_storeEnumTagSinglePayload(destPtr, 1, 1);
     return;
   }
   }
@@ -1378,7 +1384,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
       return unlock();
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+    // This _should_ be statically unreachable, but we leave it in as a
+    // safeguard in case the control flow above changes.
     swift_unreachable("expected to early return from when handling offer of last task in group");
+#pragma clang diagnostic pop
   }
 
   assert(!hadErrorResult && "only successfully completed tasks can reach here");
@@ -1669,7 +1680,7 @@ PollResult AccumulatingTaskGroup::poll(AsyncTask *waitingTask) {
 
   PollResult result;
   result.storage = nullptr;
-  result.successType = nullptr;
+  result.successType = ResultTypeInfo();
   result.retainedTask = nullptr;
 
   // Have we suspended the task?
@@ -1751,7 +1762,7 @@ reevaluate_if_taskgroup_has_results:;
           result.status = PollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-          result.successType = nullptr;
+          result.successType = ResultTypeInfo();
           result.retainedTask = item.getTask();
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
@@ -1776,14 +1787,14 @@ reevaluate_if_taskgroup_has_results:;
   // ==== 3) Add to wait queue -------------------------------------------------
   assert(assumed.readyTasks(this) == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "WATCH OUT, SET WAITER ONTO waitQueue.head = %p", waitQueue.load(std::memory_order_relaxed));
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
@@ -1805,7 +1816,7 @@ reevaluate_if_taskgroup_has_results:;
       // Run the new task on the same thread now - this should run the new task to
       // completion. All swift tasks in task-to-thread model run on generic
       // executor
-      swift_job_run(childTask, ExecutorRef::generic());
+      swift_job_run(childTask, SerialExecutorRef::generic());
       haveRunOneChildTaskInline = true;
 
       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", childTask, oldTask);
@@ -1938,13 +1949,13 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   auto waitHead = waitQueue.load(std::memory_order_acquire);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
@@ -1964,7 +1975,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
       // Run the new task on the same thread now - this should run the new task to
       // completion. All swift tasks in task-to-thread model run on generic
       // executor
-      swift_job_run(childTask, ExecutorRef::generic());
+      swift_job_run(childTask, SerialExecutorRef::generic());
       haveRunOneChildTaskInline = true;
 
       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", childTask, oldTask);

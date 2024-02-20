@@ -26,7 +26,7 @@ namespace swift {
 
 class ASTContext;
 class TypeRepr;
-class IdentTypeRepr;
+class MemberTypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
@@ -82,8 +82,12 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
 
-  /// Whether this resolution happens under an explicit ownership specifier.
-  HasOwnership = 1 << 13,
+  /// Whether to suppress warnings about conversions from and bindings of type
+  /// Never
+  SilenceNeverWarnings = 1 << 13,
+
+  /// Whether the immediate context has an @escaping attribute.
+  DirectEscaping = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.
@@ -91,11 +95,17 @@ enum class TypeResolverContext : uint8_t {
   /// No special type handling is required.
   None,
 
-  /// Whether we are checking generic arguments of a bound generic type.
-  GenericArgument,
+  /// Whether we are checking generic arguments of a non-variadic bound generic
+  /// type. This includes parameterized protocol types. We don't allow pack
+  /// expansions here.
+  ScalarGenericArgument,
 
-  /// Whether we are checking generic arguments of a parameterized protocol type.
-  ProtocolGenericArgument,
+  /// Whether we are checking generic arguments of a variadic generic type.
+  /// We allow pack expansions in all argument positions, and then use the
+  /// PackMatcher to ensure that scalar parameters line up with scalar
+  /// arguments, and pack expansion parameters line up with pack expansion
+  /// arguments.
+  VariadicGenericArgument,
 
   /// Whether we are checking a tuple element type.
   TupleElement,
@@ -192,7 +202,7 @@ enum class TypeResolverContext : uint8_t {
   AssociatedTypeInherited,
 
   /// Whether this is a custom attribute.
-  CustomAttr
+  CustomAttr,
 };
 
 /// Options that determine how type resolution should work.
@@ -243,7 +253,8 @@ public:
   /// Set the current type resolution context.
   void setContext(Context newContext) {
     context = newContext;
-    flags &= ~unsigned(TypeResolutionFlags::Direct);
+    flags &= ~(unsigned(TypeResolutionFlags::Direct) |
+               unsigned(TypeResolutionFlags::DirectEscaping));
   }
   void setContext(llvm::NoneType) { setContext(Context::None); }
 
@@ -261,8 +272,8 @@ public:
     case Context::ClosureExpr:
       return true;
     case Context::None:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::TupleElement:
     case Context::PackElement:
     case Context::FunctionInput:
@@ -307,8 +318,8 @@ public:
     case Context::MetatypeBase:
       return false;
     case Context::None:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::PackElement:
     case Context::TupleElement:
     case Context::InExpression:
@@ -341,11 +352,11 @@ public:
     case Context::VariadicFunctionInput:
     case Context::PackElement:
     case Context::TupleElement:
-    case Context::GenericArgument:
+    case Context::VariadicGenericArgument:
       return true;
-    case Context::PatternBindingDecl:
     case Context::None:
-    case Context::ProtocolGenericArgument:
+    case Context::PatternBindingDecl:
+    case Context::ScalarGenericArgument:
     case Context::Inherited:
     case Context::GenericParameterInherited:
     case Context::AssociatedTypeInherited:
@@ -390,8 +401,8 @@ public:
     case Context::FunctionInput:
     case Context::PackElement:
     case Context::TupleElement:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -613,7 +624,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  IdentTypeRepr *repr) const;
+                                  MemberTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -654,6 +665,21 @@ public:
                                     SourceLoc loc,
                                     ArrayRef<Type> genericArgs) const;
 };
+
+void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
+                                     unsigned argCount, unsigned paramCount,
+                                     bool hasParameterPack,
+                                     SourceRange angleBrackets);
+
+/// \param repr the repr for the type of the parameter.
+/// \param ty the non-error resolved type of the repr.
+/// \param ownership the ownership kind of the parameter
+/// \param dc the decl context used for resolving the type
+/// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
+bool diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
+                              ParamSpecifier ownership,
+                              TypeRepr *repr, Type ty,
+                              TypeResolutionOptions options);
 
 } // end namespace swift
 

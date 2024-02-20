@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  

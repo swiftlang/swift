@@ -540,9 +540,13 @@ public:
       assert(componentInit);
       assert(componentInit->canPerformPackExpansionInitialization());
 
-      auto opening = SGF.createOpenedElementValueEnvironment(packComponentTy);
-      auto openedEnv = opening.first;
-      auto eltTy = opening.second;
+      SILType eltTy;
+      CanType substEltType;
+      auto openedEnv =
+        SGF.createOpenedElementValueEnvironment({packComponentTy},
+                                                {&eltTy},
+                                                {substExpansionType},
+                                                {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
                               openedEnv, [&](SILValue indexWithinComponent,
@@ -555,12 +559,6 @@ public:
           auto eltAddr =
             SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
           auto eltAddrMV = cloner.clone(eltAddr);
-
-          CanType substEltType = substExpansionType.getPatternType();
-          if (openedEnv) {
-            substEltType =
-              openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
-          }
 
           auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
                                      eltInit, /*inout*/ false);
@@ -705,7 +703,7 @@ private:
     // - @_eagerMove
     // - @_noEagerMove
     bool isNoImplicitCopy = pd->isNoImplicitCopy();
-    if (!argrv.getType().getASTType()->isNoncopyable()) {
+    if (!argrv.getType().isMoveOnly(/*orWrapped=*/false)) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
       if (pd->isSelfParameter()) {
@@ -862,6 +860,7 @@ private:
           argrv = ManagedValue::forBorrowedAddressRValue(
               SGF.B.createCopyableToMoveOnlyWrapperAddr(pd, argrv.getValue()));
           break;
+        case swift::ParamSpecifier::ImplicitlyCopyableConsuming:
         case swift::ParamSpecifier::Consuming:
         case swift::ParamSpecifier::Default:
         case swift::ParamSpecifier::InOut:
@@ -1168,7 +1167,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
-    if (isInOut && ty.getASTType()->isNoncopyable()) {
+    if (isInOut && ty.isMoveOnly(/*orWrapped=*/false)) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -1210,16 +1209,17 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 }
 
 void SILGenFunction::emitProlog(
-    CaptureInfo captureInfo, ParameterList *paramList, ParamDecl *selfParam,
-    DeclContext *DC, Type resultType, bool throws, SourceLoc throwsLoc,
+    DeclContext *DC, CaptureInfo captureInfo,
+    ParameterList *paramList, ParamDecl *selfParam, Type resultType,
+    llvm::Optional<Type> errorType, SourceLoc throwsLoc,
     llvm::Optional<AbstractionPattern> origClosureType) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
 
-  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
-                                   DC, throws, throwsLoc,
+  uint16_t ArgNo = emitBasicProlog(DC, paramList, selfParam, resultType,
+                                   errorType, throwsLoc,
                                    /*ignored parameters*/
                                      captureInfo.getCaptures().size(),
                                    origClosureType);
@@ -1264,169 +1264,7 @@ void SILGenFunction::emitProlog(
                          capture, ++ArgNo);
   }
 
-  // Whether the given declaration context is nested within an actor's
-  // destructor.
-  auto isInActorDestructor = [](DeclContext *dc) {
-    while (!dc->isModuleScopeContext() && !dc->isTypeContext()) {
-      if (auto destructor = dyn_cast<DestructorDecl>(dc)) {
-        switch (getActorIsolation(destructor)) {
-        case ActorIsolation::ActorInstance:
-          return true;
-
-        case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
-          // Global-actor-isolated types should likely have deinits that
-          // are not themselves actor-isolated, yet still have access to
-          // the instance properties of the class.
-          return false;
-
-        case ActorIsolation::Nonisolated:
-        case ActorIsolation::Unspecified:
-          return false;
-        }
-      }
-
-      dc = dc->getParent();
-    }
-
-    return false;
-  };
-
-  // Initialize ExpectedExecutor if:
-  // - this function is async or
-  // - this function is sync and isolated to an actor, and we want to
-  //   dynamically check that we're on the right executor.
-  //
-  // Actor destructors are isolated in the sense that we now have a
-  // unique reference to the actor, but we probably aren't running on
-  // the actor's executor, so we cannot safely do this check.
-  //
-  // Defer bodies are always called synchronously within their enclosing
-  // function, so the check is unnecessary; in addition, we cannot
-  // necessarily perform the check because the defer may not have
-  // captured the isolated parameter of the enclosing function.
-  bool wantDataRaceChecks = getOptions().EnableActorDataRaceChecks &&
-      !F.isAsync() &&
-      !isInActorDestructor(FunctionDC) &&
-      !F.isDefer();
-
-  // FIXME: Avoid loading and checking the expected executor if concurrency is
-  // unavailable. This is specifically relevant for MainActor isolated contexts,
-  // which are allowed to be available on OSes where concurrency is not
-  // available. rdar://106827064
-
-  // Local function to load the expected executor from a local actor
-  auto loadExpectedExecutorForLocalVar = [&](VarDecl *var) {
-    auto loc = RegularLocation::getAutoGeneratedLocation(F.getLocation());
-    Type actorType = var->getTypeInContext();
-    RValue actorInstanceRV = emitRValueForDecl(
-        loc, var, actorType, AccessSemantics::Ordinary);
-    ManagedValue actorInstance =
-        std::move(actorInstanceRV).getScalarValue();
-    ExpectedExecutor = emitLoadActorExecutor(loc, actorInstance);
-  };
-
-  if (auto *funcDecl =
-        dyn_cast_or_null<AbstractFunctionDecl>(FunctionDC->getAsDecl())) {
-    auto actorIsolation = getActorIsolation(funcDecl);
-    switch (actorIsolation.getKind()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-      break;
-
-    case ActorIsolation::ActorInstance: {
-      // Only produce an executor for actor-isolated functions that are async
-      // or are local functions. The former require a hop, while the latter
-      // are prone to dynamic data races in code that does not enforce Sendable
-      // completely.
-      if (F.isAsync() ||
-          (wantDataRaceChecks && funcDecl->isLocalCapture())) {
-        if (auto isolatedParam = funcDecl->getCaptureInfo()
-                .getIsolatedParamCapture()) {
-          loadExpectedExecutorForLocalVar(isolatedParam);
-        } else {
-          auto loc = RegularLocation::getAutoGeneratedLocation(F.getLocation());
-          ManagedValue actorArg;
-          if (actorIsolation.getActorInstanceParameter() == 0) {
-            assert(selfParam && "no self parameter for ActorInstance isolation");
-            ManagedValue selfArg;
-            if (F.getSelfArgument()->getOwnershipKind() ==
-                OwnershipKind::Guaranteed) {
-              selfArg = ManagedValue::forBorrowedRValue(F.getSelfArgument());
-            } else {
-              selfArg =
-                  ManagedValue::forUnmanagedOwnedValue(F.getSelfArgument());
-            }
-            ExpectedExecutor = emitLoadActorExecutor(loc, selfArg);
-          } else {
-            unsigned isolatedParamIdx =
-                actorIsolation.getActorInstanceParameter() - 1;
-            auto param = funcDecl->getParameters()->get(isolatedParamIdx);
-            assert(param->isIsolated());
-            loadExpectedExecutorForLocalVar(param);
-          }
-        }
-      }
-      break;
-    }
-
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      if (F.isAsync() || wantDataRaceChecks) {
-        ExpectedExecutor =
-          emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
-      }
-      break;
-    }
-  } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
-    bool wantExecutor = F.isAsync() || wantDataRaceChecks;
-    auto actorIsolation = closureExpr->getActorIsolation();
-    switch (actorIsolation.getKind()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-      break;
-
-    case ActorIsolation::ActorInstance: {
-      if (wantExecutor) {
-        loadExpectedExecutorForLocalVar(actorIsolation.getActorInstance());
-      }
-      break;
-    }
-
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      if (wantExecutor) {
-        ExpectedExecutor =
-          emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
-        break;
-      }
-    }
-  }
-
-  // In async functions, the generic executor is our expected executor
-  // if we don't have any sort of isolation.
-  if (!ExpectedExecutor && F.isAsync() && !unsafelyInheritsExecutor()) {
-    ExpectedExecutor = emitGenericExecutor(
-      RegularLocation::getAutoGeneratedLocation(F.getLocation()));
-  }
-  
-  // Jump to the expected executor.
-  if (ExpectedExecutor) {
-    if (F.isAsync()) {
-      // For an async function, hop to the executor.
-      B.createHopToExecutor(
-          RegularLocation::getDebugOnlyLocation(F.getLocation(), getModule()),
-          ExpectedExecutor,
-          /*mandatory*/ false);
-    } else {
-      // For a synchronous function, check that we're on the same executor.
-      // Note: if we "know" that the code is completely Sendable-safe, this
-      // is unnecessary. The type checker will need to make this determination.
-      emitPreconditionCheckExpectedExecutor(
-                    RegularLocation::getAutoGeneratedLocation(F.getLocation()),
-                    ExpectedExecutor);
-    }
-  }
+  emitExpectedExecutor();
 
   // IMPORTANT: This block should be the last one in `emitProlog`, 
   // since it terminates BB and no instructions should be insterted after it.
@@ -1442,215 +1280,6 @@ void SILGenFunction::emitProlog(
       }
     }
   }
-}
-
-SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
-    auto &ctx = getASTContext();
-
-    ParameterList *emptyParams = ParameterList::createEmpty(ctx);
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        ctx, StaticSpellingKind::None,
-        DeclName(
-            ctx,
-            DeclBaseName(ctx.getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        ctx.TheExecutorType,
-        getModule().getSwiftModule());
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (ctx) SILGenNameAttr("swift_task_getMainExecutor", /*raw*/ false,
-                                 /*implicit*/ true));
-  }
-
-  auto fn = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue fnRef = B.createFunctionRefFor(loc, fn);
-  return B.createApply(loc, fnRef, {}, {});
-}
-
-SILValue SILGenFunction::emitGenericExecutor(SILLocation loc) {
-  // The generic executor is encoded as the nil value of
-  // llvm::Optional<Builtin.SerialExecutor>.
-  auto ty = SILType::getOptionalType(
-              SILType::getPrimitiveObjectType(
-                getASTContext().TheExecutorType));
-  return B.createOptionalNone(loc, ty);
-}
-
-void SILGenFunction::emitPrologGlobalActorHop(SILLocation loc,
-                                              Type globalActor) {
-  ExpectedExecutor = emitLoadGlobalActorExecutor(globalActor);
-  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
-                        ExpectedExecutor, /*mandatory*/ false);
-}
-
-SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
-  CanType actorType = globalActor->getCanonicalType();
-  NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
-  VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
-  assert(sharedInstanceDecl && "no shared actor field in global actor");
-  SubstitutionMap subs =
-    actorType->getContextSubstitutionMap(SGM.SwiftModule, nominal);
-  SILLocation loc = RegularLocation::getAutoGeneratedLocation(F.getLocation());
-  Type instanceType =
-    actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
-
-  auto metaRepr =
-    nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
-    ? MetatypeRepresentation::Thick
-    : MetatypeRepresentation::Thin;
-
-  CanType actorMetaType = CanMetatypeType::get(actorType, metaRepr);
-  ManagedValue actorMetaTypeValue =
-      ManagedValue::forObjectRValueWithoutOwnership(B.createMetatype(
-          loc, SILType::getPrimitiveObjectType(actorMetaType)));
-
-  RValue actorInstanceRV = emitRValueForStorageLoad(loc, actorMetaTypeValue,
-    actorMetaType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
-    subs, AccessSemantics::Ordinary, instanceType, SGFContext());
-  ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
-  return emitLoadActorExecutor(loc, actorInstance);
-}
-
-SILValue SILGenFunction::emitLoadActorExecutor(SILLocation loc,
-                                               ManagedValue actor) {
-  SILValue actorV;
-  if (isInFormalEvaluationScope())
-    actorV = actor.formalAccessBorrow(*this, loc).getValue();
-  else
-    actorV = actor.borrow(*this, loc).getValue();
-
-  // Open an existential actor type.
-  CanType actorType = actor.getType().getASTType();
-  if (actorType->isExistentialType()) {
-    actorType = OpenedArchetypeType::get(
-        actorType, F.getGenericSignature())->getCanonicalType();
-    SILType loweredActorType = getLoweredType(actorType);
-    actorV = B.createOpenExistentialRef(loc, actorV, loweredActorType);
-  }
-
-  // For now, we just want to emit a hop_to_executor directly to the
-  // actor; LowerHopToActor will add the emission logic necessary later.
-  return actorV;
-}
-
-ExecutorBreadcrumb
-SILGenFunction::emitHopToTargetActor(SILLocation loc,
-                                     llvm::Optional<ActorIsolation> maybeIso,
-                                     llvm::Optional<ManagedValue> maybeSelf) {
-  if (!maybeIso)
-    return ExecutorBreadcrumb();
-
-  if (auto executor = emitExecutor(loc, *maybeIso, maybeSelf)) {
-    return emitHopToTargetExecutor(loc, *executor);
-  } else {
-    return ExecutorBreadcrumb();
-  }
-}
-
-ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
-    SILLocation loc, SILValue executor) {
-  // Record that we need to hop back to the current executor.
-  auto breadcrumb = ExecutorBreadcrumb(true);
-  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
-                        executor, /*mandatory*/ false);
-  return breadcrumb;
-}
-
-llvm::Optional<SILValue>
-SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
-                             llvm::Optional<ManagedValue> maybeSelf) {
-  switch (isolation.getKind()) {
-  case ActorIsolation::Unspecified:
-  case ActorIsolation::Nonisolated:
-    return llvm::None;
-
-  case ActorIsolation::ActorInstance: {
-    // "self" here means the actor instance's "self" value.
-    assert(maybeSelf.has_value() && "actor-instance but no self provided?");
-    auto self = maybeSelf.value();
-    return emitLoadActorExecutor(loc, self);
-  }
-
-  case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
-    return emitLoadGlobalActorExecutor(isolation.getGlobalActor());
-  }
-  llvm_unreachable("covered switch");
-}
-
-void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
-  // TODO: can the type system enforce this async requirement?
-  if (!F.isAsync()) {
-    llvm::report_fatal_error("Builtin.hopToActor must be in an async function");
-  }
-  auto isolation =
-      getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
-        return CE->getActorIsolation();
-      });
-  if (isolation != ActorIsolation::Nonisolated
-      && isolation != ActorIsolation::Unspecified) {
-    // TODO: Explicit hop with no hop-back should only be allowed in nonisolated
-    // async functions. But it needs work for any closure passed to
-    // Task.detached, which currently has unspecified isolation.
-    llvm::report_fatal_error(
-      "Builtin.hopToActor must be in an actor-independent function");
-  }
-  SILValue executor = emitLoadActorExecutor(loc, actor);
-  B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
-                        executor, /*mandatory*/ true);
-}
-
-void SILGenFunction::emitPreconditionCheckExpectedExecutor(
-    SILLocation loc, SILValue executorOrActor) {
-  auto checkExecutor = SGM.getCheckExpectedExecutor();
-  if (!checkExecutor)
-    return;
-
-  // We don't want the debugger to step into these.
-  loc.markAutoGenerated();
-
-  // Get the executor.
-  SILValue executor = B.createExtractExecutor(loc, executorOrActor);
-
-  // Call the library function that performs the checking.
-  auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
-
-  emitApplyOfLibraryIntrinsic(
-      loc, checkExecutor, SubstitutionMap(),
-      {args.filenameStartPointer, args.filenameLength, args.filenameIsAscii,
-       args.line, ManagedValue::forObjectRValueWithoutOwnership(executor)},
-      SGFContext());
-}
-
-bool SILGenFunction::unsafelyInheritsExecutor() {
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(FunctionDC))
-    return fn->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>();
-  return false;
-}
-
-void ExecutorBreadcrumb::emit(SILGenFunction &SGF, SILLocation loc) {
-  if (mustReturnToExecutor) {
-    assert(SGF.ExpectedExecutor || SGF.unsafelyInheritsExecutor());
-    if (auto executor = SGF.ExpectedExecutor)
-      SGF.B.createHopToExecutor(
-          RegularLocation::getDebugOnlyLocation(loc, SGF.getModule()), executor,
-          /*mandatory*/ false);
-  }
-}
-
-SILValue SILGenFunction::emitGetCurrentExecutor(SILLocation loc) {
-  assert(ExpectedExecutor && "prolog failed to set up expected executor?");
-  return ExpectedExecutor;
 }
 
 static void emitIndirectPackParameter(SILGenFunction &SGF,
@@ -1722,18 +1351,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   assert(!resultType->is<PackExpansionType>());
 
   // If the return type is address-only, emit the indirect return argument.
-  auto &resultTI =
-    SGF.SGM.Types.getTypeLowering(origResultType, resultTypeInContext,
-                                  SGF.getTypeExpansionContext());
-  
+
   // The calling convention always uses minimal resilience expansion.
-  auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
+  auto resultConvType = SGF.SGM.Types.getLoweredType(
       resultTypeInContext, TypeExpansionContext::minimal());
-  auto resultConvType = resultTIConv.getLoweredType();
-
-  auto &ctx = SGF.getASTContext();
-
-  SILType resultSILType = resultTI.getLoweredType().getAddressType();
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
@@ -1743,19 +1364,64 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
         || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
       return;
   }
+
+  auto &ctx = SGF.getASTContext();
   auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
   var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
+  auto &resultTI =
+    SGF.SGM.Types.getTypeLowering(origResultType, resultTypeInContext,
+                                  SGF.getTypeExpansionContext());
+  SILType resultSILType = resultTI.getLoweredType().getAddressType();
   auto *arg = SGF.F.begin()->createFunctionArgument(resultSILType, var);
   (void)arg;
 }
 
+static void emitIndirectErrorParameter(SILGenFunction &SGF,
+                                       Type errorType,
+                                       AbstractionPattern origErrorType,
+                                       DeclContext *DC) {
+  CanType errorTypeInContext =
+    DC->mapTypeIntoContext(errorType)->getCanonicalType();
+
+  // If the error type is address-only, emit the indirect error argument.
+
+  // The calling convention always uses minimal resilience expansion.
+  auto errorConvType = SGF.SGM.Types.getLoweredType(
+      origErrorType, errorTypeInContext, TypeExpansionContext::minimal());
+
+  // And the abstraction pattern may force an indirect return even if the
+  // concrete type wouldn't normally be returned indirectly.
+  if (!SILModuleConventions::isThrownIndirectlyInSIL(errorConvType,
+                                                     SGF.SGM.M)) {
+    if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
+        || origErrorType.getErrorConvention(SGF.SGM.Types)
+            != AbstractionPattern::Indirect)
+      return;
+  }
+
+  auto &ctx = SGF.getASTContext();
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                 ctx.getIdentifier("$error"), SourceLoc(),
+                                 ctx.getIdentifier("$error"),
+                                 DC);
+  var->setSpecifier(ParamSpecifier::InOut);
+  var->setInterfaceType(errorType);
+
+  auto &errorTI =
+    SGF.SGM.Types.getTypeLowering(origErrorType, errorTypeInContext,
+                                  SGF.getTypeExpansionContext());
+  SILType errorSILType = errorTI.getLoweredType().getAddressType();
+  assert(SGF.IndirectErrorResult == nullptr);
+  SGF.IndirectErrorResult = SGF.F.begin()->createFunctionArgument(errorSILType, var);
+}
+
 uint16_t SILGenFunction::emitBasicProlog(
-    ParameterList *paramList, ParamDecl *selfParam, Type resultType,
-    DeclContext *DC, bool throws, SourceLoc throwsLoc,
+    DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
+    Type resultType, llvm::Optional<Type> errorType, SourceLoc throwsLoc,
     unsigned numIgnoredTrailingParameters,
     llvm::Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
@@ -1765,9 +1431,29 @@ uint16_t SILGenFunction::emitBasicProlog(
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()
     : AbstractionPattern(genericSig.getCanonicalSignature(),
-                         CanType(resultType));
+                         resultType->getCanonicalType());
   
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
+
+  llvm::Optional<AbstractionPattern> origErrorType;
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+    CanType substClosureType = origClosureType->getType()
+        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
+    CanAnyFunctionType substClosureFnType =
+        cast<AnyFunctionType>(substClosureType);
+    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
+      origErrorType = optPair->first;
+      errorType = optPair->second;
+    }
+  } else if (errorType) {
+    origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
+                                       (*errorType)->getCanonicalType());
+  }
+
+  if (origErrorType && errorType &&
+      F.getConventions().hasIndirectSILErrorResults()) {
+    emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
+  }
 
   // Emit the argument variables in calling convention order.
   unsigned ArgNo =
@@ -1775,14 +1461,16 @@ uint16_t SILGenFunction::emitBasicProlog(
       .emitParams(origClosureType, paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
-  if (throws) {
-     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
-    ManagedValue Undef = emitUndef(NativeErrorTy);
-    SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
+  if (errorType && IndirectErrorResult == nullptr) {
+    CanType errorTypeInContext =
+      DC->mapTypeIntoContext(*errorType)->getCanonicalType();
+    auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
+    ManagedValue undef = emitUndef(loweredErrorTy);
+    SILDebugVariable dbgVar("$error", /*Constant*/ false, ++ArgNo);
     RegularLocation loc = RegularLocation::getAutoGeneratedLocation();
     if (throwsLoc.isValid())
       loc = throwsLoc;
-    B.createDebugValue(loc, Undef.getValue(), DbgVar);
+    B.createDebugValue(loc, undef.getValue(), dbgVar);
   }
 
   return ArgNo;

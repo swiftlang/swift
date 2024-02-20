@@ -43,20 +43,11 @@ std::string LineList::str() const {
 }
 
 size_t swift::markup::measureIndentation(StringRef Text) {
-  size_t Col = 0;
-  for (size_t i = 0, e = Text.size(); i != e; ++i) {
-    if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {
-      ++Col;
-      continue;
-    }
-
-    if (Text[i] == '\t') {
-      Col += ((i + 8) / 8) * 8;
-      continue;
-    }
-    return i;
-  }
-  return Text.size();
+  static constexpr llvm::StringLiteral IndentChars(" \v\f\t");
+  size_t FirstNonIndentPos = Text.find_first_not_of(IndentChars);
+  if (FirstNonIndentPos == StringRef::npos)
+    return Text.size();
+  return FirstNonIndentPos;
 }
 
 void LineListBuilder::addLine(llvm::StringRef Text, swift::SourceRange Range) {

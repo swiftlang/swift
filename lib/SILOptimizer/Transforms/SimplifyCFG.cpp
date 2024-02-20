@@ -1137,11 +1137,11 @@ struct TrampolineDest {
   TrampolineDest(TrampolineDest &&) = default;
   TrampolineDest &operator=(TrampolineDest &&) = default;
 
-  bool operator==(const TrampolineDest &rhs) {
+  bool operator==(const TrampolineDest &rhs) const {
     return destBB == rhs.destBB
            && newSourceBranchArgs == rhs.newSourceBranchArgs;
   }
-  bool operator!=(const TrampolineDest &rhs) {
+  bool operator!=(const TrampolineDest &rhs) const {
     return !(*this == rhs);
   }
 
@@ -2319,6 +2319,8 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndBorrowInst:
       break;
     // We can only ignore a dealloc_stack instruction if we can ignore all
     // instructions in the block.
@@ -2550,17 +2552,20 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto context = TAI->getFunction()->getTypeExpansionContext();
     SmallVector<SILValue, 8> Args;
     unsigned numArgs = TAI->getNumArguments();
+    unsigned calleeArgIdx = 0;
     for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
+      if (origConv.isArgumentIndexOfIndirectErrorResult(i) &&
+          !targetConv.isArgumentIndexOfIndirectErrorResult(i)) {
+        continue;
+      }
       // Cast argument if required.
       std::tie(Arg, std::ignore) = castValueToABICompatibleType(
           &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
-          targetConv.getSILArgumentType(i, context), {TAI});
+          targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
       Args.push_back(Arg);
+      calleeArgIdx += 1;
     }
-
-    assert(calleeConv.getNumSILArguments() == Args.size()
-           && "The number of arguments should match");
 
     LLVM_DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
 
@@ -2809,6 +2814,7 @@ bool SimplifyCFG::simplifyBlocks() {
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
     case TermKind::UnwindInst:

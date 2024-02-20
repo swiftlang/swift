@@ -219,7 +219,7 @@ enum class ConstraintKind : char {
   /// Both (first and second) pack types should have the same reduced shape.
   SameShape,
   /// The first type is a tuple containing a single unlabeled element that is a
-  /// pack expansion. The second type is that pack expansion.
+  /// pack expansion. The second type is its pattern type.
   MaterializePackExpansion,
 };
 

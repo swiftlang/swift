@@ -154,6 +154,13 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     }
     break;
   }
+  case SILInstructionKind::ProjectBlockStorageInst: {
+    auto *Ty = I->getType().getASTType().getPointer();
+    assert(Ty->isCanonical());
+    Value = ValueTy(ProjectionKind::BlockStorageCast, Ty);
+    assert(getKind() == ProjectionKind::BlockStorageCast);
+    break;
+  }
   case SILInstructionKind::UpcastInst: {
     auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
@@ -199,6 +206,7 @@ SILType Projection::getType(SILType BaseType, SILModule &M,
   case ProjectionKind::Tuple:
     return BaseType.getTupleElementType(getIndex());
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
@@ -237,6 +245,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::TailElems:
     return nullptr;
   case ProjectionKind::Box:
+    return nullptr;
+  case ProjectionKind::BlockStorageCast:
     return nullptr;
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
@@ -285,6 +295,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
     return B.createRefTailAddr(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::Box:
     return B.createProjectBox(Loc, Base, getIndex());
+  case ProjectionKind::BlockStorageCast:
+    return B.createProjectBlockStorage(Loc, Base);
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:
@@ -600,6 +612,10 @@ void Projection::print(raw_ostream &os, SILType baseType) const {
     os << " Box over";
     break;
   }
+  case ProjectionKind::BlockStorageCast: {
+    os << "BlockStorageCast";
+    break;
+  }
   case ProjectionKind::Upcast: {
     os << "UpCast";
     break;
@@ -872,6 +888,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
     case ProjectionKind::Class:
     case ProjectionKind::TailElems:
     case ProjectionKind::Box:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Upcast:
     case ProjectionKind::RefCast:
     case ProjectionKind::BitwiseCast:
@@ -931,6 +948,7 @@ static bool isSupportedProjection(const Projection &p) {
   case ProjectionKind::Enum:
   case ProjectionKind::Box:
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:

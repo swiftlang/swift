@@ -10,6 +10,12 @@
 
 @end
 
+@interface ImplClass () <NSMutableCopying>
+
+- (void)extensionMethod:(int)param;
+
+@end
+
 
 @interface ImplClass (Category1)
 
@@ -23,6 +29,9 @@
 - (void)category2Method:(int)param;
 
 @end
+
+extern void implFunc(int param);
+extern void implFuncCName(int param) __asm__("_implFuncAsmName");
 
 
 @interface NoImplClass

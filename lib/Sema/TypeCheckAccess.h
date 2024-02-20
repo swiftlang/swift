@@ -47,6 +47,7 @@ enum class DisallowedOriginKind : uint8_t {
   SPIOnly,
   MissingImport,
   FragileCxxAPI,
+  NonPublicImport,
   None
 };
 

@@ -8,8 +8,7 @@ public class CopyableKlass {}
 
 var boolValue: Bool { return true }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var i: Int = 0
 }
 
@@ -29,8 +28,7 @@ public func consumeVal(_ x: __owned AggStruct) {}
 public func consumeVal(_ x: __owned AggGenericStruct<CopyableKlass>) {}
 
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum: ~Copyable {
     case first
     case second((Int, Int))
     case third(NonTrivialStruct)
@@ -44,14 +42,12 @@ public enum NonTrivialEnum {
 // Aggregate Struct //
 //////////////////////
 
-@_moveOnly
-public struct MOIntPair {
+public struct MOIntPair: ~Copyable {
     var lhs: Int
     var rhs: Int
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct: ~Copyable {
     var lhs: Int
     var center: Int
     var rhs: Int
@@ -402,8 +398,7 @@ public func aggStructConsumeGrandFieldOwnedArg2(_ x2: consuming AggStruct) {
 // Aggregate Generic Struct //
 //////////////////////////////
 
-@_moveOnly
-public struct AggGenericStruct<T> {
+public struct AggGenericStruct<T>: ~Copyable {
     var lhs: Int
     var rhs: UnsafeRawPointer
     var pair: MOIntPair
@@ -1093,8 +1088,7 @@ public func aggGenericStructConsumeGrandFieldOwnedArg2<T>(_ x2: consuming AggGen
 // Enum Test Cases //
 /////////////////////
 
-@_moveOnly
-public enum EnumTy {
+public enum EnumTy: ~Copyable {
     case klass(NonTrivialStruct)
     case int(Int)
 

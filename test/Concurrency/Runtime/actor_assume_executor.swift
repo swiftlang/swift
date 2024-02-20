@@ -100,7 +100,7 @@ final class MainActorEcho {
 
     let echo = MainActorEcho()
 
-    if #available(SwiftStdlib 5.9, *) {
+    if #available(SwiftStdlib 5.1, *) {
       // === MainActor --------------------------------------------------------
 
       tests.test("MainActor.assumeIsolated: assume the main executor, from 'main() async'") {

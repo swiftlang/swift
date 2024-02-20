@@ -22,15 +22,16 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ContextualTypeInfo.h"
 
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-each loop that needs to be tracked
-/// within the constraint system.
-struct ForEachStmtInfo {
+/// Describes information about a for-in loop over a sequence that needs to be
+/// tracked in the constraint system.
+struct SequenceIterationInfo {
   /// The type of the sequence.
   Type sequenceType;
 
@@ -46,6 +47,17 @@ struct ForEachStmtInfo {
   /// Implicit `$iterator.next()` call.
   Expr *nextCall;
 };
+
+/// Describes information about a for-in loop over a pack that needs to be
+/// tracked in the constraint system.
+struct PackIterationInfo {
+  /// The type of the pattern that matches the elements.
+  Type patternType;
+};
+
+/// Describes information about a for-in loop that needs to be tracked
+/// within the constraint system.
+using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
 
 /// Describes the target to which a constraint system's solution can be
 /// applied.
@@ -78,6 +90,9 @@ private:
       /// When initializing a pattern from the expression, this is the
       /// pattern.
       Pattern *pattern;
+
+      /// The parent return statement if any.
+      ReturnStmt *parentReturnStmt;
 
       struct {
         /// The variable to which property wrappers have been applied, if
@@ -147,7 +162,8 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      bool bindPatternVarsOneWay;
+      bool ignoreWhereClause;
+      GenericEnvironment *packElementEnv;
       ForEachStmtInfo info;
     } forEachStmt;
 
@@ -227,11 +243,13 @@ public:
   }
 
   SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         bool bindPatternVarsOneWay)
+                         bool ignoreWhereClause,
+                         GenericEnvironment *packElementEnv)
       : kind(Kind::forEachStmt) {
     forEachStmt.stmt = stmt;
     forEachStmt.dc = dc;
-    forEachStmt.bindPatternVarsOneWay = bindPatternVarsOneWay;
+    forEachStmt.ignoreWhereClause = ignoreWhereClause;
+    forEachStmt.packElementEnv = packElementEnv;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -242,14 +260,19 @@ public:
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
-  forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
+  forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
+  /// Form an expression target for a ReturnStmt.
+  static SyntacticElementTarget
+  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
+
   /// Form a target for a for-in loop.
-  static SyntacticElementTarget forForEachStmt(ForEachStmt *stmt,
-                                               DeclContext *dc,
-                                               bool bindPatternVarsOneWay);
+  static SyntacticElementTarget
+  forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
+                 bool ignoreWhereClause = false,
+                 GenericEnvironment *packElementEnv = nullptr);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -415,6 +438,11 @@ public:
     expression.contextualInfo.typeLoc = type;
   }
 
+  void setExprContextualTypePurpose(ContextualTypePurpose ctp) {
+    assert(kind == Kind::expression);
+    expression.contextualInfo.purpose = ctp;
+  }
+
   /// Whether this target is for an initialization expression and pattern.
   bool isForInitialization() const {
     return kind == Kind::expression &&
@@ -434,6 +462,11 @@ public:
     assert(kind == Kind::expression);
     assert(getExprContextualTypePurpose() == CTP_ExprPattern);
     return cast<ExprPattern>(expression.pattern);
+  }
+
+  ReturnStmt *getParentReturnStmt() const {
+    assert(kind == Kind::expression);
+    return expression.parentReturnStmt;
   }
 
   Type getClosureContextualType() const {
@@ -469,10 +502,8 @@ public:
   bool shouldBindPatternVarsOneWay() const {
     if (kind == Kind::expression)
       return expression.bindPatternVarsOneWay;
-
     if (kind == Kind::forEachStmt)
-      return forEachStmt.bindPatternVarsOneWay;
-
+      return !ignoreForEachWhereClause() && forEachStmt.stmt->getWhere();
     return false;
   }
 
@@ -519,6 +550,16 @@ public:
   unsigned getInitializationPatternBindingIndex() const {
     assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
+  }
+
+  bool ignoreForEachWhereClause() const {
+    assert(isForEachStmt());
+    return forEachStmt.ignoreWhereClause;
+  }
+
+  GenericEnvironment *getPackElementEnv() const {
+    assert(isForEachStmt());
+    return forEachStmt.packElementEnv;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {

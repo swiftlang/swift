@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -14,7 +14,7 @@
 //
 // We keep support for them, but also log a deprecation warning that they should move to the new signature.
 final class OldExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'OldExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) {} // no warning, we're not deprecating the UnownedJob enqueue method yet
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
@@ -26,7 +26,7 @@ final class OldExecutor: SerialExecutor {
 ///
 /// That's why we do log the deprecation warning, people should use the move-only version.
 final class BothExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'BothExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) {} // no warning, we're not deprecating the UnownedJob enqueue method yet
 
   func enqueue(_ job: __owned ExecutorJob) {}
 
@@ -37,7 +37,7 @@ final class BothExecutor: SerialExecutor {
 
 /// For now we must keep all 3 implementation kinds and warn about deprecated ones
 final class TripleExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) {} // no warning, we're not deprecating the UnownedJob enqueue method yet
 
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}
@@ -82,8 +82,8 @@ final class NewExecutor: SerialExecutor {
 }
 
 // Good impl, but missing the ownership keyword
-final class MissingOwnership: SerialExecutor {
-  func enqueue(_ job: ExecutorJob) {} // expected-error{{noncopyable parameter must specify its ownership}}
+final class MissingOwnership: SerialExecutor { // expected-error {{type 'MissingOwnership' does not conform to protocol 'Executor'}}
+  func enqueue(_ job: ExecutorJob) {} // expected-error{{parameter of noncopyable type 'ExecutorJob' must specify ownership}}
   // expected-note@-1{{add 'borrowing' for an immutable reference}}
   // expected-note@-2{{add 'inout' for a mutable reference}}
   // expected-note@-3{{add 'consuming' to take the value from the caller}}

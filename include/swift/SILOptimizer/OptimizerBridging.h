@@ -13,27 +13,58 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
-#include "swift/Basic/Nullability.h"
+// Do not add other C++/llvm/swift header files here!
+// Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
+// (under OptimizerBridging) andrequired header files should be added there.
+//
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
+#include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+
+#ifdef USED_IN_CPP_SOURCE
+
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+
+#else // USED_IN_CPP_SOURCE
+
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+#ifdef SWIFT_SIL_SILVALUE_H
+#error "should not include swift headers into bridging header"
+#endif
+#ifdef LLVM_SUPPORT_COMPILER_H
+#error "should not include llvm headers into bridging header"
+#endif
+
+#endif // USED_IN_CPP_SOURCE
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+namespace swift {
+class AliasAnalysis;
+class BasicCalleeAnalysis;
+class DeadEndBlocks;
+class DominanceInfo;
+class PostDominanceInfo;
+class BasicBlockSet;
+class NodeSet;
+class ClonerWithFixedLocation;
+class SwiftPassInvocation;
+class FixedSizeSlabPayload;
+class FixedSizeSlab;
+class SILVTable;
+}
 
 struct BridgedPassContext;
 
 struct BridgedAliasAnalysis {
   swift::AliasAnalysis * _Nonnull aa;
 
-  swift::MemoryBehavior getMemBehavior(BridgedInstruction inst, BridgedValue addr) const {
-    return aa->computeMemoryBehavior(inst.getInst(), addr.getSILValue());
-  }
+  BRIDGED_INLINE BridgedMemoryBehavior getMemBehavior(BridgedInstruction inst, BridgedValue addr) const;
 
-  typedef swift::MemoryBehavior (* _Nonnull GetMemEffectFn)(
+  typedef BridgedMemoryBehavior (* _Nonnull GetMemEffectFn)(
         BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
   typedef bool (* _Nonnull Escaping2InstFn)(
         BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
@@ -51,19 +82,28 @@ struct BridgedAliasAnalysis {
 struct BridgedCalleeAnalysis {
   swift::BasicCalleeAnalysis * _Nonnull ca;
 
-  SWIFT_IMPORT_UNSAFE
-  swift::CalleeList getCallees(BridgedValue callee) const;
+  struct CalleeList {
+    uint64_t storage[3];
 
-  SWIFT_IMPORT_UNSAFE
-  swift::CalleeList getDestructors(swift::SILType type, bool isExactType) const;
+#ifdef USED_IN_CPP_SOURCE
+    CalleeList(swift::CalleeList list) {
+      *reinterpret_cast<swift::CalleeList *>(&storage) = list;
+    }
+    swift::CalleeList unbridged() const {
+      return *reinterpret_cast<const swift::CalleeList *>(&storage);
+    }
+#endif
 
-  SWIFT_IMPORT_UNSAFE
-  static BridgedFunction getCallee(swift::CalleeList cl, SwiftInt index) {
-    return {cl.get(index)};
-  }
+    BRIDGED_INLINE bool isIncomplete() const;
+    BRIDGED_INLINE SwiftInt getCount() const;
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getCallee(SwiftInt index) const;
+  };
+
+  SWIFT_IMPORT_UNSAFE CalleeList getCallees(BridgedValue callee) const;
+  SWIFT_IMPORT_UNSAFE CalleeList getDestructors(BridgedType type, bool isExactType) const;
 
   typedef bool (* _Nonnull IsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
-  typedef swift::MemoryBehavior (* _Nonnull GetMemBehvaiorFn)(
+  typedef BridgedMemoryBehavior (* _Nonnull GetMemBehvaiorFn)(
         BridgedInstruction apply, bool observeRetains, BridgedCalleeAnalysis bca);
 
   static void registerAnalysis(IsDeinitBarrierFn isDeinitBarrierFn,
@@ -73,246 +113,136 @@ struct BridgedCalleeAnalysis {
 struct BridgedDeadEndBlocksAnalysis {
   swift::DeadEndBlocks * _Nonnull deb;
 
-  bool isDeadEnd(BridgedBasicBlock block) const {
-    return deb->isDeadEnd(block.getBlock());
-  }
+  BRIDGED_INLINE bool isDeadEnd(BridgedBasicBlock block) const;
 };
 
 struct BridgedDomTree {
   swift::DominanceInfo * _Nonnull di;
 
-  bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
-    return di->dominates(dominating.getBlock(), dominated.getBlock());
-  }
-};
-
-struct BridgedBasicBlockSet {
-  swift::BasicBlockSet * _Nonnull set;
-
-  bool contains(BridgedBasicBlock block) const {
-    return set->contains(block.getBlock());
-  }
-
-  bool insert(BridgedBasicBlock block) const {
-    return set->insert(block.getBlock());
-  }
-
-  void erase(BridgedBasicBlock block) const {
-    set->erase(block.getBlock());
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedFunction getFunction() const {
-    return {set->getFunction()};
-  }
-};
-
-struct BridgedNodeSet {
-  swift::NodeSet * _Nonnull set;
-
-  bool containsValue(BridgedValue value) const {
-    return set->contains(value.getSILValue());
-  }
-
-  bool insertValue(BridgedValue value) const {
-    return set->insert(value.getSILValue());
-  }
-
-  void eraseValue(BridgedValue value) const {
-    set->erase(value.getSILValue());
-  }
-
-  bool containsInstruction(BridgedInstruction inst) const {
-    return set->contains(inst.getInst()->asSILNode());
-  }
-
-  bool insertInstruction(BridgedInstruction inst) const {
-    return set->insert(inst.getInst()->asSILNode());
-  }
-
-  void eraseInstruction(BridgedInstruction inst) const {
-    set->erase(inst.getInst()->asSILNode());
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedFunction getFunction() const {
-    return {set->getFunction()};
-  }
-};
-
-namespace swift {
-class ClonerWithFixedLocation;
-}
-
-struct BridgedCloner {
-  swift::ClonerWithFixedLocation * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
-
-  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
-
-  void destroy(BridgedPassContext context);
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedValue getClonedValue(BridgedValue v);
-
-  bool isValueCloned(BridgedValue v) const;
-
-  void clone(BridgedInstruction inst);
+  BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
 struct BridgedPostDomTree {
   swift::PostDominanceInfo * _Nonnull pdi;
 
-  bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
-    return pdi->dominates(dominating.getBlock(), dominated.getBlock());
-  }
+  BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
+};
+
+struct BridgedBasicBlockSet {
+  swift::BasicBlockSet * _Nonnull set;
+
+  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
+  BRIDGED_INLINE bool insert(BridgedBasicBlock block) const;
+  BRIDGED_INLINE void erase(BridgedBasicBlock block) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
+struct BridgedNodeSet {
+  swift::NodeSet * _Nonnull set;
+
+  BRIDGED_INLINE bool containsValue(BridgedValue value) const;
+  BRIDGED_INLINE bool insertValue(BridgedValue value) const;
+  BRIDGED_INLINE void eraseValue(BridgedValue value) const;
+  BRIDGED_INLINE bool containsInstruction(BridgedInstruction inst) const;
+  BRIDGED_INLINE bool insertInstruction(BridgedInstruction inst) const;
+  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
+};
+
+struct BridgedCloner {
+  swift::ClonerWithFixedLocation * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedPassContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedPassContext context);
+  void destroy(BridgedPassContext context);
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void clone(BridgedInstruction inst);
 };
 
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 
-  std::string getModuleDescription() const;
+  enum class SILStage {
+    Raw,
+    Canonical,
+    Lowered
+  };
 
-  SWIFT_IMPORT_UNSAFE
-  BridgedChangeNotificationHandler asNotificationHandler() const {
-    return {invocation};
-  }
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString getModuleDescription() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
+  BRIDGED_INLINE void notifyDependencyOnBodyOf(BridgedFunction otherFunction) const;
+  BRIDGED_INLINE SILStage getSILStage() const;
+  BRIDGED_INLINE bool hadError() const;
+  BRIDGED_INLINE bool moduleIsSerialized() const;
+  BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
+
   // Analysis
 
-  SWIFT_IMPORT_UNSAFE
-  BridgedAliasAnalysis getAliasAnalysis() const {
-    return {invocation->getPassManager()->getAnalysis<swift::AliasAnalysis>(invocation->getFunction())};
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedAliasAnalysis getAliasAnalysis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCalleeAnalysis getCalleeAnalysis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNominalTypeDecl getSwiftArrayDecl() const;
 
-  SWIFT_IMPORT_UNSAFE
-  BridgedCalleeAnalysis getCalleeAnalysis() const {
-    return {invocation->getPassManager()->getAnalysis<swift::BasicCalleeAnalysis>()};
-  }
+  // AST
 
-  bool hadError() const {
-    return invocation->getPassManager()->getModule()->getASTContext().hadError();
-  }
-
-  swift::SILStage getSILStage() const {
-    return invocation->getPassManager()->getModule()->getStage();
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const {
-    auto *dba = invocation->getPassManager()->getAnalysis<swift::DeadEndBlocksAnalysis>();
-    return {dba->get(invocation->getFunction())};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedDomTree getDomTree() const {
-    auto *da = invocation->getPassManager()->getAnalysis<swift::DominanceAnalysis>();
-    return {da->get(invocation->getFunction())};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedPostDomTree getPostDomTree() const {
-    auto *pda = invocation->getPassManager()->getAnalysis<swift::PostDominanceAnalysis>();
-    return {pda->get(invocation->getFunction())};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedNominalTypeDecl getSwiftArrayDecl() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return {mod->getASTContext().getArrayDecl()};
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedDiagnosticEngine getDiagnosticEngine() const;
 
   // SIL modifications
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedBasicBlock splitBlock(BridgedInstruction bridgedInst) const {
-    auto *inst = bridgedInst.getInst();
-    auto *block = inst->getParent();
-    return {block->split(inst->getIterator())};
-  }
-
-  void eraseInstruction(BridgedInstruction inst) const {
-    invocation->eraseInstruction(inst.getInst());
-  }
-
-  void eraseBlock(BridgedBasicBlock block) const {
-    block.getBlock()->eraseFromParent();
-  }
-
-  bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
-
-  bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
 
   struct DevirtResult {
     OptionalBridgedInstruction newApply;
     bool cfgChanged;
   };
 
-  SWIFT_IMPORT_UNSAFE
-  DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
-
-  SWIFT_IMPORT_UNSAFE
-  swift::SILVTable * _Nullable specializeVTableForType(swift::SILType type, BridgedFunction function) const;
-
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock appendBlock(BridgedFunction bridgedFunction) const;
+  BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
+  BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
+  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
+  bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
+  SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+  SWIFT_IMPORT_UNSAFE swift::SILVTable * _Nullable specializeVTableForType(BridgedType type,
+                                                                           BridgedFunction function) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
-
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+                                                            SwiftInt numDeadArgs,
+                                                            BridgedFunction function) const;
 
-  std::string mangleOutlinedVariable(BridgedFunction function) const;
-
-  std::string mangleAsyncRemoved(BridgedFunction function) const;
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedGlobalVar createGlobalVariable(llvm::StringRef name, swift::SILType type, bool isPrivate) const;
-
+  SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
+                                                            bool isPrivate) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedValue getSILUndef(swift::SILType type) const {
-    return {swift::SILUndef::get(type, *invocation->getFunction())};
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
+  BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
+  BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
   // IRGen
 
-  SwiftInt getStaticSize(swift::SILType type) const;
-
-  SwiftInt getStaticAlignment(swift::SILType type) const;
-
-  SwiftInt getStaticStride(swift::SILType type) const;
+  SwiftInt getStaticSize(BridgedType type) const;
+  SwiftInt getStaticAlignment(BridgedType type) const;
+  SwiftInt getStaticStride(BridgedType type) const;
 
   // Sets
 
-  SWIFT_IMPORT_UNSAFE
-  BridgedBasicBlockSet allocBasicBlockSet() const {
-    return {invocation->allocBlockSet()};
-  }
-
-  void freeBasicBlockSet(BridgedBasicBlockSet set) const {
-    invocation->freeBlockSet(set.set);
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedNodeSet allocNodeSet() const {
-    return {invocation->allocNodeSet()};
-  }
-
-  void freeNodeSet(BridgedNodeSet set) const {
-    invocation->freeNodeSet(set.set);
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlockSet allocBasicBlockSet() const;
+  BRIDGED_INLINE void freeBasicBlockSet(BridgedBasicBlockSet set) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNodeSet allocNodeSet() const;
+  BRIDGED_INLINE void freeNodeSet(BridgedNodeSet set) const;
 
   // Stack nesting
 
-  void notifyInvalidatedStackNesting() const {
-    invocation->setNeedFixStackNesting(true);
-  }
-
-  bool getNeedFixStackNesting() const {
-    return invocation->getNeedFixStackNesting();
-  }
-
+  BRIDGED_INLINE void notifyInvalidatedStackNesting() const;
+  BRIDGED_INLINE bool getNeedFixStackNesting() const;
   void fixStackNesting(BridgedFunction function) const;
 
   // Slabs
@@ -320,216 +250,74 @@ struct BridgedPassContext {
   struct Slab {
     swift::FixedSizeSlabPayload * _Nullable data = nullptr;
 
-    static SwiftInt getCapacity() {
-      return (SwiftInt)swift::FixedSizeSlabPayload::capacity;
-    }
-
-    Slab(swift::FixedSizeSlab * _Nullable slab) {
-      if (slab) {
-        data = slab;
-        assert((void *)data == slab->dataFor<void>());
-      }
-    }
-
-    swift::FixedSizeSlab * _Nullable getSlab() const {
-      if (data)
-        return static_cast<swift::FixedSizeSlab *>(data);
-      return nullptr;
-    }
-
-    SWIFT_IMPORT_UNSAFE
-    Slab getNext() const {
-      return &*std::next(getSlab()->getIterator());
-    }
-
-    SWIFT_IMPORT_UNSAFE
-    Slab getPrevious() const {
-      return &*std::prev(getSlab()->getIterator());
-    }
+    BRIDGED_INLINE static SwiftInt getCapacity();
+    BRIDGED_INLINE Slab(swift::FixedSizeSlab * _Nullable slab);
+    BRIDGED_INLINE swift::FixedSizeSlab * _Nullable getSlab() const;
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab getNext() const;
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab getPrevious() const;
   };
 
-  SWIFT_IMPORT_UNSAFE
-  Slab allocSlab(Slab afterSlab) const {
-    return invocation->allocSlab(afterSlab.getSlab());
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  Slab freeSlab(Slab slab) const {
-    return invocation->freeSlab(slab.getSlab());
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab allocSlab(Slab afterSlab) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
 
   // Access SIL module data structures
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedFunction getFirstFunctionInModule() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    if (mod->getFunctions().empty())
-      return {nullptr};
-    return {&*mod->getFunctions().begin()};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  static OptionalBridgedFunction getNextFunctionInModule(BridgedFunction function) {
-    auto *f = function.getFunction();
-    auto nextIter = std::next(f->getIterator());
-    if (nextIter == f->getModule().getFunctions().end())
-      return {nullptr};
-    return {&*nextIter};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedGlobalVar getFirstGlobalInModule() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    if (mod->getSILGlobals().empty())
-      return {nullptr};
-    return {&*mod->getSILGlobals().begin()};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global) {
-    auto *g = global.getGlobal();
-    auto nextIter = std::next(g->getIterator());
-    if (nextIter == g->getModule().getSILGlobals().end())
-      return {nullptr};
-    return {&*nextIter};
-  }
 
   struct VTableArray {
     swift::SILVTable * const _Nonnull * _Nullable base;
     SwiftInt count;
   };
 
-  SWIFT_IMPORT_UNSAFE
-  VTableArray getVTables() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    auto vTables = mod->getVTables();
-    return {vTables.data(), (SwiftInt)vTables.size()};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedWitnessTable getFirstWitnessTableInModule() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    if (mod->getWitnessTables().empty())
-      return {nullptr};
-    return {&*mod->getWitnessTables().begin()};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  static OptionalBridgedWitnessTable getNextWitnessTableInModule(BridgedWitnessTable table) {
-    auto *t = table.table;
-    auto nextIter = std::next(t->getIterator());
-    if (nextIter == t->getModule().getWitnessTables().end())
-      return {nullptr};
-    return {&*nextIter};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedDefaultWitnessTable getFirstDefaultWitnessTableInModule() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    if (mod->getDefaultWitnessTables().empty())
-      return {nullptr};
-    return {&*mod->getDefaultWitnessTables().begin()};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  static OptionalBridgedDefaultWitnessTable getNextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
-    auto *t = table.table;
-    auto nextIter = std::next(t->getIterator());
-    if (nextIter == t->getModule().getDefaultWitnessTables().end())
-      return {nullptr};
-    return {&*nextIter};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedFunction loadFunction(llvm::StringRef name, bool loadCalleesRecursively) const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return {mod->loadFunction(name, loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
-                                                           : swift::SILModule::LinkingMode::LinkNormal)};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    mod->loadFunction(function.getFunction(),
-                      loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
-                                             : swift::SILModule::LinkingMode::LinkNormal);
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  OptionalBridgedFunction lookupStdlibFunction(llvm::StringRef name) const;
-
-  SWIFT_IMPORT_UNSAFE
-  swift::SubstitutionMap getContextSubstitutionMap(swift::SILType type) const {
-    auto *ntd = type.getASTType()->getAnyNominal();
-    auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();
-    return type.getASTType()->getContextSubstitutionMap(mod, ntd);
-  }
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getFirstFunctionInModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedFunction getNextFunctionInModule(BridgedFunction function);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedGlobalVar getFirstGlobalInModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE VTableArray getVTables() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedWitnessTable getFirstWitnessTableInModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedWitnessTable getNextWitnessTableInModule(
+                                                                                  BridgedWitnessTable table);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDefaultWitnessTable getFirstDefaultWitnessTableInModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedDefaultWitnessTable getNextDefaultWitnessTableInModule(
+                                                                                  BridgedDefaultWitnessTable table);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
+                                                                          bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,
+                                                          const BridgedParameterInfo * _Nullable bridgedParams,
+                                                          SwiftInt paramCount,
+                                                          bool hasSelfParam,
+                                                          BridgedFunction fromFunc) const;
+  void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
 
   // Passmanager housekeeping
 
-  void beginTransformFunction(BridgedFunction function) const {
-    invocation->beginTransformFunction(function.getFunction());
-  }
-
-  void endTransformFunction() const {
-    invocation->endTransformFunction();
-  }
-
-  bool continueWithNextSubpassRun(OptionalBridgedInstruction inst) const {
-    swift::SILPassManager *pm = invocation->getPassManager();
-    return pm->continueWithNextSubpassRun(inst.getInst(),
-                                          invocation->getFunction(),
-                                          invocation->getTransform());
-  }
+  BRIDGED_INLINE void beginTransformFunction(BridgedFunction function) const;
+  BRIDGED_INLINE void endTransformFunction() const;
+  BRIDGED_INLINE bool continueWithNextSubpassRun(OptionalBridgedInstruction inst) const;
 
   // SSAUpdater
 
-  void SSAUpdater_initialize(swift::SILType type, BridgedValue::Ownership ownership) const {
-    invocation->initializeSSAUpdater(type, castToOwnership(ownership));
-  }
-
-  void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
-    invocation->getSSAUpdater()->addAvailableValue(block.getBlock(), value.getSILValue());
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
-    return {invocation->getSSAUpdater()->getValueAtEndOfBlock(block.getBlock())};
-  }
-
-  SWIFT_IMPORT_UNSAFE
-  BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
-    return {invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.getBlock())};
-  }
+  BRIDGED_INLINE void SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;
 
   // Options
 
-  bool enableStackProtection() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return mod->getOptions().EnableStackProtection;
-  }
-
-  bool enableEmbeddedSwift() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return mod->getASTContext().LangOpts.hasFeature(swift::Feature::Embedded);
-  }
-
-  bool enableMoveInoutStackProtection() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return mod->getOptions().EnableMoveInoutStackProtection;
-  }
-
   enum class AssertConfiguration {
-    Debug = swift::SILOptions::Debug,
-    Release = swift::SILOptions::Release,
-    Unchecked = swift::SILOptions::Unchecked
+    Debug = 0,
+    Release = 1,
+    Unchecked = 2
   };
 
-  AssertConfiguration getAssertConfiguration() const {
-    swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return (AssertConfiguration)mod->getOptions().AssertConfig;
-  }
-
+  BRIDGED_INLINE bool enableStackProtection() const;
+  BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
+  BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
+  BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
 };
 
@@ -553,12 +341,17 @@ typedef void (* _Nonnull BridgedModulePassRunFn)(BridgedPassContext);
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
-void SILPassManager_registerModulePass(llvm::StringRef name,
+void SILPassManager_registerModulePass(BridgedStringRef name,
                                        BridgedModulePassRunFn runFn);
-void SILPassManager_registerFunctionPass(llvm::StringRef name,
+void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn);
-void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
+void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn);
+
+#ifndef PURE_BRIDGING_MODE
+// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
+#include "OptimizerBridgingImpl.h"
+#endif
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

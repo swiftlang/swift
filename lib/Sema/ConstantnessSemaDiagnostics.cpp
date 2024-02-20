@@ -354,7 +354,7 @@ void swift::diagnoseConstantArgumentRequirement(
       }
 
       if (!expr || isa<ErrorExpr>(expr) || !expr->getType())
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
         diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }

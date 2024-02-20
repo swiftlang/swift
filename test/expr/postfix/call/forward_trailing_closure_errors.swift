@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
-// REQUIRES: asserts
 
 func forwardMatchWithGeneric<T>( // expected-note{{'forwardMatchWithGeneric(closure1:closure2:)' declared here}}
   closure1: T,

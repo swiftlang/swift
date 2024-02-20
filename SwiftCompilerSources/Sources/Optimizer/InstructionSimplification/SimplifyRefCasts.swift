@@ -65,7 +65,7 @@ private extension UnaryInstruction {
   }
 
   func tryReplaceSource(withOperandOf inst: SingleValueInstruction, _ context: SimplifyContext) -> Bool {
-    let singleUse = context.preserveDebugInfo ? inst.uses.singleUse : inst.uses.singleNonDebugUse
+    let singleUse = context.preserveDebugInfo ? inst.uses.singleUse : inst.uses.ignoreDebugUses.singleUse
     let canEraseInst = singleUse?.instruction == self
     let replacement = inst.operands[0].value
 
@@ -111,7 +111,7 @@ private extension UnaryInstruction {
 private func insertCompensatingInstructions(for inst: Instruction, in failureBlock: BasicBlock, _ context: SimplifyContext) {
   assert(failureBlock.arguments.count == 1)
   let sourceValue = inst.operands[0].value
-  let newArg = failureBlock.addBlockArgument(type: sourceValue.type, ownership: sourceValue.ownership, context)
+  let newArg = failureBlock.addArgument(type: sourceValue.type, ownership: sourceValue.ownership, context)
   let builder = Builder(atBeginOf: failureBlock, context)
   let newInst: SingleValueInstruction
   switch inst {

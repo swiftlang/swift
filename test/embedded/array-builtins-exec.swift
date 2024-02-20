@@ -1,13 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s %S/Inputs/print.swift -enable-experimental-feature Embedded -enable-builtin-module -c -o %t/main.o
-// RUN: %target-clang -x c -c %S/Inputs/tiny-runtime-dummy-refcounting.c -o %t/runtime.o
-// RUN: %target-clang %t/main.o %t/runtime.o -o %t/a.out -dead_strip
+// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -enable-builtin-module -c -o %t/main.o
+// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 import Builtin
 

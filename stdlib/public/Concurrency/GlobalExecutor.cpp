@@ -135,11 +135,24 @@ void swift::swift_task_enqueueGlobalWithDeadline(
 // Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
 //
 // We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 extern "C" SWIFT_CC(swift)
-ExecutorRef _task_serialExecutor_getExecutorRef(
-    HeapObject *executor,
-    const Metadata *selfType,
+SerialExecutorRef _task_serialExecutor_getExecutorRef(
+        HeapObject *executor, const Metadata *selfType,
+        const SerialExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
+
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _task_executor_getTaskExecutorRef(
+    HeapObject *executor, const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
+#pragma clang diagnostic pop
 
 SWIFT_CC(swift)
 static bool swift_task_isOnExecutorImpl(HeapObject *executor,
@@ -159,7 +172,7 @@ bool swift::swift_task_isOnExecutor(HeapObject *executor,
     return swift_task_isOnExecutorImpl(executor, selfType, wtable);
 }
 
-bool swift::swift_executor_isComplexEquality(ExecutorRef ref) {
+bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
   return ref.isComplexEquality();
 }
 
@@ -187,18 +200,18 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
     swift_task_enqueueMainExecutorImpl(job);
 }
 
-ExecutorRef swift::swift_task_getMainExecutor() {
+SerialExecutorRef swift::swift_task_getMainExecutor() {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: this isn't right for the non-cooperative environment
-  return ExecutorRef::generic();
+  return SerialExecutorRef::generic();
 #else
-  return ExecutorRef::forOrdinary(
+  return SerialExecutorRef::forOrdinary(
            reinterpret_cast<HeapObject*>(&_dispatch_main_q),
            _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 #endif
 }
 
-bool ExecutorRef::isMainExecutor() const {
+bool SerialExecutorRef::isMainExecutor() const {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: this isn't right for the non-cooperative environment
   return isGeneric();

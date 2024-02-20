@@ -28,6 +28,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -124,7 +125,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -140,7 +141,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -156,7 +157,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -169,7 +170,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 namespace {
@@ -256,6 +257,13 @@ class Verifier : public ASTWalker {
       Out << "\n";
     }
     abort();
+  }
+
+  ModuleDecl *getModuleContext() const {
+    if (auto sourceFile = M.dyn_cast<SourceFile *>())
+      return sourceFile->getParentModule();
+
+    return M.get<ModuleDecl *>();
   }
 
 public:
@@ -393,7 +401,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue();
       cleanup(node);
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -411,7 +419,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -422,7 +430,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching post-visitation.
@@ -496,7 +504,6 @@ public:
       switch (afd->getBodyKind()) {
       case AbstractFunctionDecl::BodyKind::None:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
-      case AbstractFunctionDecl::BodyKind::Skipped:
       case AbstractFunctionDecl::BodyKind::SILSynthesize:
       case AbstractFunctionDecl::BodyKind::Deserialized:
         return true;
@@ -615,7 +622,7 @@ public:
         if (!(countType->is<PackType>() ||
               countType->is<PackArchetypeType>() ||
               countType->isRootParameterPack())) {
-          Out << "non-pack shape type" << countType->getString() << "\n";
+          Out << "non-pack shape type: " << countType->getString() << "\n";
           abort();
         }
       }
@@ -694,8 +701,8 @@ public:
           auto interfaceType = archetype->getInterfaceType();
           auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
 
-          if (contextType.getPointer() != archetype) {
-            Out << "Archetype " << archetype->getString() << "does not appear"
+          if (!contextType->isEqual(archetype)) {
+            Out << "Archetype " << archetype->getString() << " does not appear"
                 << " inside its own generic environment\n";
             Out << "Interface type: " << interfaceType.getString() << "\n";
             Out << "Contextual type: " << contextType.getString() << "\n";
@@ -796,6 +803,13 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        if (!shouldVerify(expansion)) {
+          return false;
+        }
+      }
+
       if (!S->getElementExpr())
         return true;
 
@@ -805,6 +819,11 @@ public:
     }
 
     void cleanup(ForEachStmt *S) {
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        cleanup(expansion);
+      }
+
       if (!S->getElementExpr())
         return;
 
@@ -1013,10 +1032,34 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
+      }
+
+      return nullptr;
+    }
+
     void verifyChecked(ThrowStmt *S) {
-      checkSameType(S->getSubExpr()->getType(),
-                    checkExceptionTypeExists("throw expression"),
-                    "throw operand");
+      Type thrownError;
+      SourceLoc loc = S->getThrowLoc();
+      if (loc.isValid()) {
+        auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
+        if (catchNode) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
+        } else {
+          thrownError = checkExceptionTypeExists("throw expression");
+        }
+      } else {
+        return;
+      }
+
+      checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }
 
@@ -1032,17 +1075,26 @@ public:
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
+      } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+        if (CD->hasLifetimeDependentReturn()) {
+          resultType = CD->getResultInterfaceType();
+          resultType = CD->mapTypeIntoContext(resultType);
+        } else {
+          resultType = TupleType::getEmpty(Ctx);
+        }
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }
-      
+
       if (S->hasResult()) {
-        if (isa<ConstructorDecl>(func)) {
-          Out << "Expected ReturnStmt not to have a result. A constructor "
-                 "should not return a result. Returned expression: ";
-          S->getResult()->dump(Out);
-          Out << "\n";
-          abort();
+        if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+          if (!CD->hasLifetimeDependentReturn()) {
+            Out << "Expected ReturnStmt not to have a result. A constructor "
+                   "should not return a result. Returned expression: ";
+            S->getResult()->dump(Out);
+            Out << "\n";
+            abort();
+          }
         }
 
         auto result = S->getResult();
@@ -1222,6 +1274,7 @@ public:
         break;
       case Kind::UnterminatedBranches:
       case Kind::NonExhaustiveIf:
+      case Kind::NonExhaustiveDoCatch:
       case Kind::UnhandledStmt:
       case Kind::CircularReference:
       case Kind::HasLabel:
@@ -1659,7 +1712,7 @@ public:
             auto concreteLayout = concreteTy->getCanonicalType()
                                             ->getExistentialLayout();
             canBeClass = concreteLayout.getKind() == ExistentialLayout::Kind::Class
-              && !concreteLayout.containsNonObjCProtocol;
+              && !concreteLayout.containsSwiftProtocol;
           } else {
             canBeClass = false;
           }
@@ -1738,6 +1791,14 @@ public:
       verifyConformance(E->getSubExpr()->getType(), E->getConformance());
 
       verifyCheckedBase(E);
+    }
+
+    void verifyChecked(UnreachableExpr *E) {
+      if (!E->getSubExpr()->getType()->isStructurallyUninhabited()) {
+        Out << "UnreachableExpr must have an uninhabited sub-expression: ";
+        E->getSubExpr()->dump(Out);
+        abort();
+      }
     }
 
     void verifyChecked(TupleElementExpr *E) {
@@ -2428,6 +2489,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
+      // If there is a substitute decl, we'll end up checking that instead.
+      if (expansion->getSubstituteDecl())
+        return;
+
       MacroExpansionDiscriminatorKey key{
         MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()
@@ -2599,6 +2664,14 @@ public:
         abort();
       }
 
+      // Catch cases where there's a missing generic environment.
+      if (var->getTypeInContext()->hasError()) {
+        Out << "VarDecl is missing a Generic Environment: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() !=
@@ -2747,7 +2820,6 @@ public:
         // Ignore incomplete conformances; we didn't need them.
         return;
 
-      case ProtocolConformanceState::CheckingTypeWitnesses:
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a protocol conformance that is still being checked "
@@ -2871,40 +2943,6 @@ public:
           }
 
           continue;
-        }
-      }
-
-      // Make sure we have the right signature conformances.
-      if (!normal->isInvalid()){
-        auto conformances = normal->getSignatureConformances();
-        unsigned idx = 0;
-        auto reqs = proto->getRequirementSignature().getRequirements();
-        for (const auto &req : reqs) {
-          if (req.getKind() != RequirementKind::Conformance)
-            continue;
-
-          if (idx >= conformances.size()) {
-            Out << "error: not enough conformances for requirement signature\n";
-            normal->dump(Out);
-            abort();
-          }
-
-          auto reqProto = req.getProtocolDecl();
-          if (reqProto != conformances[idx].getRequirement()) {
-            Out << "error: wrong protocol in signature conformances: have "
-              << conformances[idx].getRequirement()->getName().str()
-              << ", expected " << reqProto->getName().str()<< "\n";
-            normal->dump(Out);
-            abort();
-          }
-
-          ++idx;
-        }
-
-        if (idx != conformances.size()) {
-          Out << "error: too many conformances for requirement signature\n";
-          normal->dump(Out);
-          abort();
         }
       }
     }
@@ -3266,7 +3304,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
-      if (!isa<ClassDecl>(ND) && !ND->isMoveOnly() && !DD->isInvalid()) {
+      if (!isa<ClassDecl>(ND) && ND->canBeCopyable() && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes/move only types should be "
                "marked invalid\n";
         abort();
@@ -3798,8 +3836,9 @@ public:
         if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
           auto *expansionBuffer =
               D->getModuleContext()->getSourceFileContainingLocation(Current.Start);
-          if (auto expansion = expansionBuffer->getMacroExpansion()) {
-            Current = expansion.getSourceRange();
+
+          if (auto expansionRange = expansionBuffer->getMacroInsertionRange()) {
+            Current = expansionRange;
           }
         }
 
@@ -3841,7 +3880,17 @@ public:
       } else {
         llvm_unreachable("impossible parent node");
       }
-      
+
+      if (AltEnclosing.isInvalid()) {
+        // A preamble macro introduces child nodes directly into the tree.
+        auto *sourceFile =
+            getModuleContext()->getSourceFileContainingLocation(Current.Start);
+        if (sourceFile &&
+            sourceFile->getFulfilledMacroRole() == MacroRole::Preamble) {
+          AltEnclosing = Current;
+        }
+      }
+
       if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
           !(AltEnclosing.isValid() &&
             Ctx.SourceMgr.rangeContains(AltEnclosing, Current))) {

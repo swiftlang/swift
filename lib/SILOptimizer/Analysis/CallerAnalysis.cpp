@@ -35,7 +35,6 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
       // final/visibility/etc.
       mayHaveIndirectCallers(
           f->getDynamicallyReplacedFunction() ||
-          f->getReferencedAdHocRequirementWitnessFunction() ||
           canBeCalledIndirectly(f->getRepresentation())),
       mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
                              f->isAvailableExternally()) {}
@@ -51,7 +50,7 @@ struct CallerAnalysis::ApplySiteFinderVisitor
 
 #ifndef NDEBUG
   SmallPtrSet<SILInstruction *, 8> visitedCallSites;
-  SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
+  llvm::SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
 #endif
 
   ApplySiteFinderVisitor(CallerAnalysis *analysis, SILFunction *callerFn)

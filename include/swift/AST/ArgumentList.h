@@ -95,11 +95,11 @@ public:
   /// Whether the argument is a compile-time constant value.
   bool isConst() const;
 
-  bool operator==(const Argument &other) {
+  bool operator==(const Argument &other) const {
     return LabelLoc == other.LabelLoc && Label == other.Label &&
            ArgExpr == other.ArgExpr;
   }
-  bool operator!=(const Argument &other) { return !(*this == other); }
+  bool operator!=(const Argument &other) const { return !(*this == other); }
 };
 
 /// Represents the argument list of a function call or subscript access.

@@ -176,7 +176,7 @@ llvm::Function *IRGenModule::emitHasSymbolFunction(ValueDecl *decl) {
 
   func->setDoesNotThrow();
   func->setCallingConv(DefaultCC);
-  func->addFnAttr(llvm::Attribute::ReadOnly);
+  func->setOnlyReadsMemory();
 
   return func;
 }

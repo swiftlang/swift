@@ -7,7 +7,7 @@
 func osx() {} // expected-note 3{{'osx()' has been explicitly marked unavailable here}}
 
 @available(OSXApplicationExtension, unavailable)
-func osx_extension() {} // expected-note 3{{'osx_extension()' has been explicitly marked unavailable here}}
+func osx_extension() {} // expected-note {{'osx_extension()' has been explicitly marked unavailable here}}
 
 func call_osx_extension() {
     osx_extension() // expected-error {{'osx_extension()' is unavailable}}
@@ -18,7 +18,7 @@ func call_osx() {
 
 @available(OSX, unavailable)
 func osx_call_osx_extension() {
-    osx_extension() // expected-error {{'osx_extension()' is unavailable}}
+    osx_extension()
 }
 
 @available(OSX, unavailable)
@@ -46,7 +46,7 @@ extension NotOnOSX {
   }
 
   func osx_call_osx_extension() {
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx_extension()
   }
 }
 

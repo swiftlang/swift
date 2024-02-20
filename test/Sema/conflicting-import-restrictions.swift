@@ -38,20 +38,15 @@
 
 /// Access levels on imports
 // RUN: %target-swift-frontend -typecheck %t/Public_Exported.swift -I %t -verify \
-// RUN:   -experimental-spi-only-imports -verify \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/Package_Exported.swift -I %t -verify \
-// RUN:   -experimental-spi-only-imports -verify \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/Internal_Exported.swift -I %t -verify \
-// RUN:   -experimental-spi-only-imports -verify \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/Fileprivate_Exported.swift -I %t -verify \
-// RUN:   -experimental-spi-only-imports -verify \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/Private_Exported.swift -I %t -verify \
-// RUN:   -experimental-spi-only-imports -verify \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -experimental-spi-only-imports -verify
 
 //--- Public_Exported.swift
 @_exported public import Lib

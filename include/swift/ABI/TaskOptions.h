@@ -75,26 +75,25 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
   }
 };
 
-
 /// Task option to specify on what executor the task should be executed.
 ///
-/// Not passing this option implies that a "best guess" or good default
-/// executor should be used instead, most often this may mean the global
-/// concurrent executor, or the enclosing actor's executor.
-class ExecutorTaskOptionRecord : public TaskOptionRecord {
-  const ExecutorRef Executor;
+/// Not passing this option implies that an inferred (e.g. surrounding actor
+/// when we inherit execution context) or the default executor should be used.
+///
+/// Lack of this option usually means that the global concurrent executor, or
+/// the executor of the enclosing actor will be used.
+class InitialTaskExecutorPreferenceTaskOptionRecord : public TaskOptionRecord {
+  const TaskExecutorRef Executor;
 
 public:
-  ExecutorTaskOptionRecord(ExecutorRef executor)
-    : TaskOptionRecord(TaskOptionRecordKind::Executor),
-      Executor(executor) {}
+  InitialTaskExecutorPreferenceTaskOptionRecord(TaskExecutorRef executor)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutor),
+        Executor(executor) {}
 
-  ExecutorRef getExecutor() const {
-    return Executor;
-  }
+  TaskExecutorRef getExecutorRef() const { return Executor; }
 
   static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::Executor;
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutor;
   }
 };
 
@@ -140,6 +139,21 @@ public:
     return record->getKind() == TaskOptionRecordKind::AsyncLetWithBuffer;
   }
 };
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
+ public:
+  size_t size;
+  size_t alignMask;
+  void (*initializeWithCopy)(OpaqueValue *, OpaqueValue *);
+  void (*storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
+  void (*destroy)(OpaqueValue *);
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;
+  }
+};
+#endif
 
 class RunInlineTaskOptionRecord : public TaskOptionRecord {
   void *allocation;

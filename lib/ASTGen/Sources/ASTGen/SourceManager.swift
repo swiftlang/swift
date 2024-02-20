@@ -1,11 +1,24 @@
-import CASTBridging
+//===--- SourceManager.swift ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import ASTBridging
+import BasicBridging
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxMacros
 
 /// A source manager that keeps track of the source files in the program.
 class SourceManager {
-  init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
+  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
     self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 
@@ -14,9 +27,7 @@ class SourceManager {
 
   /// The set of source files that have been exported to the C++ code of
   /// the program.
-  var exportedSourceFilesBySyntax: [
-    SourceFileSyntax : UnsafePointer<ExportedSourceFile>
-  ] = [:]
+  var exportedSourceFilesBySyntax: [SourceFileSyntax: UnsafePointer<ExportedSourceFile>] = [:]
 
   /// The set of nodes that have been detached from their parent nodes.
   ///
@@ -90,8 +101,8 @@ extension SourceManager {
 
     // The position of our node is...
     let finalPosition =
-      node.position                      // Our position relative to its root
-      + SourceLength(utf8Length: offset) // and that root's offset in its parent
+      node.position  // Our position relative to its root
+      + SourceLength(utf8Length: offset)  // and that root's offset in its parent
       + SourceLength(utf8Length: parentOffset.utf8Offset)
     return (rootSF, finalPosition)
   }

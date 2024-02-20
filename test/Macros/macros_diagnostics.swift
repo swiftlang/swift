@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
-// expected-note@-1 2{{'stringify' declared here}}
+// expected-note@-1 3{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 // expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
@@ -132,11 +132,11 @@ func testDiags(a: Int, b: Int) {
 
 func shadow(a: Int, b: Int, stringify: Int) {
   _ = #stringify(a + b)
-  // expected-error@-1{{external macro implementation type 'MacroDefinition.StringifyMacro' could not be found for macro 'stringify'}}
+  // expected-error@-1{{external macro implementation type 'MacroDefinition.StringifyMacro' could not be found for macro 'stringify'; plugin for module 'MacroDefinition' not found}}
 }
 
 func testMissing() {
-  #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'}}
+  #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; plugin for module 'MissingModule' not found}}
 }
 
 @freestanding(expression) macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
@@ -148,12 +148,12 @@ func testExternalMacroOutOfPlace() {
 
 @freestanding(expression)
 public macro macroWithDefaults(_: Int = 17) = #externalMacro(module: "A", type: "B")
-// expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+// expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'; plugin for module 'A' not found}}
 // expected-note@-2{{'macroWithDefaults' declared here}}
 
 func callMacroWithDefaults() {
   _ = #macroWithDefaults()
-  // expected-error@-1 {{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+  // expected-error@-1 {{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'; plugin for module 'A' not found}}
 }
 
 // Make sure we don't allow macros to prevent type folding.
@@ -164,7 +164,7 @@ public macro MacroOrType() = #externalMacro(module: "A", type: "MacroOrType")
 @freestanding(codeItem, names: named(foo))
 public macro badCodeItemMacro() = #externalMacro(module: "A", type: "B")
 // expected-error@-2{{'codeItem' macros are not allowed to introduce names}}
-// expected-warning@-2{{external macro implementation type 'A.B' could not be found}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found for macro 'badCodeItemMacro()'; plugin for module 'A' not found}}
 
 struct MacroOrType {
   typealias Nested = Int

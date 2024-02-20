@@ -372,6 +372,29 @@ bool Implementation::gatherUses(SILValue value) {
     }
 
     case OperandOwnership::GuaranteedForwarding: {
+      // Always treat switches as full liveness uses of the enum being switched
+      // since the control flow is significant, and we can't destructure through
+      // the switch dispatch. If the final pattern match ends up destructuring
+      // the value, then SILGen emits that as a separate access.
+      if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
+        auto leafRange = TypeTreeLeafTypeRange::get(switchEnum->getOperand(),
+                                                    getRootValue());
+        if (!leafRange) {
+          LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
+          return false;
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), *leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), *leafRange,
+                              false /*is lifetime ending*/);
+        instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+        continue;
+      }
+    
       // Look through guaranteed forwarding if we have at least one non-trivial
       // value. If we have all non-trivial values, treat this as a liveness use.
       SmallVector<SILValue, 8> forwardedValues;
@@ -437,6 +460,17 @@ bool Implementation::gatherUses(SILValue value) {
                             false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
+      // The liveness extends to the scope-ending uses of the borrow.
+      BorrowingOperand(nextUse).visitScopeEndingUses([&](Operand *end) -> bool {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        LLVM_DEBUG(llvm::dbgs() << "        ++ Scope-ending use: ";
+                   end->getUser()->print(llvm::dbgs()));
+        liveness.updateForUse(end->getUser(), *leafRange,
+                              false /*is lifetime ending*/);
+        return true;
+      });
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
 
       continue;
@@ -1001,6 +1035,65 @@ dumpIntervalMap(IntervalMapAllocator::Map &map) {
 }
 #endif
 
+// Helper to insert end_borrows after the end of a non-consuming use. If the
+// use is momentary, one end_borrow is inserted after the use. If it is an
+// interior pointer projection or nested borrow, then end_borrows are inserted
+// after every scope-ending instruction for the use.
+static void insertEndBorrowsForNonConsumingUse(Operand *op,
+                                               SILValue borrow) {
+  if (auto iOp = InteriorPointerOperand::get(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after interior pointer scope:\n"
+                               "    ";
+               op->getUser()->print(llvm::dbgs()));
+    iOp.visitBaseValueScopeEndingUses([&](Operand *endScope) -> bool {
+      auto *endScopeInst = endScope->getUser();
+      LLVM_DEBUG(llvm::dbgs() << "       ";
+                 endScopeInst->print(llvm::dbgs()));
+      SILBuilderWithScope endBuilder(endScopeInst);
+      endBuilder.createEndBorrow(getSafeLoc(endScopeInst), borrow);
+      return true;
+    });
+  } else if (auto bOp = BorrowingOperand(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after borrow scope:\n"
+                               "    ";
+               op->getUser()->print(llvm::dbgs()));
+    bOp.visitScopeEndingUses([&](Operand *endScope) -> bool {
+      auto *endScopeInst = endScope->getUser();
+      LLVM_DEBUG(llvm::dbgs() << "       ";
+                 endScopeInst->print(llvm::dbgs()));
+      auto afterScopeInst = endScopeInst->getNextInstruction();
+      SILBuilderWithScope endBuilder(afterScopeInst);
+      endBuilder.createEndBorrow(getSafeLoc(afterScopeInst),
+                                 borrow);
+      return true;
+    });
+  } else if (auto swi = dyn_cast<SwitchEnumInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch:\n"
+                               "    ";
+               swi->print(llvm::dbgs()));
+    // End the borrow where the original borrow of the subject was ended.
+    // TODO: handle if the switch isn't directly on a borrow?
+    auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    BorrowingOperand(&beginBorrow->getOperandRef())
+      .visitScopeEndingUses([&](Operand *endScope) -> bool {
+        auto *endScopeInst = endScope->getUser();
+        LLVM_DEBUG(llvm::dbgs() << "       ";
+                   endScopeInst->print(llvm::dbgs()));
+        SILBuilderWithScope endBuilder(endScopeInst);
+        endBuilder.createEndBorrow(getSafeLoc(endScopeInst),
+                                   borrow);
+        return true;
+      });
+  } else {
+    auto *nextInst = op->getUser()->getNextInstruction();
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after momentary use at: ";
+               nextInst->print(llvm::dbgs()));
+    SILBuilderWithScope endBuilder(nextInst);
+    endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
+  }
+  
+}
+
 void Implementation::rewriteUses(InstructionDeleter *deleter) {
   blocksToUses.setFrozen();
 
@@ -1129,6 +1222,8 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
           }
 
           // Otherwise, we need to insert a borrow.
+          LLVM_DEBUG(llvm::dbgs() << "    Inserting borrow for: ";
+                     inst->print(llvm::dbgs()));
           SILBuilderWithScope borrowBuilder(inst);
           SILValue borrow =
               borrowBuilder.createBeginBorrow(getSafeLoc(inst), first);
@@ -1138,21 +1233,10 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     getSafeLoc(inst), innerValue);
           }
+          
+          insertEndBorrowsForNonConsumingUse(&operand, borrow);
 
-          if (auto op = InteriorPointerOperand::get(&operand)) {
-            op.visitBaseValueScopeEndingUses([&](Operand *endScope) -> bool {
-              auto *endScopeInst = endScope->getUser();
-              SILBuilderWithScope endBuilder(endScopeInst);
-              endBuilder.createEndBorrow(getSafeLoc(endScopeInst), borrow);
-              return true;
-            });
-          } else {
-            auto *nextInst = inst->getNextInstruction();
-            SILBuilderWithScope endBuilder(nextInst);
-            endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
-          }
-
-          // NOTE: This needs to be /after/the interior pointer operand usage
+          // NOTE: This needs to be /after/ the interior pointer operand usage
           // above so that we can use the end scope of our interior pointer base
           // value.
           // NOTE: oldInst may be nullptr if our operand is a SILArgument
@@ -1245,9 +1329,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
             }
           }
 
-          auto *nextInst = inst->getNextInstruction();
-          SILBuilderWithScope endBuilder(nextInst);
-          endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
+          insertEndBorrowsForNonConsumingUse(&operand, borrow);
           continue;
         }
 
@@ -1333,6 +1415,13 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
 }
 
 void Implementation::cleanup() {
+  LLVM_DEBUG(llvm::dbgs()
+             << "Performing BorrowToDestructureTransform::cleanup()!\n");
+  SWIFT_DEFER {
+    LLVM_DEBUG(llvm::dbgs() << "Function after cleanup!\n";
+               getMarkedValue()->getFunction()->dump());
+  };
+
   // Then add destroys for any destructure elements that we inserted that we did
   // not actually completely consume.
   auto *fn = getMarkedValue()->getFunction();
@@ -1472,9 +1561,17 @@ static bool gatherBorrows(SILValue rootValue,
 static bool
 gatherSwitchEnum(SILValue value,
                  SmallVectorImpl<SwitchEnumInst *> &switchEnumWorklist) {
+  auto *fn = value->getFunction();
+  auto &C = fn->getASTContext();
+  // TODO: For borrowing switches, we want to leave the switch as a borrowing
+  // operation. This phase of the pass should become moot once borrowing
+  // switch is on by default.
+  if (C.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
+    return true;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "Gathering switch enums for value: " << *value);
 
-  auto *fn = value->getFunction();
   StackList<Operand *> useWorklist(fn);
   for (auto *use : value->getUses()) {
     useWorklist.push_back(use);
@@ -1590,8 +1687,9 @@ gatherSwitchEnum(SILValue value,
 //===----------------------------------------------------------------------===//
 
 bool BorrowToDestructureTransform::transform() {
-  LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Tranform!\n");
   auto *fn = mmci->getFunction();
+  LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Transform!\n";
+             fn->print(llvm::dbgs()));
   StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
 
   // If we failed to gather borrows due to the transform not understanding part
@@ -1793,11 +1891,15 @@ bool BorrowToDestructureTransform::transform() {
   // Then clean up all of our borrows/copies/struct_extracts which no longer
   // have any uses...
   {
+    LLVM_DEBUG(llvm::dbgs() << "Deleting dead instructions!\n");
+
     InstructionDeleter deleter;
     while (!borrowWorklist.empty()) {
       deleter.recursivelyForceDeleteUsersAndFixLifetimes(
           borrowWorklist.pop_back_val());
     }
+    LLVM_DEBUG(llvm::dbgs() << "Function after deletion!\n";
+               impl.getMarkedValue()->getFunction()->dump());
   }
 
   return true;

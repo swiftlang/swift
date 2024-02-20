@@ -762,10 +762,10 @@ public protocol ExpressibleByDictionaryLiteral {
 /// `StringInterpolationProtocol` and have a matching `StringLiteralType`.
 ///
 /// For more information, see the `StringInterpolationProtocol` documentation.
-@_unavailableInEmbedded
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral {
   
+#if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
   ///
@@ -774,6 +774,10 @@ public protocol ExpressibleByStringInterpolation
   associatedtype StringInterpolation: StringInterpolationProtocol
     = DefaultStringInterpolation
     where StringInterpolation.StringLiteralType == StringLiteralType
+#else
+  associatedtype StringInterpolation: StringInterpolationProtocol
+    where StringInterpolation.StringLiteralType == StringLiteralType
+#endif
 
   /// Creates an instance from a string interpolation.
   /// 
@@ -788,7 +792,7 @@ public protocol ExpressibleByStringInterpolation
   init(stringInterpolation: StringInterpolation)
 }
 
-@_unavailableInEmbedded
+#if !$Embedded
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
   
@@ -811,6 +815,7 @@ extension ExpressibleByStringInterpolation
     self.init(stringLiteral: stringInterpolation.make())
   }
 }
+#endif
 
 /// Represents the contents of a string literal with interpolations while it's
 /// being built up.

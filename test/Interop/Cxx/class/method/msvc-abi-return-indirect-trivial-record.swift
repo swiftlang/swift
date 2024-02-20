@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-irgen -I %t/Inputs -enable-experimental-cxx-interop  -Xcc -std=c++17 %t/test.swift -module-name Test | %FileCheck %s
+// RUN: %target-swift-emit-irgen -I %t/Inputs -enable-experimental-cxx-interop  -Xcc -std=c++17 %t/test.swift -module-name Test | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-cpu
 
 // REQUIRES: OS=windows-msvc
 
@@ -67,4 +67,5 @@ public func passTempForIndirectRetToVoidCall() {
 
 // CHECK: void @"$sSo18LoadableIntWrapperV2peoiyyABz_ABtFZ"(ptr
 // CHECK: %[[OPRESULT:.*]] = alloca %struct.LoadableIntWrapper, align 16
-// CHECK: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) %[[OPRESULT]], i32
+// CHECK-x86_64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) %[[OPRESULT]], i32
+// CHECK-aarch64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) %[[OPRESULT]], i64

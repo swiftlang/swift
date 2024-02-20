@@ -62,17 +62,27 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     return false;
   }
 
-  // If inst has any owned move-only value as a result, deleting it may shorten
-  // that value's lifetime which is illegal according to language rules.
-  //
-  // In particular, this check is needed before returning true when
-  // getSingleValueCopyOrCast returns true.  That function returns true for
-  // move_value instructions.  And `move_value %moveOnlyValue` must not be
-  // deleted.
   for (auto result : inst->getResults()) {
-    if (result->getType().getASTType()->isNoncopyable() &&
+    // If inst has any owned move-only value as a result, deleting it may
+    // shorten that value's lifetime which is illegal according to language
+    // rules.
+    //
+    // In particular, this check is needed before returning true when
+    // getSingleValueCopyOrCast returns true.  That function returns true for
+    // move_value instructions.  And `move_value %moveOnlyValue` must not be
+    // deleted.
+    if (result->getType().isMoveOnly() &&
         result->getOwnershipKind() == OwnershipKind::Owned) {
       return false;
+    }
+
+    // If result was lexical, lifetime shortening maybe observed, return.
+    if (result->isLexical()) {
+      auto resultTy = result->getType().getAs<SILFunctionType>();
+      // Allow deleted dead lexical values when they are trivial no escape types.
+      if (!resultTy || !resultTy->isTrivialNoEscape()) {
+        return false;
+      }
     }
   }
 
@@ -97,11 +107,9 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
         cast<LoadInst>(inst)->getOwnershipQualifier();
     // If the load creates a copy, it is dead, since we know that if at all it
     // is used, it is only in a destroy_value instruction.
-    return (loadOwnershipQual == LoadOwnershipQualifier::Copy ||
+    return (loadOwnershipQual == LoadOwnershipQualifier::Take ||
+            loadOwnershipQual == LoadOwnershipQualifier::Copy ||
             loadOwnershipQual == LoadOwnershipQualifier::Trivial);
-    // TODO: we can handle load [take] but we would have to know that the
-    // operand has been consumed. Note that OperandOwnershipKind map does not
-    // say this for load.
   }
   case SILInstructionKind::PartialApplyInst: {
     bool onlyTrivialArgs = true;
@@ -250,10 +258,19 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       if (!operandValue)
         continue;
 
-      if (fixLifetimes && operand.isConsuming()) {
-        SILBuilderWithScope builder(inst);
-        auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
-        getCallbacks().createdNewInst(dvi);
+      if (fixLifetimes) {
+        LoadInst *li = nullptr;
+        if (operand.isConsuming()) {
+          SILBuilderWithScope builder(inst);
+          auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
+          getCallbacks().createdNewInst(dvi);
+        } else if ((li = dyn_cast<LoadInst>(inst)) &&
+                   li->getOwnershipQualifier() ==
+                       LoadOwnershipQualifier::Take) {
+          SILBuilderWithScope builder(inst);
+          auto *dai = builder.createDestroyAddr(inst->getLoc(), operandValue);
+          getCallbacks().createdNewInst(dai);
+        }
       }
       auto *operDef = operandValue->getDefiningInstruction();
       operand.drop();
@@ -314,10 +331,10 @@ static FunctionTest DeleterDeleteIfDeadTest(
     "deleter-delete-if-dead", [](auto &function, auto &arguments, auto &test) {
       auto *inst = arguments.takeInstruction();
       InstructionDeleter deleter;
-      llvm::dbgs() << "Deleting-if-dead " << *inst;
+      llvm::outs() << "Deleting-if-dead " << *inst;
       auto deleted = deleter.deleteIfDead(inst);
-      llvm::dbgs() << "deleteIfDead returned " << deleted << "\n";
-      function.dump();
+      llvm::outs() << "deleteIfDead returned " << deleted << "\n";
+      function.print(llvm::outs());
     });
 } // namespace swift::test
 
@@ -419,4 +436,3 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     nextInsts.clear();
   }
 }
-

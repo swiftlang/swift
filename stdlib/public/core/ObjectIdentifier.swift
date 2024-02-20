@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !$Embedded
+
 /// A unique identifier for a class instance or metatype.
 ///
 /// This unique identifier is only valid for comparisons during the lifetime
@@ -50,32 +52,39 @@ public struct ObjectIdentifier: Sendable {
   ///     // Prints "false"
   ///
   /// - Parameter x: An instance of a class.
-#if $Embedded
-  @inlinable // trivial-implementation
-  public init<Object: AnyObject>(_ x: Object) {
-    self._value = Builtin.bridgeToRawPointer(x)
-  }
-#else
   @inlinable // trivial-implementation
   public init(_ x: AnyObject) {
     self._value = Builtin.bridgeToRawPointer(x)
   }
-#endif
+
   /// Creates an instance that uniquely identifies the given metatype.
   ///
   /// - Parameter: A metatype.
-#if $Embedded
-  @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
-    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
-  }
-#else
   @inlinable // trivial-implementation
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
-#endif
 }
+
+#else
+
+@frozen // trivial-implementation
+public struct ObjectIdentifier: Sendable {
+  @usableFromInline // trivial-implementation
+  internal let _value: Builtin.RawPointer
+
+  @inlinable // trivial-implementation
+  public init<Object: AnyObject>(_ x: Object) {
+    self._value = Builtin.bridgeToRawPointer(x)
+  }
+
+  @inlinable // trivial-implementation
+  public init<Object>(_ x: Object.Type) {
+    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
+}
+
+#endif
 
 @_unavailableInEmbedded
 extension ObjectIdentifier: CustomDebugStringConvertible {

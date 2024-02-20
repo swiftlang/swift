@@ -20,7 +20,7 @@ public class Decl {
 //--- Client.swift
 import Lib
 
-extension Decl: Equatable {
+extension Decl: @retroactive Equatable {
   public static func == (lhs: Decl, rhs: Decl) -> Bool {
     return false
   }

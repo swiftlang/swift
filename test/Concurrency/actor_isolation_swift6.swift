@@ -1,8 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 final class ImmutablePoint: Sendable {
   let x : Int = 0
@@ -62,7 +60,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
-  // expected-warning@-1 {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  // expected-error@-1 {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon
@@ -80,3 +78,16 @@ struct NoGlobalActorValueType {
 }
 
 /// -----------------------------------------------------------------
+
+@MainActor
+class MainActorIsolated {
+  init() {}
+
+  // expected-note@+1 {{static property declared here}}
+  static let shared = MainActorIsolated()
+}
+
+nonisolated func accessAcrossActors() {
+  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  let _ = MainActorIsolated.shared
+}

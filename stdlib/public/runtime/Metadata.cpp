@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/LibPrespecialized.h"
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -24,6 +25,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -365,6 +367,10 @@ namespace {
 
     AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
+      if (auto *prespecialized =
+              getLibPrespecializedMetadata(description, arguments))
+        return {prespecialized, PrivateMetadataState::Complete};
+
       // Find a pattern.  Currently we always use the default pattern.
       auto &generics = description->getFullGenericContextHeader();
       auto pattern = generics.DefaultInstantiationPattern.get();
@@ -395,6 +401,18 @@ namespace {
                                   const TypeContextDescriptor *description,
                                              const void * const *arguments) {
       return true;
+    }
+
+    void verifyBuiltMetadata(const Metadata *original,
+                             const Metadata *candidate) {}
+
+    void verifyBuiltMetadata(const Metadata *original,
+                             const TypeContextDescriptor *description,
+                             const void *const *arguments) {
+      if (swift::runtime::environment::
+              SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER())
+        validateExternalGenericMetadataBuilder(original, description,
+                                               arguments);
     }
 
     MetadataStateWithDependency tryInitialize(Metadata *metadata,
@@ -811,7 +829,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
          (extraDataSize == (pattern->getExtraDataPattern()->OffsetInWords +
                             pattern->getExtraDataPattern()->SizeInWords) *
                                sizeof(void *)));
-
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
   auto bytes = (char*) MetadataAllocator(GenericValueMetadataTag)
@@ -1354,11 +1371,14 @@ public:
     const FunctionTypeFlags Flags;
     const FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
     const Metadata *const *Parameters;
-    const uint32_t *ParameterFlags;
+    const ::ParameterFlags *ParameterFlags;
     const Metadata *Result;
     const Metadata *GlobalActor;
+    const ExtendedFunctionTypeFlags ExtFlags;
+    const Metadata *ThrownError;
 
     FunctionTypeFlags getFlags() const { return Flags; }
+    ExtendedFunctionTypeFlags getExtFlags() const { return ExtFlags; }
 
     FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
       return DifferentiabilityKind;
@@ -1370,23 +1390,24 @@ public:
     }
     const Metadata *getResult() const { return Result; }
 
-    const uint32_t *getParameterFlags() const {
+    const ::ParameterFlags *getParameterFlags() const {
       return ParameterFlags;
     }
 
     ::ParameterFlags getParameterFlags(unsigned index) const {
       assert(index < Flags.getNumParameters());
-      auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
-      return ParameterFlags::fromIntValue(flags);
+      return Flags.hasParameterFlags() ? ParameterFlags[index] : ::ParameterFlags();
     }
 
     const Metadata *getGlobalActor() const { return GlobalActor; }
+    const Metadata *getThrownError() const { return ThrownError; }
 
     friend llvm::hash_code hash_value(const Key &key) {
       auto hash = llvm::hash_combine(
           key.Flags.getIntValue(),
           key.DifferentiabilityKind.getIntValue(),
-          key.Result, key.GlobalActor);
+          key.Result, key.GlobalActor,
+          key.ExtFlags.getIntValue(), key.ThrownError);
       for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
         hash = llvm::hash_combine(hash, key.getParameter(i));
         hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
@@ -1411,6 +1432,10 @@ public:
       return false;
     if (key.getGlobalActor() != Data.getGlobalActor())
       return false;
+    if (key.getExtFlags().getIntValue() != Data.getExtendedFlags().getIntValue())
+      return false;
+    if (key.getThrownError() != Data.getThrownError())
+      return false;
     for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
       if (key.getParameter(i) != Data.getParameter(i))
         return false;
@@ -1424,29 +1449,31 @@ public:
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
     Key key = {value.Data.Flags, value.Data.getDifferentiabilityKind(),
                value.Data.getParameters(), value.Data.getParameterFlags(),
-               value.Data.ResultType, value.Data.getGlobalActor()};
+               value.Data.ResultType, value.Data.getGlobalActor(),
+               value.Data.getExtendedFlags(), value.Data.getThrownError()};
     return hash_value(key);
   }
 
   static size_t getExtraAllocationSize(const Key &key) {
-    return getExtraAllocationSize(key.Flags);
+    return getExtraAllocationSize(key.Flags, key.ExtFlags);
   }
 
   size_t getExtraAllocationSize() const {
-    return getExtraAllocationSize(Data.Flags);
+    return getExtraAllocationSize(Data.Flags, Data.getExtendedFlags());
   }
 
-  static size_t getExtraAllocationSize(const FunctionTypeFlags &flags) {
+  static size_t getExtraAllocationSize(const FunctionTypeFlags &flags,
+                                       const ExtendedFunctionTypeFlags &extFlags) {
     const auto numParams = flags.getNumParameters();
-    auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
-    if (flags.hasParameterFlags())
-      size += numParams * sizeof(uint32_t);
-    if (flags.isDifferentiable())
-      size = roundUpToAlignment(size, sizeof(void *)) +
-          sizeof(FunctionMetadataDifferentiabilityKind);
-    if (flags.hasGlobalActor())
-      size = roundUpToAlignment(size, sizeof(void *)) + sizeof(Metadata *);
-    return roundUpToAlignment(size, sizeof(void *));
+    return FunctionTypeMetadata::additionalSizeToAlloc<
+        const Metadata *, ParameterFlags, FunctionMetadataDifferentiabilityKind,
+        FunctionGlobalActorMetadata, ExtendedFunctionTypeFlags,
+        FunctionThrownErrorMetadata>(numParams,
+                                     flags.hasParameterFlags() ? numParams : 0,
+                                     flags.isDifferentiable() ? 1 : 0,
+                                     flags.hasGlobalActor() ? 1 : 0,
+                                     flags.hasExtendedFlags() ? 1 : 0,
+                                     extFlags.isTypedThrows() ? 1 : 0);
   }
 };
 
@@ -1507,9 +1534,13 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
   assert(!flags.hasGlobalActor()
          && "Global actor function type metadata should be obtained using "
             "'swift_getFunctionTypeMetadataGlobalActor'");
+  assert(!flags.hasExtendedFlags()
+         && "Extended flags function type metadata should be obtained using "
+         "'swift_getExtendedFunctionTypeMetadata'");
   FunctionCacheEntry::Key key = {
     flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
-    parameterFlags, result, nullptr
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
+    ExtendedFunctionTypeFlags(), nullptr
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1522,10 +1553,15 @@ swift::swift_getFunctionTypeMetadataDifferentiable(
   assert(!flags.hasGlobalActor()
          && "Global actor function type metadata should be obtained using "
             "'swift_getFunctionTypeMetadataGlobalActor'");
+  assert(!flags.hasExtendedFlags()
+         && "Extended flags function type metadata should be obtained using "
+         "'swift_getExtendedFunctionTypeMetadata'");
   assert(flags.isDifferentiable());
   assert(diffKind.isDifferentiable());
   FunctionCacheEntry::Key key = {
-    flags, diffKind, parameters, parameterFlags, result, nullptr
+    flags, diffKind, parameters,
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr,
+    ExtendedFunctionTypeFlags(), nullptr
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1535,9 +1571,87 @@ swift::swift_getFunctionTypeMetadataGlobalActor(
     FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
     const Metadata *const *parameters, const uint32_t *parameterFlags,
     const Metadata *result, const Metadata *globalActor) {
-  assert(flags.hasGlobalActor());
+  assert(!flags.hasExtendedFlags()
+         && "Extended flags function type metadata should be obtained using "
+         "'swift_getExtendedFunctionTypeMetadata'");
   FunctionCacheEntry::Key key = {
-    flags, diffKind, parameters, parameterFlags, result, globalActor
+    flags, diffKind, parameters,
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
+    globalActor, ExtendedFunctionTypeFlags(), nullptr
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+extern "C" const EnumDescriptor NOMINAL_TYPE_DESCR_SYM(s5NeverO);
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
+
+namespace {
+  /// Classification for a given thrown error type.
+  enum class ThrownErrorClassification {
+    /// An arbitrary thrown error.
+    Arbitrary,
+    /// 'Never', which means a function type is non-throwing.
+    Never,
+    /// 'any Error', which means the function type uses untyped throws.
+    AnyError,
+  };
+
+  /// Classify a thrown error type.
+  ThrownErrorClassification classifyThrownError(const Metadata *type) {
+    if (auto enumMetadata = dyn_cast<EnumMetadata>(type)) {
+      if (enumMetadata->getDescription() == &NOMINAL_TYPE_DESCR_SYM(s5NeverO))
+        return ThrownErrorClassification::Never;
+    } else if (auto existential = dyn_cast<ExistentialTypeMetadata>(type)) {
+      auto protocols = existential->getProtocols();
+      if (protocols.size() == 1 &&
+          !protocols[0].isObjC() &&
+          protocols[0].getSwiftProtocol() == &PROTOCOL_DESCR_SYM(s5Error) &&
+          !existential->isClassBounded() &&
+          !existential->isObjC())
+        return ThrownErrorClassification::AnyError;
+    }
+
+    return ThrownErrorClassification::Arbitrary;
+  }
+}
+
+const FunctionTypeMetadata *
+swift::swift_getExtendedFunctionTypeMetadata(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result, const Metadata *globalActor,
+    ExtendedFunctionTypeFlags extFlags, const Metadata *thrownError) {
+  assert(flags.hasExtendedFlags() || extFlags.getIntValue() == 0);
+  assert(flags.hasExtendedFlags() || thrownError == nullptr);
+
+  if (thrownError) {
+    // Perform adjustments based on the given thrown error.
+    switch (classifyThrownError(thrownError)){
+    case ThrownErrorClassification::Arbitrary:
+      // Nothing to do.
+      break;
+
+    case ThrownErrorClassification::Never:
+      // The thrown error was 'Never', so make this a non-throwing function
+      flags = flags.withThrows(false);
+
+      // Fall through to clear out the error.
+      SWIFT_FALLTHROUGH;
+
+    case ThrownErrorClassification::AnyError:
+      // Clear out the thrown error and extended flags.
+      thrownError = nullptr;
+      extFlags = extFlags.withTypedThrows(false);
+      if (extFlags.getIntValue() == 0)
+        flags = flags.withExtendedFlags(false);
+      break;
+    }
+  }
+
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters,
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
+    globalActor, extFlags, thrownError
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1591,11 +1705,18 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
     *Data.getGlobalActorAddr() = key.getGlobalActor();
   if (flags.isDifferentiable())
     *Data.getDifferentiabilityKindAddress() = key.getDifferentiabilityKind();
+  if (flags.hasExtendedFlags()) {
+    auto extFlags = key.getExtFlags();
+    *Data.getExtendedFlagsAddr() = extFlags;
+
+    if (extFlags.isTypedThrows())
+      *Data.getThrownErrorAddr() = key.getThrownError();
+  }
 
   for (unsigned i = 0; i < numParameters; ++i) {
     Data.getParameters()[i] = key.getParameter(i);
     if (flags.hasParameterFlags())
-      Data.getParameterFlags()[i] = key.getParameterFlags(i).getIntValue();
+      Data.getParameterFlags()[i] = key.getParameterFlags(i);
   }
 }
 
@@ -2011,10 +2132,6 @@ static constexpr TypeLayout getInitialLayoutForHeapObject() {
           sizeof(HeapObject),
           ValueWitnessFlags().withAlignment(alignof(HeapObject)),
           0};
-}
-
-static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
-  return (size + alignMask) & ~alignMask;
 }
 
 /// Perform basic sequential layout given a vector of metadata pointers,
@@ -2490,8 +2607,9 @@ static constexpr Out pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_indirect_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
   auto wtable = self->getValueWitnesses();
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
@@ -2505,19 +2623,21 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static void pod_destroy(OpaqueValue *object, const Metadata *self) {}
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_pod_destroy(OpaqueValue *object, const Metadata *self) {}
 
-static OpaqueValue *pod_copy(OpaqueValue *dest, OpaqueValue *src,
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_copy(OpaqueValue *dest, OpaqueValue *src,
                              const Metadata *self) {
   memcpy(dest, src, self->getValueWitnesses()->size);
   return dest;
 }
 
-static OpaqueValue *pod_direct_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  return pod_copy(reinterpret_cast<OpaqueValue*>(dest),
-                  reinterpret_cast<OpaqueValue*>(src),
-                  self);
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_direct_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+  return _swift_pod_copy(reinterpret_cast<OpaqueValue *>(dest),
+                         reinterpret_cast<OpaqueValue *>(src), self);
 }
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
@@ -2542,16 +2662,16 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
       // size and alignment.
       if (flags.isInlineStorage()) {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_direct_initializeBufferWithCopyOfBuffer;
+            _swift_pod_direct_initializeBufferWithCopyOfBuffer;
       } else {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_indirect_initializeBufferWithCopyOfBuffer;
+            _swift_pod_indirect_initializeBufferWithCopyOfBuffer;
       }
-      vwtable->destroy = pod_destroy;
-      vwtable->initializeWithCopy = pod_copy;
-      vwtable->initializeWithTake = pod_copy;
-      vwtable->assignWithCopy = pod_copy;
-      vwtable->assignWithTake = pod_copy;
+      vwtable->destroy = _swift_pod_destroy;
+      vwtable->initializeWithCopy = _swift_pod_copy;
+      vwtable->initializeWithTake = _swift_pod_copy;
+      vwtable->assignWithCopy = _swift_pod_copy;
+      vwtable->assignWithTake = _swift_pod_copy;
       // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
       // interestingly optimizable based on POD-ness.
       return;
@@ -2590,7 +2710,7 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
   
   if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
-    vwtable->initializeWithTake = pod_copy;
+    vwtable->initializeWithTake = _swift_pod_copy;
     return;
   }
 
@@ -2829,6 +2949,7 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     previousFieldOffset = offset + fieldType->vw_size();
     fullOffset += fieldType->vw_size();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
+    previousFieldOffset = offset;
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
       _swift_addRefCountStringForMetatype(writer, flags,
                                           tuple->getElement(i).Type, fullOffset,
@@ -3441,38 +3562,48 @@ static void initObjCClass(ClassMetadata *self,
                           size_t *fieldOffsets) {
   ClassROData *rodata = getROData(self);
 
-  // Always clone the ivar descriptors.
-  if (numFields) {
-    const ClassIvarList *dependentIvars = rodata->IvarList;
-    assert(dependentIvars->Count == numFields);
-    assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
+  ClassIvarList *ivars = rodata->IvarList;
+  if (!ivars) {
+    assert(numFields == 0);
+    return;
+  }
 
-    auto ivarListSize = sizeof(ClassIvarList) +
-                        numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) getResilientMetadataAllocator()
-      .Allocate(ivarListSize, alignof(ClassIvarList));
-    memcpy(ivars, dependentIvars, ivarListSize);
-    rodata->IvarList = ivars;
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
 
-    for (unsigned i = 0; i != numFields; ++i) {
-      auto *eltLayout = fieldTypes[i];
+  bool copiedIvarList = false;
 
-      ClassIvarEntry &ivar = ivars->getIvars()[i];
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
 
-      // Fill in the field offset global, if this ivar has one.
-      if (ivar.Offset) {
-        if (*ivar.Offset != fieldOffsets[i])
-          *ivar.Offset = fieldOffsets[i];
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
+
+    // Fill in the field offset global, if this ivar has one.
+    if (ivar->Offset) {
+      if (*ivar->Offset != fieldOffsets[i])
+        *ivar->Offset = fieldOffsets[i];
+    }
+
+    // If the ivar's size doesn't match the field layout we
+    // computed, overwrite it and give it better type information.
+    if (ivar->Size != eltLayout->size) {
+      // If we're going to modify the ivar list, we need to copy it first.
+      if (!copiedIvarList) {
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        ivars = (ClassIvarList*) getResilientMetadataAllocator()
+          .Allocate(ivarListSize, alignof(ClassIvarList));
+        memcpy(ivars, rodata->IvarList, ivarListSize);
+        rodata->IvarList = ivars;
+        copiedIvarList = true;
+
+        // Update ivar to point to the newly copied list.
+        ivar = &ivars->getIvars()[i];
       }
-
-      // If the ivar's size doesn't match the field layout we
-      // computed, overwrite it and give it better type information.
-      if (ivar.Size != eltLayout->size) {
-        ivar.Size = eltLayout->size;
-        ivar.Type = nullptr;
-        ivar.Log2Alignment =
-          getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
-      }
+      ivar->Size = eltLayout->size;
+      ivar->Type = nullptr;
+      ivar->Log2Alignment =
+        getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
     }
   }
 }
@@ -3523,10 +3654,10 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
       if (numFields <= NumInlineGlobalIvarOffsets) {
         _globalIvarOffsets = _inlineGlobalIvarOffsets;
         // Make sure all the entries start out null.
-        memset(_globalIvarOffsets, 0, sizeof(size_t *) * numFields);
+        memset(_globalIvarOffsets, 0, numFields * sizeof(size_t *));
       } else {
         _globalIvarOffsets =
-            static_cast<size_t **>(calloc(sizeof(size_t *), numFields));
+            static_cast<size_t **>(calloc(numFields, sizeof(size_t *)));
       }
     }
     return _globalIvarOffsets;
@@ -4835,7 +4966,7 @@ public:
                                 key.Arguments.hash());
     }
 
-    bool operator==(const Key &other) {
+    bool operator==(const Key &other) const {
       return Shape == other.Shape && Arguments == other.Arguments;
     }
   };

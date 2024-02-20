@@ -375,10 +375,10 @@ static FunctionTest
     GetTypedAccessAddress("get_typed_access_address",
                           [](auto &function, auto &arguments, auto &test) {
                             auto address = arguments.takeValue();
-                            function.dump();
-                            llvm::dbgs() << "Address: " << address;
+                            function.print(llvm::outs());
+                            llvm::outs() << "Address: " << address;
                             auto access = getTypedAccessAddress(address);
-                            llvm::dbgs() << "Access: " << access;
+                            llvm::outs() << "Access: " << access;
                           });
 } // end namespace swift::test
 
@@ -404,10 +404,10 @@ static FunctionTest GetAccessBaseTest("get_access_base",
                                       [](auto &function, auto &arguments,
                                          auto &test) {
                                         auto address = arguments.takeValue();
-                                        function.dump();
-                                        llvm::dbgs() << "Address: " << address;
+                                        function.print(llvm::outs());
+                                        llvm::outs() << "Address: " << address;
                                         auto base = getAccessBase(address);
-                                        llvm::dbgs() << "Base: " << base;
+                                        llvm::outs() << "Base: " << base;
                                       });
 } // end namespace swift::test
 
@@ -437,8 +437,14 @@ bool swift::isLetAddress(SILValue address) {
 //===----------------------------------------------------------------------===//
 
 bool swift::mayAccessPointer(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
   if (!instruction->mayReadOrWriteMemory())
     return false;
+  if (isa<BuiltinInst>(instruction)) {
+    // Consider all builtins that read/write memory to access pointers.
+    return true;
+  }
   bool retval = false;
   visitAccessedAddress(instruction, [&retval](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
@@ -451,6 +457,11 @@ bool swift::mayAccessPointer(SILInstruction *instruction) {
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
   return isa<LoadWeakInst>(instruction) 
       || isa<LoadUnownedInst>(instruction) 
       || isa<StrongCopyUnownedValueInst>(instruction)
@@ -459,17 +470,23 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
-  return FullApplySite::isa(instruction) 
-      || isa<EndApplyInst>(instruction)
-      || isa<AbortApplyInst>(instruction)
-      || isa<HopToExecutorInst>(instruction);
+bool swift::maySynchronize(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
+  return isa<HopToExecutorInst>(instruction);
 }
 
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
+  if (FullApplySite::isa(instruction) || isa<EndApplyInst>(instruction) ||
+      isa<AbortApplyInst>(instruction)) {
+    return true;
+  }
   bool retval = mayAccessPointer(instruction)
              || mayLoadWeakOrUnowned(instruction)
-             || maySynchronizeNotConsideringSideEffects(instruction);
+             || maySynchronize(instruction);
   assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
   return retval;
 }
@@ -775,11 +792,11 @@ LLVM_ATTRIBUTE_USED void AccessBase::dump() const { print(llvm::dbgs()); }
 
 bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
   // Ignore both copies and other identity and ownership preserving casts
-  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi)
-         || isa<EndInitLetRefInst>(svi)
-         || isa<BeginDeallocRefInst>(svi)
-         || isa<EndCOWMutationInst>(svi)
-         || isIdentityAndOwnershipPreservingRefCast(svi);
+  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi) ||
+         isa<EndInitLetRefInst>(svi) || isa<BeginDeallocRefInst>(svi) ||
+         isa<EndCOWMutationInst>(svi) ||
+         isa<MarkUnresolvedReferenceBindingInst>(svi) ||
+         isIdentityAndOwnershipPreservingRefCast(svi);
 }
 
 // On some platforms, casting from a metatype to a reference type dynamically
@@ -1196,10 +1213,10 @@ static FunctionTest ComputeAccessStorage("compute_access_storage",
                                       [](auto &function, auto &arguments,
                                          auto &test) {
                                         auto address = arguments.takeValue();
-                                        function.dump();
-                                        llvm::dbgs() << "Address: " << address;
+                                        function.print(llvm::outs());
+                                        llvm::outs() << "Address: " << address;
                                         auto accessStorage = AccessStorage::compute(address);
-                                        accessStorage.dump();
+                                        accessStorage.print(llvm::outs());
                                       });
 } // end namespace swift::test
 
@@ -1418,11 +1435,14 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
       .findAccessPath(address);
 }
 
-void swift::visitProductLeafAccessPathNodes(
+bool swift::visitProductLeafAccessPathNodes(
     SILValue address, TypeExpansionContext tec, SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
-  SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
   auto rootPath = AccessPath::compute(address);
+  if (!rootPath.isValid()) {
+    return false;
+  }
+  SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
   auto *node = rootPath.getPathNode().node;
   worklist.push_back({address->getType(), node});
   while (!worklist.empty()) {
@@ -1455,6 +1475,7 @@ void swift::visitProductLeafAccessPathNodes(
       visitor(AccessPath::PathNode(node), silType);
     }
   }
+  return true;
 }
 
 void AccessPath::Index::print(raw_ostream &os) const {
@@ -2070,7 +2091,7 @@ static FunctionTest AccessPathBaseTest("accesspath-base", [](auto &function,
                                                              auto &arguments,
                                                              auto &test) {
   auto value = arguments.takeValue();
-  function.dump();
+  function.print(llvm::outs());
   llvm::outs() << "Access path base: " << value;
   auto accessPathWithBase = AccessPathWithBase::compute(value);
   AccessUseTestVisitor visitor;
@@ -2597,6 +2618,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
+    case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::StaticReport:
@@ -2605,12 +2627,15 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
+    case BuiltinValueKind::CreateAsyncTaskWithExecutor:
+    case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::InitializeDefaultActor:
@@ -2642,6 +2667,12 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       if (builtin->getAllOperands().size() > 0) {
         visitor(&builtin->getAllOperands()[0]);
       }
+      return;
+
+    // These builtins take a generic 'T' as their operand.
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::InjectEnumTag:
+      visitor(&builtin->getAllOperands()[0]);
       return;
 
     // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,

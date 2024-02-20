@@ -8,7 +8,7 @@ extension Gizmo {
     // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF_META:%[0-9]+]] : $@thick Gizmo.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Gizmo }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK:   [[MARKED_SELF_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[MARKED_SELF_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX_LIFETIME]]
     // CHECK:   [[SELF_OBJC_META:%.*]] = thick_to_objc_metatype [[SELF_META]]
     // CHECK:   [[ORIG_SELF:%.*]] = alloc_ref_dynamic [objc] [[SELF_OBJC_META]]

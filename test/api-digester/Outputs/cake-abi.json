@@ -1747,6 +1747,13 @@
           },
           {
             "kind": "Conformance",
+            "name": "_BitwiseCopyable",
+            "printedName": "_BitwiseCopyable",
+            "usr": "s:s16_BitwiseCopyableP",
+            "mangledName": "$ss16_BitwiseCopyableP"
+          },
+          {
+            "kind": "Conformance",
             "name": "SignedNumeric",
             "printedName": "SignedNumeric",
             "usr": "s:s13SignedNumericP",

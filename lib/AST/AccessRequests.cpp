@@ -110,10 +110,12 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // Variables declared in a top-level 'guard' statement can be accessed in
     // later top-level code.
     return AccessLevel::FilePrivate;
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
     if (isa<ParamDecl>(D)) {
       // Closure parameters may need to be accessible to the enclosing
       // context, for single-expression closures.
@@ -121,7 +123,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     } else {
       return AccessLevel::Private;
     }
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
@@ -337,8 +338,8 @@ DefaultAndMaxAccessLevelRequest::getCachedResult() const {
                                    (std::numeric_limits<uint8_t>::digits - 1));
     uint8_t firstSet = Bits == 0 ? std::numeric_limits<uint8_t>::max()
                                  : llvm::countr_zero(Bits);
-    AccessLevel Max = static_cast<AccessLevel>(lastSet);
-    AccessLevel Default = static_cast<AccessLevel>(firstSet);
+    AccessLevel Max = static_cast<AccessLevel>(lastSet + 1);
+    AccessLevel Default = static_cast<AccessLevel>(firstSet + 1);
 
     assert(Max >= Default);
     return std::make_pair(Default, Max);

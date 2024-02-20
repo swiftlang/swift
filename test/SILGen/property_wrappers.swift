@@ -903,8 +903,8 @@ struct NonMutatingSetterWrapper<Value> {
 struct NonMutatingWrapperTestStruct {
     // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers28NonMutatingWrapperTestStructV3valACSi_tcfC : $@convention(method) (Int, @thin NonMutatingWrapperTestStruct.Type) -> NonMutatingWrapperTestStruct {
     // CHECK: %[[LOAD:[0-9]+]] = load [trivial] %[[SRC:[0-9]+]] : $*NonMutatingWrapperTestStruct
-    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
-    // CHECK-NEXT: assign_by_wrapper %[[SETVAL:[0-9]+]] : $Int to %[[ADDR:[0-9]+]] : $*NonMutatingSetterWrapper<Int>, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
+    // CHECK-NEXT: assign_by_wrapper %[[SETVAL:[0-9]+]] : $Int to %[[ADDR:[0-9]+]] : $*NonMutatingSetterWrapper<Int>, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@noescape @callee_guaranteed (Int) -> ()
     @NonMutatingSetterWrapper var SomeProp: Int
     init(val: Int) {
         SomeProp = val
@@ -980,12 +980,14 @@ struct S_58201 {
 // CHECK: bb0(%0 : $S_58201):
 // CHECK-NEXT:  debug_value %0 : $S_58201, let, name "self", argno 1, implicit
 // CHECK-NEXT:  [[BOX:%.*]] = alloc_box ${ var BasicComputedIntWrapper }, var, name "_b"
-// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var BasicComputedIntWrapper }, 0
+// CHECK-NEXT:  [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK-NEXT:  [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }, 0
 // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin BasicComputedIntWrapper.Type
 // CHECK-NEXT:  // function_ref BasicComputedIntWrapper.init()
 // CHECK-NEXT:  [[DEFAULTVALUE_FN:%.*]] = function_ref @$s17property_wrappers23BasicComputedIntWrapperVACycfC : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin BasicComputedIntWrapper.Type) -> BasicComputedIntWrapper
 // CHECK-NEXT:  store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*BasicComputedIntWrapper
+// CHECK-NEXT:  end_borrow [[BOX_LIFETIME]] : ${ var BasicComputedIntWrapper }
 // CHECK-NEXT:  destroy_value [[BOX]] : ${ var BasicComputedIntWrapper }
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()

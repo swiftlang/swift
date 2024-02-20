@@ -3,7 +3,7 @@
 public struct S {}
 
 // CHECK-LABEL: sil{{.*}}@$s4Test15unavailableFuncAA1SVyF
-// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:ss31_diagnoseUnavailableCodeReacheds5NeverOy(FTwb|F)]] : $@convention(thin) () -> Never
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         function_ref @$s4Test1SVACycfC
 // CHECK:       } // end sil function '$s4Test15unavailableFuncAA1SVyF'
@@ -39,3 +39,12 @@ public func unavailableThrowingFunc() throws {
 // CHECK:       } // end sil function '$s4Test9globalVarAA1SVvau'
 @available(*, unavailable)
 public var globalVar = S()
+
+public enum Uninhabited {}
+
+//
+// CHECK-LABEL: sil{{.*}}@$s4Test28unavailableTakingUninhabitedyyAA0D0OF : $@convention(thin) (Uninhabited) -> () {
+// CHECK:         unreachable
+// CHECK:       } // end sil function '$s4Test28unavailableTakingUninhabitedyyAA0D0OF'
+@available(*, unavailable)
+public func unavailableTakingUninhabited(_ u: Uninhabited) {}

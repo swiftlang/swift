@@ -34,5 +34,5 @@ func testMe() {
 // CHECK: @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT: public struct X<T> {
 // CHECK-NEXT: }
-// CHECK: public struct X<Int32> {
-// CHECK: public typealias XofInt = X<Int32>
+// CHECK: public struct X<CInt> {
+// CHECK: public typealias XofInt = X<CInt>

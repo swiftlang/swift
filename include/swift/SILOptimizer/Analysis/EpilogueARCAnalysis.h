@@ -99,7 +99,8 @@ private:
       return BB->getTerminator()->isFunctionExiting();
 
     return BB->getTerminator()->isFunctionExiting() &&
-           BB->getTerminator()->getTermKind() != TermKind::ThrowInst;
+           BB->getTerminator()->getTermKind() != TermKind::ThrowInst &&
+           BB->getTerminator()->getTermKind() != TermKind::ThrowAddrInst;
   }
 
   /// Return true if this is a function exit block.

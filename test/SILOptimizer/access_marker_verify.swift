@@ -53,7 +53,8 @@ struct StructOfInt {
 // CHECK: bb0(%0 : $@thin StructOfInt.Type):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var StructOfInt }, var, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var StructOfInt }
-// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT]] : ${ var StructOfInt }, 0
+// CHECK:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[UNINIT]]
+// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]] : ${ var StructOfInt }, 0
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]] : $*StructOfInt
 // CHECK:   [[ADR:%.*]] = struct_element_addr [[ACCESS]] : $*StructOfInt, #StructOfInt.i
 // CHECK:   assign %{{.*}} to [[ADR]] : $*Int
@@ -105,7 +106,7 @@ class SubHasInt : SuperHasInt {
 // CHECK: bb0(%0 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
+// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT]]
 // CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var SubHasInt }, 0
 // CHECK-NOT: begin_access
 // CHECK:   store %0 to [init] [[PROJ]] : $*SubHasInt
@@ -134,7 +135,7 @@ class SubHasInt : SuperHasInt {
 // CHECK: bb0(%0 : $Int, %1 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
+// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT]]
 // CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var SubHasInt }, 0
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [init] [[PROJ]] : $*SubHasInt
@@ -220,11 +221,12 @@ func testCaptureLocal() -> ()->() {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
-// CHECK:   [[PROJ:%.*]] = project_box [[BOX]]
+// CHECK:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]]
 // CHECK:   end_access
-// CHECK:   [[CAPTURE:%.*]] = copy_value [[BOX]] : ${ var Int }
+// CHECK:   [[CAPTURE:%.*]] = copy_value [[LIFETIME]] : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
@@ -332,14 +334,9 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   alloc_box $<τ_0_0> { var GenericEnum<τ_0_0> } <T>, var, name "self"
 // CHECK:   mark_uninitialized [delegatingself] %3 : $<τ_0_0> { var GenericEnum<τ_0_0> } <T>
 // CHECK:   [[PROJ:%.*]] = project_box
-// CHECK:   [[ADR1:%.*]] = alloc_stack $T
-// CHECK-NOT: begin_access
-// CHECK:   copy_addr %1 to [init] [[ADR1]] : $*T
 // CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
 // CHECK:   [[ENUMDATAADDR:%.*]] = init_enum_data_addr [[STK]]
-// CHECK:   [[ACCESSENUM:%.*]] = begin_access [modify] [unsafe] [[ENUMDATAADDR]] : $*T
-// CHECK:   copy_addr [take] [[ADR1]] to [init] [[ACCESSENUM]] : $*T
-// CHECK:   end_access [[ACCESSENUM]] : $*T
+// CHECK:   copy_addr %1 to [init] [[ENUMDATAADDR]] : $*T
 // CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   copy_addr [take] %{{.*}} to [[ACCESS]] : $*GenericEnum<T>
@@ -360,9 +357,9 @@ func testIndirectEnum() -> IndirectEnum {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testIndirectEnumAA0eF0OyF : $@convention(thin) () -> @owned IndirectEnum {
 // CHECK: bb0:
-// CHECK:   apply
 // CHECK:   alloc_box ${ var Int }
 // CHECK:   [[PROJ:%.*]] = project_box
+// CHECK:   apply
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access

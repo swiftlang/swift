@@ -132,6 +132,12 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
 
+  // Make requests in the ClangImporter zone friends so they can access `Impl`.
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
+  friend class Name;
+#include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 public:
   class Implementation;
 
@@ -176,14 +182,19 @@ public:
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   static std::vector<std::string>
-  getClangArguments(ASTContext &ctx, bool ignoreClangTarget = false);
+  getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
+
+  static std::optional<std::vector<std::string>>
+  getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
+                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+                       bool ignoreClangTarget = false);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        ArrayRef<std::string> invocationArgStrs,
-                        std::vector<std::string> *CC1Args = nullptr);
+                        std::vector<std::string> &CC1Args);
+
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
   ClangImporter &operator=(const ClangImporter &) = delete;
@@ -434,16 +445,18 @@ public:
 
   void verifyAllModules() override;
 
+  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
-      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath);
+      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
                         llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(
@@ -580,6 +593,8 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
+
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
@@ -609,8 +624,11 @@ public:
   /// Enable the symbolic import experimental feature for the given callback.
   void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
 
-  static const clang::TypedefType *getTypedefForCXXCFOptionsDefinition(
-      const clang::Decl *candidateDecl, const ASTContext &ctx);
+  /// Returns true when the symbolic import experimental feature is enabled.
+  bool isSymbolicImportEnabled() const;
+
+  const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
+      const clang::Decl *candidateDecl) override;
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
@@ -632,6 +650,11 @@ namespace importer {
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
 
+/// Returns true if the given module is one of the C++ standard library modules.
+/// This could be the top-level std module, or any of the libc++ split modules
+/// (std_vector, std_iosfwd, etc).
+bool isCxxStdModule(const clang::Module *module);
+
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.
 llvm::Optional<clang::QualType>
@@ -645,6 +668,7 @@ bool isCxxConstReferenceType(const clang::Type *type);
 struct ClangInvocationFileMapping {
   SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
   SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+  bool requiresBuiltinHeadersInSystemModules;
 };
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.

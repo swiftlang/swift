@@ -50,8 +50,21 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
+      // It's not required to set the perf_constraint flag on all functions in embedded mode.
+      // Embedded mode already implies that flag.
+      if !moduleContext.options.enableEmbeddedSwift {
+        f.set(isPerformanceConstraint: true, context)
+      }
+
       optimize(function: f, context, &worklist)
     }
+
+    // Generic specialization takes care of removing metatype arguments of generic functions.
+    // But sometimes non-generic functions have metatype arguments which must be removed.
+    // We need handle this case with a function signature optimization.
+    removeMetatypeArgumentsInCallees(of: f, moduleContext)
+
+    worklist.addCallees(of: f)
   }
 }
 
@@ -90,6 +103,21 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
           _ = context.specializeClassMethodInst(classMethod)
         }
 
+      // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
+      case let destroyValue as DestroyValueInst:
+        if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
+          context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+        }
+      case let destroyAddr as DestroyAddrInst:
+        if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
+          context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+        }
+
+      case let iem as InitExistentialMetatypeInst:
+        if iem.uses.ignoreDebugUses.isEmpty {
+          context.erase(instructionIncludingDebugUses: iem)
+        }
+
       default:
         break
       }
@@ -101,10 +129,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
-    _ = context.eliminateDeadAllocations(in: function)
+    changed = context.eliminateDeadAllocations(in: function) || changed
   }
-
-  worklist.add(calleesOf: function)
 }
 
 private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
@@ -143,6 +169,14 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
   }
 }
 
+private func removeMetatypeArgumentsInCallees(of function: Function, _ context: ModulePassContext) {
+  for inst in function.instructions {
+    if let apply = inst as? FullApplySite {
+      specializeByRemovingMetatypeArguments(apply: apply, context)
+    }
+  }
+}
+
 private func removeUnusedMetatypeInstructions(in function: Function, _ context: FunctionPassContext) {
   for inst in function.instructions {
     if let mt = inst as? MetatypeInst,
@@ -155,11 +189,6 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
 private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
   if callee.isTransparent {
     return true
-  }
-
-  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
-    // Cannot inline a non-ossa function into an ossa function
-    return false
   }
 
   if apply is BeginApplyInst {
@@ -265,7 +294,14 @@ private extension Value {
     var singleUseValue: any Value = self
     var path = SmallProjectionPath()
     while true {
-      guard let use = singleUseValue.uses.singleRelevantUse else {
+      // The initializer value of a global can contain access instructions if it references another
+      // global variable by address, e.g.
+      //   var p = Point(x: 10, y: 20)
+      //   let o = UnsafePointer(&p)
+      // Therefore ignore the `end_access` use of a `begin_access`.
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+
+      guard let use = relevantUses.singleUse else {
         return nil
       }
       
@@ -339,7 +375,7 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addAllNonGenericFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where !f.isGenericFunction {
+    for f in moduleContext.functions where !f.isGeneric {
       pushIfNotVisited(f)
     }
     return
@@ -354,7 +390,7 @@ fileprivate struct FunctionWorklist {
     }
   }
 
-  mutating func add(calleesOf function: Function) {
+  mutating func addCallees(of function: Function) {
     for inst in function.instructions {
       switch inst {
       case let apply as ApplySite:
@@ -381,29 +417,5 @@ fileprivate struct FunctionWorklist {
     if pushedFunctions.insert(element).inserted {
       functions.append(element)
     }
-  }
-}
-
-private extension UseList {
-  var singleRelevantUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      switch use.instruction {
-      case is DebugValueInst,
-           // The initializer value of a global can contain access instructions if it references another
-           // global variable by address, e.g.
-           //   var p = Point(x: 10, y: 20)
-           //   let o = UnsafePointer(&p)
-           // Therefore ignore the `end_access` use of a `begin_access`.
-           is EndAccessInst:
-        continue
-      default:
-        if singleUse != nil {
-          return nil
-        }
-        singleUse = use
-      }
-    }
-    return singleUse
   }
 }

@@ -72,5 +72,13 @@ int main() {
     largeStruct.dump();
 // CHECK-NEXT: 1, -1, -9075, -2, 9075, -456 
   }
+
+  {
+    auto x = ClassWithNonFinalMethods::classClassMethod(3);
+    assert(x == 5);
+    ClassWithNonFinalMethods::staticClassMethod();
+  }
+// CHECK-NEXT: ClassWithNonFinalMethods.classClassMethod;
+// CHECK-NEXT: ClassWithNonFinalMethods.staticClassMethod;
   return 0;
 }

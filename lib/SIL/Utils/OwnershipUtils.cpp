@@ -105,9 +105,9 @@ static FunctionTest OwnershipUtilsHasPointerEscape(
     "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto has = findPointerEscape(value);
-      value->print(llvm::errs());
+      value->print(llvm::outs());
       auto *boolString = has ? "true" : "false";
-      llvm::errs() << boolString << "\n";
+      llvm::outs() << boolString << "\n";
     });
 } // end namespace swift::test
 
@@ -490,7 +490,7 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // guaranteedForwardingOps is a collection of all transitive
   // GuaranteedForwarding uses of \p value. It is a set, to avoid repeated
   // processing of structs and tuples which are GuaranteedForwarding.
-  SmallSetVector<Operand *, 4> guaranteedForwardingOps;
+  llvm::SmallSetVector<Operand *, 4> guaranteedForwardingOps;
   // Collect first-level GuaranteedForwarding uses, and call the visitor on any
   // GuaranteedForwardingPhi uses.
   for (auto *use : value->getUses()) {
@@ -600,6 +600,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginBorrow:
     os << "BeginBorrow";
     return;
+  case Kind::StoreBorrow:
+    os << "StoreBorrow";
+    return;
   case Kind::BeginApply:
     os << "BeginApply";
     return;
@@ -617,6 +620,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
     return;
   case Kind::PartialApplyStack:
     os << "PartialApply [stack]";
+    return;
+  case Kind::MarkDependenceNonEscaping:
+    os << "MarkDependence [nonescaping]";
     return;
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
@@ -649,9 +655,11 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
-  case BorrowingOperandKind::PartialApplyStack: {
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping: {
     return op->getUser()->hasUsesOfAnyResult();
   }
   case BorrowingOperandKind::Branch: {
@@ -687,6 +695,20 @@ bool BorrowingOperand::visitScopeEndingUses(
     // false.
     return !deadBorrow;
   }
+  case BorrowingOperandKind::StoreBorrow: {
+    bool deadBorrow = true;
+    for (auto *use : cast<StoreBorrowInst>(op->getUser())->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        deadBorrow = false;
+        if (!func(use))
+          return false;
+      }
+    }
+    // FIXME: special case for dead borrows. This is dangerous because clients
+    // only expect visitScopeEndingUses to return false if the visitor returned
+    // false.
+    return !deadBorrow;
+  }
   case BorrowingOperandKind::BeginApply: {
     bool deadApply = true;
     auto *user = cast<BeginApplyInst>(op->getUser());
@@ -698,12 +720,17 @@ bool BorrowingOperand::visitScopeEndingUses(
     return !deadApply;
   }
   case BorrowingOperandKind::PartialApplyStack: {
-    auto user = cast<PartialApplyInst>(op->getUser());
+    auto *user = cast<PartialApplyInst>(op->getUser());
     assert(user->isOnStack() && "escaping closures can't borrow");
     // The closure's borrow lifetimes end when the closure itself ends its
     // lifetime. That may happen transitively through conversions that forward
     // ownership of the closure.
     return user->visitOnStackLifetimeEnds(func);
+  }
+  case BorrowingOperandKind::MarkDependenceNonEscaping: {
+    auto *user = cast<MarkDependenceInst>(op->getUser());
+    assert(user->isNonEscaping() && "escaping dependencies don't borrow");
+    return user->visitNonEscapingLifetimeEnds(func);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
     auto user = cast<BuiltinInst>(op->getUser());
@@ -762,7 +789,9 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::Yield:
   case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::StoreBorrow:
     return BorrowedValue();
 
   case BorrowingOperandKind::BeginBorrow: {
@@ -791,7 +820,9 @@ SILValue BorrowingOperand::getScopeIntroducingUserResult() {
 
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::StoreBorrow:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BeginApply:
@@ -1151,7 +1182,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
-  SmallSetVector<SILValue, 32> worklist;
+  llvm::SmallSetVector<SILValue, 32> worklist;
   worklist.insert(inputValue);
 
   // worklist grows in this loop.
@@ -1546,7 +1577,7 @@ void swift::visitExtendedReborrowPhiBaseValuePairs(
   // paths.
   // For that reason, worklist stores (reborrow, base value) pairs.
   // We need a SetVector to make sure we don't revisit the same pair again.
-  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
+  llvm::SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
 
   // Find all reborrows of value and insert the (reborrow, base value) pair into
   // the worklist.
@@ -1602,7 +1633,7 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
   // value) pairs. We need a SetVector to make sure we don't revisit the same
   // pair again.
-  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
+  llvm::SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
 
   auto collectGuaranteedForwardingPhis = [&](SILValue value,
                                              SILValue baseValue) {
@@ -2057,10 +2088,10 @@ namespace swift::test {
 // - the enclosing defs
 static FunctionTest FindEnclosingDefsTest(
     "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Enclosing Defs:\n";
+      function.print(llvm::outs());
+      llvm::outs() << "Enclosing Defs:\n";
       visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
-        def->dump();
+        def->print(llvm::outs());
         return true;
       });
     });
@@ -2082,10 +2113,10 @@ namespace swift::test {
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
     "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Introducers:\n";
+      function.print(llvm::outs());
+      llvm::outs() << "Introducers:\n";
       visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
-        def->dump();
+        def->print(llvm::outs());
         return true;
       });
     });
@@ -2202,10 +2233,10 @@ namespace swift::test {
 static FunctionTest VisitInnerAdjacentPhisTest(
     "visit-inner-adjacent-phis",
     [](auto &function, auto &arguments, auto &test) {
-      function.dump();
+      function.print(llvm::outs());
       visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
                              [](auto *argument) -> bool {
-                               argument->dump();
+                               argument->print(llvm::outs());
                                return true;
                              });
     });

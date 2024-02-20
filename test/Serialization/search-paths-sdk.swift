@@ -1,5 +1,4 @@
 // REQUIRES: VENDOR=apple
-// REQUIRES: asserts
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mock-sdk/usr/lib/swift/SystemLibrary.swiftmodule)
 // RUN: %empty-directory(%t/secret)

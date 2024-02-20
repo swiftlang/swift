@@ -129,6 +129,8 @@ static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
+  LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
+             getCurrentDef()->print(llvm::dbgs()));
   defUseWorklist.initialize(getCurrentDef());
   // Only the first level of reborrows need to be consider. All nested inner
   // adjacent reborrows and phis are encapsulated within their lifetimes.
@@ -140,7 +142,13 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
     });
   }
   while (SILValue value = defUseWorklist.pop()) {
+    LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
+               value->print(llvm::dbgs()));
+
     for (Operand *use : value->getUses()) {
+      LLVM_DEBUG(llvm::dbgs() << "    Use:\n";
+                 use->getUser()->print(llvm::dbgs()));
+      
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
@@ -169,6 +177,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
+        LLVM_DEBUG(llvm::dbgs() << "      Value escaped! Giving up\n");
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -197,7 +206,8 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         break;
       case OperandOwnership::Borrow:
         if (liveness->updateForBorrowingOperand(use)
-            != InnerBorrowKind::Contained) {
+              != InnerBorrowKind::Contained) {
+          LLVM_DEBUG(llvm::dbgs() << "      Inner borrow can't be contained! Giving up\n");
           return false;
         }
         break;
@@ -261,22 +271,11 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
 
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       getCurrentDef(), completeLiveness, [&](auto *unreachable) {
-        recordConsumingUser(unreachable);
-        if (auto *previous = unreachable->getPreviousInstruction()) {
-          if (liveness->isInterestingUser(previous) ==
-              PrunedLiveness::IsInterestingUser::NonUser) {
-            liveness->updateForUse(previous, /*lifetimeEnding=*/false);
-          }
-          return;
-        }
-        for (auto *predecessor :
-             unreachable->getParent()->getPredecessorBlocks()) {
-          auto *previous = &predecessor->back();
-          if (liveness->isInterestingUser(previous) ==
-              PrunedLiveness::IsInterestingUser::NonUser) {
-            liveness->updateForUse(previous, /*lifetimeEnding=*/false);
-          }
-        }
+        recordUnreachableLifetimeEnd(unreachable);
+        unreachable->visitPriorInstructions([&](auto *inst) {
+          liveness->extendToNonUse(inst);
+          return true;
+        });
       });
 
   auto *def = getCurrentDef()->getDefiningInstruction();
@@ -308,19 +307,17 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
                                     LifetimeEndingUse;
                        });
   for (auto *barrier : barriers.instructions) {
-    liveness->updateForUse(barrier, /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(barrier);
   }
   for (auto *barrier : barriers.phis) {
     for (auto *predecessor : barrier->getPredecessorBlocks()) {
-      liveness->updateForUse(predecessor->getTerminator(),
-                             /*lifetimeEnding*/ false);
+      liveness->extendToNonUse(predecessor->getTerminator());
     }
   }
   for (auto *edge : barriers.edges) {
     auto *predecessor = edge->getSinglePredecessorBlock();
     assert(predecessor);
-    liveness->updateForUse(&predecessor->back(),
-                           /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(&predecessor->back());
   }
   // Ignore barriers.initialBlocks.  If the collection is non-empty, it
   // contains the def-block.  Its presence means that no barriers were found
@@ -515,7 +512,7 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
           break;
         }
         if (endsAccessOverlappingPrunedBoundary(&inst)) {
-          liveness->updateForUse(&inst, /*lifetimeEnding*/ false);
+          liveness->extendToNonUse(&inst);
           changed = true;
           break;
         }
@@ -648,14 +645,10 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
         continue;
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
-      if (auto *inst = predecessor->getTerminator()->getPreviousInstruction()) {
-        liveness->updateForUse(inst, /*lifetimeEnding*/ false);
-      } else {
-        for (auto *grandPredecessor : predecessor->getPredecessorBlocks()) {
-          liveness->updateForUse(grandPredecessor->getTerminator(),
-                                 /*lifetimeEnding*/ false);
-        }
-      }
+      predecessor->getTerminator()->visitPriorInstructions([&](auto *inst) {
+        liveness->extendToNonUse(inst);
+        return true;
+      });
     }
   }
 
@@ -922,8 +915,11 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
                                            InstModCallbacks &callbacks) {
   // OSSALifetimeCompletion: This conditional clause can be deleted with
   // complete lifetimes.
-  if (isa<UnreachableInst>(nextInstruction)) {
-    // Don't create a destroy_value if the next instruction is an unreachable.
+  if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
+    // Don't create a destroy_value if the next instruction is an unreachable
+    // (or a terminator on the availability boundary of the dead-end region
+    // starting from the non-lifetime-ending boundary of `currentDef`).
+    //
     // If there was a destroy here already, it would be reused.  Avoids
     // creating an explicit destroy of a value which might have an unclosed
     // borrow scope.  Doing so would result in
@@ -982,9 +978,10 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
           auto *insertionPoint = &*successor->begin();
           insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(),
                                          consumes, getCallbacks());
-          LLVM_DEBUG(llvm::dbgs()
-                     << "  Destroy after terminator " << instruction
-                     << " at beginning of " << successor << "\n");
+          LLVM_DEBUG(llvm::dbgs() << "  Destroy after terminator "
+                                  << *instruction << " at beginning of ";
+                     successor->printID(llvm::dbgs(), false);
+                     llvm::dbgs() << "\n";);
         }
         continue;
       }
@@ -1150,10 +1147,12 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeLiveness() {
-  if (currentDef->getOwnershipKind() != OwnershipKind::Owned)
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << currentDef);
+
+  if (currentDef->getOwnershipKind() != OwnershipKind::Owned) {
+    LLVM_DEBUG(llvm::dbgs() << "  not owned, never mind\n");
+    return false;
+  }
 
   // Note: There is no need to register callbacks with this utility. 'onDelete'
   // is the only one in use to handle dangling pointers, which could be done
@@ -1165,13 +1164,13 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
   //
   // NotifyWillBeDeleted will not work because copy rewriting removes operands
   // before deleting instructions. Also prohibit setUse callbacks just because
-  // that would simply be insane.
+  // that would simply be unsound.
   assert(!getCallbacks().notifyWillBeDeletedFunc
          && !getCallbacks().setUseValueFunc && "unsupported");
 
   // Step 1: compute liveness
   if (!computeCanonicalLiveness()) {
-    LLVM_DEBUG(llvm::errs() << "Failed to compute canonical liveness?!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute canonical liveness?!\n");
     clear();
     return false;
   }
@@ -1263,7 +1262,7 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
           calleeAnalysis, deleter);
       auto value = arguments.takeValue();
       canonicalizer.canonicalizeValueLifetime(value);
-      function.dump();
+      function.print(llvm::outs());
     });
 } // end namespace swift::test
 

@@ -53,7 +53,6 @@ namespace llvm {
   template <typename T, unsigned N> class SmallVector;
 #endif
   template <unsigned N> class SmallString;
-  template <typename T, unsigned N> class SmallSetVector;
 #if SWIFT_LLVM_ODR_SAFE
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
@@ -93,7 +92,6 @@ namespace swift {
   using llvm::SmallBitVector;
   using llvm::SmallPtrSet;
   using llvm::SmallPtrSetImpl;
-  using llvm::SmallSetVector;
   using llvm::SmallString;
 #if SWIFT_LLVM_ODR_SAFE
   using llvm::SmallVector;

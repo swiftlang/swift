@@ -114,6 +114,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case PolymorphicEffectKind::ByConformance:
     out << "by conformance";
     break;
+  case PolymorphicEffectKind::AsyncSequenceRethrows:
+    out << "by async sequence implicit @rethrows";
+    break;
   case PolymorphicEffectKind::Always:
     out << "always";
     break;

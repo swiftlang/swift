@@ -254,3 +254,59 @@ bb3:
   return %2 : $C
 }
 
+// CHECK-LABEL: sil [ossa] @test_store_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       bb2:
+// CHECK:         end_borrow {{%[0-9]}} : $*C
+// CHECK:         [[B:%.*]] = begin_borrow %2
+// CHECK:         end_borrow [[B]] : $C
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       } // end sil function 'test_store_borrow'
+sil [ossa] @test_store_borrow : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  %10 = alloc_stack $C
+  %11 = store_borrow %2 to %10 : $*C
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %11 : $*C
+  dealloc_stack %10 : $*C
+  return %2 : $C
+bb2:
+  end_borrow %11 : $*C
+  %17 = begin_borrow %2 : $C
+  %18 = ref_element_addr %17 : $C, #C.a
+  %19 = begin_access [deinit] [static] %18 : $*Int
+  destroy_addr %19 : $*Int
+  end_access %19 : $*Int
+  end_borrow %17 : $C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_reborrow :
+// CHECK:       bb1([[A:%.*]] : @reborrow @guaranteed $C):
+// CHECK:         end_borrow [[A]]
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       } // end sil function 'test_reborrow'
+sil [ossa] @test_reborrow : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  br bb1(%3 : $C)
+bb1(%3a : @reborrow @guaranteed $C):
+  end_borrow %3a : $C
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = load [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  return %2 : $C
+}
+

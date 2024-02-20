@@ -394,7 +394,7 @@ public:
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
   bool isOverriding() const { return IsOverriding; };
-  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
+  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
@@ -492,7 +492,7 @@ public:
 class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
-  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::NoEscape); }
   static bool classof(const SDKNode *N);
   void diagnose(SDKNode *Right) override;
 };
@@ -536,8 +536,8 @@ public:
   ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
   ViewerIterator& operator++();
   ViewerIterator operator++(int) {ViewerIterator tmp(*this); operator++(); return tmp;}
-  bool operator==(const ViewerIterator& rhs) {return P==rhs.P;}
-  bool operator!=(const ViewerIterator& rhs) {return P!=rhs.P;}
+  bool operator==(const ViewerIterator& rhs) const {return P==rhs.P;}
+  bool operator!=(const ViewerIterator& rhs) const {return P!=rhs.P;}
   const NodePtr& operator*() {return *P;}
 };
 

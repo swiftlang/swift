@@ -52,7 +52,7 @@ enum class RefCountingKind : uint8_t {
   MultiPayloadEnumFNResolved = 0x15,
   MultiPayloadEnumGeneric = 0x16,
 
-  Skip = 0x80,
+  // Skip = 0x80,
   // We may use the MSB as flag that a count follows,
   // so all following values are reserved
   // Reserved: 0x81 - 0xFF
@@ -245,9 +245,10 @@ void swift_generic_arrayInitWithCopy(swift::OpaqueValue *dest,
                                      size_t stride,
                                      const Metadata *metadata);
 
-void swift_generic_arrayAssignWithCopy(swift::OpaqueValue *dest,
-                                       swift::OpaqueValue *src, size_t count,
-                                       size_t stride, const Metadata *metadata);
+extern "C" void swift_generic_arrayAssignWithCopy(swift::OpaqueValue *dest,
+                                                  swift::OpaqueValue *src,
+                                                  size_t count, size_t stride,
+                                                  const Metadata *metadata);
 
 constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 

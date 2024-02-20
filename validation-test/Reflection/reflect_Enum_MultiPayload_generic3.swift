@@ -9,12 +9,6 @@
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
-import Darwin
-
-private func debugLog(_ message: @autoclosure () -> String) {
-  fputs("Child: \(message())\n", stderr)
-  fflush(stderr)
-}
 
 struct StructWithEnumDepth0<T> {
   enum E {

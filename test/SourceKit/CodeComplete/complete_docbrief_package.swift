@@ -27,7 +27,7 @@ package struct S: P {
 package import DocBriefTest
 
 func test() {
-  // RUN: %sourcekitd-test -req=complete -pos=%(line+1):7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser -package-name DocPackage -enable-experimental-feature AccessLevelOnImport | %FileCheck %s -check-prefix=CHECK
+  // RUN: %sourcekitd-test -req=complete -pos=%(line+1):7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser -package-name DocPackage | %FileCheck %s -check-prefix=CHECK
   S().foo()
 
   // CHECK: {

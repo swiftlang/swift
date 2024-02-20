@@ -124,7 +124,7 @@ public:
     // If we have an inout parameter that isn't ever actually written to, return
     // false.
     if (!arg->isIndirectResult() &&
-        arg->getKnownParameterInfo().isIndirectMutating()) {
+        arg->getArgumentConvention().isExclusiveIndirectParameter()) {
       auto wellBehavedWrites = ctx.addressToExhaustiveWriteListCache.get(arg);
       if (!wellBehavedWrites.has_value()) {
         return answer(true);

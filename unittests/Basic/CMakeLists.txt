@@ -14,9 +14,11 @@ add_swift_unittest(SwiftBasicTests
   DemangleTest.cpp
   DiverseStackTest.cpp
   EditorPlaceholderTest.cpp
+  EnumMapTest.cpp
   EncodedSequenceTest.cpp
   ExponentialGrowthAppendingBinaryByteStreamTests.cpp
   FileSystemTest.cpp
+  FileTypes.cpp
   FixedBitSetTest.cpp
   FrozenMultiMapTest.cpp
   ImmutablePointerSetTest.cpp
@@ -27,6 +29,7 @@ add_swift_unittest(SwiftBasicTests
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp
+  SmallMapTest.cpp
   SourceManagerTest.cpp
   StableHasher.cpp
   STLExtrasTest.cpp

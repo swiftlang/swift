@@ -29,11 +29,13 @@ DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *FragmentStorageTy,
                              llvm::Optional<Size::int_type> SizeInBits,
                              Alignment Align, bool HasDefaultAlignment,
                              bool IsMetadata, bool SizeIsFragmentSize,
-                             bool IsFixedBuffer)
+                             bool IsFixedBuffer,
+                             std::optional<uint32_t> NumExtraInhabitants)
     : Type(Ty.getPointer()), FragmentStorageType(FragmentStorageTy),
-      SizeInBits(SizeInBits), Align(Align),
-      DefaultAlignment(HasDefaultAlignment), IsMetadataType(IsMetadata),
-      SizeIsFragmentSize(SizeIsFragmentSize), IsFixedBuffer(IsFixedBuffer) {
+      SizeInBits(SizeInBits), NumExtraInhabitants(NumExtraInhabitants),
+      Align(Align), DefaultAlignment(HasDefaultAlignment),
+      IsMetadataType(IsMetadata), SizeIsFragmentSize(SizeIsFragmentSize),
+      IsFixedBuffer(IsFixedBuffer) {
   assert(Align.getValue() != 0);
 }
 
@@ -52,6 +54,7 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
                                              bool IsFragmentTypeInfo) {
   llvm::Optional<Size::int_type> SizeInBits;
   llvm::Type *StorageType = TI.getStorageType();
+  std::optional<uint32_t> NumExtraInhabitants;
   if (StorageType->isSized())
     SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
   else if (TI.isFixedSize()) {
@@ -59,10 +62,14 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
     Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
     SizeInBits = Size;
   }
+  if (TI.isFixedSize()) {
+    const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
+    NumExtraInhabitants = FixTy.getFixedExtraInhabitantCount(IGM);
+  }
   assert(TI.getStorageType() && "StorageType is a nullptr");
   return DebugTypeInfo(Ty.getPointer(), StorageType, SizeInBits,
                        TI.getBestKnownAlignment(), ::hasDefaultAlignment(Ty),
-                       false, IsFragmentTypeInfo);
+                       false, IsFragmentTypeInfo, false, NumExtraInhabitants);
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,

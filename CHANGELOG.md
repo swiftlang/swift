@@ -3,6 +3,286 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift 5.11
+* [SE-0422][]:
+  Non-built-in expression macros can now be used as default arguments that
+  expand at each call site. For example, a custom `#CurrentFile` macro used as
+  a default argument in 'Library.swift' won't be expanded to `"Library.swift"`:
+
+  ```swift
+  @freestanding(expression)
+  public macro CurrentFile() -> String = ...
+
+  public func currentFile(name: String = #CurrentFile) { name }
+  ```
+
+  Instead, it will be expanded at where the function is called:
+  
+  ```swift
+  print(currentFile())
+  // Prints "main.swift"
+  ```
+
+  The expanded code can also use declarations from the caller side context:
+
+  ```swift
+  var person = "client"
+  greetPerson(/* greeting: #informalGreeting */)
+  // Prints "Hi client" if macro expands to "Hi \(person)"
+  ```
+
+* [SE-0417][]:
+  Tasks now gain the ability to respect Task Executor preference.
+  This allows tasks executing default actors (which do not declare a custom executor),
+  and nonisolated asynchronous functions to fall back to a preferred executor, rather than always
+  executing on the default global pool.
+
+  The executor preference may be stated using the `withTaskExecutorPreference` function:
+
+  ```swift
+  nonisolated func doSomething() async { ... }
+  
+  await withTaskExecutorPreference(preferredExecutor) {
+    doSomething()
+  ```
+
+  Or when creating new unstructured or child-tasks (e.g. in a task group):
+
+  ```swift
+  Task(executorPreference: preferredExecutor) {
+    // executes on 'preferredExecutor'
+    await doSomething() // doSomething body would execute on 'preferredExecutor'
+  }
+  ```
+
+* [SE-0413][]:
+
+  Functions can now specify the type of error that they throw as part of the
+  function signature. For example:
+
+  ```swift
+  func parseRecord(from string: String) throws(ParseError) -> Record { ... }
+  ```
+
+  A call to `parseRecord(from:)` will either return a `Record` instance or throw
+  an error of type `ParseError`. For example, a `do..catch` block will infer
+  the `error` variable as being of type `ParseError`:
+
+  ```swift
+  do {
+    let record = try parseRecord(from: myString)
+  } catch {
+    // error has type ParseError
+  }
+  ```
+
+  Typed throws generalizes over throwing and non-throwing functions. A function
+  that is specified as `throws` (without an explicitly-specified error type) is
+  equivalent to one that specifies `throws(any Error)`, whereas a non-throwing
+  is equivalent to one that specifies `throws(Never)`. Calls to functions that
+  are `throws(Never)` are non-throwing.
+
+  Typed throws can also be used in generic functions to propagate error types
+  from parameters, in a manner that is more precise than `rethrows`. For
+  example, the `Sequence.map` operation can propagate the thrown error type from
+  its closure parameter, indicating that it only throws errors of the same type
+  as that closure does:
+
+  ```swift
+  extension Sequence {
+    func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T] { ... }
+  }
+  ```
+
+  When given a non-throwing closure as a parameter, `map` will not throw.
+
+* [#70065][]:
+
+  With the implementation of [SE-0110][], a closure parameter syntax consisting
+  of only a parameter type — and no parameter name — was accidentally made legal
+  for certain unambiguous type syntaxes in Swift 4. For example:
+
+  ```swift
+  let closure = { ([Int]) in }
+  ```
+
+  Having been [gated](https://github.com/apple/swift/pull/28171) behind a
+  compiler warning since at least Swift 5.2, this syntax is now rejected.
+
+* [#71075][]:
+
+  \_SwiftConcurrencyShims used to declare the `exit` function, even though it
+  might not be available. The declaration has been removed, and must be imported
+  from the appropriate C library module (e.g. Darwin or SwiftGlibc)
+  
+* [SE-0270][]:
+
+  The Standard Library now provides APIs for performing collection operations
+  over noncontiguous elements. For example:
+  
+  ```swift
+  var numbers = Array(1...15)
+
+  // Find the indices of all the even numbers
+  let indicesOfEvens = numbers.indices(where: { $0.isMultiple(of: 2) })
+
+  // Perform an operation with just the even numbers
+  let sumOfEvens = numbers[indicesOfEvens].reduce(0, +)
+  // sumOfEvens == 56
+
+  // You can gather the even numbers at the beginning
+  let rangeOfEvens = numbers.moveSubranges(indicesOfEvens, to: numbers.startIndex)
+  // numbers == [2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+  // numbers[rangeOfEvens] == [2, 4, 6, 8, 10, 12, 14]
+  ```
+  
+  The standard library now provides a new `indices(where:)` function which creates
+  a `RangeSet` - a new type representing a set of discontiguous indices. `RangeSet`
+  is generic over its index type and can be used to execute operations over
+  noncontiguous indices such as collecting, moving, or removing elements from a
+  collection. Additionally, `RangeSet` is generic over any `Comparable` collection
+  index and can be used to represent a selection of items in a list or a refinement
+  of a filter or search result.
+
+## Swift 5.10
+
+* Swift 5.10 closes all known static data-race safey holes in complete strict
+concurrency checking.
+
+  When writing code against `-strict-concurrency=complete`, Swift 5.10 will
+  diagnose all potential for data races at compile time unless an explicit
+  unsafe opt out, such as `nonisolated(unsafe)` or `@unchecked Sendable`, is
+  used.
+
+  For example, in Swift 5.9, the following code crashes at runtime due to a
+  `@MainActor`-isolated initializer being evaluated outside the actor, but it
+  was not diagnosed under `-strict-concurrency=complete`:
+
+  ```swift
+  @MainActor
+  class MyModel {
+    init() {
+      MainActor.assertIsolated()
+    }
+
+    static let shared = MyModel()
+  }
+
+  func useShared() async {
+    let model = MyModel.shared
+  }
+
+  await useShared()
+  ```
+
+  The above code admits data races because a `@MainActor`-isolated static
+  variable, which evaluates a `@MainActor`-isolated initial value upon first
+  access, is accessed synchronously from a `nonisolated` context. In Swift
+  5.10, compiling the code with `-strict-concurrency=complete` produces a
+  warning that the access must be done asynchronously:
+
+  ```
+  warning: expression is 'async' but is not marked with 'await'
+    let model = MyModel.shared
+                ^~~~~~~~~~~~~~
+                await
+  ```
+
+  Swift 5.10 fixed numerous other bugs in `Sendable` and actor isolation
+  checking to strengthen the guarantees of complete concurrency checking.
+
+  Note that the complete concurrency model in Swift 5.10 is conservative.
+  Several Swift Evolution proposals are in active development to improve the
+  usability of strict concurrency checking ahead of Swift 6.
+
+* [SE-0412][]:
+
+  Global and static variables are prone to data races because they provide memory that can be accessed from any program context.  Strict concurrency checking in Swift 5.10 prevents data races on global and static variables by requiring them to be either:
+
+    1. isolated to a global actor, or
+    2. immutable and of `Sendable` type.
+
+  For example:
+
+  ```swift
+  var mutableGlobal = 1
+  // warning: var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state
+  // (unless it is top-level code which implicitly isolates to @MainActor)
+
+  @MainActor func mutateGlobalFromMain() {
+    mutableGlobal += 1
+  }
+
+  nonisolated func mutateGlobalFromNonisolated() async {
+    mutableGlobal += 10
+  }
+
+  struct S {
+    static let immutableSendable = 10
+    // okay; 'immutableSendable' is safe to access concurrently because it's immutable and 'Int' is 'Sendable'
+  }
+  ```
+
+  A new `nonisolated(unsafe)` modifier can be used to annotate a global or static variable to suppress data isolation violations when manual synchronization is provided:
+
+  ```swift
+  // This global is only set in one part of the program
+  nonisolated(unsafe) var global: String!
+  ```
+
+  `nonisolated(unsafe)` can be used on any form of storage, including stored properties and local variables, as a more granular opt out for `Sendable` checking, eliminating the need for `@unchecked Sendable` wrapper types in many use cases:
+
+  ```swift
+  import Dispatch
+
+  // 'MutableData' is not 'Sendable'
+  class MutableData { ... } 
+
+  final class MyModel: Sendable {
+    private let queue = DispatchQueue(...)
+    // 'protectedState' is manually isolated by 'queue'
+    nonisolated(unsafe) private var protectedState: MutableData
+  }
+  ```
+
+  Note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as the Thread Sanitizer could still identify failures.
+
+* [SE-0411][]:
+
+  Swift 5.10 closes a data-race safety hole that previously permitted isolated
+  default stored property values to be synchronously evaluated from outside the
+  actor. For example, the following code compiles warning-free under
+  `-strict-concurrency=complete` in Swift 5.9, but it will crash at runtime at
+  the call to `MainActor.assertIsolated()`:
+
+  ```swift
+  @MainActor func requiresMainActor() -> Int {
+    MainActor.assertIsolated()
+    return 0
+  }
+
+  @MainActor struct S {
+    var x = requiresMainActor()
+    var y: Int
+  }
+
+  nonisolated func call() async {
+    let s = await S(y: 10)
+  }
+
+  await call()
+  ```
+
+  This happens because `requiresMainActor()` is used as a default argument to
+  the member-wise initializer of `S`, but default arguments are always
+  evaluated in the caller. In this case, the caller runs on the generic
+  executor, so the default argument evaluation crashes.
+
+  Under `-strict-concurrency=complete` in Swift 5.10, default argument values
+  can safely share the same isolation as the enclosing function or stored
+  property. The above code is still valid, but the isolated default argument is
+  guaranteed to be evaluated in the callee's isolation domain.
+
 ## Swift 5.9.2
 
 * [SE-0407][]:
@@ -9785,6 +10065,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md>
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/main/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/main/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0270]: <https://github.com/apple/swift-evolution/blob/main/proposals/0270-rangeset-and-collection-operations.md>
 [SE-0274]: <https://github.com/apple/swift-evolution/blob/main/proposals/0274-magic-file.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/main/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/main/proposals/0279-multiple-trailing-closures.md>
@@ -9848,6 +10129,10 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
+[SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
+[SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
+[SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
+[SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
@@ -9889,4 +10174,6 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#57081]: <https://github.com/apple/swift/issues/57081>
 [#57225]: <https://github.com/apple/swift/issues/57225>
 [#56139]: <https://github.com/apple/swift/issues/56139>
+[#70065]: <https://github.com/apple/swift/pull/70065>
+[#71075]: <https://github.com/apple/swift/pull/71075>
 [swift-syntax]: https://github.com/apple/swift-syntax

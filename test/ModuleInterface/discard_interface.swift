@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library -verify -enable-experimental-feature MoveOnlyResilientTypes
-// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %t -enable-experimental-feature MoveOnlyResilientTypes
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library -verify
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %t
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
 // This test makes sure that discard is emitted correctly in the interfaces.

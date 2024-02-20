@@ -16,8 +16,6 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
-
 enum ArrayImageSourceError: Error {
   case outOfBoundsRead(UInt64, UInt64)
 }
@@ -35,16 +33,16 @@ struct ArrayImageSource<T>: ImageSource {
     return Bounds(base: 0, size: Size(array.count * MemoryLayout<T>.stride))
   }
 
-  public func fetch<U>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<U>) throws {
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     try array.withUnsafeBytes{
       let size = Size($0.count)
-      let requested = Size(buffer.count * MemoryLayout<U>.stride)
+      let requested = Size(buffer.count)
       if addr > size || requested > size - addr {
         throw ArrayImageSourceError.outOfBoundsRead(addr, requested)
       }
 
-      memcpy(buffer.baseAddress!, $0.baseAddress! + Int(addr), Int(requested))
+      buffer.copyBytes(from: $0[Int(addr)..<Int(addr+requested)])
     }
   }
 }

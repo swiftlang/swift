@@ -33,6 +33,7 @@ class C {}
 // CHECK-LABEL: sil [ossa] @foo
 // CHECK: begin_borrow {{%[^,]+}}
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
+// CHECK: begin_borrow [var_decl] {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'foo'
 sil [ossa] @foo : $@convention(thin) () -> () {
   %instance = alloc_ref $C
@@ -40,6 +41,8 @@ sil [ossa] @foo : $@convention(thin) () -> () {
   end_borrow %guaranteed_c2 : $C
   %guaranteed_c = begin_borrow [lexical] %instance : $C
   end_borrow %guaranteed_c : $C
+  %guaranteed_c3 = begin_borrow [var_decl] %instance : $C
+  end_borrow %guaranteed_c3 : $C
   destroy_value %instance : $C
   %res = tuple ()
   return %res : $()

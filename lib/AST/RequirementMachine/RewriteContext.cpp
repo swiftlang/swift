@@ -180,8 +180,6 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
             .Case("redundant-rules", DebugFlags::RedundantRules)
             .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
             .Case("concrete-contraction", DebugFlags::ConcreteContraction)
-            .Case("propagate-requirement-ids",
-                  DebugFlags::PropagateRequirementIDs)
             .Case("timers", DebugFlags::Timers)
             .Case("conflicting-rules", DebugFlags::ConflictingRules)
             .Case("split-concrete-equiv-class",

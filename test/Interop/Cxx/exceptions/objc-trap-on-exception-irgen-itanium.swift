@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-ir %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 5.11 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir -target %target-triple -min-runtime-version 5.9 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s --check-prefix=GXX
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=windows-msvc
@@ -32,7 +33,7 @@ func testObjCMethodCall() {
 
 testObjCMethodCall()
 
-// CHECK: define {{.*}} @"$s4test0A14ObjCMethodCallyyF"() #[[#UWATTR:]] personality
+// CHECK: define {{.*}} @"$s4test0A14ObjCMethodCallyyF"() #[[#UWATTR:]] personality ptr @_swift_exceptionPersonality
 // CHECK: invoke void {{.*}}@objc_msgSend
 // CHECK-NEXT: to label %[[CONT1:.*]] unwind label %[[UNWIND1:.*]]
 // CHECK-EMPTY:
@@ -45,3 +46,17 @@ testObjCMethodCall()
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
+
+// GXX: define {{.*}} @"$s4test0A14ObjCMethodCallyyF"() #[[#UWATTR:]] personality ptr @__gxx_personality_v0
+// GXX: invoke void {{.*}}@objc_msgSend
+// GXX-NEXT: to label %[[CONT1:.*]] unwind label %[[UNWIND1:.*]]
+// GXX-EMPTY:
+// GXX-NEXT: [[CONT1]]:
+// GXX:  ret
+// GXX-EMPTY:
+// GXX-NEXT: [[UNWIND1]]:
+// GXX-NEXT: landingpad { ptr, i32 }
+// GXX-NEXT:    catch ptr null
+// GXX-NEXT: call void @llvm.trap()
+// GXX-NEXT: unreachable
+// GXX-NEXT: }

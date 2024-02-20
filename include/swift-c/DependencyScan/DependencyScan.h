@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 5
+#define SWIFTSCAN_VERSION_MINOR 7
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -178,6 +178,10 @@ swiftscan_swift_binary_detail_get_module_doc_path(
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
@@ -437,16 +441,22 @@ typedef struct swiftscan_cas_options_s *swiftscan_cas_options_t;
 /// ActionCache.
 typedef struct swiftscan_cas_s *swiftscan_cas_t;
 
-/// Enum types for output types for cache key computation.
-/// TODO: complete the list.
-typedef enum {
-  SWIFTSCAN_OUTPUT_TYPE_OBJECT = 0,
-  SWIFTSCAN_OUTPUT_TYPE_SWIFTMODULE = 1,
-  SWIFTSCAN_OUTPUT_TYPE_SWIFTINTERFACE = 2,
-  SWIFTSCAN_OUTPUT_TYPE_SWIFTPRIVATEINTERFACE = 3,
-  SWIFTSCAN_OUTPUT_TYPE_CLANG_MODULE = 4,
-  SWIFTSCAN_OUTPUT_TYPE_CLANG_PCH = 5
-} swiftscan_output_kind_t;
+/// Opaque container for a cached compilation.
+typedef struct swiftscan_cached_compilation_s *swiftscan_cached_compilation_t;
+
+/// Opaque container for a cached compilation output.
+typedef struct swiftscan_cached_output_s *swiftscan_cached_output_t;
+
+/// Opaque type for a cache replay instance.
+typedef struct swiftscan_cache_replay_instance_s
+    *swiftscan_cache_replay_instance_t;
+
+/// Opaque container for a cached compilation replay result.
+typedef struct swiftscan_cache_replay_result_s *swiftscan_cache_replay_result_t;
+
+/// Opaque type for a cancellation token for async cache operations.
+typedef struct swiftscan_cache_cancellation_token_s
+    *swiftscan_cache_cancellation_token_t;
 
 /// Create a \c CASOptions for creating CAS inside scanner specified.
 SWIFTSCAN_PUBLIC swiftscan_cas_options_t swiftscan_cas_options_create(void);
@@ -469,18 +479,15 @@ swiftscan_cas_options_set_plugin_path(swiftscan_cas_options_t options,
 /// If error happens, the error message is returned via `error` parameter, and
 /// caller needs to free the error message via `swiftscan_string_dispose`.
 SWIFTSCAN_PUBLIC bool
-swiftscan_cas_options_set_option(swiftscan_cas_options_t options,
-                                 const char *name, const char *value,
-                                 swiftscan_string_ref_t *error);
+swiftscan_cas_options_set_plugin_option(swiftscan_cas_options_t options,
+                                        const char *name, const char *value,
+                                        swiftscan_string_ref_t *error);
 
 /// Create a \c cas instance from plugin. Return NULL if error.
 /// If error happens, the error message is returned via `error` parameter, and
 /// caller needs to free the error message via `swiftscan_string_dispose`.
 SWIFTSCAN_PUBLIC swiftscan_cas_t swiftscan_cas_create_from_options(
     swiftscan_cas_options_t options, swiftscan_string_ref_t *error);
-
-/// Dispose the \c cas instance.
-SWIFTSCAN_PUBLIC void swiftscan_cas_dispose(swiftscan_cas_t cas);
 
 /// Store content into CAS. Return \c CASID as string. Return NULL on error.
 /// If error happens, the error message is returned via `error` parameter, and
@@ -489,13 +496,207 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data, unsigned size,
                     swiftscan_string_ref_t *error);
 
-/// Compute \c CacheKey for output of \c kind from the compiler invocation \c
-/// argc and \c argv with \c input. Return \c CacheKey as string.
+/// Get the local storage size for the CAS in bytes. Return the local storage
+/// size of the CAS/cache data, or -1 if the implementation does not support
+/// reporting such size, or -2 if an error occurred.
 /// If error happens, the error message is returned via `error` parameter, and
 /// caller needs to free the error message via `swiftscan_string_dispose`.
-SWIFTSCAN_PUBLIC swiftscan_string_ref_t swiftscan_compute_cache_key(
-    swiftscan_cas_t cas, int argc, const char **argv, const char *input,
-    swiftscan_output_kind_t kind, swiftscan_string_ref_t *error);
+SWIFTSCAN_PUBLIC int64_t
+swiftscan_cas_get_ondisk_size(swiftscan_cas_t, swiftscan_string_ref_t *error);
+
+/// Set the size for the limiting disk storage size for CAS. \c size_limit is
+/// the maximum size limit in bytes (0 means no limit, negative is invalid).
+/// Return true if error. If error happens, the error message is returned via
+/// `error` parameter, and caller needs to free the error message via
+/// `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_set_ondisk_size_limit(swiftscan_cas_t, int64_t size_limit,
+                                    swiftscan_string_ref_t *error);
+
+/// Prune local CAS storage according to the size limit. Return true if error.
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_prune_ondisk_data(swiftscan_cas_t, swiftscan_string_ref_t *error);
+
+/// Dispose the \c cas instance.
+SWIFTSCAN_PUBLIC void swiftscan_cas_dispose(swiftscan_cas_t cas);
+
+/// Compute \c CacheKey for the outputs of a primary input file from a compiler
+/// invocation with command-line \c argc and \c argv. When primary input file
+/// is not available for compilation, e.g., using WMO, primary file is the first
+/// swift input on the command-line by convention. Return \c CacheKey as string.
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+/// This API is DEPRECATED and in favor of using
+/// `swiftscan_cache_compute_key_from_input_index`.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_cache_compute_key(swiftscan_cas_t cas, int argc, const char **argv,
+                            const char *input, swiftscan_string_ref_t *error);
+
+/// Compute \c CacheKey for the outputs of a primary input file from a compiler
+/// invocation with command-line \c argc and \c argv and the index for the
+/// input. The index of the input is computed from the position of the input
+/// file from all input files. When primary input file is not available for
+/// compilation, e.g., using WMO, primary file is the first swift input on the
+/// command-line by convention. Return \c CacheKey as string. If error happens,
+/// the error message is returned via `error` parameter, and caller needs to
+/// free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
+                                             const char **argv,
+                                             unsigned input_index,
+                                             swiftscan_string_ref_t *error);
+
+/// Query the result of the compilation using the output cache key. \c globally
+/// suggests if the lookup should check remote cache if such operation exists.
+/// Returns the cached compilation of the result if found, or nullptr if output
+/// is not found or an error occurs. When an error occurs, the error message is
+/// returned via \c error parameter and its caller needs to free the message
+/// using `swiftscan_string_dispose`. The returned cached compilation needs to
+/// be freed via `swiftscan_cached_compilation_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_cached_compilation_t
+swiftscan_cache_query(swiftscan_cas_t cas, const char *key, bool globally,
+                      swiftscan_string_ref_t *error);
+
+/// Async version of `swiftscan_cache_query` where result is returned via
+/// callback. Both cache_result enum and cached compilation will be provided to
+/// callback. \c ctx is an opaque value that passed to the callback and \c
+/// swiftscan_cache_cancellation_token_t will return an token that can be used
+/// to cancel the async operation. The token needs to be freed by caller using
+/// `swiftscan_cache_cancellation_token_dispose`. If no token is needed, nullptr
+/// can be passed and no token will be returned.
+SWIFTSCAN_PUBLIC void swiftscan_cache_query_async(
+    swiftscan_cas_t cas, const char *key, bool globally, void *ctx,
+    void (*callback)(void *ctx, swiftscan_cached_compilation_t,
+                     swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *);
+
+/// Query the number of outputs from a cached compilation.
+SWIFTSCAN_PUBLIC unsigned swiftscan_cached_compilation_get_num_outputs(
+    swiftscan_cached_compilation_t);
+
+/// Get the cached output for the given index in the cached compilation.
+SWIFTSCAN_PUBLIC swiftscan_cached_output_t
+swiftscan_cached_compilation_get_output(swiftscan_cached_compilation_t,
+                                        unsigned idx);
+
+/// Check if the requested cached compilation is uncacheable. That means the
+/// compiler decides to skip caching its output even the compilation is
+/// successful.
+SWIFTSCAN_PUBLIC bool
+    swiftscan_cached_compilation_is_uncacheable(swiftscan_cached_compilation_t);
+
+/// Make the cache compilation available globally. \c callback will be called
+/// on completion.
+/// \c swiftscan_cache_cancellation_token_t will return an token that can be
+/// used to cancel the async operation. The token needs to be freed by caller
+/// using `swiftscan_cache_cancellation_token_dispose`. If no token is needed,
+/// nullptr can be passed and no token will be returned.
+SWIFTSCAN_PUBLIC void swiftscan_cached_compilation_make_global_async(
+    swiftscan_cached_compilation_t, void *ctx,
+    void (*callback)(void *ctx, swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *);
+
+/// Dispose a cached compilation.
+SWIFTSCAN_PUBLIC
+void swiftscan_cached_compilation_dispose(swiftscan_cached_compilation_t);
+
+/// Download and materialize the cached output if needed from a remote CAS.
+/// Return true if load is successful, else false if not found or error. If
+/// error, the error message is returned via \c error parameter and its caller
+/// needs to free the message using `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cached_output_load(swiftscan_cached_output_t,
+                             swiftscan_string_ref_t *error);
+
+/// Async version of `swiftscan_cached_output_load` where result is
+/// returned via callback. \c ctx is an opaque value that passed to the callback
+/// and \c swiftscan_cache_cancellation_token_t will return an token that can be
+/// used to cancel the async operation. The token needs to be freed by caller
+/// using `swiftscan_cache_cancellation_token_dispose`. If no token is needed,
+/// nullptr can be passed and no token will be returned.
+SWIFTSCAN_PUBLIC void swiftscan_cached_output_load_async(
+    swiftscan_cached_output_t, void *ctx,
+    void (*callback)(void *ctx, bool success, swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *);
+
+/// Check if cached output is materialized locally and can be accessed
+/// without downloading.
+SWIFTSCAN_PUBLIC bool
+    swiftscan_cached_output_is_materialized(swiftscan_cached_output_t);
+
+/// Return the casid for the cached output as \c swiftscan_string_ref_t and the
+/// returned string needs to be freed using `swiftscan_string_dispose`. CASID
+/// can be requested before loading/materializing.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+    swiftscan_cached_output_get_casid(swiftscan_cached_output_t);
+
+/// Get the output name for cached compilation. The
+/// returned name needs to be freed by `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+    swiftscan_cached_output_get_name(swiftscan_cached_output_t);
+
+/// Dispose a cached output.
+SWIFTSCAN_PUBLIC
+void swiftscan_cached_output_dispose(swiftscan_cached_output_t);
+
+/// Cancel the async cache action that is associated with token.
+SWIFTSCAN_PUBLIC void
+    swiftscan_cache_action_cancel(swiftscan_cache_cancellation_token_t);
+
+/// Dispose the cancellation token.
+SWIFTSCAN_PUBLIC void swiftscan_cache_cancellation_token_dispose(
+    swiftscan_cache_cancellation_token_t);
+
+/// Async load CASObject using CASID. This is only to perform the download to
+/// local CAS where result is returned via callback. \c ctx is an opaque value
+/// that passed to the callback and \c swiftscan_cache_cancellation_token_t will
+/// return an token that can be used to cancel the async operation. The token
+/// needs to be freed by caller using
+/// `swiftscan_cache_cancellation_token_dispose`. If no token is needed, nullptr
+/// can be passed and no token will be returned.
+SWIFTSCAN_PUBLIC void swiftscan_cache_download_cas_object_async(
+    swiftscan_cas_t, const char *id, void *ctx,
+    void (*callback)(void *ctx, bool success, swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *);
+
+/// Create a swift cached compilation replay instance with its command-line
+/// invocation. Return nullptr when errors occurs and the error message is
+/// returned via \c error parameter and its caller needs to free the message
+/// using `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_cache_replay_instance_t
+swiftscan_cache_replay_instance_create(int argc, const char **argv,
+                                       swiftscan_string_ref_t *error);
+
+/// Dispose swift cached compilation replay instance.
+SWIFTSCAN_PUBLIC void
+    swiftscan_cache_replay_instance_dispose(swiftscan_cache_replay_instance_t);
+
+/// Replay the cached compilation using cached compliation replay instance.
+/// Returns replay result or nullptr if output not found or error occurs. If
+/// error, the error message is returned via \c error parameter and its caller
+/// needs to free the message using `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_cache_replay_result_t
+swiftscan_cache_replay_compilation(swiftscan_cache_replay_instance_t,
+                                   swiftscan_cached_compilation_t,
+                                   swiftscan_string_ref_t *error);
+
+/// Get stdout from cached replay result. The returning swiftscan_string_ref_t
+/// is owned by replay result and should not be disposed.
+SWIFTSCAN_PUBLIC
+swiftscan_string_ref_t
+    swiftscan_cache_replay_result_get_stdout(swiftscan_cache_replay_result_t);
+
+/// Get stderr from cached replay result. The returning swiftscan_string_ref_t
+/// is owned by replay result and should not be disposed.
+SWIFTSCAN_PUBLIC
+swiftscan_string_ref_t
+    swiftscan_cache_replay_result_get_stderr(swiftscan_cache_replay_result_t);
+
+/// Dispose a cached replay result.
+SWIFTSCAN_PUBLIC
+void swiftscan_cache_replay_result_dispose(swiftscan_cache_replay_result_t);
 
 //===----------------------------------------------------------------------===//
 

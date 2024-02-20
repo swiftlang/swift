@@ -55,15 +55,15 @@ func /*varargs2:def*/withVarargs(x: Int, y: Int, _: Int...) {}
 /*varargs2:call*/withVarargs(x: 1, 2, y: 2, 4)
 
 
-func /*mixed:def*/betterName(a: Int = 2, b: Int..., c: Int = 2, d: () -> Int) {}
+func /*mixed:def*/<base>withAllOfTheAbove</base>(<arglabel index=0>x</arglabel><param index=0></param>: Int = 2, <arglabel index=1>_</arglabel><param index=1></param>: Int..., <arglabel index=2>z</arglabel><param index=2></param>: Int = 2, <arglabel index=3>c</arglabel><param index=3></param>: () -> Int) {}
 
 // valid
-/*mixed:call*/betterName(b: 2){ return 1 }
-/*mixed:call*/betterName(a: 1, b: 2, d: {return 1})
-/*mixed:call*/betterName(a: 1, d: {return 1})
-/*mixed:call*/betterName(b: 1, c: 1) { return 1 }
-/*mixed:call*/betterName(b: 1, 2, d: {return 1})
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callcombo index=1></callcombo>2){ return 1 }
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callcombo index=1></callcombo>2, <callarg index=3>c</callarg><callcolon index=3>: </callcolon>{return 1})
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=3>c</callarg><callcolon index=3>: </callcolon>{return 1})
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callcombo index=1></callcombo>1, <callarg index=2>z</callarg><callcolon index=2>: </callcolon>1) { return 1 }
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callcombo index=1></callcombo>1, 2, <callarg index=3>c</callarg><callcolon index=3>: </callcolon>{return 1})
 
 // false positives
-/*mixed:call*/betterName(c: 1, 2, d: {return 1})
+/*mixed:call*/<base>withAllOfTheAbove</base>(<callarg index=2>z</callarg><callcolon index=2>: </callcolon>1, 2, <callarg index=3>c</callarg><callcolon index=3>: </callcolon>{return 1})
 

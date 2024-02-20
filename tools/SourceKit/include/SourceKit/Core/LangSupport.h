@@ -17,6 +17,9 @@
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/AST/Type.h"
+#include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CodeCompletionResult.h"
+#include "swift/Refactoring/RenameLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -26,6 +29,7 @@
 #include <functional>
 #include <memory>
 #include <unordered_set>
+#include <variant>
 
 namespace llvm {
   class MemoryBuffer;
@@ -33,6 +37,8 @@ namespace llvm {
 
 namespace SourceKit {
 class GlobalConfig;
+using swift::ide::CancellableResult;
+using swift::ide::RenameLoc;
 
 struct EntityInfo {
   UIdent Kind;
@@ -220,17 +226,17 @@ struct RawCharSourceRange {
   unsigned Length;
 };
 
-enum class MacroRole : uint32_t {
-  // This should align with 'swift::MacroRole'.
-  Expression = 0x01,
-  Declaration = 0x02,
-  Accessor = 0x04,
-  MemberAttribute = 0x08,
-  Member = 0x10,
-  Peer = 0x20,
-  Conformance = 0x40,
-  CodeItem = 0x80,
-  Extension = 0x100,
+enum class MacroRoleBits: uint8_t {
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
+};
+
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroRole: uint32_t {
+#define MACRO_ROLE(Name, Description) \
+    Name = 1 << static_cast<uint8_t>(MacroRoleBits::Name),
+#include "swift/Basic/MacroRoles.def"
 };
 using MacroRoles = swift::OptionSet<MacroRole>;
 
@@ -256,9 +262,10 @@ struct MacroExpansionInfo {
     };
     std::string expansionText;
     std::vector<Replacement> replacements;
+    std::vector<Replacement> genericReplacements;
 
     ExpandedMacroDefinition(StringRef expansionText)
-        : expansionText(expansionText), replacements(){};
+        : expansionText(expansionText), replacements(), genericReplacements() {};
   };
 
   // Offset of the macro expansion syntax (i.e. attribute or #<macro name>) from
@@ -329,6 +336,35 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   DiagnosticSeverityKind Severity = DiagnosticSeverityKind::Error;
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
+
+struct SwiftSemanticToken {
+  unsigned ByteOffset;
+  unsigned Length : 24;
+  // The code-completion kinds are a good match for the semantic kinds we want.
+  // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
+  swift::ide::CodeCompletionDeclKind Kind : 6;
+  unsigned IsRef : 1;
+  unsigned IsSystem : 1;
+
+  SwiftSemanticToken(swift::ide::CodeCompletionDeclKind Kind,
+                     unsigned ByteOffset, unsigned Length, bool IsRef,
+                     bool IsSystem)
+      : ByteOffset(ByteOffset), Length(Length), Kind(Kind), IsRef(IsRef),
+        IsSystem(IsSystem) {}
+
+  bool getIsRef() const { return static_cast<bool>(IsRef); }
+
+  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
+
+  UIdent getUIdentForKind();
+};
+
+#if !defined(_MSC_VER)
+static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, because static_assert is only for
+// keeping low memory usage.
+#endif
 
 struct SourceFileRange {
   /// The byte offset at which the range begins
@@ -709,6 +745,9 @@ struct CursorInfoData {
 /// The result type of `LangSupport::getDiagnostics`
 typedef ArrayRef<DiagnosticEntryInfo> DiagnosticsResult;
 
+/// The result of `LangSupport::getSemanticTokens`.
+typedef std::vector<SwiftSemanticToken> SemanticTokensResult;
+
 struct RangeInfo {
   UIdent RangeKind;
   StringRef ExprType;
@@ -745,9 +784,22 @@ struct SemanticRefactoringInfo {
   StringRef PreferredName;
 };
 
-struct RelatedIdentsInfo {
-  /// (Offset,Length) pairs.
-  ArrayRef<std::pair<unsigned, unsigned>> Ranges;
+struct RelatedIdentInfo {
+  unsigned Offset;
+  unsigned Length;
+  swift::ide::RenameLocUsage Usage;
+};
+
+/// Result of `findRelatedIdentifiersInFile`.
+struct RelatedIdentsResult {
+  SmallVector<RelatedIdentInfo, 8> RelatedIdents;
+  std::optional<std::string> OldName;
+
+  RelatedIdentsResult(SmallVector<RelatedIdentInfo, 8> RelatedIdents,
+                      std::optional<std::string> OldName)
+      : RelatedIdents(RelatedIdents), OldName(OldName) {}
+
+  static RelatedIdentsResult empty() { return RelatedIdentsResult({}, ""); }
 };
 
 /// Represent one branch of an if config.
@@ -857,27 +909,6 @@ struct CategorizedRenameRanges {
   std::vector<RenameRangeDetail> Ranges;
 };
 
-enum class RenameType {
-  Unknown,
-  Definition,
-  Reference,
-  Call
-};
-
-struct RenameLocation {
-  unsigned Line;
-  unsigned Column;
-  RenameType Type;
-};
-
-struct RenameLocations {
-  StringRef OldName;
-  StringRef NewName;
-  const bool IsFunctionLike;
-  const bool IsNonProtocolType;
-  std::vector<RenameLocation> LineColumnLocs;
-};
-
 struct IndexStoreOptions {
   std::string IndexStorePath;
   std::string IndexUnitOutputPath;
@@ -887,7 +918,8 @@ struct IndexStoreInfo{};
 
 typedef std::function<void(RequestResult<ArrayRef<CategorizedEdits>> Result)>
     CategorizedEditsReceiver;
-typedef std::function<void(RequestResult<ArrayRef<CategorizedRenameRanges>> Result)>
+typedef std::function<void(
+    CancellableResult<std::vector<CategorizedRenameRanges>> Result)>
     CategorizedRenameRangesReceiver;
 typedef std::function<void(RequestResult<IndexStoreInfo> Result)> IndexToStoreReceiver;
 
@@ -1103,6 +1135,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) = 0;
 
+  virtual void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)>
+          Receiver) = 0;
+
   virtual void
   getNameInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
               unsigned Offset, NameTranslatingInfo &Input,
@@ -1124,11 +1163,20 @@ public:
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
+  /// - Parameters:
+  ///   - IncludeNonEditableBaseNames: If `true` also return results if the
+  ///     referenced declaration is an initializer or subscript. This is
+  ///     intended if the related identifiers response is used for rename, which
+  ///     allows renaming parameter labels of these declaration.
+  ///     If the function's base name should be highlighted, this should be
+  ///     `false` because e.g. highlighting a subscript with
+  ///     `IncludeNonEditableBaseNames = true` would return the locations of all
+  ///     `[` that call that subscript.
   virtual void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsResult> &)>
           Receiver) = 0;
 
   virtual void findActiveRegionsInFile(
@@ -1148,15 +1196,10 @@ public:
                                 ArrayRef<const char *> Args,
                                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
-  virtual void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                               ArrayRef<RenameLocations> RenameLocations,
-                               ArrayRef<const char*> Args,
-                               CategorizedEditsReceiver Receiver) = 0;
-
-  virtual void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                                ArrayRef<RenameLocations> RenameLocations,
-                                ArrayRef<const char *> Args,
-                                CategorizedRenameRangesReceiver Receiver) = 0;
+  virtual CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLoc> RenameLocations,
+                   ArrayRef<const char *> Args) = 0;
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,

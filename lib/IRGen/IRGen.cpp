@@ -17,6 +17,7 @@
 #include "../Serialization/ModuleFormat.h"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/ObjectFile.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -26,9 +27,9 @@
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -55,7 +56,7 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -80,7 +81,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
@@ -127,6 +127,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
   TargetOpts.FunctionSections = Opts.FunctionSections;
+
+  // Set option to UseCASBackend if CAS was enabled on the command line.
+  TargetOpts.UseCASBackend = Opts.UseCASBackend;
+
+  // Set option to select the CASBackendMode.
+  TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
@@ -196,14 +202,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   PipelineTuningOptions PTO;
 
-  bool RunSwiftMergeFunctions = true;
-  // LLVM MergeFunctions and SwiftMergeFunctions don't understand that the
-  // string in the metadata on calls in @llvm.type.checked.load intrinsics is
-  // semantically meaningful, and mis-compile (mis-merge) unrelated functions.
-  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination) {
-    RunSwiftMergeFunctions = false;
-  }
-
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
 
@@ -216,7 +214,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PTO.LoopInterleaving = true;
     PTO.LoopVectorization = true;
     PTO.SLPVectorization = true;
-    PTO.MergeFunctions = RunSwiftMergeFunctions;
+    PTO.MergeFunctions = true;
     level = llvm::OptimizationLevel::Os;
   } else {
     level = llvm::OptimizationLevel::O0;
@@ -232,9 +230,9 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   PrintPassOptions PrintPassOpts;
   PrintPassOpts.Indent = DebugPassStructure;
   PrintPassOpts.SkipAnalyses = DebugPassStructure;
-  StandardInstrumentations SI(DebugPassStructure, /*VerifyEach*/ false,
-                              PrintPassOpts);
-  SI.registerCallbacks(PIC, &FAM);
+  StandardInstrumentations SI(Module->getContext(), DebugPassStructure,
+                              /*VerifyEach*/ false, PrintPassOpts);
+  SI.registerCallbacks(PIC, &MAM);
 
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
 
@@ -265,6 +263,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                           OptimizationLevel Level) {
       if (Level != OptimizationLevel::O0)
         MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
+      if (Level == OptimizationLevel::O0)
+        MPM.addPass(AlwaysInlinerPass());
     });
   }
 
@@ -280,6 +280,11 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                             SanitizerKind::Address);
       ASOpts.UseAfterScope = false;
       ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
+      if (Opts.SanitizerUseStableABI) {
+        ASOpts.MaxInlinePoisoningSize = 0;
+        ASOpts.InstrumentationWithCallsThreshold = 0;
+        ASOpts.InsertVersionCheck = false;
+      }
       MPM.addPass(AddressSanitizerPass(
           ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
           /*DestructorKind=*/llvm::AsanDtorKind::Global));
@@ -304,7 +309,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                         allowlistFiles, ignorelistFiles));
     });
   }
-  if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
+  if (RunSwiftSpecificLLVMOptzns) {
     PB.registerOptimizerLastEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel Level) {
           if (Level != OptimizationLevel::O0) {
@@ -371,7 +376,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
-    MPM.addPass(PrintModulePass(*out, "", false));
+    MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
+                                /*EmitSummaryIndex=*/false));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -490,11 +496,11 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
                                 const llvm::Module& Module) {
   auto &C = Stats.getFrontendCounters();
   // FIXME: calculate these in constant time if possible.
-  C.NumIRGlobals += Module.getGlobalList().size();
+  C.NumIRGlobals += Module.global_size();
   C.NumIRFunctions += Module.getFunctionList().size();
-  C.NumIRAliases += Module.getAliasList().size();
-  C.NumIRIFuncs += Module.getIFuncList().size();
-  C.NumIRNamedMetaData += Module.getNamedMDList().size();
+  C.NumIRAliases += Module.alias_size();
+  C.NumIRIFuncs += Module.ifunc_size();
+  C.NumIRNamedMetaData += Module.named_metadata_size();
   C.NumIRValueSymbols += Module.getValueSymbolTable().size();
   C.NumIRComdatSymbols += Module.getComdatSymbolTable().size();
   for (auto const &Func : Module) {
@@ -601,17 +607,31 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   if (OutputFilename.empty())
     return false;
 
+  std::unique_ptr<raw_fd_ostream> CASIDFile;
+  if (Opts.UseCASBackend && Opts.EmitCASIDFile &&
+      Opts.CASObjMode != llvm::CASBackendMode::CASID &&
+      Opts.OutputKind == IRGenOutputKind::ObjectFile && OutputFilename != "-") {
+    std::string OutputFilenameCASID = std::string(OutputFilename);
+    OutputFilenameCASID.append(".casid");
+    std::error_code EC;
+    CASIDFile = std::make_unique<raw_fd_ostream>(OutputFilenameCASID, EC);
+    if (EC) {
+      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+                   OutputFilename, std::move(EC.message()));
+      return true;
+    }
+  }
+
   return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
-                                    *OutputFile, DiagMutex);
+                             *OutputFile, DiagMutex,
+                             CASIDFile ? CASIDFile.get() : nullptr);
 }
 
-bool swift::compileAndWriteLLVM(llvm::Module *module,
-                                llvm::TargetMachine *targetMachine,
-                                const IRGenOptions &opts,
-                                UnifiedStatsReporter *stats,
-                                DiagnosticEngine &diags,
-                                llvm::raw_pwrite_stream &out,
-                                llvm::sys::Mutex *diagMutex) {
+bool swift::compileAndWriteLLVM(
+    llvm::Module *module, llvm::TargetMachine *targetMachine,
+    const IRGenOptions &opts, UnifiedStatsReporter *stats,
+    DiagnosticEngine &diags, llvm::raw_pwrite_stream &out,
+    llvm::sys::Mutex *diagMutex, llvm::raw_pwrite_stream *casid) {
 
   // Set up the final code emission pass. Bitcode/LLVM IR is emitted as part of
   // the optimization pass pipeline.
@@ -635,8 +655,8 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
-    bool fail = targetMachine->addPassesToEmitFile(EmitPasses, out, nullptr,
-                                                   FileType, !opts.Verify);
+    bool fail = targetMachine->addPassesToEmitFile(
+        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);
@@ -1067,9 +1087,9 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   // making sure to include non-public symbols.
   auto &ctx = desc.getParentModule()->getASTContext();
   auto tbdDesc = desc.getTBDGenDescriptor();
-  tbdDesc.getOptions().PublicSymbolsOnly = false;
+  tbdDesc.getOptions().PublicOrPackageSymbolsOnly = false;
   const auto *symbolMap =
-      llvm::cantFail(ctx.evaluator(SymbolSourceMapRequest{std::move(tbdDesc)}));
+      evaluateOrFatal(ctx.evaluator, SymbolSourceMapRequest{std::move(tbdDesc)});
 
   // Then split up the symbols so they can be emitted by the appropriate part
   // of the pipeline.
@@ -1116,7 +1136,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts,
                                               nullptr, llvm::None};
-    SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
+    SILMod = evaluateOrFatal(Ctx.evaluator, LoweredSILRequest{loweringDesc});
 
     // If there was an error, bail.
     if (Ctx.hadError())
@@ -1469,13 +1489,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::ExternalLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       collectReference(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       collectReference(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       collectReference(A);
     }
   }
@@ -1495,13 +1515,13 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
         G.setLinkage(GlobalValue::WeakODRLinkage);
       }
     };
-    for (llvm::GlobalVariable &G : M->getGlobalList()) {
+    for (llvm::GlobalVariable &G : M->globals()) {
       updateLinkage(G);
     }
     for (llvm::Function &F : M->getFunctionList()) {
       updateLinkage(F);
     }
-    for (llvm::GlobalAlias &A : M->getAliasList()) {
+    for (llvm::GlobalAlias &A : M->aliases()) {
       updateLinkage(A);
     }
 
@@ -1562,7 +1582,7 @@ GeneratedModule swift::performIRGeneration(
     // needed as return value.
     return GeneratedModule::null();
   }
-  return llvm::cantFail(M->getASTContext().evaluator(IRGenRequest{desc}));
+  return evaluateOrFatal(M->getASTContext().evaluator, IRGenRequest{desc});
 }
 
 GeneratedModule swift::
@@ -1579,7 +1599,7 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, PrivateDiscriminator,
       /*symsToEmit*/ llvm::None, outModuleHash);
-  return llvm::cantFail(file->getASTContext().evaluator(IRGenRequest{desc}));
+  return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 
 void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
@@ -1609,6 +1629,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
                                           llvm::GlobalVariable::InternalLinkage,
                                           Data, "__Swift_AST");
+
   std::string Section;
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
@@ -1617,18 +1638,23 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    Section = COFFASTSectionName;
+  case llvm::Triple::COFF: {
+    SwiftObjectFileFormatCOFF COFF;
+    Section = COFF.getSectionName(ReflectionSectionKind::swiftast);
     break;
+  }
   case llvm::Triple::ELF:
-    Section = ELFASTSectionName;
+  case llvm::Triple::Wasm: {
+    SwiftObjectFileFormatELF ELF;
+    Section = ELF.getSectionName(ReflectionSectionKind::swiftast);
     break;
-  case llvm::Triple::MachO:
-    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+  }
+  case llvm::Triple::MachO: {
+    SwiftObjectFileFormatMachO MachO;
+    Section = std::string(*MachO.getSegmentName()) + "," +
+              MachO.getSectionName(ReflectionSectionKind::swiftast).str();
     break;
-  case llvm::Triple::Wasm:
-    Section = WasmASTSectionName;
-    break;
+  }
   }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));
@@ -1672,7 +1698,7 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
   if (ctx.hadError())
     return GeneratedModule::null();
 
-  auto irMod = llvm::cantFail(evaluator(IRGenRequest{desc}));
+  auto irMod = evaluateOrFatal(ctx.evaluator, IRGenRequest{desc});
   if (!irMod)
     return irMod;
 

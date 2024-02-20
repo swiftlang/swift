@@ -120,7 +120,7 @@ extension Array where Element == BadStruct {
   subscript(okay _: Int) -> Int { 0 } // okay
 }
 
-extension Int: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+extension Int: @retroactive BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 struct TestExtensionConformanceOkay {}
 extension TestExtensionConformanceOkay: BadProto {} // okay
 

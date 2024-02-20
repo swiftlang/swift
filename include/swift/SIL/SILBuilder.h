@@ -349,6 +349,7 @@ public:
   static SILType getPartialApplyResultType(
       TypeExpansionContext context, SILType Ty, unsigned ArgCount, SILModule &M,
       SubstitutionMap subs, ParameterConvention calleeConvention,
+      SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
           PartialApplyInst::OnStackKind::NotOnStack);
 
@@ -396,20 +397,7 @@ public:
   llvm::Optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
                           llvm::Optional<SILDebugVariable> Var,
-                          SILLocation Loc) {
-    if (Var && shouldDropVariable(*Var, Loc))
-      return {};
-    if (!Var || !Var->ArgNo || !Var->Name.empty())
-      return Var;
-
-    auto *VD = Loc.getAsASTNode<VarDecl>();
-    if (VD && !VD->getName().empty())
-      return Var;
-
-    llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
-    Var->Name = Name;
-    return Var;
-  }
+                          SILLocation Loc);
 
   AllocStackInst *
   createAllocStack(SILLocation Loc, SILType elementType,
@@ -429,6 +417,16 @@ public:
         getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
         wasMoved));
+  }
+
+  AllocVectorInst *
+  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
+    if (isInsertingIntoGlobal()) {
+      return insert(AllocVectorInst::createInInitializer(
+          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
+    }
+    return insert(AllocVectorInst::create(
+        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
   }
 
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
@@ -526,28 +524,31 @@ public:
   }
 
   ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args,
-      ApplyOptions options,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
-    return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
-                                    options, C.silConv, *F,
-                                    SpecializationInfo));
+      SILLocation loc, SILValue callee, SubstitutionMap subs,
+      ArrayRef<SILValue> args, ApplyOptions options,
+      const GenericSpecializationInformation *specializationInfo = nullptr,
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
+    return insert(ApplyInst::create(getSILDebugLocation(loc), callee, subs,
+                                    args, options, C.silConv, *F,
+                                    specializationInfo, isolationCrossing));
   }
 
   TryApplyInst *createTryApply(
-      SILLocation Loc, SILValue fn, SubstitutionMap subs,
+      SILLocation loc, SILValue callee, SubstitutionMap subs,
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
       ApplyOptions options = ApplyOptions(),
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+      const GenericSpecializationInformation *specializationInfo = nullptr,
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
     return insertTerminator(TryApplyInst::create(
-        getSILDebugLocation(Loc), fn, subs, args, normalBB, errorBB,
-        options, *F, SpecializationInfo));
+        getSILDebugLocation(loc), callee, subs, args, normalBB, errorBB,
+        options, *F, specializationInfo, isolationCrossing));
   }
 
   PartialApplyInst *createPartialApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
+      SILFunctionTypeIsolation ResultIsolation =
+          SILFunctionTypeIsolation::Unknown,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
@@ -559,17 +560,18 @@ public:
                         }) &&
                "Must have an owned compatible object");
     return insert(PartialApplyInst::create(
-        getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention, *F,
-        SpecializationInfo, OnStack));
+        getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
+        ResultIsolation, *F, SpecializationInfo, OnStack));
   }
 
   BeginApplyInst *createBeginApply(
-      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, ApplyOptions options = ApplyOptions(),
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+      SILLocation loc, SILValue callee, SubstitutionMap subs,
+      ArrayRef<SILValue> args, ApplyOptions options = ApplyOptions(),
+      const GenericSpecializationInformation *specializationInfo = nullptr,
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
     return insert(BeginApplyInst::create(
-        getSILDebugLocation(Loc), Fn, Subs, Args, options, C.silConv, *F,
-        SpecializationInfo));
+        getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
+        specializationInfo, isolationCrossing));
   }
 
   AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
@@ -681,13 +683,11 @@ public:
     return insert(new (getModule())
                       AllocGlobalInst(getSILDebugLocation(Loc), g));
   }
-  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g) {
+  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g,
+                                   SILValue dependencyToken) {
     return insert(new (getModule()) GlobalAddrInst(getSILDebugLocation(Loc), g,
+                                                   dependencyToken,
                                                    getTypeExpansionContext()));
-  }
-  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILType Ty) {
-    return insert(new (F->getModule())
-                  GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
   GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g, bool isBare) {
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
@@ -817,11 +817,13 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false,
-                                     bool hasPointerEscape = false) {
+                                     bool hasPointerEscape = false,
+                                     bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
-    return insert(new (getModule()) BeginBorrowInst(getSILDebugLocation(Loc),
-                                                    LV, isLexical, hasPointerEscape));
+    return insert(new (getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
+                                      hasPointerEscape, fromVarDecl));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -840,11 +842,14 @@ public:
     return createLoadBorrow(loc, v);
   }
 
-  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
+  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v,
+                                    bool isLexical = false,
+                                    bool hasPointerEscape = false,
+                                    bool fromVarDecl = false) {
     if (!hasOwnership() ||
         v->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;
-    return createBeginBorrow(loc, v);
+    return createBeginBorrow(loc, v, isLexical, hasPointerEscape, fromVarDecl);
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
@@ -1063,11 +1068,10 @@ public:
     return createDebugValue(Loc, src, Var);
   }
 
-  TestSpecificationInst *
-  createTestSpecificationInst(SILLocation Loc,
-                              StringRef ArgumentsSpecification) {
-    return insert(TestSpecificationInst::create(
-        getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
+  SpecifyTestInst *createSpecifyTestInst(SILLocation Loc,
+                                         StringRef ArgumentsSpecification) {
+    return insert(SpecifyTestInst::create(getSILDebugLocation(Loc),
+                                          ArgumentsSpecification, getModule()));
   }
 
   UnownedCopyValueInst *createUnownedCopyValue(SILLocation Loc,
@@ -1415,13 +1419,15 @@ public:
 
   MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
                                  bool isLexical = false,
-                                 bool hasPointerEscape = false) {
+                                 bool hasPointerEscape = false,
+                                 bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitMoveValueOperation");
-    return insert(new (getModule()) MoveValueInst(
-        getSILDebugLocation(loc), operand, isLexical, hasPointerEscape));
+    return insert(new (getModule())
+                      MoveValueInst(getSILDebugLocation(loc), operand,
+                                    isLexical, hasPointerEscape, fromVarDecl));
   }
 
   DropDeinitInst *createDropDeinit(SILLocation loc, SILValue operand) {
@@ -1441,9 +1447,11 @@ public:
 
   MarkUnresolvedNonCopyableValueInst *createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, SILValue src,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict) {
     return insert(new (getModule()) MarkUnresolvedNonCopyableValueInst(
-        getSILDebugLocation(loc), src, kind));
+        getSILDebugLocation(loc), src, kind, strict));
   }
 
   MarkUnresolvedReferenceBindingInst *createMarkUnresolvedReferenceBindingInst(
@@ -1623,6 +1631,11 @@ public:
                                      forwardingOwnershipKind));
   }
 
+  VectorInst *createVector(SILLocation Loc, ArrayRef<SILValue> Elements) {
+    return insert(VectorInst::create(getSILDebugLocation(Loc), Elements,
+                                     getModule()));
+  }
+
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
     return createStruct(Loc, Ty, Elements,
@@ -1656,6 +1669,16 @@ public:
   }
 
   TupleInst *createTuple(SILLocation loc, ArrayRef<SILValue> elts);
+
+  TupleAddrConstructorInst *
+  createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
+                             ArrayRef<SILValue> Elements,
+                             IsInitialization_t IsInitOfDest) {
+    assert(getFunction().getModule().useLoweredAddresses());
+    return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
+                                                   DestAddr, Elements,
+                                                   IsInitOfDest, getModule()));
+  }
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
@@ -1754,20 +1777,10 @@ public:
       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
       llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
       ProfileCounter DefaultCount = ProfileCounter()) {
-    return createSelectEnum(Loc, Operand, Ty, DefaultValue, CaseValues,
-                            CaseCounts, DefaultCount,
-                            Operand->getOwnershipKind());
-  }
-
-  SelectEnumInst *createSelectEnum(
-      SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind) {
     assert(isLoadableOrOpaque(Ty));
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
-        getModule(), CaseCounts, DefaultCount, forwardingOwnershipKind));
+        getModule(), CaseCounts, DefaultCount));
   }
 
   SelectEnumAddrInst *createSelectEnumAddr(
@@ -2274,15 +2287,19 @@ public:
                                                        SILValue value);
 
   MarkDependenceInst *createMarkDependence(SILLocation Loc, SILValue value,
-                                           SILValue base) {
-    return createMarkDependence(Loc, value, base, value->getOwnershipKind());
+                                           SILValue base,
+                                           MarkDependenceKind dependenceKind) {
+    return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
+                                dependenceKind);
   }
 
   MarkDependenceInst *
   createMarkDependence(SILLocation Loc, SILValue value, SILValue base,
-                       ValueOwnershipKind forwardingOwnershipKind) {
+                       ValueOwnershipKind forwardingOwnershipKind,
+                       MarkDependenceKind dependenceKind) {
     return insert(new (getModule()) MarkDependenceInst(
-        getSILDebugLocation(Loc), value, base, forwardingOwnershipKind));
+                    getSILDebugLocation(Loc), value, base,
+                    forwardingOwnershipKind, dependenceKind));
   }
 
   IsUniqueInst *createIsUnique(SILLocation Loc, SILValue operand) {
@@ -2297,7 +2314,7 @@ public:
                                         Int1Ty, getFunction(), isNative));
   }
   EndCOWMutationInst *createEndCOWMutation(SILLocation Loc, SILValue operand,
-                                           bool keepUnique = false) {
+                                           bool keepUnique) {
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
@@ -2488,6 +2505,13 @@ public:
                                                         resultType));
   }
 
+  FunctionExtractIsolationInst *
+  createFunctionExtractIsolation(SILLocation loc, SILValue fnValue) {
+    auto resultType = SILType::getOpaqueIsolationType(getASTContext());
+    return insert(new (getModule()) FunctionExtractIsolationInst(
+                    getSILDebugLocation(loc), fnValue, resultType));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
@@ -2505,6 +2529,11 @@ public:
   ThrowInst *createThrow(SILLocation Loc, SILValue errorValue) {
     return insertTerminator(
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));
+  }
+
+  ThrowAddrInst *createThrowAddr(SILLocation Loc) {
+    return insertTerminator(
+        new (getModule()) ThrowAddrInst(getSILDebugLocation(Loc)));
   }
 
   UnwindInst *createUnwind(SILLocation loc) {
@@ -2822,13 +2851,16 @@ public:
 
   /// Convenience function that is a no-op for trivial values and inserts a
   /// move_value on non-trivial instructions.
-  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v) {
+  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v,
+                                  bool isLexical = false,
+                                  bool hasPointerEscape = false,
+                                  bool fromVarDecl = false) {
     assert(!v->getType().isAddress());
     if (v->getType().isTrivial(*getInsertionBB()->getParent()))
       return v;
     assert(v->getOwnershipKind() == OwnershipKind::Owned &&
            "move_value consumes its argument");
-    return createMoveValue(Loc, v);
+    return createMoveValue(Loc, v, isLexical, hasPointerEscape, fromVarDecl);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

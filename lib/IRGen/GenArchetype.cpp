@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
@@ -171,7 +172,6 @@ public:
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
   }
 };
-
 } // end anonymous namespace
 
 /// Emit a single protocol witness table reference.
@@ -361,6 +361,17 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
             ? IsABIAccessible
             : IsNotABIAccessible;
   }
+
+  // TODO: Should this conformance imply isAddressOnlyTrivial is true?
+  auto *bitwiseCopyableProtocol =
+      IGM.getSwiftModule()->getASTContext().getProtocol(
+          KnownProtocolKind::BitwiseCopyable);
+  // The protocol won't be present in swiftinterfaces from older SDKs.
+  if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
+                                     archetype, bitwiseCopyableProtocol)) {
+    return BitwiseCopyableTypeInfo::create(storageType, abiAccessible);
+  }
+
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
 }
 
@@ -492,7 +503,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                        {request.get(IGF), genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addFnAttr(llvm::Attribute::ReadOnly);
+      result->setOnlyReadsMemory();
     });
   assert(result);
   
@@ -556,7 +567,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                    {genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addFnAttr(llvm::Attribute::ReadOnly);
+      result->setOnlyReadsMemory();
     });
   assert(result);
   

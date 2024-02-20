@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
@@ -54,7 +55,7 @@ namespace swift {
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
-  enum DeclAttrKind : unsigned;
+  enum class DeclAttrKind : unsigned;
   enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.
@@ -104,6 +105,14 @@ namespace swift {
     Type getType() const { return t; }
   };
 
+  struct WitnessType {
+    Type t;
+
+    WitnessType(Type t) : t(t) {}
+
+    Type getType() { return t; }
+  };
+
   /// Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -116,6 +125,7 @@ namespace swift {
     Type,
     TypeRepr,
     FullyQualifiedType,
+    WitnessType,
     DescriptivePatternKind,
     SelfAccessKind,
     ReferenceOwnership,
@@ -150,6 +160,7 @@ namespace swift {
       Type TypeVal;
       TypeRepr *TyR;
       FullyQualified<Type> FullyQualifiedTypeVal;
+      WitnessType WitnessTypeVal;
       DescriptivePatternKind DescriptivePatternKindVal;
       SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
@@ -212,6 +223,10 @@ namespace swift {
     DiagnosticArgument(FullyQualified<Type> FQT)
         : Kind(DiagnosticArgumentKind::FullyQualifiedType),
           FullyQualifiedTypeVal(FQT) {}
+
+    DiagnosticArgument(WitnessType WT)
+        : Kind(DiagnosticArgumentKind::WitnessType),
+          WitnessTypeVal(WT) {}
 
     DiagnosticArgument(const TypeLoc &TL) {
       if (TypeRepr *tyR = TL.getTypeRepr()) {
@@ -326,6 +341,11 @@ namespace swift {
     FullyQualified<Type> getAsFullyQualifiedType() const {
       assert(Kind == DiagnosticArgumentKind::FullyQualifiedType);
       return FullyQualifiedTypeVal;
+    }
+
+    WitnessType getAsWitnessType() const {
+      assert(Kind == DiagnosticArgumentKind::WitnessType);
+      return WitnessTypeVal;
     }
 
     DescriptivePatternKind getAsDescriptivePatternKind() const {
@@ -509,6 +529,9 @@ namespace swift {
     void addChildNote(Diagnostic &&D);
     void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
   };
+
+  /// A diagnostic that has no input arguments, so it is trivially-destructable.
+  using ZeroArgDiagnostic = Diag<>;
   
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
@@ -560,6 +583,35 @@ namespace swift {
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
+
+    /// Conditionally prevent the diagnostic from behaving more severely than \p
+    /// limit. If the condition is false, no limit is imposed.
+    InFlightDiagnostic &limitBehaviorIf(bool shouldLimit,
+                                        DiagnosticBehavior limit) {
+      if (!shouldLimit) {
+        return *this;
+      }
+      return limitBehavior(limit);
+    }
+
+    /// Conditionally limit the diagnostic behavior if the given \c limit
+    /// is not \c None.
+    InFlightDiagnostic &limitBehaviorIf(
+        llvm::Optional<DiagnosticBehavior> limit) {
+      if (!limit) {
+        return *this;
+      }
+
+      return limitBehavior(*limit);
+    }
+
+    /// Limit the diagnostic behavior to \c limit until the specified
+    /// version.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
+        DiagnosticBehavior limit, unsigned majorVersion);
 
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
@@ -875,6 +927,10 @@ namespace swift {
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
 
+    /// The stats reporter used to keep track of Swift 6 errors
+    /// diagnosed via \c warnUntilSwiftVersion(6).
+    UnifiedStatsReporter *statsReporter = nullptr;
+
     /// Whether we are actively pretty-printing a declaration as part of
     /// diagnostics.
     bool IsPrettyPrintingDecl = false;
@@ -945,6 +1001,10 @@ namespace swift {
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
 
     void setLanguageVersion(version::Version v) { languageVersion = v; }
+
+    void setStatsReporter(UnifiedStatsReporter *stats) {
+      statsReporter = stats;
+    }
 
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());

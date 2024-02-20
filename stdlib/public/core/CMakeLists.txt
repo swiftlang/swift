@@ -43,13 +43,13 @@ split_embedded_sources(
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
   EMBEDDED BidirectionalCollection.swift
-    NORMAL Bitset.swift
+  EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
     NORMAL BridgeObjectiveC.swift
-    NORMAL BridgeStorage.swift
+  EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
-    NORMAL BuiltinMath.swift
+  EMBEDDED BuiltinMath.swift
     NORMAL Character.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
@@ -65,12 +65,13 @@ split_embedded_sources(
     NORMAL CString.swift
   EMBEDDED CTypes.swift
     NORMAL DebuggerSupport.swift
-    NORMAL Dictionary.swift
-    NORMAL DictionaryBridging.swift
-    NORMAL DictionaryBuilder.swift
-    NORMAL DictionaryCasting.swift
-    NORMAL DictionaryStorage.swift
-    NORMAL DictionaryVariant.swift
+  EMBEDDED Dictionary.swift
+  EMBEDDED DictionaryBridging.swift
+  EMBEDDED DictionaryBuilder.swift
+  EMBEDDED DictionaryCasting.swift
+  EMBEDDED DictionaryStorage.swift
+  EMBEDDED DictionaryVariant.swift
+    NORMAL DiscontiguousSlice.swift
     NORMAL DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
@@ -89,7 +90,7 @@ split_embedded_sources(
   # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-    NORMAL HashTable.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
     NORMAL InputStream.swift
@@ -98,26 +99,26 @@ split_embedded_sources(
     NORMAL Join.swift
     NORMAL KeyPath.swift
     NORMAL KeyValuePairs.swift
-    NORMAL LazyCollection.swift
-    NORMAL LazySequence.swift
+  EMBEDDED LazyCollection.swift
+  EMBEDDED LazySequence.swift
     NORMAL LegacyABI.swift
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
     NORMAL Map.swift
   EMBEDDED MemoryLayout.swift
-    NORMAL UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
-    NORMAL NativeDictionary.swift
-    NORMAL NativeSet.swift
+  EMBEDDED NativeDictionary.swift
+  EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
     NORMAL NFD.swift
   EMBEDDED ObjectIdentifier.swift
   EMBEDDED Optional.swift
-    NORMAL OptionSet.swift
+  EMBEDDED OptionSet.swift
     NORMAL OutputStream.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
@@ -129,6 +130,8 @@ split_embedded_sources(
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
   EMBEDDED RangeReplaceableCollection.swift
+    NORMAL RangeSet.swift
+    NORMAL RangeSetRanges.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift
@@ -139,15 +142,15 @@ split_embedded_sources(
   EMBEDDED SipHash.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
-    NORMAL Set.swift
-    NORMAL SetAlgebra.swift
+  EMBEDDED Set.swift
+  EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
-    NORMAL SetBuilder.swift
-    NORMAL SetCasting.swift
-    NORMAL SetStorage.swift
-    NORMAL SetVariant.swift
-    NORMAL ShadowProtocols.swift
+  EMBEDDED SetBuilder.swift
+  EMBEDDED SetCasting.swift
+  EMBEDDED SetStorage.swift
+  EMBEDDED SetVariant.swift
+  EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
   EMBEDDED Slice.swift
     NORMAL SmallString.swift
@@ -221,7 +224,7 @@ split_embedded_sources(
     NORMAL Diffing.swift
   EMBEDDED Duration.swift
   EMBEDDED DurationProtocol.swift
-    NORMAL FloatingPointRandom.swift
+  EMBEDDED FloatingPointRandom.swift
   EMBEDDED Instant.swift
     NORMAL Mirror.swift
     NORMAL PlaygroundDisplay.swift
@@ -252,9 +255,16 @@ split_embedded_sources(
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
-list(APPEND SWIFTLIB_EMBEDDED_SOURCES EmbeddedStubs.swift)
+list(APPEND SWIFTLIB_EMBEDDED_SOURCES
+  EmbeddedRuntime.swift
+  EmbeddedStubs.swift
+  EmbeddedPrint.swift
+  )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
@@ -297,6 +307,8 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
@@ -385,24 +397,8 @@ add_swift_target_library(swiftCore
 #
 # For now, we build a hardcoded list of target triples of the embedded stdlib,
 # and only when building Swift on macOS.
-set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB TRUE)
-if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-elseif(NOT SWIFT_INCLUDE_TOOLS)
-  # Temporarily, only build embedded stdlib when building the compiler, to
-  # unblock CI jobs that run against old(er) toolchains.
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
-  set(EMBEDDED_STDLIB_TARGET_TRIPLES
-    # arch    module_name               target triple
-    "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
-    "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
-    "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-    "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
-    )
 
   set(SWIFT_ENABLE_REFLECTION OFF)
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
@@ -416,19 +412,24 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 2 triple)
     
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     add_swift_target_library_single(
-      embedded-stdlib-${triple}
+      embedded-stdlib-${mod}
       swiftCore
       ONLY_SWIFTMODULE
-      IS_STDLIB IS_STDLIB_CORE
+      IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS -target "${triple}" -Xcc -D__MACH__ -enable-experimental-feature Embedded
+      SWIFT_COMPILE_FLAGS
+        ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+        -Xfrontend -enable-ossa-modules
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
-      INSTALL_IN_COMPONENT "never_install"
+      FILE_DEPENDS ${swiftCore_common_dependencies}
+      INSTALL_IN_COMPONENT stdlib
       )
-    add_dependencies(embedded-stdlib embedded-stdlib-${triple})
+    add_dependencies(embedded-stdlib embedded-stdlib-${mod})
   endforeach()
 endif()

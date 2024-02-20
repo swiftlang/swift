@@ -633,7 +633,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
 
     // Then check that our final use and initialCAI are in the same block and
     // that all instructions in between them with side-effects are instructions
-    // that we visited. This is a sanity check.
+    // that we visited. This is a soundness check.
     if (finalUse->getParentBlock() != initialCAI->getParent() ||
         llvm::any_of(llvm::make_range(initialCAI->getIterator(),
                                       finalUse->getUser()->getIterator()),

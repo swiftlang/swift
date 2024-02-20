@@ -446,7 +446,14 @@ extension _StringGuts {
          (.zwj, _):
       if y != .format && y != .extend && y != .zwj {
         state.previousProperty = y
-        state.previousIndex = state.index
+
+        // If we already have a constraint in flight, then use that as our base
+        // previous index. Otherwise, use where we're at right now.
+        if let constraint = state.constraint {
+          state.previousIndex = constraint.index
+        } else {
+          state.previousIndex = state.index
+        }
       }
 
       return false

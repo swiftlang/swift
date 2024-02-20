@@ -152,7 +152,9 @@ ERROR(error_mode_cannot_emit_module_summary,none,
 ERROR(error_mode_cannot_emit_symbol_graph,none,
       "this mode does not support emitting symbol graph files", ())
 ERROR(error_mode_cannot_emit_abi_descriptor,none,
-      "this mode does not support emitting ABI descriptor", ())
+      "this mode does not support emitting ABI descriptor files", ())
+ERROR(error_mode_cannot_emit_api_descriptor,none,
+      "this mode does not support emitting API descriptor files", ())
 ERROR(error_mode_cannot_emit_const_values,none,
       "this mode does not support emitting extracted const values", ())
 ERROR(error_mode_cannot_emit_module_semantic_info,none,
@@ -163,6 +165,9 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+
+WARNING(ignoring_option_requires_option,none,
+        "ignoring %0 (requires %1)", (StringRef, StringRef))
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
@@ -313,6 +318,10 @@ ERROR(tbd_not_supported_with_cmo,none,
         "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
         ())
 
+WARNING(api_descriptor_only_supported_in_whole_module,none,
+        "API descriptor generation is only supported when the whole module can be seen",
+        ())
+
 ERROR(previous_installname_map_missing,none,
       "cannot open previous install name map from %0",
       (StringRef))
@@ -434,7 +443,8 @@ NOTE(compiled_module_ignored_reason,none,
      "compiled module '%0' was ignored because %select{%error"
      "|it belongs to a framework in the SDK"
      "|loading from module interfaces is preferred"
-     "|it's a compiler host module}1",
+     "|it's a compiler host module"
+     "|the module name is blocklisted}1",
      (StringRef, unsigned))
 NOTE(out_of_date_module_here,none,
      "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
@@ -485,9 +495,10 @@ REMARK(matching_output_produced,none,
 // Caching related diagnostics
 ERROR(error_caching_no_cas_fs, none,
     "caching is enabled without -cas-fs option, input is not immutable", ())
+ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
-REMARK(output_cache_miss, none, "cache miss output file '%0': key '%1'", (StringRef, StringRef))
+REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
 ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
@@ -495,6 +506,10 @@ ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
 
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
 ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
+
+ERROR(error_load_input_from_cas, none, "failed to load input '%0' from CAS", (StringRef))
+
+ERROR(error_wrong_input_num_for_input_file_key, none, "-input-file-key only support one input file", ())
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
@@ -529,9 +544,6 @@ REMARK(warning_in_access_notes_file,none,
        "ignored invalid content in access notes file: %0",
        (StringRef))
 
-WARNING(compiler_plugin_not_loaded,none,
-        "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
-        
 ERROR(dont_enable_interop_and_compat,none,
       "do not pass both '-enable-experimental-cxx-interop' and "
       "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
@@ -556,6 +568,14 @@ ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,
       "Objective-C interoperability cannot be enabled with embedded Swift.", ())
+ERROR(no_allocations_without_embedded,none,
+      "-no-allocations is only applicable with embedded Swift.", ())
+ERROR(no_swift_sources_with_embedded,none,
+      "embedded swift cannot be enabled in a compiler built without Swift sources", ())
+
+ERROR(experimental_not_supported_in_production,none,
+      "experimental feature '%0' cannot be enabled in production compiler",
+      (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

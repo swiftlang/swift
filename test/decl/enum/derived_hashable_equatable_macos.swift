@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -print-ast %s | %FileCheck %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.51 -print-ast %s | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.51 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-PRE-SWIFT5_9
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx14 -print-ast %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
 // REQUIRES: OS=macosx
 
 // CHECK-LABEL: internal enum HasElementsWithAvailability : Hashable
@@ -24,27 +25,31 @@ enum HasElementsWithAvailability: Hashable {
   case introduced10_50
 
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasElementsWithAvailability, _ b: HasElementsWithAvailability) -> Bool {
-  // CHECK-NEXT:    private var index_a: Int
+  // CHECK-NEXT:    var index_a: Int
   // CHECK-NEXT:    switch a {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_a = 0
   // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .obsoleted10_50:
   // CHECK-NEXT:      index_a = 1
   // CHECK-NEXT:    case .introduced10_50:
   // CHECK-NEXT:      index_a = 2
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    private var index_b: Int
+  // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_b = 0
   // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .obsoleted10_50:
   // CHECK-NEXT:      index_b = 1
   // CHECK-NEXT:    case .introduced10_50:
@@ -54,14 +59,16 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:  }
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    private var discriminator: Int
+  // CHECK-NEXT:    var discriminator: Int
   // CHECK-NEXT:    switch self {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      discriminator = 0
   // CHECK-NEXT:    case .neverAvailable:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-PRE-SWIFT5_9-NEXT: _diagnoseUnavailableCodeReached_aeic()
+  // CHECK-SWIFT5_9-NEXT:     _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .obsoleted10_50:
   // CHECK-NEXT:      discriminator = 1
   // CHECK-NEXT:    case .introduced10_50:

@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -enable-builtin-module -emit-sil -o - | %FileCheck %s
 
 // REQUIRES: concurrency
 
-import _Concurrency
+import Builtin
 
 @MainActor
 func suspend() async {}

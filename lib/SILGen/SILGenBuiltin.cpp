@@ -25,9 +25,12 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/AST/TypeCheckRequests.h" // FIXME: Temporary
+#include "swift/AST/NameLookupRequests.h" // FIXME: Temporary
 
 using namespace swift;
 using namespace Lowering;
@@ -203,33 +206,46 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
-                                      SILLocation loc,
-                                      SubstitutionMap substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  assert(args.size() >= 2 && "assign should have two arguments");
+static ManagedValue emitBuiltinStore(SILGenFunction &SGF, SILLocation loc,
+                                     SubstitutionMap substitutions,
+                                     ArrayRef<ManagedValue> args, SGFContext C,
+                                     bool isStrict, bool isInvariant,
+                                     llvm::MaybeAlign alignment) {
+  assert(args.size() >= 2 && "should have two arguments");
   assert(substitutions.getReplacementTypes().size() == 1 &&
-         "assign should have a single substitution");
+         "should have a single substitution");
 
   // The substitution determines the type of the thing we're destroying.
-  CanType assignFormalType =
-    substitutions.getReplacementTypes()[0]->getCanonicalType();
-  SILType assignType = SGF.getLoweredType(assignFormalType);
-  
+  CanType formalTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+  SILType loweredTy = SGF.getLoweredType(formalTy);
+
   // Convert the destination pointer argument to a SIL address.
-  SILValue addr = SGF.B.createPointerToAddress(loc,
-                                               args.back().getUnmanagedValue(),
-                                               assignType.getAddressType(),
-                                               /*isStrict*/ true,
-                                               /*isInvariant*/ false);
-  
-  // Build the value to be assigned, reconstructing tuples if needed.
-  auto src = RValue(SGF, args.slice(0, args.size() - 1), assignFormalType);
-  
+  SILValue addr = SGF.B.createPointerToAddress(
+      loc, args.back().getUnmanagedValue(), loweredTy.getAddressType(),
+      isStrict, isInvariant, alignment);
+
+  // Build the value to be stored, reconstructing tuples if needed.
+  auto src = RValue(SGF, args.slice(0, args.size() - 1), formalTy);
+
   std::move(src).ensurePlusOne(SGF, loc).assignInto(SGF, loc, addr);
 
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
+}
+
+static ManagedValue emitBuiltinAssign(SILGenFunction &SGF, SILLocation loc,
+                                      SubstitutionMap substitutions,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/true,
+                          /*isInvariant=*/false, llvm::MaybeAlign());
+}
+
+static ManagedValue emitBuiltinStoreRaw(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/false,
+                          /*isInvariant=*/false, llvm::MaybeAlign(1));
 }
 
 /// Emit Builtin.initialize by evaluating the operand directly into
@@ -1019,7 +1035,7 @@ emitBuiltinEndCOWMutation(SILGenFunction &SGF,
 
   SILValue refAddr = args[0].getValue();
   auto ref = SGF.B.createLoad(loc, refAddr, LoadOwnershipQualifier::Take);
-  auto endRef = SGF.B.createEndCOWMutation(loc, ref);
+  auto endRef = SGF.B.createEndCOWMutation(loc, ref, /*keepUnique=*/ false);
   SGF.B.createStore(loc, endRef, refAddr, StoreOwnershipQualifier::Init);
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
@@ -1442,7 +1458,8 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
   auto guaranteedNonTrivialRefMV =
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
   // Now create a mark dependence on our base and return the result.
-  return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV);
+  return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV,
+                                    MarkDependenceKind::Escaping);
 }
 
 // Emit SIL for the named builtin: getCurrentAsyncTask.
@@ -1518,29 +1535,54 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
   return function.ensurePlusOne(SGF, loc);
 }
 
-// Emit SIL for the named builtin: createAsyncTask.
+// Emit SIL for the named builtin: createAsyncTask(...) variants.
 ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         SubstitutionMap subs,
                                         ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
+                                        SGFContext C, BuiltinValueKind kind,
+                                        bool inGroup, bool withExecutor,
+                                        bool isDiscarding) {
   ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
 
+  SmallVector<SILValue, 4> builtinArgs;
+  unsigned nextArgIdx = 0;
+  builtinArgs.push_back(args[nextArgIdx++].forward(SGF)); // flags
+  if (inGroup) {
+    builtinArgs.push_back(
+        args[nextArgIdx++].borrow(SGF, loc).forward(SGF)); // group
+  }
+  if (withExecutor) {
+    builtinArgs.push_back(args[nextArgIdx++].forward(SGF)); // executor
+  }
+
+  CanType futureResultType;
   // Form the metatype of the result type.
-  CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                       /*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()),
-                             MetatypeRepresentation::Thick))
-          .subst(subs)
-          ->getCanonicalType();
-  CanType anyTypeType = ExistentialMetatypeType::get(
-      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
+  if (isDiscarding) {
+    futureResultType =
+        Type(MetatypeType::get(TupleType::getEmpty(ctx)->getCanonicalType(),
+                               MetatypeRepresentation::Thick))
+            ->getCanonicalType();
+  } else {
+    futureResultType = Type(MetatypeType::get(GenericTypeParamType::get(
+                                                  /*isParameterPack*/ false,
+                                                  /*depth*/ 0, /*index*/ 0,
+                                                  SGF.getASTContext()),
+                                              MetatypeRepresentation::Thick))
+                           .subst(subs)
+                           ->getCanonicalType();
+  }
+  CanType anyTypeType =
+      ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
+
+  auto module = SGF.getModule().getSwiftModule();
+  auto conformances = module->collectExistentialConformances(futureResultType,
+                                                             anyTypeType);
+
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
   auto futureResultMetadata =
       SGF.emitExistentialErasure(
-             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
+             loc, futureResultType, futureResultTL, anyTypeTL, conformances, C,
              [&](SGFContext C) -> ManagedValue {
                return ManagedValue::forObjectRValueWithoutOwnership(
                    SGF.B.createMetatype(loc,
@@ -1548,6 +1590,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
              })
           .borrow(SGF, loc)
           .forward(SGF);
+  builtinArgs.push_back(futureResultMetadata);
 
   // Ensure that the closure has the appropriate type.
   auto extInfo =
@@ -1556,27 +1599,32 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .withThrows()
           .withRepresentation(GenericFunctionType::Representation::Swift)
           .build();
-  auto genericSig = subs.getGenericSignature().getCanonicalSignature();
-  auto genericResult =
-      GenericTypeParamType::get(/*isParameterPack*/ false,
-                                /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
-  // <T> () async throws -> T
-  CanType functionTy =
-      GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
-          ->getCanonicalType();
-  AbstractionPattern origParam(genericSig, functionTy);
-  CanType substParamType = functionTy.subst(subs)->getCanonicalType();
-  auto reabstractedFun =
-      SGF.emitSubstToOrigValue(loc, args[1], origParam, substParamType);
+
+  ManagedValue entryPointFun;
+  if (isDiscarding) {
+    entryPointFun = args[nextArgIdx];
+  } else {
+    auto genericSig = subs.getGenericSignature().getCanonicalSignature();
+    auto genericResult = GenericTypeParamType::get(/*isParameterPack*/ false,
+                                                   /*depth*/ 0, /*index*/ 0,
+                                                   SGF.getASTContext());
+    // <T> () async throws -> T
+    CanType functionTy =
+        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+            ->getCanonicalType();
+    AbstractionPattern origParam(genericSig, functionTy);
+    CanType substParamType = functionTy.subst(subs)->getCanonicalType();
+    entryPointFun = SGF.emitSubstToOrigValue(loc, args[nextArgIdx], origParam,
+                                             substParamType);
+  }
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
-      SGF, loc, reabstractedFun, futureResultType);
+      SGF, loc, entryPointFun, futureResultType);
+  builtinArgs.push_back(function.forward(SGF));
 
   auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
-      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, futureResultMetadata, function.forward(SGF) });
+      loc, ctx.getIdentifier(getBuiltinName(kind)),
+      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs, builtinArgs);
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
@@ -1584,42 +1632,57 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
-  auto group = args[1].borrow(SGF, loc).forward(SGF);
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTaskInGroup,
+      /*inGroup=*/true, /*withExecutor=*/false, /*isDiscarding=*/false);
+}
 
-  // Form the metatype of the result type.
-  CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                       /*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()),
-                             MetatypeRepresentation::Thick))
-          .subst(subs)
-          ->getCanonicalType();
-  CanType anyTypeType = ExistentialMetatypeType::get(
-      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
-  auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
-  auto &futureResultTL = SGF.getTypeLowering(futureResultType);
-  auto futureResultMetadata =
-      SGF.emitExistentialErasure(
-             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
-             [&](SGFContext C) -> ManagedValue {
-               return ManagedValue::forObjectRValueWithoutOwnership(
-                   SGF.B.createMetatype(loc,
-                                        SGF.getLoweredType(futureResultType)));
-             })
-          .borrow(SGF, loc)
-          .forward(SGF);
+// Emit SIL for the named builtin: createAsyncDiscardingTaskInGroup.
+static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroup(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncDiscardingTaskInGroup,
+      /*inGroup=*/true, /*withExecutor=*/false, /*isDiscarding=*/true);
+}
 
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
-                                                             futureResultType);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateAsyncTaskInGroup)),
-      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, group, futureResultMetadata, function.forward(SGF) });
-  return SGF.emitManagedRValueWithCleanup(apply);
+// Emit SIL for the named builtin: createAsyncTaskWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncTaskWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTaskWithExecutor,
+      /*inGroup=*/false, /*withExecutor=*/true, /*isDiscarding=*/false);
+}
+// Emit SIL for the named builtin: createAsyncTaskInGroupWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncTaskInGroupWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor,
+      /*inGroup=*/true, /*withExecutor=*/true, /*isDiscarding=*/false);
+}
+
+// Emit SIL for the named builtin: createAsyncTaskInGroupWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor,
+      /*inGroup=*/true, /*withExecutor=*/true, /*isDiscarding=*/true);
+}
+
+// Emit SIL for the named builtin: createAsyncTask.
+ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTask,
+      /*inGroup=*/false, /*withExecutor=*/false, /*isDiscarding=*/false);
 }
 
 // Shared implementation of withUnsafeContinuation and
@@ -1780,6 +1843,12 @@ static ManagedValue emitBuildExecutorRef(SILGenFunction &SGF, SILLocation loc,
       subs, argValues);
   return ManagedValue::forObjectRValueWithoutOwnership(builtinApply);
 }
+static ManagedValue emitBuiltinBuildOrdinaryTaskExecutorRef(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuildExecutorRef(SGF, loc, subs, args,
+                              BuiltinValueKind::BuildOrdinaryTaskExecutorRef);
+}
 static ManagedValue emitBuiltinBuildOrdinarySerialExecutorRef(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
@@ -1803,6 +1872,142 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
     ArrayRef<ManagedValue> args, SGFContext C) {
   return emitBuildExecutorRef(SGF, loc, subs, args,
                               BuiltinValueKind::BuildMainActorExecutorRef);
+}
+
+static ManagedValue emitBuiltinExtractFunctionIsolation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&args, SGFContext C) {
+  auto argSources = std::move(args).getSources();
+  assert(argSources.size() == 1);
+
+  auto argType = argSources[0].getSubstRValueType();
+  if (auto fnType = dyn_cast<AnyFunctionType>(argType);
+      !fnType || !fnType->getIsolation().isErased()) {
+    SGF.SGM.diagnose(argSources[0].getLocation(),
+                     diag::builtin_get_function_isolation_bad_argument);
+    return SGF.emitUndef(SILType::getOpaqueIsolationType(SGF.getASTContext()));
+  }
+
+  return SGF.emitExtractFunctionIsolation(loc, std::move(argSources[0]), C);
+}
+
+static ManagedValue emitBuiltinGetEnumTag(SILGenFunction &SGF, SILLocation loc,
+                                          SubstitutionMap subs,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+
+  auto bi = SGF.B.createBuiltin(
+    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetEnumTag)),
+    SILType::getBuiltinIntegerType(32, ctx), subs,
+    { args[0].getValue() });
+
+  return ManagedValue::forObjectRValueWithoutOwnership(bi);
+}
+
+static ManagedValue emitBuiltinInjectEnumTag(SILGenFunction &SGF, SILLocation loc,
+                                             SubstitutionMap subs,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+
+  auto bi = SGF.B.createBuiltin(
+    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::InjectEnumTag)),
+    SILType::getEmptyTupleType(ctx), subs,
+    { args[0].getValue(), args[1].getValue() });
+
+  return ManagedValue::forObjectRValueWithoutOwnership(bi);
+}
+
+/// Find the extension on DistributedActor that defines __actorUnownedExecutor.
+static ExtensionDecl *findDistributedActorAsActorExtension(
+    ProtocolDecl *distributedActorProto, ModuleDecl *module) {
+  ASTContext &ctx = distributedActorProto->getASTContext();
+  auto name = ctx.getIdentifier("__actorUnownedExecutor");
+  auto results = distributedActorProto->lookupDirect(
+      name, SourceLoc(),
+      NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
+  for (auto result : results) {
+    if (auto var = dyn_cast<VarDecl>(result)) {
+      return dyn_cast<ExtensionDecl>(var->getDeclContext());
+    }
+  }
+
+  return nullptr;
+}
+
+ProtocolConformanceRef
+SILGenModule::getDistributedActorAsActorConformance(SubstitutionMap subs) {
+  ASTContext &ctx = M.getASTContext();
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  Type distributedActorType = subs.getReplacementTypes()[0];
+
+  if (!distributedActorAsActorConformance) {
+    auto distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    if (!distributedActorProto)
+      return ProtocolConformanceRef();
+
+    auto ext = findDistributedActorAsActorExtension(
+        distributedActorProto, M.getSwiftModule());
+    if (!ext)
+      return ProtocolConformanceRef();
+
+    // Conformance of DistributedActor to Actor.
+    auto genericParam = subs.getGenericSignature().getGenericParams()[0];
+    distributedActorAsActorConformance = ctx.getNormalConformance(
+        Type(genericParam), actorProto, SourceLoc(), ext,
+        ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+        /*isPreconcurrency=*/false);
+  }
+
+  return ProtocolConformanceRef(
+      actorProto,
+      ctx.getSpecializedConformance(distributedActorType,
+                                    distributedActorAsActorConformance,
+                                    subs));
+}
+
+void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
+  VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+
+  // If the member is the special `asLocalActor` operation on
+  // distributed actors, make sure we have the conformance needed
+  // for a builtin.
+  ASTContext &ctx = var->getASTContext();
+  if (var->getName() == ctx.Id_asLocalActor &&
+      var->getDeclContext()->getSelfProtocolDecl() &&
+      var->getDeclContext()->getSelfProtocolDecl()
+          ->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
+    auto conformance =
+        getDistributedActorAsActorConformance(
+          e->getMember().getSubstitutions());
+    useConformance(conformance);
+  }
+
+}
+
+static ManagedValue emitBuiltinDistributedActorAsAnyActor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto distributedActor = args[0];
+  ProtocolConformanceRef conformances[1] = {
+    SGF.SGM.getDistributedActorAsActorConformance(subs)
+  };
+
+  // Erase the distributed actor instance into an `any Actor` existential with
+  // the special conformance.
+  CanType distributedActorType =
+      subs.getReplacementTypes()[0]->getCanonicalType();
+  auto &distributedActorTL = SGF.getTypeLowering(distributedActorType);
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  auto &anyActorTL = SGF.getTypeLowering(actorProto->getDeclaredExistentialType());
+  return SGF.emitExistentialErasure(
+      loc, distributedActorType, distributedActorTL, anyActorTL, 
+      ctx.AllocateCopy(conformances),
+      C, [&distributedActor](SGFContext) {
+        return distributedActor;
+      });
 }
 
 llvm::Optional<SpecializedEmitter>

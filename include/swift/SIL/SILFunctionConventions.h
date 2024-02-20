@@ -78,6 +78,8 @@ class SILModuleConventions {
 public:
   static bool isPassedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static bool isThrownIndirectlyInSIL(SILType type, SILModule &M);
+
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
   static SILModuleConventions getLoweredAddressConventions(SILModule &M) {
@@ -214,6 +216,8 @@ public:
     return getSILType(funcTy->getErrorResult(), context);
   }
 
+  bool isTypedError() const;
+
   /// Returns an array of result info.
   /// Provides convenient access to the underlying SILFunctionType.
   ArrayRef<SILResultInfo> getResults() const {
@@ -227,8 +231,26 @@ public:
                                     : funcTy->getNumPackResults();
   }
 
+  /// Get the number of SIL error results passed as address-typed arguments.
+  unsigned getNumIndirectSILErrorResults() const {
+    if (!silConv.loweredAddresses)
+      return 0;
+    if (auto errorResultInfo = funcTy->getOptionalErrorResult()) {
+      return errorResultInfo->getConvention() == ResultConvention::Indirect ? 1 : 0;
+    }
+
+    return 0;
+  }
+
+  bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
+    unsigned indirectResults = getNumIndirectSILResults();
+    return idx >= indirectResults &&
+           idx < indirectResults + getNumIndirectSILErrorResults();
+  }
+
   /// Are any SIL results passed as address-typed arguments?
   bool hasIndirectSILResults() const { return getNumIndirectSILResults() != 0; }
+  bool hasIndirectSILErrorResults() const { return getNumIndirectSILErrorResults() != 0; }
 
   struct IndirectSILResultFilter {
     bool loweredAddresses;
@@ -376,7 +398,7 @@ public:
   unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }
 
   unsigned getSILArgIndexOfFirstParam() const {
-    return getNumIndirectSILResults();
+    return getNumIndirectSILResults() + getNumIndirectSILErrorResults();
   }
 
   /// Returns the index of self.
@@ -405,13 +427,15 @@ public:
   /// this function type. This is also the total number of SILArguments
   /// in the entry block.
   unsigned getNumSILArguments() const {
-    return getNumIndirectSILResults() + funcTy->getNumParameters();
+    return getNumIndirectSILResults() + getNumIndirectSILErrorResults() +
+      funcTy->getNumParameters();
   }
 
   SILParameterInfo getParamInfoForSILArg(unsigned index) const {
-    assert(index >= getNumIndirectSILResults()
+    assert(index >= (getNumIndirectSILResults() + getNumIndirectSILErrorResults())
            && index <= getNumSILArguments());
-    return funcTy->getParameters()[index - getNumIndirectSILResults()];
+    return funcTy->getParameters()[index - getNumIndirectSILResults()
+                                         - getNumIndirectSILErrorResults()];
   }
 
   /// Return the SIL argument convention of apply/entry argument at
@@ -513,11 +537,20 @@ inline SILType
 SILFunctionConventions::getSILArgumentType(unsigned index,
                                            TypeExpansionContext context) const {
   assert(index <= getNumSILArguments());
-  if (index < getNumIndirectSILResults()) {
+  auto numIndirectSILResults = getNumIndirectSILResults();
+  if (index < numIndirectSILResults) {
     return *std::next(getIndirectSILResultTypes(context).begin(), index);
   }
+
+  auto numIndirectSILErrorResults = getNumIndirectSILErrorResults();
+  if (numIndirectSILErrorResults &&
+      (index < (numIndirectSILResults + numIndirectSILErrorResults))) {
+    return getSILType(funcTy->getErrorResult(), context);
+  }
+
   return getSILType(
-      funcTy->getParameters()[index - getNumIndirectSILResults()], context);
+      funcTy->getParameters()[index - numIndirectSILResults -
+                              numIndirectSILErrorResults], context);
 }
 
 inline bool

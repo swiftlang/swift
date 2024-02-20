@@ -192,7 +192,7 @@ bool extractSeparatedParams(
     auto ParagraphContent = ParagraphText->getLiteralContent();
     auto PotentialMatch = ParagraphContent.substr(0, ParameterPrefix.size());
 
-    if (!PotentialMatch.startswith_insensitive(ParameterPrefix)) {
+    if (!PotentialMatch.starts_with_insensitive(ParameterPrefix)) {
       NormalItems.push_back(Child);
       continue;
     }

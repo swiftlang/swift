@@ -1,0 +1,4 @@
+module MoveOnlyCxxOperators {
+  header "move-only-cxx-value-operators.h"
+  requires cplusplus
+}

@@ -9,4 +9,5 @@
 add_swift_compiler_module(Basic
   SOURCES
     SourceLoc.swift
+    StringParser.swift
     Utils.swift)

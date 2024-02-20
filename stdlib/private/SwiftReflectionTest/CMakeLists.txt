@@ -1,13 +1,18 @@
+if(SWIFT_BUILD_SDK_OVERLAY)
+set(swift_reflection_test_darwin_depencencies Darwin)
+else()
+set(swift_reflection_test_darwin_depencencies)
+endif()
 
 if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)
   add_swift_target_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     SwiftReflectionTest.swift
     SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     SWIFT_COMPILE_FLAGS_LINUX -Xcc -D_GNU_SOURCE
-    SWIFT_MODULE_DEPENDS_OSX Darwin
-    SWIFT_MODULE_DEPENDS_IOS Darwin
-    SWIFT_MODULE_DEPENDS_TVOS Darwin
-    SWIFT_MODULE_DEPENDS_WATCHOS Darwin
+    SWIFT_MODULE_DEPENDS_OSX ${swift_reflection_test_darwin_depencencies}
+    SWIFT_MODULE_DEPENDS_IOS ${swift_reflection_test_darwin_depencencies}
+    SWIFT_MODULE_DEPENDS_TVOS ${swift_reflection_test_darwin_depencencies}
+    SWIFT_MODULE_DEPENDS_WATCHOS ${swift_reflection_test_darwin_depencencies}
     SWIFT_MODULE_DEPENDS_LINUX Glibc
     SWIFT_MODULE_DEPENDS_FREEBSD Glibc
     SWIFT_MODULE_DEPENDS_OPENBSD Glibc

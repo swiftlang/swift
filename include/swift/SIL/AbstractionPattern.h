@@ -1521,6 +1521,22 @@ public:
   /// abstraction pattern for its result type.
   AbstractionPattern getFunctionResultType() const;
 
+  /// Given that the value being abstracted is a function, return the
+  /// abstraction pattern for its thrown error type.
+  llvm::Optional<AbstractionPattern> getFunctionThrownErrorType() const;
+
+  /// Utility method to adjust a thrown error pattern and thrown error type
+  /// to account for some quirks in type lowering.
+  ///
+  /// When lowered with an opaque pattern,
+  ///
+  /// - () -> () becomes () -> (),
+  /// - () throws(any Error) -> () becomes () -> (@error any Error),
+  ///
+  /// *not* () -> (@error_indirect Never) or () -> (@error_indirect any Error).
+  llvm::Optional<std::pair<AbstractionPattern, CanType>>
+  getFunctionThrownErrorType(CanAnyFunctionType substFnInterfaceType) const;
+
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;
@@ -1611,15 +1627,19 @@ public:
   /// Given that this is a pack expansion, do the pack elements need to be
   /// passed indirectly?
   bool arePackElementsPassedIndirectly(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function return position, how is
   /// the corresponding value returned?
   CallingConventionKind getResultConvention(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function parameter position, how
   /// is the corresponding value passed?
   CallingConventionKind getParameterConvention(TypeConverter &TC) const;
-  
+
+  /// If this abstraction pattern appears in function thrown error position, how
+  /// is the corresponding value passed?
+  CallingConventionKind getErrorConvention(TypeConverter &TC) const;
+
   /// Generate the abstraction pattern for lowering the substituted SIL
   /// function type for a function type matching this abstraction pattern.
   ///

@@ -162,17 +162,18 @@ TEST(SourceLoc, StmtConditionElement) {
                                             , false);
   
   // Case a, when the IntroducerLoc is valid.
-  auto introducer = StmtConditionElement( start.getAdvancedLoc(3)
-                                        , pattern, init);
-  
+  auto introducer = StmtConditionElement(ConditionalPatternBindingInfo::create(
+      C.Ctx, start.getAdvancedLoc(3), pattern, init));
+
   EXPECT_EQ(start.getAdvancedLoc(3), introducer.getStartLoc());
   EXPECT_EQ(start.getAdvancedLoc(25), introducer.getEndLoc());
   EXPECT_EQ( SourceRange(start.getAdvancedLoc(3), start.getAdvancedLoc(25))
            , introducer.getSourceRange());
   
   // Case b, when the IntroducerLoc is invalid, but the pattern has a valid loc.
-  auto patternStmtCond = StmtConditionElement(SourceLoc(), pattern, init);
-  
+  auto patternStmtCond = StmtConditionElement(
+      ConditionalPatternBindingInfo::create(C.Ctx, SourceLoc(), pattern, init));
+
   EXPECT_EQ(start.getAdvancedLoc(7), patternStmtCond.getStartLoc());
   EXPECT_EQ(start.getAdvancedLoc(25), patternStmtCond.getEndLoc());
   EXPECT_EQ( SourceRange(start.getAdvancedLoc(7), start.getAdvancedLoc(25))
@@ -180,18 +181,20 @@ TEST(SourceLoc, StmtConditionElement) {
   
   // If the IntroducerLoc is valid but the stmt cond init is invalid.
   auto invalidInit = new (C.Ctx) IntegerLiteralExpr("1", SourceLoc(), false);
-  auto introducerStmtInvalid = StmtConditionElement( start.getAdvancedLoc(3)
-                                                   , pattern, invalidInit);
-  
+  auto introducerStmtInvalid =
+      StmtConditionElement(ConditionalPatternBindingInfo::create(
+          C.Ctx, start.getAdvancedLoc(3), pattern, invalidInit));
+
   EXPECT_EQ(SourceLoc(), introducerStmtInvalid.getStartLoc());
   EXPECT_EQ(SourceLoc(), introducerStmtInvalid.getEndLoc());
   EXPECT_EQ(SourceRange(), introducerStmtInvalid.getSourceRange());
   
   // If the IntroducerLoc is invalid, the pattern is valid, but the stmt cond 
   // init is invalid.
-  auto patternStmtInvalid = StmtConditionElement( SourceLoc(), pattern
-                                                , invalidInit);
-  
+  auto patternStmtInvalid =
+      StmtConditionElement(ConditionalPatternBindingInfo::create(
+          C.Ctx, SourceLoc(), pattern, invalidInit));
+
   EXPECT_EQ(SourceLoc(), patternStmtInvalid.getStartLoc());
   EXPECT_EQ(SourceLoc(), patternStmtInvalid.getEndLoc());
   EXPECT_EQ(SourceRange(), patternStmtInvalid.getSourceRange());

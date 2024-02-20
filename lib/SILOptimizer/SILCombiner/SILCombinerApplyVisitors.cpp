@@ -600,6 +600,8 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
     Builder.setInsertionPoint(endApply);
   });
 
+  invalidatedStackNesting = true;
+
   eraseInstFromFunction(*endApply);
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;

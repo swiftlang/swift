@@ -262,7 +262,7 @@ ASTNode BraceStmt::findAsyncNode() {
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       return Action::Continue(expr);
     }
@@ -276,7 +276,7 @@ ASTNode BraceStmt::findAsyncNode() {
         return Action::Continue();
       }
 
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
@@ -333,13 +333,9 @@ Stmt *BraceStmt::getSingleActiveStatement() const {
   return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
-IsSingleValueStmtResult Stmt::mayProduceSingleValue(Evaluator &eval) const {
-  return evaluateOrDefault(eval, IsSingleValueStmtRequest{this},
-                           IsSingleValueStmtResult::circularReference());
-}
-
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
-  return mayProduceSingleValue(ctx.evaluator);
+  return evaluateOrDefault(ctx.evaluator, IsSingleValueStmtRequest{this, &ctx},
+                           IsSingleValueStmtResult::circularReference());
 }
 
 SourceLoc ReturnStmt::getStartLoc() const {
@@ -375,19 +371,34 @@ ThenStmt *ThenStmt::createImplicit(ASTContext &ctx, Expr *result) {
 }
 
 SourceRange ThenStmt::getSourceRange() const {
-  auto range = getResult()->getSourceRange();
-  if (!range)
-    return ThenLoc;
-
-  if (ThenLoc)
-    range.widen(ThenLoc);
-
-  return range;
+  return SourceRange::combine(ThenLoc, getResult()->getSourceRange());
 }
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 SourceLoc DiscardStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
+
+DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc) {
+  ASTContext &ctx = dc->getASTContext();
+
+  auto params = ParameterList::createEmpty(ctx);
+  DeclName name(ctx, ctx.getIdentifier("$defer"), params);
+  auto *const funcDecl = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, name, /*NameLoc=*/deferLoc,
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*ThrownType=*/Type(),
+      /*GenericParams=*/nullptr, params, TupleType::getEmpty(ctx), dc);
+
+  // Form the call, which will be emitted on any path that needs to run the
+  // code.
+  auto DRE = new (ctx)
+      DeclRefExpr(funcDecl, DeclNameLoc(deferLoc),
+                  /*Implicit*/ true, AccessSemantics::DirectToStorage);
+  auto call = CallExpr::createImplicitEmpty(ctx, DRE);
+
+  return new (ctx) DeferStmt(deferLoc, funcDecl, call);
+}
 
 SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
@@ -450,16 +461,24 @@ void ForEachStmt::setPattern(Pattern *p) {
 }
 
 Expr *ForEachStmt::getTypeCheckedSequence() const {
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
+    return expansion;
+
   return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
-DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc, Stmt *body,
+DoCatchStmt *DoCatchStmt::create(DeclContext *dc,
+                                 LabeledStmtInfo labelInfo,
+                                 SourceLoc doLoc,
+                                 SourceLoc throwsLoc, TypeLoc thrownType,
+                                 Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
                                  llvm::Optional<bool> implicit) {
+  ASTContext &ctx = dc->getASTContext();
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
-  return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
+  return ::new (mem) DoCatchStmt(dc, labelInfo, doLoc, throwsLoc, thrownType,
+                                 body, catches, implicit);
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
@@ -474,6 +493,27 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
     }
   }
   return false;
+}
+
+Type DoCatchStmt::getExplicitCaughtType() const {
+  ASTContext &ctx = DC->getASTContext();
+  return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
+}
+
+Type DoCatchStmt::getCaughtErrorType() const {
+  // Check for an explicitly-specified error type.
+  if (Type explicitError = getExplicitCaughtType())
+    return explicitError;
+
+  auto firstPattern = getCatches()
+    .front()
+    ->getCaseLabelItems()
+    .front()
+    .getPattern();
+  if (firstPattern->hasType())
+    return firstPattern->getType();
+
+  return Type();
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {
@@ -547,6 +587,21 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   return false;
 }
 
+SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
+  SourceLoc Start;
+  if (IntroducerLoc.isValid())
+    Start = IntroducerLoc;
+  else
+    Start = ThePattern->getStartLoc();
+
+  SourceLoc End = Initializer->getEndLoc();
+  if (Start.isValid() && End.isValid()) {
+    return SourceRange(Start, End);
+  } else {
+    return SourceRange();
+  }
+}
+
 PoundAvailableInfo *
 PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                            SourceLoc LParenLoc,
@@ -579,18 +634,7 @@ SourceRange StmtConditionElement::getSourceRange() const {
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
-    SourceLoc Start;
-    if (IntroducerLoc.isValid())
-      Start = IntroducerLoc;
-    else
-      Start = getPattern()->getStartLoc();
-    
-    SourceLoc End = getInitializer()->getEndLoc();
-    if (Start.isValid() && End.isValid()) {
-      return SourceRange(Start, End);
-    } else {
-      return SourceRange();
-    }
+    return getPatternBinding()->getSourceRange();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -612,7 +656,7 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().Start;
+    return getPatternBinding()->getStartLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getStartLoc();
   }
@@ -627,7 +671,7 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().End;
+    return getPatternBinding()->getEndLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getEndLoc();
   }
@@ -640,7 +684,7 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
   return Ctx.AllocateCopy(Arr);
 }
 
-IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
                Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
     : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
              Else, implicit) {}
@@ -733,6 +777,87 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
     vd->setParentPatternStmt(this);
   }
+}
+
+namespace {
+static MutableArrayRef<VarDecl *>
+getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
+  // Grab the first case label item pattern and use it to initialize the case
+  // body var decls.
+  SmallVector<VarDecl *, 4> tmp;
+  labelItems.front().getPattern()->collectVariables(tmp);
+  return ctx.AllocateTransform<VarDecl *>(
+      llvm::makeArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
+        auto *vNew = new (ctx) VarDecl(
+            /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
+            vOld->getName(), vOld->getDeclContext());
+        vNew->setImplicit();
+        return vNew;
+      });
+}
+
+struct FallthroughFinder : ASTWalker {
+  FallthroughStmt *result;
+
+  FallthroughFinder() : result(nullptr) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  // We walk through statements.  If we find a fallthrough, then we got what
+  // we came for.
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
+    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
+      result = f;
+    }
+
+    return Action::Continue(s);
+  }
+
+  // Expressions, patterns and decls cannot contain fallthrough statements, so
+  // there is no reason to walk into them.
+  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
+    return Action::SkipNode(e);
+  }
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
+    return Action::SkipNode(p);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *d) override {
+    return Action::SkipNode();
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
+    return Action::SkipNode();
+  }
+
+  static FallthroughStmt *findFallthrough(Stmt *s) {
+    FallthroughFinder finder;
+    s->walk(finder);
+    return finder.result;
+  }
+};
+} // namespace
+
+CaseStmt *
+CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
+                                 ArrayRef<CaseLabelItem> caseLabelItems,
+                                 SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                                 BraceStmt *body) {
+  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  auto fallthroughStmt = FallthroughFinder().findFallthrough(body);
+  return create(ctx, CaseParentKind::Switch, introducerLoc, caseLabelItems,
+                unknownAttrLoc, colonLoc, body, caseVarDecls,
+                /*implicit=*/false, fallthroughStmt);
+}
+
+CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
+                                        ArrayRef<CaseLabelItem> caseLabelItems,
+                                        BraceStmt *body) {
+  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  return create(ctx, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
+                /*unknownAttrLoc=*/SourceLoc(), body->getStartLoc(), body,
+                caseVarDecls, /*implicit=*/false, /*fallthroughStmt=*/nullptr);
 }
 
 CaseStmt *
@@ -850,6 +975,15 @@ ArrayRef<Stmt *>
 SwitchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
   assert(scratch.empty());
   for (auto *CS : getCases())
+    scratch.push_back(CS->getBody());
+  return scratch;
+}
+
+ArrayRef<Stmt *>
+DoCatchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  scratch.push_back(getBody());
+  for (auto *CS : getCatches())
     scratch.push_back(CS->getBody());
   return scratch;
 }

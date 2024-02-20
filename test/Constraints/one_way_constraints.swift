@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -parse-stdlib
-import Swift
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-builtin-module
+import Builtin
 
 func int8Or16(_ x: Int8) -> Int8 { return x }
 func int8Or16(_ x: Int16) -> Int16 { return x }

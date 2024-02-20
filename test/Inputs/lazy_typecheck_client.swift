@@ -7,50 +7,84 @@ struct ConformsToPublicProto: PublicProto {
   func req() -> Int { return 1 }
 }
 
+struct ConformsToMainActorProto: MainActorProtocol {
+  func req() -> Int { return 1 }
+}
+
 func testGlobalFunctions() {
-  _ = publicFunc()
-  _ = publicFuncWithDefaultArg()
+  let _: Int = publicFunc()
+  let _: Int = publicFuncReturnsTypealias()
+  let _: Int = publicFuncWithDefaultArg()
   #if TEST_PACKAGE
-  _ = packageFunc()
+  let _: Int = packageFunc()
   #endif
   constrainedGenericPublicFunction(ConformsToPublicProto())
-  _ = publicSpecializedFunc(4)
-  _ = publicSpecializedFunc(ConformsToPublicProto())
+  let _: Int = publicSpecializedFunc(4)
+  let _: ConformsToPublicProto = publicSpecializedFunc(ConformsToPublicProto())
   if #available(SwiftStdlib 5.1, *) {
-    _ = publicFuncWithOpaqueReturnType()
-    _ = publicAEICFuncWithOpaqueReturnType()
+    let _: any PublicProto = publicFuncWithOpaqueReturnType()
+    let _: Any = publicAEICFuncWithOpaqueReturnType()
   }
 }
 
 func testGobalVars() {
   let _: Int = publicGlobalVar
+  let _: Int = publicGlobalVarTypealias
   let _: String = publicGlobalVarInferredType
+  let _: [Int] = publicGlobalVarInferredInferredGeneric
+  let _: Int? = publicGlobalVarTypealiasGeneric
   let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
 }
 
-func testPublicStruct() {
+func testPublicStructs() {
   let s = PublicStruct(x: 1)
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
+  let _: Int = s.publicTypealiasProperty
   let _: String = s.publicPropertyInferredType
+  let _: Int = s.publicLazyProperty
+  let _: Int = s.publicLazyPropertyInferred
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
+  let _: Int = s.publicTransparentProperty
+  let _: Int = s.publicDynamicProperty
   PublicStruct.publicStaticMethod()
   PublicStruct.activeMethod()
+  let _: Int = PublicStruct.publicStaticProperty
+  let _: Int = PublicStruct.publicStaticPropertyInferred
+
+  let _ = FrozenPublicStruct(1)
 }
 
-func testPublicClass() {
+extension PublicStruct {
+  @_dynamicReplacement(for: publicDynamicProperty)
+  var replacementVar: Int
+}
+
+func testPublicClasses() {
   let c = PublicClass(x: 2)
   let _: Int = c.publicMethod()
   let _: Int = c.publicProperty
   let _: String = c.publicPropertyInferredType
+  let _: Int = c.publicLazyProperty
+  let _: Int = c.publicLazyPropertyInferred
+  c.publicFinalWrappedProperty = true
   PublicClass.publicClassMethod()
+  let _: Int = PublicClass.publicStaticProperty
+  let _: Int = PublicClass.publicStaticPropertyInferred
 
   let d = PublicDerivedClass(x: 3)
   let _: Int = d.publicMethod()
   let _: Int = d.publicProperty
   let _: String = d.publicPropertyInferredType
   PublicDerivedClass.publicClassMethod()
+  let _: Int = PublicDerivedClass.publicStaticProperty
+  let _: Int = PublicDerivedClass.publicStaticPropertyInferred
+
+  class DerivedFromPublicClassSynthesizedDesignatedInit: PublicClassSynthesizedDesignatedInit {
+    init() {}
+  }
+  let _ = DerivedFromPublicClassSynthesizedDesignatedInit()
 }
 
 func testPublicEnum(_ e: PublicEnum) {
@@ -76,6 +110,12 @@ func testConformances() {
     _ = x.req()
     constrainedGenericPublicFunction(x)
   }
+}
+
+@MainActor
+func testMainActorConstraint() {
+  let _: ConformsToMainActorProto = ConformsToMainActorProto()
+  let _: Int = PublicStruct(x: 5).publicMainActorMethod()
 }
 
 // FIXME: This conformance ought to be included to verify that a redundant

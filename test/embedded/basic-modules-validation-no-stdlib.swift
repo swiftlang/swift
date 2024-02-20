@@ -13,6 +13,8 @@
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded -wmo
 // RUN: not %target-swift-frontend -emit-ir -I %t %t/Main.swift -parse-stdlib -wmo 2>&1 | %FileCheck %s --check-prefix CHECK-B
 
+// REQUIRES: swift_in_compiler
+
 // BEGIN MyModule.swift
 
 public func foo() { }

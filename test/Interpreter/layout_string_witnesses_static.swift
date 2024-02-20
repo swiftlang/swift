@@ -31,6 +31,7 @@ class TestClass {
 func testSimple() {
     let ptr = UnsafeMutablePointer<Simple>.allocate(capacity: 1)
 
+    // initWithCopy
     do {
         let x = Simple(x: 3, y: SimpleClass(x: 23), z: SimpleBig())
         testInit(ptr, to: x)
@@ -39,6 +40,7 @@ func testSimple() {
     // CHECK: 3 - 23
     print("\(ptr.pointee.x) - \(ptr.pointee.y.x)")
 
+    // assignWithTake
     do {
         let y = Simple(x: 2, y: SimpleClass(x: 1), z: SimpleBig())
 
@@ -52,10 +54,24 @@ func testSimple() {
     // CHECK-NEXT: 2 - 1
     print("\(ptr.pointee.x) - \(ptr.pointee.y.x)")
 
+    // assignWithCopy
+    do {
+        var z = Simple(x: 23, y: SimpleClass(x: 5), z: SimpleBig())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: 23 - 5
+    print("\(ptr.pointee.x) - \(ptr.pointee.y.x)")
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
 
-
+    // destroy
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
 
@@ -106,6 +122,28 @@ func testWeakNative() {
         }
     }
 
+    do {
+        let ref = SimpleClass(x: 23)
+
+        withExtendedLifetime(ref) {
+
+            // CHECK-NEXT: SimpleClass deinitialized!
+            var wrapper = WeakNativeWrapper(x: ref)
+            testAssignCopy(ptr, from: &wrapper)
+
+            guard let x = ptr.pointee.x else {
+                fatalError("Weak reference prematurely destroyed")
+            }
+
+            // CHECK-NEXT: value: 23
+            print("value: \(x.x)")
+
+            // NOTE: There is still a strong reference to it here
+            // CHECK-NEXT: Before deinit
+            print("Before deinit")
+        }
+    }
+
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
 
@@ -147,6 +185,23 @@ func testUnownedNative() {
         }
     }
 
+    do {
+        let ref = SimpleClass(x: 23)
+
+        withExtendedLifetime(ref) {
+            // CHECK-NEXT: SimpleClass deinitialized!
+            var wrapper = UnownedNativeWrapper(x: ref)
+            testAssignCopy(ptr, from: &wrapper)
+
+            // CHECK-NEXT: value: 23
+            print("value: \(ptr.pointee.x.x)")
+
+            // NOTE: There is still a strong reference to it here
+            // CHECK-NEXT: Before deinit
+            print("Before deinit")
+        }
+    }
+
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
 
@@ -175,6 +230,19 @@ func testClosure() {
         testAssign(ptr, from: ClosureWrapper(f: { print("value: \(ref.x)") }))
 
         // CHECK-NEXT: value: 34
+        ptr.pointee.f()
+    }
+
+    do {
+        let ref = SimpleClass(x: 23)
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = ClosureWrapper(f: { print("value: \(ref.x)") })
+        testAssignCopy(ptr, from: &wrapper)
+
+        // CHECK-NEXT: value: 23
         ptr.pointee.f()
     }
 
@@ -213,6 +281,17 @@ func testExistentialClass() {
         testAssign(ptr, from: ExistentialWrapper(x: y))
     }
 
+    do {
+        let z = ClassWithSomeProtocol()
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ClassWithSomeProtocol deinitialized!
+        var wrapper = ExistentialWrapper(x: z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
 
@@ -226,6 +305,12 @@ testExistentialClass()
 
 struct StructWithSomeProtocolInline: SomeProtocol {
     let y: Int = 0
+    let x: SimpleClass
+}
+
+struct StructWithSomeProtocolInlineShifted: SomeProtocol {
+    let y: Int = 0
+    let y2: Int = 0
     let x: SimpleClass
 }
 
@@ -245,6 +330,17 @@ func testExistentialStructInline() {
 
         // CHECK-NEXT: SimpleClass deinitialized!
         testAssign(ptr, from: createExistentialWrapper(y))
+    }
+
+    do {
+        let z = StructWithSomeProtocolInline(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(z)
+        testAssignCopy(ptr, from: &wrapper)
     }
 
     // CHECK-NEXT: Before deinit
@@ -284,6 +380,17 @@ func testExistentialStructBox() {
         testAssign(ptr, from: createExistentialWrapper(y))
     }
 
+    do {
+        let z = StructWithSomeProtocolBox(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
 
@@ -294,6 +401,47 @@ func testExistentialStructBox() {
 }
 
 testExistentialStructBox()
+
+func testExistentialStructTypeChange() {
+    let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = StructWithSomeProtocolInline(x: SimpleClass(x: 23))
+        testInit(ptr, to: createExistentialWrapper(x))
+    }
+
+    do {
+        let y = StructWithSomeProtocolInlineShifted(x: SimpleClass(x: 32))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(y)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    do {
+        let z = StructWithSomeProtocolBox(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testExistentialStructTypeChange()
 
 func testAnyWrapper() {
     let ptr = UnsafeMutablePointer<AnyWrapper>.allocate(capacity: 1)
@@ -312,6 +460,18 @@ func testAnyWrapper() {
         // CHECK-NEXT: TestClass deinitialized!
         // CHECK-NEXT: SimpleClass deinitialized!
         testAssign(ptr, from: AnyWrapper(y: y, z: SimpleClass(x: 32)))
+    }
+
+    do {
+        let z = TestClass()
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = AnyWrapper(y: z, z: SimpleClass(x: 32))
+        testAssignCopy(ptr, from: &wrapper)
     }
 
     // CHECK-NEXT: Before deinit
@@ -351,6 +511,18 @@ func testMultiProtocolExistential() {
         testAssign(ptr, from: MultiProtocolExistentialWrapper(y: y, z: SimpleClass(x: 32)))
     }
 
+    do {
+        let z = ClassWithABC()
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ClassWithABC deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = MultiProtocolExistentialWrapper(y: z, z: SimpleClass(x: 32))
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
 
@@ -387,6 +559,17 @@ func testExistentialReference() {
         testAssign(ptr, from: ExistentialRefWrapper(x: y))
     }
 
+    do {
+        let z = ClassWithSomeClassProtocol()
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ClassWithSomeClassProtocol deinitialized!
+        var wrapper = ExistentialRefWrapper(x: z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
 
@@ -421,7 +604,22 @@ func testSinglePayloadSimpleClassEnum() {
         testAssign(ptr, from: y)
     }
 
-    // CHECK-NEXT: Value: 28
+    do {
+        // CHECK: Value: 28
+        if case .nonEmpty(let c) = ptr.pointee {
+            print("Value: \(c.x)")
+        }
+
+        var z = SinglePayloadSimpleClassEnum.nonEmpty(SimpleClass(x: 32))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Value: 32
     if case .nonEmpty(let c) = ptr.pointee {
         print("Value: \(c.x)")
     }
@@ -593,6 +791,60 @@ func testMultiPayloadEnum() {
 }
 
 testMultiPayloadEnum()
+
+func testMultiPayloadEnumMultiLarge() {
+    let ptr = UnsafeMutablePointer<MultiPayloadEnumMultiLarge>.allocate(capacity: 1)
+
+    do {
+        let x = MultiPayloadEnumMultiLarge.nonEmpty(
+            0, SimpleClass(x: 1), 2, SimpleClass(x: 3), 4, true,
+            SimpleClass(x: 6), false, SimpleClass(x: 8), true)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        var y = MultiPayloadEnumMultiLarge.nonEmpty(
+            10, SimpleClass(x: 11), 12, SimpleClass(x: 13), 14, false,
+            SimpleClass(x: 6), true, SimpleClass(x: 8), false)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &y)
+    }
+
+    do {
+        var z = MultiPayloadEnumMultiLarge.nonEmpty2(
+            SimpleClass(x: 20), 21, 22, SimpleClass(x: 23), 24, true,
+            SimpleClass(x: 26), false, SimpleClass(x: 28), true)
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadEnumMultiLarge()
 
 func testNullableRefEnum() {
     let ptr = UnsafeMutablePointer<NullableRefEnum>.allocate(capacity: 1)
@@ -770,6 +1022,164 @@ func testSinglePayloadEnumManyXIEmpty() {
 
 testSinglePayloadEnumManyXIEmpty()
 
+func testEnumWithExistential() {
+    // Regression test for rdar://117755666
+    // A missing call to memcpy in `handleSingleRefCountInitWithCopy`
+    // was causing unexpected behavior like wrong enum cases, crashes etc.
+    // Without the fix, this test would not release the references.
+    struct SomeProtocolImpl: SomeProtocol {
+        let x: AnyObject
+    }
+
+    let ptr = UnsafeMutablePointer<SinglePayloadEnumExistential>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadEnumExistential.b
+        testInit(ptr, to: x)
+    }
+
+    do {
+        var z = SinglePayloadEnumExistential.a(SomeProtocolImpl(x: SimpleClass(x: 23)), SimpleClass(x: 43))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testEnumWithExistential()
+
+// Regression test for rdar://118606044
+func testNotBitwiseTakableBridge() {
+    let ptr = UnsafeMutablePointer<NotBitwiseTakableBridge<SimpleClass>>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = NotBitwiseTakableBridge([SimpleClass(x: 23)])
+        testInitTake(ptr, to: consume x)
+    }
+
+    // assignWithTake
+    do {
+        let y = NotBitwiseTakableBridge([SimpleClass(x: 33)])
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = NotBitwiseTakableBridge([SimpleClass(x: 43)])
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNotBitwiseTakableBridge()
+
+// Regression test for rdar://121868127
+func testMultiPayloadEnumNested() {
+    let ptr = UnsafeMutablePointer<NestedMultiPayloadOuter>.allocate(capacity: 1)
+
+    do {
+        testInit(ptr, to: .b(.b(SimpleClass(x: 23))))
+    }
+
+    do {
+        let y = NestedMultiPayloadOuter.b(.b(SimpleClass(x: 23)))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadEnumNested()
+
+struct MyError: Error {
+    let x: SimpleClass
+}
+
+// Regression test for rdar://122911427
+func testMultiPayloadError() {
+    let ptr = UnsafeMutablePointer<MultiPayloadError>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = MultiPayloadError.error2(0, MyError(x: SimpleClass(x: 23)))
+        testInitTake(ptr, to: consume x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadError.error2(1, MyError(x: SimpleClass(x: 32)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadError.error2(2, MyError(x: SimpleClass(x: 41)))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadError()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
@@ -789,6 +1199,18 @@ func testObjc() {
 
         // CHECK-macosx-NEXT: ObjcClass deinitialized!
         testAssign(ptr, from: x)
+
+        // CHECK-macosx-NEXT: value: 34
+        print("value: \(ptr.pointee.x.x)")
+    }
+
+    do {
+        var x = ObjcWrapper(x: ObjcClass(x: 34))
+        // CHECK-macosx-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
+        testAssignCopy(ptr, from: &x)
 
         // CHECK-macosx-NEXT: value: 34
         print("value: \(ptr.pointee.x.x)")
@@ -819,6 +1241,28 @@ func testWeakObjc() {
             }
 
             // CHECK-macosx: value: 2
+            print("value: \(x.x)")
+
+            // NOTE: There is still a strong reference to it here
+            // CHECK-macosx-NEXT: Before deinit
+            print("Before deinit")
+        }
+    }
+
+    do {
+        let ref = ObjcClass(x: 23)
+
+        withExtendedLifetime(ref) {
+
+            // CHECK-macosx-NEXT: ObjcClass deinitialized!
+            var wrapper = WeakObjcWrapper(x: ref)
+            testAssignCopy(ptr, from: &wrapper)
+
+            guard let x = ptr.pointee.x else {
+                fatalError("Weak reference prematurely destroyed")
+            }
+
+            // CHECK-macosx-NEXT: value: 23
             print("value: \(x.x)")
 
             // NOTE: There is still a strong reference to it here
@@ -881,6 +1325,23 @@ func testUnownedObjc() {
             testAssign(ptr, from: UnownedObjcWrapper(x: ref))
 
             // CHECK-macosx-NEXT: value: 34
+            print("value: \(ptr.pointee.x.x)")
+
+            // NOTE: There is still a strong reference to it here
+            // CHECK-macosx-NEXT: Before deinit
+            print("Before deinit")
+        }
+    }
+
+    do {
+        let ref = ObjcClass(x: 23)
+
+        withExtendedLifetime(ref) {
+            // CHECK-macosx-NEXT: ObjcClass deinitialized!
+            var wrapper = UnownedObjcWrapper(x: ref)
+            testAssignCopy(ptr, from: &wrapper)
+
+            // CHECK-macosx-NEXT: value: 23
             print("value: \(ptr.pointee.x.x)")
 
             // NOTE: There is still a strong reference to it here

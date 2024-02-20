@@ -34,7 +34,7 @@ protocol Invertible {
 
 extension HasOperatorExclaim: Invertible {}
 
-extension HasOperatorEqualEqual: Equatable {}
+extension HasOperatorEqualEqual: @retroactive Equatable {}
 
 
 protocol HasOperatorPlusEqualProtocol {

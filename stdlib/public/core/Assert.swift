@@ -12,7 +12,7 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal sanity checks that are active during testing
+/// Use this function for internal consistency checks that are active during testing
 /// but do not impact performance of shipping code. To check for invalid usage
 /// in Release builds, see `precondition(_:_:file:line:)`.
 ///
@@ -138,7 +138,7 @@ public func precondition(
 }
 #endif
 
-/// Indicates that an internal sanity check failed.
+/// Indicates that an internal consistency check failed.
 ///
 /// This function's effect varies depending on the build flag used:
 ///

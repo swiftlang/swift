@@ -26,8 +26,13 @@ final class SwiftPluginServer {
     }
   }
 
+  struct LoadedLibraryPlugin {
+    var libraryPath: String
+    var handle: UnsafeMutableRawPointer
+  }
+
   /// Loaded dylib handles associated with the module name.
-  var loadedLibraryPlugins: [String: UnsafeMutableRawPointer] = [:]
+  var loadedLibraryPlugins: [String: LoadedLibraryPlugin] = [:]
 
   /// Resolved cached macros.
   var resolvedMacros: [MacroRef: Macro.Type] = [:]
@@ -48,35 +53,39 @@ extension SwiftPluginServer: PluginProvider {
   func loadPluginLibrary(libraryPath: String, moduleName: String) throws {
     var errorMessage: UnsafePointer<CChar>?
     guard let dlHandle = PluginServer_load(libraryPath, &errorMessage) else {
-      throw PluginServerError(message: String(cString: errorMessage!))
+      throw PluginServerError(message: "loader error: " + String(cString: errorMessage!))
     }
-    loadedLibraryPlugins[moduleName] = dlHandle
+    loadedLibraryPlugins[moduleName] = LoadedLibraryPlugin(
+      libraryPath: libraryPath,
+      handle: dlHandle
+    )
   }
 
   /// Lookup a loaded macro by a pair of module name and type name.
-  func resolveMacro(moduleName: String, typeName: String) -> Macro.Type? {
+  func resolveMacro(moduleName: String, typeName: String) throws -> Macro.Type {
     if let resolved = resolvedMacros[.init(moduleName, typeName)] {
       return resolved
     }
 
     // Find 'dlopen'ed library for the module name.
-    guard let dlHandle = loadedLibraryPlugins[moduleName] else {
-      return nil
+    guard let plugin = loadedLibraryPlugins[moduleName] else {
+      // NOTE: This should be unreachable. Compiler should not use this server
+      // unless the plugin loading succeeded.
+      throw PluginServerError(message: "(plugin-server) plugin not loaded for module '\(moduleName)'")
     }
 
     // Lookup the type metadata.
     var errorMessage: UnsafePointer<CChar>?
     guard let macroTypePtr = PluginServer_lookupMacroTypeMetadataByExternalName(
-      moduleName, typeName, dlHandle, &errorMessage
+      moduleName, typeName, plugin.handle, &errorMessage
     ) else {
-      // FIXME: Propagate error message?
-      return nil
+      throw PluginServerError(message: "macro implementation type '\(moduleName).\(typeName)' could not be found in library plugin '\(plugin.libraryPath)'")
     }
 
     // THe type must be a 'Macro' type.
     let macroType = unsafeBitCast(macroTypePtr, to: Any.Type.self)
     guard let macro = macroType as? Macro.Type else {
-      return nil
+      throw PluginServerError(message: "type '\(moduleName).\(typeName)' is not a valid macro implementation type in library plugin '\(plugin.libraryPath)'")
     }
 
     // Cache the resolved type.
@@ -172,12 +181,12 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while (bytesToWrite > 0) {
-      let writtenSize = PluginServer_write(handle, ptr, SwiftUInt(bytesToWrite))
+      let writtenSize = PluginServer_write(handle, ptr, bytesToWrite)
       if (writtenSize <= 0) {
         // error e.g. broken pipe.
         break
       }
-      ptr = ptr.advanced(by: Int(writtenSize))
+      ptr = ptr.advanced(by: writtenSize)
       bytesToWrite -= Int(writtenSize)
     }
     return buffer.count - bytesToWrite
@@ -193,13 +202,13 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while bytesToRead > 0 {
-      let readSize = PluginServer_read(handle, ptr, SwiftUInt(bytesToRead))
+      let readSize = PluginServer_read(handle, ptr, bytesToRead)
       if (readSize <= 0) {
         // 0: EOF (the host closed), -1: Broken pipe (the host crashed?)
         break;
       }
-      ptr = ptr.advanced(by: Int(readSize))
-      bytesToRead -= Int(readSize)
+      ptr = ptr.advanced(by: readSize)
+      bytesToRead -= readSize
     }
     return buffer.count - bytesToRead
   }

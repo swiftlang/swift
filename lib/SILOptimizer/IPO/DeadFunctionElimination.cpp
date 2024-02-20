@@ -92,6 +92,13 @@ class DeadFunctionAndGlobalElimination {
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
+    // In embedded Swift, (even public) generic functions *after serialization*
+    // cannot be used externally and are not anchors.
+    bool embedded = Module->getOptions().EmbeddedSwift;
+    bool generic = F->isGeneric();
+    bool isSerialized = Module->isSerialized();
+    if (embedded && generic && isSerialized)
+      return false;
 
     // Functions that may be used externally cannot be removed.
     if (F->isPossiblyUsedExternally())
@@ -101,9 +108,6 @@ class DeadFunctionAndGlobalElimination {
       return true;
 
     if (F->isDynamicallyReplaceable())
-      return true;
-
-    if (F->getReferencedAdHocRequirementWitnessFunction())
       return true;
 
     // Don't remove pre-specialized functions. We need to preserver the
@@ -148,6 +152,7 @@ class DeadFunctionAndGlobalElimination {
 
   /// Marks a function as alive.
   void makeAlive(SILFunction *F) {
+    LLVM_DEBUG(llvm::dbgs() << "         makeAlive " << F->getName() << '\n');
     AliveFunctionsAndTables.insert(F);
     assert(F && "function does not exist");
     Worklist.insert(F);
@@ -212,6 +217,8 @@ class DeadFunctionAndGlobalElimination {
     for (const SILInstruction &initInst : *global) {
       if (auto *fRef = dyn_cast<FunctionRefInst>(&initInst))
         ensureAlive(fRef->getReferencedFunction());
+      if (auto *gRef = dyn_cast<GlobalAddrInst>(&initInst))
+        ensureAlive(gRef->getReferencedGlobal());
     }
   }
 
@@ -333,9 +340,6 @@ class DeadFunctionAndGlobalElimination {
     if (auto *replacedFn = F->getDynamicallyReplacedFunction())
       ensureAlive(replacedFn);
 
-    if (auto *adHocWitness = F->getReferencedAdHocRequirementWitnessFunction())
-      ensureAlive(adHocWitness);
-
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
@@ -399,6 +403,8 @@ class DeadFunctionAndGlobalElimination {
       linkage = SILLinkage::Hidden;
       break;
     case AccessLevel::Package:
+      linkage = SILLinkage::Package;
+      break;
     case AccessLevel::Public:
     case AccessLevel::Open:
       linkage = SILLinkage::Public;
@@ -431,7 +437,11 @@ class DeadFunctionAndGlobalElimination {
       F.forEachSpecializeAttrTargetFunction(
           [this](SILFunction *targetFun) { ensureAlive(targetFun); });
 
-      if (!F.shouldOptimize()) {
+      bool retainBecauseFunctionIsNoOpt = !F.shouldOptimize();
+      if (Module->getOptions().EmbeddedSwift)
+        retainBecauseFunctionIsNoOpt = false;
+
+      if (retainBecauseFunctionIsNoOpt) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: "
                                 << F.getName() << "\n");
         ensureAlive(&F);
@@ -526,6 +536,8 @@ class DeadFunctionAndGlobalElimination {
 
     // Check vtable methods.
     for (auto &vTable : Module->getVTables()) {
+      LLVM_DEBUG(llvm::dbgs() << " processing vtable "
+                              << vTable->getClass()->getName() << '\n');
       for (const SILVTable::Entry &entry : vTable->getEntries()) {
         if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
             entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {

@@ -382,7 +382,15 @@ void IRGenModule::addVTableTypeMetadata(
   using VCallVisibility = llvm::GlobalObject::VCallVisibility;
   VCallVisibility vis = VCallVisibility::VCallVisibilityPublic;
   auto AS = decl->getFormalAccessScope();
-  if (AS.isFileScope()) {
+  if (decl->isObjC()) {
+    // Swift methods are called from Objective-C via objc_MsgSend
+    // and thus such call sites are not taken into consideration
+    // by VFE in GlobalDCE. We cannot for the timebeing at least
+    // safely eliminate a virtual function that might be called from
+    // Objective-C. Setting vcall_visibility to public ensures this is
+    // prevented.
+    vis = VCallVisibility::VCallVisibilityPublic;
+  } else if (AS.isFileScope()) {
     vis = VCallVisibility::VCallVisibilityTranslationUnit;
   } else if (AS.isPrivate() || AS.isInternal()) {
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
@@ -1875,7 +1883,7 @@ namespace {
       // Emit method dispatch thunk if the class is resilient.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
 
-      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Public) ||
+      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Package) ||
           IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
@@ -2123,6 +2131,8 @@ namespace {
                 .getLinkage(NotForDefinition)) {
       case SILLinkage::Public:
       case SILLinkage::PublicExternal:
+      case SILLinkage::Package:
+      case SILLinkage::PackageExternal:
       case SILLinkage::Hidden:
       case SILLinkage::HiddenExternal:
       case SILLinkage::Private:
@@ -2130,6 +2140,7 @@ namespace {
         
       case SILLinkage::Shared:
       case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
         return false;
       }
       llvm_unreachable("covered switch");
@@ -2711,8 +2722,11 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
       // at runtime.
       auto mangledName = entity.mangleAsString();
       if (auto otherDefinition = Module.getGlobalVariable(mangledName)) {
-        GlobalVars.insert({entity, otherDefinition});
-        return otherDefinition;
+        if (!otherDefinition->isDeclaration() ||
+            !entity.isAlwaysSharedLinkage()) {
+          GlobalVars.insert({entity, otherDefinition});
+          return otherDefinition;
+        }
       }
       
       // Otherwise, emit the descriptor.
@@ -3895,6 +3909,16 @@ namespace {
       llvm_unreachable("covered switch");
     }
 
+    void addEmbeddedSuperclass(CanType classTy) {
+      CanType superclass = asImpl().getSuperclassTypeForMetadata();
+      if (!superclass) {
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+      CanType superTy = classTy->getSuperclass()->getCanonicalType();
+      B.add(IGM.getAddrOfTypeMetadata(superTy));
+    }
+
     void addSuperclass() {
       if (asImpl().shouldAddNullSuperclass()) {
         B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -3959,10 +3983,18 @@ namespace {
 
     void addDestructorFunction() {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-        auto dtorRef = SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
-        addReifiedVTableEntry(dtorRef);
+        auto dtorRef =
+            SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
+        auto entry = VTable->getEntry(IGM.getSILModule(), dtorRef);
+        if (llvm::Constant *ptr = IGM.getAddrOfSILFunction(
+                entry->getImplementation(), NotForDefinition)) {
+          B.addSignedPointer(ptr, IGM.getOptions().PointerAuth.HeapDestructors,
+                             PointerAuthEntity::Special::HeapDestructor);
+        } else {
+          B.addNullPointer(IGM.FunctionPtrTy);
+        }
         return;
-      }      
+      }
 
       if (asImpl().getFieldLayout().hasObjCImplementation())
         return;
@@ -4988,33 +5020,63 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   }
 }
 
-void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                                      const ClassLayout &fragileLayout) {
-  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
-  assert(!classDecl->isForeign());
+static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
+                               SILVTable *vtable) {
+  SILType classType = SILType::getPrimitiveObjectType(classTy);
+  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
 
-  // Set up a dummy global to stand in for the metadata object while we produce
-  // relative references.
-  ConstantInitBuilder builder(IGM);
-  auto init = builder.beginStruct();
-  init.setPacked(true);
+  auto &fragileLayout =
+      classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
 
+  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
   assert(strategy == ClassMetadataStrategy::FixedOrUpdate ||
          strategy == ClassMetadataStrategy::Fixed);
 
-  FixedClassMetadataBuilder metadataBuilder(IGM, classDecl, init,
-                                            fragileLayout);
-  metadataBuilder.layout();
-  bool canBeConstant = metadataBuilder.canBeConstant();
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
 
-  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+  assert(vtable);
+
+  FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
+                                    vtable);
+  builder.layoutEmbedded(classTy);
+  bool canBeConstant = builder.canBeConstant();
 
   StringRef section{};
-  bool isPattern = false;
-  auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+  auto var = IGM.defineTypeMetadata(classTy, /*isPattern*/ false, canBeConstant,
                                     init.finishAndCreateFuture(), section);
   (void)var;
+}
+
+void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
+                                      const ClassLayout &fragileLayout) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+  assert(!classDecl->isForeign());
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+  SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
+  emitEmbeddedVTable(IGM, declaredType, vtable);
+}
+
+void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
+  // Might already be emitted, skip if that's the case.
+  auto entity =
+      LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
+  auto *existingVar = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  if (!existingVar->isDeclaration()) {
+    return;
+  }
+
+  auto &context = classTy->getNominalOrBoundGenericNominal()->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+    context, "emitting lazy class metadata for", classTy);
+
+  SILType classType = SILType::getPrimitiveObjectType(classTy);
+  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
+  emitEmbeddedVTable(IGM, classTy, vtable);
 }
 
 void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
@@ -5024,28 +5086,8 @@ void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
     context, "emitting lazy specialized class metadata for", classTy);
 
   SILType classType = SILType::getPrimitiveObjectType(classTy);
-  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
-  
-  auto &fragileLayout =
-    classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
-
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
-
-  ConstantInitBuilder initBuilder(IGM);
-  auto init = initBuilder.beginStruct();
-  init.setPacked(true);
-
   SILVTable *vtable = IGM.getSILModule().lookUpSpecializedVTable(classType);
-  assert(vtable);
-
-  FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout, vtable);
-  builder.layout();
-  bool canBeConstant = builder.canBeConstant();
-
-  StringRef section{};
-  auto var = IGM.defineTypeMetadata(classTy, false, canBeConstant,
-                                    init.finishAndCreateFuture(), section);
-  (void)var;
+  emitEmbeddedVTable(IGM, classTy, vtable);
 }
 
 void irgen::emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,
@@ -6120,7 +6162,7 @@ namespace {
             IGF.IGM.getGetForeignTypeMetadataFunctionPointer(),
             {request.get(IGF), candidate});
         call->addFnAttr(llvm::Attribute::NoUnwind);
-        call->addFnAttr(llvm::Attribute::ReadNone);
+        call->setDoesNotAccessMemory();
 
         return MetadataResponse::handle(IGF, request, call);
       });
@@ -6519,6 +6561,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
+  case KnownProtocolKind::CxxConvertibleToBool:
   case KnownProtocolKind::CxxConvertibleToCollection:
   case KnownProtocolKind::CxxDictionary:
   case KnownProtocolKind::CxxPair:
@@ -6534,11 +6577,14 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
+  case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::Copyable:
+  case KnownProtocolKind::Escapable:
+  case KnownProtocolKind::BitwiseCopyable:
     return SpecialProtocol::None;
   }
 
@@ -6882,7 +6928,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
   auto originatingClass =
     cast<ClassDecl>(method.getOverriddenVTableEntry().getDecl()->getDeclContext());
 
-  if (originatingClass->getEffectiveAccess() >= AccessLevel::Public) {
+  if (originatingClass->getEffectiveAccess() >= AccessLevel::Package) {
     // If the class is public,
     // and it's either marked fragile or part of a non-resilient module, then
     // other modules will directly address vtable offsets and we can't remove
@@ -6892,7 +6938,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                               << vtable->getClass()->getName()
                               << " for ";
                  method.print(llvm::dbgs());
-                 llvm::dbgs() << " originates from a public fragile class\n");
+                 llvm::dbgs() << " originates from a public/package fragile class\n");
       return true;
     }
   }
@@ -6927,7 +6973,7 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
                                                 CanType shapeType) {
-  auto typeLinkage = getTypeLinkage_correct(shapeType);
+  auto typeLinkage = getTypeLinkage(shapeType);
   if (typeLinkage == FormalLinkage::Private)
     return FormalLinkage::Private;
 
@@ -6974,7 +7020,7 @@ ExtendedExistentialTypeShapeInfo::get(
                                    .getCanonicalSignature();
 
   auto linkage = getExistentialShapeLinkage(genSig, shapeType);
-  assert(linkage != FormalLinkage::PublicUnique);
+  assert(linkage != FormalLinkage::PublicUnique && linkage != FormalLinkage::PackageUnique);
 
   return { genSig, shapeType, SubstitutionMap(), linkage };
 }

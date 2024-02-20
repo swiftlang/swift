@@ -160,8 +160,8 @@ func captureStorageAddress_callee<T>(_ t: (G<T>) -> ()) {}
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var TakingMOG }, var
-// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX]]
-// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         mark_function_escape [[BOX_ADDR]]
 // CHECK:         [[LOCAL:%[^,]+]] = function_ref @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF5localL_yylF
 // CHECK:         apply [[LOCAL]]<T>([[BOX_LIFETIME]], [[T]])
@@ -186,7 +186,7 @@ struct TakingMOG {
 // CaptureKind::ImmutableBox, non-opaque, canGuarantee=false, captureCanEscape=true
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlF : {{.*}} {
 // CHECK:         [[IMMUTABLEBOX:%[^,]+]] = alloc_box $<τ_0_0> { let MOG<τ_0_0> } <T>, let
-// CHECK:         [[IMMUTABLEBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[IMMUTABLEBOX]]
+// CHECK:         [[IMMUTABLEBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[IMMUTABLEBOX]]
 // CHECK:         [[IMMUTABLEBOX_ADDR:%[^,]+]] = project_box [[IMMUTABLEBOX_LIFETIME]]
 // CHECK:         store {{%[^,]+}} to [init] [[IMMUTABLEBOX_ADDR]]
 // CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlFyycfU_ : $@convention(thin) <τ_0_0> (@guaranteed <τ_0_0> { let MOG<τ_0_0> } <τ_0_0>) -> () 
@@ -223,7 +223,8 @@ func captureImmutableBoxNonopaqueOwnedEscaping_callee(_ t: @escaping () -> ()) {
 // CaptureKind::Box, opaque, canGuarantee=true, captureCanEscape=true
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures39captureBoxOpaqueGuaranteedEscaping_vendQryF", 0) __ }, var
-// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX]]
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         [[BOX2:%[^,]+]] = alloc_box ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures39captureBoxOpaqueGuaranteedEscaping_vendQryF", 0) __ } 
 // CHECK:         [[BOX2_ADDR:%[^,]+]] = project_box [[BOX2]]
 // CHECK:         copy_addr [[BOX_ADDR]] to [init] [[BOX2_ADDR]]
@@ -253,7 +254,8 @@ func captureBoxOpaqueGuaranteedEscaping_vend() -> some P { return PImpl() }
 // CaptureKind::Box, opaque, canGuarantee=false, captureCanEscape=true
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures34captureBoxOpaqueOwnedEscaping_vendQryF", 0) __ }, var
-// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX]]
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         [[BOX_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[BOX_ADDR]]
 // CHECK:         [[FIRST:%[^,]+]] = load [trivial] [[BOX_ACCESS]]
 // CHECK:         end_access [[BOX_ACCESS]]
@@ -304,8 +306,8 @@ func captureBoxOpaqueOwnedEscaping_callee<T : P>(_ t: T, _ c: @escaping (T) -> (
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF : {{.*}} {
 // CHECK:       bb0([[GET:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var Array<τ_0_0> } <U>, var
-// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX]]
-// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [[BOX]]
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         mark_function_escape [[BOX_ADDR]]
 // CHECK:         [[LOCAL:%[^,]+]] = function_ref @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF5localL_yylF
 // CHECK:         apply [[LOCAL]]<U>([[BOX_LIFETIME]], [[GET]])
@@ -328,7 +330,7 @@ func captureBoxNonopaqueGuaranteedEscaping<U>(_ get: () -> U) {
 // CaptureKind::Box, non-opaque, canGuarantee=false, captureCanEscape=true
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var C }, var
-// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         [[BOX_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[BOX_ADDR]]
 // CHECK:         [[INITIAL_VALUE:%[^,]+]] = load [copy] [[BOX_ACCESS]]
@@ -362,7 +364,7 @@ func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
 // CHECK:       bb0([[GET:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, var
 // CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[BOX]]
-// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR]]
 // CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
 // TODO: DETERMINE: Considering that captureCanEscape is false, should this mark_function_escape be emitted?
 // CHECK:         mark_function_escape [[VAR_ADDR]]

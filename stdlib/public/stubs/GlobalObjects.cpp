@@ -53,10 +53,8 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   }
 };
 
-// Define required symbols to be used by constant static arrays.
-// * `__swiftImmortalRefCount`:    The bit pattern for the ref-count field of
-//                                 the array buffer.
-// * `__swiftStaticArrayMetadata`: The isa-pointer for the array buffer.
+// Define `__swiftImmortalRefCount` which is used by constant static arrays.
+// It is the bit pattern for the ref-count field of the array buffer.
 //
 // TODO: Support constant static arrays on other platforms, too.
 // This needs a bit more work because the tricks with absolute symbols and

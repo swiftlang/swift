@@ -280,8 +280,7 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 /// will be added in the corresponding term from the substitution array.
 void RuleBuilder::addRequirement(const Requirement &req,
                                  const ProtocolDecl *proto,
-                                 llvm::Optional<ArrayRef<Term>> substitutions,
-                                 llvm::Optional<unsigned> requirementID) {
+                                 llvm::Optional<ArrayRef<Term>> substitutions) {
   if (Dump) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
@@ -394,17 +393,12 @@ void RuleBuilder::addRequirement(const Requirement &req,
   }
   }
 
-  RequirementRules.emplace_back(
-      std::move(subjectTerm), std::move(constraintTerm),
-      requirementID);
+  RequirementRules.emplace_back(std::move(subjectTerm), std::move(constraintTerm));
 }
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,
                                  const ProtocolDecl *proto) {
-  WrittenRequirements.push_back(req);
-  unsigned requirementID = WrittenRequirements.size() - 1;
-  addRequirement(req.req.getCanonical(), proto, /*substitutions=*/llvm::None,
-                 requirementID);
+  addRequirement(req.req.getCanonical(), proto, /*substitutions=*/llvm::None);
 }
 
 /// Lowers a protocol typealias to a rewrite rule.
@@ -436,8 +430,7 @@ void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
     constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
   }
 
-  RequirementRules.emplace_back(subjectTerm, constraintTerm,
-                                /*requirementID=*/llvm::None);
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
 }
 
 /// If we haven't seen this protocol yet, save it for later so that we can

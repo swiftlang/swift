@@ -487,6 +487,19 @@ struct RequireOSSAModules_t {
   explicit operator bool() const { return bool(value); }
 };
 
+/// Help prevent confusion between different bools being passed around.
+struct RequireNoncopyableGenerics_t {
+private:
+  bool value;
+public:
+  RequireNoncopyableGenerics_t(const ASTContext &ctx)
+    : RequireNoncopyableGenerics_t(ctx.LangOpts) {}
+  RequireNoncopyableGenerics_t(const LangOptions &opts)
+      : value(opts.hasFeature(Feature::NoncopyableGenerics)) {}
+
+  explicit operator bool() const { return value; }
+};
+
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
@@ -495,22 +508,26 @@ class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t RequiresOSSAModules;
+  RequireNoncopyableGenerics_t RequireNCGenerics;
 
 public:
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      StringRef BackupInterfaceDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules)
+                                StringRef prebuiltCacheDir,
+                                StringRef BackupInterfaceDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics)
       : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
         BackupInterfaceDir(BackupInterfaceDir),
-        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
+        Opts(opts), RequiresOSSAModules(requiresOSSAModules),
+        RequireNCGenerics(requireNCGenerics) {}
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules):
+                                StringRef prebuiltCacheDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
-                               opts, requiresOSSAModules) {}
+                               opts, requiresOSSAModules, requireNCGenerics) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -579,13 +596,14 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
       const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-      const ClangImporterOptions &ClangOpts, StringRef CacheDir,
-      StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
-      StringRef ModuleName, StringRef InPath,
+      const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+      StringRef CacheDir, StringRef PrebuiltCacheDir,
+      StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
-      bool SerializeDependencyHashes,
-      bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
+      bool SerializeDependencyHashes, bool TrackSystemDependencies,
+      ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
+      RequireNoncopyableGenerics_t RequireNCGenerics,
       bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -639,8 +657,10 @@ private:
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
+                                     const CASOptions &casOpts,
                                      bool suppressRemarks,
-                                     RequireOSSAModules_t requireOSSAModules);
+                                     RequireOSSAModules_t requireOSSAModules,
+                                     RequireNoncopyableGenerics_t requireNCGenerics);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
@@ -649,12 +669,12 @@ public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
       const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
-      const ClangImporterOptions &clangImporterOpts,
+      const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
-      StringRef backupModuleInterfaceDir,
-      bool serializeDependencyHashes, bool trackSystemDependencies,
-      RequireOSSAModules_t requireOSSAModules);
+      StringRef backupModuleInterfaceDir, bool serializeDependencyHashes,
+      bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules,
+      RequireNoncopyableGenerics_t requireNCGenerics);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -673,6 +693,7 @@ public:
 
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
+                                  StringRef sdkPath,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -680,6 +701,7 @@ public:
                                        StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
+                                           StringRef sdkPath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
                                            bool silenceErrors,
@@ -690,9 +712,10 @@ public:
   /// includes a hash of relevant key data.
   StringRef computeCachedOutputPath(StringRef moduleName,
                                     StringRef UseInterfacePath,
+                                    StringRef sdkPath,
                                     llvm::SmallString<256> &OutPath,
                                     StringRef &CacheHash);
-  std::string getCacheHash(StringRef useInterfacePath);
+  std::string getCacheHash(StringRef useInterfacePath, StringRef sdkPath);
 };
 }
 

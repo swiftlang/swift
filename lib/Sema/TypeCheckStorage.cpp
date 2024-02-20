@@ -157,21 +157,30 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
 
-      if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
-        SmallVector<ProtocolConformance *, 1> conformances;
-        classDecl->lookupConformance(actorProto, conformances);
-        for (auto conformance : conformances)
-          TypeChecker::checkConformance(conformance->getRootNormalConformance());
-      }
+      auto evaluateConformance = [&](KnownProtocolKind Kind) {
+        if (auto actorProto = ctx.getProtocol(Kind)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(actorProto, conformances);
+          for (auto conformance : conformances) {
+            // FIXME: This is too much. Instead, we should force the witnesses.
+            // that we actually need.
+
+            auto *normal = conformance->getRootNormalConformance();
+            evaluateOrDefault(ctx.evaluator,
+                              ResolveTypeWitnessesRequest{normal},
+                              evaluator::SideEffect());
+            evaluateOrDefault(ctx.evaluator,
+                              ResolveValueWitnessesRequest{normal},
+                              evaluator::SideEffect());
+          }
+        }
+      };
+
+      evaluateConformance(KnownProtocolKind::Actor);
 
       // If this is a distributed actor, synthesize its special stored properties.
       if (classDecl->isDistributedActor()) {
-        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
-          SmallVector<ProtocolConformance *, 1> conformances;
-          classDecl->lookupConformance(actorProto, conformances);
-          for (auto conformance : conformances)
-            TypeChecker::checkConformance(conformance->getRootNormalConformance());
-        }
+        evaluateConformance(KnownProtocolKind::DistributedActor);
       }
     }
   }
@@ -397,8 +406,7 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
 
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
-    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
-    bool LeaveClosureBodiesUnchecked) const {
+    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
@@ -412,8 +420,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     return &pbe;
   }
 
-  binding->setPattern(entryNumber, pattern,
-                      binding->getInitContext(entryNumber));
+  binding->setPattern(entryNumber, pattern);
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -513,12 +520,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   if (patternType->hasUnresolvedType() ||
       patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
-    TypeCheckExprOptions options;
-    if (LeaveClosureBodiesUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber, patternType,
-                                             options)) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -567,7 +570,64 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                                  : GlobalVariable);
     }
   }
+  
+  // If the pattern binding appears as a compound stored `let` property with an
+  // initializer inside of a struct type, diagnose it as unsupported.
+  // This hasn't ever been implemented properly.
+  if (!Context.LangOpts.hasFeature(Feature::StructLetDestructuring)
+      && !binding->isStatic()
+      && binding->isInitialized(entryNumber)
+      && isa<StructDecl>(binding->getDeclContext())
+      && !pattern->getSingleVar()
+      && !vars.empty()
+      && vars[0]->isLet()) {
+    Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
+                           diag::destructuring_let_struct_stored_property_unsupported);
+  }
+  
   return &pbe;
+}
+
+static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
+                                                    unsigned i) {
+  // Force the entry to be checked.
+  (void)binding->getCheckedPatternBindingEntry(i);
+  if (binding->isInvalid())
+    return;
+
+  if (!binding->isInitialized(i))
+    return;
+
+  if (!binding->isInitializerChecked(i))
+    TypeChecker::typeCheckPatternBinding(binding, i);
+
+  if (binding->isInvalid())
+    return;
+
+  // If we entered an initializer context, contextualize any auto-closures we
+  // might have created. Note that we don't contextualize the initializer for a
+  // property with a wrapper, because the initializer will have been subsumed by
+  // the backing storage property.
+  if (binding->getDeclContext()->isLocalContext())
+    return;
+
+  if (auto *var = binding->getSingleVar()) {
+    if (var->hasAttachedPropertyWrapper())
+      return;
+  }
+
+  if (auto *initContext = binding->getInitContext(i)) {
+    auto *init = binding->getInit(i);
+    TypeChecker::contextualizeInitializer(initContext, init);
+    (void)binding->getInitializerIsolation(i);
+    TypeChecker::checkInitializerEffects(initContext, init);
+  }
+}
+
+Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(
+    Evaluator &eval, PatternBindingDecl *binding, unsigned i) const {
+  checkAndContextualizePatternBindingInit(binding, i);
+  return binding->getInit(i);
 }
 
 bool
@@ -733,7 +793,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  if (storage->getValueInterfaceType()->isNoncopyable())
+  GenericEnvironment *env = nullptr;
+  if (auto *gc = storage->getAsGenericContext())
+    env = gc->getGenericEnvironment();
+  else
+    env = storage->getDeclContext()->getGenericEnvironmentOfContext();
+
+  if (isInterfaceTypeNoncopyable(storage->getValueInterfaceType(), env))
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;
@@ -805,7 +871,7 @@ static bool doesAccessorHaveBody(AccessorDecl *accessor) {
   auto *storage = accessor->getStorage();
 
   // NSManaged getters and setters don't have bodies.
-  if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
     if (accessor->isGetterOrSetter())
       return false;
 
@@ -1258,8 +1324,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto,
-                                                      dc->getParentModule()))
+    if (auto result = dc->getParentModule()->checkConformance(type, proto))
       return result;
   }
 
@@ -1338,7 +1403,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                         Argument::unlabeled(Val));
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
-  DSCE->setThrows(false);
+  DSCE->setThrows(nullptr);
 
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil->setType(copyMethodType->getParams()[0].getParameterType());
@@ -1347,7 +1412,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
       ArgumentList::forImplicitCallTo(copyMethod->getParameters(), {Nil}, Ctx);
   auto *Call = CallExpr::createImplicit(Ctx, DSCE, argList);
   Call->setType(copyMethodType->getResult());
-  Call->setThrows(false);
+  Call->setThrows(nullptr);
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
@@ -1450,9 +1515,7 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 
   SmallVector<ASTNode, 2> body;
   if (result != nullptr) {
-    ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
-                                              /*IsImplicit=*/true);
-    body.push_back(returnStmt);
+    body.push_back(ReturnStmt::createImplicit(ctx, result));
   }
 
   return { BraceStmt::create(ctx, loc, body, loc, true),
@@ -1497,6 +1560,9 @@ synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 namespace {
   /// This ASTWalker explores an expression tree looking for expressions (which
   /// are DeclContext's) and changes their parent DeclContext to NewDC.
+  /// TODO: We ought to consider merging this with
+  /// ContextualizeClosuresAndMacros, or better yet removing it in favor of
+  /// avoiding the recontextualization for lazy vars.
   class RecontextualizeClosures : public ASTWalker {
     DeclContext *NewDC;
   public:
@@ -1510,36 +1576,44 @@ namespace {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-        return Action::SkipChildren(E);
-      }
-      
-      if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
-        // Make sure to recontextualize any decls in the capture list as well.
-        for (auto &CLE : CLE->getCaptureList()) {
-          CLE.getVar()->setDeclContext(NewDC);
-          CLE.PBD->setDeclContext(NewDC);
-        }
-      }
-      
-      // Unlike a closure, a TapExpr is not a DeclContext, so we need to
-      // recontextualize its variable and then anything else in its body.
-      // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()
-      // below, but I don't know what other effects that might have.
-      if (auto TE = dyn_cast<TapExpr>(E)) {
-        TE->getVar()->setDeclContext(NewDC);
-        for (auto node : TE->getBody()->getElements())
-          node.walk(RecontextualizeClosures(NewDC));
+        return Action::SkipNode(E);
       }
 
       return Action::Continue(E);
     }
 
-    /// We don't want to recurse into declarations or statements.
-    PreWalkAction walkToDeclPre(Decl *) override {
-      return Action::SkipChildren();
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      if (auto *EP = dyn_cast<ExprPattern>(P))
+        EP->setDeclContext(NewDC);
+      if (auto *EP = dyn_cast<EnumElementPattern>(P))
+        EP->setDeclContext(NewDC);
+
+      return Action::Continue(P);
     }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      // The ASTWalker doesn't walk the case body variables, contextualize them
+      // ourselves.
+      if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+          CaseVar->setDeclContext(NewDC);
+      }
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      D->setDeclContext(NewDC);
+
+      // Auxiliary decls need to have their contexts adjusted too.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+          D->setDeclContext(NewDC);
+        });
+      }
+
+      // Skip walking the children of any Decls that are also DeclContexts,
+      // they will already have the right parent.
+      return Action::SkipNodeIf(isa<DeclContext>(D));
     }
   };
 } // end anonymous namespace
@@ -1578,22 +1652,21 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
                                              TargetImpl::Storage, Ctx);
   SmallVector<StmtConditionElement, 1> Cond;
-  Cond.emplace_back(SourceLoc(), Some, StoredValueExpr);
+  Cond.emplace_back(ConditionalPatternBindingInfo::create(
+      Ctx, SourceLoc(), Some, StoredValueExpr));
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::Ordinary);
   Tmp1DRE->setType(Tmp1VD->getTypeInContext());
-  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
-                                      /*implicit*/true);
-
+  auto *Return = ReturnStmt::createImplicit(Ctx, Tmp1DRE);
+  auto *ReturnBranch = BraceStmt::createImplicit(Ctx, {Return});
 
   // Build the "if" around the early return.
-  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(),
-                                  SourceLoc(), Ctx.AllocateCopy(Cond), Return,
-                                  /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true));
-
+  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(), SourceLoc(),
+                                  Ctx.AllocateCopy(Cond), ReturnBranch,
+                                  /*elseloc*/ SourceLoc(),
+                                  /*else*/ nullptr, /*implicit*/ true));
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    SourceLoc(), Ctx.getIdentifier("tmp2"),
@@ -1610,12 +1683,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   Expr *InitValue;
   if (PBD->getInit(entryIndex)) {
-    PBD->setInitializerSubsumed(entryIndex);
-
-    if (!PBD->isInitializerChecked(entryIndex))
-      TypeChecker::typeCheckPatternBinding(PBD, entryIndex);
-
-    InitValue = PBD->getInit(entryIndex);
+    assert(PBD->isInitializerSubsumed(entryIndex));
+    InitValue = PBD->getCheckedAndContextualizedInit(entryIndex);
   } else {
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getTypeInContext());
   }
@@ -1655,7 +1724,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   AccessSemantics::DirectToStorage);
   Tmp2DRE->setType(Tmp2VD->getTypeInContext());
 
-  Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
+  Body.push_back(ReturnStmt::createImplicit(Ctx, Tmp2DRE));
 
   auto Range = InitValue->getSourceRange();
   return { BraceStmt::create(Ctx, Range.Start, Body, Range.End,
@@ -1833,7 +1902,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
       DSCE->setType(type);
-      DSCE->setThrows(false);
+      DSCE->setThrows(nullptr);
       Callee = DSCE;
     }
 
@@ -1848,7 +1917,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
-    Call->setThrows(false);
+    Call->setThrows(nullptr);
 
     SetterBody.push_back(Call);
   };
@@ -2016,7 +2085,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
       DSCE->setType(type);
-      DSCE->setThrows(false);
+      DSCE->setThrows(nullptr);
       Callee = DSCE;
     }
 
@@ -2024,7 +2093,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
-    Call->setThrows(false);
+    Call->setThrows(nullptr);
 
     body.push_back(Call);
   };
@@ -2174,10 +2243,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
       const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
-      auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getInitContext(i));
-
-      selfDecl = bindingInit->getImplicitSelfDecl();
+      selfDecl = bindingDecl->getInitContext(i)->getImplicitSelfDecl();
     }
   }
 
@@ -2190,10 +2256,9 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ loc, AccessorKind::Get, storage,
-      staticLoc, StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), getterParams, Type(),
-      storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      getterParams, Type(), storage->getDeclContext());
   getter->setSynthesized();
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -2287,10 +2352,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   auto setter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(), AccessorKind::Set, storage,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, Type(),
-      storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, Type(), storage->getDeclContext());
   setter->setSynthesized();
 
   if (isMutating)
@@ -2366,9 +2430,9 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   auto *accessor = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, retTy, dc);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, retTy, dc);
   accessor->setSynthesized();
 
   if (isMutating)
@@ -2724,6 +2788,11 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   PBD->setInitializerChecked(0);
 
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
+
+  // Make sure the original init is marked as subsumed.
+  auto *originalPBD = VD->getParentPatternBinding();
+  auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
+  originalPBD->setInitializerSubsumed(originalIndex);
 
   return Storage;
 }
@@ -3224,7 +3293,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       // Check initializer effects.
       auto *initContext = new (ctx) PropertyWrapperInitializer(
           dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
-      checkInitializerActorIsolation(initContext, projectedValueInit);
+      (void)projection->getInitializerIsolation();
       TypeChecker::checkInitializerEffects(initContext, projectedValueInit);
     }
   }
@@ -3533,7 +3602,8 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
       storage->getParsedAccessor(AccessorKind::Address) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
-      storage->getParsedAccessor(AccessorKind::MutableAddress))
+      storage->getParsedAccessor(AccessorKind::MutableAddress) ||
+      storage->getParsedAccessor(AccessorKind::Init))
     return false;
 
   // willSet or didSet in an overriding property imply that there is no storage.
@@ -3567,6 +3637,29 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   return hasStorage;
 }
 
+llvm::Optional<bool> HasStorageRequest::getCachedResult() const {
+  AbstractStorageDecl *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.HasStorageComputed)
+    return static_cast<bool>(decl->LazySemanticInfo.HasStorage);
+  return llvm::None;
+}
+
+void HasStorageRequest::cacheResult(bool hasStorage) const {
+  AbstractStorageDecl *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.HasStorageComputed = true;
+  decl->LazySemanticInfo.HasStorage = hasStorage;
+
+  // Add an attribute for printing, but only to VarDecls.
+  if (isa<ParamDecl>(decl))
+    return;
+  
+  if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+    if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
+      varDecl->getAttrs().add(new (varDecl->getASTContext())
+                              HasStorageAttr(/*isImplicit=*/true));
+  }
+}
+
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
@@ -3580,7 +3673,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
-    if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+    if (var->getParsedAttrs().hasAttribute<HasStorageAttr>()) {
       // The SIL rules for @_hasStorage are slightly different from the non-SIL
       // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
       // and the only thing that determines mutability is the existence of the

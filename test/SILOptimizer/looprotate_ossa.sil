@@ -465,6 +465,7 @@ bb1:
   cond_br %0, bb1a, bb2
 
 bb1a:
+  %t = tuple(%0 : $Builtin.Int1, %0 : $Builtin.Int1)
   br bb1
 
 bb2:

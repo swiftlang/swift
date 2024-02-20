@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only | %FileCheck %s
 
 sil_stage raw
 
@@ -266,7 +266,7 @@ bb0(%0 : $Bool):
   return %6 : $Bool
 
   // CHECK: alloc_stack $Bool
-  // CHECK-NEXT: store
+  // CHECK-NEXT: store {{%[0-9]+}}
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: load
   // CHECK-NEXT: dealloc_stack
@@ -803,7 +803,7 @@ bb5(%25 : $Error):                                // Preds: bb4 bb3
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]] : $*Bool, loc "testloc":27:27
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Int, loc "testloc":27:27
@@ -841,7 +841,7 @@ bb3:
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[REF:%[0-9]+]] = alloc_ref [stack] $SomeClass
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack_ref [[REF]]
 // CHECK-NEXT:   tuple
@@ -868,7 +868,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
@@ -904,7 +904,7 @@ bb2:
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
@@ -938,7 +938,7 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
@@ -969,7 +969,7 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -998,7 +998,7 @@ bb2:
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -1065,7 +1065,7 @@ bb3:
 // CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK-NEXT:   store
+// CHECK-NEXT:   store {{%[0-9]+}}
 // CHECK-NEXT:   load
 // CHECK-NEXT:   unreachable
 sil @nesting_and_unreachable7 : $@convention(thin) (Bool) -> Bool {
@@ -1100,7 +1100,7 @@ bb3:
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   br bb4
 // CHECK:      bb3:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]

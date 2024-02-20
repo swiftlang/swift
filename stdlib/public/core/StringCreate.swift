@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -297,5 +297,81 @@ extension String {
     return Array(str.utf8).withUnsafeBufferPointer {
       String._uncheckedFromUTF8($0)
     }
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.11, *)
+  internal static func _validate<Encoding: Unicode.Encoding>(
+    _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
+    as encoding: Encoding.Type
+  ) -> String? {
+    if encoding.CodeUnit.self == UInt8.self {
+      let bytes = _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
+      if encoding.self == UTF8.self {
+        guard case .success(let info) = validateUTF8(bytes) else { return nil }
+        return String._uncheckedFromUTF8(bytes, asciiPreScanResult: info.isASCII)
+      } else if encoding.self == Unicode.ASCII.self {
+        guard _allASCII(bytes) else { return nil }
+        return String._uncheckedFromASCII(bytes)
+      }
+    }
+
+    // slow-path
+    var isASCII = true
+    var buffer: UnsafeMutableBufferPointer<UInt8>
+    buffer = UnsafeMutableBufferPointer.allocate(capacity: input.count*3)
+    var written = buffer.startIndex
+
+    var parser = Encoding.ForwardParser()
+    var input = input.makeIterator()
+
+    transcodingLoop:
+    while true {
+      switch parser.parseScalar(from: &input) {
+      case .valid(let s):
+        let scalar = Encoding.decode(s)
+        guard let utf8 = Unicode.UTF8.encode(scalar) else {
+          // transcoding error: clean up and return nil
+          fallthrough
+        }
+        if buffer.count < written + utf8.count {
+          let newCapacity = buffer.count + (buffer.count >> 1)
+          let copy: UnsafeMutableBufferPointer<UInt8>
+          copy = UnsafeMutableBufferPointer.allocate(capacity: newCapacity)
+          let copied = copy.moveInitialize(
+            fromContentsOf: buffer.prefix(upTo: written)
+          )
+          buffer.deallocate()
+          buffer = copy
+          written = copied
+        }
+        if isASCII && utf8.count > 1 {
+          isASCII = false
+        }
+        written = buffer.suffix(from: written).initialize(fromContentsOf: utf8)
+        break
+      case .error:
+        // validation error: clean up and return nil
+        buffer.prefix(upTo: written).deinitialize()
+        buffer.deallocate()
+        return nil
+      case .emptyInput:
+        break transcodingLoop
+      }
+    }
+
+    let storage = buffer.baseAddress.map {
+      __SharedStringStorage(
+        _mortal: $0,
+        countAndFlags: _StringObject.CountAndFlags(
+          count: buffer.startIndex.distance(to: written),
+          isASCII: isASCII,
+          isNFC: isASCII,
+          isNativelyStored: false,
+          isTailAllocated: false
+        )
+      )
+    }
+    return storage?.asString
   }
 }

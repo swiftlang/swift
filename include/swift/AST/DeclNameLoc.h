@@ -20,6 +20,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
+class BridgedDeclNameLoc;
+
 namespace swift {
 
 class ASTContext;
@@ -27,6 +29,8 @@ class ASTContext;
 /// Source location information for a declaration name (\c DeclName)
 /// written in the source.
 class DeclNameLoc {
+  friend class ::BridgedDeclNameLoc;
+
   /// Source location information.
   ///
   /// If \c NumArgumentLabels == 0, this is the SourceLoc for the base name.
@@ -56,14 +60,16 @@ class DeclNameLoc {
     return reinterpret_cast<SourceLoc const *>(LocationInfo);
   }
 
+  DeclNameLoc(const void *LocationInfo, unsigned NumArgumentLabels)
+      : LocationInfo(LocationInfo), NumArgumentLabels(NumArgumentLabels) {}
+
 public:
   /// Create an invalid declaration name location.
-  DeclNameLoc() : LocationInfo(0), NumArgumentLabels(0) { }
+  DeclNameLoc() : DeclNameLoc(nullptr, 0) {}
 
   /// Create declaration name location information for a base name.
   explicit DeclNameLoc(SourceLoc baseNameLoc)
-    : LocationInfo(baseNameLoc.getOpaquePointerValue()),
-      NumArgumentLabels(0) { }
+      : DeclNameLoc(baseNameLoc.getOpaquePointerValue(), 0) {}
 
   /// Create declaration name location information for a compound
   /// name.

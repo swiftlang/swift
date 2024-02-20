@@ -127,7 +127,7 @@ public:
 #define DEFAULT_TO_ACCESS_LEVEL(KIND)                                          \
   bool visit##KIND##Decl(const KIND##Decl *D) {                                \
     static_assert(std::is_convertible<KIND##Decl *, ValueDecl *>::value,       \
-                  "##KIND##Decl must be a ValueDecl");                         \
+                  #KIND "Decl must be a ValueDecl");                           \
     return false;                                                              \
   }
   DEFAULT_TO_ACCESS_LEVEL(NominalType);
@@ -145,16 +145,12 @@ public:
   // exportability queries.
 #define UNREACHABLE(KIND)                                                      \
   bool visit##KIND##Decl(const KIND##Decl *D) {                                \
-    llvm_unreachable("unexpected decl kind");                                  \
+    llvm_unreachable("unexpected " #KIND "Decl");                              \
     return true;                                                               \
   }
   UNREACHABLE(Module);
-  UNREACHABLE(TopLevelCode);
-  UNREACHABLE(Import);
-  UNREACHABLE(PoundDiagnostic);
   UNREACHABLE(Missing);
   UNREACHABLE(MissingMember);
-  UNREACHABLE(MacroExpansion);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
 
@@ -168,10 +164,14 @@ public:
   // context has already been checked.
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
+  UNINTERESTING(TopLevelCode);
   UNINTERESTING(IfConfig);
+  UNINTERESTING(Import);
+  UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
+  UNINTERESTING(MacroExpansion);
 
 #undef UNINTERESTING
 };

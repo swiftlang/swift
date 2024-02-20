@@ -82,8 +82,7 @@ MergeTopDownLatticeStates(TopDownRefCountState::LatticeState L1,
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool BottomUpRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I,
-    RCIdentityFunctionInfo *RCFI) {
+    ImmutablePointerSet<SILInstruction *> *I, RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   assert((isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst)) &&
@@ -529,8 +528,7 @@ void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool TopDownRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I,
-    RCIdentityFunctionInfo *RCFI) {
+    ImmutablePointerSet<SILInstruction *> *I, RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   (void)Inst;
@@ -563,7 +561,7 @@ void TopDownRefCountState::initWithArg(SILFunctionArgument *Arg) {
 /// Initialize this RefCountState with an instruction which introduces a new
 /// ref count at +1.
 void TopDownRefCountState::initWithEntranceInst(
-    ImmutablePointerSet<SILInstruction> *I, SILValue RCIdentity) {
+    ImmutablePointerSet<SILInstruction *> *I, SILValue RCIdentity) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(I);
   assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&

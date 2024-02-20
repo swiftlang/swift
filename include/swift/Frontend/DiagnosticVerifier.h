@@ -94,14 +94,16 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   SmallVector<unsigned, 4> AdditionalBufferIDs;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  bool UseColor;
   ArrayRef<std::string> AdditionalExpectedPrefixes;
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
                               bool AutoApplyFixes, bool IgnoreUnknown,
+                              bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
       : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
-        IgnoreUnknown(IgnoreUnknown),
+        IgnoreUnknown(IgnoreUnknown), UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
 
   void appendAdditionalBufferID(unsigned bufferID) {
@@ -123,6 +125,11 @@ private:
     bool HadError;
     bool HadUnexpectedDiag;
   };
+
+  void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
+
+  bool
+  verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any

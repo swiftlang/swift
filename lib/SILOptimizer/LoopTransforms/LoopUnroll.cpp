@@ -488,8 +488,12 @@ class LoopUnrolling : public SILFunctionTransform {
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
 
+    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
+                            << Fun->getName() << "\n");
+
     // Collect innermost loops.
     SmallVector<SILLoop *, 16> InnermostLoops;
+
     for (auto *Loop : *LoopInfo) {
       SmallVector<SILLoop *, 8> Worklist;
       Worklist.push_back(Loop);
@@ -503,11 +507,10 @@ class LoopUnrolling : public SILFunctionTransform {
       }
     }
 
-    if (InnermostLoops.empty())
+    if (InnermostLoops.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "No innermost loops\n");
       return;
-
-    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
-                            << Fun->getName() << "\n");
+    }
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)

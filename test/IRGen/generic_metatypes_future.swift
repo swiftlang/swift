@@ -24,7 +24,7 @@ public func type<T, Metatype>(of value: T) -> Metatype {
   never()
 }
 
-// CHECK: define hidden swiftcc ptr [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](ptr noalias nocapture %0, ptr [[TYPE:%.*]])
+// CHECK: define hidden swiftcc ptr [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](ptr noalias %0, ptr [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call ptr @swift_getDynamicType(ptr {{.*}}, ptr [[TYPE]], i1 false)
   // CHECK: ret ptr [[METATYPE]]
@@ -38,10 +38,10 @@ class Bar {}
 func remapToSubstitutedMetatypes(_ x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
-  // CHECK: call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias nocapture undef, ptr {{.*}} @"$s17generic_metatypes3FooVMf", {{.*}})
+  // CHECK: call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias undef, ptr {{.*}} @"$s17generic_metatypes3FooVMf", {{.*}})
   // CHECK: [[BAR_REQUEST:%.*]] = call {{.*}}@"$s17generic_metatypes3BarCMa"
   // CHECK: [[BAR:%.*]] = extractvalue {{.*}} [[BAR_REQUEST]]
-  // CHECK: [[BAR_META:%.*]] = call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias nocapture {{%.*}}, ptr [[BAR]])
+  // CHECK: [[BAR_META:%.*]] = call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias {{%.*}}, ptr [[BAR]])
   // CHECK: ret ptr [[BAR_META]]
   return (genericTypeof(x), genericTypeof(y))
 }
@@ -117,16 +117,16 @@ func makeGenericMetatypes() {
   // CHECK-SAME: )
   genericMetatype(OneArg<Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMD") [[NOUNWIND_READNONE:#[0-9]+]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMD") [[NOUNWIND_READONLY:#[0-9]+]]
   genericMetatype(TwoArgs<Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMD") [[NOUNWIND_READONLY]]
   genericMetatype(ThreeArgs<Foo, Bar, Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMD") [[NOUNWIND_READONLY]]
   genericMetatype(FourArgs<Foo, Bar, Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMD") [[NOUNWIND_READNONE]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMD") [[NOUNWIND_READONLY]]
   genericMetatype(FiveArgs<Foo, Bar, Foo, Bar, Foo>.self)
 }
 
@@ -152,5 +152,5 @@ func makeGenericMetatypes() {
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.metadata_response
 
-// CHECK-DAG: attributes [[NOUNWIND_READNONE]] = { nounwind readonly }
+// CHECK-DAG: attributes [[NOUNWIND_READONLY]] = { nounwind memory(read) }
 // CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "

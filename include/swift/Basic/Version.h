@@ -64,6 +64,9 @@ public:
   /// Create a literal version from a list of components.
   Version(std::initializer_list<unsigned> Values) : Components(Values) {}
 
+  /// Create a version from an llvm::VersionTuple.
+  Version(const llvm::VersionTuple &version);
+
   /// Return a string to be used as an internal preprocessor define.
   ///
   /// The components of the version are multiplied element-wise by
@@ -131,8 +134,8 @@ public:
 
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 3> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5"}};
+  static std::array<StringRef, 4> getValidEffectiveVersions() {
+    return {{"4", "4.2", "5", "6"}};
   };
 };
 

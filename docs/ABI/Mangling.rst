@@ -108,6 +108,10 @@ The following symbolic reference kinds are currently implemented:
      symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
    #endif
 
+   #if SWIFT_RUNTIME_VERSION >= 5.TBD
+    objective-c-protocol-relative-reference  ::=  `\x0C`  .{4} // Reference points directly to a objective-c protcol reference
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
@@ -324,9 +328,16 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOs' // Outlined release
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
+  global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness
   global ::= generic-signature? type 'WOd' // Outlined assignWithTake
+  global ::= generic-signature? type 'WOD' // Outlined assignWithTake, not using value witness
   global ::= generic-signature? type 'WOf' // Outlined assignWithCopy
+  global ::= generic-signature? type 'WOF' // Outlined assignWithCopy, not using value witness
   global ::= generic-signature? type 'WOh' // Outlined destroy
+  global ::= generic-signature? type 'WOH' // Outlined destroy, not using value witness
+  global ::= generic-signature? type 'WOi` // Outlined store enum tag
+  global ::= generic-signature? type 'WOj` // Outlined enum destructive project
+  global ::= generic-signature? type 'WOg` // Outlined enum get tag
 
 Entities
 ~~~~~~~~
@@ -403,6 +414,9 @@ Entities
   macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
   macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
   macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMe' // attached extension macro
+  macro-expansion-operator ::= decl-name identifier 'fMq' // attached preamble macro
+  macro-expansion-operator ::= decl-name identifier 'fMb' // attached body macro
   macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
@@ -629,7 +643,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -639,14 +653,23 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
-    global-actor :: = type 'Yc'                // Global actor on function type
+    function-isolation ::= type 'Yc'          // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.11
+    throws ::= type 'YK'                     // 'throws(type)' annotation on function types
+    function-isolation ::= type 'YA'         // @isolated(any) on function type
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
-
+ #if SWIFT_RUNTIME_VERSION >= 5.TBD
+  lifetime-dependence ::= 'Yli'              // inherit lifetime dependence on param
+  lifetime-dependence ::= 'Yls'              // scoped lifetime dependence on param
+  self-lifetime-dependence ::= 'YLi'         // inherit lifetime dependence on self
+  self-lifetime-dependence ::= 'YLs'         // scoped lifetime dependence on self
+#endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
@@ -716,13 +739,15 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
+
+  ISOLATION ::= 'A'                          // @isolated(any)
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)
@@ -937,6 +962,8 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
+  LAYOUT-CONSTRAINT ::= 'B' // BridgeObject
+  LAYOUT-CONSTRAINT ::= 'S' // TrivialStride
 
   LAYOUT-SIZE ::= INDEX // Size only
   LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment

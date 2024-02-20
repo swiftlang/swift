@@ -14,6 +14,17 @@ x // expected-error {{parameterless closing #sourceLocation() directive without 
 
 #sourceLocation(file: x.swift, line: 1) // expected-error{{expected filename string literal}}
 
+// expected-warning@+1 {{expected starting line number for #sourceLocation directive; this is an error in Swift 6}}
+#sourceLocation(file: "x.swift", line: 0xff)
+
+#sourceLocation()
+
+// expected-warning@+1 {{'#sourceLocation' cannot be a multi-line string literal; this is an error in Swift 6}}
+#sourceLocation(file: """
+x.swift
+y.swift
+""", line: 42)
+
 #sourceLocation(file: "x.swift", line: 42)
 x x ; // should be ignored by expected_error because it is in a different file
 x

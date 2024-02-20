@@ -230,6 +230,16 @@ public:
 
   /// Does this pattern have any mutable 'var' bindings?
   bool hasAnyMutableBindings() const;
+  
+  /// Get the ownership behavior of this pattern on the value being matched
+  /// against it.
+  ///
+  /// The pattern must be type-checked for this operation to be valid. If
+  /// \c mostRestrictiveSubpatterns is non-null, the pointed-to vector will be
+  /// populated with references to the subpatterns that cause the pattern to
+  /// have stricter than "shared" ownership behavior for diagnostic purposes.
+  ValueOwnership getOwnership(
+    SmallVectorImpl<Pattern*> *mostRestrictiveSubpatterns = nullptr) const;
 
   static bool classof(const Pattern *P) { return true; }
 
@@ -447,6 +457,13 @@ public:
     return tp;
   }
 
+  static TypedPattern *createPropagated(ASTContext &ctx, Pattern *pattern,
+                                        TypeRepr *typeRepr) {
+    auto *TP = new (ctx) TypedPattern(pattern, typeRepr);
+    TP->setPropagatedType();
+    return TP;
+  }
+
   /// True if the type in this \c TypedPattern was propagated from a different
   /// \c TypedPattern.
   ///
@@ -566,6 +583,7 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -677,8 +695,10 @@ class ExprPattern : public Pattern {
   DeclContext *DC;
 
   /// A synthesized call to the '~=' operator comparing the match expression
-  /// on the left to the matched value on the right.
-  mutable Expr *MatchExpr = nullptr;
+  /// on the left to the matched value on the right, pairend with a record of the
+  /// ownership of the subject operand.
+  mutable llvm::PointerIntPair<Expr *, 2, ValueOwnership>
+    MatchExprAndOperandOwnership{nullptr, ValueOwnership::Default};
 
   /// An implicit variable used to represent the RHS value of the synthesized
   /// match expression.
@@ -689,6 +709,8 @@ class ExprPattern : public Pattern {
         DC(DC) {}
 
   friend class ExprPatternMatchRequest;
+
+  void updateMatchExpr(Expr *matchExpr) const;
 
 public:
   /// Create a new parsed unresolved ExprPattern.
@@ -703,12 +725,27 @@ public:
 
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
-
   DeclContext *getDeclContext() const { return DC; }
+
+  void setDeclContext(DeclContext *newDC) {
+    DC = newDC;
+    if (MatchVar)
+      MatchVar->setDeclContext(newDC);
+  }
 
   /// The match expression if it has been computed, \c nullptr otherwise.
   /// Should only be used by the ASTDumper and ASTWalker.
-  Expr *getCachedMatchExpr() const { return MatchExpr; }
+  Expr *getCachedMatchExpr() const {
+    return MatchExprAndOperandOwnership.getPointer();
+  }
+
+  /// Return the ownership of the subject parameter for the `~=` operator being
+  /// used (and thereby, the ownership of the pattern match itself), or
+  /// \c Default if the ownership of the parameter is unresolved.
+  ValueOwnership getCachedMatchOperandOwnership() const {
+    auto ownership = MatchExprAndOperandOwnership.getInt();
+    return ownership;
+  }
 
   /// The match variable if it has been computed, \c nullptr otherwise.
   /// Should only be used by the ASTDumper and ASTWalker.
@@ -717,14 +754,18 @@ public:
   /// A synthesized call to the '~=' operator comparing the match expression
   /// on the left to the matched value on the right.
   Expr *getMatchExpr() const;
+  ValueOwnership getMatchOperandOwnership() const {
+    (void)getMatchExpr();
+    return getCachedMatchOperandOwnership();
+  }
 
   /// An implicit variable used to represent the RHS value of the synthesized
   /// match expression.
   VarDecl *getMatchVar() const;
 
   void setMatchExpr(Expr *e) {
-    assert(MatchExpr && "Should only update an existing MatchExpr");
-    MatchExpr = e;
+    assert(getCachedMatchExpr() && "Should only update an existing MatchExpr");
+    updateMatchExpr(e);
   }
 
   SourceLoc getLoc() const;
@@ -753,6 +794,13 @@ public:
     setIntroducer(introducer);
   }
 
+  static BindingPattern *createParsed(ASTContext &ctx, SourceLoc loc,
+                                      VarDecl::Introducer introducer,
+                                      Pattern *sub);
+
+  /// Create implicit 'let error' pattern for 'catch' statement.
+  static BindingPattern *createImplicitCatch(DeclContext *dc, SourceLoc loc);
+
   VarDecl::Introducer getIntroducer() const {
     return VarDecl::Introducer(Bits.BindingPattern.Introducer);
   }
@@ -769,17 +817,8 @@ public:
     return VP;
   }
 
-  bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
-
   StringRef getIntroducerStringRef() const {
-    switch (getIntroducer()) {
-    case VarDecl::Introducer::Let:
-      return "let";
-    case VarDecl::Introducer::Var:
-      return "var";
-    case VarDecl::Introducer::InOut:
-      return "inout";
-    }
+    return VarDecl::getIntroducerStringRef(getIntroducer());
   }
 
   SourceLoc getLoc() const { return VarLoc; }

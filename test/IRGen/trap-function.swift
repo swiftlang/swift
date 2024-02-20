@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -primary-file %s -trap-function oopsie -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN
 // RUN: %target-swift-frontend -O -primary-file %s -trap-function oopsie -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN_OPT
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=NOTRAPFN
+// REQUIRES: objc_codegen
 
 // TRAPFN-LABEL: define hidden swiftcc {{.*}} @"$s13trap_function14checkOverflow1yS2i_SitF"
 // TRAPFN: call void @llvm.trap() [[ATTR0:#[0-9]+]]

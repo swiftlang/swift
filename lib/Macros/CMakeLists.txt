@@ -33,7 +33,7 @@ function(add_swift_macro_library name)
 
   # If we don't have the Swift swift parser, bail out, because the above
   # add_pure_swift_host_library did nothing.
-  if (NOT SWIFT_SWIFT_PARSER)
+  if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     return()
   endif()
 
@@ -60,6 +60,9 @@ function(add_swift_macro_library name)
   set(destination_dir "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins")
 
   swift_install_in_component(TARGETS ${name}
+    RUNTIME
+      DESTINATION bin
+      COMPONENT compiler
     LIBRARY
       DESTINATION "${destination_dir}"
       COMPONENT compiler

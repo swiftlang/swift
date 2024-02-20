@@ -175,7 +175,7 @@ private:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
-      return PreWalkAction::SkipChildren;
+      return Action::SkipNode();
     }
 
     if (auto *newDC = dyn_cast<DeclContext>(D)) {

@@ -194,6 +194,11 @@ struct SILOptOptions {
                                         "default"));
 
   llvm::cl::opt<bool>
+  StrictImplicitModuleContext = llvm::cl::opt<bool>("strict-implicit-module-context",
+                              llvm::cl::desc("Enable the strict forwarding of compilation "
+                                             "context to downstream implicit module dependencies"));
+
+  llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
       "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
       llvm::cl::desc(
@@ -223,17 +228,10 @@ struct SILOptOptions {
   EnableExperimentalConcurrency = llvm::cl::opt<bool>("enable-experimental-concurrency",
                      llvm::cl::desc("Enable experimental concurrency model."));
 
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-  EnableLexicalLifetimes = llvm::cl::opt<llvm::cl::boolOrDefault>(
-      "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
-      llvm::cl::desc("Enable lexical lifetimes. Mutually exclusive with "
-                     "enable-lexical-borrow-scopes and "
-                     "disable-lexical-lifetimes."));
-
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-      EnableLexicalBorrowScopes = llvm::cl::opt<llvm::cl::boolOrDefault>("enable-lexical-borrow-scopes",
-                                llvm::cl::init(llvm::cl::BOU_UNSET),
-                                llvm::cl::desc("Enable lexical borrow scopes."));
+  llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes =
+      llvm::cl::opt<llvm::cl::boolOrDefault>(
+          "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+          llvm::cl::desc("Enable lexical lifetimes."));
 
   llvm::cl::opt<llvm::cl::boolOrDefault>
   EnableExperimentalMoveOnly = llvm::cl::opt<llvm::cl::boolOrDefault>(
@@ -477,6 +475,17 @@ struct SILOptOptions {
       cl::desc("The format used for serializing remarks (default: YAML)"),
       cl::value_desc("format"), cl::init("yaml"));
 
+  // Strict Concurrency
+  llvm::cl::opt<StrictConcurrency> StrictConcurrencyLevel =
+      llvm::cl::opt<StrictConcurrency>(
+          "strict-concurrency", cl::desc("strict concurrency level"),
+          llvm::cl::values(clEnumValN(StrictConcurrency::Complete, "complete",
+                                      "Enable complete strict concurrency"),
+                           clEnumValN(StrictConcurrency::Targeted, "targeted",
+                                      "Enable targeted strict concurrency"),
+                           clEnumValN(StrictConcurrency::Minimal, "minimal",
+                                      "Enable minimal strict concurrency")));
+
   llvm::cl::opt<bool>
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
                        llvm::cl::desc("Enable C++ interop."),
@@ -518,6 +527,10 @@ struct SILOptOptions {
                       swift::UnavailableDeclOptimization::Complete, "complete",
                       "Eliminate unavailable decls from lowered SIL/IR")),
               llvm::cl::init(swift::UnavailableDeclOptimization::None));
+
+  llvm::cl::list<std::string> ClangXCC = llvm::cl::list<std::string>(
+      "Xcc",
+      llvm::cl::desc("option to pass to clang"));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -608,6 +621,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setRuntimeResourcePath(options.ResourceDir);
   Invocation.getFrontendOptions().EnableLibraryEvolution
     = options.EnableLibraryEvolution;
+  Invocation.getFrontendOptions().StrictImplicitModuleContext
+    = options.StrictImplicitModuleContext;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
@@ -625,18 +640,19 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       toOptionalBool(options.EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
     // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
-    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
-    Invocation.getLangOptions().Features.insert(Feature::NoImplicitCopy);
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(Feature::MoveOnly);
+    Invocation.getLangOptions().enableFeature(Feature::NoImplicitCopy);
+    Invocation.getLangOptions().enableFeature(
         Feature::OldOwnershipOperatorSpellings);
   }
+
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
   Invocation.getDiagnosticOptions().PrintDiagnosticNames =
       options.DebugDiagnosticNames;
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
-      Invocation.getLangOptions().Features.insert(*feature);
+      Invocation.getLangOptions().enableFeature(*feature);
     } else {
       llvm::errs() << "error: unknown feature "
                    << QuotedString(featureName) << "\n";
@@ -648,7 +664,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().Features.insert(Feature::LayoutPrespecialization);
+  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
@@ -656,10 +672,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       createOptRemarkRegex(options.PassRemarksMissed);
 
   if (options.EnableExperimentalStaticAssert)
-    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
+    Invocation.getLangOptions().enableFeature(Feature::StaticAssert);
 
   if (options.EnableExperimentalDifferentiableProgramming) {
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(
         Feature::DifferentiableProgramming);
   }
 
@@ -667,9 +683,18 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
+  if (options.StrictConcurrencyLevel.hasArgStr())
+    Invocation.getLangOptions().StrictConcurrencyLevel =
+        options.StrictConcurrencyLevel;
 
   Invocation.getDiagnosticOptions().VerifyMode =
     options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+
+  ClangImporterOptions &clangImporterOptions =
+      Invocation.getClangImporterOptions();
+  for (const auto &xcc : options.ClangXCC) {
+    clangImporterOptions.ExtraArgs.push_back(xcc);
+  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -737,32 +762,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   llvm::Optional<bool> enableLexicalLifetimes =
       toOptionalBool(options.EnableLexicalLifetimes);
-  llvm::Optional<bool> enableLexicalBorrowScopes =
-      toOptionalBool(options.EnableLexicalBorrowScopes);
 
-  // Enable lexical lifetimes if it is set or if experimental move only is
-  // enabled. This is because move only depends on lexical lifetimes being
-  // enabled and it saved some typing ; ).
-  bool specifiedLexicalLifetimesEnabled =
-      enableExperimentalMoveOnly && *enableExperimentalMoveOnly &&
-      enableLexicalLifetimes && *enableLexicalLifetimes;
-  if (specifiedLexicalLifetimesEnabled && enableLexicalBorrowScopes &&
-      !*enableLexicalBorrowScopes) {
-    fprintf(
-        stderr,
-        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
-        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
-    exit(-1);
-  }
   if (enableLexicalLifetimes)
     SILOpts.LexicalLifetimes =
         *enableLexicalLifetimes ? LexicalLifetimesOption::On
                                 : LexicalLifetimesOption::DiagnosticMarkersOnly;
-  if (enableLexicalBorrowScopes)
-    SILOpts.LexicalLifetimes =
-        *enableLexicalBorrowScopes
-            ? LexicalLifetimesOption::DiagnosticMarkersOnly
-            : LexicalLifetimesOption::Off;
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;

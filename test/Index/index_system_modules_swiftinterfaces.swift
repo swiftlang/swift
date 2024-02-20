@@ -113,7 +113,7 @@
 /// Index a client reading from a broken swiftinterface
 // RUN: %empty-directory(%t/idx)
 // RUN: %empty-directory(%t/modulecache)
-// RUN: echo "breaking_the_swifinterface" >> %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule/%module-target-triple.swiftinterface
+// RUN: echo "breaking_the_swiftinterface" >> %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule/%module-target-triple.swiftinterface
 
 // RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
@@ -128,7 +128,7 @@
 
 /// We don't expect to see the swiftinterface error for indexing
 // BROKEN-BUILD-NOT: error
-// BROKEN-BUILD-NOT: breaking_the_swifinterface
+// BROKEN-BUILD-NOT: breaking_the_swiftinterface
 // BROKEN-BUILD: indexing system module {{.*}} skipping
 
 /// We don't expect SystemModule to be indexed with a broken swiftinterface
@@ -177,6 +177,19 @@ import SystemDepA
 import SystemDepB
 public func systemFunc() {}
 func leakyFunc(_ a: SecretType) {}
+
+// Currently requires salvaging, which we need to make sure runs when the
+// interface is rebuilt (as it produces a solution), we'll crash if it isn't.
+public struct SysA { public init() {} }
+public struct SysB { public init() {} }
+@available(macOS, unavailable)
+public func forceDisjunction() -> SysA { return SysA() }
+public func forceDisjunction() -> SysB { return SysB() }
+@available(macOS, unavailable)
+@inlinable
+public func requireSalvage() -> SysA {
+  return forceDisjunction()
+}
 
 //--- SystemDepA.swift
 import SystemDepCommon

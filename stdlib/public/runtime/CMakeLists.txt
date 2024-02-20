@@ -47,11 +47,13 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
+    Exception.cpp
     Exclusivity.cpp
     ExistentialContainer.cpp
     Float16Support.cpp
     FoundationSupport.cpp
     FunctionReplacement.cpp
+    GenericMetadataBuilder.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionCommon.cpp
@@ -63,6 +65,7 @@ set(swift_runtime_sources
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
+    LibPrespecialized.cpp
     Metadata.cpp
     MetadataLookup.cpp
     Numeric.cpp
@@ -88,6 +91,7 @@ set(swift_runtime_threading_sources
 
 set(swift_runtime_backtracing_sources
   Backtrace.cpp
+  BacktraceUtils.cpp
   CrashHandlerMacOS.cpp
   CrashHandlerLinux.cpp)
 
@@ -100,8 +104,10 @@ set(LLVM_OPTIONAL_SOURCES
     ${swift_runtime_leaks_sources}
     ${swift_runtime_backtracing_sources})
 
+set(swift_enable_backtracing)
 if(SWIFT_ENABLE_BACKTRACING)
   list(APPEND swift_runtime_sources ${swift_runtime_backtracing_sources})
+  set(swift_enable_backtracing -DSWIFT_ENABLE_BACKTRACING)
 endif()
 
 set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
@@ -149,6 +155,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_threading_sources}
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
+    ${swift_enable_backtracing}
   LINK_FLAGS ${swift_runtime_linker_flags}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)
@@ -172,7 +179,9 @@ endforeach()
 add_swift_target_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-ELF-WASM.cpp
-                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  C_COMPILE_FLAGS
+                    ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                    ${swift_enable_backtracing}
                   C_COMPILE_FLAGS_LINUX -fno-lto
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${ELFISH_SDKS}
@@ -183,7 +192,9 @@ add_swift_target_library(swiftImageRegistrationObjectELF
 add_swift_target_library(swiftImageRegistrationObjectCOFF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-COFF.cpp
-                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  C_COMPILE_FLAGS
+                    ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                    ${swift_enable_backtracing}
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${COFF_SDKS}
                   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -192,7 +203,9 @@ add_swift_target_library(swiftImageRegistrationObjectCOFF
 add_swift_target_library(swiftImageRegistrationObjectWASM
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-ELF-WASM.cpp
-                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  C_COMPILE_FLAGS
+                    ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                    ${swift_enable_backtracing}
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${WASM_SDKS}
                   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

@@ -35,6 +35,7 @@
 
 namespace llvm {
 class FileCollectorBase;
+class TreePathPrefixMapper;
 namespace vfs {
 class OutputBackend;
 }
@@ -105,15 +106,25 @@ public:
         : path(std::move(Path)), fingerprint(std::move(FP)) {}
   };
 
-  inline static std::string getPath(const IncrementalDependency &id) {
-    return id.path;
+  struct MacroPluginDependency {
+    Identifier moduleName;
+    std::string path;
+
+    MacroPluginDependency(const Identifier &moduleName, const std::string &path)
+        : moduleName(moduleName), path(path) {}
+  };
+
+  template <typename Dep>
+  inline static const std::string getPath(const Dep &dep) {
+    return dep.path;
   }
-  typedef ArrayRefView<IncrementalDependency, std::string, getPath>
-      DependencyPathArrayRef;
+  template <typename Dep>
+  using PathArrayRefView = ArrayRefView<Dep, const std::string, getPath>;
 
   std::shared_ptr<clang::DependencyCollector> clangCollector;
   SmallVector<IncrementalDependency, 8> incrementalDeps;
   llvm::StringSet<> incrementalDepsUniquer;
+  llvm::SetVector<MacroPluginDependency> macroPluginDeps;
 
 public:
   explicit DependencyTracker(
@@ -133,6 +144,12 @@ public:
   /// \p File is performed.
   void addIncrementalDependency(StringRef File, Fingerprint FP);
 
+  /// Adds a macro plugin dependency.
+  ///
+  /// No additional canonicalization or adulteration of the file path in
+  /// \p File is performed.
+  void addMacroPluginDependency(StringRef File, Identifier ModuleName);
+
   /// Fetches the list of dependencies.
   ArrayRef<std::string> getDependencies() const;
 
@@ -142,8 +159,19 @@ public:
 
   /// A view of the paths of the dependencies known to have incremental swift
   /// dependency information embedded inside of them.
-  DependencyPathArrayRef getIncrementalDependencyPaths() const {
-    return DependencyPathArrayRef(getIncrementalDependencies());
+  PathArrayRefView<IncrementalDependency>
+  getIncrementalDependencyPaths() const {
+    return PathArrayRefView<IncrementalDependency>(
+        getIncrementalDependencies());
+  }
+
+  /// The list of macro plugin dependencies.
+  ArrayRef<MacroPluginDependency> getMacroPluginDependencies() const;
+
+  PathArrayRefView<MacroPluginDependency>
+  getMacroPluginDependencyPaths() const {
+    return PathArrayRefView<MacroPluginDependency>(
+        getMacroPluginDependencies());
   }
 
   /// Return the underlying clang::DependencyCollector that this
@@ -181,6 +209,7 @@ public:
 struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,
                                           StringRef interfacePath,
+                                          StringRef sdkPath,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -188,6 +217,7 @@ struct InterfaceSubContextDelegate {
                                        ArrayRef<StringRef>, StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
+                                                   StringRef sdkPath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
                                                    bool silenceErrors,
@@ -340,15 +370,40 @@ public:
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName,
+  getModuleDependencies(Identifier moduleName,
                         StringRef moduleOutputPath,
                         llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
 };
 
 } // namespace swift
+
+namespace llvm {
+template <>
+struct DenseMapInfo<swift::DependencyTracker::MacroPluginDependency> {
+  using MacroPluginDependency = swift::DependencyTracker::MacroPluginDependency;
+
+  static MacroPluginDependency getEmptyKey() {
+    return {DenseMapInfo<swift::Identifier>::getEmptyKey(), ""};
+  }
+
+  static MacroPluginDependency getTombstoneKey() {
+    return {DenseMapInfo<swift::Identifier>::getTombstoneKey(), ""};
+  }
+
+  static unsigned getHashValue(MacroPluginDependency Val) {
+    return hash_combine(Val.moduleName, Val.path);
+  }
+
+  static bool isEqual(const MacroPluginDependency &LHS,
+                      const MacroPluginDependency &RHS) {
+    return LHS.moduleName == RHS.moduleName && LHS.path == RHS.path;
+  }
+};
+} // namespace llvm
 
 #endif

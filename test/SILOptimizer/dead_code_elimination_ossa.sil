@@ -432,3 +432,39 @@ bb0(%0 : @owned $MO):
   %63 = tuple ()
   return %63 : $()
 }
+
+// The InstructionDeleter will delete the `load [take]` and insert a
+// `destroy_addr`.  Observe the creation of the new destroy_addr instruction
+// that occurs when deleting the `load [take]` and mark it live.  Prevents a
+// leak.
+// CHECK-LABEL: sil [ossa] @keep_new_destroy_addr : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'keep_new_destroy_addr'
+sil [ossa] @keep_new_destroy_addr : $@convention(thin) () -> () {
+bb0:
+  try_apply undef() : $@convention(thin) () -> @error any Error, normal bb1, error bb5
+
+bb1(%4 : $()):
+  %err = alloc_stack $any Error
+  try_apply undef<any Error>(%err) : $@convention(method) <τ_1_1 where τ_1_1 : Error> () -> (@error_indirect τ_1_1), normal bb2, error bb6
+
+bb2(%15 : $()):
+  dealloc_stack %err : $*any Error
+  br bb3
+
+bb4(%24 : @owned $any Error):
+  destroy_value %24 : $any Error
+  br bb3
+
+bb5(%30 : @owned $any Error):
+  br bb4(%30 : $any Error)
+
+bb6:
+  %33 = load [take] %err : $*any Error
+  dealloc_stack %err : $*any Error
+  br bb4(%33 : $any Error)
+
+bb3:
+  %22 = tuple ()
+  return %22 : $()
+}

@@ -57,6 +57,10 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
     if (callback(dep))
       return true;
   }
+  for (auto dep : CI.getDependencyTracker()->getMacroPluginDependencyPaths()) {
+    if (callback(dep))
+      return true;
+  }
 
   return false;
 }

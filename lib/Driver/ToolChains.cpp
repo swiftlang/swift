@@ -13,7 +13,6 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -143,6 +142,22 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+namespace {
+
+template<typename Container>
+bool containsValue(
+    const Container &container,
+    typename Container::value_type const &element
+) {
+  for (const auto &value : container) {
+    if (value == element)
+      return true;
+  }
+
+  return false;
+}
+
+}
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -178,7 +193,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin()) {
+  if (Triple.isOSDarwin() &&
+      !containsValue(
+          inputArgs
+            .getAllArgValues(options::OPT_enable_experimental_feature),
+          "Embedded")) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -252,6 +271,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension_library);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
@@ -262,6 +282,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
+  inputArgs.AddLastArg(arguments, options::OPT_dwarf_version);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
@@ -278,6 +299,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_Rpass_missed_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
+  inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -288,6 +310,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_stable_abi_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
@@ -312,8 +335,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
@@ -374,6 +395,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
 
   addPluginArguments(inputArgs, arguments);
+
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
@@ -523,7 +552,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_CrossModuleOptimization)) {
     Arguments.push_back("-cross-module-optimization");
   }
-                                 
+
   if (context.Args.hasArg(options::OPT_ExperimentalPerformanceAnnotations)) {
     Arguments.push_back("-experimental-performance-annotations");
   }
@@ -727,12 +756,14 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
@@ -855,6 +886,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -991,12 +1026,14 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_PackageSwiftModuleInterfaceFile:
     case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
     case file_types::TY_IndexUnitOutputPath:
     case file_types::TY_SwiftABIDescriptor:
+    case file_types::TY_SwiftAPIDescriptor:
     case file_types::TY_ConstValues:
     case file_types::TY_SwiftFixIt:
     case file_types::TY_ModuleSemanticInfo:
@@ -1145,6 +1182,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
@@ -1160,8 +1200,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

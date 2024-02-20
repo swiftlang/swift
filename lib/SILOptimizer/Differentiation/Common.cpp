@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Common.h"
@@ -36,28 +37,16 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
   if (!ptai)
     return nullptr;
+  auto *mdi = dyn_cast<MarkDependenceInst>(
+      ptai->getOperand()->getDefiningInstruction());
+  if (!mdi)
+    return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          ptai->getOperand()->getDefiningInstruction()))
+          mdi->getValue()->getDefiningInstruction()))
     return ArraySemanticsCall(dti->getOperand(),
                               semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
-}
-
-DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
-  bool foundDestructureTupleUser = false;
-  if (!value->getType().is<TupleType>())
-    return nullptr;
-  DestructureTupleInst *result = nullptr;
-  for (auto *use : value->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-      assert(!foundDestructureTupleUser &&
-             "There should only be one `destructure_tuple` user of a tuple");
-      foundDestructureTupleUser = true;
-      result = dti;
-    }
-  }
-  return result;
 }
 
 bool isSemanticMemberAccessor(SILFunction *original) {
@@ -108,7 +97,7 @@ void forEachApplyDirectResult(
       resultCallback(ai);
       return;
     }
-    if (auto *dti = getSingleDestructureTupleUser(ai))
+    if (auto *dti = ai->getSingleUserOfType<DestructureTupleInst>())
       for (auto directResult : dti->getResults())
         resultCallback(directResult);
     break;
@@ -212,8 +201,8 @@ void collectMinimalIndicesForFunctionCall(
   results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
   unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(calleeConvs.getResults())) {
-    auto &res = resAndIdx.value();
+  for (const auto &resAndIdx : enumerate(calleeConvs.getResults())) {
+    const auto &res = resAndIdx.value();
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
@@ -231,8 +220,8 @@ void collectMinimalIndicesForFunctionCall(
   
   // Record all semantic result parameters as results.
   auto semanticResultParamResultIndex = calleeFnTy->getNumResults();
-  for (auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
-    auto &param = paramAndIdx.value();
+  for (const auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {
+    const auto &param = paramAndIdx.value();
     if (!param.isAutoDiffSemanticResult())
       continue;
     unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
@@ -252,12 +241,12 @@ void collectMinimalIndicesForFunctionCall(
 llvm::Optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return asi->getVarInfo().transform([&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return dvi->getVarInfo().transform([&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
@@ -401,7 +390,8 @@ SILValue emitMemoryLayoutSize(
   return builder.createBuiltin(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
-          builtin->getGenericSignature(), ArrayRef<Type>{type}, {}),
+          builtin->getGenericSignature(), ArrayRef<Type>{type},
+          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
       {metatypeVal});
 }
 

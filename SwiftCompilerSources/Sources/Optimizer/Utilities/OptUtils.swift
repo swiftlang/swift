@@ -1,4 +1,4 @@
-//===--- OptUtils.swift - Utilities for optimizations ----------------------===//
+//===--- OptUtils.swift - Utilities for optimizations ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,36 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import SIL
 import OptimizerBridging
 
 extension Value {
-  var nonDebugUses: LazyFilterSequence<UseList> {
-    uses.lazy.filter { !($0.instruction is DebugValueInst) }
+  var lookThroughBorrow: Value {
+    if let beginBorrow = self as? BeginBorrowInst {
+      return beginBorrow.borrowedValue.lookThroughBorrow
+    }
+    return self
+  }
+
+  var lookThroughCopy: Value {
+    if let copy = self as? CopyValueInst {
+      return copy.fromValue.lookThroughCopy
+    }
+    return self
+  }
+
+  var lookThoughOwnershipInstructions: Value {
+    switch self {
+    case let beginBorrow as BeginBorrowInst:
+      return beginBorrow.borrowedValue.lookThoughOwnershipInstructions
+    case let copy as CopyValueInst:
+      return copy.fromValue.lookThoughOwnershipInstructions
+    case let move as MoveValueInst:
+      return move.fromValue.lookThoughOwnershipInstructions
+    default:
+      return self
+    }
   }
 
   /// Walks over all fields of an aggregate and checks if a reference count
@@ -108,6 +132,37 @@ extension Value {
     }
     return builder.createCopyValue(operand: self)
   }
+
+  /// True if this value is a valid in a static initializer, including all its operands.
+  var isValidGlobalInitValue: Bool {
+    guard let svi = self as? SingleValueInstruction else {
+      return false
+    }
+    if let beginAccess = svi as? BeginAccessInst {
+      return beginAccess.address.isValidGlobalInitValue
+    }
+    if !svi.isValidInStaticInitializerOfGlobal {
+      return false
+    }
+    for op in svi.operands {
+      if !op.value.isValidGlobalInitValue {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+extension FullApplySite {
+  func isSemanticCall(_ name: StaticString, withArgumentCount: Int) -> Bool {
+    if arguments.count == withArgumentCount,
+       let callee = referencedFunction,
+       callee.hasSemanticsAttribute(name)
+    {
+      return true
+    }
+    return false
+  }
 }
 
 extension Builder {
@@ -125,6 +180,49 @@ extension Builder {
       let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
     }
+  }
+}
+
+extension Value {
+  /// Return true if all elements occur on or after `instruction` in
+  /// control flow order. If this returns true, then zero or more uses
+  /// of `self` may be operands of `instruction` itself.
+  ///
+  /// This performs a backward CFG walk from `instruction` to `self`.
+  func usesOccurOnOrAfter(instruction: Instruction, _ context: some Context)
+  -> Bool {
+    var users = InstructionSet(context)
+    defer { users.deinitialize() }
+    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+
+    let pushPreds = { (block: BasicBlock) in
+      block.predecessors.lazy.map({ pred in pred.terminator }).forEach {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+    if let prev = instruction.previous {
+      worklist.pushIfNotVisited(prev)
+    } else {
+      pushPreds(instruction.parentBlock)
+    }
+    let definingInst = self.definingInstruction
+    while let lastInst = worklist.pop() {
+      for inst in ReverseInstructionList(first: lastInst) {
+        if users.contains(inst) {
+          return false
+        }
+        if inst == definingInst {
+          break
+        }
+      }
+      if lastInst.parentBlock != self.parentBlock {
+        pushPreds(lastInst.parentBlock)
+      }
+    }
+    return true
   }
 }
 
@@ -179,7 +277,7 @@ extension Instruction {
   }
 
   var isTriviallyDeadIgnoringDebugUses: Bool {
-    if results.contains(where: { !$0.uses.isEmptyIgnoringDebugUses }) {
+    if results.contains(where: { !$0.uses.ignoreDebugUses.isEmpty }) {
       return false
     }
     return self.canBeRemovedIfNotUsed
@@ -216,7 +314,10 @@ extension StoreInst {
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
         }
       } else {
-        for idx in 0..<type.getNominalFields(in: parentFunction).count {
+        guard let fields = type.getNominalFields(in: parentFunction) else {
+          return
+        }
+        for idx in 0..<fields.count {
           let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
           let fieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
           builder.createStore(source: srcField, destination: fieldAddr, ownership: splitOwnership(for: srcField))
@@ -260,7 +361,10 @@ extension LoadInst {
       if type.nominal.isStructWithUnreferenceableStorage {
         return
       }
-      for idx in 0..<type.getNominalFields(in: parentFunction).count {
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return
+      }
+      for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
         let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
         elements.append(splitLoad)
@@ -289,48 +393,6 @@ extension LoadInst {
       return self.loadOwnership
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
-    }
-  }
-}
-
-
-extension UseList {
-  var singleNonDebugUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      if use.instruction is DebugValueInst {
-        continue
-      }
-      if singleUse != nil {
-        return nil
-      }
-      singleUse = use
-    }
-    return singleUse
-  }
-
-  var isEmptyIgnoringDebugUses: Bool {
-    for use in self {
-      if !(use.instruction is DebugValueInst) {
-        return false
-      }
-    }
-    return true
-  }
-}
-
-extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
     }
   }
 }
@@ -394,7 +456,7 @@ extension SimplifyContext {
   /// The operation is not done if it would require to insert a copy due to keep ownership correct.
   func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
                                           with replacement: Value) {
-    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
+    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
     if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
@@ -465,6 +527,18 @@ extension Function {
     }
     return nil
   }
+
+  var initializedGlobal: GlobalVariable? {
+    if !isGlobalInitOnceFunction {
+      return nil
+    }
+    for inst in entryBlock.instructions {
+      if let allocGlobal = inst as? AllocGlobalInst {
+        return allocGlobal.global
+      }
+    }
+    return nil
+  }
 }
 
 extension FullApplySite {
@@ -479,6 +553,14 @@ extension FullApplySite {
        !calleeFunction.isSerialized {
       return false
     }
+
+    // Cannot inline a non-ossa function into an ossa function
+    if parentFunction.hasOwnership,
+      let calleeFunction = referencedFunction,
+      !calleeFunction.hasOwnership {
+      return false
+    }
+
     return true
   }
 
@@ -528,4 +610,91 @@ extension GlobalVariable {
       }
     }
   }
+}
+
+extension InstructionRange {
+  /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
+  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(borrow)
+    while let value = worklist.pop() {
+      for use in value.uses {
+        switch use.instruction {
+        case let endBorrow as EndBorrowInst:
+          self.insert(endBorrow)
+        case let branch as BranchInst:
+          worklist.pushIfNotVisited(branch.getArgument(for: use))
+        default:
+          break
+        }
+      }
+    }
+  }
+}
+
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+/// Returns nil if `function` has any side-effects beside initializing the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+func getGlobalInitialization(
+  of function: Function,
+  allowGlobalValue: Bool
+) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+  guard let block = function.blocks.singleElement else {
+    return nil
+  }
+
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
+      break
+    case let agi as AllocGlobalInst:
+      if allocInst != nil {
+        return nil
+      }
+      allocInst = agi
+    case let ga as GlobalAddrInst:
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
+      }
+    case let si as StoreInst:
+      if store != nil {
+        return nil
+      }
+      guard let ga = globalAddr else {
+        return nil
+      }
+      if si.destination != ga {
+        return nil
+      }
+      store = si
+    case is GlobalValueInst where allowGlobalValue:
+      break
+    default:
+      if !inst.isValidInStaticInitializerOfGlobal {
+        return nil
+      }
+    }
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
 }

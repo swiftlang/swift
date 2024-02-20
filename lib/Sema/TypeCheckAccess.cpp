@@ -20,6 +20,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Import.h"
@@ -114,54 +115,67 @@ public:
   void checkGlobalActorAccess(const Decl *D);
 };
 
-class TypeAccessScopeDiagnoser : private ASTWalker {
-  AccessScope accessScope;
-  const DeclContext *useDC;
-  bool treatUsableFromInlineAsPublic;
-  const IdentTypeRepr *offendingType = nullptr;
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
-    auto ITR = dyn_cast<IdentTypeRepr>(TR);
-    if (!ITR)
-      return Action::Continue();
-
-    const ValueDecl *VD = ITR->getBoundDecl();
-    if (!VD)
-      return Action::Continue();
-
-    if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic)
-        != accessScope)
-      return Action::Continue();
-
-    offendingType = ITR;
-    return Action::Stop();
-  }
-
-  explicit TypeAccessScopeDiagnoser(AccessScope accessScope,
-                                    const DeclContext *useDC,
-                                    bool treatUsableFromInlineAsPublic)
-    : accessScope(accessScope), useDC(useDC),
-      treatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic) {}
-
-public:
-  static const TypeRepr *findTypeWithScope(TypeRepr *TR,
-                                           AccessScope accessScope,
-                                           const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic) {
-    if (TR == nullptr)
-      return nullptr;
-    TypeAccessScopeDiagnoser diagnoser(accessScope, useDC,
-                                       treatUsableFromInlineAsPublic);
-    TR->walk(diagnoser);
-    return diagnoser.offendingType;
-  }
-};
-
 } // end anonymous namespace
+
+/// Searches the given type representation for a `DeclRefTypeRepr` that is
+/// bound to a type declaration with the given access scope. The type
+/// representation is searched in source order. For example, nodes in
+/// `A<T>.B<U>` will be checked in the following order: `ATBU`.
+static const DeclRefTypeRepr *
+findTypeDeclWithAccessScope(TypeRepr *TR, AccessScope accessScope,
+                            const DeclContext *useDC,
+                            bool treatUsableFromInlineAsPublic) {
+  if (!TR) {
+    return nullptr;
+  }
+
+  class Finder : public ASTWalker {
+    AccessScope accessScope;
+    const DeclContext *useDC;
+    bool treatUsableFromInlineAsPublic;
+
+    const DeclRefTypeRepr *theFind;
+
+  public:
+    explicit Finder(AccessScope accessScope, const DeclContext *useDC,
+                    bool treatUsableFromInlineAsPublic)
+        : accessScope(accessScope), useDC(useDC),
+          treatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
+          theFind(nullptr) {}
+
+    const DeclRefTypeRepr *getFind() const { return theFind; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
+    MemberTypeReprWalkingScheme
+    getMemberTypeReprWalkingScheme() const override {
+      return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+    }
+
+    PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
+      auto *declRefTR = dyn_cast<DeclRefTypeRepr>(TR);
+      if (!declRefTR)
+        return Action::Continue();
+
+      const ValueDecl *VD = declRefTR->getBoundDecl();
+      if (!VD)
+        return Action::Continue();
+
+      if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic) !=
+          accessScope)
+        return Action::Continue();
+
+      theFind = declRefTR;
+      return Action::Stop();
+    }
+  } walker(accessScope, useDC, treatUsableFromInlineAsPublic);
+
+  TR->walk(walker);
+
+  return walker.getFind();
+}
 
 /// Checks if the access scope of the type described by \p TL contains
 /// \p contextAccessScope. If it isn't, calls \p diagnose with a TypeRepr
@@ -190,6 +204,46 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (contextAccessScope.isInContext() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
+
+  // Report where it was imported from.
+  if (contextAccessScope.isPublic() ||
+      contextAccessScope.isPackage()) {
+    auto SF = useDC->getParentSourceFile();
+    auto report = [&](const DeclRefTypeRepr *typeRepr, const ValueDecl *VD) {
+      ImportAccessLevel import = VD->getImportAccessFrom(useDC);
+      if (import.has_value()) {
+        if (SF) {
+          auto useLevel = contextAccessScope.isPublic() ? AccessLevel::Public
+                                                        : AccessLevel::Package;
+          SF->registerAccessLevelUsingImport(import.value(), useLevel);
+        }
+
+        if (Context.LangOpts.EnableModuleApiImportRemarks) {
+          SourceLoc diagLoc = typeRepr? typeRepr->getLoc()
+                                      : extractNearestSourceLoc(useDC);
+          ModuleDecl *importedVia = import->module.importedModule,
+                     *sourceModule = VD->getModuleContext();
+          Context.Diags.diagnose(diagLoc, diag::module_api_import,
+                                 VD, importedVia, sourceModule,
+                                 importedVia == sourceModule,
+                                 /*isImplicit*/!typeRepr);
+        }
+      }
+    };
+
+    if (typeRepr) {
+      typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
+        const ValueDecl *VD = TR->getBoundDecl();
+        report(TR, VD);
+        return true;
+      }));
+    } else if (type) {
+      type.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+        report(/*typeRepr=*/nullptr, VD);
+        return TypeWalker::Action::Continue;
+      }));
+    }
+  };
 
   AccessScope problematicAccessScope = AccessScope::getPublic();
 
@@ -259,14 +313,14 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     }
   }
 
-  const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
+  const DeclRefTypeRepr *complainRepr = findTypeDeclWithAccessScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
   ImportAccessLevel complainImport = llvm::None;
   if (complainRepr) {
-    const ValueDecl *VD =
-      static_cast<const IdentTypeRepr*>(complainRepr)->getBoundDecl();
-    assert(VD && "findTypeWithScope should return bound TypeReprs only");
+    const ValueDecl *VD = complainRepr->getBoundDecl();
+    assert(VD &&
+           "findTypeDeclWithAccessScope should return bound TypeReprs only");
     complainImport = VD->getImportAccessFrom(useDC);
 
     // Don't complain about an import that doesn't restrict the access
@@ -320,8 +374,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   diag.highlight(complainRepr->getSourceRange());
   diag.flush();
 
-  if (auto ITR = dyn_cast<IdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = ITR->getBoundDecl();
+  if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = declRefTR->getBoundDecl();
     VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
@@ -337,15 +391,15 @@ static void noteLimitingImport(ASTContext &ctx,
   assert(limitImport->accessLevel != AccessLevel::Public &&
          "a public import shouldn't limit the access level of a decl");
 
-  if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
-    ValueDecl *VD = ITR->getBoundDecl();
-    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr)) {
+    ValueDecl *VD = declRefTR->getBoundDecl();
+    ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,
                        limitImport->accessLevel,
                        limitImport->module.importedModule);
   } else {
-    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
+    ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
                        limitImport->accessLevel);
   }
@@ -836,7 +890,7 @@ public:
             ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
-      // Sanity check: we couldn't find the superclass for whatever reason
+      // Soundness check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
       if (superclassLocIter == inheritedEntries.end())
@@ -1040,10 +1094,18 @@ public:
       FK_Initializer
     };
 
+    // This must stay in sync with diag::function_type_access
+    enum {
+      EK_Parameter = 0,
+      EK_ThrownError,
+      EK_Result
+    };
+
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
     ImportAccessLevel minImportLimit = llvm::None;
+    unsigned entityKind = EK_Parameter;
 
     bool hasInaccessibleParameterWrapper = false;
     for (auto *P : *fn->getParameters()) {
@@ -1085,7 +1147,25 @@ public:
           });
     }
 
-    bool problemIsResult = false;
+    if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
+      checkTypeAccess(
+        fn->getThrownInterfaceType(), thrownTypeRepr, fn,
+        /*mayBeInferred*/ false,
+        [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+            DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
+          if (typeAccessScope.isChildOf(minAccessScope) ||
+              (!complainRepr &&
+               typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+            minAccessScope = typeAccessScope;
+            complainRepr = thisComplainRepr;
+            downgradeToWarning = downgradeDiag;
+            minImportLimit = importLimit;
+            entityKind = EK_ThrownError;
+          }
+      });
+    }
+
+
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
                       FD, /*mayBeInferred*/false,
@@ -1100,7 +1180,7 @@ public:
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
           minImportLimit = importLimit;
-          problemIsResult = true;
+          entityKind = EK_Result;
         }
       });
     }
@@ -1122,7 +1202,7 @@ public:
         diagID = diag::function_type_access_warn;
       auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
                                isa<FileUnit>(fn->getDeclContext()), minAccess,
-                               functionKind, problemIsResult,
+                               functionKind, entityKind,
                                hasInaccessibleParameterWrapper);
       highlightOffendingType(diag, complainRepr);
       noteLimitingImport(fn->getASTContext(), minImportLimit, complainRepr);
@@ -1214,7 +1294,7 @@ public:
   }
 
   void checkAttachedMacrosAccess(const Decl *D) {
-    for (auto customAttrC : D->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
       auto customAttr = const_cast<CustomAttr *>(customAttrC);
       auto *macroDecl = D->getResolvedMacro(customAttr);
       if (macroDecl) {
@@ -1544,7 +1624,7 @@ public:
             ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
-      // Sanity check: we couldn't find the superclass for whatever reason
+      // Soundness check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
       if (superclassLocIter == inheritedEntries.end())
@@ -1915,6 +1995,13 @@ swift::getDisallowedOriginKind(const Decl *decl,
       isFragileClangNode(decl->getClangNode()))
     return DisallowedOriginKind::FragileCxxAPI;
 
+  // Report non-public import last as it can be ignored by the caller.
+  // See \c diagnoseValueDeclRefExportability.
+  auto importSource = decl->getImportAccessFrom(where.getDeclContext());
+  if (importSource.has_value() &&
+      importSource->accessLevel < AccessLevel::Public)
+    return DisallowedOriginKind::NonPublicImport;
+
   return DisallowedOriginKind::None;
 }
 
@@ -1940,6 +2027,25 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
                              Where.withReason(reason), flags);
   }
 
+  /// Identify the AsyncSequence.flatMap set of functions from the
+  /// _Concurrency module.
+  static bool isAsyncSequenceFlatMap(const GenericContext *gc) {
+    auto func = dyn_cast<FuncDecl>(gc);
+    if (!func)
+      return false;
+
+    auto proto = func->getDeclContext()->getSelfProtocolDecl();
+    if (!proto ||
+        !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+      return false;
+
+    ASTContext &ctx = proto->getASTContext();
+    if (func->getModuleContext()->getName() != ctx.Id_Concurrency)
+      return false;
+
+    return !func->getName().isSimpleName("flatMap");
+  }
+
   void checkGenericParams(const GenericContext *ownerCtx,
                           const ValueDecl *ownerDecl) {
     if (!ownerCtx->isGenericContext())
@@ -1957,6 +2063,13 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     }
 
     if (ownerCtx->getTrailingWhereClause()) {
+      // Ignore the where clause for AsyncSequence.flatMap from the
+      // _Concurrency module. This is an egregious hack to allow us to
+      // use overloading tricks to retain the behavior previously
+      // afforded by rethrowing conformances.
+      if (isAsyncSequenceFlatMap(ownerCtx))
+        return;
+
       forAllRequirementTypes(WhereClauseOwner(
                                const_cast<GenericContext *>(ownerCtx)),
                              [&](Type type, TypeRepr *typeRepr) {
@@ -2174,6 +2287,10 @@ public:
 
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
     }
+
+    if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
+      checkType(fn->getThrownInterfaceType(), thrownTypeRepr, fn);
+    }
   }
 
   void visitFuncDecl(FuncDecl *FD) {
@@ -2256,6 +2373,32 @@ public:
     Where = wasWhere.withExported(hasExportedMembers ||
                                   !ED->getInherited().empty());
     checkConstrainedExtensionRequirements(ED, hasExportedMembers);
+
+    if (!hasExportedMembers &&
+        !ED->getInherited().empty()) {
+      // If we haven't already visited the extended nominal visit it here.
+      // This logic is too wide but prevents false reports of an unused public
+      // import. We should instead check for public generic requirements
+      // similarly to ShouldPrintForModuleInterface::shouldPrint.
+      auto DC = Where.getDeclContext();
+      ImportAccessLevel import = extendedType->getImportAccessFrom(DC);
+      if (import.has_value()) {
+        auto SF = DC->getParentSourceFile();
+        if (SF)
+          SF->registerAccessLevelUsingImport(import.value(),
+                                             AccessLevel::Public);
+
+        auto &ctx = DC->getASTContext();
+        if (ctx.LangOpts.EnableModuleApiImportRemarks) {
+          ModuleDecl *importedVia = import->module.importedModule,
+                     *sourceModule = ED->getModuleContext();
+          ED->diagnose(diag::module_api_import,
+                       ED, importedVia, sourceModule,
+                       importedVia == sourceModule,
+                       /*isImplicit*/false);
+        }
+      }
+    }
   }
 
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
@@ -2349,6 +2492,49 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
                                                     const ExportContext &where) {
   auto downgradeToWarning = DowngradeToWarning::No;
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
+}
+
+void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
+  ASTContext &ctx = SF.getASTContext();
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
+  for (const auto &import : SF.getImports()) {
+    // Only check imports with an explicit access level above internal.
+    if (!import.accessLevelRange.isValid() ||
+        import.accessLevel <= AccessLevel::Internal)
+      continue;
+
+    // Ignore submodules as we associate decls with the top module.
+    // The top module will be reported if it's not used.
+    auto importedModule = import.module.importedModule;
+    if (importedModule->getTopLevelModule() != importedModule)
+      continue;
+
+    // Ignore @_exported as by themselves the import is meaningful.
+    if (import.options.contains(ImportFlags::Exported))
+      continue;
+
+    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(importedModule);
+    if (import.accessLevel <= levelUsed)
+      continue;
+
+    auto diagId = import.accessLevel == AccessLevel::Public ?
+                                          diag::remove_public_import :
+                                          diag::remove_package_import;
+    auto inFlight = ctx.Diags.diagnose(import.importLoc,
+                                       diagId,
+                                       importedModule);
+
+    if (levelUsed == AccessLevel::Package) {
+      inFlight.fixItReplace(import.accessLevelRange, "package");
+    } else if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+      // Let it default to internal.
+      inFlight.fixItRemove(import.accessLevelRange);
+    } else {
+      inFlight.fixItReplace(import.accessLevelRange, "internal");
+    }
+  }
 }
 
 void swift::checkAccessControl(Decl *D) {

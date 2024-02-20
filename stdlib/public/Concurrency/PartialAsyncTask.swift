@@ -21,10 +21,25 @@ import Swift
 internal func _swiftJobRun(_ job: UnownedJob,
                            _ executor: UnownedSerialExecutor) -> ()
 
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_job_run_on_task_executor")
+@usableFromInline
+internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
+                                         _ executor: UnownedTaskExecutor) -> ()
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_job_run_on_serial_and_task_executor")
+@usableFromInline
+internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
+                                         _ serialExecutor: UnownedSerialExecutor,
+                                         _ taskExecutor: UnownedTaskExecutor) -> ()
+
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
 
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -94,14 +109,32 @@ public struct UnownedJob: Sendable {
     _swiftJobRun(self, executor)
   }
 
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 9999, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(on executor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(self, executor)
+  }
+
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 9999, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
+                               taskExecutor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
+  }
+
 }
 
+@_unavailableInEmbedded
 @available(SwiftStdlib 5.9, *)
 extension UnownedJob: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {
     let id = _getJobTaskId(self)
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
@@ -116,7 +149,7 @@ extension UnownedJob: CustomStringConvertible {
 
 /// Deprecated equivalent of ``ExecutorJob``.
 ///
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -147,9 +180,10 @@ public struct Job: Sendable {
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.
+  @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
@@ -172,7 +206,7 @@ extension Job {
   /// The passed in executor reference is used to establish the executor context for the job,
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
-  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
   /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
   /// as a job can only ever be run once, and must not be accessed after it has been run.
@@ -185,7 +219,7 @@ extension Job {
   }
 }
 
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -215,9 +249,10 @@ public struct ExecutorJob: Sendable {
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.
+  @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
@@ -240,7 +275,7 @@ extension ExecutorJob {
   /// The passed in executor reference is used to establish the executor context for the job,
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
-  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
   /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
   /// as a job can only ever be run once, and must not be accessed after it has been run.
@@ -287,7 +322,7 @@ extension TaskPriority {
   @available(SwiftStdlib 5.9, *)
   public init?(_ p: JobPriority) {
     guard p.rawValue != 0 else {
-      /// 0 is "undefined"
+      // 0 is "undefined"
       return nil
     }
     self = TaskPriority(rawValue: p.rawValue)
@@ -325,7 +360,7 @@ extension JobPriority: Comparable {
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: UncheckedContinuation
+// MARK: UnsafeContinuation
 
 /// A mechanism to interface
 /// between synchronous and asynchronous code,

@@ -528,6 +528,9 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return getConstantValue(convertEscapeInst->getOperand());
 
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(value))
+    return getConstantValue(mdi->getValue());
+
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -768,7 +771,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
       // Return a statically diagnosed overflow if the operation is supposed to
       // trap on overflow.
-      if (overflowed && !operand2.getIntegerValue().isNullValue())
+      if (overflowed && !operand2.getIntegerValue().isZero())
         return getUnknown(evaluator, SILValue(inst), UnknownReason::Overflow);
 
       auto &allocator = evaluator.getAllocator();

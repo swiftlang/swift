@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
 prefix operator /
@@ -262,7 +262,7 @@ default:
 }
 
 do {} catch /x/ {}
-// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
+// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'Never'}}
 // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {

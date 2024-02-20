@@ -1,51 +1,57 @@
-import CASTBridging
-import CBasicBridging
+//===--- ASTGen.swift -----------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
-// Needed to use SyntaxTransformVisitor's visit method.
-@_spi(SyntaxTransformVisitor)
+import ASTBridging
+import BasicBridging
+import ParseBridging
 // Needed to use BumpPtrAllocator
-@_spi(RawSyntax)
-import SwiftSyntax
+@_spi(BumpPtrAllocator) @_spi(RawSyntax) import SwiftSyntax
+
 import struct SwiftDiagnostics.Diagnostic
 
-extension UnsafePointer {
-  public var raw: UnsafeMutableRawPointer {
-    UnsafeMutableRawPointer(mutating: self)
-  }
-}
-
 enum ASTNode {
-  case decl(UnsafeMutableRawPointer)
-  case stmt(UnsafeMutableRawPointer)
-  case expr(UnsafeMutableRawPointer)
-  case type(UnsafeMutableRawPointer)
-  case misc(UnsafeMutableRawPointer)
+  case decl(BridgedDecl)
+  case stmt(BridgedStmt)
+  case expr(BridgedExpr)
 
-  var rawValue: UnsafeMutableRawPointer {
-    switch self {
-    case .decl(let ptr):
-      return ptr
-    case .stmt(let ptr):
-      return ptr
-    case .expr(let ptr):
-      return ptr
-    case .type(let ptr):
-      return ptr
-    case .misc(let ptr):
-      return ptr
+  var castToExpr: BridgedExpr {
+    guard case .expr(let bridged) = self else {
+      fatalError("Expected an expr")
     }
+    return bridged
+  }
+
+  var castToStmt: BridgedStmt {
+    guard case .stmt(let bridged) = self else {
+      fatalError("Expected a stmt")
+    }
+    return bridged
+  }
+
+  var castToDecl: BridgedDecl {
+    guard case .decl(let bridged) = self else {
+      fatalError("Expected a decl")
+    }
+    return bridged
   }
 
   var bridged: BridgedASTNode {
     switch self {
     case .expr(let e):
-      return BridgedASTNode(ptr: e, kind: .expr)
+      return BridgedASTNode(raw: e.raw, kind: .expr)
     case .stmt(let s):
-      return BridgedASTNode(ptr: s, kind: .stmt)
+      return BridgedASTNode(raw: s.raw, kind: .stmt)
     case .decl(let d):
-      return BridgedASTNode(ptr: d, kind: .decl)
-    default:
-      fatalError("Must be expr, stmt, or decl.")
+      return BridgedASTNode(raw: d.raw, kind: .decl)
     }
   }
 }
@@ -61,9 +67,7 @@ class Boxed<Value> {
   }
 }
 
-struct ASTGenVisitor: SyntaxTransformVisitor {
-  typealias ResultType = ASTNode
-
+struct ASTGenVisitor {
   fileprivate let diagnosticEngine: BridgedDiagnosticEngine
 
   let base: UnsafeBufferPointer<UInt8>
@@ -72,50 +76,53 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 
   let ctx: BridgedASTContext
 
-  fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(slabSize: 256)
+  fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
+
+  /// Fallback legacy parser used when ASTGen doesn't have the generate(_:)
+  /// implementation for the AST node kind.
+  let legacyParse: BridgedLegacyParser
 
   init(
     diagnosticEngine: BridgedDiagnosticEngine,
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
-    astContext: BridgedASTContext
+    astContext: BridgedASTContext,
+    legacyParser: BridgedLegacyParser
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
+    self.legacyParse = legacyParser
   }
 
-  // TODO: this some how messes up the witness table when I uncomment it locally :/
-  //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
-  //    if let node = node { return visit(node) }
-  //    return nil
-  //  }
-
-  @_disfavoredOverload
-  public func visit(_ node: SourceFileSyntax) -> ASTNode {
-    fatalError("Use other overload.")
-  }
-
-  public func visitAny(_ node: Syntax) -> ASTNode {
-    fatalError("Not implemented.")
-  }
-
-  public func visit(_ node: SourceFileSyntax) -> [UnsafeMutableRawPointer] {
-    var out = [UnsafeMutableRawPointer]()
+  func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
+    var out = [BridgedDecl]()
 
     for element in node.statements {
-      let loc = element.bridgedSourceLoc(in: self)
-      let swiftASTNodes = visit(element)
+      let loc = self.generateSourceLoc(element)
+      let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
       case .decl(let d):
         out.append(d)
       case .stmt(let s):
-        out.append(TopLevelCodeDecl_createStmt(astContext: self.ctx, declContext: self.declContext, startLoc: loc, statement: s, endLoc: loc))
+        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          stmt: s,
+          endLoc: loc
+        )
+        out.append(topLevelDecl.asDecl)
       case .expr(let e):
-        out.append(TopLevelCodeDecl_createExpr(astContext: self.ctx, declContext: self.declContext, startLoc: loc, expression: e, endLoc: loc))
-      default:
-        fatalError("Top level nodes must be decls, stmts, or exprs.")
+        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          expr: e,
+          endLoc: loc
+        )
+        out.append(topLevelDecl.asDecl)
       }
     }
 
@@ -124,13 +131,121 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 }
 
 extension ASTGenVisitor {
+  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  ///
+  /// If the token text is `_`, return an empty identifier. If the token is an
+  /// escaped identifier, backticks are stripped.
+  @inline(__always)
+  func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
+    if token.rawTokenKind == .wildcard {
+      return nil
+    }
+    var text = token.rawText
+    if text.count > 2 && text.hasPrefix("`") && text.hasSuffix("`") {
+      text = .init(rebasing: text.dropFirst().dropLast())
+    }
+    return self.ctx.getIdentifier(text.bridged)
+  }
+
+  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  ///
+  /// If the `token` text is `nil`, return an empty identifier.
+  @inline(__always)
+  func generateIdentifier(_ token: TokenSyntax?) -> BridgedIdentifier {
+    token.map(generateIdentifier(_:)) ?? nil
+  }
+
+  /// Obtains the start location of the node excluding leading trivia in the
+  /// source buffer.
+  @inline(__always)
+  func generateSourceLoc(_ node: some SyntaxProtocol) -> BridgedSourceLoc {
+    BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+  }
+
+  /// Obtains the start location of the node excluding leading trivia in the
+  /// source buffer. If the `node` is nil returns an invalid source location.
+  @inline(__always)
+  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+    node.map(generateSourceLoc(_:)) ?? nil
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  @inline(__always)
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
+    return (
+      self.generateIdentifier(token),
+      self.generateSourceLoc(token)
+    )
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
+  /// source location.
+  @inline(__always)
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
+    token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  @inline(__always)
+  func generateLocatedIdentifier(_ token: TokenSyntax) -> BridgedLocatedIdentifier {
+    BridgedLocatedIdentifier(
+      name: self.generateIdentifier(token),
+      nameLoc: self.generateSourceLoc(token)
+    )
+  }
+
+  /// Obtains bridged token source range from a pair of token nodes.
+  @inline(__always)
+  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> BridgedSourceRange {
+    BridgedSourceRange(
+      start: self.generateSourceLoc(start),
+      end: self.generateSourceLoc(end)
+    )
+  }
+
+  /// Obtains bridged token source range of a syntax node.
+  @inline(__always)
+  func generateSourceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+    guard let start = node.firstToken(viewMode: .sourceAccurate) else {
+      return BridgedSourceRange(start: nil, end: nil)
+    }
+    return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
+  }
+
+  /// Obtains bridged character source range.
+  @inline(__always)
+  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
+    BridgedCharSourceRange(
+      start: BridgedSourceLoc(at: start, in: self.base),
+      byteLength: UInt32(length.utf8Length)
+    )
+  }
+
+  /// Extract `SyntaxText` of the node.
+  @inline(__always)
+  func extractRawText(_ node: some SyntaxProtocol) -> SyntaxText {
+    SyntaxText(
+      baseAddress: self.base.baseAddress! + node.positionAfterSkippingLeadingTrivia.utf8Offset,
+      count: node.trimmedLength.utf8Length
+    )
+  }
+}
+
+extension ASTGenVisitor {
   /// Replaces the current declaration context with `declContext` for the duration of its execution, and calls `body`.
   @inline(__always)
-  func withDeclContext(_ declContext: BridgedDeclContext, _ body: () -> Void) {
+  func withDeclContext<T>(_ declContext: BridgedDeclContext, _ body: () -> T) -> T {
     let oldDeclContext = self.declContext
     self.declContext = declContext
-    body()
-    self.declContext = oldDeclContext
+    defer {
+      self.declContext = oldDeclContext
+    }
+    return body()
   }
 }
 
@@ -147,109 +262,52 @@ extension ASTGenVisitor {
   }
 }
 
-// Misc visits.
-// TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
-extension ASTGenVisitor {
-  public func visit(_ node: MemberBlockItemSyntax) -> ASTNode {
-    visit(Syntax(node.decl))
-  }
-
-  public func visit(_ node: InitializerClauseSyntax) -> ASTNode {
-    visit(node.value)
-  }
-
-  public func visit(_ node: ConditionElementSyntax) -> ASTNode {
-    visit(node.condition)
-  }
-
-  public func visit(_ node: CodeBlockItemSyntax) -> ASTNode {
-    visit(node.item)
-  }
-
-  public func visit(_ node: ArrayElementSyntax) -> ASTNode {
-    visit(node.expression)
-  }
-
-  @inline(__always)
-  func visit(_ node: CodeBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.visit($0).bridged }.bridgedArray(in: self)
-  }
-}
-
 // Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
-// 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
+// 'self.generate(foo: FooSyntax)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
   @inline(__always)
-  func visit(_ node: TypeSyntax?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.visit(node)
+  func generate(type node: TypeSyntax?) -> BridgedNullableTypeRepr {
+    node.map(generate(type:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: ExprSyntax?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.visit(node)
+  func generate(expr node: ExprSyntax?) -> BridgedNullableExpr {
+    node.map(generate(expr:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: (some SyntaxChildChoices)?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    // This call recurses without disambiguation.
-    return (self.visit as (_) -> ASTNode)(node)
+  func generate(pattern node: PatternSyntax?) -> BridgedNullablePattern {
+    node.map(generate(pattern:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: GenericParameterClauseSyntax?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.visit(node)
+  func generate(genericParameterClause node: GenericParameterClauseSyntax?) -> BridgedNullableGenericParamList {
+    node.map(generate(genericParameterClause:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: GenericWhereClauseSyntax?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.visit(node)
+  func generate(genericWhereClause node: GenericWhereClauseSyntax?) -> BridgedNullableTrailingWhereClause {
+    node.map(generate(genericWhereClause:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: EnumCaseParameterClauseSyntax?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.visit(node)
+  func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax?) -> BridgedNullableParameterList {
+    node.map(generate(enumCaseParameterClause:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    guard let node else {
-      return .init()
-    }
-
-    return self.visit(node)
+  func generate(accessorParameters node: AccessorParametersSyntax?) -> BridgedNullableParameterList {
+    node.map(generate(accessorParameters:)).asNullable
   }
 
   @inline(__always)
-  func visit(_ node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
-    guard let node else {
-      return .init()
-    }
+  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
+    node.map(generate(inheritedTypeList:)) ?? .init()
+  }
 
-    return self.visit(node)
+  @inline(__always)
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
+    node.map(generate(precedenceGroupNameList:)) ?? .init()
   }
 }
 
@@ -278,7 +336,16 @@ extension Collection {
       }
     }
 
-    return .init(data: baseAddress, numElements: SwiftInt(self.count))
+    return .init(data: baseAddress, count: self.count)
+  }
+}
+
+extension CollectionOfOne {
+  /// Returns a single element as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    let buffer = astgen.allocator.allocate(Element.self, count: 1)
+    _ = buffer.initialize(from: self)
+    return .init(data: buffer.baseAddress, count: 1)
   }
 }
 
@@ -292,7 +359,7 @@ extension LazyCollectionProtocol {
     let buffer = astgen.allocator.allocate(Element.self, count: self.count)
     _ = buffer.initialize(from: self)
 
-    return .init(data: buffer.baseAddress, numElements: SwiftInt(self.count))
+    return .init(data: buffer.baseAddress, count: self.count)
   }
 }
 
@@ -319,24 +386,178 @@ extension Optional where Wrapped: LazyCollectionProtocol {
   }
 }
 
+extension TokenSyntax {
+  /// Get `Keyword` kind if the token is a keyword.
+  var keywordKind: Keyword? {
+    // Performance note:
+    // This is faster than `token.tokenKind == .keyword(.true)` because
+    // `TokenKind.tokenKind` may instantiate `Swift.String`.
+    // That being said, `SwiftSyntax.Keyword` is a non-SPI public type, so it
+    // cannot be `@frozen`. Also `Keyword(_:SyntaxText)` itself is heavier than
+    // simple `token.rawText == "true"`.
+    // We should ensure `token.keywordKind == .true` is optimized out to
+    // a simple `cmp` instruction.
+    guard rawTokenKind == .keyword else {
+      return nil
+    }
+    return Keyword(self.rawText)
+  }
+}
+
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
-  sourceFilePtr: UnsafePointer<UInt8>,
-  dc: UnsafeMutableRawPointer,
-  ctx: UnsafeMutableRawPointer,
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  dc: BridgedDeclContext,
+  ctx: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
-  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
-    ASTGenVisitor(
-      diagnosticEngine: .init(raw: diagEnginePtr),
-      sourceBuffer: sourceFile.pointee.buffer,
-      declContext: BridgedDeclContext(raw: dc),
-      astContext: BridgedASTContext(raw: ctx)
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  ASTGenVisitor(
+    diagnosticEngine: diagEngine,
+    sourceBuffer: sourceFile.pointee.buffer,
+    declContext: dc,
+    astContext: ctx,
+    legacyParser: legacyParser
+  )
+  .generate(sourceFile: sourceFile.pointee.syntax)
+  .forEach { callback($0.raw, outputContext) }
+}
+
+/// Generate an AST node at the given source location. Returns the generated
+/// ASTNode and mutate the pointee of `endLocPtr` to the end of the node.
+private func _build<Node: SyntaxProtocol, Result>(
+  generator: (ASTGenVisitor) -> (Node) -> Result,
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> Result? {
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+
+  // Find the type syntax node.
+  guard
+    let node = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      // FIXME: findSyntaxNodeInSourceFile should receive `BridgedSourceLoc`.
+      sourceLocationPtr: sourceLoc.getOpaquePointerValue()?.assumingMemoryBound(to: UInt8.self),
+      type: Node.self,
+      wantOutermost: true
     )
-    .visit(sourceFile.pointee.syntax)
-    .forEach { callback($0, outputContext) }
+  else {
+    // FIXME: Produce an error
+    return nil
   }
+
+  // Fill in the end location.
+  endLocPtr.pointee = sourceLoc.advanced(by: node.totalLength.utf8Length)
+
+  // Convert the syntax node.
+  return generator(
+    ASTGenVisitor(
+      diagnosticEngine: diagEngine,
+      sourceBuffer: sourceFile.pointee.buffer,
+      declContext: declContext,
+      astContext: astContext,
+      legacyParser: legacyParser
+    )
+  )(node)
+}
+
+@_cdecl("swift_ASTGen_buildTypeRepr")
+@usableFromInline
+func buildTypeRepr(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    generator: ASTGenVisitor.generate(type:),
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )?.raw
+}
+
+@_cdecl("swift_ASTGen_buildDecl")
+@usableFromInline
+func buildDecl(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    generator: ASTGenVisitor.generate(decl:),
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )?.raw
+}
+
+@_cdecl("swift_ASTGen_buildExpr")
+@usableFromInline
+func buildExpr(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    generator: ASTGenVisitor.generate(expr:),
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )?.raw
+}
+
+@_cdecl("swift_ASTGen_buildStmt")
+@usableFromInline
+func buildStmt(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    generator: ASTGenVisitor.generate(stmt:),
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )?.raw
 }

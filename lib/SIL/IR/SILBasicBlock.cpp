@@ -19,7 +19,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -442,7 +441,7 @@ bool SILBasicBlock::hasPhi() const {
 
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
   for (auto &Inst : *this)
-    if (Inst.isMetaInstruction())
+    if (!Inst.isMetaInstruction())
       return Inst.getDebugScope();
   return begin()->getDebugScope();
 }

@@ -52,6 +52,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/Timer.h"
+#include <cmath>
 #include <iterator>
 
 using namespace swift;
@@ -85,7 +86,7 @@ namespace {
         ParentDC = oldParentDC;
 
         TypeChecker::computeCaptures(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       } 
 
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
@@ -113,12 +114,15 @@ namespace {
           CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Caller-side default arguments need their @autoclosures checked.
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
-        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+        if (DAE->isCallerSide() &&
+            (DAE->getParamDecl()->isAutoClosure() ||
+             (DAE->getParamDecl()->getDefaultArgumentKind() ==
+              DefaultArgumentKind::ExpressionMacro)))
           DAE->getCallerSideDefaultExpr()->walk(*this);
 
       // Macro expansion expressions require a DeclContext as well.
@@ -133,7 +137,7 @@ namespace {
     PreWalkAction walkToDeclPre(Decl *D) override {
       // But we do want to walk into the initializers of local
       // variables.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
   private:
@@ -172,7 +176,7 @@ namespace {
 
       if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
-        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
+        llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
 
         if (AFD) {
@@ -201,6 +205,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
+  ContextualizeClosuresAndMacros CC(DC);
+  E->walk(CC);
+}
+
+void TypeChecker::contextualizeCallSideDefaultArgument(DeclContext *DC,
+                                                       Expr *E) {
   ContextualizeClosuresAndMacros CC(DC);
   E->walk(CC);
 }
@@ -257,7 +267,7 @@ namespace {
       //   - non-local initializers
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
         if (CE->getRawDiscriminator() != AutoClosureExpr::InvalidDiscriminator)
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         assert(
             CE->getRawDiscriminator() == AutoClosureExpr::InvalidDiscriminator);
@@ -267,7 +277,7 @@ namespace {
         // but parenting to the autoclosure instead of the outer closure.
         CE->getBody()->walk(*this);
 
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Explicit closures start their own sequence.
@@ -288,7 +298,7 @@ namespace {
           CE->getBody()->walk(innerVisitor);
         }
 
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
 
       // Caller-side default arguments need their @autoclosures checked.
@@ -323,7 +333,7 @@ namespace {
 
       // But we do want to walk into the initializers of local
       // variables.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -999,6 +1009,8 @@ public:
 
   StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
+  llvm::SmallVector<GenericEnvironment *, 4> genericSigStack;
+
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
@@ -1062,56 +1074,15 @@ public:
       return RS;
     }
 
-    // If the body consisted of a single return without a result
-    // 
-    //   func foo() -> Int {
-    //     return
-    //   }
-    // 
-    // in parseAbstractFunctionBody the return is given an empty, implicit tuple
-    // as its result
-    //
-    //   func foo() -> Int {
-    //     return ()
-    //   }
-    //
-    // Look for that case and diagnose it as missing return expression.
-    if (!ResultTy->isVoid() && TheFunc->hasSingleExpressionBody()) {
-      auto expr = TheFunc->getSingleExpressionBody();
-      if (expr->isImplicit() && isa<TupleExpr>(expr) &&
-          cast<TupleExpr>(expr)->getNumElements() == 0) {
-        getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                       diag::return_expr_missing);
-        return RS;
-      }
+    using namespace constraints;
+    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto resultTarget = TypeChecker::typeCheckTarget(target);
+    if (resultTarget) {
+      RS->setResult(resultTarget->getAsExpr());
+    } else {
+      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
+                                              ResultTy, DC->getParentModule());
     }
-
-    Expr *E = RS->getResult();
-    TypeCheckExprOptions options = {};
-    
-    if (LeaveBraceStmtBodyUnchecked) {
-      assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-
-    ContextualTypePurpose ctp = CTP_ReturnStmt;
-    if (auto func =
-            dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
-      if (func->hasSingleExpressionBody()) {
-        ctp = CTP_ReturnSingleExpr;
-      }
-    }
-
-    auto exprTy =
-        TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
-    RS->setResult(E);
-
-    if (!exprTy) {
-      tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), E, ResultTy,
-                                              DC->getParentModule());
-    }
-
     return RS;
   }
 
@@ -1195,10 +1166,22 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-    if (!getASTContext().getErrorDecl())
+    // Look up the catch node for this "throw" to determine the error type.
+    CatchNode catchNode = ASTScope::lookupCatchNode(
+        DC->getParentModule(), TS->getThrowLoc());
+    Type errorType;
+    if (catchNode) {
+      errorType = catchNode.getThrownErrorTypeInContext(Ctx).value_or(Type());
+    }
+
+    // If there was no error type, use 'any Error'. We'll check it later.
+    if (!errorType) {
+      errorType = getASTContext().getErrorExistentialType();
+    }
+
+    if (!errorType)
       return TS;
 
-    Type errorType = getASTContext().getErrorExistentialType();
     TypeChecker::typeCheckExpression(E, DC, {errorType, CTP_ThrowStmt});
     TS->setSubExpr(E);
 
@@ -1369,15 +1352,15 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
-    Stmt *S = IS->getThenStmt();
-    typeCheckStmt(S);
-    IS->setThenStmt(S);
+    auto *TS = IS->getThenStmt();
+    typeCheckStmt(TS);
+    IS->setThenStmt(TS);
 
-    if ((S = IS->getElseStmt())) {
-      typeCheckStmt(S);
-      IS->setElseStmt(S);
+    if (auto *ES = IS->getElseStmt()) {
+      typeCheckStmt(ES);
+      IS->setElseStmt(ES);
     }
-    
+
     return IS;
   }
   
@@ -1427,7 +1410,10 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    if (TypeChecker::typeCheckForEachBinding(DC, S))
+    GenericEnvironment *genericSignature =
+        genericSigStack.empty() ? nullptr : genericSigStack.back();
+
+    if (TypeChecker::typeCheckForEachBinding(DC, S, genericSignature))
       return nullptr;
 
     // Type-check the body of the loop.
@@ -1435,9 +1421,17 @@ public:
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
     BraceStmt *Body = S->getBody();
+
+    if (auto packExpansion =
+            dyn_cast<PackExpansionExpr>(S->getParsedSequence()))
+      genericSigStack.push_back(packExpansion->getGenericEnvironment());
+
     typeCheckStmt(Body);
     S->setBody(Body);
-    
+
+    if (isa<PackExpansionExpr>(S->getParsedSequence()))
+      genericSigStack.pop_back();
+
     return S;
   }
 
@@ -1461,6 +1455,7 @@ public:
   }
 
   void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                                 CaseParentKind parentKind,
                                  bool &limitExhaustivityChecks,
                                  Type subjectType) {
     Pattern *pattern = labelItem.getPattern();
@@ -1477,6 +1472,9 @@ public:
     if (subjectType) {
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
       TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      if (parentKind == CaseParentKind::DoCatch)
+        patternOptions |= TypeResolutionFlags::SilenceNeverWarnings;
+
       auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, subjectType, patternOptions);
       if (coercedPattern)
@@ -1577,8 +1575,8 @@ public:
       for (auto &labelItem : caseLabelItemArray) {
         // Resolve the pattern in our case label if it has not been resolved and
         // check that our var decls follow invariants.
-        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
-                                  subjectType);
+        checkCaseLabelItemPattern(caseBlock, labelItem, parentKind,
+                                  limitExhaustivityChecks, subjectType);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
@@ -1670,10 +1668,11 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
+    Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
-                          getASTContext().getErrorExistentialType());
+                          caughtErrorType);
 
     return S;
   }
@@ -1710,8 +1709,9 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
 
   auto *E = RS->getResult();
 
-  // In an initializer, the only expression allowed is "nil", which indicates
-  // failure from a failable initializer.
+  // In an initializer, the only expressions allowed are "nil", which indicates
+  // failure from a failable initializer or "self" in the case of ~Escapable
+  // initializers with explicit lifetime dependence.
   if (auto *ctor =
           dyn_cast_or_null<ConstructorDecl>(fn->getAbstractFunctionDecl())) {
 
@@ -1719,6 +1719,19 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     // 'nil'.
     auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
     if (!nilExpr) {
+      if (ctor->hasLifetimeDependentReturn()) {
+        bool isSelf = false;
+        if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+          isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
+        }
+        if (!isSelf) {
+          ctx.Diags.diagnose(
+              RS->getStartLoc(),
+              diag::lifetime_dependence_ctor_non_self_or_nil_return);
+          RS->setResult(nullptr);
+        }
+        return RS;
+      }
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
       RS->setResult(nullptr);
@@ -2031,9 +2044,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (LeaveBraceStmtBodyUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
@@ -2071,7 +2081,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
@@ -2221,7 +2231,17 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
                          ctor, superclassDecl->getName());
     }
-
+    
+    // Only allowed to synthesize a throwing super.init() call if the init being
+    // checked is also throwing.
+    if (ctor->hasThrows()) {
+      // Diagnose on nonthrowing or rethrowing initializer.
+      if (!fromCtor->hasThrows() || fromCtor->hasPolymorphicEffect(EffectKind::Throws)) {
+        fromCtor->diagnose(diag::implicit_throws_super_init);
+        return true; // considered an error
+      }
+    }
+    
     // Not allowed to implicitly generate a super.init() call if the init
     // is async; that would hide the 'await' from the programmer.
     if (ctor->hasAsync()) {
@@ -2380,8 +2400,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/false);
+            typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
@@ -2401,7 +2420,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       }
     }
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-      if (AFD->hasBody() && !AFD->isBodyTypeChecked()) {
+      if (AFD->hasBody() && !AFD->isBodyTypeChecked() &&
+          !AFD->isBodySkipped()) {
         // Pre-check the function body if needed.
         (void)evaluateOrDefault(evaluator, PreCheckFunctionBodyRequest{AFD},
                                 nullptr);
@@ -2459,7 +2479,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             SM, brace->getSourceRange());
         // Unless this brace contains the loc, there's nothing to do.
         if (!braceCharRange.contains(Loc))
-          return Action::SkipChildren(S);
+          return Action::SkipNode(S);
 
         // Reset the node found in a parent context if it's not part of this
         // brace statement.
@@ -2519,16 +2539,16 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(Loc, E->getStartLoc()))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, E->getEndLoc());
       if (SM.isBeforeInBuffer(endLoc, Loc))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       // Don't walk into 'TapExpr'. They should be type checked with parent
       // 'InterpolatedStringLiteralExpr'.
       if (isa<TapExpr>(E))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       // If the location is within a result of a SingleValueStmtExpr, walk it
       // directly rather than as part of the brace. This ensures we type-check
@@ -2543,7 +2563,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             if (!result->walk(*this))
               return Action::Stop();
 
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
         }
         return Action::Continue(E);
@@ -2553,7 +2573,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         // NOTE: When a client wants to type check a closure signature, it
         // requests with closure's 'getLoc()' location.
         if (Loc == closure->getLoc())
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         DC = closure;
       }
@@ -2645,57 +2665,179 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   return false;
 }
 
+/// Insert an implicit return for a single expression body function if needed.
+static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
+  if (body->empty())
+    return;
+
+  // Must have a single active element (which is guarenteed to be the last
+  // element), or we must be allowing implicit last expression results.
+  auto &ctx = dc->getASTContext();
+  if (!body->getSingleActiveElement() &&
+      !ctx.LangOpts.hasFeature(Feature::ImplicitLastExprResults)) {
+    return;
+  }
+  auto node = body->getLastElement();
+  if (!node)
+    return;
+
+  auto makeResult = [&](Expr *E) {
+    body->setLastElement(ReturnStmt::createImplied(ctx, E));
+  };
+
+  // For a constructor, we only support nil literals as the implicit result.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(dc)) {
+    if (auto *E = node.dyn_cast<Expr *>()) {
+      if (ctor->isFailable() && isa<NilLiteralExpr>(E))
+        makeResult(E);
+    }
+    return;
+  }
+
+  // Otherwise, we only support implicit results for FuncDecls and ClosureExprs.
+  if (!isa<FuncDecl>(dc) && !isa<ClosureExpr>(dc))
+    return;
+
+  if (auto *fd = dyn_cast<FuncDecl>(dc)) {
+    // Don't apply if we have a result builder, or a Void return type.
+    if (getResultBuilderType(fd) || fd->getResultInterfaceType()->isVoid())
+      return;
+  }
+
+  // A statement can potentially become an expression.
+  if (auto *S = node.dyn_cast<Stmt *>()) {
+    if (S->mayProduceSingleValue(ctx)) {
+      auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+          ctx, S, dc, /*mustBeExpr*/ false);
+      makeResult(SVE);
+      return;
+    }
+  }
+
+  if (auto *E = node.dyn_cast<Expr *>()) {
+    // Take any expression, except for assignments. This helps improves
+    // diagnostics.
+    // TODO: We probably ought to apply this to closures too, but that currently
+    // regresses a couple of diagnostics.
+    if (!isa<ClosureExpr>(dc)) {
+      auto *SemanticExpr = E->getSemanticsProvidingExpr();
+      if (auto *SE = dyn_cast<SequenceExpr>(SemanticExpr)) {
+        if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1)))
+          return;
+      }
+      if (isa<AssignExpr>(SemanticExpr))
+        return;
+    }
+    makeResult(E);
+  }
+}
+
 BraceStmt *
 PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                                       AbstractFunctionDecl *AFD) const {
+  assert(!AFD->isBodySkipped());
+
   auto &ctx = AFD->getASTContext();
   auto *body = AFD->getBody();
   assert(body && "Expected body");
   assert(!AFD->isBodyTypeChecked() && "Body already type-checked?");
 
-  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
-    // Don't apply this pre-checking to functions with result builders.
-    if (getResultBuilderType(func))
-      return body;
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, AFD);
 
-    if (func->hasSingleExpressionBody() &&
-        func->getResultInterfaceType()->isVoid()) {
-      // The function returns void.  We don't need an explicit return, no
-      // matter what the type of the expression is. Take the inserted return
-      // back out.
-      body->setLastElement(func->getSingleExpressionBody());
-    }
-    // If there is a single statement in the body that can be turned into a
-    // single expression return, do so now.
-    if (!func->getResultInterfaceType()->isVoid()) {
-      if (auto *S = body->getSingleActiveStatement()) {
-        if (S->mayProduceSingleValue(evaluator)) {
-          auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-              ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-          body->setLastElement(RS);
-          func->setHasSingleExpressionBody();
-          func->setSingleExpressionBody(SVE);
-        }
-      }
-    }
-  }
-
+  // For constructors, we make sure that the body ends with a "return"
+  // stmt, which we either implicitly synthesize, or the user can write.
+  // This simplifies SILGen.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (body->empty() || !isKnownEndOfConstructor(body->getLastElement())) {
-      // For constructors, we make sure that the body ends with a "return"
-      // stmt, which we either implicitly synthesize, or the user can write.
-      // This simplifies SILGen.
       SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                    body->getElements().end());
-      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                          /*value*/ nullptr,
-                                          /*implicit*/ true));
+      Elts.push_back(ReturnStmt::createImplicit(ctx, body->getRBraceLoc(),
+                                                /*value*/ nullptr));
       body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
                                body->getRBraceLoc(), body->isImplicit());
     }
   }
   return body;
+}
+
+BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
+                                                ClosureExpr *closure) const {
+  auto *body = closure->getBody();
+
+  // If we have a single statement 'return', synthesize 'return ()' to ensure
+  // it's treated as a single expression body.
+  if (auto *S = body->getSingleActiveStatement()) {
+    if (auto *returnStmt = dyn_cast<ReturnStmt>(S)) {
+      if (!returnStmt->hasResult()) {
+        auto &ctx = closure->getASTContext();
+        auto *returnExpr = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                                  /*implicit*/ true);
+        returnStmt->setResult(returnExpr);
+      }
+    }
+  }
+  // Insert an implicit return if needed.
+  addImplicitReturnIfNeeded(body, closure);
+  return body;
+}
+
+/// Determine whether the given declaration requires a definition.
+///
+/// Only valid for declarations that can have definitions, i.e.,
+/// functions, initializers, etc.
+static bool requiresDefinition(Decl *decl) {
+  // Invalid, implicit, and Clang-imported declarations never
+  // require a definition.
+  if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+    return false;
+
+  // Protocol requirements do not require definitions.
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return false;
+
+  // Functions can have _silgen_name, semantics, and NSManaged attributes.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+        func->getAttrs().hasAttribute<ExternAttr>() ||
+        func->getAttrs().hasAttribute<SemanticsAttr>() ||
+        func->getAttrs().hasAttribute<NSManagedAttr>())
+      return false;
+  }
+
+  // Declarations in SIL and module interface files don't require
+  // definitions.
+  auto dc = decl->getDeclContext();
+  if (auto sourceFile = dc->getParentSourceFile()) {
+    switch (sourceFile->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
+      break;
+    }
+  }
+
+  // Declarations deserialized from a module file don't require definitions.
+  if (auto fileUnit = dyn_cast<FileUnit>(dc->getModuleScopeContext()))
+    if (fileUnit->getKind() == FileUnitKind::SerializedAST)
+      return false;
+
+  // Everything else requires a definition.
+  return true;
+}
+
+/// Determine whether the given declaration should not have a definition.
+static bool requiresNoDefinition(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // Function with @_extern should not have a body.
+    return func->getAttrs().hasAttribute<ExternAttr>();
+  }
+  // Everything else can have a definition.
+  return false;
 }
 
 BraceStmt *
@@ -2708,11 +2850,31 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
 
-  auto SF = AFD->getParentSourceFile();
-  if (SF)
-    TypeChecker::buildTypeRefinementContextHierarchyDelayed(*SF, AFD);
+  /// If the function body has been skipped, there's nothing to do here.
+  if (AFD->isBodySkipped())
+    return nullptr;
 
-  BraceStmt *body = AFD->getBody();
+  BraceStmt *body = AFD->getMacroExpandedBody();
+
+  // If there is no function body, there is nothing to type-check.
+  if (!body) {
+    // If a definition is required here, complain.
+    if (requiresDefinition(AFD)) {
+      if (isa<ConstructorDecl>(AFD))
+        AFD->diagnose(diag::missing_initializer_def);
+      else
+        AFD->diagnose(diag::func_decl_without_brace);
+    }
+
+    return nullptr;
+  }
+
+  // If the function body must not have a definition, complain and drop it.
+  if (requiresNoDefinition(AFD)) {
+    AFD->diagnose(diag::func_decl_no_body_expected);
+    return nullptr;
+  }
+
   assert(body && "Expected body to type-check");
 
   // It's possible we synthesized an already type-checked body, in which case
@@ -2758,27 +2920,19 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   // So, build out the body now.
   ASTScope::expandFunctionBody(AFD);
 
+  if (AFD->isDistributedThunk()) {
+    if (auto func = dyn_cast<FuncDecl>(AFD)) {
+      if (TypeChecker::checkDistributedFunc(func)) {
+        return errorBody();
+      }
+    }
+  }
+
   // Type check the function body if needed.
   bool hadError = false;
   if (!alreadyTypeChecked) {
     StmtChecker SC(AFD);
     hadError = SC.typeCheckBody(body);
-  }
-
-  // If this was a function with a single expression body, let's see
-  // if implicit return statement came out to be `Never` which means
-  // that we have eagerly converted something like `{ fatalError() }`
-  // into `{ return fatalError() }` that has to be corrected here.
-  if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getLastElement().dyn_cast<Stmt *>()) {
-      if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
-        if (retStmt->isImplicit() && retStmt->hasResult()) {
-          auto returnType = retStmt->getResult()->getType();
-          if (returnType && returnType->isUninhabited())
-            body->setLastElement(retStmt->getResult());
-        }
-      }
-    }
   }
 
   // Class constructor checking.
@@ -2818,7 +2972,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {
-    closure->setBody(body, closure->hasSingleExpressionBody());
+    closure->setBody(body);
   }
   closure->setBodyState(ClosureExpr::BodyState::SeparatelyTypeChecked);
   return HadError;
@@ -2891,11 +3045,11 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     // We don't need to walk into closures, you can't jump out of them.
-    return Action::SkipChildrenIf(isa<AbstractClosureExpr>(E), E);
+    return Action::SkipNodeIf(isa<AbstractClosureExpr>(E), E);
   }
   PreWalkAction walkToDeclPre(Decl *D) override {
     // We don't need to walk into any nested local decls.
-    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 };
 } // end anonymous namespace
@@ -2912,28 +3066,8 @@ static bool doesBraceEndWithThrow(BraceStmt *BS) {
   return isa<ThrowStmt>(S);
 }
 
-/// Whether the given brace statement is considered to produce a result for
-/// an if/switch expression.
-static bool doesBraceProduceResult(BraceStmt *BS, Evaluator &eval) {
-  if (BS->empty())
-    return false;
-
-  // We consider the branch as having a result if there is:
-  // - A single active expression or statement that can be turned into an
-  //   expression.
-  // - 'then <expr>' as the last statement.
-  if (BS->getSingleActiveExpression())
-    return true;
-
-  if (auto *S = BS->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(eval))
-      return true;
-  }
-  return SingleValueStmtExpr::hasResult(BS);
-}
-
 IsSingleValueStmtResult
-areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
+areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
   TinyPtrVector<Stmt *> unterminatedBranches;
   JumpOutOfContextFinder jumpFinder(invalidJumps);
@@ -2949,8 +3083,10 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    // Check to see if a result is produced from the branch.
-    if (doesBraceProduceResult(BS, eval)) {
+    // Must either have an explicit or implicit result for the branch.
+    if (SingleValueStmtExpr::hasResult(BS) ||
+        SingleValueStmtExpr::isLastElementImplicitResult(
+            BS, ctx, /*mustBeSingleValueStmt*/ false)) {
       hadResult = true;
       continue;
     }
@@ -2976,28 +3112,45 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
 }
 
 IsSingleValueStmtResult
-IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S) const {
-  if (!isa<IfStmt>(S) && !isa<SwitchStmt>(S))
-    return IsSingleValueStmtResult::unhandledStmt();
+IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
+                                   ASTContext *_ctx) const {
+  assert(_ctx);
+  auto &ctx = *_ctx;
 
   // Statements must be unlabeled.
-  auto *LS = cast<LabeledStmt>(S);
-  if (LS->getLabelInfo())
-    return IsSingleValueStmtResult::hasLabel();
-
+  if (auto *LS = dyn_cast<LabeledStmt>(S)) {
+    if (LS->getLabelInfo())
+      return IsSingleValueStmtResult::hasLabel();
+  }
   if (auto *IS = dyn_cast<IfStmt>(S)) {
     // Must be exhaustive.
     if (!IS->isSyntacticallyExhaustive())
       return IsSingleValueStmtResult::nonExhaustiveIf();
 
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(eval, IS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, IS->getBranches(scratch));
   }
   if (auto *SS = dyn_cast<SwitchStmt>(S)) {
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(eval, SS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, SS->getBranches(scratch));
   }
-  llvm_unreachable("Unhandled case");
+  if (auto *DS = dyn_cast<DoStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, DS->getBody());
+  }
+  if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    if (!DCS->isSyntacticallyExhaustive())
+      return IsSingleValueStmtResult::nonExhaustiveDoCatch();
+
+    SmallVector<Stmt *, 4> scratch;
+    return areBranchesValidForSingleValueStmt(ctx, DCS->getBranches(scratch));
+  }
+  return IsSingleValueStmtResult::unhandledStmt();
 }
 
 void swift::checkUnknownAttrRestrictions(
@@ -3103,4 +3256,33 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
   for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
     recordVar(nullptr, bodyVar);
   }
+}
+
+FuncDecl *TypeChecker::getForEachIteratorNextFunction(
+    DeclContext *dc, SourceLoc loc, bool isAsync
+) {
+  ASTContext &ctx = dc->getASTContext();
+
+  // A synchronous for..in loop uses IteratorProtocol.next().
+  if (!isAsync)
+    return ctx.getIteratorNext();
+
+  // If AsyncIteratorProtocol.next(_:) isn't available at all,
+  // we're stuck using AsyncIteratorProtocol.next().
+  auto nextElement = ctx.getAsyncIteratorNextIsolated();
+  if (!nextElement)
+    return ctx.getAsyncIteratorNext();
+
+  // If availability checking is disabled, use next(_:).
+  if (ctx.LangOpts.DisableAvailabilityChecking || loc.isInvalid())
+    return nextElement;
+
+  // We can only call next(_:) if we are in an availability context
+  // that supports typed throws.
+  auto availability = overApproximateAvailabilityAtLocation(loc, dc);
+  if (availability.isContainedIn(ctx.getTypedThrowsAvailability()))
+    return nextElement;
+
+  // Fall back to AsyncIteratorProtocol.next().
+  return ctx.getAsyncIteratorNext();
 }

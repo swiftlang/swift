@@ -1538,7 +1538,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // Create a new partial apply with the new arguments.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      pai->getCalleeConvention(), pai->getResultIsolation(),
       pai->isOnStack());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

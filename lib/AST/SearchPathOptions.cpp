@@ -79,6 +79,35 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
   State.IsPopulated = true;
 }
 
+void SearchPathOptions::dump(bool isDarwin) const {
+  llvm::errs() << "Module import search paths (non system):\n";
+  for (auto Entry : llvm::enumerate(getImportSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+  }
+
+  llvm::errs() << "Framework search paths:\n";
+  for (auto Entry : llvm::enumerate(getFrameworkSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] "
+                 << (Entry.value().IsSystem ? "(system) " : "(non-system) ")
+                 << Entry.value().Path << "\n";
+  }
+
+  if (isDarwin) {
+    llvm::errs() << "Darwin implicit framework search paths:\n";
+    for (auto Entry :
+         llvm::enumerate(getDarwinImplicitFrameworkSearchPaths())) {
+      llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+    }
+  }
+
+  llvm::errs() << "Runtime library import search paths:\n";
+  for (auto Entry : llvm::enumerate(getRuntimeLibraryImportPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+  }
+
+  llvm::errs() << "(End of search path lists.)\n";
+}
+
 SmallVector<const ModuleSearchPath *, 4>
 ModuleSearchPathLookup::searchPathsContainingFile(
     const SearchPathOptions *Opts, llvm::ArrayRef<std::string> Filenames,
@@ -101,10 +130,12 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   llvm::SmallSet<std::pair<ModuleSearchPathKind, unsigned>, 4> ResultIds;
 
   for (auto &Filename : Filenames) {
-    for (auto &Entry : LookupTable.lookup(Filename)) {
-      if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
-              .second) {
-        Result.push_back(Entry.get());
+    if (LookupTable.contains(Filename)) {
+      for (auto &Entry : LookupTable.at(Filename)) {
+        if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
+                .second) {
+          Result.push_back(Entry.get());
+        }
       }
     }
   }

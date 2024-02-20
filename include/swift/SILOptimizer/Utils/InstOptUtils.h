@@ -423,14 +423,6 @@ bool canReplaceLoadSequence(SILInstruction *inst);
 /// starting with the innermost struct_element_addr
 void replaceLoadSequence(SILInstruction *inst, SILValue value);
 
-/// Do we have enough information to determine all callees that could
-/// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
-
-/// Do we have enough information to determine all callees that could
-/// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd);
-
 // Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
 // The information that a static type is the same as the exact dynamic,
@@ -590,12 +582,12 @@ IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
 /// Performs "predictable" memory access optimizations.
 ///
 /// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn);
+bool optimizeMemoryAccesses(SILFunction *fn, DominanceInfo *domInfo);
 
 /// Performs "predictable" dead allocation optimizations.
 ///
 /// See the PredictableDeadAllocationElimination pass.
-bool eliminateDeadAllocations(SILFunction *fn);
+bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
 
 SILVTable *specializeVTableForType(SILType type, SILModule &mod, SILTransform *transform);
 

@@ -55,6 +55,7 @@ extension DarwinBoolean : CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension DarwinBoolean : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
@@ -129,6 +130,7 @@ public var stderr : UnsafeMutablePointer<FILE> {
   }
 }
 
+#if !$Embedded
 public func dprintf(_ fd: Int, _ format: UnsafePointer<Int8>, _ args: CVarArg...) -> Int32 {
   return withVaList(args) { va_args in
     vdprintf(Int32(fd), format, va_args)
@@ -140,6 +142,8 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
     return vsnprintf(ptr, len, format, va_args)
   }
 }
+#endif
+
 #elseif os(OpenBSD)
 public var stdin: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdin() }
 public var stdout: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdout() }
@@ -383,7 +387,7 @@ internal var _ignore = _UnsupportedPlatformError()
 // semaphore.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) 
+#if !os(Windows) && !os(WASI)
 
 #if os(OpenBSD)
 public typealias Semaphore = UnsafeMutablePointer<sem_t?>

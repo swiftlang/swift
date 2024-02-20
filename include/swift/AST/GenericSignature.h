@@ -310,6 +310,13 @@ public:
     return Mem;
   }
 
+  /// Transform the requirements into a form where implicit Copyable and
+  /// Escapable conformances are omitted, and their absence is explicitly
+  /// noted.
+  void getRequirementsWithInverses(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses) const;
+
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.
@@ -361,8 +368,6 @@ public:
   
   /// Determine whether the given dependent type is required to be a class.
   bool requiresClass(Type type) const;
-
-  Type getUpperBound(Type type, bool wantDependentUpperBound = false) const;
 
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type) const;
@@ -457,19 +462,25 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  /// Given a type parameter, compute the most specific supertype (upper bound)
-  /// that is not dependent on other type parameters.
+  /// Given a type parameter, compute the most specific supertype (upper bound),
+  /// possibly dependent on other type parameters.
+  ///
+  ///
+  /// \param forExistentialSelf If true, we ensure the result does not include
+  /// any type parameters rooted in the same generic parameter as the one given.
+  ///
+  /// \param includeParameterizedProtocols If true, we form parameterized
+  /// protocol types if we find that the given type's primary associated types
+  /// are sufficiently constrained.
   ///
   /// \note If the upper bound is a protocol or protocol composition,
   /// will return an instance of \c ExistentialType.
-  Type getNonDependentUpperBounds(Type type) const;
+  Type getUpperBound(Type type,
+                     bool forExistentialSelf,
+                     bool includeParameterizedProtocols) const;
 
-  /// Given a type parameter, compute the most specific supertype (upper bound)
-  /// that is possibly dependent on other type parameters.
-  ///
-  /// \note If the upper bound is a protocol or protocol composition,
-  /// will return an instance of \c ExistentialType.
-  Type getDependentUpperBounds(Type type) const;
+  /// Utility wrapper for use when this is an opened existential signature.
+  Type getExistentialType(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
@@ -561,7 +572,8 @@ GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
-    SmallVector<Requirement, 2> addedRequirements);
+    SmallVector<Requirement, 2> addedRequirements,
+    bool allowInverses);
 
 /// Summary of error conditions detected by the Requirement Machine.
 enum class GenericSignatureErrorFlags {

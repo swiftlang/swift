@@ -67,7 +67,7 @@ PluginRegistry::loadLibraryPlugin(StringRef path) {
   }
 #endif
 
-  storage = std::make_unique<LoadedLibraryPlugin>(lib);
+  storage = std::make_unique<LoadedLibraryPlugin>(lib, path);
   return storage.get();
 }
 
@@ -84,7 +84,7 @@ void *LoadedLibraryPlugin::getAddressOfSymbol(const char *symbolName) {
 }
 
 llvm::Expected<LoadedExecutablePlugin *>
-PluginRegistry::loadExecutablePlugin(StringRef path) {
+PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   llvm::sys::fs::file_status stat;
   if (auto err = llvm::sys::fs::status(path, stat)) {
     return llvm::errorCodeToError(err);
@@ -114,7 +114,7 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
   }
 
   auto plugin = std::make_unique<LoadedExecutablePlugin>(
-      path, stat.getLastModificationTime());
+      path, stat.getLastModificationTime(), disableSandbox);
 
   plugin->setDumpMessaging(dumpMessaging);
 
@@ -147,7 +147,9 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
 
   // Apply sandboxing.
   llvm::BumpPtrAllocator Allocator;
-  Sandbox::apply(command, Allocator);
+  if (!disableSandbox) {
+    Sandbox::apply(command, Allocator);
+  }
 
   // Launch.
   auto childInfo = ExecuteWithPipe(command[0], command);

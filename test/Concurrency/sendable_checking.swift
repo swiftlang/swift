@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete- -verify-additional-prefix complete-and-sns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix sns- -verify-additional-prefix complete-and-sns- -emit-sil -o /dev/null %s -enable-experimental-feature SendNonSendable 
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete- -verify-additional-prefix complete-and-tns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s -enable-experimental-feature RegionBasedIsolation 
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -18,7 +18,7 @@ extension NS1: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 struct NS2 { // expected-note {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
-  // expected-complete-and-sns-note @-1 {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
+  // expected-complete-and-tns-note @-1 {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
   var ns1: NS1
 }
 
@@ -30,7 +30,7 @@ extension NS3: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 class NS4 { } // expected-note {{class 'NS4' does not conform to the 'Sendable' protocol}}
-// expected-complete-and-sns-note @-1 {{class 'NS4' does not conform to the 'Sendable' protocol}}
+// expected-complete-and-tns-note @-1 {{class 'NS4' does not conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 func acceptCV<T: Sendable>(_: T) { }
@@ -47,15 +47,15 @@ func testCV(
 
   acceptCV(ns1array) // expected-warning {{conformance of 'NS1' to 'Sendable' is unavailable}}
 
-  acceptCV(ns2) // expected-complete-and-sns-warning {{type 'NS2' does not conform to the 'Sendable' protocol}}
+  acceptCV(ns2) // expected-complete-and-tns-warning {{type 'NS2' does not conform to the 'Sendable' protocol}}
 
   acceptCV(ns3) // expected-warning {{conformance of 'NS3' to 'Sendable' is only available in macOS 11.0 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
 
-  acceptCV(ns4) // expected-complete-and-sns-warning {{type 'NS4' does not conform to the 'Sendable' protocol}}
+  acceptCV(ns4) // expected-complete-and-tns-warning {{type 'NS4' does not conform to the 'Sendable' protocol}}
 
-  acceptCV(fn) // expected-complete-and-sns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
-  // expected-complete-and-sns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptCV(fn) // expected-complete-and-tns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-complete-and-tns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
 }
@@ -97,16 +97,6 @@ public actor MyActor: MyProto {
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
-  }
-}
-
-// rdar://82452688 - make sure sendable checking doesn't fire for a capture
-// of a value of error-type
-@available(SwiftStdlib 5.1, *)
-func f() async {
-  let n = wobble() // expected-error{{cannot find 'wobble' in scope}}
-  @Sendable func nested() {
-    n.pointee += 1
   }
 }
 
@@ -248,9 +238,9 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 @available(SwiftStdlib 5.1, *)
 final class NonSendable {
   // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
-  // SendNonSendable emits 3 fewer errors here.
+  // TransferNonSendable emits 3 fewer errors here.
   // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
-  // expected-complete-and-sns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-complete-and-tns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -261,15 +251,17 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
 
     _ = await self.x
-    // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+      // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
   }
 
   @MainActor
@@ -278,12 +270,15 @@ final class NonSendable {
 
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable()
+  let t = NonSendable() // expected-tns-note {{variable defined here}}
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{transferring non-Sendable value 't' could yield races with later accesses}}
+  // expected-tns-note @-3 {{'t' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-tns-note@-2 {{access here could race}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -296,15 +291,15 @@ func callNonisolatedAsyncClosure(
   ns: NonSendable,
   g: (NonSendable) async -> Void
 ) async {
-  // FIXME: Both cases below should also produce a diagnostic with SendNonSendable,
-  // because the 'ns' parameter should be merged into the MainActor's region.
-
   await g(ns)
-  // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
+
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -313,6 +308,53 @@ func testLocalCaptures() {
 
   @Sendable func a2() -> NonSendable {
     return ns
-    // expected-complete-and-sns-warning@-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
+    // expected-complete-and-tns-warning@-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
+  }
+}
+
+func testPointersAreNotSendable() {
+  func testSendable<T: Sendable>(_: T) {}
+
+  func testUnsafePointer(ptr: UnsafePointer<Int>,
+                         mutablePtr: UnsafeMutablePointer<String>) {
+    testSendable(ptr) // expected-warning {{conformance of 'UnsafePointer<Pointee>' to 'Sendable' is unavailable}}
+    testSendable(mutablePtr) // expected-warning {{conformance of 'UnsafeMutablePointer<Pointee>' to 'Sendable' is unavailable}}
+  }
+
+  func testRawPointer(ptr: UnsafeRawPointer,
+                            mutablePtr: UnsafeMutableRawPointer) {
+    testSendable(ptr) // expected-warning {{conformance of 'UnsafeRawPointer' to 'Sendable' is unavailable}}
+    testSendable(mutablePtr) // expected-warning {{conformance of 'UnsafeMutableRawPointer' to 'Sendable' is unavailable}}
+  }
+
+  func testOpaqueAndCPointers(opaquePtr: OpaquePointer, cPtr: CVaListPointer, autoReleasePtr: AutoreleasingUnsafeMutablePointer<Int>) {
+    testSendable(opaquePtr) // expected-warning {{conformance of 'OpaquePointer' to 'Sendable' is unavailable}}
+    testSendable(cPtr) // expected-warning {{conformance of 'CVaListPointer' to 'Sendable' is unavailable}}
+    testSendable(autoReleasePtr) // expected-warning {{conformance of 'AutoreleasingUnsafeMutablePointer<Pointee>' to 'Sendable' is unavailable}}
+  }
+
+  func testBufferPointers(buffer: UnsafeBufferPointer<Int>, mutableBuffer: UnsafeMutableBufferPointer<Int>,
+                          rawBuffer: UnsafeRawBufferPointer, rawMutableBuffer: UnsafeMutableRawBufferPointer) {
+    testSendable(buffer) // expected-warning {{conformance of 'UnsafeBufferPointer<Element>' to 'Sendable' is unavailable}}
+    testSendable(mutableBuffer) // expected-warning {{conformance of 'UnsafeMutableBufferPointer<Element>' to 'Sendable' is unavailable}}
+    testSendable(buffer.makeIterator()) // expected-warning {{conformance of 'UnsafeBufferPointer<Element>.Iterator' to 'Sendable' is unavailable}}
+    testSendable(rawBuffer) // expected-warning {{conformance of 'UnsafeRawBufferPointer' to 'Sendable' is unavailable}}
+    testSendable(rawBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
+    testSendable(rawMutableBuffer) // expected-warning {{conformance of 'UnsafeMutableRawBufferPointer' to 'Sendable' is unavailable}}
+    testSendable(rawMutableBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
+  }
+}
+
+@available(*, unavailable)
+extension SynthesizedConformances.NotSendable: Sendable {}
+
+enum SynthesizedConformances {
+  // expected-note@+1 2 {{consider making struct 'NotSendable' conform to the 'Sendable' protocol}}
+  struct NotSendable: Equatable {}
+
+  // expected-warning@+2 2{{non-sendable type 'SynthesizedConformances.NotSendable' in asynchronous access to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-note@+1 2 {{in derived conformance to 'Equatable'}}
+  @MainActor struct Isolated: Equatable {
+    let x: NotSendable
   }
 }

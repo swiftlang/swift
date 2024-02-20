@@ -375,9 +375,12 @@ struct TypeTreeLeafTypeRange {
 
   /// Sets each bit in \p bits corresponding to an element of this range.
   void setBits(SmallBitVector &bits) const {
-    for (auto element : getRange()) {
-      bits.set(element);
-    }
+    bits.set(startEltOffset, endEltOffset);
+  }
+
+  /// Resets each bit in \p bits corresponding to an element of this range.
+  void resetBits(SmallBitVector &bits) const {
+    bits.reset(startEltOffset, endEltOffset);
   }
 
   IntRange<unsigned> getRange() const {
@@ -694,6 +697,15 @@ public:
   enum IsInterestingUser { NonUser, NonLifetimeEndingUse, LifetimeEndingUse };
 
   struct InterestingUser {
+    // Together these bit vectors encode four states per field:
+    //   +---------------+----------------+---------------+
+    // - | liveBits[bit] | consumingBits] |     state     |
+    //   +---------------+----------------+---------------+
+    //   |      0        |        0       | dead          |
+    //   |      0        |        1       | non-use       |
+    //   |      1        |        0       | non-consuming |
+    //   |      1        |        1       | consuming     |
+    //   +---------------+----------------+---------------+
     SmallBitVector liveBits;
     SmallBitVector consumingBits;
 
@@ -708,18 +720,33 @@ public:
 
     /// Record that the instruction uses the bits of the value in \p range.
     void addUses(TypeTreeLeafTypeRange range, bool lifetimeEnding) {
-      range.setBits(liveBits);
-      if (lifetimeEnding) {
-        range.setBits(consumingBits);
-      }
+      SmallBitVector bits(liveBits.size());
+      range.setBits(bits);
+      addUses(bits, lifetimeEnding);
     }
 
     /// Record that the instruction uses the bits in \p bits.
     void addUses(SmallBitVector const &bits, bool lifetimeEnding) {
-      liveBits |= bits;
       if (lifetimeEnding) {
-        consumingBits |= bits;
+        consumingBits |= bits & ~liveBits;
+      } else {
+        consumingBits &= ~bits;
       }
+      liveBits |= bits;
+    }
+
+    /// Extend liveness at the bits in the specified  \p range without
+    /// overriding whether the lifetimes of those bits end.
+    void extendToNonUse(TypeTreeLeafTypeRange range) {
+      SmallBitVector bits(liveBits.size());
+      range.setBits(bits);
+      extendToNonUse(bits);
+    }
+
+    /// Extend liveness at the specified \p bits without overriding whether the
+    /// lifetimes of those bits end.
+    void extendToNonUse(SmallBitVector const &bits) {
+      consumingBits |= bits & ~liveBits;
     }
 
     /// Populates the provided vector with contiguous ranges of bits which are
@@ -755,10 +782,18 @@ public:
     }
 
     IsInterestingUser isInterestingUser(unsigned element) const {
-      if (!liveBits.test(element))
+      auto isLive = liveBits.test(element);
+      auto isConsuming = consumingBits.test(element);
+      if (!isLive && !isConsuming) {
         return NonUser;
-      return consumingBits.test(element) ? LifetimeEndingUse
-                                         : NonLifetimeEndingUse;
+      } else if (!isLive && isConsuming) {
+        return NonLifetimeEndingUse;
+      } else if (isLive && isConsuming) {
+        return LifetimeEndingUse;
+      } else if (isLive && !isConsuming) {
+        return NonLifetimeEndingUse;
+      }
+      llvm_unreachable("covered conditions");
     }
   };
 
@@ -875,6 +910,16 @@ public:
                     bool lifetimeEnding,
                     SmallBitVector const &useBeforeDefBits);
 
+  /// Adds \p user which doesn't use the def to liveness.
+  ///
+  /// Different from calling updateForUse because it never overrides the value
+  /// \p lifetimeEnding stored for \p inst.
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange span,
+                      SmallBitVector const &useBeforeDefBits);
+
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits,
+                      SmallBitVector const &useBeforeDefBits);
+
   void getBlockLiveness(SILBasicBlock *bb, TypeTreeLeafTypeRange span,
                         SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
                             &resultingFoundLiveness) const {
@@ -943,7 +988,7 @@ public:
 
   unsigned getNumSubElements() const { return liveBlocks.getNumBitsToTrack(); }
 
-  void print(llvm::raw_ostream &os) const { liveBlocks.print(os); }
+  void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 protected:
@@ -971,6 +1016,14 @@ protected:
                           bool lifetimeEnding) {
     getOrCreateInterestingUser(user).addUses(bits, lifetimeEnding);
   }
+
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange range) {
+    getOrCreateInterestingUser(user).extendToNonUse(range);
+  }
+
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits) {
+    getOrCreateInterestingUser(user).extendToNonUse(bits);
+  }
 };
 
 /// Record the last use points and CFG edges that form the boundary of
@@ -993,7 +1046,7 @@ class FieldSensitivePrunedLivenessBoundary {
 public:
   FieldSensitivePrunedLivenessBoundary(unsigned numBits) : numBits(numBits) {}
 
-  /// Sanity check meant for NDEBUG mode.
+  /// Soundness check meant for NDEBUG mode.
   unsigned getNumLastUsersAndDeadDefs(unsigned bitNo) const {
 #ifdef NDEBUG
     llvm_unreachable("Only call in asserts build!\n");
@@ -1089,6 +1142,14 @@ public:
   void updateForUse(SILInstruction *user, SmallBitVector const &bits,
                     bool lifetimeEnding);
 
+  /// Customize extendToNonUse for FieldSensitivePrunedLiveness to consider
+  /// defs as kills.
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange span);
+
+  /// Customize extendToNonUse for FieldSensitivePrunedLiveness to consider
+  /// defs as kills.
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits);
+
   /// Compute the boundary from the blocks discovered during liveness analysis.
   ///
   /// Precondition: \p liveness.getDiscoveredBlocks() is a valid list of all
@@ -1160,17 +1221,24 @@ public:
     return inst == defInst.first && defInst.second->contains(bit);
   }
 
-  bool isDef(SILInstruction *inst, SmallBitVector const &bits) const {
+  void isDef(SILInstruction *inst, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    assert(bitsOut.none());
     if (inst != defInst.first)
-      return false;
-    SmallBitVector defBits(bits.size());
-    defInst.second->setBits(defBits);
-    return (defBits & bits) == bits;
+      return;
+    defInst.second->setBits(bitsOut);
+    bitsOut &= bits;
   }
 
-  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
-    return inst == defInst.first &&
-           defInst.second->setIntersection(span).has_value();
+  void isDef(SILInstruction *inst, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    assert(bitsOut.none());
+    if (inst != defInst.first)
+      return;
+    auto intersection = defInst.second->setIntersection(span);
+    if (!intersection.has_value())
+      return;
+    intersection.value().setBits(bitsOut);
   }
 
   bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
@@ -1233,20 +1301,16 @@ public:
         bits, [&](auto range) { initializeDef(def, range); });
   }
 
-  void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+  void initializeDef(SILNode *node, TypeTreeLeafTypeRange span) {
     assert(Super::isInitialized());
-    defs.insert(def, span);
-    auto *block = def->getParentBlock();
+    defs.insert(node, span);
+    auto *block = node->getParentBlock();
     defBlocks.insert(block, span);
     initializeDefBlock(block, span);
   }
 
   void initializeDef(SILInstruction *def, TypeTreeLeafTypeRange span) {
-    assert(Super::isInitialized());
-    defs.insert(cast<SILNode>(def), span);
-    auto *block = def->getParent();
-    defBlocks.insert(block, span);
-    initializeDefBlock(block, span);
+    initializeDef(cast<SILNode>(def), span);
   }
 
   bool isInitialized() const { return Super::isInitialized() && !defs.empty(); }
@@ -1261,24 +1325,32 @@ public:
         *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
   }
 
-  bool isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span) const {
+  void isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span,
+                  SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defBlocks.find(block);
     if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+      return;
+    for (auto defSpan : *iter) {
+      auto intersection = span.setIntersection(defSpan);
+      if (!intersection.has_value())
+        continue;
+      intersection.value().setBits(bitsOut);
+    }
   }
 
-  bool isDefBlock(SILBasicBlock *block, SmallBitVector const &bits) const {
+  void isDefBlock(SILBasicBlock *block, SmallBitVector const &bits,
+                  SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defBlocks.find(block);
     if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return storedSpan.intersects(bits);
-    });
+      return;
+    for (auto defSpan : *iter) {
+      defSpan.setBits(bitsOut);
+    }
+    bitsOut &= bits;
   }
 
   /// Return true if \p user occurs before the first def in the same basic
@@ -1301,66 +1373,69 @@ public:
     }
   }
 
-  bool isDef(SILInstruction *inst, unsigned bit) const {
+  bool isDef(SILNode *node, unsigned bit) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
+    auto iter = defs.find(node);
     if (!iter)
       return false;
     return llvm::any_of(
         *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+  }
+
+  bool isDef(SILInstruction *inst, unsigned bit) const {
+    return isDef(cast<SILNode>(inst), bit);
   }
 
   bool isDef(SILValue value, unsigned bit) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
-    if (!iter)
-      return false;
-    return llvm::any_of(
-        *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+    return isDef(cast<SILNode>(value), bit);
   }
 
-  bool isDef(SILValue value, SmallBitVector const &bits) const {
+  void isDef(SILNode *node, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
+    assert(bitsOut.none());
+    auto iter = defs.find(node);
     if (!iter)
-      return false;
-    SmallBitVector allBits(bits.size());
+      return;
     for (auto range : *iter) {
-      range.setBits(allBits);
+      range.setBits(bitsOut);
     }
-    return (bits & allBits) == bits;
+    bitsOut &= bits;
   }
 
-  bool isDef(SILInstruction *inst, SmallBitVector const &bits) const {
+  void isDef(SILValue value, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    isDef(cast<SILNode>(value), bits, bitsOut);
+  }
+
+  void isDef(SILInstruction *inst, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    isDef(cast<SILNode>(inst), bits, bitsOut);
+  }
+
+  void isDef(SILNode *node, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
+    assert(bitsOut.none());
+    auto iter = defs.find(node);
     if (!iter)
-      return false;
-    SmallBitVector allBits(bits.size());
-    for (auto range : *iter) {
-      range.setBits(allBits);
+      return;
+    for (auto defSpan : *iter) {
+      auto intersection = span.setIntersection(defSpan);
+      if (!intersection.has_value())
+        continue;
+      span.setBits(bitsOut);
     }
-    return (bits & allBits) == bits;
   }
 
-  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
-    if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+  void isDef(SILInstruction *inst, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    return isDef(cast<SILNode>(inst), span, bitsOut);
   }
 
-  bool isDef(SILValue value, TypeTreeLeafTypeRange span) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
-    if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+  void isDef(SILValue value, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    return isDef(cast<SILNode>(value), span, bitsOut);
   }
 
   void

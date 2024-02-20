@@ -1,22 +1,22 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -Xcc -fignore-exceptions | %FileCheck %s
-//
-// We should be able to support windows now. We will remove XFAIL in follow up
-// XFAIL: windows
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -Xcc -fignore-exceptions | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi
 
 import MemberInline
 
 public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs - rhs }
 
-// CHECK: call [[RESA:i32|i64]] [[NAMEA:@(_ZN18LoadableIntWrappermiES_|"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z")]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\) align 4}} {{%[0-9]+}})
+// CHECK-SYSV: call [[RESA:i32|i64]] [[NAMEA:@_ZN18LoadableIntWrappermiES_]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\) align 4}} {{%[0-9]+}})
+// CHECK-WIN: call [[RESA:void]] [[NAMEA:@"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z"]](ptr {{%[0-9]+}}, ptr sret(%struct.LoadableIntWrapper) {{.*}}, i32 {{%[0-9]+}})
 
 public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { wrapper(arg) }
 
-// CHECK: call [[RES:i32|i64]] [[NAME:@(_ZN18LoadableIntWrapperclEi|"\?\?GLoadableIntWrapper@@QEAAHH@Z")]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\)}}{{.*}})
+// CHECK-SYSV: call [[RES:i32|i64]] [[NAME:@(_ZN18LoadableIntWrapperclEi|"\?\?GLoadableIntWrapper@@QEAAHH@Z")]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\)}}{{.*}})
+// CHECK-WIN: call [[RES:i32]] [[NAME:@"\?\?RLoadableIntWrapper@@QEAAHH@Z"]](ptr {{%[0-9]+}}, i32 {{%[0-9]+}})
 // CHECK: define  {{.*}}[[RES]] [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(%struct.LoadableIntWrapper\)}}{{.*}})
 
 public func call(_ wrapper: inout AddressOnlyIntWrapper) -> Int32 { wrapper() }
 
-// CHECK: call [[RES:i32|i64]] [[NAME:@(_ZN21AddressOnlyIntWrapperclEv|"\?\?GAddressOnlyIntWrapper@@QEAAHXZ")]](ptr {{.*}})
+// CHECK-SYSV: call [[RES:i32|i64]] [[NAME:@_ZN21AddressOnlyIntWrapperclEv]](ptr {{.*}})
+// CHECK-WIN: call [[RES:i32]] [[NAME:@"\?\?RAddressOnlyIntWrapper@@QEAAHXZ"]](ptr {{.*}})
 // CHECK: define {{.*}}[[RES]] [[NAME]](ptr {{.*}})
 
 public func index(_ arr: inout ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[arg] }
@@ -39,7 +39,8 @@ public func index(_ arr: inout ReadWriteIntArray, _ arg: Int32, _ val: Int32) { 
 
 public func index(_ arr: inout NonTrivialIntArrayByVal, _ arg: Int32) -> Int32 { arr[arg] }
 
-// CHECK: call [[RES:i32|i64]] [[NAME:@(_ZNK23NonTrivialIntArrayByValixEi|"\?\?ANonTrivialIntArrayByVal@@QEBAAEBHH@Z")]](ptr {{.*}}, {{i32|i64}}{{.*}})
+// CHECK-SYSV: call [[RES:i32|i64]] [[NAME:@_ZNK23NonTrivialIntArrayByValixEi]](ptr {{.*}}, {{i32|i64}}{{.*}})
+// CHECK-WIN: call [[RES:i32]] [[NAME:@"\?\?ANonTrivialIntArrayByVal@@QEBAHH@Z"]](ptr {{.*}}, i32 {{.*}})
 
 // CHECK: define {{.*}}[[RES:i32|i64]] [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.NonTrivialIntArrayByVal\* byval\(%struct.NonTrivialIntArrayByVal\)}}{{.*}})
 // CHECK:   [[THIS:%.*]] = load ptr, ptr

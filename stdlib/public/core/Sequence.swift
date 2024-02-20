@@ -670,9 +670,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
@@ -688,6 +689,17 @@ extension Sequence {
       result.append(try transform(element))
     }
     return Array(result)
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
+    _ transform: (Element) throws -> T
+  ) throws -> [T] {
+    try map(transform)
   }
 
   /// Returns an array containing, in order, the elements of the sequence
@@ -988,7 +1000,10 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = (i + 1) % maxLength
+        i += 1
+        if i >= maxLength {
+          i = 0
+        }
       }
     }
 
@@ -1067,7 +1082,10 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = (i + 1) % k
+        i += 1
+        if i >= k {
+          i = 0
+        }
       }
     }
     return Array(result)
@@ -1241,6 +1259,11 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 }
 
 extension IteratorSequence: IteratorProtocol, Sequence {
+
+  #if $NoncopyableGenerics
+    public typealias Element = Base.Element
+  #endif
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///

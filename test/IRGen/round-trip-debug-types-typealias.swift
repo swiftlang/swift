@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -g %s
+// RUN: %target-build-swift -g %s -emit-ir | %FileCheck %s
 
 // https://github.com/apple/swift/issues/66554
 // IRGenDebugInfo type reconstruction crash because existential types
@@ -8,3 +8,6 @@
 protocol Protocol<T> { associatedtype T }
 typealias AnyProtocol<T> = any Protocol<T>
 let crash: AnyProtocol<Any?>
+
+// CHECK: @"$s4main5crashAA8Protocol_pypSg1TAaCPRts_XPvp" =
+// CHECK: !DIGlobalVariable(name: "crash", linkageName: "$s4main5crashAA8Protocol_pypSg1TAaCPRts_XPvp"

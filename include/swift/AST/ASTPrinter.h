@@ -18,6 +18,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Decl.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -27,10 +28,6 @@
 // Prefix to use when printing module names in module interfaces to avoid
 // ambiguities with type names, in AliasModuleNames mode.
 #define MODULE_DISAMBIGUATING_PREFIX "Module___"
-
-namespace clang {
-class Decl;
-}
 
 namespace swift {
   class Decl;

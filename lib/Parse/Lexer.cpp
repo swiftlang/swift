@@ -15,16 +15,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Confusables.h"
-#include "swift/Parse/RegexParserBridging.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -32,12 +32,6 @@
 #include "clang/Basic/CharInfo.h"
 
 #include <limits>
-
-// Regex lexing delivered via libSwift.
-static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
-  regexLiteralLexingFn = fn;
-}
 
 using namespace swift;
 
@@ -60,7 +54,7 @@ using clang::isWhitespace;
 static bool EncodeToUTF8(unsigned CharValue,
                          SmallVectorImpl<char> &Result) {
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
 
   // Handle the leading byte, based on the number of bits in the value.
   unsigned NumTrailingBytes;
@@ -97,18 +91,12 @@ static bool EncodeToUTF8(unsigned CharValue,
   return false;
 }
 
-
-/// CLO8 - Return the number of leading ones in the specified 8-bit value.
-static unsigned CLO8(unsigned char C) {
-  return llvm::countLeadingOnes(uint32_t(C) << 24);
-}
-
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
   // RFC 2279: The octet values FE and FF never appear.
   // RFC 3629: The octet values C0, C1, F5 to FF never appear.
-  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
+  return C < 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -123,13 +111,9 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   if (CurByte < 0x80)
     return CurByte;
   
-  // Read the number of high bits set, which indicates the number of bytes in
-  // the character.
-  unsigned EncodedBytes = CLO8(CurByte);
-  
-  // If this is 0b10XXXXXX, then it is a continuation character.
-  if (EncodedBytes == 1 ||
-      !isStartOfUTF8Character(CurByte)) {
+  // If this is not the start of a UTF8 character,
+  // then it is either a continuation byte or an invalid UTF8 code point.
+  if (!isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -137,11 +121,16 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
     return ~0U;
   }
   
+  // Read the number of high bits set, which indicates the number of bytes in
+  // the character.
+  unsigned char EncodedBytes = llvm::countl_one(CurByte);
+  assert((EncodedBytes >= 2 && EncodedBytes <= 4));
+  
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
   
   // Read and validate the continuation bytes.
-  for (unsigned i = 1; i != EncodedBytes; ++i) {
+  for (unsigned char i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
       return ~0U;
     CurByte = *Ptr;
@@ -162,7 +151,7 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
   
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;
@@ -2040,9 +2029,10 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
 const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
                                        DiagnosticEngine *Diags,
                                        bool &CompletelyErroneous) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+  if (!LangOpts.EnableExperimentalStringProcessing)
     return nullptr;
 
   bool IsForwardSlash = (*TokStart == '/');
@@ -2088,9 +2078,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   // - Ptr will not be advanced if this is not for a regex literal.
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
-  auto *Ptr = TokStart;
-  CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
+  const char *Ptr = TokStart;
+  CompletelyErroneous =
+      swift_ASTGen_lexRegexLiteral(&Ptr, BufferEnd, MustBeRegex, Diags);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -2178,6 +2168,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   }
   assert(Ptr > TokStart && Ptr <= BufferEnd);
   return Ptr;
+#else
+  return nullptr;
+#endif
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
@@ -2603,7 +2596,6 @@ void Lexer::lexImpl() {
   if (DiagQueue)
     DiagQueue->clear();
 
-  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
@@ -2615,7 +2607,7 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  lexTrivia();
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2819,8 +2811,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   return L.peekNextToken();
 }
 
-StringRef Lexer::lexTrivia(bool IsForTrailingTrivia,
-                           const char *AllTriviaStart) {
+void Lexer::lexTrivia() {
   CommentStart = nullptr;
 
 Restart:
@@ -2828,13 +2819,9 @@ Restart:
 
   switch (*CurPtr++) {
   case '\n':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     goto Restart;
   case '\r':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
       ++CurPtr;
@@ -2846,8 +2833,7 @@ Restart:
   case '\f':
     goto Restart;
   case '/':
-    if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivia (for now).
+    if (isKeepingComments()) {
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
@@ -2928,15 +2914,12 @@ Restart:
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
     if (ShouldTokenize) {
       CurPtr = Tmp;
-      size_t Length = CurPtr - AllTriviaStart;
-      return StringRef(AllTriviaStart, Length);
+      return;
     }
     goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
-  size_t Length = CurPtr - AllTriviaStart;
-  return StringRef(AllTriviaStart, Length);
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {

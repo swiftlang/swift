@@ -126,7 +126,11 @@ getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
       &clangDecl->getASTContext().Idents.get("iterator_category");
   auto iteratorCategories = clangDecl->lookup(iteratorCategoryDeclName);
-  if (!iteratorCategories.isSingleResult())
+  // If this is a templated typedef, Clang might have instantiated several
+  // equivalent typedef decls. If they aren't equivalent, Clang has already
+  // complained about this. Let's assume that they are equivalent. (see
+  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  if (iteratorCategories.empty())
     return nullptr;
   auto iteratorCategory = iteratorCategories.front();
 
@@ -569,6 +573,39 @@ void swift::conformToCxxIteratorIfNeeded(
   else
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
+}
+
+void swift::conformToCxxConvertibleToBoolIfNeeded(
+    ClangImporter::Implementation &impl, swift::NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxConvertibleToBool", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  auto conversionId = ctx.getIdentifier("__convertToBool");
+  auto conversions = lookupDirectWithoutExtensions(decl, conversionId);
+
+  // Find a non-mutating overload of `__convertToBool`.
+  FuncDecl *conversion = nullptr;
+  for (auto c : conversions) {
+    auto candidate = dyn_cast<FuncDecl>(c);
+    if (!candidate || candidate->isMutating())
+      continue;
+    if (conversion)
+      // Overload ambiguity?
+      return;
+    conversion = candidate;
+  }
+  if (!conversion)
+    return;
+  auto conversionTy = conversion->getResultInterfaceType();
+  if (!conversionTy->isBool())
+    return;
+
+  impl.addSynthesizedProtocolAttrs(decl,
+                                   {KnownProtocolKind::CxxConvertibleToBool});
 }
 
 void swift::conformToCxxOptionalIfNeeded(

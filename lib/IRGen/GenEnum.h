@@ -91,6 +91,10 @@ Address emitDestructiveProjectEnumAddressForLoad(IRGenFunction &IGF,
                                                   Address enumAddr,
                                                   EnumElementDecl *theCase);
 
+// Should an outlined value function be created for by address enum SIL
+// instructions instead of emitting the code inline.
+bool shouldOutlineEnumValueOperation(const TypeInfo &TI, IRGenModule &IGM);
+
 /// Stores the tag bits for an enum case to the given address, overlaying
 /// the data (if any) stored there.
 void emitStoreEnumTagToAddress(IRGenFunction &IGF,
@@ -200,7 +204,10 @@ public:
   IsTriviallyDestroyable_t isTriviallyDestroyable(ResilienceExpansion expansion) const {
     return getTypeInfo().isTriviallyDestroyable(expansion);
   }
-  
+
+  const TypeInfo &getTypeInfoForPayloadCase(EnumElementDecl *theCase) const;
+  bool isPayloadCase(EnumElementDecl *theCase) const;
+
   /// \group Query enum layout
   ///
   /// These APIs assume a fixed layout; they will not work on generic
@@ -252,9 +259,19 @@ public:
   
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
-  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
-                                      SILType T,
-                                      Address enumAddr) const = 0;
+  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T,
+                                      Address enumAddr,
+                                      bool maskExtraTagBits = false) const = 0;
+
+  /// Return the enum case tag for the given value. Payload cases come first,
+  /// followed by non-payload cases. Used for the getEnumTag value witness.
+  ///
+  /// Only ever called for fixed types.
+  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                           Address enumAddr,
+                                           bool maskExtraTagBits = false) const;
+  llvm::Value *emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                           Address enumAddr) const;
 
   /// Project the address of the data for a case. Does not check or modify
   /// the referenced enum value.
@@ -298,20 +315,24 @@ public:
 
   /// Return an i1 value that indicates whether the specified indirect enum
   /// value holds the specified case.  This is a light-weight form of a switch.
+  /// If `noLoad` is true don't load the enum's value from the address.
   virtual llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF,
                                             SILType T,
                                             Address enumAddr,
-                                            EnumElementDecl *Case) const = 0;
+                                            EnumElementDecl *Case,
+                                            bool noLoad) const = 0;
   
   /// Emit a branch on the case contained by an enum explosion.
   /// Performs the branching for a SIL 'switch_enum_addr'
   /// instruction.
+  /// If `noLoad` is true don't load the enum's value from the address.
   virtual void emitIndirectSwitch(IRGenFunction &IGF,
                                   SILType T,
                                   Address enumAddr,
                                   ArrayRef<std::pair<EnumElementDecl*,
                                                      llvm::BasicBlock*>> dests,
-                                  llvm::BasicBlock *defaultDest) const = 0;
+                                  llvm::BasicBlock *defaultDest,
+                                  bool noLoad) const = 0;
 
   /// Emit code to extract the discriminator as an integer value.
   /// Returns null if this is not supported by the enum implementation.
@@ -496,6 +517,20 @@ public:
                                                    unsigned index) const {
     return false;
   }
+
+  struct SpareBitsMaskInfo {
+    const llvm::APInt bits;
+    const uint32_t byteOffset;
+    const uint32_t bytesInMask;
+
+    uint64_t wordsInMask() const { return (bytesInMask + 3) / 4; }
+  };
+
+  /// Calculates the spare bits mask for the enum. Returns none if the type
+  /// should not emit the spare bits.
+  virtual std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const {
+    return {};
+  };
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

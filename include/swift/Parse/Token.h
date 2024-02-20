@@ -190,7 +190,7 @@ public:
 #define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
       .Case("macro", true)
       .Default(false);
@@ -266,6 +266,12 @@ public:
   bool isMultilineString() const {
     return MultilineString;
   }
+
+  bool isLifetimeDependenceToken() const {
+    return isContextualKeyword("_copy") || isContextualKeyword("_consume") ||
+           isContextualKeyword("_borrow") || isContextualKeyword("_mutate");
+  }
+
   /// Count of extending escaping '#'.
   unsigned getCustomDelimiterLen() const {
     return CustomDelimiterLen;

@@ -20,8 +20,11 @@
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
-                                   bool isThrowing, CleanupLocation CleanupL) {
+void SILGenFunction::prepareEpilog(DeclContext *DC,
+                                   llvm::Optional<Type> directResultType,
+                                   llvm::Optional<Type> errorType,
+                                   CleanupLocation CleanupL,
+                                   llvm::Optional<AbstractionPattern> origClosureType) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -62,8 +65,14 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
 
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
-  if (isThrowing) {
-    prepareRethrowEpilog(CleanupL);
+  if (errorType) {
+    auto genericSig = DC->getGenericSignatureOfContext();
+    AbstractionPattern origErrorType = origClosureType
+      ? *origClosureType->getFunctionThrownErrorType()
+      : AbstractionPattern(genericSig.getCanonicalSignature(),
+                           (*errorType)->getCanonicalType());
+
+    prepareRethrowEpilog(DC, origErrorType, *errorType, CleanupL);
   }
 
   if (F.getLoweredFunctionType()->isCoroutine()) {
@@ -71,11 +80,18 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
   }
 }
 
-void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
-  auto exnType = SILType::getExceptionType(getASTContext());
+void SILGenFunction::prepareRethrowEpilog(
+    DeclContext *dc, AbstractionPattern origErrorType, Type errorType,
+    CleanupLocation cleanupLoc) {
+
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPhiArgument(exnType, OwnershipKind::Owned);
-  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
+  if (!IndirectErrorResult) {
+    SILType loweredErrorType = getLoweredType(origErrorType, errorType);
+    rethrowBB->createPhiArgument(loweredErrorType, OwnershipKind::Owned);
+  }
+
+  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc,
+                       ThrownErrorInfo(IndirectErrorResult));
 }
 
 void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
@@ -388,12 +404,21 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
 void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   SILValue exn;
   SILLocation throwLoc = topLevel;
-  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc, &exn))
+
+  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc,
+                          !IndirectErrorResult ? &exn : nullptr)) {
     return;
+  }
 
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
-  B.createThrow(CleanupLocation(throwLoc), exn);
+  // FIXME: opaque values
+  if (!IndirectErrorResult) {
+    B.createThrow(CleanupLocation(throwLoc), exn);
+  } else {
+    assert(IndirectErrorResult);
+    B.createThrowAddr(CleanupLocation(throwLoc));
+  }
 
   ThrowDest = JumpDest::invalid();
 }

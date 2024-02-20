@@ -103,6 +103,37 @@ enum class MacroWalking {
   None
 };
 
+/// A scheme for walking a `MemberTypeRepr`.
+enum class MemberTypeReprWalkingScheme {
+  /// Walk in source order, such that each subsequent dot-separated component is
+  /// a child of the previous one. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// A
+  /// ╰─B
+  ///   ├─T
+  ///   │ ╰─U
+  ///   ╰─C
+  /// ```
+  SourceOrderRecursive,
+
+  /// Walk in AST order (that is, according to how member type
+  /// representations are modeled in the AST, such that each previous
+  /// dot-separated component is a child of the subsequent one), base before
+  /// generic arguments. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// C
+  /// ╰─B
+  ///   ├─A
+  ///   ╰─U
+  ///     ╰─T
+  /// ```
+  ASTOrderRecursive
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -163,23 +194,24 @@ public:
 
     // The 'Action' set of types, which do not take a payload.
     struct ContinueWalkAction {};
-    struct SkipChildrenIfWalkAction { bool Cond; };
+    struct SkipChildrenIfWalkAction { bool Cond; bool SkipPostWalk; };
     struct StopIfWalkAction { bool Cond; };
     struct StopWalkAction {};
 
     // The 'Result' set of types, which do take a payload.
     template <typename T>
     struct ContinueWalkResult {
+      ContinueWalkAction Action;
       T Value;
     };
     template <typename T>
     struct SkipChildrenIfWalkResult {
-      bool Cond;
+      SkipChildrenIfWalkAction Action;
       T Value;
     };
     template <typename T>
     struct StopIfWalkResult {
-      bool Cond;
+      StopIfWalkAction Action;
       T Value;
     };
   };
@@ -212,15 +244,23 @@ public:
     /// Continue the current walk, replacing the current node with \p node.
     template <typename T>
     static _Detail::ContinueWalkResult<T> Continue(T node) {
-      return {std::move(node)};
+      return {Continue(), std::move(node)};
     }
 
     /// Continue the current walk, replacing the current node with \p node.
-    /// However, skip visiting the children of \p node, and instead resume the
-    /// walk of the parent node.
+    /// However, skip visiting the children of \p node, and resume at its
+    /// post-walk.
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T> SkipChildren(T node) {
       return SkipChildrenIf(true, std::move(node));
+    }
+
+    /// Similar to \c Action::SkipChildren, but also skips the call to the
+    /// post-visitation method.
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipNode(T node) {
+      return SkipNodeIf(true, std::move(node));
     }
 
     /// If \p cond is true, this is equivalent to \c Action::SkipChildren(node).
@@ -228,7 +268,15 @@ public:
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T>
     SkipChildrenIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {SkipChildrenIf(cond), std::move(node)};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode(node).
+    /// Otherwise, it is equivalent to \c Action::Continue(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipNodeIf(bool cond, T node) {
+      return {SkipNodeIf(cond), std::move(node)};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue(node).
@@ -239,32 +287,60 @@ public:
       return SkipChildrenIf(!cond, std::move(node));
     }
 
+    /// If \p cond is true, this is equivalent to \c Action::Continue(node).
+    /// Otherwise, it is equivalent to \c Action::SkipNode(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    VisitNodeIf(bool cond, T node) {
+      return SkipNodeIf(!cond, std::move(node));
+    }
+
     /// If \p cond is true, this is equivalent to \c Action::Stop().
     /// Otherwise, it is equivalent to \c Action::Continue(node).
     template <typename T>
     static _Detail::StopIfWalkResult<T> StopIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {StopIf(cond), std::move(node)};
     }
 
     /// Continue the current walk.
     static _Detail::ContinueWalkAction Continue() { return {}; }
 
     /// Continue the current walk, but do not visit the children of the current
-    /// node. Instead, resume at the parent's post-walk.
+    /// node, resuming at its post-walk.
     static _Detail::SkipChildrenIfWalkAction SkipChildren() {
       return SkipChildrenIf(true);
+    }
+
+    /// Similar to \c Action::SkipChildren, but also skips the call to the
+    /// post-visitation method.
+    static _Detail::SkipChildrenIfWalkAction SkipNode() {
+      return SkipNodeIf(true);
     }
 
     /// If \p cond is true, this is equivalent to \c Action::SkipChildren().
     /// Otherwise, it is equivalent to \c Action::Continue().
     static _Detail::SkipChildrenIfWalkAction SkipChildrenIf(bool cond) {
-      return {cond};
+      return {cond, /*SkipPostWalk*/ false};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode().
+    /// Otherwise, it is equivalent to \c Action::Continue().
+    static _Detail::SkipChildrenIfWalkAction
+    SkipNodeIf(bool cond) {
+      return {cond, /*SkipPostWalk*/ true};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue().
     /// Otherwise, it is equivalent to \c Action::SkipChildren().
     static _Detail::SkipChildrenIfWalkAction VisitChildrenIf(bool cond) {
       return SkipChildrenIf(!cond);
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::Continue().
+    /// Otherwise, it is equivalent to \c Action::SkipNode().
+    static _Detail::SkipChildrenIfWalkAction
+    VisitNodeIf(bool cond) {
+      return SkipNodeIf(!cond);
     }
 
     /// Terminate the walk, returning without visiting any other nodes.
@@ -280,16 +356,19 @@ public:
   /// A pre-visitation action for AST nodes that do not support being replaced
   /// while walking.
   struct PreWalkAction {
-    enum Kind { Stop, SkipChildren, Continue };
+    enum Kind { Stop, SkipChildren, SkipNode, Continue };
     Kind Action;
-
-    PreWalkAction(Kind action) : Action(action) {}
 
     PreWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PreWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
 
-    PreWalkAction(_Detail::SkipChildrenIfWalkAction action)
-        : Action(action.Cond ? SkipChildren : Continue) {}
+    PreWalkAction(_Detail::SkipChildrenIfWalkAction action) {
+      if (action.Cond) {
+        Action = action.SkipPostWalk ? SkipNode : SkipChildren;
+      } else {
+        Action = Continue;
+      }
+    }
 
     PreWalkAction(_Detail::StopIfWalkAction action)
         : Action(action.Cond ? Stop : Continue) {}
@@ -302,8 +381,6 @@ public:
   struct PostWalkAction {
     enum Kind { Stop, Continue };
     Kind Action;
-
-    PostWalkAction(Kind action) : Action(action) {}
 
     PostWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PostWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
@@ -340,21 +417,18 @@ public:
 
     template <typename U>
     PreWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PreWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::SkipChildrenIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::SkipChildren
-                             : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::Stop : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PreWalkResult(_Detail::StopWalkAction)
-        : Action(PreWalkAction::Stop), Value(llvm::None) {}
+    PreWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(llvm::None) {}
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
@@ -385,15 +459,14 @@ public:
 
     template <typename U>
     PostWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PostWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PostWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PostWalkAction::Stop : PostWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PostWalkResult(_Detail::StopWalkAction)
-        : Action(PostWalkAction::Stop), Value(llvm::None) {}
+    PostWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(llvm::None) {}
   };
 
   /// This method is called when first visiting an expression
@@ -519,6 +592,11 @@ public:
   ///
   virtual PostWalkAction walkToTypeReprPost(TypeRepr *T) {
     return Action::Continue();
+  }
+
+  /// This method configures how to walk `MemberTypeRepr` nodes.
+  virtual MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const {
+    return MemberTypeReprWalkingScheme::ASTOrderRecursive;
   }
 
   /// This method configures whether the walker should explore into the generic

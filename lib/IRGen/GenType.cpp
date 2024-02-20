@@ -115,8 +115,6 @@ TypeInfo::~TypeInfo() {
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
-  assert(cast<llvm::PointerType>(ptr->getType())
-             ->isOpaqueOrPointeeTypeMatches(getStorageType()));
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }
 
@@ -934,7 +932,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
     occupiedIndex = index;
     spareIndex = spareBitBias;
   } else {
-    auto occupiedBitMask = APInt::getAllOnesValue(occupiedBitCount);
+    auto occupiedBitMask = APInt::getAllOnes(occupiedBitCount);
     occupiedBitMask = occupiedBitMask.zext(32);
     auto occupiedBitMaskValue = llvm::ConstantInt::get(C, occupiedBitMask);
     occupiedIndex = IGF.Builder.CreateAnd(index, occupiedBitMaskValue);
@@ -1372,6 +1370,11 @@ namespace {
     }
     StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                                const llvm::Twine &name) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
+                                llvm::Value *capacity,
+                                const Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
@@ -2171,7 +2174,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     case BuiltinFloatType::IEEE80: {
       llvm::Type *floatTy = llvm::Type::getX86_FP80Ty(ctx);
       uint64_t ByteSize = IGM.DataLayout.getTypeAllocSize(floatTy);
-      unsigned align = IGM.DataLayout.getABITypeAlignment(floatTy);
+      unsigned align = IGM.DataLayout.getABITypeAlign(floatTy).value();
       return RetTy{ floatTy, Size(ByteSize), Alignment(align) };
     }
     case BuiltinFloatType::IEEE128:

@@ -33,7 +33,7 @@ func consume<T>(_ t: T) {
 // CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
 // CHECK-SAME:     $s4main5ValueOyS2i10TestModule1PAAyHCg_GMD
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:     ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:     ptr [[DEMANGLED_TYPE]]
 // CHECK-SAME:   )
 // CHECK: }
@@ -42,7 +42,7 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1, ptr %2) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(

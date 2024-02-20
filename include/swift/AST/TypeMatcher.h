@@ -397,6 +397,13 @@ private:
             return false;
         }
 
+        // Compare the thrown error types.
+        Type thrownError1 = firstFunc->getEffectiveThrownErrorTypeOrNever();
+        Type thrownError2 = secondFunc->getEffectiveThrownErrorTypeOrNever();
+        if (!this->visit(thrownError1->getCanonicalType(),
+                         thrownError2, thrownError1))
+          return false;
+
         return this->visit(firstFunc.getResult(), secondFunc->getResult(),
                            sugaredFirstFunc->getResult());
       }

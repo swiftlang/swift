@@ -52,48 +52,56 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
+public var standardError = CFileStream(fp: stderr)
+
+#if os(Android) || canImport(Musl)
+  public typealias FILEPointer = OpaquePointer
+#else
+  public typealias FILEPointer = UnsafeMutablePointer<FILE>
+#endif
+
+public struct CFileStream: TextOutputStream {
+  var fp: FILEPointer
+
+  public func write(_ string: String) {
+    fputs(string, fp)
+  }
+
+  public func flush() {
+    fflush(fp)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: llvm.StringRef
+  let _bridged: BridgedStringRef
 
-  public init(bridged: llvm.StringRef) { self._bridged = bridged }
+  public init(bridged: BridgedStringRef) { self._bridged = bridged }
 
-  public var string: String { _bridged.string }
+  public var string: String { String(_bridged)  }
   public var description: String { string }
 
   public var count: Int {
-#if $NewCxxMethodSafetyHeuristics
-    Int(_bridged.bytes_end() - _bridged.bytes_begin())
-#else
-    Int(_bridged.__bytes_endUnsafe() - _bridged.__bytes_beginUnsafe())
-#endif
+    _bridged.count
   }
 
   public subscript(index: Int) -> UInt8 {
-#if $NewCxxMethodSafetyHeuristics
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.bytes_begin(),
-                                            count: count)
-#else
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.__bytes_beginUnsafe(),
-                                            count: count)
-#endif
+    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: count)
     return buffer[index]
   }
 
+  public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
+    let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)
+    if lhsBuffer.count != rhsBuffer.count { return false }
+    return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
+  }
+
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-#if $NewCxxMethodSafetyHeuristics
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(
-      start: lhs._bridged.bytes_begin(),
-      count: lhs.count)
-#else
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(
-      start: lhs._bridged.__bytes_beginUnsafe(),
-      count: lhs.count)
-#endif
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
@@ -101,6 +109,7 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   }
   
   public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+  public static func !=(lhs: StringRef, rhs: StringRef) -> Bool { !(lhs == rhs) }
 
   public static func ~=(pattern: StaticString, value: StringRef) -> Bool { value == pattern }
 }
@@ -109,34 +118,30 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension llvm.StringRef {
-  public var string: String {
-    String(_cxxString: self.str())
-  }
-}
-
 extension String {
-  /// Underscored to avoid name collision with Swift LLVM Bindings.
-  /// To be replaced with a bindings call once bindings are a dependency.
-  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
+  public func _withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
+      return c(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
   }
 
-  /// Underscored to avoid name collision with the std overlay.
-  /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
-  public init(_cxxString s: std.string) {
-    self.init(cString: s.__c_strUnsafe())
-    withExtendedLifetime(s) {}
+  public init(_ s: BridgedStringRef) {
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
+    self.init(decoding: buffer, as: UTF8.self)
+  }
+
+  public init(taking s: BridgedOwnedString) {
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
+    self.init(decoding: buffer, as: UTF8.self)
+    s.destroy()
   }
 }
 
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
     return withUnsafeBytes { buf in
-      return c(BridgedArrayRef(data: buf.baseAddress!, numElements: count))
+      return c(BridgedArrayRef(data: buf.baseAddress!, count: count))
     }
   }
 }
@@ -165,8 +170,8 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
 
 extension BridgedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    let start = data?.bindMemory(to: ty, capacity: numElements);
-    let buffer = UnsafeBufferPointer(start: start, count: numElements);
+    let start = data?.bindMemory(to: ty, capacity: count)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
   }
 }

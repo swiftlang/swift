@@ -1,5 +1,4 @@
 # RUN: %empty-directory(%t)
-# RUN: mkdir -p %t
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --xcode --release --swift-darwin-supported-archs="$(uname -m)" --dry-run --cmake %cmake 2>&1 | %FileCheck %s
 
 # REQUIRES: standalone_build

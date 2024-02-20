@@ -18,7 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 
 namespace swift {
 namespace unittest {
@@ -35,6 +35,7 @@ public:
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 

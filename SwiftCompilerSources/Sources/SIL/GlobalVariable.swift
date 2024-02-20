@@ -14,13 +14,16 @@ import Basic
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.getDecl())
+  }
+
   public var name: StringRef {
     return StringRef(bridged: bridged.getName())
   }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var shortDescription: String { name.string }
@@ -127,7 +130,7 @@ extension Instruction {
       return false
     case let sli as StringLiteralInst:
       switch sli.encoding {
-      case .Bytes, .UTF8:
+      case .Bytes, .UTF8, .UTF8_OSLOG:
         return true
       case .ObjCSelector:
         // Objective-C selector string literals cannot be used in static
@@ -143,6 +146,8 @@ extension Instruction {
          is IntegerLiteralInst,
          is FloatLiteralInst,
          is ObjectInst,
+         is VectorInst,
+         is AllocVectorInst,
          is ValueToBridgeObjectInst,
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,
@@ -163,8 +168,10 @@ private extension TupleExtractInst {
        let bi = tuple as? BuiltinInst,
        bi.id == .USubOver,
        bi.operands[1].value is IntegerLiteralInst,
-       let overFlowFlag = bi.operands[2].value as? IntegerLiteralInst,
-       overFlowFlag.value.isNullValue() {
+       let overflowLiteral = bi.operands[2].value as? IntegerLiteralInst,
+       let overflowValue = overflowLiteral.value,
+       overflowValue == 0
+    {
       return true
     }
     return false

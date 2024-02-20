@@ -41,7 +41,8 @@ enum NLOptions : unsigned {
 
   /// Don't check access when doing lookup into a type.
   ///
-  /// This option is not valid when performing lookup into a module.
+  /// When performing lookup into a module, this option only applies to
+  /// declarations in the same module the lookup is coming from.
   NL_IgnoreAccessControl = 1 << 3,
 
   /// This lookup should only return type declarations.

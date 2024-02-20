@@ -188,7 +188,7 @@ class VeryErrorProne : ErrorProne {
 // CHECK:    bb0([[ARG1:%.*]] : @owned $Optional<AnyObject>, [[ARG2:%.*]] : @owned $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
-// CHECK:      [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_BOX]]
+// CHECK:      [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_BOX]]
 // CHECK:      [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK:      store [[ARG2]] to [init] [[PB]]
 // CHECK:      [[T0:%.*]] = load [take] [[PB]]

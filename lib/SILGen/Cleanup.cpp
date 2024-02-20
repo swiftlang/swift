@@ -142,6 +142,14 @@ void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation loc) {
   emitCleanups(depth, loc, NotForUnwind, /*popCleanups*/ true);
 }
 
+/// Leave a scope, emitting all the cleanups that are currently active but leaving them on the stack so they
+/// can be reenabled on other pattern match branches.
+void CleanupManager::endNoncopyablePatternMatchBorrow(CleanupsDepth depth,
+                                                      CleanupLocation loc,
+                                                      bool popCleanups) {
+  emitCleanups(depth, loc, NotForUnwind, popCleanups);
+}
+
 bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
                                           CleanupsDepth to) {
   return ::hasAnyActiveCleanups(stack.find(from), stack.find(to));

@@ -86,7 +86,7 @@ private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
 
   // Create a new cond_fail using the merged condition.
   _ = builder.createCondFail(condition: mergedCond!,
-                             message: lastCFI.message)
+                             message: lastCFI.message.string)
 
   while let cfi = condFailToMerge.pop() {
     context.erase(instruction: cfi)

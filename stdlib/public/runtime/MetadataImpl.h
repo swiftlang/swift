@@ -40,6 +40,7 @@
 #ifndef SWIFT_RUNTIME_METADATAIMPL_H
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
+#include "swift/Basic/MathUtils.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
@@ -469,10 +470,6 @@ struct FunctionPointerBox : NativeBox<void*> {
   }
 };
 
-constexpr size_t roundUpToAlignment(size_t offset, size_t alignment) {
-  return ((offset + alignment - 1) & ~(alignment - 1));
-}
-
 // A helper template for building an AggregateBox.  The more natural
 // way to do this would be to left-recurse, but we have to
 // right-recurse because C++ only lets you pattern-match things off
@@ -702,7 +699,7 @@ template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment,
           bool hasExtraInhabitants>
 struct FixedSizeBufferValueWitnesses;
 
-/// A fixed size buffer value witness that can rely on the presents of the extra
+/// A fixed size buffer value witness that can rely on the presence of the extra
 /// inhabitant functions.
 template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
 struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
@@ -727,7 +724,7 @@ struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
   }
 };
 
-/// A fixed size buffer value witness that cannot rely on the presents of the
+/// A fixed size buffer value witness that cannot rely on the presence of the
 /// extra inhabitant functions.
 template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
 struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,

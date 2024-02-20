@@ -88,6 +88,8 @@ class ReabstractionInfo {
   /// See `droppedMetatypeArgs`.
   bool dropMetatypeArgs = false;
   
+  bool hasIndirectErrorResult = false;
+
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
   unsigned NumFormalIndirectResults = 0;
@@ -124,8 +126,13 @@ class ReabstractionInfo {
   // callee.
   SubstitutionMap ClonerParamSubMap;
 
-  // Reference to the original generic non-specialized callee function.
+  // Reference to the original generic non-specialized callee function, if available
   SILFunction *Callee = nullptr;
+
+  // The method to specialize. This must be not null if Callee is null.
+  SILDeclRef methodDecl;
+
+  SILModule *M = nullptr;
 
   // The module the specialization is created in.
   ModuleDecl *TargetModule = nullptr;
@@ -185,8 +192,10 @@ private:
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
+  TypeCategory handleReturnAndError(SILResultInfo RI, unsigned argIdx);
+
 public:
-  ReabstractionInfo() {}
+  ReabstractionInfo(SILModule &M) : M(&M) {}
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// substitutions \p ParamSubs.
@@ -208,9 +217,11 @@ public:
                     bool isPrespecialization = false);
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
+                    SILDeclRef methodDecl,
                     SILModule &M) :
     SubstitutedType(substitutedType),
-    isWholeModule(M.isWholeModule()) {}
+    methodDecl(methodDecl),
+    M(&M), isWholeModule(M.isWholeModule()) {}
 
 
   bool isPrespecialized() const { return isPrespecialization; }
@@ -220,7 +231,12 @@ public:
   }
 
   unsigned param2ArgIndex(unsigned ParamIdx) const  {
-    return ParamIdx + NumFormalIndirectResults;
+    return ParamIdx + NumFormalIndirectResults + (hasIndirectErrorResult ? 1: 0);
+  }
+
+  unsigned indirectErrorIndex() const {
+    assert(hasIndirectErrorResult);
+    return NumFormalIndirectResults;
   }
 
   /// Returns true if the specialized function needs an alternative mangling.
@@ -246,6 +262,10 @@ public:
   bool isFormalResultConverted(unsigned ResultIdx) const {
     assert(ResultIdx < NumFormalIndirectResults);
     return ConvertIndirectToDirect && Conversions.test(ResultIdx);
+  }
+
+  bool isErrorResultConverted() const {
+    return ConvertIndirectToDirect && Conversions.test(indirectErrorIndex());
   }
 
   /// Gets the total number of original function arguments.
@@ -326,13 +346,10 @@ public:
 
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
-  /// Map type into a context of the specialized function.
-  Type mapTypeIntoContext(Type type) const;
-
   /// Map SIL type into a context of the specialized function.
   SILType mapTypeIntoContext(SILType type) const;
 
-  SILModule &getModule() const { return Callee->getModule(); }
+  SILModule &getModule() const { return *M; }
 
   /// Returns true if generic specialization is possible.
   bool canBeSpecialized() const;

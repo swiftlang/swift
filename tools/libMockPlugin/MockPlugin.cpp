@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift-c/MockPlugin/MockPlugin.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/JSON.h"
 

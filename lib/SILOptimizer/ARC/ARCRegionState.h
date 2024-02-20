@@ -191,7 +191,7 @@ public:
       llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &LoopRegionState,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
 
   /// If this region is a block, process all instructions bottom up. Otherwise,
   /// apply the summarized bottom up information to the merged bottom up
@@ -204,7 +204,7 @@ public:
       llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
 
   void summarizeBlock(SILBasicBlock *BB);
 
@@ -223,10 +223,10 @@ public:
 private:
   bool processBlockBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-      EpilogueARCFunctionInfo *EAFI,
-      LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
+      EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
+      bool FreezeOwnedArgEpilogueReleases,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
   bool processLoopBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
       RCIdentityFunctionInfo *RCIA,
@@ -236,7 +236,7 @@ private:
   bool processBlockTopDown(
       SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
   bool processLoopTopDown(
       const LoopRegion *R, ARCRegionState *State, AliasAnalysis *AA,
       LoopRegionFunctionInfo *LRFI, RCIdentityFunctionInfo *RCIA,

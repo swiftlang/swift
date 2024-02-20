@@ -90,6 +90,7 @@ struct PatternBindingState {
       : kind(NotInBinding) {
     switch (introducer) {
     case VarDecl::Introducer::Let:
+    case VarDecl::Introducer::Borrowing:
       kind = InLet;
       break;
     case VarDecl::Introducer::Var:

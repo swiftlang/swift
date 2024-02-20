@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_1 | %FileCheck %s -check-prefix=POUND_EXPR_INTCONTEXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_2 | %FileCheck %s -check-prefix=POUND_EXPR_STRINGCONTEXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_3 | %FileCheck %s -check-prefix=POUND_EXPR_SELECTORCONTEXT
-// REQUIRES: objc_interop
+// REQUIRES: objc_interop, swift_swift_parser
 
 import ObjectiveC
 

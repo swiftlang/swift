@@ -645,10 +645,12 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
   // same structural position in the first type.
   TypeSubstitutionMap substMap;
   substTypeB = substTypeB->substituteBindingsTo(substTypeA,
-      [&](ArchetypeType *origType, CanType substType,
-          ArchetypeType *, ArrayRef<ProtocolConformanceRef>) -> CanType {
+      [&](ArchetypeType *origType, CanType substType) -> CanType {
     auto interfaceTy =
         origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
+
+    if (!interfaceTy)
+      return CanType();
 
     // Make sure any duplicate bindings are equal to the one already recorded.
     // Otherwise, the substitution has conflicting generic arguments.
@@ -663,12 +665,12 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
   if (!substTypeB)
     return false;
 
-  auto result = TypeChecker::checkGenericArguments(
+  auto result = checkRequirements(
       declA->getDeclContext()->getParentModule(),
       genericSignatureB.getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
-  if (result != CheckGenericArgumentsResult::Success)
+  if (result != CheckRequirementsResult::Success)
     return false;
 
   return substTypeA->isEqual(substTypeB);
@@ -785,7 +787,7 @@ bool swift::isSIMDOperator(ValueDecl *value) {
   if (nominal->getName().empty())
     return false;
 
-  return nominal->getName().str().startswith_insensitive("simd");
+  return nominal->getName().str().starts_with_insensitive("simd");
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(

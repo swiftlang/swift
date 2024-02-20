@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 // features.
 //
 //
-// LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+// LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 //
 //   The LANGUAGE_FEATURE macro describes each named feature that is
 //   introduced in Swift. It allows Swift code to check for a particular
@@ -25,9 +25,6 @@
 //     SENumber: The number assigned to this feature in the Swift Evolution
 //       process, or 0 if there isn't one.
 //     Description: A string literal describing the feature.
-//     Option: either a reference to a language option in the form
-//       "langOpts.<option name>" or "true" to indicate that it's always
-//       enabled.
 //
 // Suppressible language features can be suppressed when printing
 // an interface without having to suppress the entire declaration they're
@@ -37,6 +34,10 @@
 // imply the existence of earlier features.  (This only needs to apply to
 // suppressible features.)
 //
+// BASELINE_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but is used
+// for features that can be assumed to be available in any Swift compiler that
+// will be used to process the textual interface files produced by this
+// Swift compiler.
 //===----------------------------------------------------------------------===//
 
 #ifndef LANGUAGE_FEATURE
@@ -44,22 +45,20 @@
 #endif
 
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
 #ifndef UPCOMING_FEATURE
 #  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
-     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
-                      langOpts.hasFeature(#FeatureName))
+     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE
 // Warning: setting `AvailableInProd` to `true` on a feature means that the flag
 //          cannot be dropped in the future.
 #  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)  \
-     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
-                      langOpts.hasFeature(#FeatureName))
+     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
@@ -67,64 +66,88 @@
      EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #endif
 
-LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
-LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
-LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
-LANGUAGE_FEATURE(Actors, 0, "actors", true)
-LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions", true)
-LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol", true)
-LANGUAGE_FEATURE(GlobalActors, 316, "Global actors", true)
-LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
-LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
-LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
-LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
-LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor", true)
-LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins", true)
-LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
-LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
-LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
-LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins", true)
-LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
-LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
-LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
-LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
-LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc", true)
-LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
-LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
-LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
-LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
-LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
-LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors", true)
-LANGUAGE_FEATURE(Macros, 0, "Macros", hasSwiftSwiftParser)
-LANGUAGE_FEATURE(
-    FreestandingExpressionMacros, 382, "Expression macros",
-        hasSwiftSwiftParser)
-LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
-LANGUAGE_FEATURE(ExtensionMacros, 402, "Extension macros", hasSwiftSwiftParser)
-LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
-LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
-SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations", true)
-LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", true)
+#ifndef BASELINE_LANGUAGE_FEATURE
+#  define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+BASELINE_LANGUAGE_FEATURE(AsyncAwait, 296, "async/await")
+BASELINE_LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties")
+BASELINE_LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol")
+BASELINE_LANGUAGE_FEATURE(Actors, 0, "actors")
+BASELINE_LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions")
+LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol")
+BASELINE_LANGUAGE_FEATURE(GlobalActors, 316, "Global actors")
+BASELINE_LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type")
+BASELINE_LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable")
+BASELINE_LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type")
+BASELINE_LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins")
+BASELINE_LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor")
+BASELINE_LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins")
+BASELINE_LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute")
+BASELINE_LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute")
+LANGUAGE_FEATURE(BuiltinBuildTaskExecutorRef, 0, "TaskExecutor-building builtins")
+LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
+LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
+BASELINE_LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
+LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in task group builtin with extra flags")
+LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference")
+LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
+LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()")
+LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
+LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
+LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
+LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
+LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
+LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
+SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
+LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
+LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
+SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
+SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types")
+SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)")
+LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors")
+LANGUAGE_FEATURE(Macros, 0, "Macros")
+LANGUAGE_FEATURE(FreestandingExpressionMacros, 382, "Expression macros")
+LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros")
+LANGUAGE_FEATURE(ExtensionMacros, 402, "Extension macros")
+LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types")
+LANGUAGE_FEATURE(MoveOnlyResilientTypes, 390, "non-@frozen noncopyable types with library evolution")
+LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs")
+SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations")
+LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
+SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
+SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
+LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
+LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
+SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
+LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
+LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
+UPCOMING_FEATURE(StrictConcurrency, 0337, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
-UPCOMING_FEATURE(ExistentialAny, 335, 6)
+UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
+UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
+UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
+UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
+UPCOMING_FEATURE(FullTypedThrows, 413, 6)
+UPCOMING_FEATURE(ExistentialAny, 335, 7)
+UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
+
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
+EXPERIMENTAL_FEATURE(BodyMacros, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
-
-SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -140,14 +163,12 @@ EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
 EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
-EXPERIMENTAL_FEATURE(MoveOnlyResilientTypes, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
+EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
-EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
-EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Whether to enable experimental layout string value witnesses
@@ -191,10 +212,6 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
-/// Use the syntax tree produced by the Swift (swift-syntax) parser for type
-/// parsing, using ASTGen to translate them into AST nodes.
-EXPERIMENTAL_FEATURE(ASTGenTypes, false)
-
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
@@ -213,14 +230,8 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, true)
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
-// Enable strict concurrency.
-EXPERIMENTAL_FEATURE(StrictConcurrency, true)
-
-/// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(SendNonSendable, false)
-
-/// Within strict concurrency, narrow global variable isolation requirements.
-EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
+/// Region Based Isolation testing using the TransferNonSendable pass
+EXPERIMENTAL_FEATURE(RegionBasedIsolation, true)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
@@ -229,6 +240,13 @@ EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
 /// Enable 'then' statements.
 EXPERIMENTAL_FEATURE(ThenStatements, false)
 
+/// Enable 'do' expressions.
+EXPERIMENTAL_FEATURE(DoExpressions, false)
+
+/// Enable implicitly treating the last expression in a function, closure,
+/// and 'if'/'switch' expression as the result.
+EXPERIMENTAL_FEATURE(ImplicitLastExprResults, false)
+
 /// Enable the `@_rawLayout` attribute.
 EXPERIMENTAL_FEATURE(RawLayout, true)
 
@@ -236,10 +254,47 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
+EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
+
+/// Allow destructuring stored `let` bindings in structs.
+EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
+
+/// Enable non-escapable type attributes and function attributes that support
+/// lifetime-dependent results.
+EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+
+/// Enable the `@_staticExclusiveOnly` attribute.
+EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
+
+/// Enable the @extractConstantsFromMembers attribute.
+EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
+
+/// Enable bitwise-copyable feature.
+EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
+
+/// Enables the FixedArray data type.
+EXPERIMENTAL_FEATURE(FixedArrays, true)
+
+// Group Main Actor Isolation Errors by Scope
+EXPERIMENTAL_FEATURE(GroupActorErrors, true)
+
+// Allow for the 'transferring' keyword to be applied to arguments and results.
+EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+
+// Enable `@preconcurrency` attribute on protocol conformances and runtime checks
+// of actor isolation in @obj thunks and arguments of APIs that haven't yet adopted
+// strict concurrency checking.
+EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
+
+// Allow for `switch` of noncopyable values to be borrowing or consuming.
+EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
+
+// Enable isolated(any) attribute on function types.
+EXPERIMENTAL_FEATURE(IsolatedAny, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
+#undef BASELINE_LANGUAGE_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

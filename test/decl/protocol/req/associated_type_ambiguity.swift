@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 {
@@ -9,18 +9,16 @@ protocol P2 {
   associatedtype T
 }
 
-// Note: the warnings should probably be emitted.
-
 // CHECK: ExtensionDecl line={{.*}} base=P1
 // CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
-extension P1 where Self : P2, T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
+extension P1 where Self : P2, T == Int {
   func takeT11(_: T) {}
   func takeT12(_: Self.T) {}
 }
 
 // CHECK: ExtensionDecl line={{.*}} base=P1
 // CHECK-NEXT: Generic signature: <Self where Self : P1, Self : P2, Self.[P2]T == Int>
-extension P1 where Self : P2, Self.T == Int { // expected-warning {{redundant same-type constraint 'Self.T' == 'Int'}}
+extension P1 where Self : P2, Self.T == Int {
   func takeT21(_: T) {}
   func takeT22(_: Self.T) {}
 }

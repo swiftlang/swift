@@ -23,7 +23,7 @@ struct State<T> {
 }
 
 struct S {
-  @State var value: Int = 1
+  @State var value: Int64 = 1
 
   init() {
     value = 10 // CRASH
@@ -39,10 +39,10 @@ print(s)
 // the method of this self type (struct S) does not.
 
 // CHECK: define {{.*}}swiftcc ptr @"$s4test1SVACycfC"()
-// CHECK:  [[RES:%.*]] = call swiftcc ptr @"$s4test1SV5valueSivpfP"(i64 1)
+// CHECK:  [[RES:%.*]] = call swiftcc ptr @"$s4test1SV5values5Int64VvpfP"(i64 1)
 // CHECK:  ret ptr [[RES]]
 
 // This used to crash.
 
 // CHECK-EXEC: Hello!
-// CHECK-EXEC: S(_value: main.State<Swift.Int>(ref: main.State<Swift.Int>.(unknown context at {{.*}}).Reference))
+// CHECK-EXEC: S(_value: main.State<Swift.Int64>(ref: main.State<Swift.Int64>.(unknown context at {{.*}}).Reference))

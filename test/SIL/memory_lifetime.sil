@@ -763,3 +763,21 @@ bb3:
   return %22 : $()                                
 } 
 
+sil @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+sil @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+// Test alloc_stack of a non-trivial (thick) function.
+// Initialize by storing a thin function, which as ownership .none.
+// Deallocation does not require a destroy_adr.
+sil [ossa] @testTrivialThinToThick : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %1 = thin_to_thick_function %0 : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int> to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %2 = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  store %1 to [trivial] %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %4 = function_ref @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<() -> Int>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %7 = tuple ()
+  return %7 : $()
+}

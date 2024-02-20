@@ -29,3 +29,4 @@ func foo2(_ e : MyEnum) -> Int {
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=16:1 -end-pos=23:4 >> %t.result/Int.swift
 // RUN: diff -u %S/Outputs/extract_switch/Int.swift.expected %t.result/Int.swift
+// REQUIRES: swift_swift_parser

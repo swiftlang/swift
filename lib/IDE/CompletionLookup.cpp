@@ -13,6 +13,8 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 
@@ -83,8 +85,12 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::StringLiteral:
     return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
+    if (!Ctx.getArrayDecl())
+      return Type();
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
+    if (!Ctx.getDictionaryDecl())
+      return Type();
     return Ctx.getDictionaryDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
@@ -196,14 +202,14 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
         }
         return Action::Continue(E);
@@ -388,7 +394,7 @@ CompletionLookup::getSemanticContext(const Decl *D, DeclVisibilityKind Reason,
     return *ForcedSemanticContext;
 
   switch (Reason) {
-  case DeclVisibilityKind::LocalVariable:
+  case DeclVisibilityKind::LocalDecl:
   case DeclVisibilityKind::FunctionParameter:
   case DeclVisibilityKind::GenericParameter:
     return SemanticContextKind::Local;
@@ -551,15 +557,10 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
   if (!genericSig)
     return type;
 
-  auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
-    SmallVector<Type, 2> types;
-    for (auto proto : protos)
-      types.push_back(proto->getDeclaredInterfaceType());
-    return ProtocolCompositionType::get(Ctx, types,
-                                        /*HasExplicitAnyObject=*/false);
-  };
-
   if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
+    assert(genericFuncType->getGenericSignature()->isEqual(genericSig) &&
+           "if not, just use the GFT's signature instead below");
+
     SmallVector<AnyFunctionType::Param, 8> erasedParams;
     for (const auto &param : genericFuncType->getParams()) {
       auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
@@ -580,15 +581,24 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
           archetypeType->isRoot())
         return t;
 
-      auto protos = archetypeType->getConformsTo();
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
+      auto upperBound = genericSig->getUpperBound(
+          archetypeType->getInterfaceType(),
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
     if (t->isTypeParameter()) {
-      const auto protos = genericSig->getRequiredProtocols(t);
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto upperBound = genericSig->getUpperBound(
+          t,
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
     return t;
@@ -632,6 +642,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
     //   { τ_0_0(T) => Circle
     //     τ_1_0(U) => U }
     auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
+
+    // FIXME: The below should use substitution map substitution.
 
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
@@ -761,15 +773,15 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
-  case ActorIsolation::GlobalActorUnsafe:
-    // For "unsafe" global actor isolation, automatic 'async' only happens
+  case ActorIsolation::GlobalActor: {
+    // For "preconcurrency" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.
-    if (!CanCurrDeclContextHandleAsync &&
+    if (isolation.preconcurrency() &&
+        !CanCurrDeclContextHandleAsync &&
         !completionContextUsesConcurrencyFeatures(CurrDeclContext)) {
       return;
     }
-    LLVM_FALLTHROUGH;
-  case ActorIsolation::GlobalActor: {
+
     auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
       // Prefer solution-specific actor-isolations and fall back to the one
       // recorded in the AST.
@@ -787,29 +799,32 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
+  case ActorIsolation::Erased:
+    implicitlyAsync = true;
+    break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     return;
   }
 
   // If the reference is 'async', all types must be 'Sendable'.
   if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
       implicitlyAsync && T) {
-    auto *M = CurrDeclContext->getParentModule();
     if (isa<VarDecl>(VD)) {
-      if (!isSendableType(M, T)) {
+      if (!T->isSendableType()) {
         NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
       }
     } else {
       assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
       // Check if the result and the param types are all 'Sendable'.
       auto *AFT = T->castTo<AnyFunctionType>();
-      if (!isSendableType(M, AFT->getResult())) {
+      if (!AFT->getResult()->isSendableType()) {
         NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
       } else {
         for (auto &param : AFT->getParams()) {
           Type paramType = param.getPlainType();
-          if (!isSendableType(M, paramType)) {
+          if (!paramType->isSendableType()) {
             NotRecommended =
                 ContextualNotRecommendedReason::CrossActorReference;
             break;
@@ -994,6 +1009,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::ExpressionMacro:
     return false;
   }
 }
@@ -1227,6 +1243,10 @@ void CompletionLookup::addFunctionCallPattern(
             : CodeCompletionResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(AFD));
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
+    if (DotLoc) {
+      Builder.setNumBytesToErase(Ctx.SourceMgr.getByteDistance(
+          DotLoc, Ctx.SourceMgr.getIDEInspectionTargetLoc()));
+    }
     if (AFD)
       Builder.setAssociatedDecl(AFD);
 
@@ -1305,6 +1325,7 @@ bool CompletionLookup::isImplicitlyCurriedInstanceMethod(
 
   switch (Kind) {
   case LookupKind::ValueExpr:
+  case LookupKind::StoredProperty:
     return ExprType->is<AnyMetatypeType>();
   case LookupKind::ValueInDeclContext:
     if (InsideStaticMethod)
@@ -1854,6 +1875,12 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
     case MacroRole::Peer:
       roleStrs.push_back("Peer Macro");
       break;
+    case MacroRole::Preamble:
+      roleStrs.push_back("Preamble Macro");
+      break;
+    case MacroRole::Body:
+      roleStrs.push_back("Body Macro");
+      break;
     }
   }
 
@@ -1970,10 +1997,11 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   if (!useFunctionReference && funcTy) {
     // We know that the CodeCompletionResultType is AST-based so we can pass
     // nullptr for USRTypeContext.
-    auto maxRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
+    auto maxFuncTyRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
         &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
-    useFunctionReference =
-        maxRel >= CodeCompletionResultTypeRelation::Convertible;
+    auto maxResultTyRel = CodeCompletionResultType(funcTy->getResult()).calculateTypeRelation(
+        &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
+    useFunctionReference = maxFuncTyRel > maxResultTyRel;
   }
   if (!useFunctionReference)
     return false;
@@ -2248,6 +2276,13 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     }
 
     return;
+  case LookupKind::StoredProperty:
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (VD->hasStorage()) {
+        addVarDeclRef(VD, Reason, dynamicLookupInfo);
+      }
+      return;
+    }
   }
 }
 
@@ -2461,6 +2496,17 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
                            IncludeInstanceMembers,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
+}
+
+void CompletionLookup::getStoredPropertyCompletions(const NominalTypeDecl *D) {
+  Kind = LookupKind::StoredProperty;
+  NeedLeadingDot = false;
+
+  lookupVisibleMemberDecls(*this, D->getDeclaredInterfaceType(),
+                           /*DotLoc=*/SourceLoc(), CurrDeclContext,
+                           /*IncludeInstanceMembers*/ true,
+                           /*includeDerivedRequirements*/ false,
+                           /*includeProtocolExtensionMembers*/ false);
 }
 
 void CompletionLookup::collectOperators(
@@ -2732,8 +2778,8 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
   FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Expr,
                               CodeCompletionFilterFlag::Type};
@@ -2934,7 +2980,7 @@ void CompletionLookup::getGenericRequirementCompletions(
   // qualified by the current type. Thus also suggest current self type so the
   // user can do a memberwise lookup on it.
   if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
-    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalVariable,
+    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalDecl,
                       DynamicLookupInfo());
   }
 
@@ -2985,10 +3031,10 @@ void CompletionLookup::getAttributeDeclCompletions(
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK,     \
-                            #KEYWORD))                                         \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
+                            DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(
@@ -3051,6 +3097,43 @@ void CompletionLookup::getAttributeDeclParamCompletions(
       break;
     }
     break;
+  case CustomSyntaxAttributeKind::StorageRestrictions: {
+    bool suggestInitializesLabel = false;
+    bool suggestAccessesLabel = false;
+    bool suggestArgument = false;
+    switch (static_cast<StorageRestrictionsCompletionKind>(ParamIndex)) {
+    case StorageRestrictionsCompletionKind::Label:
+      suggestAccessesLabel = true;
+      suggestInitializesLabel = true;
+      break;
+    case StorageRestrictionsCompletionKind::Argument:
+      suggestArgument = true;
+      break;
+    case StorageRestrictionsCompletionKind::ArgumentOrInitializesLabel:
+      suggestArgument = true;
+      suggestInitializesLabel = true;
+      break;
+    case StorageRestrictionsCompletionKind::ArgumentOrAccessesLabel:
+      suggestArgument = true;
+      suggestAccessesLabel = true;
+      break;
+    }
+    if (suggestInitializesLabel) {
+      addDeclAttrParamKeyword(
+          "initializes", /*Parameters=*/{},
+          "Specify stored properties initialized by the accessor", true);
+    }
+    if (suggestAccessesLabel) {
+      addDeclAttrParamKeyword(
+          "accesses", /*Parameters=*/{},
+          "Specify stored properties accessed by the accessor", true);
+    }
+    if (suggestArgument) {
+      if (auto NT = dyn_cast<NominalTypeDecl>(CurrDeclContext)) {
+        getStoredPropertyCompletions(NT);
+      }
+    }
+  }
   }
 }
 
@@ -3179,8 +3262,8 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   Kind = LookupKind::TypeInDeclContext;
 
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
-  lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(AccessFilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Type};
   if (ModuleQualifier) {
@@ -3309,7 +3392,7 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
 
       if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
         if (LS->getLabelInfo()) {
@@ -3330,7 +3413,7 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       return Action::Continue(E);
     }
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
@@ -3367,12 +3450,12 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
   // modules. For suggesting top level results, we need a way to filter cached
   // results.
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 }
 
-void CompletionLookup::getWithoutConstraintTypes() {
-  // FIXME: Once we have a typealias declaration for copyable, we should be
-  // returning that instead of a keyword (rdar://109107817).
-  addKeyword("Copyable");
+void CompletionLookup::addWithoutConstraintTypes() {
+  auto *CopyableDecl = Ctx.getProtocol(KnownProtocolKind::Copyable);
+  addNominalTypeRef(CopyableDecl, DeclVisibilityKind::VisibleAtTopLevel,
+                    DynamicLookupInfo());
 }

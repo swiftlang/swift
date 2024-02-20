@@ -135,6 +135,8 @@ class BuildScriptInvocation(object):
             '--build-swift-libexec', str(args.build_swift_libexec).lower(),
             '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            '--build-swift-external-generic-metadata-builder', str(
+                args.build_swift_external_generic_metadata_builder).lower(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -248,13 +250,15 @@ class BuildScriptInvocation(object):
         if args.swift_disable_dead_stripping:
             args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
 
-        swift_syntax_src = os.path.join(self.workspace.source_root,
-                                        "swift-syntax")
-        args.extra_cmake_options.append(
-            '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
-
         if args.build_early_swiftsyntax:
-            impl_args += ["--swift-earlyswiftsyntax"]
+            swift_syntax_src = os.path.join(self.workspace.source_root,
+                                            "swift-syntax")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+            args.extra_cmake_options.append('-DSWIFT_BUILD_SWIFT_SYNTAX:BOOL=TRUE')
+            if self.args.assertions:
+                args.extra_cmake_options.append(
+                    '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
@@ -443,6 +447,15 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.coverage_db)
             ]
 
+        # '--install-swiftsyntax' is a legacy form of 'swift-syntax-lib'
+        # install component.
+        if (args.install_swiftsyntax and
+                '--install-swift' not in args.build_script_impl_args):
+            impl_args += [
+                "--install-swift",
+                "--swift-install-components=swift-syntax-lib"
+            ]
+
         if args.llvm_install_components:
             impl_args += [
                 "--llvm-install-components=%s" % args.llvm_install_components
@@ -565,9 +578,6 @@ class BuildScriptInvocation(object):
 
         builder.begin_pipeline()
 
-        builder.add_product(products.EarlySwiftSyntax,
-                            is_enabled=self.args.build_early_swiftsyntax)
-
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
@@ -638,8 +648,6 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swiftformat)
         builder.add_product(products.SKStressTester,
                             is_enabled=self.args.build_skstresstester)
-        builder.add_product(products.SwiftEvolve,
-                            is_enabled=self.args.build_swiftevolve)
         builder.add_product(products.IndexStoreDB,
                             is_enabled=self.args.build_indexstoredb)
         builder.add_product(products.PlaygroundSupport,
@@ -658,6 +666,14 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.install_swiftdocc)
         builder.add_product(products.MinimalStdlib,
                             is_enabled=self.args.build_minimalstdlib)
+        builder.add_product(products.WASILibc,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmLLVMRuntimeLibs,
+                            is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmKit,
+                            is_enabled=self.args.build_wasmkit)
+        builder.add_product(products.WasmStdlib,
+                            is_enabled=self.args.build_wasmstdlib)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully

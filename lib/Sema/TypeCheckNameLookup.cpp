@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
@@ -496,13 +497,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance.getConcrete();
+      auto *concrete = conformance.getConcrete();
+      auto *normal = concrete->getRootNormalConformance();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
-      if (concrete->getState() ==
-          ProtocolConformanceState::CheckingTypeWitnesses)
+      if (dc->getASTContext().evaluator.hasActiveRequest(
+            ResolveTypeWitnessesRequest{normal})) {
         continue;
+      }
 
       auto *typeDecl =
         concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
@@ -581,6 +584,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         TypoCorrectionResults &corrections,
                                         GenericSignature genericSig,
                                         unsigned maxResults) {
+  // Even when typo correction is disabled, we want to make sure people are
+  // calling into it the right way.
+  assert(!baseTypeOrNull || !baseTypeOrNull->hasTypeParameter() || genericSig);
+
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
   auto &Ctx = DC->getASTContext();
@@ -623,8 +630,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                              /*includeProtocolExtensionMembers*/true,
                              genericSig);
   } else {
-    lookupVisibleDecls(consumer, DC, /*top level*/ true,
-                       corrections.Loc.getBaseNameLoc());
+    lookupVisibleDecls(consumer, corrections.Loc.getBaseNameLoc(), DC,
+                       /*top level*/ true);
   }
 
   // Impose a maximum distance from the best score.

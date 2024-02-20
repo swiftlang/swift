@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation -Xfrontend -enable-lexical-borrow-scopes=false) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
-// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation -Xfrontend -enable-lexical-borrow-scopes=false) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
+// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
+// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -70,7 +70,6 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  // CHECK-OPT-NEXT: deallocated
 
   print(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
@@ -84,7 +83,7 @@ if true {
   _fixLifetime(bo3)
   _fixLifetime(bo4)
 }
-// CHECK-DBG-NEXT: deallocated
+// CHECK-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
 // Try with all spare bits set.
@@ -99,7 +98,6 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  // CHECK-OPT-NEXT: deallocated
   
   print(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
@@ -113,7 +111,7 @@ if true {
   _fixLifetime(bo3)
   _fixLifetime(bo4)
 }
-// CHECK-DBG-NEXT: deallocated
+// CHECK-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
 

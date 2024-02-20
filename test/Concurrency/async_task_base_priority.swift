@@ -13,6 +13,7 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
+// UNSUPPORTED: single_threaded_concurrency
 
 import StdlibUnittest
 import Dispatch

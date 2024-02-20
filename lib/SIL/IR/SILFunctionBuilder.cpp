@@ -13,10 +13,9 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 
@@ -32,7 +31,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (auto fn = mod.lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(stripExternalFromLinkage(fn->getLinkage()) ==
-           stripExternalFromLinkage(linkage));
+           stripExternalFromLinkage(linkage) || mod.getOptions().EmbeddedSwift);
     return fn;
   }
 
@@ -58,10 +57,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (auto *A = Attrs.getAttribute(DAK_EmitAssemblyVisionRemarks))
+  if (auto *A = Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
-
-  auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
 
   // Propagate @_specialize.
   for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
@@ -107,30 +104,14 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
   }
 
-  EffectsAttr const *writeNoneEffect = nullptr;
-  EffectsAttr const *releaseNoneEffect = nullptr;
   llvm::SmallVector<const EffectsAttr *, 8> customEffects;
   if (constant) {
     for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
       auto *effectsAttr = cast<EffectsAttr>(attr);
-      switch (effectsAttr->getKind()) {
-      case EffectsKind::Custom:
+      if (effectsAttr->getKind() == EffectsKind::Custom) {
         customEffects.push_back(effectsAttr);
-        // Proceed to the next attribute, don't set the effects kind based on
-        // this attribute.
         continue;
-      case EffectsKind::ReadNone:
-      case EffectsKind::ReadOnly:
-        writeNoneEffect = effectsAttr;
-        break;
-      case EffectsKind::ReleaseNone:
-        releaseNoneEffect = effectsAttr;
-        break;
-      default:
-        break;
       }
-      if (effectsAttr->getKind() == EffectsKind::Custom)
-        continue;
       if (F->getEffectsKind() != EffectsKind::Unspecified) {
         // If multiple known effects are specified, the most restrictive one
         // is used.
@@ -139,42 +120,6 @@ void SILFunctionBuilder::addFunctionAttributes(
       } else {
         F->setEffectsKind(effectsAttr->getKind());
       }
-    }
-  }
-
-  if (writeNoneEffect && !releaseNoneEffect) {
-    auto constantType = mod.Types.getConstantFunctionType(
-        TypeExpansionContext::minimal(), constant);
-    SILFunctionConventions fnConv(constantType, mod);
-
-    auto selfIndex = fnConv.getSILArgIndexOfSelf();
-    for (auto index : indices(fnConv.getParameters())) {
-      auto param = fnConv.getParameters()[index];
-      if (!param.isConsumed())
-        continue;
-      if (index == selfIndex) {
-        mod.getASTContext().Diags.diagnose(
-            writeNoneEffect->getLocation(),
-            diag::
-                error_attr_effects_consume_requires_explicit_releasenone_self);
-      } else {
-        auto *pd = attributedFuncDecl->getParameters()->get(index);
-        mod.getASTContext().Diags.diagnose(
-            writeNoneEffect->getLocation(),
-            diag::error_attr_effects_consume_requires_explicit_releasenone,
-            pd->getName());
-        mod.getASTContext().Diags.diagnose(
-            pd->getNameLoc(),
-            diag::note_attr_effects_consume_requires_explicit_releasenone,
-            pd->getName());
-      }
-      mod.getASTContext()
-          .Diags
-          .diagnose(
-              writeNoneEffect->getLocation(),
-              diag::fixit_attr_effects_consume_requires_explicit_releasenone)
-          .fixItInsertAfter(writeNoneEffect->getRange().End,
-                            " @_effects(releasenone)");
     }
   }
 
@@ -218,6 +163,29 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
+    bool shouldExportDecl = true;
+    if (Attrs.hasAttribute<CDeclAttr>()) {
+      // If the function is marked with @cdecl, expose only C compatible
+      // thunk function.
+      shouldExportDecl = constant.isNativeToForeignThunk();
+    }
+    if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
+      // A wasm-level exported function must be retained if it appears in a
+      // compilation unit.
+      F->setMarkedAsUsed(true);
+      if (EA->Name.empty())
+        F->setWasmExportName(F->getName());
+      else
+        F->setWasmExportName(EA->Name);
+    }
+  }
+
+  if (auto *EA = ExternAttr::find(Attrs, ExternKind::Wasm)) {
+    // @_extern(wasm) always has explicit names
+    F->setWasmImportModuleAndField(*EA->ModuleName, *EA->Name);
+  }
+
   if (Attrs.hasAttribute<UsedAttr>())
     F->setMarkedAsUsed(true);
 
@@ -225,10 +193,24 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoLocks);
   } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  } else if (Attrs.hasAttribute<NoRuntimeAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoRuntime);
+  } else if (Attrs.hasAttribute<NoExistentialsAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoExistentials);
+  } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
     F->setForceEnableLexicalLifetimes(DoForceEnableLexicalLifetimes);
+  }
+
+  if (Attrs.hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    F->setHasUnsafeNonEscapableResult(true);
+  }
+
+  if (Attrs.hasAttribute<ResultDependsOnSelfAttr>()) {
+    F->setHasResultDependsOnSelf();
   }
 
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
@@ -292,15 +274,6 @@ void SILFunctionBuilder::addFunctionAttributes(
 
       F->setDynamicallyReplacedFunction(replacedFunc);
     }
-  } else if (constant.isDistributedThunk()) {
-    auto decodeFuncDecl =
-            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl);
-    assert(decodeFuncDecl && "decodeNextArgument function not found!");
-
-    auto decodeRef = SILDeclRef(decodeFuncDecl);
-    auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-    F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
   }
 }
 
@@ -327,8 +300,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
-             (linkageForDef == SILLinkage::PublicNonABI &&
-              fnLinkage == SILLinkage::Shared))));
+             (linkageForDef == SILLinkage::PublicNonABI ||
+              linkageForDef == SILLinkage::PackageNonABI) &&
+              fnLinkage == SILLinkage::Shared)));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally

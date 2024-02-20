@@ -26,13 +26,18 @@ set(BACKTRACING_COMPILE_FLAGS
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include")
 
-add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
+set(BACKTRACING_SOURCES
   main.swift
   AnsiColor.swift
   TargetMacOS.swift
   TargetLinux.swift
   Themes.swift
   Utils.swift
+  )
+
+
+add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
+  ${BACKTRACING_SOURCES}
 
   SWIFT_MODULE_DEPENDS         ${backtracing}
 
@@ -47,3 +52,22 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
 
   TARGET_SDKS OSX LINUX)
 
+if(SWIFT_BUILD_STATIC_STDLIB)
+  add_swift_target_executable(swift-backtrace-static BUILD_WITH_LIBEXEC
+    PREFER_STATIC
+
+    ${BACKTRACING_SOURCES}
+
+    SWIFT_MODULE_DEPENDS         ${backtracing}
+
+    SWIFT_MODULE_DEPENDS_OSX     ${darwin}
+    SWIFT_MODULE_DEPENDS_WINDOWS ${wincrt_sdk}
+    SWIFT_MODULE_DEPENDS_LINUX   ${glibc}
+
+    INSTALL_IN_COMPONENT libexec
+    COMPILE_FLAGS
+      ${BACKTRACING_COMPILE_FLAGS}
+      -parse-as-library
+
+    TARGET_SDKS LINUX)
+endif()

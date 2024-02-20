@@ -228,6 +228,30 @@ bool useLegacySwiftValueUnboxingInCasting() {
 #endif
 }
 
+// Controls how ObjC -hashValue and -isEqual are handled
+// by Swift objects.
+// There are two basic semantics:
+// * pointer: -hashValue returns pointer, -isEqual: tests pointer equality
+// * proxy: -hashValue calls on Hashable conformance, -isEqual: calls Equatable conformance
+//
+// Legacy handling:
+// * Swift struct/enum values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum values that implement Equatable but not Hashable: pointer semantics
+// * Swift class values regardless of hashable/Equatable support: pointer semantics
+//
+// New behavior:
+// * Swift struct/enum/class values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum/class values that implement Equatable but not Hashable: proxy -isEqual:, constant -hashValue
+// * All other cases: pointer semantics
+//
+bool useLegacySwiftObjCHashing() {
+#if BINARY_COMPATIBILITY_APPLE
+  return true; // For now, legacy behavior on Apple OSes
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
 } // namespace bincompat
 
 } // namespace runtime

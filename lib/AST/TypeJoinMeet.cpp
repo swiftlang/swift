@@ -404,7 +404,8 @@ CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
     return TheAnyType;
 
   auto &ctx = result[0]->getASTContext();
-  return ProtocolCompositionType::get(ctx, result, false)->getCanonicalType();
+  return ProtocolCompositionType::get(ctx, result, /*inverses=*/{},
+                                      false)->getCanonicalType();
 }
 
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
@@ -431,8 +432,12 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
     protocolType.push_back(First);
     firstMembers = protocolType;
   } else {
+    assert(cast<ProtocolCompositionType>(First)->getInverses().empty() &&
+           "FIXME: move-only generics");
     firstMembers = cast<ProtocolCompositionType>(First)->getMembers();
   }
+  assert(cast<ProtocolCompositionType>(second)->getInverses().empty() &&
+         "FIXME: move-only generics");
   auto secondMembers = cast<ProtocolCompositionType>(second)->getMembers();
 
   return computeProtocolCompositionJoin(firstMembers, secondMembers);

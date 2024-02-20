@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_swift_parser
 
 @available(SwiftStdlib 5.1, *)
 actor A {
@@ -14,13 +14,13 @@ extension Actor {
   func g() { }
 }
 
-@MainActor func mainActorFn() {}
+@MainActor func mainActorFn() {} // expected-note {{calls to global function 'mainActorFn()' from outside of its actor context are implicitly asynchronous}}
 
 @available(SwiftStdlib 5.1, *)
 func testA<T: Actor>(
   a: isolated A,  // expected-note{{previous 'isolated' parameter 'a'}}
   b: isolated T,  // expected-warning{{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
-  c: isolated Int // expected-error {{'isolated' parameter has non-actor type 'Int'}}
+  c: isolated Int // expected-error {{'isolated' parameter type 'Int' does not conform to 'Actor' or 'DistributedActor'}}
 ) {
   a.f()
   a.g()
@@ -232,7 +232,7 @@ func checkIsolatedAndGlobalClosures(_ a: A) {
   let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
       = {
     $0.f()
-    mainActorFn()
+    mainActorFn() // expected-error {{call to main actor-isolated global function 'mainActorFn()' in a synchronous actor-isolated context}}
   }
 
   let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
@@ -350,10 +350,130 @@ func getValues(
 }
 
 func isolated_generic_bad_1<T>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 func isolated_generic_bad_2<T: Equatable>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
 func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
-// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+// expected-error@-1 {{'isolated' parameter type 'T' does not conform to 'Actor' or 'DistributedActor'}}
+
+func isolated_generic_bad_4<T>(_ t: isolated Array<T>) {}
+// expected-error@-1 {{'isolated' parameter type 'Array<T>' does not conform to 'Actor' or 'DistributedActor'}}
 
 func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}
+
+
+class NotSendable {} // expected-complete-note 5 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+// expected-note@-1 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+func optionalIsolated(_ ns: NotSendable, to actor: isolated (any Actor)?) async {}
+func optionalIsolatedSync(_ ns: NotSendable, to actor: isolated (any Actor)?) {}
+
+nonisolated func callFromNonisolated(ns: NotSendable) async {
+  await optionalIsolated(ns, to: nil)
+
+  optionalIsolatedSync(ns, to: nil)
+
+  let myActor = A()
+
+  await optionalIsolated(ns, to: myActor)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: myActor)
+  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+}
+
+@MainActor func callFromMainActor(ns: NotSendable) async {
+  await optionalIsolated(ns, to: nil)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' outside of main actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: nil)
+
+  let myActor = A()
+
+  await optionalIsolated(ns, to: myActor)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: myActor)
+  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+}
+
+// TODO: Consider making an actor's Self behave like in a struct, removing this special casing.
+//       We could consider changing this, so that self is always Self because we don't allow inheritance of actors.
+//       See: https://github.com/apple/swift/issues/70954 and rdar://121091417
+actor A2 {
+  nonisolated func f1() async {
+    await { (self: isolated Self) in }(self)
+    // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
+    await { (self: isolated Self?) in }(self)
+    // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self?'}}
+  }
+  nonisolated func f2() async -> Self {
+    await { (self: isolated Self) in }(self)
+    await { (self: isolated Self?) in }(self)
+    return self
+  }
+}
+
+func testNonSendableCaptures(ns: NotSendable, a: isolated MyActor) {
+  Task {
+    _ = a
+    _ = ns
+  }
+
+  // FIXME: The `a` in the capture list and `isolated a` are the same,
+  // but the actor isolation checker doesn't know that.
+  Task { [a] in
+    _ = a
+    _ = ns // expected-warning {{capture of 'ns' with non-sendable type 'NotSendable' in a `@Sendable` closure}}
+  }
+}
+
+
+@globalActor actor MyGlobal {
+  static let shared = MyGlobal()
+}
+
+func sync(isolatedTo actor: isolated (any Actor)?) {}
+
+func pass(value: NotSendable, isolation: isolated (any Actor)?) async -> NotSendable {
+  value
+}
+
+func preciseIsolated(a: isolated MyActor) async {
+  sync(isolatedTo: a)
+  sync(isolatedTo: nil) // okay from anywhere
+  sync(isolatedTo: #isolation)
+
+  Task { @MainActor in
+    sync(isolatedTo: MainActor.shared)
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
+  }
+
+  Task { @MyGlobal in
+    sync(isolatedTo: MyGlobal.shared)
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
+  }
+
+  Task.detached {
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
+  }
+}
+
+@MainActor func fromMain(ns: NotSendable) async -> NotSendable {
+  await pass(value: ns, isolation: MainActor.shared)
+}
+
+nonisolated func fromNonisolated(ns: NotSendable) async -> NotSendable {
+  await pass(value: ns, isolation: nil)
+}
+
+func invalidIsolatedClosureParam<A: AnyActor> (
+  _: (isolated A) async throws -> Void // expected-error {{'isolated' parameter type 'A' does not conform to 'Actor' or 'DistributedActor'}}
+) {}

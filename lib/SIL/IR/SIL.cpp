@@ -41,6 +41,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Package:
+    return FormalLinkage::PackageUnique;
   case AccessLevel::Public:
   case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
@@ -65,6 +66,9 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
     // uniqueness is buggy.
     return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
 
+  case FormalLinkage::PackageUnique:
+    return (forDefinition ? SILLinkage::Package : SILLinkage::PackageExternal);
+
   case FormalLinkage::HiddenUnique:
     return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
 
@@ -77,9 +81,8 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 SILLinkage
 swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
-  // If the conformance was synthesized by the ClangImporter, give it
-  // shared linkage.
-  if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
+  // If the conformance was synthesized, give it shared linkage.
+  if (C->isSynthesized())
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
@@ -89,11 +92,12 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return SILLinkage::Private;
-
     case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
-
-    default:
+    case AccessLevel::Package:
+      return (definition ? SILLinkage::Package : SILLinkage::PackageExternal);
+    case AccessLevel::Public:
+    case AccessLevel::Open:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
 }
@@ -126,6 +130,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Public declarations are accessible from everywhere.
     case FormalLinkage::PublicUnique:
     case FormalLinkage::PublicNonUnique:
+    case FormalLinkage::PackageUnique: 
       return false;
 
     // Hidden declarations are inaccessible from different modules.
@@ -172,9 +177,10 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
-      switch (getTypeLinkage_correct(CanType(req.getSecondType()))) {
+      switch (getTypeLinkage(CanType(req.getSecondType()))) {
       case FormalLinkage::PublicUnique:
       case FormalLinkage::PublicNonUnique:
+      case FormalLinkage::PackageUnique:
         continue;
       case FormalLinkage::HiddenUnique:
         linkage = FormalLinkage::HiddenUnique;
@@ -190,19 +196,6 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
 }
 
 /// Return the formal linkage of the given formal type.
-///
-/// Note that this function is buggy and generally should not be
-/// used in new code; we should migrate all callers to
-/// getTypeLinkage_correct and then consolidate them.
-FormalLinkage swift::getTypeLinkage(CanType t) {
-  assert(t->isLegalFormalType());
-  // Due to a bug, this always returns PublicUnique.
-  // It's a bit late in the 5.7 timeline to be changing that, but
-  // we can optimize it!
-  return FormalLinkage::PublicUnique;
-}
-
-/// Return the formal linkage of the given formal type.
 /// This in the appropriate linkage for a lazily-emitted entity
 /// derived from the type.
 ///
@@ -211,7 +204,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
 /// uniquely-emitted nominal type, the formal linkage of that
 /// type may differ from the formal linkage of the underlying
 /// type declaration.
-FormalLinkage swift::getTypeLinkage_correct(CanType t) {
+FormalLinkage swift::getTypeLinkage(CanType t) {
   assert(t->isLegalFormalType());
   
   class Walker : public TypeWalker {
@@ -265,7 +258,6 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 
   // Otherwise, check that we can fetch the type metadata.
   return M.isTypeMetadataAccessible(type.getASTType());
-
 }
 
 /// Can we perform value operations on the given type?  We have no way
@@ -384,6 +376,8 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   switch (getterLinkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageNonABI:
     // We may need a descriptor.
     break;
     
@@ -395,10 +389,13 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
     llvm_unreachable("should be definition linkage?");
   }
 
-  if (isUnsupportedKeyPathValueType(getValueInterfaceType())) {
+  auto typeInContext = getInnermostDeclContext()->mapTypeIntoContext(
+      getValueInterfaceType());
+  if (isUnsupportedKeyPathValueType(typeInContext)) {
     return false;
   }
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
 
 protocol P1 where A == Never {
   associatedtype A
@@ -48,11 +48,12 @@ protocol P6 where A == Never { // expected-error {{no type for 'Self.A' can sati
 struct S6: P6 {} // expected-error {{type 'S6' does not conform to protocol 'P6'}}
 
 protocol P7a where A == Never {
-  associatedtype A
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 // expected-error@+1 {{no type for 'Self.A' can satisfy both 'Self.A == Never' and 'Self.A == Bool'}}
 protocol P7b: P7a where A == Bool {}
 struct S7: P7b {}
+// expected-error@-1 {{type 'S7' does not conform to protocol 'P7a'}}
 
 protocol P8a where A == Never {
   associatedtype A
@@ -108,9 +109,8 @@ protocol Q11 {
 }
 do {
   struct Conformer: Q11, P11b {}
-  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P11b'}}
-  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P11a'}}
-  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'Q11'}}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P11a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'Q11'}}
 }
 
 protocol P12 where A == B {
@@ -151,7 +151,6 @@ protocol P15b: P15a where A == B {}
 do {
   struct Conformer: P15b {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P15a'}}
-  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P15b'}}
 }
 
 protocol P16a where A == B {

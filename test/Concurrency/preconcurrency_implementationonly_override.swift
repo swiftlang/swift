@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

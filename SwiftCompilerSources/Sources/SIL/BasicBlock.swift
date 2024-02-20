@@ -21,8 +21,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   public var parentFunction: Function { bridged.getFunction().function }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
   public var shortDescription: String { name }
 
@@ -53,6 +52,10 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   }
   
   public var hasSinglePredecessor: Bool { singlePredecessor != nil }
+
+  public var singleSuccessor: BasicBlock? {
+    successors.count == 1 ? successors[0] : nil
+  }
 
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging

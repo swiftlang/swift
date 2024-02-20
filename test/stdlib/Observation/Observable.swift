@@ -1,9 +1,9 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
 
 // Run this test via the swift-plugin-server
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
 
 // REQUIRES: observation
 // REQUIRES: concurrency
@@ -213,6 +213,44 @@ class RecursiveOuter {
 #else
 #endif
 class GuardedAvailability {
+}
+
+@Observable class TestASTScopeLCA {
+  // Make sure ASTScope unqualified lookup can find local variables
+  // inside initial values with closures when accessor macros are
+  // involved.
+  var state : Bool = {
+    let value = true
+    return value
+  }()
+}
+
+@Observable class Parent {
+  class Nested {}
+}
+
+extension Parent.Nested {}
+
+struct CowContainer {
+  final class Contents { }
+  
+  var contents = Contents()
+  
+  mutating func mutate() {
+    if !isKnownUniquelyReferenced(&contents) {
+      contents = Contents()
+    }
+  }
+  
+  var id: ObjectIdentifier {
+    ObjectIdentifier(contents)
+  }
+}
+
+
+@Observable
+final class CowTest {
+  var container = CowContainer()
 }
 
 @main
@@ -429,6 +467,14 @@ struct Validator {
       obj.inner.value = "test"
       expectEqual(obj.innerEventCount, 2)
       expectEqual(obj.outerEventCount, 2)
+    }
+    
+    suite.test("validate copy on write semantics") {
+      let subject = CowTest()
+      let startId = subject.container.id
+      expectEqual(subject.container.id, startId)
+      subject.container.mutate()
+      expectEqual(subject.container.id, startId)
     }
 
     runAllTests()

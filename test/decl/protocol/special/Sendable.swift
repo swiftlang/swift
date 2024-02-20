@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete
 
 func acceptSendable<T: Sendable>(_: T) { }
 

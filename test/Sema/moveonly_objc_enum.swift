@@ -8,7 +8,7 @@
 @objc enum Foo : Int { // expected-error {{noncopyable enums cannot be marked '@objc'}}
                        // expected-error@-1 {{'Foo' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is noncopyable}}
   case X, Y, Z
-  deinit {} // expected-error {{deinitializers cannot be declared on an @objc enum type}}
+  deinit {}
 }
 
 @_moveOnly

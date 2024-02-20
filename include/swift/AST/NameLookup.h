@@ -18,6 +18,7 @@
 #define SWIFT_AST_NAME_LOOKUP_H
 
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
@@ -244,6 +245,8 @@ enum class UnqualifiedLookupFlags {
   ExcludeMacroExpansions = 1 << 6,
   /// This lookup should only return macros.
   MacroLookup            = 1 << 7,
+  /// This lookup should only return modules
+  ModuleLookup           = 1 << 8,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -258,7 +261,7 @@ inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
 /// Describes the reason why a certain declaration is visible.
 enum class DeclVisibilityKind {
   /// Declaration is a local variable or type.
-  LocalVariable,
+  LocalDecl,
 
   /// Declaration is a function parameter.
   FunctionParameter,
@@ -439,8 +442,8 @@ public:
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
-/// Filters out decls that are not usable based on their source location, eg.
-/// a decl inside its own initializer or a non-type decl before its definition.
+/// Filters out decls that are not usable based on their source location, e.g.
+/// a top-level decl inside its own initializer or shadowed decls.
 class UsableFilteringDeclConsumer final : public VisibleDeclConsumer {
   const SourceManager &SM;
   const DeclContext *DC;
@@ -462,7 +465,7 @@ public:
   }
 
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
-                 DynamicLookupInfo dynamicLookupInfo) override;
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
 /// Remove any declarations in the given set that were overridden by
@@ -501,14 +504,11 @@ bool removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
 bool removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
                          const DeclContext *dc);
 
-/// Finds decls visible in the given context and feeds them to the given
-/// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
-/// the SourceLoc is used to determine which declarations in that function
-/// are visible.
-void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        const DeclContext *DC,
-                        bool IncludeTopLevel,
-                        SourceLoc Loc = SourceLoc());
+/// Finds decls visible in the given context at the given location and feeds
+/// them to the given VisibleDeclConsumer. The \p Loc must be valid, and \p DC
+/// must be in a SourceFile.
+void lookupVisibleDecls(VisibleDeclConsumer &Consumer, SourceLoc Loc,
+                        const DeclContext *DC, bool IncludeTopLevel);
 
 /// Finds decls visible as members of the given type and feeds them to the given
 /// VisibleDeclConsumer.
@@ -549,8 +549,10 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 /// \returns The set of macro declarations with the given name that
 /// fulfill any of the given macro roles.
-SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, MacroRoles roles);
+SmallVector<MacroDecl *, 1> lookupMacros(DeclContext *dc,
+                                         DeclNameRef moduleName,
+                                         DeclNameRef macroName,
+                                         MacroRoles roles);
 
 /// \returns Whether the given source location is inside an attached
 /// or freestanding macro argument.
@@ -581,12 +583,15 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "unchecked" attribute, if present.
   SourceLoc uncheckedLoc;
 
+  /// The location of the "preconcurrency" attribute if present.
+  SourceLoc preconcurrencyLoc;
+
   InheritedNominalEntry() { }
 
-  InheritedNominalEntry(
-    NominalTypeDecl *item, SourceLoc loc,
-    SourceLoc uncheckedLoc
-  ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+  InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
+                        SourceLoc uncheckedLoc, SourceLoc preconcurrencyLoc)
+      : Located(item, loc), uncheckedLoc(uncheckedLoc),
+        preconcurrencyLoc(preconcurrencyLoc) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -621,70 +626,6 @@ SelfBounds getSelfBoundsFromWhereClause(
 SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
 
 namespace namelookup {
-
-/// Searches through statements and patterns for local variable declarations.
-class FindLocalVal : public StmtVisitor<FindLocalVal> {
-  friend class ASTVisitor<FindLocalVal>;
-
-  const SourceManager &SM;
-  SourceLoc Loc;
-  VisibleDeclConsumer &Consumer;
-
-public:
-  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
-               VisibleDeclConsumer &Consumer)
-      : SM(SM), Loc(Loc), Consumer(Consumer) {}
-
-  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason);
-
-  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
-  
-  void checkParameterList(const ParameterList *params);
-
-  void checkGenericParams(GenericParamList *Params);
-
-  void checkSourceFile(const SourceFile &SF);
-
-private:
-  bool isReferencePointInRange(SourceRange R) {
-    return SM.rangeContainsTokenLoc(R, Loc);
-  }
-
-  void visitBreakStmt(BreakStmt *) {}
-  void visitContinueStmt(ContinueStmt *) {}
-  void visitFallthroughStmt(FallthroughStmt *) {}
-  void visitFailStmt(FailStmt *) {}
-  void visitReturnStmt(ReturnStmt *) {}
-  void visitYieldStmt(YieldStmt *) {}
-  void visitThenStmt(ThenStmt *) {}
-  void visitThrowStmt(ThrowStmt *) {}
-  void visitDiscardStmt(DiscardStmt *) {}
-  void visitPoundAssertStmt(PoundAssertStmt *) {}
-  void visitDeferStmt(DeferStmt *DS) {
-    // Nothing in the defer is visible.
-  }
-
-  void checkStmtCondition(const StmtCondition &Cond);
-
-  void visitIfStmt(IfStmt *S);
-  void visitGuardStmt(GuardStmt *S);
-
-  void visitWhileStmt(WhileStmt *S);
-  void visitRepeatWhileStmt(RepeatWhileStmt *S);
-  void visitDoStmt(DoStmt *S);
-
-  void visitForEachStmt(ForEachStmt *S);
-
-  void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
-  
-  void visitSwitchStmt(SwitchStmt *S);
-
-  void visitCaseStmt(CaseStmt *S);
-
-  void visitDoCatchStmt(DoCatchStmt *S);
-  
-};
-
 
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
@@ -729,9 +670,9 @@ public:
   }
 
 #ifndef NDEBUG
-  virtual void startingNextLookupStep() = 0;
-  virtual void finishingLookup(std::string) const = 0;
-  virtual bool isTargetLookup() const = 0;
+  virtual void startingNextLookupStep() {}
+  virtual void finishingLookup(std::string) const {}
+  virtual bool isTargetLookup() const { return false; }
 #endif
 };
   
@@ -832,6 +773,25 @@ public:
   static void lookupEnclosingMacroScope(
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(PotentialMacro macro)> consume);
+
+  /// Look up the scope tree for the nearest point at which an error thrown from
+  /// this location can be caught or rethrown.
+  ///
+  /// For example, given this code:
+  ///
+  /// \code
+  /// func f() throws {
+  ///   do {
+  ///     try g() // A
+  ///   } catch {
+  ///     throw ErrorWrapper(error) // B
+  ///   }
+  /// }
+  /// \endcode
+  ///
+  /// At the point marked A, the catch node is the enclosing do...catch
+  /// statement. At the point marked B, the catch node is the function itself.
+  static CatchNode lookupCatchNode(ModuleDecl *module, SourceLoc loc);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;

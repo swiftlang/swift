@@ -75,7 +75,27 @@ public enum Ownership {
   /// points in the SSA graph, where more information about the value is
   /// statically available on some control flow paths.
   case none
-  
+
+  public var hasLifetime: Bool {
+    switch self {
+    case .owned, .guaranteed:
+      return true
+    case .unowned, .none:
+      return false
+    }
+  }
+
+  public init(bridged: BridgedValue.Ownership) {
+    switch bridged {
+    case .Unowned:    self = .unowned
+    case .Owned:      self = .owned
+    case .Guaranteed: self = .guaranteed
+    case .None:       self = .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned
@@ -88,8 +108,7 @@ public enum Ownership {
 
 extension Value {
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var uses: UseList { UseList(bridged.getFirstUse()) }
@@ -133,6 +152,12 @@ public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
 
 public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
+}
+
+extension CollectionLikeSequence where Element == Value {
+  public func contains(_ element: Element) -> Bool {
+    return self.contains { $0 == element }
+  }
 }
 
 /// A projected value, which is defined by the original value and a projection path.
@@ -208,5 +233,20 @@ extension OptionalBridgedValue {
 extension Optional where Wrapped == Value {
   public var bridged: OptionalBridgedValue {
     OptionalBridgedValue(obj: self?.bridged.obj)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Bridging Utilities
+//===----------------------------------------------------------------------===//
+
+extension Array where Element == Value {
+  public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
+    return self.withUnsafeBufferPointer { bufPtr in
+      assert(bufPtr.count == self.count)
+      return bufPtr.withMemoryRebound(to: BridgeValueExistential.self) { valPtr in
+        return c(BridgedValueArray(base: valPtr.baseAddress, count: self.count))
+      }
+    }
   }
 }

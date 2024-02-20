@@ -94,15 +94,18 @@ include(CMakeDependentOption)
 include(CheckLanguage)
 include(GNUInstallDirs)
 include(SwiftImplicitImport)
+include(FetchContent)
 
 # Enable Swift for the host compiler build if we have the language. It is
 # optional until we have a bootstrap story.
 check_language(Swift)
 if(CMAKE_Swift_COMPILER)
   enable_language(Swift)
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
   message(STATUS "WARNING! Did not find a host compiler swift?! Can not build
                   any compiler host sources written in Swift")
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION)
 endif()
 
 # A convenience pattern to match Darwin platforms. Example:
@@ -214,6 +217,10 @@ option(SWIFT_BUILD_REMOTE_MIRROR
     "Build the Swift Remote Mirror Library"
     TRUE)
 
+option(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER
+    "Build the Swift External Generic Metadata Builder Library"
+    TRUE)
+
 option(SWIFT_BUILD_DYNAMIC_STDLIB
     "Build dynamic variants of the Swift standard library"
     TRUE)
@@ -221,11 +228,11 @@ option(SWIFT_BUILD_DYNAMIC_STDLIB
 option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library"
     FALSE)
-    
+
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
-    
+
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     "Include Unicode data files in the standard library.
     NOTE: Disabling this will cause many String methods to crash."
@@ -268,10 +275,6 @@ endif()
 option(SWIFT_BUILD_PERF_TESTSUITE
     "Create in-tree targets for building swift performance benchmarks."
     FALSE)
-
-option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
-    "Build the Swift regex parser as part of the compiler."
-    TRUE)
 
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
@@ -345,6 +348,19 @@ How to build the swift compiler modules. Possible values are
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
 ]=] OFF)
 
+option(BRIDGING_MODE [=[
+How swift-C++ bridging code is compiled:
+    INLINE:       uses full swift C++ interop and briding functions are inlined
+    PURE:         uses limited C++ interp an bridging functions are not inlined
+    DEFAULT:      based on the build configuration
+]=] DEFAULT)
+
+option(SWIFT_USE_SYMLINKS "Use symlinks instead of copying binaries" ${CMAKE_HOST_UNIX})
+set(SWIFT_COPY_OR_SYMLINK "copy")
+if(SWIFT_USE_SYMLINKS)
+  set(SWIFT_COPY_OR_SYMLINK "create_symlink")
+endif()
+
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
@@ -388,6 +404,18 @@ endif()
 set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
   ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
   CACHE STRING "MSVC Runtime Library for the standard library")
+
+
+if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" MATCHES "WINDOWS|ANDROID" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+    # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
+    # On Windows and Android, to workaround a build problem.
+    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
+    set(BRIDGING_MODE "PURE")
+  else()
+    set(BRIDGING_MODE "INLINE")
+  endif()
+endif()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
@@ -438,6 +466,10 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
+set(SWIFT_MIN_RUNTIME_VERSION "${DEFAULT_SWIFT_MIN_RUNTIME_VERSION}" CACHE STRING
+  "Specify the minimum version of the runtime that we target when building \
+the compiler itself. This is used on non-Darwin platforms to ensure \
+that it's possible to build the compiler using host tools.")
 
 #
 # User-configurable Android specific options.
@@ -617,12 +649,24 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS
+  "Enable experimental NoncopyableGenerics"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
   FALSE)
 
 option(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION
   "Enable build of the Swift observation module"
+  FALSE)
+
+option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
+  "Build the stdlib with -strict-concurrency=complete"
+  FALSE)
+
+option(SWIFT_ENABLE_SYNCHRONIZATION
+  "Enable build of the Swift Synchronization module"
   FALSE)
 
 option(SWIFT_ENABLE_DISPATCH
@@ -691,9 +735,16 @@ if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
 endif()
 
-# Make sure we know where swift-syntax is because we need it to build the parser.
-if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
-  message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
+option(SWIFT_BUILD_SWIFT_SYNTAX
+  "Enable building swift syntax"
+  FALSE)
+
+option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
+    "Build the Swift regex parser as part of the compiler."
+    TRUE)
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER AND NOT SWIFT_BUILD_SWIFT_SYNTAX)
+  message(WARNING "Force setting SWIFT_BUILD_REGEX_PARSER_IN_COMPILER=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER OFF)
 endif()
 
 set(SWIFT_BUILD_HOST_DISPATCH FALSE)
@@ -751,11 +802,17 @@ if (CMAKE_Swift_COMPILER)
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
+
+set(THREADS_PREFER_PTHREAD_FLAG YES)
+include(FindThreads)
+
 if(SWIFT_PATH_TO_CMARK_BUILD)
   execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
+elseif(SWIFT_INCLUDE_TOOLS)
+  find_package(cmark-gfm CONFIG REQUIRED)
 endif()
 message(STATUS "")
 
@@ -794,7 +851,6 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 include(AddPureSwift)
-include(SetRPATH)
 
 # Configure swift include, install, build components.
 swift_configure_components()
@@ -830,7 +886,7 @@ elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   else()
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
-elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_SWIFT_PARSER)
+elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_BUILD_SWIFT_SYNTAX)
   # We are building using a pre-installed host toolchain but not bootstrapping
   # the Swift modules. This happens when building using 'build-tooling-libs'
   # where we haven't built a new Swift compiler. Use the Swift compiler from the
@@ -838,22 +894,13 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_SWIFT_PARSER)
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
-# When we have the early SwiftSyntax build, we can include its parser.
-if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
-  set(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS
-    ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
-  if(NOT EXISTS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS}")
-    message(STATUS "Skipping Swift Swift parser integration due to missing early SwiftSyntax")
-  else()
-    set(SWIFT_SWIFT_PARSER TRUE)
-    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
-
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-      # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
-      message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
-      set(BOOTSTRAPPING_MODE "HOSTTOOLS")
-    endif()
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX)
+  # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
+    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+  add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
@@ -961,7 +1008,6 @@ if(XCODE)
   # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
-
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
@@ -1171,13 +1217,18 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
+swift_get_host_triple(SWIFT_HOST_TRIPLE)
+set(SWIFT_HOST_MODULE_TRIPLE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE}")
+set(SWIFT_HOST_LIBRARIES_DEST_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
+
 if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
-  message(STATUS "  Swift parser:   ${SWIFT_SWIFT_PARSER}")
+  message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
+  message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1197,10 +1248,12 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
+  message(STATUS "NoncopyableGenerics Support:        ${SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Backtracing Support:                ${SWIFT_ENABLE_BACKTRACING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
+  message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1214,6 +1267,11 @@ endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
   message(STATUS "Building Swift Remote Mirror for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "")
+endif()
+
+if(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
+  message(STATUS "Building Swift External Generic Metadata Builder for SDKs: ${SWIFT_SDKS}")
   message(STATUS "")
 endif()
 
@@ -1323,11 +1381,16 @@ endif()
 add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
+  # TODO Remove this once release/5.9 is done and we can finish migrating Swift
+  #      off of `llvm::None`/`llvm::Optional`, and `llvm::makeArrayRef`.
+  # This is to silence the avalanche of deprecation warnings from LLVM headers
+  # until we can actually do something about them. This is nasty, but it's
+  # better than losing context due to the sheer number in-actionable deprecation
+  # warnings or the massive number of merge-conflicts we would get otherwise.
+  add_definitions(-DSWIFT_TARGET)
+
   add_subdirectory(lib)
 
-  # SwiftCompilerSources must come before "tools".
-  # It adds swift module names to the global property "swift_compiler_modules"
-  # which is used in add_swift_host_tool for the lldb workaround.
   add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!

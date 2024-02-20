@@ -273,10 +273,11 @@ void swift::printConformanceDescription(llvm::raw_ostream &out,
     return;
   }
 
-  out << "protocol conformance to ";
-  printDeclDescription(out, conformance->getProtocol(), /*newline*/false);
-  out << " for ";
-  printTypeDescription(out, conformance->getType(), ctxt, addNewline);
+  out << "protocol conformance "
+      << conformance->getType() << ": "
+      << conformance->getProtocol()->getName() << " at ";
+  auto *decl = conformance->getDeclContext()->getInnermostDeclarationDeclContext();
+  printDeclDescription(out, decl, addNewline);
 }
 
 void swift::printSourceLocDescription(llvm::raw_ostream &out,

@@ -95,6 +95,7 @@ internal enum _PtrAuth {
   }
 
   /// Sign an unauthenticated pointer.
+  @_semantics("no.preserve.debugger") // Relies on inlining this function.
   @_transparent
   static func sign(pointer: UnsafeRawPointer,
                    key: Key,
@@ -110,6 +111,7 @@ internal enum _PtrAuth {
 
   /// Authenticate a pointer using one scheme and resign it using another.
   @_transparent
+  @_semantics("no.preserve.debugger") // Relies on inlining this function.
   static func authenticateAndResign(pointer: UnsafeRawPointer,
                                 oldKey: Key,
                                 oldDiscriminator: UInt64,
@@ -127,6 +129,7 @@ internal enum _PtrAuth {
   }
 
   /// Get the type-specific discriminator for a function type.
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   static func discriminator<T>(for type: T.Type) -> UInt64 {
     return UInt64(Builtin.typePtrAuthDiscriminator(type))
@@ -175,6 +178,7 @@ internal enum _PtrAuth {
 extension UnsafeRawPointer {
   /// Load a function pointer from memory that has been authenticated
   /// specifically for its given address.
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   internal func _loadAddressDiscriminatedFunctionPointer<T>(
     fromByteOffset offset: Int = 0,
@@ -196,6 +200,7 @@ extension UnsafeRawPointer {
     return unsafeBitCast(resigned, to: type)
   }
 
+  @_semantics("no.preserve.debugger") // Don't keep the generic version alive
   @_transparent
   internal func _loadAddressDiscriminatedFunctionPointer<T>(
     fromByteOffset offset: Int = 0,

@@ -201,7 +201,7 @@ public:
 struct UnparsedSpecification {
   /// The string which specifies the test.
   ///
-  /// Not a StringRef because the TestSpecificationInst whose payload is of
+  /// Not a StringRef because the SpecifyTestInst whose payload is of
   /// interest gets deleted.
   std::string string;
   /// The next non-debug instruction.

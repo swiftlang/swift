@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
+#include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
@@ -1521,6 +1522,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+  // If this is a using declaration, import the name of the shadowed decl and
+  // adjust the context.
+  if (auto usingShadowDecl = dyn_cast<clang::UsingShadowDecl>(D)) {
+    auto targetDecl = usingShadowDecl->getTargetDecl();
+    if (isa<clang::CXXMethodDecl>(targetDecl)) {
+      ImportedName baseName = importName(targetDecl, version, givenName);
+      baseName.effectiveContext = effectiveCtx;
+      return baseName;
+    }
+  }
+
   // Gather information from the swift_async attribute, if there is one.
   llvm::Optional<unsigned> completionHandlerParamIndex;
   bool completionHandlerFlagIsZeroOnError = false;
@@ -2214,111 +2226,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
                             version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
-      auto getSwiftBuiltinTypeName =
-          [&](const clang::BuiltinType *builtin) -> std::optional<StringRef> {
-        Type swiftType = nullptr;
-        switch (builtin->getKind()) {
-        case clang::BuiltinType::Void:
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),
-                                                 "Void");
-          break;
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
-        case clang::BuiltinType::CLANG_BUILTIN_KIND:                           \
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),   \
-                                                 #SWIFT_TYPE_NAME);            \
-          break;
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
-        case clang::BuiltinType::CLANG_BUILTIN_KIND:                           \
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),   \
-                                                 #SWIFT_TYPE_NAME);            \
-          break;
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-        default:
-          break;
-        }
-
-        if (swiftType) {
-          if (auto nominal = swiftType->getAs<NominalType>()) {
-            return nominal->getDecl()->getNameStr();
-          }
-        }
-        return std::nullopt;
-      };
-
-      // When constructing the name of a C++ template, don't expand all the
-      // template, only expand one layer. Here we want to prioritize
-      // readability over total completeness.
-      llvm::SmallString<128> storage;
-      llvm::raw_svector_ostream buffer(storage);
-      D->printName(buffer);
-      buffer << "<";
-      llvm::interleaveComma(classTemplateSpecDecl->getTemplateArgs().asArray(),
-                            buffer,
-                            [&buffer, this, version, &getSwiftBuiltinTypeName](const clang::TemplateArgument& arg) {
-        // Use import name here so builtin types such as "int" map to their
-        // Swift equivalent ("Int32").
-        if (arg.getKind() == clang::TemplateArgument::Type) {
-          auto ty = arg.getAsType().getTypePtr();
-          if (auto builtin = dyn_cast<clang::BuiltinType>(ty)) {
-            if (auto swiftTypeName = getSwiftBuiltinTypeName(builtin)) {
-              buffer << *swiftTypeName;
-              return;
-            }
-          } else {
-            // FIXME: Generalize this to cover pointer to
-            // builtin type too.
-            // Check if this a struct/class
-            // or a pointer/reference to a struct/class.
-            auto *tagDecl = ty->getAsTagDecl();
-            enum class TagTypeDecorator {
-              None,
-              UnsafePointer,
-              UnsafeMutablePointer
-            };
-            TagTypeDecorator decorator = TagTypeDecorator::None;
-            if (!tagDecl && ty->isPointerType()) {
-              tagDecl = ty->getPointeeType()->getAsTagDecl();
-              if (tagDecl) {
-                bool isReferenceType = false;
-                if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-                  isReferenceType = ClangImporter::Implementation::
-                      recordHasReferenceSemantics(rd, swiftCtx);
-                if (!isReferenceType)
-                  decorator = ty->getPointeeType().isConstQualified()
-                                  ? TagTypeDecorator::UnsafePointer
-                                  : TagTypeDecorator::UnsafeMutablePointer;
-              }
-            }
-            if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
-              if (decorator != TagTypeDecorator::None)
-                buffer << (decorator == TagTypeDecorator::UnsafePointer
-                               ? "UnsafePointer"
-                               : "UnsafeMutablePointer")
-                       << '<';
-              importNameImpl(namedArg, version, clang::DeclarationName())
-                  .getDeclName()
-                  .print(buffer);
-              if (decorator != TagTypeDecorator::None)
-                buffer << '>';
-              return;
-            }
-          }
-        } else if (arg.getKind() == clang::TemplateArgument::Integral) {
-          buffer << "_";
-          if (arg.getIntegralType()->isBuiltinType()) {
-            if (auto swiftTypeName = getSwiftBuiltinTypeName(
-                    arg.getIntegralType()->getAs<clang::BuiltinType>())) {
-              buffer << *swiftTypeName << "_";
-            }
-          }
-          arg.getAsIntegral().print(buffer, true);
-          return;
-        }
-        buffer << "_";
-      });
-      buffer << ">";
-
-      baseName = swiftCtx.getIdentifier(buffer.str()).get();
+      auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
+                                                       swiftCtx, this, version);
+      baseName = swiftCtx.getIdentifier(name).get();
     }
   }
 
@@ -2481,6 +2391,14 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,
                                       const clang::MacroInfo *Macro) {
   return ::shouldIgnoreMacro(Name, Macro, Impl.getClangPreprocessor());
+}
+
+Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
+  auto baseName = declName.getBaseName();
+  if (!baseName.isSpecial())
+    return baseName.getIdentifier();
+
+  return ctx.getIdentifier(baseName.userFacingName());
 }
 
 Identifier

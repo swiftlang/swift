@@ -45,10 +45,8 @@ class Klass {}
 // CHECK-SIL-NEXT: [[VALUE:%[0-9][0-9]*]] = load [[INPUT]]{{.*}}
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
-// CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_release [[VALUE]]
 // CHECK-SIL-NEXT: dealloc_stack [[INPUT]] : $*Klass
-// CHECK-SIL-NEXT: strong_release [[VALUE]] : $Klass
 // CHECK-SIL-NEXT: return [[VALUE]] : $Klass
 // CHECK-SIL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
@@ -86,10 +84,8 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-SIL-NEXT: [[VALUE:%.*]] = load [[INPUT]] : $*T
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
-// CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_release [[VALUE]]
 // CHECK-SIL-NEXT: dealloc_stack [[INPUT]]
-// CHECK-SIL-NEXT: strong_release [[VALUE]] : $T
 // CHECK-SIL-NEXT: return [[VALUE]] : $T
 // CHECK-SIL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 

@@ -85,6 +85,7 @@ class IRGenThunk {
   llvm::Value *indirectReturnSlot = nullptr;
   llvm::Value *selfValue = nullptr;
   llvm::Value *errorResult = nullptr;
+  llvm::Value *typedErrorIndirectErrorSlot = nullptr;
   WitnessMetadata witnessMetadata;
   Explosion params;
 
@@ -137,16 +138,31 @@ void IRGenThunk::prepareArguments() {
   SILFunctionConventions conv(origTy, IGF.getSILModule());
 
   if (origTy->hasErrorResult()) {
+    typedErrorIndirectErrorSlot = nullptr;
+
+    // Set the typed error value result slot.
+    if (conv.isTypedError() && !conv.hasIndirectSILErrorResults()) {
+      auto directTypedErrorAddr = original.takeLast();
+      auto errorType =
+        conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
+
+     IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
+                                               errorTI.getStorageType(),
+                                               errorTI.getFixedAlignment()));
+    } else if (conv.isTypedError()) {
+      auto directTypedErrorAddr = original.takeLast();
+      // Store for later processing when we know the argument index.
+      // (i.e. emission->setIndirectTypedErrorResultSlotArgsIndex was called)
+      typedErrorIndirectErrorSlot = directTypedErrorAddr;
+    }
+
     if (isAsync) {
       // nothing to do.
     } else {
       errorResult = original.takeLast();
-      auto errorType =
-          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
-      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
-
       IGF.setCallerErrorResultSlot(Address(errorResult,
-                                           errorTI.getStorageType(),
+                                           IGF.IGM.Int8PtrTy,
                                            IGF.IGM.getPointerAlignment()));
     }
   }
@@ -275,6 +291,10 @@ void IRGenThunk::emit() {
 
   std::unique_ptr<CallEmission> emission =
       getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
+
+  if (typedErrorIndirectErrorSlot) {
+    emission->setIndirectTypedErrorResultSlot(typedErrorIndirectErrorSlot);
+  }
 
   emission->begin();
 

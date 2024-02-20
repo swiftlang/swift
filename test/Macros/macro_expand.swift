@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
 
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt
-// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
+// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS -dump-input=always %s
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
@@ -24,7 +24,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
 // Debug info IR testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
+// RUN: %target-swift-frontend -swift-version 5 -dwarf-version=5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
 // RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps
@@ -71,7 +71,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -127,6 +127,24 @@ struct Bad {}
 // CHECK-DIAGS: END CONTENTS OF FILE
 #endif
 
+@freestanding(declaration)
+macro accidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+@attached(peer)
+macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+#if TEST_DIAGNOSTICS
+func invalidDeclarationMacro() {
+  #accidentalCodeItem
+  // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+
+  @AccidentalCodeItem struct S {}
+  // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF1SL_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+}
+#endif
+
 @freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
@@ -145,10 +163,10 @@ func testFileID(a: Int, b: Int) {
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
   print(
-    /// CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+1]], column: 5
+    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+3]], column: 5
+    // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
+    // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}")
     #addBlocker(
-      /// CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
-      /// CHECK-IR-DAG: ![[L3:[0-9]+]] = !DILocation({{.*}}inlinedAt: ![[L2]])
       #stringify(a - b)
       )
     )
@@ -158,6 +176,11 @@ testFileID(a: 1, b: 2)
 
 @freestanding(expression) macro stringifyAndTry<T>(_ value: T) -> (T, String) =
     #externalMacro(module: "MacroDefinition", type: "StringifyAndTryMacro")
+
+enum Angle {
+case degrees(Double)
+case radians(Double)
+}
 
 func testStringify(a: Int, b: Int) {
   let s = #stringify(a + b)
@@ -178,6 +201,14 @@ func testStringify(a: Int, b: Int) {
   // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
 
   _ = (b, b2, s2, s3)
+
+  let angle = Angle.degrees(17)
+  switch angle {
+  case .degrees(let value):
+    _ = #stringify(value)
+  case .radians(let value):
+    _ = #stringify(value)
+  }
 }
 
 func testAssert(a: Int, b: Int) {
@@ -342,7 +373,7 @@ func testNestedDeclInExpr() {
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
 // Freestanding macros are not in inlined scopes.
-// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift"{{.*}} -> Int }
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf_.swift"{{.*}} -> Int }
 
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
@@ -405,10 +436,10 @@ func testFreestandingMacroExpansion() {
   struct Foo3 {
     #bitwidthNumberedStructs("BUG", blah: false)
     // expected-note@-1 4{{in expansion of macro 'bitwidthNumberedStructs' here}}
-    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_.swift
+    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_.swift
     // CHECK-DIAGS: struct BUG {
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_6methodfMu_()
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_6methodfMu0{{_?}}()
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu_()
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
   }
   #endif
 
@@ -594,3 +625,12 @@ macro DefineComparableType() = #externalMacro(module: "MacroDefinition", type: "
 struct HasNestedType {
   #DefineComparableType
 }
+
+#if TEST_DIAGNOSTICS
+@freestanding(expression)
+macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
+// expected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
+@freestanding(expression)
+macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
+// expected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+#endif

@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 // CHECK-LABEL: .P1@
@@ -50,7 +49,7 @@ protocol Q5: Q2, Q3, Q4 {}
 // CHECK-NEXT: Requirement signature: <Self where Self : Q2, Self : Q3, Self : Q4>
 protocol Q6: Q2,
              Q3, Q4 {
-    associatedtype X: P1 // expected-warning{{redundant conformance constraint 'Self.X' : 'P1'}}
+    associatedtype X: P1
                    // expected-warning@-1{{redeclaration of associated type 'X' from protocol 'Q1' is}}
 }
 

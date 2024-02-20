@@ -68,7 +68,8 @@ bb0(%arg0 : @owned $MyKlass, %arg1 : @owned $MyKlass, %arg2 : @owned $MyKlass):
   %4 = metatype $@thin MyArray<MyKlass>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyKlass> on %7 : $MyArray<MyKlass>
   debug_value %7 : $MyArray<MyKlass>
   debug_value %8 : $UnsafeMutablePointer<MyKlass>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyKlass>, #UnsafeMutablePointer._rawValue
@@ -143,7 +144,8 @@ bb0(%arg0 : @owned $MyKlass, %arg1 : @owned $MyKlass, %arg2 : @owned $MyKlass):
   %4 = metatype $@thin MyArray<MyKlass>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyKlass> on %7 : $MyArray<MyKlass>
   debug_value %7 : $MyArray<MyKlass>
   debug_value %8 : $UnsafeMutablePointer<MyKlass>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyKlass>, #UnsafeMutablePointer._rawValue
@@ -213,7 +215,8 @@ bb0(%arg0 : @owned $MyKlass):
   %4 = metatype $@thin MyArray<MyKlass>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin MyArray<MyKlass>.Type) -> @owned (MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyKlass> on %7 : $MyArray<MyKlass>
   debug_value %7 : $MyArray<MyKlass>
   debug_value %8 : $UnsafeMutablePointer<MyKlass>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyKlass>, #UnsafeMutablePointer._rawValue
@@ -272,7 +275,8 @@ bb0(%0 : $*Array<MyKlass>, %1 : @owned $MyKlass):
   %8 = metatype $@thin Array<MyKlass>.Type
   %9 = function_ref @adoptStorageMyKlass : $@convention(method) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin Array<MyKlass>.Type) -> (@owned Array<MyKlass>, UnsafeMutablePointer<MyKlass>)
   %10 = apply %9(%7, %6, %8) : $@convention(method) (@owned _ContiguousArrayStorage<MyKlass>, MyInt, @thin Array<MyKlass>.Type) -> (@owned Array<MyKlass>, UnsafeMutablePointer<MyKlass>)
-  (%11, %12) = destructure_tuple %10 : $(Array<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  (%11, %12a) = destructure_tuple %10 : $(Array<MyKlass>, UnsafeMutablePointer<MyKlass>)
+  %12 = mark_dependence %12a : $UnsafeMutablePointer<MyKlass> on %11 : $Array<MyKlass>
   %13 = struct_extract %12 : $UnsafeMutablePointer<MyKlass>, #UnsafeMutablePointer._rawValue
   %22 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*MyKlass
   %copy1 = copy_value %1 : $MyKlass

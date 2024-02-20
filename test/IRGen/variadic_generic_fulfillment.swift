@@ -10,7 +10,7 @@ public struct GG<each T> {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s28variadic_generic_fulfillment2GGV7doStuff5inputyxxQp_tF"(ptr noalias nocapture %0, ptr %"GG<repeat each T>", ptr noalias nocapture swiftself %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s28variadic_generic_fulfillment2GGV7doStuff5inputyxxQp_tF"(ptr noalias %0, ptr %"GG<repeat each T>", ptr noalias swiftself %1)
 // CHECK: [[T_PTR:%.*]] = getelementptr inbounds ptr, ptr %"GG<repeat each T>"
 // CHECK: [[T:%.*]] = load ptr, ptr [[T_PTR]]
 

@@ -383,6 +383,8 @@ enum class SymbolicReferenceKind : uint8_t {
   UniqueExtendedExistentialTypeShape,
   /// A symbolic reference to a non-unique extended existential type shape.
   NonUniqueExtendedExistentialTypeShape,
+  /// A symbolic reference to a objective C protocol ref.
+  ObjectiveCProtocol,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -564,6 +566,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplParameterTransferring();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -630,7 +633,9 @@ protected:
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
-  
+
+  NodePointer demangleLifetimeDependenceKind(bool isSelfDependence);
+
   void dump();
 
 public:

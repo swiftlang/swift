@@ -25,7 +25,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   # to do it.
   set(ASKD_BOOTSTRAPPING_MODE ${BOOTSTRAPPING_MODE})
   if (NOT ASKD_BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
       set(ASKD_BOOTSTRAPPING_MODE HOSTTOOLS)
     endif()
   endif()
@@ -98,18 +98,6 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
         message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
       endif()
 
-      # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-      # to the linker command line.
-      set(swift_ast_path_flags "-Wl")
-      get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-      foreach(module ${modules})
-        get_target_property(module_file "SwiftModule${module}" "module_file")
-        string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-      endforeach()
-
-      set_property(TARGET ${target} APPEND_STRING PROPERTY
-                   LINK_FLAGS " ${swift_ast_path_flags} ")
-
       # Workaround for a linker crash related to autolinking: rdar://77839981
       set_property(TARGET ${target} APPEND_STRING PROPERTY
                    LINK_FLAGS " -lobjc ")
@@ -152,7 +140,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
@@ -235,7 +223,7 @@ macro(add_sourcekit_library name)
     set(libkind)
   endif()
   add_library(${name} ${libkind} ${srcs})
-  if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  if(NOT SWIFT_BUILT_STANDALONE AND SOURCEKIT_SWIFT_SWAP_COMPILER)
     add_dependencies(${name} clang)
   endif()
   llvm_update_compile_flags(${name})
@@ -261,7 +249,7 @@ macro(add_sourcekit_library name)
   endif()
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND SOURCEKITLIB_SHARED)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND SOURCEKITLIB_SHARED)
     set(SOURCEKITLIB_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -325,7 +313,7 @@ macro(add_sourcekit_executable name)
     "${SOURCEKIT_EXECUTABLE_multiple_parameter_options}" ${ARGN})
 
   add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  if(NOT SWIFT_BUILT_STANDALONE AND SOURCEKIT_SWIFT_SWAP_COMPILER)
     add_dependencies(${name} clang)
   endif()
   llvm_update_compile_flags(${name})
@@ -365,7 +353,7 @@ macro(add_sourcekit_framework name)
   set(framework_location "${lib_dir}/${name}.framework")
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_BUILD_SWIFT_SYNTAX)
     set(SOURCEKITFW_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -433,7 +421,7 @@ macro(add_sourcekit_framework name)
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set(RPATH_LIST)
-    add_sourcekit_swift_runtime_link_flags(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}/Versions/A" ${SOURCEKITFW_HAS_SWIFT_MODULES})
     file(RELATIVE_PATH relative_lib_path
       "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
     list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")

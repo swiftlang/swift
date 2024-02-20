@@ -7,6 +7,7 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
   c-include-check.c
+  SwiftCaching.cpp
   HAS_SWIFT_MODULES)
 
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -43,7 +44,7 @@ if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND BOOTSTRAPP
   )
 endif()
 
-if(SWIFT_SWIFT_PARSER)
+if(SWIFT_BUILD_SWIFT_SYNTAX)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     # Ensure that we can find the host shared libraries.
     set_property(
@@ -93,10 +94,12 @@ else()
        ${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}
        ${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/swift/host/lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
   message(STATUS "Installing symlink (${target_install_relative_path}) to lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+
   install(SCRIPT ${INSTALL_SYMLINK}
           CODE "install_symlink(lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}
                                 ${target_install_relative_path}
-                                lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})"
+                                lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}
+                                ${SWIFT_COPY_OR_SYMLINK})"
           COMPONENT compiler)
 endif()
 

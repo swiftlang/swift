@@ -43,6 +43,62 @@ private func refersToSelf(_ str: String) -> Bool {
   // No match.
   return false
 }
+
+internal func getRemoteProcess(processId: ProcessIdentifier,
+                               options: UniversalOptions) -> (any RemoteProcess)? {
+  return DarwinRemoteProcess(processId: processId,
+                             forkCorpse: options.forkCorpse)
+}
+
+internal func getProcessName(processId: ProcessIdentifier) -> String? {
+  var info = proc_bsdinfo()
+  let bsdinfoSize = Int32(MemoryLayout<proc_bsdinfo>.stride)
+  let size = proc_pidinfo(processId, PROC_PIDTBSDINFO, 0, &info, bsdinfoSize)
+  if (size != bsdinfoSize) {
+    return nil
+  }
+ let processName = withUnsafeBytes(of: info.pbi_name) { buffer in
+    let nonnullBuffer = buffer.prefix { $0 != 0 }
+    return String(decoding: nonnullBuffer, as: UTF8.self)
+  }
+  return processName
+}
+
+internal func getAllProcesses(options: UniversalOptions) -> [ProcessIdentifier]? {
+  var ProcessIdentifiers = [ProcessIdentifier]()
+  let kinfo_stride = MemoryLayout<kinfo_proc>.stride
+  var bufferSize: Int = 0
+  var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL]
+
+  guard sysctl(&name, u_int(name.count), nil, &bufferSize, nil, 0) == 0 else {
+    return nil
+  }
+  let count = bufferSize / kinfo_stride
+  var buffer = Array(repeating: kinfo_proc(), count: count)
+  guard sysctl(&name, u_int(name.count), &buffer, &bufferSize, nil, 0) == 0 else {
+    return nil
+  }
+  let newCount = bufferSize / kinfo_stride
+  if count > newCount {
+    buffer.dropLast(count - newCount)
+  }
+  let sorted = buffer.sorted { first, second in
+    first.kp_proc.p_pid > second.kp_proc.p_pid
+  }
+  let myPid = getpid()
+  for kinfo in sorted {
+    let pid = kinfo.kp_proc.p_pid
+    if pid <= 1 {
+      break
+    }
+    if pid == myPid { // skip self
+      continue
+    }
+    ProcessIdentifiers.append(pid)
+  }
+  return ProcessIdentifiers
+}
+
 #elseif os(Windows)
 import WinSDK
 
@@ -81,6 +137,12 @@ internal func process(matching: String) -> ProcessIdentifier? {
 
   return matches.first?.0
 }
+
+internal func getRemoteProcess(processId: ProcessIdentifier,
+                               options: UniversalOptions) -> (any RemoteProcess)? {
+  return WindowsRemoteProcess(processId: processId)
+}
+
 #else
 #error("Unsupported platform")
 #endif

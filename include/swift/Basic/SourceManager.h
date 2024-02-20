@@ -16,11 +16,13 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
+#include <vector>
 
 namespace swift {
 
@@ -33,35 +35,17 @@ class GeneratedSourceInfo {
 public:
   /// The kind of generated source code.
   enum Kind {
-    /// The expansion of a freestanding expression macro.
-    ExpressionMacroExpansion,
-
-    /// The expansion of a freestanding declaration macro.
-    FreestandingDeclMacroExpansion,
-
-    /// The expansion of an accessor attached macro.
-    AccessorMacroExpansion,
-
-    /// The expansion of a member attribute attached macro.
-    MemberAttributeMacroExpansion,
-
-    /// The expansion of an attached member macro.
-    MemberMacroExpansion,
-
-    /// The expansion of an attached peer macro.
-    PeerMacroExpansion,
-
-    /// The expansion of an attached conformance macro.
-    ConformanceMacroExpansion,
-
-    /// The expansion of an attached extension macro.
-    ExtensionMacroExpansion,
+#define MACRO_ROLE(Name, Description) Name##MacroExpansion,
+#include "swift/Basic/MacroRoles.def"
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 
     /// Pretty-printed declarations that have no source location.
     PrettyPrinted,
+
+    /// The expansion of default argument at caller side
+    DefaultArgument,
   } kind;
 
   /// The source range in the enclosing buffer where this source was generated.
@@ -89,6 +73,10 @@ public:
   /// The name of the source file on disk that was created to hold the
   /// contents of this file for external clients.
   StringRef onDiskBufferCopyFileName = StringRef();
+
+  /// Contains the ancestors of this source buffer, starting with the root source
+  /// buffer and ending at this source buffer.
+  mutable llvm::ArrayRef<unsigned> ancestors = llvm::ArrayRef<unsigned>();
 };
 
 /// This class manages and owns source buffers.
@@ -133,6 +121,28 @@ private:
 
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
+
+  /// A cache that improves the speed of location -> buffer lookups.
+  struct BufferLocCache {
+    /// The set of memory buffers IDs, sorted by the start of their source range.
+    std::vector<unsigned> sortedBuffers;
+
+    /// The number of buffers that were present when sortedBuffers was formed.
+    ///
+    /// There can be multiple buffers that refer to the same source range,
+    /// and we remove duplicates as part of the processing of forming the
+    /// vector of sorted buffers. This number is the number of original buffers,
+    /// used to determine when the sorted buffers are out of date.
+    unsigned numBuffersOriginal = 0;
+
+    /// The last buffer we looked in. This acts as a one-element MRU cache for
+    /// lookups based on source locations.
+    llvm::Optional<unsigned> lastBufferID;
+  };
+
+  /// The cache that's used to quickly map a source location to a particular
+  /// buffer ID.
+  mutable BufferLocCache LocCache;
 
   llvm::Optional<unsigned> findBufferContainingLocInternal(SourceLoc Loc) const;
 
@@ -203,6 +213,15 @@ public:
   llvm::Optional<GeneratedSourceInfo>
   getGeneratedSourceInfo(unsigned bufferID) const;
 
+  /// Retrieve the list of ancestors of the given source buffer, starting with
+  /// the root buffer and proceding to the given buffer ID at the end.
+  ///
+  /// The scratch parameter will be used to avoid allocation in the case where
+  /// the given buffer ID is the top-level buffer, in which case bufferID will
+  /// be written into scratch at the returned array will contain that one
+  /// element.
+  ArrayRef<unsigned> getAncestors(unsigned bufferID, unsigned &scratch) const;
+
   /// Record the starting source location of a regex literal.
   void recordRegexLiteralStartLoc(SourceLoc loc) {
     RegexLiteralStartLocs.insert(loc);
@@ -214,13 +233,49 @@ public:
     return RegexLiteralStartLocs.contains(loc);
   }
 
-  /// Returns true if \c LHS is before \c RHS in the source buffer.
+  /// Returns true if \c first is before \c second in the same source file,
+  /// accounting for the possibility that first and second are in different
+  /// source buffers that are conceptually within the same source file,
+  /// due to macro expansion.
+  bool isBefore(SourceLoc first, SourceLoc second) const;
+
+  /// Returns true if \c first is at or before \c second in the same source
+  /// file, accounting for the possibility that first and second are in
+  /// different source buffers that are conceptually within the same source
+  /// file, due to macro expansion.
+  bool isAtOrBefore(SourceLoc first, SourceLoc second) const;
+
+  /// Returns true if \c LHS is before \c RHS in the same source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
     return LHS.Value.getPointer() < RHS.Value.getPointer();
   }
 
-  /// Returns true if range \c R contains the location \c Loc.  The location
-  /// \c Loc should point at the beginning of the token.
+  /// Returns true if \c range contains the location \c loc.  The location
+  /// \c loc should point at the beginning of the token.
+  ///
+  /// This function accounts for the possibility that the source locations
+  /// provided might come from different source buffers that are conceptually
+  /// part of the same source file, for example due to macro expansion.
+  bool containsTokenLoc(SourceRange range, SourceLoc loc) const;
+
+  /// Returns true if \c range contains the location \c loc.
+  ///
+  /// This function accounts for the possibility that the source locations
+  /// provided might come from different source buffers that are conceptually
+  /// part of the same source file, for example due to macro expansion.
+  bool containsLoc(SourceRange range, SourceLoc loc) const;
+
+  /// Returns true if \c enclosing contains the whole range \c inner.
+  ///
+  /// This function accounts for the possibility that the source locations
+  /// provided might come from different source buffers that are conceptually
+  /// part of the same source file, for example due to macro expansion.
+  bool encloses(SourceRange enclosing, SourceRange inner) const;
+
+  /// Returns true if range \c R contains the location \c Loc, where all
+  /// locations are known to be in the same source buffer.
+  ///
+  /// The location \c Loc should point at the beginning of the token.
   bool rangeContainsTokenLoc(SourceRange R, SourceLoc Loc) const {
     return Loc == R.Start || Loc == R.End ||
            (isBeforeInBuffer(R.Start, Loc) && isBeforeInBuffer(Loc, R.End));

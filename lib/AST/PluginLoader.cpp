@@ -150,58 +150,85 @@ const PluginLoader::PluginEntry &
 PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto &map = getPluginMap();
   auto found = map.find(moduleName);
-  if (found != map.end()) {
-    return found->second;
-  } else {
+  if (found == map.end()) {
     static PluginEntry notFound{"", ""};
     return notFound;
   }
+
+  // Track the dependency.
+  recordDependency(found->second, moduleName);
+  return found->second;
 }
 
-LoadedLibraryPlugin *PluginLoader::loadLibraryPlugin(StringRef path) {
+llvm::Expected<LoadedLibraryPlugin *>
+PluginLoader::loadLibraryPlugin(StringRef path) {
   auto fs = Ctx.SourceMgr.getFileSystem();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                       err.message());
-    return nullptr;
+    return llvm::createStringError(err, err.message());
   }
-
-  // Track the dependency.
-  if (DepTracker)
-    DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
 
   // Load the plugin.
   auto plugin = getRegistry()->loadLibraryPlugin(resolvedPath);
   if (!plugin) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                       llvm::toString(plugin.takeError()));
-    return nullptr;
+    resolvedPath.push_back(0);
+    return llvm::handleErrors(
+        plugin.takeError(), [&](const llvm::ErrorInfoBase &err) {
+          return llvm::createStringError(
+              err.convertToErrorCode(),
+              "compiler plugin '%s' could not be loaded;  %s",
+              resolvedPath.data(), err.message().data());
+        });
   }
 
-  return plugin.get();
+  return plugin;
 }
 
-LoadedExecutablePlugin *PluginLoader::loadExecutablePlugin(StringRef path) {
+llvm::Expected<LoadedExecutablePlugin *>
+PluginLoader::loadExecutablePlugin(StringRef path) {
   auto fs = Ctx.SourceMgr.getFileSystem();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                       err.message());
-    return nullptr;
+    return llvm::createStringError(err, err.message());
   }
-
-  // Track the dependency.
-  if (DepTracker)
-    DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
 
   // Load the plugin.
-  auto plugin = getRegistry()->loadExecutablePlugin(resolvedPath);
+  auto plugin =
+      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
   if (!plugin) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                       llvm::toString(plugin.takeError()));
-    return nullptr;
+    resolvedPath.push_back(0);
+    return llvm::handleErrors(
+        plugin.takeError(), [&](const llvm::ErrorInfoBase &err) {
+          return llvm::createStringError(
+              err.convertToErrorCode(),
+              "compiler plugin '%s' could not be loaded: %s",
+              resolvedPath.data(), err.message().data());
+        });
   }
 
-  return plugin.get();
+  return plugin;
+}
+
+void PluginLoader::recordDependency(const PluginEntry &plugin,
+                                    Identifier moduleName) {
+  if (!DepTracker)
+    return;
+
+  // libraryPath: non-nil, executablePath: nil: in-process library plugin.
+  // libraryPath: non-nil, executablePath: non-nil: external library plugin.
+  // libraryPath: nil, executablePath: non-nil: executable plugin.
+  StringRef path =
+      !plugin.libraryPath.empty() ? plugin.libraryPath : plugin.executablePath;
+
+  // NOTE: We don't track plugin-server path as a dependency because it doesn't
+  // provide much value.
+
+  assert(!path.empty());
+  SmallString<128> resolvedPath;
+  auto fs = Ctx.SourceMgr.getFileSystem();
+  if (auto err = fs->getRealPath(path, resolvedPath)) {
+    return;
+  }
+
+  DepTracker->addMacroPluginDependency(resolvedPath, moduleName);
 }

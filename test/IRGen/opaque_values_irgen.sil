@@ -4,7 +4,7 @@ import Builtin
 
 sil_stage raw
 
-// CHECK: define hidden swiftcc void @f010_irgen_identity(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T)
+// CHECK: define hidden swiftcc void @f010_irgen_identity(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T)
 // CHECK: entry:
 // CHECK-NOT: call
 // CHECK-NOT: call

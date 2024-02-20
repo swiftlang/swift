@@ -42,9 +42,11 @@ target_sources(swiftSILOptimizer PRIVATE
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp
-  SendNonSendable.cpp
+  TransferNonSendable.cpp
+  LowerTupleAddrConstructor.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  RegionAnalysisInvalidationTransform.cpp
   OwnershipModelEliminator.cpp)

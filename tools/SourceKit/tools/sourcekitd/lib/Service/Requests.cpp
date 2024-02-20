@@ -37,6 +37,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -194,6 +195,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
                               ResponseReceiver Rec);
 
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec);
+
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
 
@@ -207,6 +212,7 @@ static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result, Res
 
 static void findRelatedIdents(StringRef PrimaryFilePath,
                               StringRef InputBufferName, int64_t Offset,
+                              bool IncludeNonEditableBaseNames,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
@@ -305,26 +311,20 @@ static sourcekitd_response_t
 editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args);
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
-                             std::vector<RenameLocations> &RenameLocations,
+buildRenameLocationsFromDict(const RequestDict &Req,
+                             std::vector<RenameLoc> &RenameLocations,
                              llvm::SmallString<64> &Error);
 
 static sourcekitd_response_t
 createCategorizedEditsResponse(
     const RequestResult<ArrayRef<CategorizedEdits>> &Result);
 
-static sourcekitd_response_t
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args);
-
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(
-    const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result);
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result);
 
 static sourcekitd_response_t
 findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                 ArrayRef<RenameLocations> RenameLocations,
+                 ArrayRef<RenameLoc> RenameLocations,
                  ArrayRef<const char *> Args);
 
 static bool isSemanticEditorDisabled();
@@ -580,12 +580,12 @@ handleRequestGlobalConfiguration(const RequestDict &Req,
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<unsigned> CompletionMaxASTContextReuseCount =
-        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
-            .transform([](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> CompletionCheckDependencyInterval =
-        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval)
-            .transform([](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionMaxASTContextReuseCount = swift::transform(
+        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount),
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionCheckDependencyInterval = swift::transform(
+        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval),
+        [](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
         Config->update(CompletionMaxASTContextReuseCount,
@@ -1056,28 +1056,6 @@ handleRequestModuleGroups(const RequestDict &Req,
 }
 
 static void
-handleRequestSyntacticRename(const RequestDict &Req,
-                             SourceKitCancellationToken CancellationToken,
-                             ResponseReceiver Rec) {
-  {
-    SmallVector<const char *, 8> Args;
-    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
-      return;
-    Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
-    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
-        getInputBufForRequestOrEmitError(Req, vfsOptions, Rec);
-    if (!InputBuf)
-      return;
-
-    SmallString<64> ErrBuf;
-    std::vector<RenameLocations> RenameLocations;
-    if (buildRenameLocationsFromDict(Req, true, RenameLocations, ErrBuf))
-      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
-    return Rec(syntacticRename(InputBuf.get(), RenameLocations, Args));
-  }
-}
-
-static void
 handleRequestFindRenameRanges(const RequestDict &Req,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
@@ -1092,8 +1070,8 @@ handleRequestFindRenameRanges(const RequestDict &Req,
       return;
 
     SmallString<64> ErrBuf;
-    std::vector<RenameLocations> RenameLocations;
-    if (buildRenameLocationsFromDict(Req, false, RenameLocations, ErrBuf))
+    std::vector<RenameLoc> RenameLocations;
+    if (buildRenameLocationsFromDict(Req, RenameLocations, ErrBuf))
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     return Rec(findRenameRanges(InputBuf.get(), RenameLocations, Args));
   }
@@ -1674,10 +1652,12 @@ handleRequestCollectVariableType(const RequestDict &Req,
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
 
-    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).transform(
-        [](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).transform(
-        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Offset =
+        swift::transform(Req.getOptionalInt64(KeyOffset),
+                         [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length =
+        swift::transform(Req.getOptionalInt64(KeyLength),
+                         [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     return Lang.collectVariableTypes(
@@ -1715,7 +1695,8 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
         *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
-        [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
+        [Rec](const CancellableResult<std::vector<CategorizedRenameRanges>>
+                  &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
         });
   });
@@ -1807,14 +1788,18 @@ handleRequestRelatedIdents(const RequestDict &Req,
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
 
+    int64_t IncludeNonEditableBaseNames = 0;
+    Req.getInt64(KeyIncludeNonEditableBaseNames, IncludeNonEditableBaseNames,
+                 /*isOptional=*/true);
+
     // For backwards compatibility, the default is 1.
     int64_t CancelOnSubsequentRequest = 1;
     Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
                  /*isOptional=*/true);
 
-    return findRelatedIdents(*PrimaryFilePath, InputBufferName, Offset,
-                             CancelOnSubsequentRequest, Args, CancellationToken,
-                             Rec);
+    return findRelatedIdents(
+        *PrimaryFilePath, InputBufferName, Offset, IncludeNonEditableBaseNames,
+        CancelOnSubsequentRequest, Args, CancellationToken, Rec);
   });
 }
 
@@ -1862,6 +1847,32 @@ handleRequestDiagnostics(const RequestDict &Req,
                         [Rec](const RequestResult<DiagnosticsResult> &Result) {
                           reportDiagnostics(Result, Rec);
                         });
+    return;
+  });
+}
+
+static void
+handleRequestSemanticTokens(const RequestDict &Req,
+                            SourceKitCancellationToken CancellationToken,
+                            ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getSemanticTokens(
+        *PrimaryFilePath, InputBufferName, Args, std::move(vfsOptions),
+        CancellationToken,
+        [Rec](const RequestResult<SemanticTokensResult> &Result) {
+          reportSemanticTokens(Result, Rec);
+        });
     return;
   });
 }
@@ -1930,24 +1941,10 @@ static void handleRequestSyntacticMacroExpansion(
     }
     MacroRoles macroRoles;
     for (auto uid : macroRoleUIDs) {
-      if (uid == KindMacroRoleExpression)
-        macroRoles |= MacroRole::Expression;
-      if (uid == KindMacroRoleDeclaration)
-        macroRoles |= MacroRole::Declaration;
-      if (uid == KindMacroRoleCodeItem)
-        macroRoles |= MacroRole::CodeItem;
-      if (uid == KindMacroRoleAccessor)
-        macroRoles |= MacroRole::Accessor;
-      if (uid == KindMacroRoleMemberAttribute)
-        macroRoles |= MacroRole::MemberAttribute;
-      if (uid == KindMacroRoleMember)
-        macroRoles |= MacroRole::Member;
-      if (uid == KindMacroRolePeer)
-        macroRoles |= MacroRole::Peer;
-      if (uid == KindMacroRoleConformance)
-        macroRoles |= MacroRole::Conformance;
-      if (uid == KindMacroRoleExtension)
-        macroRoles |= MacroRole::Extension;
+#define MACRO_ROLE(Name, Description)        \
+      if (uid == KindMacroRole##Name)        \
+        macroRoles |= MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
     }
 
     // definition.
@@ -2061,7 +2058,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                  handleRequestEditorFindInterfaceDoc)
   HANDLE_REQUEST(RequestModuleGroups, handleRequestModuleGroups)
 
-  HANDLE_REQUEST(RequestSyntacticRename, handleRequestSyntacticRename)
   HANDLE_REQUEST(RequestFindRenameRanges, handleRequestFindRenameRanges)
 
   HANDLE_REQUEST(RequestCodeCompleteClose, handleRequestCodeCompleteClose)
@@ -2100,6 +2096,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestRelatedIdents, handleRequestRelatedIdents)
   HANDLE_REQUEST(RequestActiveRegions, handleRequestActiveRegions)
   HANDLE_REQUEST(RequestDiagnostics, handleRequestDiagnostics)
+  HANDLE_REQUEST(RequestSemanticTokens, handleRequestSemanticTokens)
   HANDLE_REQUEST(RequestSyntacticMacroExpansion,
                  handleRequestSyntacticMacroExpansion)
 
@@ -2725,6 +2722,32 @@ static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
 }
 
 //===----------------------------------------------------------------------===//
+// ReportSemanticTokens
+//===----------------------------------------------------------------------===//
+
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  TokenAnnotationsArrayBuilder SemanticAnnotations;
+  for (auto SemaTok : Result.value()) {
+    UIdent Kind = SemaTok.getUIdentForKind();
+    if (Kind.isValid()) {
+      SemanticAnnotations.add(Kind, SemaTok.ByteOffset, SemaTok.Length,
+                              SemaTok.getIsSystem());
+    }
+  }
+  Dict.setCustomBuffer(KeySemanticTokens, SemanticAnnotations.createBuffer());
+  Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
 // ReportRangeInfo
 //===----------------------------------------------------------------------===//
 
@@ -2840,29 +2863,48 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
 
+static sourcekitd_uid_t renameLocUsageUID(swift::ide::RenameLocUsage Usage) {
+  switch (Usage) {
+  case swift::ide::RenameLocUsage::Definition:
+    return KindDefinition;
+  case swift::ide::RenameLocUsage::Reference:
+    return KindReference;
+  case swift::ide::RenameLocUsage::Call:
+    return KindCall;
+  case swift::ide::RenameLocUsage::Unknown:
+    return KindUnknown;
+  }
+}
+
 static void findRelatedIdents(StringRef PrimaryFilePath,
                               StringRef InputBufferName, int64_t Offset,
+                              bool IncludeNonEditableBaseNames,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(
-      PrimaryFilePath, InputBufferName, Offset, CancelOnSubsequentRequest, Args,
-      CancellationToken, [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
+      PrimaryFilePath, InputBufferName, Offset, IncludeNonEditableBaseNames,
+      CancelOnSubsequentRequest, Args, CancellationToken,
+      [Rec](const RequestResult<RelatedIdentsResult> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());
         if (Result.isError())
           return Rec(createErrorRequestFailed(Result.getError()));
 
-        const RelatedIdentsInfo &Info = Result.value();
+        const RelatedIdentsResult &Info = Result.value();
 
         ResponseBuilder RespBuilder;
         auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
-        for (auto R : Info.Ranges) {
+        for (auto R : Info.RelatedIdents) {
           auto Elem = Arr.appendDictionary();
-          Elem.set(KeyOffset, R.first);
-          Elem.set(KeyLength, R.second);
+          Elem.set(KeyOffset, R.Offset);
+          Elem.set(KeyLength, R.Length);
+          Elem.set(KeyNameType, renameLocUsageUID(R.Usage));
+        }
+        if (Info.OldName) {
+          RespBuilder.getDictionary().set(KeyName, *Info.OldName);
         }
 
         Rec(RespBuilder.createResponse());
@@ -3976,44 +4018,17 @@ editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
 }
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
-                             std::vector<RenameLocations> &RenameLocations,
+buildRenameLocationsFromDict(const RequestDict &Req,
+                             std::vector<RenameLoc> &RenameLocations,
                              llvm::SmallString<64> &Error) {
   bool Failed = Req.dictionaryArrayApply(KeyRenameLocations,
                                          [&](RequestDict RenameLocation) {
-    int64_t IsFunctionLike = false;
-    if (RenameLocation.getInt64(KeyIsFunctionLike, IsFunctionLike, false)) {
-      Error = "missing key.is_function_like";
-      return true;
-    }
-
-    int64_t IsNonProtocolType = false;
-    if (RenameLocation.getInt64(KeyIsNonProtocolType, IsNonProtocolType, false)) {
-      Error = "missing key.is_non_protocol_type";
-      return true;
-    }
-
     Optional<StringRef> OldName = RenameLocation.getString(KeyName);
     if (!OldName.has_value()) {
       Error = "missing key.name";
       return true;
     }
 
-    Optional<StringRef> NewName;
-    if (UseNewName) {
-      NewName = RenameLocation.getString(KeyNewName);
-      if (!NewName.has_value()) {
-        Error = "missing key.newname";
-        return true;
-      }
-    }
-
-    RenameLocations.push_back({*OldName,
-                               UseNewName ? *NewName : "",
-                               static_cast<bool>(IsFunctionLike),
-                               static_cast<bool>(IsNonProtocolType),
-                               {}});
-    auto &LineCols = RenameLocations.back().LineColumnLocs;
     bool Failed = RenameLocation.dictionaryArrayApply(KeyLocations,
                                                       [&](RequestDict LineAndCol) {
       int64_t Line = 0;
@@ -4033,19 +4048,21 @@ buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
         Error = "missing key.nametype";
         return true;
       }
-      RenameType RenameType = RenameType::Unknown;
+      using swift::ide::RenameLocUsage;
+      RenameLocUsage RenameType = RenameLocUsage::Unknown;
       if (NameType == KindDefinition) {
-        RenameType = RenameType::Definition;
+        RenameType = RenameLocUsage::Definition;
       } else if (NameType == KindReference) {
-        RenameType = RenameType::Reference;
+        RenameType = RenameLocUsage::Reference;
       } else if (NameType == KindCall) {
-        RenameType = RenameType::Call;
+        RenameType = RenameLocUsage::Call;
       } else if (NameType != KindUnknown) {
         Error = "invalid value for 'key.nametype'";
         return true;
       }
-      LineCols.push_back({static_cast<unsigned>(Line),
-        static_cast<unsigned>(Column), RenameType});
+      RenameLocations.emplace_back(
+          static_cast<unsigned>(Line), static_cast<unsigned>(Column),
+                    RenameType, *OldName);
       return false;
     });
     if (Failed && Error.empty()) {
@@ -4106,27 +4123,19 @@ createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &
   return RespBuilder.createResponse();
 }
 
-static sourcekitd_response_t
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args) {
-  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  sourcekitd_response_t Result;
-  Lang.syntacticRename(InputBuf, RenameLocations, Args,
-    [&](const RequestResult<ArrayRef<CategorizedEdits>> &ReqResult) {
-      Result = createCategorizedEditsResponse(ReqResult);
-  });
-  return Result;
-}
-
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
-  if (Result.isCancelled())
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result) {
+  using swift::ide::CancellableResultKind;
+  switch (Result.getKind()) {
+  case CancellableResultKind::Cancelled:
     return createErrorRequestCancelled();
-  if (Result.isError())
+  case CancellableResultKind::Failure:
     return createErrorRequestFailed(Result.getError());
+  case CancellableResultKind::Success:
+    break; // Handle below
+  }
 
-  const ArrayRef<CategorizedRenameRanges> &Ranges = Result.value();
+  const std::vector<CategorizedRenameRanges> &Ranges = Result.getResult();
 
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
@@ -4152,16 +4161,12 @@ createCategorizedRenameRangesResponse(const RequestResult<ArrayRef<CategorizedRe
 
 static sourcekitd_response_t
 findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                 ArrayRef<RenameLocations> RenameLocations,
+                 ArrayRef<RenameLoc> RenameLocations,
                  ArrayRef<const char *> Args) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  sourcekitd_response_t Result;
-  Lang.findRenameRanges(
-      InputBuf, RenameLocations, Args,
-      [&](const RequestResult<ArrayRef<CategorizedRenameRanges>> &ReqResult) {
-        Result = createCategorizedRenameRangesResponse(ReqResult);
-      });
-  return Result;
+  CancellableResult<std::vector<CategorizedRenameRanges>> ReqResult =
+      Lang.findRenameRanges(InputBuf, RenameLocations, Args);
+  return createCategorizedRenameRangesResponse(ReqResult);
 }
 
 static bool isSemanticEditorDisabled() {

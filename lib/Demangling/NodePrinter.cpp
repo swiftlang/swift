@@ -357,6 +357,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::BodyAttachedMacroExpansion:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
@@ -423,8 +424,10 @@ private:
     case Node::Kind::IVarDestroyer:
     case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
+    case Node::Kind::ImplErasedIsolation:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
+    case Node::Kind::ImplParameterTransferring:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
@@ -440,6 +443,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
+    case Node::Kind::Transferring:
     case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
@@ -486,6 +490,7 @@ private:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
+    case Node::Kind::PreambleAttachedMacroExpansion:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
@@ -555,8 +560,11 @@ private:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
+    case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::TransferringResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::TypedThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
@@ -570,6 +578,13 @@ private:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedDestroy:
+    case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
+    case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
+    case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
+    case Node::Kind::OutlinedDestroyNoValueWitness:
+    case Node::Kind::OutlinedEnumTagStore:
+    case Node::Kind::OutlinedEnumGetTag:
+    case Node::Kind::OutlinedEnumProjectDataForLoad:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::OutlinedReadOnlyObject:
     case Node::Kind::AssocTypePath:
@@ -618,6 +633,7 @@ private:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
+    case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::ExtendedExistentialTypeShape:
@@ -626,6 +642,9 @@ private:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    case Node::Kind::ParamLifetimeDependence:
+    case Node::Kind::SelfLifetimeDependence:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -862,10 +881,15 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false, hasTransferringResult = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind()
+            == Node::Kind::IsolatedAnyFunctionType) {
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() ==
@@ -879,10 +903,20 @@ private:
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
       ++startIndex;
     }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SelfLifetimeDependence) {
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
-      isThrows = true;
     }
+
+    Node *thrownErrorNode = nullptr;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
+        node->getChild(startIndex)->getKind()
+          == Node::Kind::TypedThrowsAnnotation) {
+      thrownErrorNode = node->getChild(startIndex);
+      ++startIndex;
+    }
+
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
@@ -891,6 +925,11 @@ private:
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
+    }
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::TransferringResultFunctionType) {
+      ++startIndex;
+      hasTransferringResult = true;
     }
 
     switch (diffKind) {
@@ -922,8 +961,14 @@ private:
     if (isAsync)
       Printer << " async";
 
-    if (isThrows)
-      Printer << " throws";
+    if (thrownErrorNode) {
+      print(thrownErrorNode, depth + 1);
+    }
+
+    Printer << " -> ";
+
+    if (hasTransferringResult)
+      Printer << "transferring ";
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1368,19 +1413,35 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedInitializeWithCopy:
+  case Node::Kind::OutlinedInitializeWithCopyNoValueWitness:
     Printer << "outlined init with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithTake:
+  case Node::Kind::OutlinedAssignWithTakeNoValueWitness:
     Printer << "outlined assign with take of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedAssignWithCopy:
+  case Node::Kind::OutlinedAssignWithCopyNoValueWitness:
     Printer << "outlined assign with copy of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedDestroy:
+  case Node::Kind::OutlinedDestroyNoValueWitness:
     Printer << "outlined destroy of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumProjectDataForLoad:
+    Printer << "outlined enum project data for load of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumTagStore:
+    Printer << "outlined enum tag store of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OutlinedEnumGetTag:
+    Printer << "outlined enum get tag of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedVariable:
@@ -1440,46 +1501,19 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
-  case Node::Kind::AccessorAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("accessor macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)                \
+  case Node::Kind::Name##AttachedMacroExpansion:                           \
+    return printEntity(Node, depth, asPrefixContext,                       \
+                       TypePrinting::NoType, /*hasName*/true,              \
+                       (Description " macro @" +                           \
+                        nodeToString(Node->getChild(2)) + " expansion #"), \
                        (int)Node->getChild(3)->getIndex() + 1);
+#include "swift/Basic/MacroRoles.def"
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::MemberAttributeAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member attribute macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::MemberAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::PeerAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("peer macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ConformanceAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("conformance macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ExtensionAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("extension macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "unique name #",
@@ -1653,9 +1687,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
-      Printer << " -> " << Node->getText();
+      Printer << Node->getText();
     else {
-      Printer << " -> ";
       printChildren(Node, depth);
     }
     return nullptr;
@@ -1681,6 +1714,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "isolated ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::Transferring:
+    Printer << "transferring ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::CompileTimeConst:
     Printer << "_const ";
     print(Node->getChild(0), depth + 1);
@@ -1697,6 +1734,33 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ParamLifetimeDependence: {
+    Printer << "lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope ";
+      break;
+    }
+    print(Node->getChild(1), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::SelfLifetimeDependence: {
+    Printer << "(self lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit) ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope) ";
+      break;
+    }
+    return nullptr;
+  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;
@@ -2247,6 +2311,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "accessible function runtime record for ";
     }
     return nullptr;
+  case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "accessible distributed function runtime record for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2682,10 +2751,20 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
+  case Node::Kind::ImplErasedIsolation:
+    Printer << "@isolated(any)";
+    return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
   case Node::Kind::ImplParameterResultDifferentiability:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with trailing space.
+    Printer << Node->getText() << ' ';
+    return nullptr;
+  case Node::Kind::ImplParameterTransferring:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;
@@ -2731,6 +2810,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Print differentiability, if it exists.
     if (Node->getNumChildren() == 3)
       print(Node->getChild(1), depth + 1);
+    // Print differentiability and transferring if it exists.
+    if (Node->getNumChildren() == 4) {
+      print(Node->getChild(1), depth + 1);
+      print(Node->getChild(2), depth + 1);
+    }
     // Print type.
     print(Node->getLastChild(), depth + 1);
     return nullptr;
@@ -2907,11 +2991,23 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
+  case Node::Kind::IsolatedAnyFunctionType:
+    Printer << "@isolated(any) ";
+    return nullptr;
+  case Node::Kind::TransferringResultFunctionType:
+    Printer << "transferring ";
+    return nullptr;
   case Node::Kind::AsyncAnnotation:
-    Printer << " async ";
+    Printer << " async";
     return nullptr;
   case Node::Kind::ThrowsAnnotation:
-    Printer << " throws ";
+    Printer << " throws";
+    return nullptr;
+  case Node::Kind::TypedThrowsAnnotation:
+    Printer << " throws(";
+    if (Node->getNumChildren() == 1)
+      print(Node->getChild(0), depth + 1);
+    Printer << ")";
     return nullptr;
   case Node::Kind::EmptyList:
     Printer << " empty-list ";
@@ -3191,6 +3287,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "non-unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    Printer << "objective-c protocol symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::SymbolicExtendedExistentialType: {

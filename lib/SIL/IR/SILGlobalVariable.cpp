@@ -113,7 +113,11 @@ static SILGlobalVariable *getStaticallyInitializedVariable(SILFunction *AddrF) {
   if (AddrF->isExternalDeclaration())
     return nullptr;
 
-  auto *RetInst = cast<ReturnInst>(AddrF->findReturnBB()->getTerminator());
+  auto ReturnBB = AddrF->findReturnBB();
+  if (ReturnBB == AddrF->end())
+    return nullptr;
+
+  auto *RetInst = cast<ReturnInst>(ReturnBB->getTerminator());
   auto *API = dyn_cast<AddressToPointerInst>(RetInst->getOperand());
   if (!API)
     return nullptr;

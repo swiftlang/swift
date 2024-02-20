@@ -75,12 +75,19 @@ class SILModule::SerializationCallback final
       // translation units in the same Swift module.
       decl->setLinkage(SILLinkage::Shared);
       return;
+    case SILLinkage::Package:
+      decl->setLinkage(SILLinkage::PackageExternal);
+      return;
+    case SILLinkage::PackageNonABI: // Same as PublicNonABI
+      decl->setLinkage(SILLinkage::Shared);
+      return;
     case SILLinkage::Hidden:
       decl->setLinkage(SILLinkage::HiddenExternal);
       return;
     case SILLinkage::Private:
       llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::Shared:
       return;
@@ -100,6 +107,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
+      hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
       Types(TC) {
   assert(!context.isNull());
@@ -146,7 +154,6 @@ SILModule::~SILModule() {
   for (SILFunction &F : *this) {
     F.dropAllReferences();
     F.dropDynamicallyReplacedFunction();
-    F.dropReferencedAdHocRequirementWitnessFunction();
     F.clearSpecializeAttrs();
   }
 
@@ -484,7 +491,6 @@ void SILModule::eraseFunction(SILFunction *F) {
   // (References are not needed anymore.)
   F->clear();
   F->dropDynamicallyReplacedFunction();
-  F->dropReferencedAdHocRequirementWitnessFunction();
   // Drop references for any _specialize(target:) functions.
   F->clearSpecializeAttrs();
 }
@@ -517,6 +523,20 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
   SILVTable *Vtbl = getSILLoader()->lookupVTable(C);
   if (!Vtbl)
     return nullptr;
+
+  if (C->walkSuperclasses([&](ClassDecl *S) {
+    auto R = VTableMap.find(S);
+    if (R != VTableMap.end())
+      return TypeWalker::Action::Continue;
+    SILVTable *Vtbl = getSILLoader()->lookupVTable(S);
+    if (!Vtbl) {
+      return TypeWalker::Action::Stop;
+    }
+    VTableMap[S] = Vtbl;
+    return TypeWalker::Action::Continue;
+  })) {
+    return nullptr;
+  }
 
   // If we succeeded, map C -> VTbl in the table and return VTbl.
   VTableMap[C] = Vtbl;
@@ -665,7 +685,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 SILFunction *
 SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
-  assert(nomDecl->isMoveOnly());
+  assert(!nomDecl->canBeCopyable());
 
   auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
 
@@ -964,6 +984,8 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
     linkage = SILLinkage::Hidden;
     break;
   case AccessLevel::Package:
+    linkage = SILLinkage::Package;
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     linkage = SILLinkage::Public;

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
 //
 // REQUIRES: executable_test
 
@@ -81,6 +81,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(44, result2.value)
   expectEqual(43, result1.value)
   expectEqual(42, wrapper.value)
+}
+
+OperatorsTestSuite.test("IntWrapperInNamespace.equal (inline)") {
+  let lhs = NS.IntWrapperInNamespace(value: 42)
+  let rhs = NS.IntWrapperInNamespace(value: 42)
+
+  let result = lhs == rhs
+
+  expectTrue(result)
 }
 
 OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
@@ -376,6 +385,38 @@ OperatorsTestSuite.test("DerivedFromConstIterator.pointee") {
   let stars = DerivedFromConstIterator()
   let res = stars.pointee
   expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("SubscriptSetterConst") {
+  var setterConst = SubscriptSetterConst()
+  setterConst[0] = 10
+}
+
+OperatorsTestSuite.test("DerivedFromConstIteratorPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromConstIteratorPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(567, res)
+}
+
+OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
+  var d = DerivedFromLoadableIntWrapperWithUsingDecl()
+  d.setValue(123)
+  var d1 = LoadableIntWrapper()
+  d1.value = 543
+  d += d1
+  expectEqual(666, d.getValue())
+}
+
+OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
+  let h = HasOperatorCallWithDefaultArg(value: 321)
+  let res = h(123)
+  expectEqual(444, res)
 }
 
 runAllTests()

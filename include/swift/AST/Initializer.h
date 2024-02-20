@@ -21,9 +21,9 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Decl.h"
 
 namespace swift {
+class ParamDecl;
 class PatternBindingDecl;
 
 enum class InitializerKind : uint8_t {
@@ -76,28 +76,25 @@ class PatternBindingInitializer : public Initializer {
   // created lazily for 'self' lookup from lazy property initializer
   ParamDecl *SelfParam;
 
-  friend class ASTContext; // calls reset on unused contexts
+  // Sets itself as the parent.
+  friend class PatternBindingDecl;
 
-  void reset(DeclContext *parent) {
-    setParent(parent);
-    Binding = nullptr;
-    SelfParam = nullptr;
-  }
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex);
 
-public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr), SelfParam(nullptr) {
     SpareBits = 0;
   }
- 
 
-  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
-    setParent(binding->getDeclContext());
-    Binding = binding;
-    SpareBits = bindingIndex;
+public:
+  static PatternBindingInitializer *create(DeclContext *parent) {
+    return new (parent->getASTContext()) PatternBindingInitializer(parent);
   }
-  
+
+  static PatternBindingInitializer *createDeserialized(PatternBindingDecl *PBD,
+                                                       unsigned index);
+
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
@@ -116,37 +113,6 @@ public:
   }
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::PatternBinding;
-  }
-};
-
-/// SerializedPatternBindingInitializer - This represents what was originally a
-/// PatternBindingInitializer during serialization. It is preserved as a special
-/// class only to maintain the correct AST structure and remangling after
-/// deserialization.
-class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
-  PatternBindingDecl *Binding;
-
-public:
-  SerializedPatternBindingInitializer(PatternBindingDecl *Binding,
-                                      unsigned bindingIndex)
-    : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
-                                 Binding->getDeclContext()),
-      Binding(Binding) {
-    SpareBits = bindingIndex;
-  }
-
-  PatternBindingDecl *getBinding() const {
-    return Binding;
-  }
-
-  unsigned getBindingIndex() const { return SpareBits; }
-
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-      LocalDeclContextKind::PatternBindingInitializer;
-    return false;
   }
 };
 
@@ -173,29 +139,6 @@ public:
   }
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
-  }
-};
-
-/// SerializedDefaultArgumentInitializer - This represents what was originally a
-/// DefaultArgumentInitializer during serialization. It is preserved only to
-/// maintain the correct AST structure and remangling after deserialization.
-class SerializedDefaultArgumentInitializer : public SerializedLocalDeclContext {
-  const unsigned Index;
-public:
-  SerializedDefaultArgumentInitializer(unsigned Index, DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::DefaultArgumentInitializer,
-                                 Parent),
-      Index(Index) {}
-
-  unsigned getIndex() const {
-    return Index;
-  }
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::DefaultArgumentInitializer;
-    return false;
   }
 };
 

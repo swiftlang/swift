@@ -74,6 +74,11 @@ let earlyRedundantLoadElimination = FunctionPass(name: "early-redundant-load-eli
 }
 
 private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, _ context: FunctionPassContext) {
+
+  // Avoid quadratic complexity by limiting the number of visited instructions.
+  // This limit is sufficient for most "real-world" functions, by far.
+  var complexityBudget = 50_000
+
   for block in function.blocks.reversed() {
 
     // We cannot use for-in iteration here because if the load is split, the new
@@ -89,21 +94,21 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
         if ignoreArrays && load.type.isNominal && load.type.nominal == context.swiftArrayDecl {
           continue
         }
-        tryEliminate(load: load, context)
+        tryEliminate(load: load, complexityBudget: &complexityBudget, context)
       }
     }
   }
 }
 
-private func tryEliminate(load: LoadInst, _ context: FunctionPassContext) {
-  switch load.isRedundant(context) {
+private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
+  switch load.isRedundant(complexityBudget: &complexityBudget, context) {
   case .notRedundant:
     break
   case .redundant(let availableValues):
     replace(load: load, with: availableValues, context)
   case .maybePartiallyRedundant(let subPath):
     // Check if the a partial load would really be redundant to avoid unnecessary splitting.
-    switch load.isRedundant(at: subPath, context) {
+    switch load.isRedundant(at: subPath, complexityBudget: &complexityBudget, context) {
       case .notRedundant, .maybePartiallyRedundant:
         break
       case .redundant:
@@ -130,25 +135,29 @@ private extension LoadInst {
     }
   }
 
-  func isRedundant(_ context: FunctionPassContext) -> DataflowResult {
-    return isRedundant(at: address.accessPath, context)
+  func isRedundant(complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
+    return isRedundant(at: address.accessPath, complexityBudget: &complexityBudget, context)
   }
 
-  func isRedundant(at accessPath: AccessPath, _ context: FunctionPassContext) -> DataflowResult {
+  func isRedundant(at accessPath: AccessPath, complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
     var scanner = InstructionScanner(load: self, accessPath: accessPath, context.aliasAnalysis)
 
-    switch scanner.scan(instructions: ReverseInstructionList(first: self.previous), in: parentBlock) {
+    switch scanner.scan(instructions: ReverseInstructionList(first: self.previous),
+                        in: parentBlock,
+                        complexityBudget: &complexityBudget)
+    {
     case .overwritten:
       return DataflowResult(notRedundantWith: scanner.potentiallyRedundantSubpath)
     case .available:
       return .redundant(scanner.availableValues)
     case .transparent:
-      return self.isRedundantInPredecessorBlocks(scanner: &scanner, context)
+      return self.isRedundantInPredecessorBlocks(scanner: &scanner, complexityBudget: &complexityBudget, context)
     }
   }
 
   private func isRedundantInPredecessorBlocks(
     scanner: inout InstructionScanner,
+    complexityBudget: inout Int,
     _ context: FunctionPassContext
   ) -> DataflowResult {
 
@@ -157,7 +166,10 @@ private extension LoadInst {
     liferange.pushPredecessors(of: self.parentBlock)
 
     while let block = liferange.pop() {
-      switch scanner.scan(instructions: block.instructions.reversed(), in: block) {
+      switch scanner.scan(instructions: block.instructions.reversed(),
+                          in: block,
+                          complexityBudget: &complexityBudget)
+      {
       case .overwritten:
         return DataflowResult(notRedundantWith: scanner.potentiallyRedundantSubpath)
       case .available:
@@ -402,10 +414,6 @@ private struct InstructionScanner {
   private(set) var potentiallyRedundantSubpath: AccessPath? = nil
   private(set) var availableValues = Array<AvailableValue>()
 
-  // Avoid quadratic complexity by limiting the number of visited instructions for each store.
-  // The limit of 1000 instructions is not reached by far in "real-world" functions.
-  private var budget = 1000
-
   init(load: LoadInst, accessPath: AccessPath, _ aliasAnalysis: AliasAnalysis) {
     self.load = load
     self.accessPath = accessPath
@@ -419,8 +427,16 @@ private struct InstructionScanner {
     case transparent
   }
 
-  mutating func scan(instructions: ReverseInstructionList, in block: BasicBlock) -> ScanResult {
+  mutating func scan(instructions: ReverseInstructionList,
+                     in block: BasicBlock,
+                     complexityBudget: inout Int) -> ScanResult
+  {
     for inst in instructions {
+      complexityBudget -= 1
+      if complexityBudget <= 0 {
+        return .overwritten
+      }
+
       switch visit(instruction: inst) {
         case .available:   return .available
         case .overwritten: return .overwritten
@@ -489,10 +505,6 @@ private struct InstructionScanner {
 
     default:
       break
-    }
-    budget -= 1
-    if budget == 0 {
-      return .overwritten
     }
     if load.loadOwnership == .take {
       // In case of `take`, don't allow reading instructions in the liferange.

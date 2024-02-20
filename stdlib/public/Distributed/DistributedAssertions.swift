@@ -18,8 +18,8 @@ import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
 extension DistributedActor {
-  /// Unconditionally if the current task is executing on the serial executor of the passed in `actor`,
-  /// and if not crash the program offering information about the executor mismatch.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
   ///
   /// This function's effect varies depending on the build flag used:
   ///
@@ -30,9 +30,18 @@ extension DistributedActor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
-  ///   never called. Failure to satisfy that assumption is a serious
-  ///   programming error.
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
   @available(SwiftStdlib 5.9, *)
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -58,18 +67,30 @@ extension DistributedActor {
 
 @available(SwiftStdlib 5.9, *)
 extension DistributedActor {
-  /// Performs an executor check in debug builds.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
+  ///
+  /// This function's effect varies depending on the build flag used:
   ///
   /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
-  ///   configuration): If `condition` evaluates to `false`, stop program
-  ///   execution in a debuggable state after printing `message`.
+  ///   configuration), stops program execution in a debuggable state after
+  ///   printing `message`.
   ///
   /// * In `-O` builds (the default for Xcode's Release configuration),
-  ///   `condition` is not evaluated, and there are no effects.
+  ///   the isolation check is not performed and there are no effects.
   ///
-  /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
-  ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
-  ///   assumption is a serious programming error.
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
   @available(SwiftStdlib 5.9, *)
   @_transparent
   public nonisolated func assertIsolated(
@@ -99,25 +120,39 @@ extension DistributedActor {
 @available(SwiftStdlib 5.9, *)
 extension DistributedActor {
 
-  /// Assume that the current actor is a local distributed actor and that the currently executing context is the same as that actors
-  /// serial executor, or crash.
+  /// Assume that the current task is executing on this (local) distributed
+  /// actor's serial executor, or stop program execution otherwise.
   ///
-  /// This method allows developers to *assume and verify* that the currently executing synchronous function
-  /// is actually executing on the serial executor that this distributed (local) actor is using.
+  /// This method allows to *assume and verify* that the currently
+  /// executing synchronous function is actually executing on the serial
+  /// executor of the this (local) distributed actor.
   ///
-  /// If that is the case, the operation is invoked with an `isolated` version of the actoe,
-  /// allowing synchronous access to actor local state without hopping through asynchronous boundaries.
+  /// If that is the case, the operation is invoked isolated to the main actor
+  /// (`@MainActor () -> T`), allowing synchronous access to actor local state
+  /// without hopping through asynchronous boundaries.
   ///
-  /// If the current context is not running on the actor's serial executor, or if the actor is a reference to a remote actor,
-  /// this method will crash with a fatalError (similar to ``preconditionIsolated()``).
+  /// If the current context is not running on the actor's serial executor,
+  /// this method will crash with a fatal error (similar
+  /// to ``preconditionIsolated()``).
   ///
-  /// This method can only be used from synchronous functions, as asynchronous ones should instead
-  /// perform normal method call to the actor.
+  /// This method can only be used from synchronous functions, as asynchronous
+  /// functions should instead perform a normal method call to the actor, which
+  /// will hop task execution to the target actor if necessary.
+  ///
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   another actor's executor as its own ``DistributedActor/unownedExecutor``
+  ///   --this check will succeed , as from a concurrency safety perspective,
+  ///   the serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
-  ///   - operation: the operation that will be executed if the current context is executing on the actors serial executor, and the actor is a local reference
-  ///   - file: source location where the assume call is made
-  ///   - file: source location where the assume call is made
+  ///   - operation: the operation that will be executed if the current context
+  ///                is executing on the actors serial executor, and the actor
+  ///                is a local reference.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
   @available(SwiftStdlib 5.9, *)

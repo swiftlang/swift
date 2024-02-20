@@ -35,7 +35,7 @@ int main() {
 // CHECKARC: %[[VAL:.*]] = {{(tail )?}}call swiftcc ptr @"$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"
 // CHECKARC: call ptr @llvm.objc.autorelease(ptr %[[VAL]])
 // CHECKARC: @llvm.objc.
-// CHECKARC-SAME: autorelease(ptr)
+// CHECKARC-SAME: autorelease(ptr
 // CHECKARC-NOT: @llvm.objc.
 
 //--- string-to-nsstring.mm

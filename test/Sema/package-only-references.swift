@@ -5,27 +5,22 @@
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/PackageImportedLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -swift-version 5 -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
 // RUN:   -swift-version 5 -enable-library-evolution -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -package-name MyPackage
 
 /// A client in the same package builds fine.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name MyPackage -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -package-name MyPackage -I %t
 
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name MyPackage -I %t \
-// RUN:   -enable-deserialization-safety \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -enable-deserialization-safety
 
 /// A client outside of the package raises errors.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name NotMyPackage -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -package-name NotMyPackage -I %t -verify
 
 //--- PackageImportedLib.swift
 public struct IndirectType {
@@ -51,7 +46,7 @@ package struct PackageStruct : IndirectProtocol {
 }
 
 //--- Client.swift
-public import PackageLib
+import PackageLib
 
 let t = getIndirectType() // expected-error {{cannot find 'getIndirectType' in scope}}
 t.someMethod()

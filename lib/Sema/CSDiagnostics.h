@@ -449,7 +449,9 @@ class SameShapeExpansionFailure final : public FailureDiagnostic {
 public:
   SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+      : FailureDiagnostic(solution, locator),
+        lhs(resolveType(lhs)),
+        rhs(resolveType(rhs)) {}
 
   bool diagnoseAsError() override;
 };
@@ -933,6 +935,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures related to conversion between the thrown error type
+/// of two function types, e.g.,
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws(MyError) -> Void {}
+/// let _: (Int) throws (OtherError)-> Void = foo
+///   // `MyError` can't be implicitly converted to `OtherError`
+/// ```
+class ThrownErrorTypeConversionFailure final : public ContextualFailure {
+public:
+  ThrownErrorTypeConversionFailure(const Solution &solution, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between 'async' function type
 /// and a synchronous one e.g.
 ///
@@ -1276,6 +1296,9 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+
+  static ValueDecl *findImportedCaseWithMatchingSuffix(Type instanceTy,
+                                                       DeclNameRef name);
 };
 
 class UnintendedExtraGenericParamMemberFailure final
@@ -1882,6 +1905,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose that a `where` clause is not supported with pack iteration.
+class InvalidWhereClauseInPackIteration final : public FailureDiagnostic {
+public:
+  InvalidWhereClauseInPackIteration(const Solution &solution,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
@@ -2087,9 +2120,9 @@ public:
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
 
-  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// Tailored diagnostics for argument mismatches associated with (trailing)
   /// closures being passed to non-closure parameters.
-  bool diagnoseTrailingClosureMismatch() const;
+  bool diagnoseClosureMismatch() const;
 
   /// Tailored key path as function diagnostics for argument mismatches where
   /// argument is a keypath expression that has a root type that matches a
@@ -3103,6 +3136,24 @@ public:
                                  ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), D(decl), NumParams(numParams),
         NumArgs(numArgs), HasParameterPack(hasParameterPack) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose attempts to pass non-keypath as an argument to key path subscript:
+///
+/// \code
+/// func test(data: Int) {
+///   data[keyPath: 42] // error `42` is not a key path
+/// }
+/// \endcode
+class InvalidTypeAsKeyPathSubscriptIndex final : public FailureDiagnostic {
+  Type ArgType;
+
+public:
+  InvalidTypeAsKeyPathSubscriptIndex(const Solution &solution, Type argType,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
 
   bool diagnoseAsError() override;
 };

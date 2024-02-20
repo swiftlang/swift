@@ -1029,7 +1029,7 @@ struct alledge_iterator {
     return copy;
   }
 
-  bool operator==(alledge_iterator rhs) {
+  bool operator==(alledge_iterator rhs) const {
     if (Wrapper->Region != rhs.Wrapper->Region)
       return false;
     if (SubregionIter != rhs.SubregionIter)
@@ -1041,7 +1041,7 @@ struct alledge_iterator {
     return BackedgeIter == rhs.BackedgeIter;
   }
 
-  bool operator!=(alledge_iterator rhs) { return !(*this == rhs); }
+  bool operator!=(alledge_iterator rhs) const { return !(*this == rhs); }
 };
 
 } // end anonymous namespace

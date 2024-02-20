@@ -41,8 +41,18 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
+           .AllocVector,
            .IsPOD:
-        optimizeFirstArgumentToThinMetatype(context)
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CreateAsyncTask:
+        // In embedded Swift, CreateAsyncTask needs a thin metatype
+        if context.options.enableEmbeddedSwift {
+          optimizeArgumentToThinMetatype(argument: 1, context)
+        }
+      case .ICMP_EQ:
+        constantFoldIntegerEquality(isEqual: true, context)
+      case .ICMP_NE:
+        constantFoldIntegerEquality(isEqual: false, context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -91,6 +101,8 @@ private extension BuiltinInst {
     guard let callee = calleeOfOnce, callee.isDefinition else {
       return
     }
+    context.notifyDependency(onBodyOf: callee)
+
     // If the callee is side effect-free we can remove the whole builtin "once".
     // We don't use the callee's memory effects but instead look at all callee instructions
     // because memory effects are not computed in the Onone pipeline, yet.
@@ -98,6 +110,10 @@ private extension BuiltinInst {
     // or contains the side-effect instruction `alloc_global` right at the beginning.
     if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
       return
+    }
+    for use in uses {
+      let ga = use.instruction as! GlobalAddrInst
+      ga.clearToken(context)
     }
     context.erase(instruction: self)
   }
@@ -174,16 +190,70 @@ private extension BuiltinInst {
     context.erase(instruction: self)
   }
   
-  func optimizeFirstArgumentToThinMetatype(_ context: SimplifyContext) {
-    guard let metatypeInst = operands[0].value as? MetatypeInst,
-          metatypeInst.type.representationOfMetatype(in: parentFunction) == .Thick else {
+  func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
+    let type: Type
+
+    if let metatypeInst = operands[argument].value as? MetatypeInst {
+      type = metatypeInst.type
+    } else if let initExistentialInst = operands[argument].value as? InitExistentialMetatypeInst {
+      type = initExistentialInst.metatype.type
+    } else {
+      return
+    }
+
+    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
       return
     }
     
-    let instanceType = metatypeInst.type.instanceTypeOfMetatype(in: parentFunction)
+    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
-    let metatype = builder.createMetatype(of: instanceType, representation: .Thin)
-    operands[0].set(to: metatype, context)
+    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    operands[argument].set(to: newMetatype, context)
+  }
+
+  func constantFoldIntegerEquality(isEqual: Bool, _ context: SimplifyContext) {
+    if constantFoldStringNullPointerCheck(isEqual: isEqual, context) {
+      return
+    }
+    if let literal = constantFold(context) {
+      uses.replaceAll(with: literal, context)
+    }
+  }
+
+  func constantFoldStringNullPointerCheck(isEqual: Bool, _ context: SimplifyContext) -> Bool {
+    if operands[1].value.isZeroInteger &&
+       operands[0].value.lookThroughScalarCasts is StringLiteralInst
+    {
+      let builder = Builder(before: self, context)
+      let result = builder.createIntegerLiteral(isEqual ? 0 : 1, type: type)
+      uses.replaceAll(with: result, context)
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+}
+
+private extension Value {
+  var isZeroInteger: Bool {
+    if let literal = self as? IntegerLiteralInst,
+       let value = literal.value
+    {
+      return value == 0
+    }
+    return false
+  }
+
+  var lookThroughScalarCasts: Value {
+    guard let bi = self as? BuiltinInst else {
+      return self
+    }
+    switch bi.id {
+    case .ZExt, .ZExtOrBitCast, .PtrToInt:
+      return bi.operands[0].value.lookThroughScalarCasts
+    default:
+      return self
+    }
   }
 }
 
@@ -207,8 +277,13 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsTy = lhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
+  let lhsMetatype = lhsExistential.metatype.type
+  let rhsMetatype = rhsExistential.metatype.type
+  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+    return nil
+  }
+  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.

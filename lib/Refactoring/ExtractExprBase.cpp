@@ -186,7 +186,8 @@ swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
   case swift::DeclContextKind::TopLevelCodeDecl:
     break;
 
-  case swift::DeclContextKind::SerializedLocal:
+  case swift::DeclContextKind::SerializedAbstractClosure:
+  case swift::DeclContextKind::SerializedTopLevelCodeDecl:
   case swift::DeclContextKind::Package:
   case swift::DeclContextKind::Module:
   case swift::DeclContextKind::FileUnit:

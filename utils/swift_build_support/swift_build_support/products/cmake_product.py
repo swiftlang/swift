@@ -70,7 +70,10 @@ class CMakeProduct(product.Product):
                            + self.args.extra_cmake_options + [self.source_dir],
                            env=env)
 
-        if not self.args.skip_build or self.product_name() == "llvm":
+        is_llvm = self.product_name() == "llvm"
+        if (not is_llvm and not self.args.skip_build) or (
+            is_llvm and self.args._build_llvm
+        ):
             cmake_opts = [self.build_dir, "--config", build_type]
 
             if self.args.cmake_generator == "Xcode":

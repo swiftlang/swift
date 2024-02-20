@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/AST/CASTBridging.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Markup/Markup.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -29,98 +31,12 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cmath>
 
 using namespace swift;
 using namespace swift::markup;
 
-extern "C" void *swift_ASTGen_createQueuedDiagnostics();
-extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
-extern "C" void swift_ASTGen_addQueuedSourceFile(
-      void *queuedDiagnostics,
-      SwiftInt bufferID,
-      void *sourceFile,
-      const uint8_t *displayNamePtr,
-      intptr_t displayNameLength,
-      SwiftInt parentID,
-      SwiftInt positionInParent);
-extern "C" void swift_ASTGen_addQueuedDiagnostic(
-    void *queued,
-    const char* text, ptrdiff_t textLength,
-    BridgedDiagnosticSeverity severity,
-    const void *sourceLoc,
-    const void **highlightRanges,
-    ptrdiff_t numHighlightRanges
-);
-extern "C" void swift_ASTGen_renderQueuedDiagnostics(
-    void *queued, SwiftInt contextSize, SwiftInt colorize,
-    char **outBuffer, SwiftInt *outBufferLength);
-extern "C" void swift_ASTGen_freeString(const char *str);
-
-// FIXME: Hack because we cannot easily get to the already-parsed source
-// file from here. Fix this egregious oversight!
-extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
-                                              size_t bufferLength,
-                                              const char *moduleName,
-                                              const char *filename,
-                                              void *_Nullable ctx);
-extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
-
 namespace {
-  class ColoredStream : public raw_ostream {
-    raw_ostream &Underlying;
-  public:
-    explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() override { flush(); }
-
-    raw_ostream &changeColor(Colors color, bool bold = false,
-                             bool bg = false) override {
-      Underlying.changeColor(color, bold, bg);
-      return *this;
-    }
-    raw_ostream &resetColor() override {
-      Underlying.resetColor();
-      return *this;
-    }
-    raw_ostream &reverseColor() override {
-      Underlying.reverseColor();
-      return *this;
-    }
-    bool has_colors() const override {
-      return true;
-    }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override {
-      return 0;
-    }
-  };
-
-  /// A stream which drops all color settings.
-  class NoColorStream : public raw_ostream {
-    raw_ostream &Underlying;
-
-  public:
-    explicit NoColorStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~NoColorStream() override { flush(); }
-
-    bool has_colors() const override { return false; }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override { return 0; }
-  };
-
 // MARK: Markdown Printing
     class TerminalMarkupPrinter : public MarkupASTVisitor<TerminalMarkupPrinter> {
       llvm::raw_ostream &OS;
@@ -315,7 +231,7 @@ namespace {
     }
 } // end anonymous namespace
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void enqueueDiagnostic(
     void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
@@ -388,16 +304,26 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
   }
 }
 
+void *PrintingDiagnosticConsumer::getSourceFileSyntax(
+    SourceManager &sourceMgr, unsigned bufferID, StringRef displayName) {
+  auto known = sourceFileSyntax.find({&sourceMgr, bufferID});
+  if (known != sourceFileSyntax.end())
+    return known->second;
+
+  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
+  auto sourceFile = swift_ASTGen_parseSourceFile(
+      bufferContents.data(), bufferContents.size(),
+      "module", displayName.str().c_str(), /*ctx*/ nullptr);
+
+  sourceFileSyntax[{&sourceMgr, bufferID}] = sourceFile;
+  return sourceFile;
+}
+
 void PrintingDiagnosticConsumer::queueBuffer(
     SourceManager &sourceMgr, unsigned bufferID) {
   QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
   if (knownSourceFile)
     return;
-
-  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
-  auto sourceFile = swift_ASTGen_parseSourceFile(
-      bufferContents.data(), bufferContents.size(),
-      "module", "file.swift", /*ctx*/ nullptr);
 
   // Find the parent and position in parent, if there is one.
   int parentID = -1;
@@ -429,13 +355,14 @@ void PrintingDiagnosticConsumer::queueBuffer(
         sourceMgr.getLocForBufferStart(bufferID)).str();
   }
 
+  auto sourceFile = getSourceFileSyntax(sourceMgr, bufferID, displayName);
   swift_ASTGen_addQueuedSourceFile(
       queuedDiagnostics, bufferID, sourceFile,
       (const uint8_t*)displayName.data(), displayName.size(),
       parentID, positionInParent);
   queuedBuffers[bufferID] = sourceFile;
 }
-#endif // SWIFT_SWIFT_PARSER
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
@@ -452,7 +379,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 
   switch (FormattingStyle) {
   case DiagnosticOptions::FormattingStyle::Swift: {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
     auto bufferStack = getSourceBufferStack(SM, Info.Loc);
     if (!bufferStack.empty()) {
@@ -494,22 +421,19 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 }
 
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
-    char *renderedString = nullptr;
-    SwiftInt renderedStringLen = 0;
-    swift_ASTGen_renderQueuedDiagnostics(
-        queuedDiagnostics, /*contextSize=*/2, ForceColors ? 1 : 0,
-        &renderedString, &renderedStringLen);
-    if (renderedString) {
-      Stream.write(renderedString, renderedStringLen);
-      swift_ASTGen_freeString(renderedString);
+    BridgedStringRef bridgedRenderedString{nullptr, 0};
+    swift_ASTGen_renderQueuedDiagnostics(queuedDiagnostics, /*contextSize=*/2,
+                                         ForceColors ? 1 : 0,
+                                         &bridgedRenderedString);
+    auto renderedString = bridgedRenderedString.unbridged();
+    if (renderedString.data()) {
+      Stream.write(renderedString.data(), renderedString.size());
+      swift_ASTGen_freeBridgedString(renderedString);
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
     queuedDiagnostics = nullptr;
-    for (const auto &buffer : queuedBuffers) {
-      swift_ASTGen_destroySourceFile(buffer.second);
-    }
     queuedBuffers.clear();
 
     if (includeTrailingBreak)
@@ -650,4 +574,9 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
 PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
     llvm::raw_ostream &stream)
     : Stream(stream) {}
-PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() = default;
+
+PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+  for (const auto &sourceFileSyntax : sourceFileSyntax) {
+    swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
+  }
+}

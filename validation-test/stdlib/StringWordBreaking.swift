@@ -83,6 +83,39 @@ if #available(SwiftStdlib 5.9, *) {
   }
 }
 
+// rdar://116652595
+//
+// We were accidently hanging when rounding word indices for some concoctions of
+// strings. In particular, where we had a pair of scalars create a constraint
+// for the preceeding pair, but the preceeding extend rules were not taking the
+// constraint into consideration.
+if #available(SwiftStdlib 5.10, *) {
+  StringWordBreaking.test("word breaking backward extend constraints") {
+    let strs = ["日\u{FE0F}:X ", "👨‍👨‍👧‍👦\u{FE0F}:X ", "⛔️:X ", "⛔️·X ", "⛔️：X "]
+    let strWords = [
+      ["日\u{FE0F}", ":", "X", " "],
+      ["👨‍👨‍👧‍👦\u{FE0F}", ":", "X", " "],
+      ["⛔️", ":", "X", " "],
+      ["⛔️", "·", "X", " "],
+      ["⛔️", "：", "X", " "]
+    ]
+
+    for (str, words) in zip(strs, strWords) {
+      expectEqual(
+        words,
+        str._words,
+        "string: \(String(reflecting: str))"
+      )
+
+      expectEqual(
+        words.reversed(),
+        str._wordsBackwards,
+        "string: \(String(reflecting: str))"
+      )
+    }
+  }
+}
+
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {

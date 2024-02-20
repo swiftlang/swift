@@ -20,11 +20,13 @@ extension CondBranchInst : OnoneSimplifyable {
 
 private extension CondBranchInst {
   func tryConstantFold(_ context: SimplifyContext) {
-    guard let literal = condition as? IntegerLiteralInst else {
+    guard let literal = condition as? IntegerLiteralInst,
+          let conditionValue = literal.value else
+    {
       return
     }
     let builder = Builder(before: self, context)
-    if literal.value.isZero() {
+    if conditionValue == 0 {
       builder.createBranch(to: falseBlock, arguments: Array(falseOperands.map { $0.value }))
     } else {
       builder.createBranch(to: trueBlock, arguments: Array(trueOperands.map { $0.value }))

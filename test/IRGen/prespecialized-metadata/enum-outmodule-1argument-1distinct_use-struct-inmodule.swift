@@ -54,7 +54,7 @@ struct TheArgument {
 // CHECK-SAME:   )
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0
 // CHECK-NEXT:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr [[CANONICALIZED_METADATA]]
 // CHECK-SAME:   )
 //      CHECK: }

@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.50 -emit-module -emit-module-path %t/weak_import_availability_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_availability_helper.swift -enable-library-evolution
 //
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -unavailable-decl-optimization=none -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -unavailable-decl-optimization=none -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -unavailable-decl-optimization=none -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
 
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -unavailable-decl-optimization=none -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -unavailable-decl-optimization=none -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
 
 // REQUIRES: OS=macosx
 
@@ -110,8 +110,8 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
   s.conditionallyAvailableMethod()
 }
 
-// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias nocapture swiftself)
-// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias nocapture swiftself)
+// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
+// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
 
 @available(macOS, unavailable)
 public func useUnavailableStruct() {
@@ -125,4 +125,4 @@ public func useUnavailableMethod(s: UnvailableStruct) {
   s.unavailableMethod()
 }
 
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(ptr noalias nocapture swiftself)
+// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(ptr noalias swiftself)

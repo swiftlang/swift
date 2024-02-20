@@ -6,6 +6,8 @@
 
 sil_stage raw
 
+import Swift
+
 fileprivate final class _Box<T> {
   var value: _Node<T>
 

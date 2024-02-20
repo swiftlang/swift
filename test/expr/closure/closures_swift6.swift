@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
-// REQUIRES: asserts
 
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
@@ -81,7 +80,7 @@ class C_56501 {
   }
 }
 
-public class TestImplicitSelfForWeakSelfCapture {
+public final class TestImplicitSelfForWeakSelfCapture: Sendable {
   static let staticOptional: TestImplicitSelfForWeakSelfCapture? = .init()
   func method() { }
   

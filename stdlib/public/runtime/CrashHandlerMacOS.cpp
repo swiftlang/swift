@@ -44,6 +44,8 @@
 
 #include <cstring>
 
+#include "BacktracePrivate.h"
+
 #ifndef lengthof
 #define lengthof(x)     (sizeof(x) / sizeof(x[0]))
 #endif
@@ -225,9 +227,42 @@ handle_fatal_signal(int signum,
   crashInfo.fault_address = (uint64_t)pinfo->si_addr;
   crashInfo.mctx = (uint64_t)(((ucontext_t *)uctx)->uc_mcontext);
 
+  // Display a progress message
+  void *pc = 0;
+  ucontext_t *ctx = (ucontext_t *)uctx;
+
+#if defined(__arm64__) && __DARWIN_OPAQUE_ARM_THREAD_STATE64
+#define THREAD_STATE_MEMBER(x) __opaque_##x
+#elif __DARWIN_UNIX03
+#define THREAD_STATE_MEMBER(x) __##x
+#else
+#define THREAD_STATE_MEMBER(x) x
+#endif
+
+#if __DARWIN_UNIX03
+#define CTX_MEMBER(x) __##x
+#else
+#define CTX_MEMBER(x) x
+#endif
+
+#if defined(__x86_64__)
+  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).THREAD_STATE_MEMBER(rip));
+#elif defined(__arm64__)
+  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).THREAD_STATE_MEMBER(pc));
+#endif
+
+  _swift_displayCrashMessage(signum, pc);
+
   /* Start the backtracer; this will suspend the process, so there's no need
      to try to suspend other threads from here. */
-  run_backtracer();
+  if (!run_backtracer()) {
+    const char *message = _swift_backtraceSettings.color == OnOffTty::On
+      ? " failed\n\n" : " failed ***\n\n";
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+      write(STDERR_FILENO, message, strlen(message));
+    else
+      write(STDOUT_FILENO, message, strlen(message));
+  }
 
   // Restart the other threads
   resume_other_threads();
@@ -272,62 +307,10 @@ const char *backtracer_argv[] = {
   "true",                       // 28
   "--output-to",                // 29
   "stdout",                     // 30
+  "--symbolicate",              // 31
+  "true",                       // 32
   NULL
 };
-
-// We can't call sprintf() here because we're in a signal handler,
-// so we need to be async-signal-safe.
-void
-format_address(uintptr_t addr, char buffer[18])
-{
-  char *ptr = buffer + 18;
-  *--ptr = '\0';
-  while (ptr > buffer) {
-    char digit = '0' + (addr & 0xf);
-    if (digit > '9')
-      digit += 'a' - '0' - 10;
-    *--ptr = digit;
-    addr >>= 4;
-    if (!addr)
-      break;
-  }
-
-  // Left-justify in the buffer
-  if (ptr > buffer) {
-    char *pt2 = buffer;
-    while (*ptr)
-      *pt2++ = *ptr++;
-    *pt2++ = '\0';
-  }
-}
-void
-format_address(const void *ptr, char buffer[18])
-{
-  format_address(reinterpret_cast<uintptr_t>(ptr), buffer);
-}
-
-// See above; we can't use sprintf() here.
-void
-format_unsigned(unsigned u, char buffer[22])
-{
-  char *ptr = buffer + 22;
-  *--ptr = '\0';
-  while (ptr > buffer) {
-    char digit = '0' + (u % 10);
-    *--ptr = digit;
-    u /= 10;
-    if (!u)
-      break;
-  }
-
-  // Left-justify in the buffer
-  if (ptr > buffer) {
-    char *pt2 = buffer;
-    while (*ptr)
-      *pt2++ = *ptr++;
-    *pt2++ = '\0';
-  }
-}
 
 const char *
 trueOrFalse(bool b) {
@@ -436,15 +419,27 @@ run_backtracer()
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
 
-  format_unsigned(_swift_backtraceSettings.timeout, timeout_buf);
+  switch (_swift_backtraceSettings.symbolicate) {
+  case Symbolication::Off:
+    backtracer_argv[32] = "off";
+    break;
+  case Symbolication::Fast:
+    backtracer_argv[32] = "fast";
+    break;
+  case Symbolication::Full:
+    backtracer_argv[32] = "full";
+    break;
+  }
+
+  _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
 
   if (_swift_backtraceSettings.limit < 0)
     std::strcpy(limit_buf, "none");
   else
-    format_unsigned(_swift_backtraceSettings.limit, limit_buf);
+    _swift_formatUnsigned(_swift_backtraceSettings.limit, limit_buf);
 
-  format_unsigned(_swift_backtraceSettings.top, top_buf);
-  format_address(&crashInfo, addr_buf);
+  _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
+  _swift_formatAddress(&crashInfo, addr_buf);
 
   // Actually execute it
   return _swift_spawnBacktracer(backtracer_argv);

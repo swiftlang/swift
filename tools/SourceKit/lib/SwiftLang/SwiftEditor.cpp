@@ -643,36 +643,6 @@ struct EditorConsumerSyntaxMapEntry {
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
 
-struct SwiftSemanticToken {
-  unsigned ByteOffset;
-  unsigned Length : 24;
-  // The code-completion kinds are a good match for the semantic kinds we want.
-  // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
-  CodeCompletionDeclKind Kind : 6;
-  unsigned IsRef : 1;
-  unsigned IsSystem : 1;
-
-  SwiftSemanticToken(CodeCompletionDeclKind Kind,
-                     unsigned ByteOffset, unsigned Length,
-                     bool IsRef, bool IsSystem)
-    : ByteOffset(ByteOffset), Length(Length), Kind(Kind),
-      IsRef(IsRef), IsSystem(IsSystem) { }
-
-  bool getIsRef() const { return static_cast<bool>(IsRef); }
-
-  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
-
-  UIdent getUIdentForKind() const {
-    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
-  }
-};
-#if !defined(_MSC_VER)
-static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
-// FIXME: MSVC doesn't pack bitfields with different underlying types.
-// Giving up to check this in MSVC for now, because static_assert is only for
-// keeping low memory usage.
-#endif
-
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
 
@@ -982,9 +952,35 @@ class SemanticAnnotator : public SourceEntityWalker {
 public:
 
   std::vector<SwiftSemanticToken> SemaToks;
+  bool IsWalkingMacroExpansionBuffer = false;
 
   SemanticAnnotator(SourceManager &SM, unsigned BufferID)
-    : SM(SM), BufferID(BufferID) {}
+      : SM(SM), BufferID(BufferID) {
+    if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(BufferID)) {
+      switch (GeneratedSourceInfo->kind) {
+#define MACRO_ROLE(Name, Description)                 \
+      case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+        IsWalkingMacroExpansionBuffer = true;
+        break;
+      case GeneratedSourceInfo::DefaultArgument:
+      case GeneratedSourceInfo::ReplacedFunctionBody:
+      case GeneratedSourceInfo::PrettyPrinted:
+        break;
+      }
+    }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    if (IsWalkingMacroExpansionBuffer) {
+      // When we are walking a macro expansion buffer, we need to set the macro
+      // walking behavior to walk the expansion, otherwise we skip over all the
+      // declarations in the buffer.
+      return MacroWalking::ArgumentsAndExpansion;
+    } else {
+      return SourceEntityWalker::getMacroWalkingBehavior();
+    }
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
@@ -1026,6 +1022,12 @@ public:
     if (!Range.isValid())
       return;
 
+    // If we are walking into macro expansions, make sure we only report ranges
+    // from the requested buffer, not any buffers of child macro expansions.
+    if (IsWalkingMacroExpansionBuffer &&
+        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+      return;
+    }
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
@@ -1246,9 +1248,10 @@ inferAccessSyntactically(const ValueDecl *D) {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     return AccessLevel::FilePrivate;
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
@@ -1606,7 +1609,7 @@ private:
             Elem.walk(*this);
           }
         }
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       return Action::Continue();
     }
@@ -1739,9 +1742,19 @@ private:
           return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
 
         if (auto BS = dyn_cast<BraceStmt>(S)) {
-          if (BS->getNumElements() == 1) {
-            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
-              return isImplicitReturnBody(innerS);
+          if (BS->getNumElements() != 1)
+            return false;
+
+          if (auto *innerS = BS->getSingleActiveStatement())
+            return isImplicitReturnBody(innerS);
+
+          // Before pre-checking, the implicit return will not have been
+          // inserted. Look for a single expression body in a closure.
+          if (auto *ParentE = getWalker().Parent.getAsExpr()) {
+            if (isa<ClosureExpr>(ParentE)) {
+              if (auto *innerE = BS->getSingleActiveExpression())
+                return innerE->getStartLoc() == TargetLoc;
+            }
           }
         }
 
@@ -1825,17 +1838,16 @@ private:
       auto &outParam = outParams.back();
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if (CE->hasSingleExpressionBody() &&
-            CE->getSingleExpressionBody()->getStartLoc() ==
-                targetPlaceholderLoc) {
-          targetPlaceholderIndex = outParams.size() - 1;
-          if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
-                  CE->getSingleExpressionBody())) {
-            outParam.isWrappedWithBraces = true;
-            ClosureInfo info;
-            if (scanClosureType(PHE, info))
-              outParam.placeholderClosure = info;
-            continue;
+        if (auto *E = CE->getSingleExpressionBody()) {
+          if (E->getStartLoc() == targetPlaceholderLoc) {
+            targetPlaceholderIndex = outParams.size() - 1;
+            if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(E)) {
+              outParam.isWrappedWithBraces = true;
+              ClosureInfo info;
+              if (scanClosureType(PHE, info))
+                outParam.placeholderClosure = info;
+              continue;
+            }
           }
         }
         // else...
@@ -2126,7 +2138,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
     Impl.SyntaxMap = std::move(NewMap);
 
     // Recording an affected length of 0 still results in the client updating
-    // its copy of the syntax map (by clearning all tokens on the line of the
+    // its copy of the syntax map (by clearing all tokens on the line of the
     // affected offset). We need to not record it at all to signal a no-op.
     if (SawChanges)
       Consumer.recordAffectedRange(Impl.AffectedRange->Offset,
@@ -2534,4 +2546,69 @@ void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
     return;
   }
   EditorDoc->expandPlaceholder(Offset, Length, Consumer);
+}
+
+//===----------------------------------------------------------------------===//
+// Semantic Tokens
+//===----------------------------------------------------------------------===//
+
+void SwiftLangSupport::getSemanticTokens(
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<SemanticTokensResult>::fromError(FileSystemError));
+    return;
+  }
+
+  std::string InvocationError;
+  SwiftInvocationRef Invok = ASTMgr->getTypecheckInvocation(
+      Args, PrimaryFilePath, FileSystem, InvocationError);
+  if (!InvocationError.empty()) {
+    LOG_WARN_FUNC("error creating ASTInvocation: " << InvocationError);
+  }
+  if (!Invok) {
+    Receiver(RequestResult<SemanticTokensResult>::fromError(InvocationError));
+    return;
+  }
+
+  class SemanticTokensConsumer : public SwiftASTConsumer {
+    StringRef InputBufferName;
+    std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver;
+
+  public:
+    SemanticTokensConsumer(
+        StringRef InputBufferName,
+        std::function<void(const RequestResult<SemanticTokensResult> &)>
+            Receiver)
+        : InputBufferName(InputBufferName), Receiver(Receiver) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+      SourceFile *SF = retrieveInputFile(InputBufferName, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<SemanticTokensResult>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+      SemanticAnnotator Annotator(CompIns.getSourceMgr(), *SF->getBufferID());
+      Annotator.walk(SF);
+      Receiver(
+          RequestResult<SemanticTokensResult>::fromResult(Annotator.SemaToks));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<SemanticTokensResult>::cancelled());
+    }
+  };
+
+  auto Consumer = std::make_shared<SemanticTokensConsumer>(InputBufferName,
+                                                           std::move(Receiver));
+
+  getASTManager()->processASTAsync(Invok, std::move(Consumer),
+                                   /*OncePerASTToken=*/nullptr,
+                                   CancellationToken, FileSystem);
 }

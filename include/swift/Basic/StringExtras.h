@@ -21,9 +21,11 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <string>
@@ -223,6 +225,8 @@ namespace swift {
 
       reverse_iterator rbegin() const { return reverse_iterator(end()); }
       reverse_iterator rend() const { return reverse_iterator(begin()); }
+
+      bool hasWordStartingAt(unsigned targetPosition) const;
     };
 
     /// Retrieve the camelCase words in the given string.
@@ -235,6 +239,10 @@ namespace swift {
     /// Check whether the first word starts with the second word, ignoring the
     /// case of the first letter.
     bool startsWithIgnoreFirstCase(StringRef word1, StringRef word2);
+
+    /// Check whether the first word ends with the second word, ignoring the
+    /// case of the first word (handles initialisms).
+    bool hasWordSuffix(StringRef haystack, StringRef needle);
 
     /// Lowercase the first word within the given camelCase string.
     ///
@@ -486,13 +494,21 @@ public:
 
   /// Create a null-terminated string, copying \p Str into \p A .
   template <typename Allocator>
-  NullTerminatedStringRef(StringRef Str, Allocator &A) : Ref("") {
-    if (Str.empty())
+  NullTerminatedStringRef(llvm::Twine Str, Allocator &A) : Ref("") {
+    if (Str.isTriviallyEmpty())
       return;
+    if (Str.isSingleStringLiteral()) {
+      Ref = Str.getSingleStringRef();
+      return;
+    }
+    llvm::SmallString<0> stash;
+    auto _ref = Str.toStringRef(stash);
 
-    size_t size = Str.size();
-    char *memory = A.template Allocate<char>(size + 1);
-    memcpy(memory, Str.data(), size);
+    size_t size = _ref.size();
+    if (size == 0)
+      return;
+    char *memory = static_cast<char *>(A.Allocate(size + 1, alignof(char)));
+    memcpy(memory, _ref.data(), size);
     memory[size] = '\0';
     Ref = {memory, size};
   }

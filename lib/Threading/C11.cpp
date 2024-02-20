@@ -43,9 +43,9 @@ public:
   void once_unlock() { SWIFT_C11THREADS_CHECK(mtx_unlock(&onceMutex_)); }
   void once_broadcast() { SWIFT_C11THREADS_CHECK(cnd_broadcast(&onceCond_)); }
   void once_wait() {
-    SWIFT_C11THREADS_CHECK(mtx_lock(&onceMutex_));
+    // The mutex must be locked when this function is entered.  It will
+    // be locked again before the function returns.
     SWIFT_C11THREADS_CHECK(cnd_wait(&onceCond_, &onceMutex_));
-    SWIFT_C11THREADS_CHECK(mtx_unlock(&onceMutex_));
   }
 };
 

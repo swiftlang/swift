@@ -90,7 +90,8 @@ inline bool isEmbedded(CanType t) {
 }
 
 inline bool isMetadataAllowedInEmbedded(CanType t) {
-  return isa<ClassType>(t) || isa<BoundGenericClassType>(t);
+  return isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
+         isa<DynamicSelfType>(t);
 }
 
 inline bool isEmbedded(Decl *d) {
@@ -381,7 +382,8 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
-    /// An outlined read-only global object. The pointer is a SILGlobalVariable*.
+    /// An outlined read-only global object. The pointer is a
+    /// SILGlobalVariable*.
     ReadOnlyGlobalObject,
 
     // These next few are protocol-conformance kinds.
@@ -512,13 +514,15 @@ class LinkEntity {
 
     /// The pointer is SILFunction*
     DistributedAccessor,
-    /// An async function pointer for a distributed accessor (method or property).
+    /// An async function pointer for a distributed accessor (method or
+    /// property).
     /// The pointer is a SILFunction*.
     DistributedAccessorAsyncPointer,
 
     /// Accessible function record, which describes a function that can be
     /// looked up by name by the runtime.
     AccessibleFunctionRecord,
+    AccessibleProtocolRequirementFunctionRecord,
 
     /// Extended existential type shape.
     /// Pointer is the (generalized) existential type.
@@ -1012,7 +1016,8 @@ public:
   }
 
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
-    assert(!isEmbedded(concreteType));
+    // Explicitly allowed in embedded Swift because we generate value witnesses
+    // (but not witness tables) for Swift Concurrency usage.
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitness))
@@ -1595,6 +1600,9 @@ public:
            getKind() == Kind::DispatchThunkAllocator ||
            getKind() == Kind::DispatchThunkDerivative;
   }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
+  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
@@ -1609,6 +1617,12 @@ public:
   /// Get the default LLVM type to use for forward declarations of this
   /// entity.
   llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
+
+  /// Determine whether entity that represents a symbol is in TEXT segment.
+  bool isText() const;
+
+  /// Determine whether entity that represents a symbol is in DATA segment.
+  bool isData() const { return !isText(); }
 
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD

@@ -14,3 +14,4 @@ public func foo() -> Int{
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=6:1 -end-pos=7:26 >> %t.result/L6-7.swift
 // RUN: diff -u %S/Outputs/extract_with_comments/L6-7.swift.expected %t.result/L6-7.swift
+// REQUIRES: swift_swift_parser

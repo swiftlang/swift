@@ -10,7 +10,7 @@ func foo(x: FooStruct1) -> S1 {}
 // RUN: %empty-directory(%t)
 // RUN: %swiftc_driver -emit-module -o %t/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
 
-// Sanity check that we have identical responses when things work.
+// Soundness check that we have identical responses when things work.
 // RUN: %sourcekitd-test -req=cursor -pos=5:8 %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %s > %t.from_offset.txt
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %s > %t.from_usr.txt
 // RUN: %FileCheck %s -check-prefix=CHECK_SANITY1 < %t.from_offset.txt

@@ -17,6 +17,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/Serialization/Validation.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 
 namespace llvm {
@@ -102,6 +103,9 @@ class ModuleFileSharedCore {
   /// \c true if this module was compiled with -enable-ossa-modules.
   bool RequiresOSSAModules;
 
+  /// \c true if this module was compiled with NoncopyableGenerics
+  bool RequiresNoncopyableGenerics;
+
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
 
@@ -119,7 +123,7 @@ public:
     const unsigned IsScoped : 1;
 
     static unsigned rawControlFromKind(ImportFilterKind importKind) {
-      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+      return llvm::countr_zero(static_cast<unsigned>(importKind));
     }
     ImportFilterKind getImportControl() const {
       return static_cast<ImportFilterKind>(1 << RawImportControl);
@@ -132,7 +136,7 @@ public:
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader),
           IsScoped(isScoped) {
-      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+      assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
@@ -407,7 +411,10 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-      bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+      bool isFramework,
+      bool requiresOSSAModules,
+      bool requiresNoncopyableGenerics,
+      StringRef requiredSDK,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -543,14 +550,16 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
-       PathObfuscator &pathRecoverer,
+       bool isFramework, bool requiresOSSAModules,
+       bool requiresNoncopyableGenerics,
+       StringRef requiredSDK, PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info, pathRecoverer);
+        requiresOSSAModules, requiresNoncopyableGenerics, requiredSDK, info,
+        pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);

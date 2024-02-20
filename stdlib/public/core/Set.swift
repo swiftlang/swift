@@ -327,7 +327,7 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    //FIXME(accessors): Provide a _read
+    // FIXME(accessors): Provide a _read
     get {
       return _variant.element(at: position)
     }
@@ -448,12 +448,14 @@ extension Set: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension Set: _HasCustomAnyHashableRepresentation {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _SetAnyHashableBox(self))
   }
 }
 
+@_unavailableInEmbedded
 internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
   internal let _value: Set<Element>
   internal let _canonical: Set<AnyHashable>
@@ -1034,6 +1036,7 @@ extension Set: SetAlgebra {
   }
 }
 
+@_unavailableInEmbedded
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the set.
   public var description: String {

@@ -27,3 +27,13 @@ func testInstanceMethodWithSendable(c: C, any: Any) {
   let _ = C.g
   c.f(any)
 }
+
+class Request {
+  @preconcurrency let identifier: (any Sendable)? = nil
+}
+
+func test(from request: Request) {
+  // Make sure we don't assert in CSApply when adjusting 'any Sendable' -> 'Any'
+  // for preconcurrency
+  let _ = request.identifier
+}

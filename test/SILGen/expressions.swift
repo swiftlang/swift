@@ -392,7 +392,8 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box ${ var (Int, Float) }
-  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
+  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [var_decl] [[XADDR]]
+  // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
 
   int(x.0)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
@@ -427,15 +428,20 @@ func ternary_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[PBA:%.*]] = project_box [[AB]]
+  // CHECK: [[BAL:%.*]] = begin_borrow [var_decl] [[AB]]
+  // CHECK: [[PBA:%.*]] = project_box [[BAL]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[PBB:%.*]] = project_box [[BB]]
+  // CHECK: [[BBL:%.*]] = begin_borrow [var_decl] [[BB]]
+  // CHECK: [[PBB:%.*]] = project_box [[BBL]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBX:%.*]] = project_box [[XB]]
+  // CHECK: [[BXL:%.*]] = begin_borrow [var_decl] [[XB]]
+  // CHECK: [[PBX:%.*]] = project_box [[BXL]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBY:%.*]] = project_box [[YB]]
+  // CHECK: [[BYL:%.*]] = begin_borrow [var_decl] [[YB]]
+  // CHECK: [[PBY:%.*]] = project_box [[BYL]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
+  // CHECK: [[BZL:%.*]] = begin_borrow [var_decl] [[ZB]]
+  // CHECK: [[PBZ:%.*]] = project_box [[BZL]]
 
   return a
     ? x

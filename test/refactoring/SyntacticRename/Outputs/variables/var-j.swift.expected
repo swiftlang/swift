@@ -24,8 +24,8 @@ case (let /*pattern-a:def*/a, let b):
 var opt = Optional.some(1)
 var opt2 = Optional.some(2)
 
-if let i = opt, let /*var-j:def*/jackalope = opt2 {
-	print(i + /*var-j*/jackalope)
+if let i = opt, let /*var-j:def*/<base>j</base> = opt2 {
+	print(i + /*var-j*/<base>j</base>)
 }
 
 var (a, /*pattern-b:def*/b) = (1, 2)

@@ -195,7 +195,7 @@ public:
     return resolvePointer(address, pointerData);
   }
 
- // Parse extra inhabitants stored in a pointer.
+  // Parse extra inhabitants stored in a pointer.
   // Sets *extraInhabitant to -1 if the pointer at this address
   // is actually a valid pointer.
   // Otherwise, it sets *extraInhabitant to the inhabitant

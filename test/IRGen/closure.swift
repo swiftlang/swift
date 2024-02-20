@@ -31,7 +31,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK: }
 
 // -- Closure entry point
-// CHECK: define internal swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_"(i64 %0, ptr noalias nocapture %1, ptr %T, ptr %T.Ordinable) {{.*}} {
+// CHECK: define internal swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_"(i64 %0, ptr noalias %1, ptr %T, ptr %T.Ordinable) {{.*}} {
 
 // -- partial_apply stub
 // CHECK: define internal swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_TA"(i64 %0, ptr swiftself %1) {{.*}} {
@@ -40,12 +40,12 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK:   [[TYPE:%.*]] = load ptr, ptr [[BINDINGSADDR]], align 8
 // CHECK:   [[WITNESSADDR:%.*]] = getelementptr inbounds ptr, ptr [[BINDINGSADDR]], i32 1
 // CHECK:   [[WITNESS:%.*]] = load ptr, ptr [[WITNESSADDR]], align 8
-// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_"(i64 %0, ptr noalias nocapture {{.*}}, ptr [[TYPE]], ptr [[WITNESS]])
+// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_"(i64 %0, ptr noalias {{.*}}, ptr [[TYPE]], ptr [[WITNESS]])
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
-// CHECK: define hidden swiftcc { ptr, ptr } @"$s7closure14captures_tuple1xx_q_tycx_q_t_tr0_lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr %T, ptr %U)
+// CHECK: define hidden swiftcc { ptr, ptr } @"$s7closure14captures_tuple1xx_q_tycx_q_t_tr0_lF"(ptr noalias %0, ptr noalias %1, ptr %T, ptr %U)
 func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2(i64 0, ptr %T, ptr %U, ptr null, ptr null)
   // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0

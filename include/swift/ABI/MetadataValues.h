@@ -673,6 +673,7 @@ private:
 
     HasResilientWitnessesMask = 0x01u << 16,
     HasGenericWitnessTableMask = 0x01u << 17,
+    IsConformanceOfProtocolMask = 0x01u << 18,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -724,6 +725,14 @@ public:
                                  : 0));
   }
 
+  ConformanceFlags withIsConformanceOfProtocol(
+                                           bool isConformanceOfProtocol) const {
+    return ConformanceFlags((Value & ~IsConformanceOfProtocolMask)
+                            | (isConformanceOfProtocol
+                                 ? IsConformanceOfProtocolMask
+                                 : 0));
+  }
+  
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -749,6 +758,20 @@ public:
     return Value & IsSynthesizedNonUniqueMask;
   }
 
+  /// Is this a conformance of a protocol to another protocol?
+  ///
+  /// The Swift compiler can synthesize a conformance of one protocol to
+  /// another, meaning that every type that conforms to the first protocol
+  /// can also produce a witness table conforming to the second. Such
+  /// conformances cannot generally be written in the surface language, but
+  /// can be made available for specific tasks. The only such instance at the
+  /// time of this writing is that a (local) distributed actor can conform to
+  /// a local actor, but the witness table can only be used via a specific
+  /// builtin to form an existential.
+  bool isConformanceOfProtocol() const {
+    return Value & IsConformanceOfProtocolMask;
+  }
+  
   /// Retrieve the # of conditional requirements.
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)
@@ -1037,7 +1060,8 @@ class TargetFunctionTypeFlags {
     GlobalActorMask        = 0x10000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
-    // NOTE: The next bit will need to introduce a separate flags word.
+    ExtendedFlagsMask      = 0x80000000U,
+    // NOTE: No more room for flags here. Use TargetExtendedFunctionTypeFlags.
   };
   int_type Data;
 
@@ -1099,6 +1123,12 @@ public:
         (Data & ~GlobalActorMask) | (globalActor ? GlobalActorMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withExtendedFlags(bool extendedFlags) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~ExtendedFlagsMask) | (extendedFlags ? ExtendedFlagsMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -1127,6 +1157,10 @@ public:
     return bool (Data & GlobalActorMask);
   }
 
+  bool hasExtendedFlags() const {
+    return bool (Data & ExtendedFlagsMask);
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -1144,6 +1178,76 @@ public:
 };
 using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
+/// Extended flags in a function type metadata record.
+template <typename int_type>
+class TargetExtendedFunctionTypeFlags {
+  enum : int_type {
+    TypedThrowsMask        = 0x00000001U,
+    IsolationMask          = 0x0000000EU, // three bits
+
+    // Values for the enumerated isolation kinds
+    IsolatedAny            = 0x00000002U,
+
+    // Values if we have a transferring result.
+    HasTransferringResult  = 0x00000010U,
+  };
+  int_type Data;
+
+  constexpr TargetExtendedFunctionTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr TargetExtendedFunctionTypeFlags() : Data(0) {}
+
+  constexpr TargetExtendedFunctionTypeFlags<int_type>
+  withTypedThrows(bool typedThrows) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+               (Data & ~TypedThrowsMask) | (typedThrows ? TypedThrowsMask : 0));
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withNonIsolated() const {
+    return TargetExtendedFunctionTypeFlags<int_type>(Data & ~IsolationMask);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withIsolatedAny() const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+              (Data & ~IsolationMask) | IsolatedAny);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withTransferringResult(bool newValue = true) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~HasTransferringResult) |
+        (newValue ? HasTransferringResult : 0));
+  }
+
+  bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
+
+  bool isIsolatedAny() const {
+    return (Data & IsolationMask) == IsolatedAny;
+  }
+
+  bool hasTransferringResult() const {
+    return bool(Data & HasTransferringResult);
+  }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+
+  static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetExtendedFunctionTypeFlags(Data);
+  }
+
+  bool operator==(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using ExtendedFunctionTypeFlags = TargetExtendedFunctionTypeFlags<uint32_t>;
+
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
@@ -1152,6 +1256,7 @@ class TargetParameterTypeFlags {
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
     IsolatedMask          = 0x400,
+    TransferringMask      = 0x800,
   };
   int_type Data;
 
@@ -1190,11 +1295,18 @@ public:
         (Data & ~IsolatedMask) | (isIsolated ? IsolatedMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withTransferring(bool isTransferring) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~TransferringMask) | (isTransferring ? TransferringMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
   bool isIsolated() const { return Data & IsolatedMask; }
+  bool isTransferring() const { return Data & TransferringMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -1484,6 +1596,8 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Functions accessible at runtime (i.e. distributed method accessors).
   const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
+  const uint16_t AccessibleProtocolRequirementFunctionRecord =
+      0xa98e; // = 43406
 
   /// C type GetExtraInhabitantTag function descriminator
   const uint16_t GetExtraInhabitantTagFunction = 0x392e; // = 14638
@@ -2389,6 +2503,7 @@ public:
 /// Flags for schedulable jobs.
 class JobFlags : public FlagSet<uint32_t> {
 public:
+  // clang-format off
   enum {
     Kind           = 0,
     Kind_width     = 8,
@@ -2400,12 +2515,14 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask           = 24,
-    Task_IsFuture              = 25,
-    Task_IsGroupChildTask      = 26,
+    Task_IsChildTask                      = 24,
+    Task_IsFuture                         = 25,
+    Task_IsGroupChildTask                 = 26,
     // 27 is currently unused
-    Task_IsAsyncLetTask        = 28,
+    Task_IsAsyncLetTask                   = 28,
+    Task_HasInitialTaskExecutorPreference = 29,
   };
+  // clang-format on
 
   explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
@@ -2437,6 +2554,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
+                                task_hasInitialTaskExecutorPreference,
+                                task_setHasInitialTaskExecutorPreference)
 };
 
 /// Kinds of task status record.
@@ -2462,6 +2582,10 @@ enum class TaskStatusRecordKind : uint8_t {
   /// escalated.
   EscalationNotification = 4,
 
+  /// A task executor preference, which may impact what executor a task will be
+  /// enqueued on.
+  TaskExecutorPreference = 5,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2470,14 +2594,16 @@ enum class TaskStatusRecordKind : uint8_t {
 /// Kinds of option records that can be passed to creating asynchronous tasks.
 enum class TaskOptionRecordKind : uint8_t {
   /// Request a task to be kicked off, or resumed, on a specific executor.
-  Executor  = 0,
+  InitialTaskExecutor = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
   /// DEPRECATED. AsyncLetWithBuffer is used instead.
   /// Request a child task for an 'async let'.
-  AsyncLet  = 2,
+  AsyncLet = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
+  /// Information about the result type of the task, used in embedded Swift.
+  ResultTypeInfo = 4,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

@@ -12,6 +12,7 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
+@_implementationOnly import SwiftConcurrencyInternalShims
 
 // ==== Task -------------------------------------------------------------------
 
@@ -128,7 +129,7 @@ import Swift
 ///
 /// Note that there is nothing, other than the Task's use of `self` retaining the actor,
 /// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
-/// So once the task completes and its the closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+/// So once the task is completed and its closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
@@ -247,7 +248,7 @@ extension Task: Equatable {
   }
 }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Error {
     @_spi(MainActorUtilities)
@@ -270,7 +271,7 @@ extension Task where Failure == Error {
 }
 #endif
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Never {
     @_spi(MainActorUtilities)
@@ -382,6 +383,7 @@ extension TaskPriority: Comparable {
 
 
 @available(SwiftStdlib 5.9, *)
+@_unavailableInEmbedded
 extension TaskPriority: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {
@@ -400,8 +402,10 @@ extension TaskPriority: CustomStringConvertible {
   }
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.1, *)
 extension TaskPriority: Codable { }
+#endif
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
@@ -593,6 +597,7 @@ func taskCreateFlags(
 }
 
 // ==== Task Creation ----------------------------------------------------------
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -716,6 +721,7 @@ extension Task where Failure == Error {
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -905,6 +911,20 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try body(UnsafeCurrentTask(_task))
 }
 
+@available(SwiftStdlib 9999, *)
+public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
+  guard let _task = _getCurrentAsyncTask() else {
+    return try await body(nil)
+  }
+
+  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+  //        with "destroying a task that never completed" in the task's destroy.
+  //        How do we solve this properly?
+  Builtin.retain(_task)
+
+  return try await body(UnsafeCurrentTask(_task))
+}
+
 /// An unsafe reference to the current task.
 ///
 /// To get an instance of `UnsafeCurrentTask` for the current task,
@@ -991,7 +1011,7 @@ extension UnsafeCurrentTask: Equatable {
 // ==== Internal ---------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
-func _getCurrentAsyncTask() -> Builtin.NativeObject?
+public func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_startOnMainActor")
 fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
@@ -1027,6 +1047,22 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+/// Get the default generic serial executor.
+///
+/// It is used by default used by tasks and default actors,
+/// unless other executors are specified.
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+internal func _getGenericSerialExecutor() -> Builtin.Executor {
+  // The `SerialExecutorRef` to "default generic executor" is guaranteed
+  // to be a zero value;
+  //
+  // As the runtime relies on this in multiple places,
+  // so instead of a runtime call to get this executor ref, we bitcast a "zero"
+  // of expected size to the builtin executor type.
+  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+}
+
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
@@ -1035,7 +1071,7 @@ internal func _getMainExecutor() -> Builtin.Executor
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   fatalError("Unavailable in task-to-thread concurrency model")
 }
-#else
+#elseif !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @preconcurrency
@@ -1072,7 +1108,7 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_cancel")
-func _taskCancel(_ task: Builtin.NativeObject)
+public func _taskCancel(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")

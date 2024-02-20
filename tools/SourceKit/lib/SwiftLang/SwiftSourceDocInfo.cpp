@@ -1537,9 +1537,9 @@ public:
   }
 };
 
-static SourceFile *retrieveInputFile(StringRef inputBufferName,
-                                     const CompilerInstance &CI,
-                                     bool haveRealPath = false) {
+SourceFile *SourceKit::retrieveInputFile(StringRef inputBufferName,
+                                         const CompilerInstance &CI,
+                                         bool haveRealPath) {
   // Don't bother looking up if we have the same file as the primary file or
   // we weren't given a separate input file
   if (inputBufferName.empty() ||
@@ -2119,11 +2119,9 @@ void SwiftLangSupport::getCursorInfo(
   std::shared_ptr<llvm::MemoryBuffer> InputBuffer;
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
-    llvm::SmallString<128> RealInputFilePath;
-    fileSystem->getRealPath(PrimaryFilePath, RealInputFilePath);
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
-            RealInputFilePath, fileSystem, InputFileError));
+            PrimaryFilePath, fileSystem, InputFileError));
   }
 
   // Receiver is async, so be careful about captured values. This is all
@@ -2489,262 +2487,143 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 // SwiftLangSupport::findRelatedIdentifiersInFile
 //===----------------------------------------------------------------------===//
 
-namespace {
-class RelatedIdScanner : public SourceEntityWalker {
-  ValueDecl *Dcl;
-  llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges;
-  /// Declarations that are tied to the same name as \c Dcl and should thus also
-  /// be renamed if \c Dcl is renamed. Most notabliy this contains closure
-  /// captures like `[foo]`.
-  llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls;
-  SourceManager &SourceMgr;
-  unsigned BufferID = -1;
-  bool Cancelled = false;
-
-public:
-  explicit RelatedIdScanner(
-      SourceFile &SrcFile, unsigned BufferID, ValueDecl *D,
-      llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges,
-      llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls)
-      : Ranges(Ranges), RelatedDecls(RelatedDecls),
-        SourceMgr(SrcFile.getASTContext().SourceMgr), BufferID(BufferID) {
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      // Always use the canonical var decl for comparison. This is so we
-      // pick up all occurrences of x in case statements like the below:
-      //   case .first(let x), .second(let x)
-      //     fallthrough
-      //   case .third(let x)
-      //     print(x)
-      Dcl = V->getCanonicalVarDecl();
-
-      // If we have a property wrapper backing property or projected value, use
-      // the wrapped property instead (i.e. if this is _foo or $foo, pretend
-      // it's foo).
-      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
-        Dcl = Wrapped;
-      }
-    } else {
-      Dcl = D;
-    }
-  }
-
-private:
-  bool walkToExprPre(Expr *E) override {
-    if (Cancelled)
-      return false;
-
-    // Check if there are closure captures like `[foo]` where the caputred
-    // variable should also be renamed
-    if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      for (auto ShorthandShadow : getShorthandShadows(CaptureList)) {
-        if (ShorthandShadow.first == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.second);
-        } else if (ShorthandShadow.second == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.first);
-        }
-      }
-    }
-    return true;
-  }
-
-  bool walkToStmtPre(Stmt *S) override {
-    if (Cancelled)
-      return false;
-
-    if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
-      for (auto ShorthandShadow : getShorthandShadows(CondStmt)) {
-        if (ShorthandShadow.first == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.second);
-        } else if (ShorthandShadow.second == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.first);
-        }
-      }
-    }
-    return true;
-  }
-
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (Cancelled)
-      return false;
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      // Handle references to the implicitly generated vars in case statements
-      // matching multiple patterns
-      D = V->getCanonicalVarDecl();
-    }
-    if (D == Dcl)
-      return passId(Range);
-    return true;
-  }
-
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
-    if (Cancelled)
-      return false;
-
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      D = V->getCanonicalVarDecl();
-
-      // If we have a property wrapper backing property or projected value, use
-      // the wrapped property for comparison instead (i.e. if this is _foo or
-      // $foo, pretend it's foo).
-      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1 &&
-               (Range.str().front() == '_' || Range.str().front() == '$'));
-        D = Wrapped;
-        Range = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
-      }
-    } else if (CtorTyRef) {
-      D = CtorTyRef;
-    }
-
-    if (D == Dcl)
-      return passId(Range);
-    return true;
-  }
-
-  bool passId(CharSourceRange Range) {
-    unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(),BufferID);
-    Ranges.insert({Offset, Range.getByteLength()});
-    return !Cancelled;
-  }
-};
-
-} // end anonymous namespace
-
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken,
-    std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) {
+    bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver) {
 
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
+    Receiver(RequestResult<RelatedIdentsResult>::fromError(Error));
     return;
   }
 
   class RelatedIdConsumer : public SwiftASTConsumer {
     std::string InputFile;
     unsigned Offset;
-    std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver;
+    bool IncludeNonEditableBaseNames;
+    std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    // FIXME: Don't silently eat errors here.
+    RelatedIdentsResult getRelatedIdents(SourceFile *SrcFile,
+                                         CompilerInstance &CompInst) {
+      unsigned BufferID = SrcFile->getBufferID().value();
+      SourceLoc Loc = Lexer::getLocForStartOfToken(CompInst.getSourceMgr(),
+                                                   BufferID, Offset);
+      if (Loc.isInvalid())
+        return RelatedIdentsResult::empty();
+
+      SourceManager &SrcMgr = CompInst.getASTContext().SourceMgr;
+
+      ResolvedCursorInfoPtr CursorInfo =
+          evaluateOrDefault(CompInst.getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
+                            new ResolvedCursorInfo());
+      auto ValueRefCursorInfo =
+          dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
+      if (!ValueRefCursorInfo)
+        return RelatedIdentsResult::empty();
+      if (ValueRefCursorInfo->isKeywordArgument())
+        return RelatedIdentsResult::empty();
+
+      ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
+      if (!VD)
+        return RelatedIdentsResult::empty(); // This was a module reference.
+
+      // Only accept pointing to an identifier.
+      if (!IncludeNonEditableBaseNames && !ValueRefCursorInfo->isRef() &&
+          (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
+           isa<SubscriptDecl>(VD)))
+        return RelatedIdentsResult::empty();
+
+      llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
+
+      if (!Info) {
+        return RelatedIdentsResult::empty();
+      }
+
+      RenameLocs Locs = localRenameLocs(SrcFile, Info->VD);
+
+      std::optional<std::string> OldName;
+      if (!Locs.getLocations().empty()) {
+        OldName = Locs.getLocations().front().OldName.str();
+      }
+#ifndef NDEBUG
+      for (auto loc : Locs.getLocations()) {
+        assert(loc.OldName == OldName &&
+               "Found related identfiers with different names?");
+      }
+#endif
+
+      // Ignore any errors produced by `resolveRenameLocations` since, if some
+      // symbol failed to resolve, we still want to return all the other
+      // symbols. This makes related idents more fault-tolerant.
+      DiagnosticEngine Diags(SrcMgr);
+
+      std::vector<ResolvedAndRenameLoc> ResolvedAndRenameLocs =
+          resolveRenameLocations(Locs.getLocations(), /*NewName=*/StringRef(),
+                                 *SrcFile, Diags);
+
+      SmallVector<RelatedIdentInfo, 8> Ranges;
+      for (auto Loc : ResolvedAndRenameLocs) {
+        if (Loc.resolved.range.isInvalid()) {
+          continue;
+        }
+        unsigned Offset = SrcMgr.getLocOffsetInBuffer(
+            Loc.resolved.range.getStart(), BufferID);
+        Ranges.push_back(
+            {Offset, Loc.resolved.range.getByteLength(), Loc.renameLoc.Usage});
+      }
+
+      return RelatedIdentsResult(Ranges, OldName);
+    }
+#endif
 
   public:
     RelatedIdConsumer(
-        StringRef InputFile, unsigned Offset,
-        std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver,
+        StringRef InputFile, unsigned Offset, bool IncludeNonEditableBaseNames,
+        std::function<void(const RequestResult<RelatedIdentsResult> &)>
+            Receiver,
         SwiftInvocationRef Invok)
         : InputFile(InputFile.str()), Offset(Offset),
+          IncludeNonEditableBaseNames(IncludeNonEditableBaseNames),
           Receiver(std::move(Receiver)), Invok(Invok) {}
 
-    // FIXME: Don't silently eat errors here.
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      using ResultType = RequestResult<RelatedIdentsResult>;
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+      ResultType::fromError(
+          "relatedidents is not supported because sourcekitd was built without "
+          "swift-syntax");
+      return;
+#else
       auto &CompInst = AstUnit->getCompilerInstance();
 
       auto *SrcFile = retrieveInputFile(InputFile, CompInst);
       if (!SrcFile) {
-        Receiver(RequestResult<RelatedIdentsInfo>::fromError(
+        Receiver(RequestResult<RelatedIdentsResult>::fromError(
             "Unable to find input file"));
         return;
       }
 
-      SmallVector<std::pair<unsigned, unsigned>, 8> Ranges;
-
-      auto Action = [&]() {
-        unsigned BufferID = SrcFile->getBufferID().value();
-        SourceLoc Loc =
-          Lexer::getLocForStartOfToken(CompInst.getSourceMgr(), BufferID, Offset);
-        if (Loc.isInvalid())
-          return;
-
-        ResolvedCursorInfoPtr CursorInfo =
-            evaluateOrDefault(CompInst.getASTContext().evaluator,
-                              CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
-                              new ResolvedCursorInfo());
-        auto ValueRefCursorInfo =
-            dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
-        if (!ValueRefCursorInfo)
-          return;
-        if (ValueRefCursorInfo->isKeywordArgument())
-          return;
-
-        ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
-        if (!VD)
-          return; // This was a module reference.
-
-        // Only accept pointing to an identifier.
-        if (!ValueRefCursorInfo->isRef() &&
-            (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
-             isa<SubscriptDecl>(VD)))
-          return;
-        if (VD->isOperator())
-          return;
-
-        // Record ranges in a set first so we don't record some ranges twice.
-        // This could happen in capture lists where e.g. `[foo]` is both the
-        // reference of the captured variable and the declaration of the
-        // variable usable in the closure.
-        llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> RangesSet;
-
-        // List of decls whose ranges should be reported as related identifiers.
-        SmallVector<ValueDecl *, 2> Worklist;
-        Worklist.push_back(VD);
-
-        // Decls that we have already visited, so we don't walk circles.
-        SmallPtrSet<ValueDecl *, 2> VisitedDecls;
-        while (!Worklist.empty()) {
-          ValueDecl *Dcl = Worklist.back();
-          Worklist.pop_back();
-          if (!VisitedDecls.insert(Dcl).second) {
-            // We have already visited this decl. Don't visit it again.
-            continue;
-          }
-
-          RelatedIdScanner Scanner(*SrcFile, BufferID, Dcl, RangesSet,
-                                   Worklist);
-
-          if (auto *Case = getCaseStmtOfCanonicalVar(Dcl)) {
-            Scanner.walk(Case);
-            while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
-              Scanner.walk(Case);
-            }
-          } else if (DeclContext *LocalDC =
-                         Dcl->getDeclContext()->getLocalContext()) {
-            Scanner.walk(LocalDC);
-          } else {
-            Scanner.walk(*SrcFile);
-          }
-        }
-
-        // Sort ranges so we get deterministic output.
-        Ranges.insert(Ranges.end(), RangesSet.begin(), RangesSet.end());
-        llvm::sort(Ranges,
-                   [](const std::pair<unsigned, unsigned> &LHS,
-                      const std::pair<unsigned, unsigned> &RHS) -> bool {
-                     if (LHS.first == RHS.first) {
-                       return LHS.second < RHS.second;
-                     } else {
-                       return LHS.first < RHS.first;
-                     }
-                   });
-      };
-      Action();
-      RelatedIdentsInfo Info;
-      Info.Ranges = Ranges;
-      Receiver(RequestResult<RelatedIdentsInfo>::fromResult(Info));
+      RelatedIdentsResult Result = getRelatedIdents(SrcFile, CompInst);
+      Receiver(ResultType::fromResult(Result));
+#endif
     }
 
     void cancelled() override {
-      Receiver(RequestResult<RelatedIdentsInfo>::cancelled());
+      Receiver(RequestResult<RelatedIdentsResult>::cancelled());
     }
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("related idents failed: " << Error);
-      Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
+      Receiver(RequestResult<RelatedIdentsResult>::fromError(Error));
     }
 
     static CaseStmt *getCaseStmtOfCanonicalVar(Decl *D) {
@@ -2758,8 +2637,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     }
   };
 
-  auto Consumer = std::make_shared<RelatedIdConsumer>(InputBufferName, Offset,
-                                                      Receiver, Invok);
+  auto Consumer = std::make_shared<RelatedIdConsumer>(
+      InputBufferName, Offset, IncludeNonEditableBaseNames, Receiver, Invok);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

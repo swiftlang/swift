@@ -45,6 +45,8 @@
 
 #include <cstring>
 
+#include "BacktracePrivate.h"
+
 // Run the memserver in a thread (0) or separate process (1)
 #define MEMSERVER_USE_PROCESS 0
 
@@ -67,7 +69,6 @@ void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
 bool run_backtracer(int fd);
-void format_unsigned(unsigned u, char buffer[22]);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -231,8 +232,35 @@ handle_fatal_signal(int signum,
   // Start the memory server
   int fd = memserver_start();
 
+  // Display a progress message
+  void *pc = 0;
+  ucontext_t *ctx = (ucontext_t *)uctx;
+
+#if defined(__x86_64__)
+  pc = (void *)(ctx->uc_mcontext.gregs[REG_RIP]);
+#elif defined(__i386__)
+  pc = (void *)(ctx->uc_mcontext.gregs[REG_EIP]);
+#elif defined(__arm64__) || defined(__aarch64__)
+  pc = (void *)(ctx->uc_mcontext.pc);
+#elif defined(__arm__)
+#if defined(__ANDROID__)
+  pc = (void *)(ctx->uc_mcontext.arm_pc);
+#else
+  pc = (void *)(ctx->uc_mcontext.gprs[15]);
+#endif
+#endif
+
+  _swift_displayCrashMessage(signum, pc);
+
   // Actually start the backtracer
-  run_backtracer(fd);
+  if (!run_backtracer(fd)) {
+    const char *message = _swift_backtraceSettings.color == OnOffTty::On
+      ? " failed\n\n" : " failed ***\n\n";
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+      write(STDERR_FILENO, message, strlen(message));
+    else
+      write(STDOUT_FILENO, message, strlen(message));
+  }
 
 #if !MEMSERVER_USE_PROCESS
   /* If the memserver is in-process, it may have set signal handlers,
@@ -327,8 +355,8 @@ signal_for_suspend(int pid, int tid)
   char pid_buffer[22];
   char tid_buffer[22];
 
-  format_unsigned((unsigned)pid, pid_buffer);
-  format_unsigned((unsigned)tid, tid_buffer);
+  _swift_formatUnsigned((unsigned)pid, pid_buffer);
+  _swift_formatUnsigned((unsigned)tid, tid_buffer);
 
   char status_file[6 + 22 + 6 + 22 + 7 + 1];
 
@@ -503,9 +531,10 @@ suspend_other_threads(struct thread *self)
           tgkill(our_pid, tid, sig_to_use);
           ++pending;
         } else {
-          warn("swift-runtime: unable to suspend thread ");
+          warn("swift-runtime: failed to suspend thread ");
           warn(dp->d_name);
-          warn("\n");
+          warn(" while processing a crash; backtraces will be missing "
+               "information\n");
         }
       }
     }
@@ -672,7 +701,7 @@ memserver_read(void *to, const void *from, size_t len) {
       memcpy(to, from, len);
       return len;
     } else {
-      return 1;
+      return -1;
     }
   }
 }
@@ -785,62 +814,10 @@ const char *backtracer_argv[] = {
   "true",                       // 28
   "--output-to",                // 29
   "stdout",                     // 30
+  "--symbolicate",              // 31
+  "full",                       // 32
   NULL
 };
-
-// We can't call sprintf() here because we're in a signal handler,
-// so we need to be async-signal-safe.
-void
-format_address(uintptr_t addr, char buffer[18])
-{
-  char *ptr = buffer + 18;
-  *--ptr = '\0';
-  while (ptr > buffer) {
-    char digit = '0' + (addr & 0xf);
-    if (digit > '9')
-      digit += 'a' - '0' - 10;
-    *--ptr = digit;
-    addr >>= 4;
-    if (!addr)
-      break;
-  }
-
-  // Left-justify in the buffer
-  if (ptr > buffer) {
-    char *pt2 = buffer;
-    while (*ptr)
-      *pt2++ = *ptr++;
-    *pt2++ = '\0';
-  }
-}
-void
-format_address(const void *ptr, char buffer[18])
-{
-  format_address(reinterpret_cast<uintptr_t>(ptr), buffer);
-}
-
-// See above; we can't use sprintf() here.
-void
-format_unsigned(unsigned u, char buffer[22])
-{
-  char *ptr = buffer + 22;
-  *--ptr = '\0';
-  while (ptr > buffer) {
-    char digit = '0' + (u % 10);
-    *--ptr = digit;
-    u /= 10;
-    if (!u)
-      break;
-  }
-
-  // Left-justify in the buffer
-  if (ptr > buffer) {
-    char *pt2 = buffer;
-    while (*ptr)
-      *pt2++ = *ptr++;
-    *pt2++ = '\0';
-  }
-}
 
 const char *
 trueOrFalse(bool b) {
@@ -949,15 +926,27 @@ run_backtracer(int memserver_fd)
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
 
-  format_unsigned(_swift_backtraceSettings.timeout, timeout_buf);
+  switch (_swift_backtraceSettings.symbolicate) {
+  case Symbolication::Off:
+    backtracer_argv[32] = "off";
+    break;
+  case Symbolication::Fast:
+    backtracer_argv[32] = "fast";
+    break;
+  case Symbolication::Full:
+    backtracer_argv[32] = "full";
+    break;
+  }
+
+  _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
 
   if (_swift_backtraceSettings.limit < 0)
     std::strcpy(limit_buf, "none");
   else
-    format_unsigned(_swift_backtraceSettings.limit, limit_buf);
+    _swift_formatUnsigned(_swift_backtraceSettings.limit, limit_buf);
 
-  format_unsigned(_swift_backtraceSettings.top, top_buf);
-  format_address(&crashInfo, addr_buf);
+  _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
+  _swift_formatAddress(&crashInfo, addr_buf);
 
   // Actually execute it
   return _swift_spawnBacktracer(backtracer_argv, memserver_fd);

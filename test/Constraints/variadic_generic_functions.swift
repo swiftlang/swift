@@ -74,7 +74,7 @@ func contextualTyping() {
 do {
   func foo<each T>(_: repeat each T = bar().element) {} // expected-note {{in call to function 'foo'}}
   // expected-error@-1 {{variadic parameter cannot have a default value}}
-  // expected-error@-2 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-2 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
   // expected-error@-3 {{generic parameter 'each T' could not be inferred}}
 
   func bar<each T>() -> (repeat each T) {}

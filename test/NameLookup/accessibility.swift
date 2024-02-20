@@ -26,7 +26,7 @@ markUsed(has_accessibility.z) // expected-error {{module 'has_accessibility' has
 
 markUsed(accessibility.a)
 markUsed(accessibility.b)
-markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
+markUsed(accessibility.c) // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 markUsed(x)
 markUsed(y) // expected-error {{cannot find 'y' in scope}}

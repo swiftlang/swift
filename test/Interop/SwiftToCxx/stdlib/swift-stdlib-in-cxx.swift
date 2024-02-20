@@ -22,6 +22,7 @@
 // CHECK-NEXT: class SWIFT_SYMBOL("s:Sa") Array;
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
@@ -41,6 +42,7 @@
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCapacity() const SWIFT_SYMBOL({{.*}});
 
+// CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 

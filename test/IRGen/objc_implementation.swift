@@ -6,6 +6,9 @@
 // RUN: %FileCheck --input-file %t.ir --check-prefix NEGATIVE %s
 // REQUIRES: objc_interop
 
+// CHECK: [[selector_data_implProperty:@[^, ]+]] = private global [13 x i8] c"implProperty\00", section "__TEXT,__objc_methname,cstring_literals", align 1
+// CHECK: [[selector_data_setImplProperty_:@[^, ]+]] = private global [17 x i8] c"setImplProperty:\00", section "__TEXT,__objc_methname,cstring_literals", align 1
+
 // CHECK: [[selector_data_mainMethod_:@[^, ]+]] = private global [12 x i8] c"mainMethod:\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 
 //
@@ -14,15 +17,13 @@
 
 // Metaclass
 // CHECK: @"OBJC_METACLASS_$_ImplClass" = global %objc_class { ptr @"OBJC_METACLASS_$_NSObject", ptr @"OBJC_METACLASS_$_NSObject", ptr @_objc_empty_cache, ptr null, {{.*}}ptr [[_METACLASS_DATA_ImplClass:@[^, ]+]]{{.*}}, align 8
-// CHECK: @_PROTOCOLS_ImplClass = internal constant { i64, [1 x ptr] } { i64 1, [1 x ptr] [ptr @_PROTOCOL_NSCopying] }, section "__DATA, __objc_const", align 8
+// CHECK: @_PROTOCOLS_ImplClass = internal constant { i64, [2 x ptr] } { i64 2, [2 x ptr] [ptr @_PROTOCOL_NSCopying, ptr @_PROTOCOL_NSMutableCopying] }, section "__DATA, __objc_const", align 8
 // CHECK: [[_METACLASS_DATA_ImplClass]] = internal constant { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { i32 129, i32 40, i32 40, i32 0, ptr null, ptr @.str.9.ImplClass, ptr null, ptr @_PROTOCOLS_ImplClass, ptr null, ptr null, ptr null }, section "__DATA, __objc_const", align 8
 // TODO: Why the extra i32 field above?
 
 // Class
-// CHECK: [[selector_data_implProperty:@[^, ]+]] = private global [13 x i8] c"implProperty\00", section "__TEXT,__objc_methname,cstring_literals", align 1
-// CHECK: [[selector_data_setImplProperty_:@[^, ]+]] = private global [17 x i8] c"setImplProperty:\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: [[selector_data__cxx_destruct:@[^, ]+]] = private global [14 x i8] c".cxx_destruct\00", section "__TEXT,__objc_methname,cstring_literals", align 1
-// CHECK: [[_INSTANCE_METHODS_ImplClass:@[^, ]+]] = internal constant { i32, i32, [7 x { ptr, ptr, ptr }] } { i32 24, i32 7, [7 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(init)", ptr @".str.7.@16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEABycfcTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_implProperty]], ptr @".str.7.i16@0:8", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvgTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_setImplProperty_]], ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvsTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_mainMethod_]], ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE10mainMethodyys5Int32VFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(copyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(dealloc)", ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEfDTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data__cxx_destruct]], ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassCfETo{{(\.ptrauth)?}}" }] }, section "__DATA, __objc_data", align 8
+// CHECK: [[_INSTANCE_METHODS_ImplClass:@[^, ]+]] = internal constant { i32, i32, [9 x { ptr, ptr, ptr }] } { i32 24, i32 9, [9 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(init)", ptr @".str.7.@16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEABycfcTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_implProperty]], ptr @".str.7.i16@0:8", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvgTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_setImplProperty_]], ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvsTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data_mainMethod_]], ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE10mainMethodyys5Int32VFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(extensionMethod:)", ptr @".str.10.v20@0:8i16", ptr @"$sSo9ImplClassC19objc_implementationE15extensionMethodyys5Int32VFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(copyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(mutableCopyWithZone:)", ptr @".str.11.@24@0:8^v16", ptr @"$sSo9ImplClassC19objc_implementationE11mutableCopy4withypSg10ObjectiveC6NSZoneVSg_tFTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(dealloc)", ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassC19objc_implementationEfDTo{{(\.ptrauth)?}}" }, { ptr, ptr, ptr } { ptr [[selector_data__cxx_destruct]], ptr @".str.7.v16@0:8", ptr @"$sSo9ImplClassCfETo{{(\.ptrauth)?}}" }] }, section "__DATA, __objc_data", align 8
 // CHECK: [[_IVARS_ImplClass:@[^, ]+]] = internal constant { i32, i32, [2 x { ptr, ptr, ptr, i32, i32 }] } { i32 32, i32 2, [2 x { ptr, ptr, ptr, i32, i32 }] [{ ptr, ptr, ptr, i32, i32 } { ptr @"$sSo9ImplClassC19objc_implementationE12implPropertys5Int32VvpWvd", ptr @.str.12.implProperty, ptr @.str.0., i32 2, i32 4 }, { ptr, ptr, ptr, i32, i32 } { ptr @"$sSo9ImplClassC19objc_implementationE13implProperty2So8NSObjectCSgvpWvd", ptr @.str.13.implProperty2, ptr @.str.0., i32 3, i32 8 }] }, section "__DATA, __objc_const", align 8
 // CHECK: [[_PROPERTIES_ImplClass:@[^, ]+]] = internal constant { i32, i32, [1 x { ptr, ptr }] } { i32 16, i32 1, [1 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.12.implProperty, ptr @".str.18.Ti,N,VimplProperty" }] }, section "__DATA, __objc_const", align 8
 // FIXME: Should just be @_PROTOCOLS_ImplClass, but an IRGen bug causes the protocol list to be emitted twice.
@@ -49,6 +50,7 @@
   final var implProperty2: NSObject?
   
   @objc func mainMethod(_: Int32) { print(implProperty) }
+  @objc func extensionMethod(_: Int32) {}
 
   @objc(copyWithZone:)
   func copy(with zone: NSZone?) -> Any? {
@@ -58,6 +60,11 @@
     return copy
   }
   
+  @objc(mutableCopyWithZone:)
+  func mutableCopy(with zone: NSZone?) -> Any? {
+    return copy(with: zone)
+  }
+
   deinit { print(implProperty) }
 }
 
@@ -138,9 +145,17 @@ open class SwiftSubclass: ImplClass {
 // Functions
 //
 
+@_objcImplementation @_cdecl("implFunc")
+public func implFunc(_ param: Int32) {}
+
+@_objcImplementation @_cdecl("implFuncCName")
+public func implFuncCName(_ param: Int32) {}
+
 public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
   impl.mainMethod(0)
   swiftSub.mainMethod(1)
+  implFunc(2)
+  implFuncCName(3)
 }
 
 // Swift calling convention -[ImplClass init]
@@ -190,11 +205,26 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // ObjC calling convention -[ImplClass mainMethod:]
 // CHECK-LABEL: define internal void @"$sSo9ImplClassC19objc_implementationE10mainMethodyys5Int32VFTo"
 
+// Swift calling convention -[ImplClass extensionMethod:]
+// CHECK-LABEL: define hidden swiftcc void @"$sSo9ImplClassC19objc_implementationE15extensionMethodyys5Int32VF"
+
+// ObjC calling convention -[ImplClass extensionMethod:]
+// CHECK-LABEL: define internal void @"$sSo9ImplClassC19objc_implementationE15extensionMethodyys5Int32VFTo"
+
 // Swift calling convention -[ImplClass copyWithZone:]
 // CHECK-LABEL: define hidden swiftcc void @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tF"
 
+// FIXME: Do we actually want a public type metadata accessor? I'm guessing no.
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo9ImplClassCMa"
+
 // ObjC calling convention -[ImplClass copyWithZone:]
 // CHECK-LABEL: define internal ptr @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tFTo"
+
+// Swift calling convention -[ImplClass mutableCopyWithZone:]
+// CHECK-LABEL: define hidden swiftcc void @"$sSo9ImplClassC19objc_implementationE11mutableCopy4withypSg10ObjectiveC6NSZoneVSg_tF"
+
+// ObjC calling convention -[ImplClass mutableCopyWithZone:]
+// CHECK-LABEL: define internal ptr @"$sSo9ImplClassC19objc_implementationE11mutableCopy4withypSg10ObjectiveC6NSZoneVSg_tFTo"
 
 // Swift calling convention -[ImplClass dealloc]
 // CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$sSo9ImplClassC19objc_implementationEfD"
@@ -238,17 +268,25 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // Swift calling convention SwiftSubclass.deinit (deallocating)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation13SwiftSubclassCfD"
 
+// inplFunc(_:)
+// CHECK-LABEL: define void @implFunc
+// FIXME: We'd like this to be internal or hidden, not public.
+// CHECK: define swiftcc void @"$s19objc_implementation8implFuncyys5Int32VF"
+
+// inplFuncCName(_:)
+// CHECK-LABEL: define void @"\01_implFuncAsmName"
+// FIXME: We'd like this to be internal or hidden, not public.
+// CHECK: define swiftcc void @"$s19objc_implementation13implFuncCNameyys5Int32VF"
+
 // fn(impl:swiftSub:)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation2fn4impl8swiftSubySo9ImplClassC_AA13SwiftSubclassCtF"
 // CHECK:   [[SEL_1:%[^ ]+]] = load ptr, ptr @"\01L_selector(mainMethod:)", align 8
 // CHECK:   call void @objc_msgSend(ptr {{.*}}, ptr [[SEL_1]], i32 0)
 // CHECK:   [[SEL_2:%[^ ]+]] = load ptr, ptr @"\01L_selector(mainMethod:)", align 8
 // CHECK:   call void @objc_msgSend(ptr {{.*}}, ptr [[SEL_2]], i32 1)
+// CHECK:   call void @implFunc
 // CHECK:   ret void
 // CHECK: }
-
-// FIXME: Do we actually want a public type metadata accessor? I'm guessing no.
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo9ImplClassCMa"
 
 //
 // Not implemented in Swift

@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
 // RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+// REQUIRES: objc_codegen
 sil_stage canonical
 
 import Builtin
@@ -77,7 +78,7 @@ sil hidden_external @takingQ : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (@o
 sil hidden_external @takingQAndEmpty : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
 sil hidden_external @takingEmptyAndQ : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context(ptr noalias nocapture %0, ptr %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context(ptr noalias %0, ptr %"\CF\84_0_1")
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, ptr %"\CF\84_0_1")
 // CHECK:   [[BPTYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -104,7 +105,7 @@ bb0(%0 : $*τ_0_1):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context_2(ptr noalias nocapture %0, ptr %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context_2(ptr noalias %0, ptr %"\CF\84_0_1")
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[REF:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[CLOSURE:%.*]] = insertvalue { ptr, ptr } { ptr @"$s15takingQAndEmptyTA{{(\.ptrauth)?}}", ptr undef }, ptr [[REF]], 1
@@ -117,7 +118,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context_3(ptr noalias nocapture %0, ptr %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_context_3(ptr noalias %0, ptr %"\CF\84_0_1")
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[REF:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[CLOSURE:%.*]] = insertvalue { ptr, ptr } { ptr @"$s15takingEmptyAndQTA{{(\.ptrauth)?}}", ptr undef }, ptr [[REF]], 1
@@ -131,7 +132,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_forwarder_parameter(ptr noalias nocapture %0, ptr %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @bind_polymorphic_param_from_forwarder_parameter(ptr noalias %0, ptr %"\CF\84_0_1")
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, ptr %"\CF\84_0_1")
 // CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -160,7 +161,7 @@ struct S {
 
 sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @bind_polymorphic_param_from_context_with_layout(ptr noalias nocapture %0, i64 %1, ptr %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @bind_polymorphic_param_from_context_with_layout(ptr noalias %0, i64 %1, ptr %"\CF\84_0_1")
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, ptr %"\CF\84_0_1")
 // CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0

@@ -116,6 +116,9 @@ KNOWN_SETTINGS=(
     darwin-toolchain-require-use-os-runtime       "0"               "When setting up a plist for a toolchain, require the users of the toolchain to link against the OS instead of the packaged toolchain runtime. 0 for false, 1 for true"
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
+    ## Runtime options
+    min-runtime-version                ""                "Used to specify the minimum host runtime version when building the compiler on non-Darwin platforms"
+
     ## WebAssembly/WASI Options
     wasi-sysroot                                  ""                "An absolute path to the wasi-sysroot that will be used as a libc implementation for Wasm builds"
 
@@ -147,6 +150,7 @@ KNOWN_SETTINGS=(
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
     build-swift-remote-mirror                     "1"               "set to 1 to build the Swift Remote Mirror library"
+    build-swift-external-generic-metadata-builder "1"               "set to 1 to build the Swift External Generic Metadata Builder library"
     build-swift-static-sdk-overlay                ""                "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
@@ -218,6 +222,7 @@ KNOWN_SETTINGS=(
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-threading-package                       ""                "override the threading package for the host build; this is either a single package or a semicolon-separated list of sdk:package pairs.  Valid packages are empty string (no override), 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'"
     swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
+    swift-stdlib-task-to-thread-model-concurrency "0"               "build Swift concurrency with task-to-thread mode"
     swift-stdlib-tracing                          ""                "whether to enable tracing signposts for the stdlib; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
@@ -245,6 +250,7 @@ KNOWN_SETTINGS=(
     swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
     swift-enable-backtracing                      "1"               "whether to build the backtracing support"
     swift-runtime-fixed-backtracer-path           ""                "if set, use a fixed path for the backtracer"
+    swift-stdlib-overridable-retain-release       "1"               "whether to allow retain/release functions to be overridden by indirecting through function pointers"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -747,6 +753,12 @@ function set_build_options_for_host() {
                 )
             fi
 
+            if [[ ! -z "${MIN_RUNTIME_VERSION}" ]]; then
+                swift_cmake_options+=(
+                    -DSWIFT_MIN_RUNTIME_VERSION="${MIN_RUNTIME_VERSION}"
+                )
+            fi
+
             swift_cmake_options+=(
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
@@ -844,16 +856,6 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
-
-    if [[ "$(true_false ${SWIFT_EARLYSWIFTSYNTAX})" == "TRUE" ]]; then
-        early_swiftsyntax_build_dir="$(build_directory ${host} earlyswiftsyntax)"
-        swift_cmake_options+=(
-            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
-        )
-        lldb_cmake_options+=(
-            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
-        )
-    fi
 }
 
 function configure_default_options() {
@@ -1844,6 +1846,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT:BOOL=$(true_false "${SWIFT_IMPLICIT_CONCURRENCY_IMPORT}")
                     -DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT}")
                     -DSWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY}")
+                    -DSWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY:BOOL=$(true_false "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
                     -DSWIFT_STDLIB_HAS_DLADDR:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLADDR}")
                     -DSWIFT_STDLIB_HAS_DLSYM:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLSYM}")
@@ -1868,6 +1871,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
+                    -DSWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL=$(true_false "${BUILD_SWIFT_EXTERNAL_GENERIC_METADATA_BUILDER}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
                     -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")
@@ -1886,6 +1890,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
                     -DSWIFT_ENABLE_BACKTRACING:BOOL=$(true_false "${SWIFT_ENABLE_BACKTRACING}")
+                    -DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE:BOOL=$(true_false "${SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE}")
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2791,6 +2796,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
+                FILTER_SWIFT_API_OPTION="--filter=lang/swift"
                 LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
@@ -2799,19 +2805,32 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                echo "--- Running LLDB tests (Swift tests using ClangImporter) ---"
+                echo "--- Running LLDB tests (Swift Config: Precise/ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
-                echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=true"
+                echo "--- Rerun LLDB Swift API tests (Swift Config: Precise/DWARFImporter) ---"
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_OPTION} \
-                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=true"
+                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/ClangImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=true --setting symbols.swift-precise-compiler-invocation=false"
+                echo "--- Rerun LLDB Swift API tests (Swift Config: Classic/DWARFImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false --setting symbols.swift-precise-compiler-invocation=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \

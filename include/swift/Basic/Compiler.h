@@ -98,6 +98,12 @@
 #define SWIFT_ATTRIBUTE_NORETURN
 #endif
 
+#if __has_attribute(unused)
+#define SWIFT_ATTRIBUTE_UNUSED __attribute__((__unused__))
+#else
+#define SWIFT_ATTRIBUTE_UNUSED
+#endif
+
 #ifndef SWIFT_BUG_REPORT_URL
 #define SWIFT_BUG_REPORT_URL "https://swift.org/contributing/#reporting-bugs"
 #endif
@@ -200,7 +206,7 @@
 #if defined(__cplusplus)
 #if defined(__cpp_char8_t)
 inline constexpr char operator""_swift_u8(char8_t c) { return c; }
-inline const char *operator""_swift_u8(const char8_t *p, std::size_t) {
+inline const char *operator""_swift_u8(const char8_t *p, size_t) {
   return reinterpret_cast<const char *>(p);
 }
 #define SWIFT_UTF8(literal) u8##literal##_swift_u8

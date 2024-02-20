@@ -313,6 +313,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocVectorInst, alloc_vector,
+                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
@@ -559,13 +561,15 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
                     SingleValueInstruction, None, DoesNotRelease)
 
-  // Function Application
+  // Functions
   SINGLE_VALUE_INST(ApplyInst, apply,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(BuiltinInst, builtin,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(FunctionExtractIsolationInst, function_extract_isolation,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,
@@ -579,6 +583,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // Aggregate Types
   SINGLE_VALUE_INST(ObjectInst, object,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(VectorInst, vector,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -722,6 +728,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(ThrowAddrInst, throw_addr,
+             TermInst, None, DoesNotRelease)
   TERMINATOR(YieldInst, yield,
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(UnwindInst, unwind,
@@ -836,7 +844,7 @@ NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugStepInst, debug_step,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(TestSpecificationInst, specify_test,
+NON_VALUE_INST(SpecifyTestInst, specify_test,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NON_VALUE_INST(Store##Name##Inst, store_##name, \
@@ -845,6 +853,8 @@ NON_VALUE_INST(TestSpecificationInst, specify_test,
 NON_VALUE_INST(CopyAddrInst, copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(ExplicitCopyAddrInst, explicit_copy_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(TupleAddrConstructorInst, tuple_addr_constructor,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(DestroyAddrInst, destroy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)

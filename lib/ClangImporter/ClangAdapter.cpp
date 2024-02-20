@@ -560,7 +560,9 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     clang::LookupResult lookupResult(clangSema, notificationName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
-    if (!clangSema.LookupName(lookupResult, clangSema.TUScope))
+    if (!clangSema.LookupQualifiedName(
+            lookupResult,
+            /*LookupCtx*/ clangSema.getASTContext().getTranslationUnitDecl()))
       return nullptr;
     auto nsDecl = lookupResult.getAsSingle<clang::TypedefNameDecl>();
     if (!nsDecl)
@@ -586,6 +588,13 @@ bool importer::isNSString(const clang::Type *type) {
 
 bool importer::isNSString(clang::QualType qt) {
   return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
+}
+
+bool importer::isNSNotificationName(clang::QualType type) {
+  if (auto *typealias = type->getAs<clang::TypedefType>()) {
+    return typealias->getDecl()->getName() == "NSNotificationName";
+  }
+  return false;
 }
 
 bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {

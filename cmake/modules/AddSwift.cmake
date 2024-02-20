@@ -112,9 +112,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
   endif()
 endfunction()
 
-# Usage:
-# _add_host_variant_c_compile_link_flags(name)
-function(_add_host_variant_c_compile_link_flags name)
+function(swift_get_host_triple out_var)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
@@ -123,26 +121,30 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
+  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+    MACCATALYST_BUILD_FLAVOR ""
+    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+
+  set(${out_var} "${target}" PARENT_SCOPE)
+endfunction()
+
+# Usage:
+# _add_host_variant_c_compile_link_flags(name)
+function(_add_host_variant_c_compile_link_flags name)
   # MSVC and gcc don't understand -target.
   # clang-cl understands --target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
     else()
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
     endif()
   endif()
 
   if (CMAKE_Swift_COMPILER)
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
 
    _add_host_variant_swift_sanitizer_flags(${name})
   endif()
@@ -176,6 +178,12 @@ function(_add_host_variant_c_compile_link_flags name)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
     target_link_options(${name} PRIVATE ${_lto_flag_out})
+  endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+     set(_cov_flags $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
+     target_compile_options(${name} PRIVATE ${_cov_flags})
+     target_link_options(${name} PRIVATE ${_cov_flags})
   endif()
 endfunction()
 
@@ -320,11 +328,6 @@ function(_add_host_variant_c_compile_flags target)
   target_compile_definitions(${target} PRIVATE
     "SWIFT_THREADING_${_threading_package}")
 
-  if(SWIFT_ANALYZE_CODE_COVERAGE)
-    target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
-  endif()
-
   if((SWIFT_HOST_VARIANT_ARCH STREQUAL "armv7" OR
       SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64") AND
      (SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" OR
@@ -442,7 +445,7 @@ endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   if(NOT BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
       set(ASRLF_BOOTSTRAPPING_MODE "HOSTTOOLS")
     else()
       return()
@@ -519,35 +522,30 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
 
-    # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-    # to the linker command line.
-    set(swift_ast_path_flags " -Wl")
-    get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-    foreach(module ${modules})
-      get_target_property(module_file "SwiftModule${module}" "module_file")
-      string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-    endforeach()
-
-    set_property(TARGET ${target} APPEND_STRING PROPERTY
-                 LINK_FLAGS ${swift_ast_path_flags})
-
     # Workaround for a linker crash related to autolinking: rdar://77839981
     set_property(TARGET ${target} APPEND_STRING PROPERTY
                  LINK_FLAGS " -lobjc ")
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD|WINDOWS")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASRLF_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and run time, link against the swift libraries in the
       # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      if(SWIFT_PATH_TO_SWIFT_SDK)
+        set(swift_dir "${SWIFT_PATH_TO_SWIFT_SDK}/usr")
+      else()
+        get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+        get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      endif()
       set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
 
+      set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+      target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
 
       # At runtime, use swiftCore in the current toolchain.
       # For building stdlib, LD_LIBRARY_PATH will be set to builder's stdlib
@@ -578,7 +576,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -602,6 +600,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
+      target_link_options(${target} PRIVATE "SHELL:-Xlinker -z -Xlinker nostart-stop-gc")
     endif()
   endif()
 
@@ -656,7 +657,7 @@ function(add_swift_host_library name)
   translate_flags(ASHL "${options}")
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND ASHL_SHARED)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND ASHL_SHARED)
     set(ASHL_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -702,7 +703,7 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
-  target_link_directories(${name} PUBLIC ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  target_link_directories(${name} PUBLIC "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
@@ -924,7 +925,7 @@ function(add_swift_host_tool executable)
   endif()
 
   # Once the new Swift parser is linked in, every host tool has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND NOT ASHT_DOES_NOT_USE_SWIFT)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND NOT ASHT_DOES_NOT_USE_SWIFT)
     set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -963,7 +964,7 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     set(extra_relative_rpath "")
     if(NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "")
       if(executable MATCHES "-bootstrapping")

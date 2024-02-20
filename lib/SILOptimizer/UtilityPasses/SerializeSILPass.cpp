@@ -148,6 +148,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
@@ -239,7 +240,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::VectorInst:
   case SILInstructionKind::TupleInst:
+  case SILInstructionKind::TupleAddrConstructorInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::TupleElementAddrInst:
@@ -270,6 +273,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::BranchInst:
@@ -321,7 +325,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
@@ -354,6 +358,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
@@ -467,8 +472,23 @@ class SerializeSILPass : public SILModuleTransform {
 
       // After serialization we don't need to keep @alwaysEmitIntoClient
       // functions alive, i.e. we don't need to treat them as public functions.
-      if (F.getLinkage() == SILLinkage::PublicNonABI && M.isWholeModule())
-        F.setLinkage(SILLinkage::Shared);
+      if (M.isWholeModule()) {
+        switch (F.getLinkage()) {
+        case SILLinkage::PublicNonABI:
+        case SILLinkage::PackageNonABI:
+          F.setLinkage(SILLinkage::Shared);
+          break;
+        case SILLinkage::Public:
+        case SILLinkage::Package:
+        case SILLinkage::Hidden:
+        case SILLinkage::Shared:
+        case SILLinkage::Private:
+        case SILLinkage::PublicExternal:
+        case SILLinkage::PackageExternal:
+        case SILLinkage::HiddenExternal:
+          break;
+        }
+      }
     }
 
     for (auto &WT : M.getWitnessTables()) {

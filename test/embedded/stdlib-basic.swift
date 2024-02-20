@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -target armv7-apple-none-macho -Xcc -D__MACH__ -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 // RUN: %target-swift-frontend -target arm64-apple-none-macho -Xcc -D__MACH__ -Xcc -D__arm64__ -Xcc -D__APPLE__ -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
-// REQUIRES: VENDOR=apple
+// REQUIRES: swift_in_compiler
+// REQUIRES: CODEGENERATOR=ARM
 
 public func bool() -> Bool {
   return true
@@ -21,6 +22,11 @@ public func optional() -> Int? {
 
 public func staticstring() -> StaticString {
   return "hello"
+}
+
+public func unicodescalars() {
+  let a = UInt8(ascii: "-")
+  let b = Unicode.Scalar("-").value
 }
 
 public func checks(n: Int) {

@@ -36,8 +36,6 @@
 // RUN: cat %t/ClientFixed.swiftinterface | %FileCheck -check-prefix ALIASED %s
 // ALIASED: import Module___libB
 
-// REQUIRES: asserts
-
 // BEGIN empty.swift
 
 // BEGIN libA.swift
@@ -60,7 +58,7 @@ extension ImportedType : SomeProtocol {}
 
 /// Client module
 // BEGIN clientFileA-Swift5.swift
-import libA
+public import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
@@ -75,7 +73,7 @@ import libA
 }
 
 // BEGIN clientFileA-OldCheck.swift
-import libA
+public import libA
 @_implementationOnly import empty
 
 @inlinable public func bar() {
@@ -90,7 +88,7 @@ import libA
 }
 
 // BEGIN clientFileA-Swift6.swift
-import libA
+public import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
@@ -104,7 +102,7 @@ import libA
 
 // BEGIN clientFileB.swift
 @_implementationOnly import libB
-import libA
+public import libA
 extension ImportedType {
     public func localModuleMethod() {}
 }

@@ -9,11 +9,11 @@ distributed actor DA {
 }
 
 extension DA {
-  // CHECK-LABEL: sil hidden [thunk] [distributed] [ref_adhoc_requirement_witness "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"] [ossa] @$s17distributed_thunk2DAC1fyyYaKFTE : $@convention(method) @async (@guaranteed DA) -> @error any Error {
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ossa] @$s17distributed_thunk2DAC1fyyYaKFTE : $@convention(method) @async (@guaranteed DA) -> @error any Error {
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function
-  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@guaranteed DA) -> ()
+  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@sil_isolated @guaranteed DA) -> ()
 
   distributed func f() { }
 }
@@ -65,7 +65,7 @@ protocol Server2: DistributedActor {
 }
 
 extension Server2 where ActorSystem == LocalTestingDistributedActorSystem {
-  // CHECK-LABEL: sil hidden [thunk] [distributed] [ref_adhoc_requirement_witness "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"] [ossa] @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyYaKFTE
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ossa] @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyYaKFTE
   // CHECK-NOT: return
   // CHECK: function_ref @swift_distributed_actor_is_remote
   distributed func sayHello() { /* default impl */ }

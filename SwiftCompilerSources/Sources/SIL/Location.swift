@@ -13,11 +13,14 @@
 import SILBridging
 
 public struct Location: Equatable, CustomStringConvertible {
-  let bridged: swift.SILDebugLocation
+  let bridged: BridgedLocation
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
+  }
+  
+  public var sourceLoc: SourceLoc? {
+    return SourceLoc(bridged: bridged.getSourceLocation())
   }
 
   /// Keeps the debug scope but marks it as auto-generated.
@@ -39,6 +42,6 @@ public struct Location: Equatable, CustomStringConvertible {
   }
 
   public static var artificialUnreachableLocation: Location {
-    Location(bridged: swift.SILDebugLocation.getArtificialUnreachableLocation())
+    Location(bridged: BridgedLocation.getArtificialUnreachableLocation())
   }
 }

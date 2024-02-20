@@ -81,8 +81,8 @@ static void withSimpleTask(T &&value,
   withSimpleTask(TaskCreateFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
-static ExecutorRef createFakeExecutor(uintptr_t value) {
-  return ExecutorRef::forDefaultActor(reinterpret_cast<DefaultActor*>(value));
+static SerialExecutorRef createFakeExecutor(uintptr_t value) {
+  return SerialExecutorRef::forDefaultActor(reinterpret_cast<DefaultActor*>(value));
 }
 
 } // end anonymous namespace

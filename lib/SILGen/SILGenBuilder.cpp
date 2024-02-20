@@ -66,14 +66,16 @@ SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
-                                               ParameterConvention calleeConvention) {
+                                               ParameterConvention calleeConvention,
+                                         SILFunctionTypeIsolation resultIsolation) {
   llvm::SmallVector<SILValue, 8> values;
   llvm::transform(args, std::back_inserter(values),
                   [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
   SILValue result =
-      createPartialApply(loc, fn, subs, values, calleeConvention);
+      createPartialApply(loc, fn, subs, values, calleeConvention,
+                         resultIsolation);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -530,9 +532,12 @@ static ManagedValue createInputFunctionArgument(
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
-    if (!arg->getType().getASTType()->isNoncopyable()) {
+    if (!arg->getType().isMoveOnly()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    }
+    if (pd->hasResultDependsOn()) {
+      arg->setHasResultDependsOn();
     }
   }
   if (isNoImplicitCopy)
@@ -681,7 +686,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   if (!type.isAddressOnly(getFunction()) ||
       !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
-    return ManagedValue::forObjectRValueWithoutOwnership(noneValue);
+    return SGF.emitManagedRValueWithCleanup(noneValue);
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);
@@ -1019,12 +1024,15 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
   return ManagedValue::forBorrowedAddressRValue(pbi);
 }
 
-ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
-                                                 ManagedValue value,
-                                                 ManagedValue base) {
+ManagedValue SILGenBuilder::createMarkDependence(
+  SILLocation loc,
+  ManagedValue value,
+  ManagedValue base,
+  MarkDependenceKind dependenceKind) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
-                                   base.forward(getSILGenFunction()));
+                                   base.forward(getSILGenFunction()),
+                                   dependenceKind);
   return cloner.clone(mdi);
 }
 
@@ -1084,13 +1092,14 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 
 ManagedValue SILGenBuilder::createMarkUnresolvedNonCopyableValueInst(
     SILLocation loc, ManagedValue value,
-    MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+    MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+    MarkUnresolvedNonCopyableValueInst::IsStrict_t strict) {
   assert((value.isPlusOne(SGF) || value.isLValue() ||
           value.getType().isAddress()) &&
          "Argument must be at +1 or be an address!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkUnresolvedNonCopyableValueInst(
-      loc, value.forward(getSILGenFunction()), kind);
+      loc, value.forward(getSILGenFunction()), kind, strict);
   return cloner.clone(mdi);
 }
 

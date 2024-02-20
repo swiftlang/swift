@@ -14,7 +14,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
-// CHECK: "lines":{"count":9,"covered":6{{.*}}"functions":{"count":5,"covered":3
+// CHECK: "lines":{"count":9,"covered":5{{.*}}"functions":{"count":5,"covered":3
 
 // The functions 'unused' and 'optimizedOut' will be optimized out, but
 // make sure we still emit coverage records for them, using name data emitted

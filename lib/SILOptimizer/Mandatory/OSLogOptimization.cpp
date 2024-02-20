@@ -196,7 +196,7 @@ public:
   SILInstruction *beginInstruction;
 
   /// Instructions that mark the end points of constant evaluation.
-  SmallSetVector<SILInstruction *, 2> endInstructions;
+  llvm::SmallSetVector<SILInstruction *, 2> endInstructions;
 
 private:
   /// SIL values that were found to be constants during
@@ -313,6 +313,7 @@ static bool isSILValueFoldable(SILValue value) {
   return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
           !isa<LoadBorrowInst>(definingInst) &&
           !isa<BeginBorrowInst>(definingInst) &&
+          !isa<MoveValueInst>(definingInst) &&
           !isa<CopyValueInst>(definingInst) &&
           (isFoldableIntOrBool(value, astContext) ||
            isFoldableString(value, astContext) ||
@@ -636,7 +637,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
 
     StringRef stringVal = symVal.getStringValue();
     StringLiteralInst *stringLitInst = builder.createStringLiteral(
-        loc, stringVal, StringLiteralInst::Encoding::UTF8);
+        loc, stringVal, StringLiteralInst::Encoding::UTF8_OSLOG);
 
     // Create a builtin word for the size of the string
     IntegerLiteralInst *sizeInst = builder.createIntegerLiteral(
@@ -1426,7 +1427,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
   for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(
-        bi->getLoc(), StringRef(""), StringLiteralInst::Encoding::UTF8);
+        bi->getLoc(), StringRef(""), StringLiteralInst::Encoding::UTF8_OSLOG);
     bi->replaceAllUsesWith(stringLiteral);
     // The builtin instruction is likely dead. But since we are iterating over
     // many instructions, do the cleanup at the end.

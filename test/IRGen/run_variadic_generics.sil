@@ -149,8 +149,7 @@ sil_witness_table <T : P> GenFwdP<T>: P module main {
   method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @GenFwdP_static_member_fn
 }
 
-sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil [ossa] @main : $@convention(c) () -> Int32 {
   %0 = integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Word, 1
   %2 = integer_literal $Builtin.Word, 2

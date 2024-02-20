@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // Protocols with superclass-constrained Self.
 
@@ -27,7 +27,6 @@ func duplicateOverload<T : ProtoRefinesClass>(_: T) {}
 
 func duplicateOverload<T : ProtoRefinesClass & Generic<Int>>(_: T) {}
 // expected-error@-1 {{invalid redeclaration of 'duplicateOverload'}}
-// expected-warning@-2 {{redundant superclass constraint 'T' : 'Generic<Int>'}}
 
 extension ProtoRefinesClass {
   func extensionMethodUsesClassTypes(_ x: ConcreteAlias, _ y: GenericAlias) {
@@ -324,9 +323,7 @@ class SecondConformer : SecondClass, SecondProtocol {}
 // Duplicate superclass
 // FIXME: Should be an error here too
 protocol DuplicateSuper1 : Concrete where Self : Concrete {}
-// expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
 protocol DuplicateSuper2 where Self : Concrete, Self : Concrete {}
-// expected-warning@-1 {{redundant superclass constraint 'Self' : 'Concrete'}}
 
 // Ambiguous name lookup situation
 protocol Amb where Self : Concrete {}

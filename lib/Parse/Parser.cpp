@@ -179,10 +179,8 @@ void Parser::performIDEInspectionSecondPassImpl(
            "Delayed decl must be a type member or a top-level decl");
     ContextChange CC(*this, DC);
 
-    parseDecl(ParseDeclOptions(info.Flags),
-              /*IsAtStartOfLineOrPreviousHadSemi=*/true,
-              /*IfConfigsAreDeclAttrs=*/false,
-              [&](Decl *D) {
+    parseDecl(/*IsAtStartOfLineOrPreviousHadSemi=*/true,
+              /*IfConfigsAreDeclAttrs=*/false, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
                   NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
@@ -327,6 +325,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
     case swift::SourceFileKind::MacroExpansion:
+    case swift::SourceFileKind::DefaultArgument:
       return LexerMode::Swift;
   }
   llvm_unreachable("covered switch");
@@ -576,6 +575,23 @@ SourceLoc Parser::consumeToken() {
 
 SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+}
+
+SourceLoc Parser::consumeAttributeLParen() {
+  SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
+  if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
+    diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
+        .warnUntilSwiftVersion(6);
+  }
+  return consumeToken(tok::l_paren);
+}
+
+bool Parser::consumeIfAttributeLParen() {
+  if (!Tok.isFollowingLParen()) {
+    return false;
+  }
+  consumeAttributeLParen();
+  return true;
 }
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
@@ -1082,13 +1098,18 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 }
 
 llvm::Optional<StringRef>
-Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
+Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
+                                          bool AllowMultiline) {
   assert(Tok.is(tok::string_literal));
 
   // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
     return llvm::None;
+  }
+  if (!AllowMultiline && Tok.isMultilineString()) {
+    diagnose(Loc, diag::forbidden_multiline_string, DiagText)
+        .warnUntilSwiftVersion(6);
   }
 
   SmallVector<Lexer::StringSegment, 1> Segments;
@@ -1110,6 +1131,7 @@ struct ParserUnit::Implementation {
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions clangImporterOpts;
   symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+  CASOptions CASOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1118,10 +1140,10 @@ struct ParserUnit::Implementation {
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
                  const SILOptions &silOpts, StringRef ModuleName)
-      : LangOpts(Opts),
-        TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
+      : LangOpts(Opts), TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
-                             clangImporterOpts, symbolGraphOpts, SM, Diags)) {
+                             clangImporterOpts, symbolGraphOpts, CASOpts, SM,
+                             Diags)) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);

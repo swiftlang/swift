@@ -31,10 +31,16 @@ class SILOptFunctionBuilder;
 /// The \p ID must be the ID of a binary bit-operation builtin.
 APInt constantFoldBitOperation(APInt lhs, APInt rhs, BuiltinValueKind ID);
 
+/// Evaluates the constant result of a floating point comparison.
+///
+/// The \p ID must be the ID of a floating point builtin operation.
+APInt constantFoldComparisonFloat(APFloat lhs, APFloat rhs,
+                                  BuiltinValueKind ID);
+
 /// Evaluates the constant result of an integer comparison.
 ///
 /// The \p ID must be the ID of an integer builtin operation.
-APInt constantFoldComparison(APInt lhs, APInt rhs, BuiltinValueKind ID);
+APInt constantFoldComparisonInt(APInt lhs, APInt rhs, BuiltinValueKind ID);
 
 /// Evaluates the constant result of a binary operation with overflow.
 ///

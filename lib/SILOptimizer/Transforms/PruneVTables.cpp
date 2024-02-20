@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "prune-vtables"
 
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 

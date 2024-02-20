@@ -236,7 +236,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
   using CCOK = CodeCompletionOperatorKind;
   using OpPair = std::pair<StringRef, CCOK>;
 
-  // This list must be kept in alphabetical order.
+  // This list must be kept in lexicographic order.
   static OpPair ops[] = {
       std::make_pair("!", CCOK::Bang),
       std::make_pair("!=", CCOK::NotEq),
@@ -280,13 +280,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
       std::make_pair("||", CCOK::PipePipe),
       std::make_pair("~=", CCOK::TildeEq),
   };
-  static auto opsSize = sizeof(ops) / sizeof(ops[0]);
 
   auto I = std::lower_bound(
-      ops, &ops[opsSize], std::make_pair(name, CCOK::None),
+      std::begin(ops), std::end(ops), std::make_pair(name, CCOK::None),
       [](const OpPair &a, const OpPair &b) { return a.first < b.first; });
 
-  if (I == &ops[opsSize] || I->first != name)
+  if (I == std::end(ops) || I->first != name)
     return CCOK::Unknown;
   return I->second;
 }

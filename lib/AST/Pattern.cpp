@@ -16,6 +16,7 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -50,8 +51,15 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(Expr);
 
   case PatternKind::Binding:
-    return cast<BindingPattern>(this)->isLet() ? DescriptivePatternKind::Let
-                                               : DescriptivePatternKind::Var;
+    switch (cast<BindingPattern>(this)->getIntroducer()) {
+    case VarDecl::Introducer::Let:
+    case VarDecl::Introducer::Borrowing:
+      return DescriptivePatternKind::Let;
+      
+    case VarDecl::Introducer::Var:
+    case VarDecl::Introducer::InOut:
+      return DescriptivePatternKind::Var;
+    }
   }
 #undef TRIVIAL_PATTERN_KIND
   llvm_unreachable("bad DescriptivePatternKind");
@@ -203,23 +211,23 @@ namespace {
     // that is, don't walk into a closure body.
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ClosureExpr>(E)) {
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
       return Action::Continue(E);
     }
 
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 } // end anonymous namespace
@@ -329,6 +337,27 @@ bool Pattern::hasAnyMutableBindings() const {
       HasMutable = true;
   });
   return HasMutable;
+}
+
+BindingPattern *BindingPattern::createParsed(ASTContext &ctx, SourceLoc loc,
+                                             VarDecl::Introducer introducer,
+                                             Pattern *sub) {
+  // Reset the introducer of the all variables in the pattern.
+  sub->forEachVariable([&](VarDecl *vd) { vd->setIntroducer(introducer); });
+  return new (ctx) BindingPattern(loc, introducer, sub);
+}
+
+BindingPattern *BindingPattern::createImplicitCatch(DeclContext *dc,
+                                                    SourceLoc loc) {
+  auto &ctx = dc->getASTContext();
+  auto var = new (ctx) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Let,
+                               loc, ctx.Id_error, dc);
+  var->setImplicit();
+  auto namePattern = new (ctx) NamedPattern(var);
+  auto varPattern =
+      new (ctx) BindingPattern(loc, VarDecl::Introducer::Let, namePattern);
+  varPattern->setImplicit();
+  return varPattern;
 }
 
 OptionalSomePattern *OptionalSomePattern::create(ASTContext &ctx,
@@ -548,6 +577,49 @@ VarDecl *ExprPattern::getMatchVar() const {
       .getMatchVar();
 }
 
+void ExprPattern::updateMatchExpr(Expr *e) const {
+  class FindMatchOperatorDeclRef: public ASTWalker {
+  public:
+    ValueOwnership Ownership = ValueOwnership::Default;
+  
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // See if this is the reference to the ~= operator used.
+      auto declRef = dyn_cast<DeclRefExpr>(E);
+      if (!declRef) {
+        return Action::Continue(E);
+      }
+      auto decl = declRef->getDecl();
+      auto declName = decl->getName();
+      if (!declName.isOperator()) {
+        return Action::Continue(E);
+      }
+      
+      if (!declName.getBaseIdentifier().is("~=")) {
+        return Action::Continue(E);
+      }
+      
+      // We found a `~=` declref. Get the value ownership from the parameter.
+      auto fnTy = decl->getInterfaceType()->castTo<AnyFunctionType>();
+      if (decl->isStatic()) {
+        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+      }
+      // Subject value is the right-hand operand to the operator.
+      assert(fnTy->getParams().size() == 2);
+      Ownership = fnTy->getParams()[1].getValueOwnership();
+      // Operators are always normal functions or methods, so their default
+      // parameter ownership is always borrowing.
+      if (Ownership == ValueOwnership::Default) {
+        Ownership = ValueOwnership::Shared;
+      }
+      return Action::Stop();
+    }
+  };
+  FindMatchOperatorDeclRef walker;
+  e->walk(walker);
+
+  MatchExprAndOperandOwnership = {e, walker.Ownership};
+}
+  
 SourceLoc EnumElementPattern::getStartLoc() const {
   return (ParentType && !ParentType->isImplicit())
              ? ParentType->getSourceRange().Start
@@ -658,4 +730,111 @@ void swift::simple_display(llvm::raw_ostream &out, const Pattern *pattern) {
 
 SourceLoc swift::extractNearestSourceLoc(const Pattern *pattern) {
   return pattern->getLoc();
+}
+
+ValueOwnership
+Pattern::getOwnership(
+  SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns) const
+{
+  class GetPatternOwnership: public PatternVisitor<GetPatternOwnership, void> {
+  public:
+    ValueOwnership Ownership = ValueOwnership::Shared;
+    SmallVectorImpl<Pattern *> *RestrictingPatterns = nullptr;
+
+    void increaseOwnership(ValueOwnership newOwnership, Pattern *p) {
+      // If the new ownership is stricter than the current ownership, then
+      // clear the restricting patterns we'd collected and start over with the
+      // new stricter ownership.
+      if (newOwnership > Ownership) {
+        Ownership = newOwnership;
+        if (RestrictingPatterns) {
+          RestrictingPatterns->clear();
+        }
+      }
+      
+      if (RestrictingPatterns
+          && newOwnership == Ownership
+          && Ownership > ValueOwnership::Shared) {
+        RestrictingPatterns->push_back(p);
+      }
+    }
+
+#define USE_SUBPATTERN(Kind) \
+    void visit##Kind##Pattern(Kind##Pattern *pattern) { \
+      return visit(pattern->getSubPattern());            \
+    }
+
+    USE_SUBPATTERN(Paren)
+    USE_SUBPATTERN(Typed)
+    USE_SUBPATTERN(Binding)
+#undef USE_SUBPATTERN
+    void visitTuplePattern(TuplePattern *p) {
+      for (auto &element : p->getElements()) {
+        visit(element.getPattern());
+      }
+    }
+    
+    void visitNamedPattern(NamedPattern *p) {
+      switch (p->getDecl()->getIntroducer()) {
+      case VarDecl::Introducer::Let:
+      case VarDecl::Introducer::Var:
+        // If the subpattern type is copyable, then we can bind the variable
+        // by copying without requiring more than a borrow of the original.
+        if (!p->hasType() || !p->getType()->isNoncopyable()) {
+          break;
+        }
+        // TODO: An explicit `consuming` binding kind consumes regardless of
+        // type.
+      
+        // Noncopyable `let` and `var` consume the bound value to move it into
+        // a new independent variable.
+        increaseOwnership(ValueOwnership::Owned, p);
+        break;
+        
+      case VarDecl::Introducer::InOut:
+        // `inout` bindings modify the value in-place.
+        increaseOwnership(ValueOwnership::InOut, p);
+        break;
+        
+      case VarDecl::Introducer::Borrowing:
+        // `borrow` bindings borrow parts of the value in-place so they don't
+        // need stronger access to the subject value.
+        break;
+      }
+    }
+    
+    void visitAnyPattern(AnyPattern *p) {
+      /* no change */
+    }
+    void visitBoolPattern(BoolPattern *p) {
+      /* no change */
+    }
+    
+    void visitIsPattern(IsPattern *p) {
+      // Casting has to either be possible by borrowing or copying the subject,
+      // or can't be supported in a pattern match.
+      /* no change */
+    }
+    
+    void visitEnumElementPattern(EnumElementPattern *p) {
+      if (p->hasSubPattern()) {
+        visit(p->getSubPattern());
+      }
+    }
+    
+    void visitOptionalSomePattern(OptionalSomePattern *p) {
+      visit(p->getSubPattern());
+    }
+    
+    void visitExprPattern(ExprPattern *p) {
+      // A `~=` operator has to be able to either borrow or copy the operand,
+      // or can't be used.
+      /* no change */
+    }
+  };
+  
+  GetPatternOwnership visitor;
+  visitor.RestrictingPatterns = mostRestrictiveSubpatterns;
+  visitor.visit(const_cast<Pattern *>(this));
+  return visitor.Ownership;
 }

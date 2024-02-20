@@ -66,6 +66,10 @@ void ASTScope::lookupEnclosingMacroScope(
   return ASTScopeImpl::lookupEnclosingMacroScope(sourceFile, loc, body);
 }
 
+CatchNode ASTScope::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
+  return ASTScopeImpl::lookupCatchNode(module, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -94,11 +98,76 @@ Pattern *AbstractPatternEntryScope::getPattern() const {
 }
 
 NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
-  return !getParent() ? nullptr : getParent().get()->getClosureIfClosureScope();
+  if (auto parent = getParent()) {
+    if (auto closureScope = dyn_cast<ClosureParametersScope>(parent.get()))
+      return closureScope->closureExpr;
+  }
+
+  return nullptr;
 }
 
-NullablePtr<AbstractClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
-  return nullptr;
+std::string ASTScopeImpl::getClassName() const {
+  // GenericTypeOrExtensionScope provides a custom implementation that deals
+  // with declaration names and "portions".
+  if (auto generic = dyn_cast<GenericTypeOrExtensionScope>(this))
+    return generic->getClassName();
+
+  switch (getKind()) {
+#define SCOPE_NODE(Name) case ScopeKind::Name: return #Name "Scope";
+#include "swift/AST/ASTScopeNodes.def"
+  }
+}
+
+std::string GenericTypeOrExtensionScope::getClassName() const {
+  return declKindName() + portionName() + "Scope";
+}
+
+NullablePtr<Decl> ASTScopeImpl::getDeclIfAny() const {
+  switch (getKind()) {
+    // Declaration scope nodes extract the decl directly.
+#define DECL_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getDecl();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define DECL_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
+NullablePtr<Stmt> ASTScopeImpl::getStmtIfAny() const {
+  switch (getKind()) {
+    // Statement scope nodes extract the statement directly.
+#define STMT_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getStmt();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define STMT_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
+NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
+  switch (getKind()) {
+    // Expression scope nodes extract the statement directly.
+#define EXPR_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getExpr();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define EXPR_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
 }
 
 SourceManager &ASTScopeImpl::getSourceManager() const {
@@ -126,66 +195,18 @@ LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
 ASTContext &ASTScopeImpl::getASTContext() const {
   if (auto d = getDeclIfAny())
     return d.get()->getASTContext();
+  if (auto sfScope = dyn_cast<ASTSourceFileScope>(this))
+    return sfScope->SF->getASTContext();
   return getParent().get()->getASTContext();
 }
-
-#pragma mark getClassName
-
-std::string GenericTypeOrExtensionScope::getClassName() const {
-  return declKindName() + portionName() + "Scope";
-}
-
-#define DEFINE_GET_CLASS_NAME(Name)                                            \
-  std::string Name::getClassName() const { return #Name; }
-
-DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
-DEFINE_GET_CLASS_NAME(GenericParamScope)
-DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
-DEFINE_GET_CLASS_NAME(ParameterListScope)
-DEFINE_GET_CLASS_NAME(FunctionBodyScope)
-DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
-DEFINE_GET_CLASS_NAME(CustomAttributeScope)
-DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
-DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
-DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
-DEFINE_GET_CLASS_NAME(ConditionalClauseInitializerScope)
-DEFINE_GET_CLASS_NAME(CaptureListScope)
-DEFINE_GET_CLASS_NAME(ClosureParametersScope)
-DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
-DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
-DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
-DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
-DEFINE_GET_CLASS_NAME(EnumElementScope)
-DEFINE_GET_CLASS_NAME(MacroDeclScope)
-DEFINE_GET_CLASS_NAME(MacroDefinitionScope)
-DEFINE_GET_CLASS_NAME(MacroExpansionDeclScope)
-DEFINE_GET_CLASS_NAME(IfStmtScope)
-DEFINE_GET_CLASS_NAME(WhileStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtBodyScope)
-DEFINE_GET_CLASS_NAME(RepeatWhileScope)
-DEFINE_GET_CLASS_NAME(DoStmtScope)
-DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
-DEFINE_GET_CLASS_NAME(SwitchStmtScope)
-DEFINE_GET_CLASS_NAME(ForEachStmtScope)
-DEFINE_GET_CLASS_NAME(ForEachPatternScope)
-DEFINE_GET_CLASS_NAME(CaseStmtScope)
-DEFINE_GET_CLASS_NAME(CaseLabelItemScope)
-DEFINE_GET_CLASS_NAME(CaseStmtBodyScope)
-DEFINE_GET_CLASS_NAME(BraceStmtScope)
-
-#undef DEFINE_GET_CLASS_NAME
 
 #pragma mark getSourceFile
 
 const SourceFile *ASTScopeImpl::getSourceFile() const {
+  if (auto sourceFileScope = dyn_cast<ASTSourceFileScope>(this))
+    return sourceFileScope->SF;
+
   return getParent().get()->getSourceFile();
-}
-
-const SourceFile *ASTSourceFileScope::getSourceFile() const { return SF; }
-
-ASTContext &ASTSourceFileScope::getASTContext() const {
-  return SF->getASTContext();
 }
 
 SourceRange ExtensionScope::getBraces() const { return decl->getBraces(); }

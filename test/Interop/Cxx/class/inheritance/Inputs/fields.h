@@ -66,3 +66,37 @@ struct ClassTemplate {
 };
 
 struct DerivedFromClassTemplate : ClassTemplate<int> {};
+
+int &getCopyCounter() {
+    static int copyCounter = 0;
+    return copyCounter;
+}
+
+class CopyTrackedBaseClass {
+public:
+    CopyTrackedBaseClass(int x) : x(x) {}
+    CopyTrackedBaseClass(const CopyTrackedBaseClass &other) : x(other.x) {
+        ++getCopyCounter();
+    }
+
+    int x;
+};
+
+class CopyTrackedDerivedClass: public CopyTrackedBaseClass {
+public:
+    CopyTrackedDerivedClass(int x) : CopyTrackedBaseClass(x) {}
+};
+
+class NonEmptyBase {
+public:
+    int getY() const {
+        return y;
+    }
+private:
+    int y = 11;
+};
+
+class CopyTrackedDerivedDerivedClass: public NonEmptyBase, public CopyTrackedDerivedClass {
+public:
+    CopyTrackedDerivedDerivedClass(int x) : CopyTrackedDerivedClass(x) {}
+};

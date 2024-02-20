@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 #
-# Usage: ExtractOutputKey.py file.json OutputPath
+# Usage: ExtractOutputKey.py file.json InputPath
 
 import json
 import sys
 
 input_json = sys.argv[1]
-output_path = sys.argv[2]
+input_path = sys.argv[2]
 
 
 with open(input_json, 'r') as file:
-    outputs = json.load(file)
-    for output in outputs:
-        if output['OutputPath'] != output_path:
+    entries = json.load(file)
+    for entry in entries:
+        if entry['Input'] != input_path:
             continue
-        print(output['CacheKey'])
+        print(entry['CacheKey'])

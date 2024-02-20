@@ -95,9 +95,7 @@ doit()
 //              CHECK:   call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCySiGMb"
 //              CHECK: }
 
-//              CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCMa"
-
-//              CHECK: ; Function Attrs: noinline nounwind readnone
+//              CHECK: ; Function Attrs: noinline nounwind memory(none)
 //              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
 //         CHECK-NEXT: entry:
 //              CHECK:   [[SUPERCLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCMa"([[INT]] 0)
@@ -109,4 +107,5 @@ doit()
 //        CHECK-apple:   ret %swift.metadata_response [[COMPLETE_RESPONSE]]
 //              CHECK: }
 
+//              CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCMa"
 

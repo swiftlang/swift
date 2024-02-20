@@ -17,9 +17,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -300,99 +301,10 @@ struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
 
 void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
-struct UnresolvedLoc {
-  SourceLoc Loc;
-  bool ResolveArgLocs;
-};
-
-enum class LabelRangeType {
-  None,
-  CallArg,    // foo([a: ]2) or .foo([a: ]String)
-  Param,  // func([a b]: Int)
-  NoncollapsibleParam, // subscript([a a]: Int)
-  Selector,   // #selector(foo.func([a]:))
-};
-
-struct ResolvedLoc {
-  ASTWalker::ParentTy Node;
-  CharSourceRange Range;
-  std::vector<CharSourceRange> LabelRanges;
-  llvm::Optional<unsigned> FirstTrailingLabel;
-  LabelRangeType LabelType;
-  bool IsActive;
-  bool IsInSelector;
-};
-
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.
 struct CallingParent {
   Expr *ApplicableTo;
   CallExpr *Call;
-};
-
-
-/// Finds the parse-only AST nodes and corresponding name and param/argument
-/// label ranges for a given list of input name start locations
-///
-/// Resolved locations also indicate the nature of the matched occurrence (e.g.
-/// whether it is within active/inactive code, or a selector or string literal).
-class NameMatcher: public ASTWalker {
-  SourceFile &SrcFile;
-  std::vector<UnresolvedLoc> LocsToResolve;
-  std::vector<ResolvedLoc> ResolvedLocs;
-  ArrayRef<Token> TokensToCheck;
-
-  /// The \c ArgumentList of a parent \c CustomAttr (if one exists) and
-  /// the \c SourceLoc of the type name it applies to.
-  llvm::Optional<Located<ArgumentList *>> CustomAttrArgList;
-  unsigned InactiveConfigRegionNestings = 0;
-  unsigned SelectorNestings = 0;
-
-  /// The stack of parent CallExprs and the innermost expression they apply to.
-  std::vector<CallingParent> ParentCalls;
-
-  SourceManager &getSourceMgr() const;
-
-  SourceLoc nextLoc() const;
-  bool isDone() const { return LocsToResolve.empty(); };
-  bool isActive() const { return !InactiveConfigRegionNestings; };
-  bool isInSelector() const { return SelectorNestings; };
-  bool checkComments();
-  void skipLocsBefore(SourceLoc Start);
-  bool shouldSkip(Expr *E);
-  bool shouldSkip(SourceRange Range);
-  bool shouldSkip(CharSourceRange Range);
-  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
-  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
-                  ArgumentList *Args);
-  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
-                  LabelRangeType RangeType, ArrayRef<CharSourceRange> LabelLocs,
-                  llvm::Optional<unsigned> FirstTrailingLabel);
-  bool handleCustomAttrs(Decl *D);
-  ArgumentList *getApplicableArgsFor(Expr* E);
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-  PreWalkAction walkToDeclPre(Decl *D) override;
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
-  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
-  bool shouldWalkIntoGenericParams() override { return true; }
-  bool shouldWalkIntoUncheckedMacroDefinitions() override { return true; }
-
-  PreWalkResult<ArgumentList *>
-  walkToArgumentListPre(ArgumentList *ArgList) override;
-
-  // FIXME: Remove this
-  bool shouldWalkAccessorsTheOldWay() override { return true; }
-
-public:
-  explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
-  std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
-  ResolvedLoc resolve(UnresolvedLoc Loc);
 };
 
 enum class RangeKind : int8_t {
@@ -412,7 +324,7 @@ struct DeclaredDecl {
   bool ReferredAfterRange;
   DeclaredDecl(ValueDecl* VD) : VD(VD), ReferredAfterRange(false) {}
   DeclaredDecl(): DeclaredDecl(nullptr) {}
-  bool operator==(const DeclaredDecl& other);
+  bool operator==(const DeclaredDecl& other) const;
 };
 
 struct ReferencedDecl {
@@ -735,6 +647,19 @@ bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> get
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,
                      SmallVectorImpl<NominalTypeDecl *> &Types);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Parameters:
+///   - sourceFile: The source file from which to load the SwiftSyntax tree
+///   - locations: The locations to resolve
+/// - Returns: A list of `ResolvedLoc` that have been resolved. This list might
+///   be shorteder than `locations` if some locations could not be resolved and
+///   the resolved locations might be in a different order than `locations`.
+std::vector<ResolvedLoc> runNameMatcher(const SourceFile &sourceFile,
+                                        ArrayRef<SourceLoc> locations);
+#endif
 
 } // namespace ide
 } // namespace swift

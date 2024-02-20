@@ -474,11 +474,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
             "Unexpected SWIFT_BINARY_MODULE_DETAILS_NODE record");
       cache.configureForContextHash(getContextHash());
       unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID,
-               headerImportsArrayID, isFramework, moduleCacheKeyID;
+               overlayDependencyIDArrayID, headerImportsArrayID, isFramework,
+               moduleCacheKeyID;
       SwiftBinaryModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
-          moduleSourceInfoPathID, headerImportsArrayID, isFramework,
-          moduleCacheKeyID);
+          moduleSourceInfoPathID, overlayDependencyIDArrayID,
+          headerImportsArrayID, isFramework, moduleCacheKeyID);
 
       auto compiledModulePath = getIdentifier(compiledModulePathID);
       if (!compiledModulePath)
@@ -502,6 +503,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
            *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
            *currentModuleImports, *currentOptionalModuleImports,
            *headerImports, isFramework, *moduleCacheKey);
+
+      // Add Swift overlay dependencies
+      auto overlayModuleDependencyIDs = getModuleDependencyIDArray(overlayDependencyIDArrayID);
+      if (!overlayModuleDependencyIDs.has_value())
+        llvm::report_fatal_error("Bad overlay dependencies: no qualified dependencies");
+      moduleDep.setOverlayDependencies(overlayModuleDependencyIDs.value());
 
       cache.recordDependency(currentModuleName, std::move(moduleDep),
                              getContextHash());
@@ -999,6 +1006,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         getIdentifier(swiftBinDeps->compiledModulePath),
         getIdentifier(swiftBinDeps->moduleDocPath),
         getIdentifier(swiftBinDeps->sourceInfoPath),
+        getArrayID(moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs),
         getArrayID(moduleID, ModuleIdentifierArrayKind::DependencyHeaders),
         swiftBinDeps->isFramework,
         getIdentifier(swiftBinDeps->moduleCacheKey));
@@ -1165,7 +1173,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                  swiftTextDeps->textualModuleDetails.bridgingModuleDependencies);
         addDependencyIDArray(
             moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs,
-            swiftTextDeps->textualModuleDetails.swiftOverlayDependencies);
+            swiftTextDeps->swiftOverlayDependencies);
         addIdentifier(swiftTextDeps->textualModuleDetails.CASFileSystemRootID);
         addIdentifier(swiftTextDeps->textualModuleDetails
                           .CASBridgingHeaderIncludeTreeRootID);
@@ -1181,6 +1189,9 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addIdentifier(swiftBinDeps->moduleCacheKey);
         addStringArray(moduleID, ModuleIdentifierArrayKind::DependencyHeaders,
                        swiftBinDeps->preCompiledBridgingHeaderPaths);
+        addDependencyIDArray(
+            moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs,
+            swiftBinDeps->swiftOverlayDependencies);
         break;
       }
       case swift::ModuleDependencyKind::SwiftPlaceholder: {
@@ -1210,7 +1221,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies);
         addDependencyIDArray(
             moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs,
-            swiftSourceDeps->textualModuleDetails.swiftOverlayDependencies);
+            swiftSourceDeps->swiftOverlayDependencies);
         addStringArray(
             moduleID, ModuleIdentifierArrayKind::BuildCommandLine,
             swiftSourceDeps->textualModuleDetails.buildCommandLine);

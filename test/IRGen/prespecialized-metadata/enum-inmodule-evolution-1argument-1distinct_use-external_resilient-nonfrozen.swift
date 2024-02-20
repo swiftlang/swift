@@ -6,6 +6,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: CPU=wasm32
 
 import TestModule
 
@@ -25,7 +26,7 @@ enum Value<First> {
 // CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
 // CHECK-SAME:   $s4main5ValueOy10TestModule7IntegerVGMD
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr [[DEMANGLED_TYPE]]
 // CHECK-SAME: )
 // CHECK: }
@@ -34,7 +35,7 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 

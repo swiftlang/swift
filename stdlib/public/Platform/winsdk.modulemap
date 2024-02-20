@@ -48,6 +48,12 @@ module WinSDK [system] {
       export *
     }
 
+    // api-ms-win-appmodel-runtime-l1
+    module appmodel {
+      header "appmodel.h"
+      export *
+    }
+
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
       header "errhandlingapi.h"
@@ -213,8 +219,6 @@ module WinSDK [system] {
       export *
 
       link "xaudio2.lib"
-
-      requires cplusplus
     }
 
     // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
@@ -230,7 +234,7 @@ module WinSDK [system] {
       header "dinput.h"
       export *
 
-      link "dinput.lib"
+      link "dinput8.lib"
     }
 
     link "dxguid.lib"
@@ -311,6 +315,8 @@ module WinSDK [system] {
   }
 
   module Security {
+    header "../shared/sddl.h"
+
     module AuthZ {
       header "AuthZ.h"
       export *
@@ -382,6 +388,7 @@ module WinSDK [system] {
 
   module OLE32 {
     header "oaidl.h"
+    header "oleauto.h"
     export *
 
     link "OleAut32.Lib"

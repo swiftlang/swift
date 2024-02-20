@@ -7,7 +7,7 @@
 import Base
 import BaseUser
 
-// Sanity check.
+// Soundness check.
 useBaseClass(getBaseClass())
 useBaseClassObjC(getBaseClassObjC())
 useBaseProtoObjC(getBaseProtoObjC())

@@ -115,6 +115,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (Type thrownError = ty->getThrownError()) {
+      if (doIt(thrownError))
+        return true;
+    }
+
     return doIt(ty->getResult());
   }
 
@@ -245,6 +250,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   
+  bool visitErrorUnionType(ErrorUnionType *ty) {
+    for (auto term : ty->getTerms())
+      if (doIt(term))
+        return true;
+    return false;
+  }
+
   bool visitSILBlockStorageType(SILBlockStorageType *ty) {
     return doIt(ty->getCaptureType());
   }
@@ -271,7 +283,7 @@ public:
     switch (Walker.walkToTypePre(ty)) {
     case TypeWalker::Action::Continue:
       break;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       return false;
     case TypeWalker::Action::Stop:
       return true;
@@ -285,7 +297,7 @@ public:
     switch (Walker.walkToTypePost(ty)) {
     case TypeWalker::Action::Continue:
       return false;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       llvm_unreachable("SkipChildren is not valid for a post-visit check");
     case TypeWalker::Action::Stop:
       return true;

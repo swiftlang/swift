@@ -213,10 +213,11 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   if (unwrappedDict->isTypeVariableOrMember())
     return nullptr;
 
-  if (!TypeChecker::conformsToKnownProtocol(
-          unwrappedDict, KnownProtocolKind::ExpressibleByDictionaryLiteral,
-          cs.DC->getParentModule()))
-    return nullptr;
+  auto &ctx = cs.getASTContext();
+
+  if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
+      if (!cs.DC->getParentModule()->lookupConformance(unwrappedDict, proto))
+        return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
   return new (cs.getAllocator())
@@ -1296,13 +1297,6 @@ AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
       AllowInvalidRefInKeyPath(cs, kind, member, locator);
 }
 
-KeyPathContextualMismatch *
-KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                                  ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      KeyPathContextualMismatch(cs, lhs, rhs, locator);
-}
-
 bool RemoveAddressOf::diagnose(const Solution &solution, bool asNote) const {
   InvalidUseOfAddressOf failure(solution, getFromType(), getToType(),
                                 getLocator());
@@ -1443,6 +1437,18 @@ AllowInvalidPackExpansion *
 AllowInvalidPackExpansion::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInvalidPackExpansion(cs, locator);
+}
+
+bool IgnoreWhereClauseInPackIteration::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  InvalidWhereClauseInPackIteration failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreWhereClauseInPackIteration *
+IgnoreWhereClauseInPackIteration::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreWhereClauseInPackIteration(cs, locator);
 }
 
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
@@ -1625,6 +1631,21 @@ DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
                                                  ConstraintLocator *locator) {
   return new (cs.getAllocator())
       DropThrowsAttribute(cs, fromType, toType, locator);
+}
+
+bool IgnoreThrownErrorMismatch::diagnose(const Solution &solution,
+                                   bool asNote) const {
+  ThrownErrorTypeConversionFailure failure(solution, getFromType(),
+                                           getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreThrownErrorMismatch *IgnoreThrownErrorMismatch::create(ConstraintSystem &cs,
+                                                 Type fromErrorType,
+                                                 Type toErrorType,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreThrownErrorMismatch(cs, fromErrorType, toErrorType, locator);
 }
 
 bool DropAsyncAttribute::diagnose(const Solution &solution,
@@ -2477,259 +2498,6 @@ IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
       IgnoreDefaultExprTypeMismatch(cs, argType, paramType, locator);
 }
 
-bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
-                                              bool asNote) const {
-  MissingExplicitExistentialCoercion failure(solution, ErasedResultType,
-                                             getLocator(), fixBehavior);
-  return failure.diagnose(asNote);
-}
-
-bool AddExplicitExistentialCoercion::isRequired(
-    ConstraintSystem &cs, Type resultTy,
-    llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
-        findExistentialType,
-    ConstraintLocatorBuilder locator) {
-  using ExistentialTypeFinder =
-      llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>;
-
-  struct CoercionChecker : public TypeWalker {
-    bool RequiresCoercion = false;
-
-    ConstraintSystem &cs;
-    ExistentialTypeFinder GetExistentialType;
-
-    CoercionChecker(ConstraintSystem &cs,
-                    ExistentialTypeFinder getExistentialType)
-        : cs(cs), GetExistentialType(getExistentialType) {}
-
-    Action walkToTypePre(Type componentTy) override {
-      // In cases where result references a member type, we need to check
-      // whether such type would is resolved to concrete or not.
-      if (auto *member = componentTy->getAs<DependentMemberType>()) {
-        auto memberBaseTy = getBaseTypeOfDependentMemberChain(member);
-
-        auto typeVar = memberBaseTy->getAs<TypeVariableType>();
-        if (!typeVar)
-          return Action::SkipChildren;
-
-        // If the base is an opened existential type, let's see whether
-        // erase would produce an existential in this case and if so,
-        // we need to check whether any requirements are going to be lost
-        // in process.
-
-        auto existentialType = GetExistentialType(typeVar);
-        if (!existentialType)
-          return Action::SkipChildren;
-
-        auto erasedMemberTy = typeEraseOpenedExistentialReference(
-            Type(member), *existentialType, typeVar, TypePosition::Covariant);
-
-        // If result is an existential type and the base has `where` clauses
-        // associated with its associated types, the call needs a coercion.
-        if (erasedMemberTy->isExistentialType() &&
-            hasConstrainedAssociatedTypes(member, *existentialType)) {
-          RequiresCoercion = true;
-          return Action::Stop;
-        }
-
-        if (erasedMemberTy->isExistentialType() &&
-             erasedMemberTy->hasTypeParameter()) {
-          RequiresCoercion = true;
-          return Action::Stop;
-        }
-
-        return Action::SkipChildren;
-      }
-
-      // The case where there is a direct access to opened existential type
-      // e.g. `$T` or `[$T]`.
-      if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-        if (auto existentialType = GetExistentialType(typeVar)) {
-          RequiresCoercion |= hasAnyConstrainedAssociatedTypes(
-              (*existentialType)->getExistentialLayout());
-          return RequiresCoercion ? Action::Stop : Action::SkipChildren;
-        }
-      }
-
-      return Action::Continue;
-    }
-
-  private:
-    /// Check whether the given member type has any of its associated
-    /// types constrained by requirements associated with the given
-    /// existential type.
-    static bool hasConstrainedAssociatedTypes(DependentMemberType *member,
-                                              Type existentialTy) {
-      auto layout = existentialTy->getExistentialLayout();
-      for (auto *protocol : layout.getProtocols()) {
-        auto requirementSig = protocol->getRequirementSignature();
-        if (hasConstrainedAssociatedTypes(member,
-                                          requirementSig.getRequirements()))
-          return true;
-      }
-      return false;
-    }
-
-    /// Check whether the given member type has any of its associated
-    /// types constrained by the given requirement set.
-    static bool
-    hasConstrainedAssociatedTypes(DependentMemberType *member,
-                                  ArrayRef<Requirement> requirements) {
-      for (const auto &req : requirements) {
-        switch (req.getKind()) {
-        case RequirementKind::SameShape:
-          llvm_unreachable("Same-shape requirement not supported here");
-
-        case RequirementKind::Superclass:
-        case RequirementKind::Conformance:
-        case RequirementKind::Layout: {
-          if (isAnchoredOn(req.getFirstType(), member->getAssocType()))
-            return true;
-          break;
-        }
-
-        case RequirementKind::SameType: {
-          auto lhsTy = req.getFirstType();
-          auto rhsTy = req.getSecondType();
-
-          if (isAnchoredOn(lhsTy, member->getAssocType()) ||
-              isAnchoredOn(rhsTy, member->getAssocType()))
-            return true;
-
-          break;
-        }
-        }
-      }
-
-      return false;
-    }
-
-    /// Check whether any of the protocols mentioned in the given
-    /// existential layout have constraints associated with their
-    /// associated types via a `where` clause, for example:
-    /// `associatedtype A: P where A.B == Int`
-    static bool hasAnyConstrainedAssociatedTypes(ExistentialLayout layout) {
-      for (auto *protocol : layout.getProtocols()) {
-        auto requirementSig = protocol->getRequirementSignature();
-        for (const auto &req : requirementSig.getRequirements()) {
-          switch (req.getKind()) {
-          case RequirementKind::SameShape:
-            llvm_unreachable("Same-shape requirement not supported here");
-
-          case RequirementKind::Conformance:
-          case RequirementKind::Layout:
-          case RequirementKind::Superclass: {
-            if (getMemberChainDepth(req.getFirstType()) > 1)
-              return true;
-            break;
-          }
-
-          case RequirementKind::SameType:
-            auto lhsTy = req.getFirstType();
-            auto rhsTy = req.getSecondType();
-
-            if (getMemberChainDepth(lhsTy) > 1 ||
-                getMemberChainDepth(rhsTy) > 1)
-              return true;
-
-            break;
-          }
-        }
-      }
-      return false;
-    }
-
-    /// Check whether the given type is a dependent member type and
-    /// is anchored on the given associated type e.g. type is `A.B.C`
-    /// and associated type is `A.B`.
-    static bool isAnchoredOn(Type type, AssociatedTypeDecl *assocTy,
-                             unsigned depth = 0) {
-      if (auto *member = type->getAs<DependentMemberType>()) {
-        if (member->getAssocType() == assocTy)
-          return depth > 0;
-
-        return isAnchoredOn(member->getBase(), assocTy, depth + 1);
-      }
-
-      return false;
-    }
-
-    static unsigned getMemberChainDepth(Type type, unsigned currDepth = 0) {
-      if (auto *memberTy = type->getAs<DependentMemberType>())
-        return getMemberChainDepth(memberTy->getBase(), currDepth + 1);
-      return currDepth;
-    }
-
-    static Type getBaseTypeOfDependentMemberChain(DependentMemberType *member) {
-      if (!member->getBase())
-        return member;
-
-      auto base = member->getBase();
-
-      if (auto *DMT = base->getAs<DependentMemberType>())
-        return getBaseTypeOfDependentMemberChain(DMT);
-
-      return base;
-    }
-  };
-
-  // First, let's check whether coercion is already there.
-  if (auto *anchor = getAsExpr(locator.getAnchor())) {
-    // If this is erasure related to `Self`, let's look through
-    // the call, if any.
-    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-      // If this is an implicit `makeIterator` call, let's skip the check.
-      if (UDE->isImplicit() &&
-          cs.getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
-        return false;
-
-      auto parentExpr = cs.getParentExpr(anchor);
-      if (parentExpr && isa<CallExpr>(parentExpr))
-        anchor = parentExpr;
-    }
-
-    auto *parent = cs.getParentExpr(anchor);
-    // Support both `as` and `as!` coercions.
-    if (parent &&
-        (isa<CoerceExpr>(parent) || isa<ForcedCheckedCastExpr>(parent)))
-      return false;
-  }
-
-  CoercionChecker check(cs, findExistentialType);
-  resultTy.walk(check);
-
-  return check.RequiresCoercion;
-}
-
-bool AddExplicitExistentialCoercion::isRequired(
-    ConstraintSystem &cs, Type resultTy,
-    ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-        openedExistentials,
-    ConstraintLocatorBuilder locator) {
-  return isRequired(
-      cs, resultTy,
-      [&](TypeVariableType *typeVar) -> llvm::Optional<Type> {
-        auto opened =
-            llvm::find_if(openedExistentials, [&typeVar](const auto &entry) {
-              return typeVar == entry.first;
-            });
-
-        if (opened == openedExistentials.end())
-          return llvm::None;
-
-        return opened->second->getExistentialType();
-      },
-      locator);
-}
-
-AddExplicitExistentialCoercion *
-AddExplicitExistentialCoercion::create(ConstraintSystem &cs, Type resultTy,
-                                       ConstraintLocator *locator) {
-  FixBehavior fixBehavior = FixBehavior::Error;
-  return new (cs.getAllocator())
-      AddExplicitExistentialCoercion(cs, resultTy, locator, fixBehavior);
-}
-
 bool RenameConflictingPatternVariables::diagnose(const Solution &solution,
                                                  bool asNote) const {
   ConflictingPatternVariables failure(solution, ExpectedType,
@@ -2871,4 +2639,17 @@ IgnoreGenericSpecializationArityMismatch::create(ConstraintSystem &cs,
                                                  ConstraintLocator *locator) {
   return new (cs.getAllocator()) IgnoreGenericSpecializationArityMismatch(
       cs, decl, numParams, numArgs, hasParameterPack, locator);
+}
+
+bool IgnoreKeyPathSubscriptIndexMismatch::diagnose(const Solution &solution,
+                                                   bool asNote) const {
+  InvalidTypeAsKeyPathSubscriptIndex failure(solution, ArgType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreKeyPathSubscriptIndexMismatch *
+IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
 }

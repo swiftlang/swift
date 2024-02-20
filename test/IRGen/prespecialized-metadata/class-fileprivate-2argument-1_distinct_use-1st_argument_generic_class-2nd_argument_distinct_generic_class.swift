@@ -109,25 +109,13 @@ func consume<T>(_ t: T) {
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4:[0-9A-Z_]+]]LLCyAA9Argument1ACLLCySiGAA9Argument2ACLLCySSGGMb"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {
   consume( Value(first: Argument1(value: 13), second: Argument2(value: "13")) )
 }
 doit()
-
-//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr [[ARGUMENT1_METADATA:%[0-9]+]], ptr [[ARGUMENT2_METADATA:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
-//      CHECK:   call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr [[ARGUMENT1_METADATA]], 
-// CHECK-SAME:     ptr [[ARGUMENT2_METADATA]], 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMn
-// CHECK-SAME:   )
-//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
-//      CHECK: }
-
 
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4]]LLCyAA9Argument1ACLLCySiGAA9Argument2ACLLCySSGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]}} {{(section)?.*}}{
 //         CHECK: entry:
@@ -147,3 +135,13 @@ doit()
 //   CHECK-apple:  ret %swift.metadata_response [[METADATA_RESPONSE]]
 //         CHECK: }
 
+//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr [[ARGUMENT1_METADATA:%[0-9]+]], ptr [[ARGUMENT2_METADATA:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
+//      CHECK:   call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
+// CHECK-SAME:     ptr [[ARGUMENT1_METADATA]], 
+// CHECK-SAME:     ptr [[ARGUMENT2_METADATA]], 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMn
+// CHECK-SAME:   )
+//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
+//      CHECK: }

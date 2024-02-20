@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: libdispatch
+// UNSUPPORTED: threading_none
 
 import StdlibUnittest
 import Dispatch

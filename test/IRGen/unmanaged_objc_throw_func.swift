@@ -24,13 +24,14 @@ import Foundation
     // CHECK-NEXT: call void @llvm.objc.release(ptr %[[T4]])
     // CHECK-NEXT: ret ptr %[[T4]]
     let arr = [1] as CFArray
-    return Unmanaged.passUnretained(arr) 
-  } 
+    return Unmanaged.passUnretained(arr)
+  }
 }
 
 // CHECK: %[[T0:.+]] = call swiftcc ptr @"$s25unmanaged_objc_throw_func1CC22returnUnmanagedCFArrays0F0VySo0G3RefaGyKF"
 // CHECK-NEXT: %[[T2:.+]] = load ptr, ptr %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: %[[T3:.+]] = icmp ne ptr %[[T2]], null
+// CHECK-NEXT: ptrtoint ptr %[[T2]] to i
 // CHECK-NEXT: br i1 %[[T3]], label %[[L1:.+]], label %[[L2:.+]]
 
 // CHECK: [[L2]]:                                     ; preds = %entry
@@ -51,7 +52,7 @@ import Foundation
 // CHECK: [[L6]]:                                     ; preds = %[[L5]]
 // CHECK-NEXT: %[[T9:.+]] = phi ptr [ %[[T8]], %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc ptr @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(ptr %[[T6]]) #{{[0-9]+}}
-// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias nocapture %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
+// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
 // CHECK: call void @swift_errorRelease(ptr %[[T6]]) #{{[0-9]+}}
 // CHECK-NEXT: br label %[[L7:.+]]
 

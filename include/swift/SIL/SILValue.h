@@ -1019,26 +1019,38 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
 class Operand {
-  /// The value used as this operand.
-  SILValue TheValue;
+  template <class, class> friend class SILBitfield;
 
-  /// The next operand in the use-chain.  Note that the chain holds
-  /// every use of the current ValueBase, not just those of the
-  /// designated result.
-  Operand *NextUse = nullptr;
+  /// The value used as this operand combined with three bits we use for
+  /// `customBits`.
+  llvm::PointerIntPair<SILValue, 3> TheValueAndThreeBits = {SILValue(), 0};
+
+  /// The next operand in the use-chain. Note that the chain holds every use of
+  /// the current ValueBase, not just those of the designated result.
+  ///
+  /// We use 3 bits of the pointer for customBits.
+  llvm::PointerIntPair<Operand *, 3> NextUseAndThreeBits = {nullptr, 0};
 
   /// A back-pointer in the use-chain, required for fast patching
   /// of use-chains.
-  Operand **Back = nullptr;
+  ///
+  /// We use 2 bits of the pointer for customBits.
+  llvm::PointerIntPair<Operand **, 3> BackAndThreeBits = {nullptr, 0};
 
   /// The owner of this operand.
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
+  /// Used by `OperandBitfield`
+  enum { numCustomBits = 8 };
+
+  /// Used by `OperandBitfield`
+  int64_t lastInitializedBitfieldID = 0;
+
 public:
   Operand(SILInstruction *owner) : Owner(owner) {}
   Operand(SILInstruction *owner, SILValue theValue)
-      : TheValue(theValue), Owner(owner) {
+      : TheValueAndThreeBits(theValue), Owner(owner) {
     insertIntoCurrent();
   }
 
@@ -1050,14 +1062,14 @@ public:
   Operand &operator=(Operand &&) = default;
 
   /// Return the current value being used by this operand.
-  SILValue get() const { return TheValue; }
+  SILValue get() const { return TheValueAndThreeBits.getPointer(); }
 
   /// Set the current value being used by this operand.
   void set(SILValue newValue) {
     // It's probably not worth optimizing for the case of switching
     // operands on a single value.
     removeFromCurrent();
-    TheValue = newValue;
+    TheValueAndThreeBits.setPointer(newValue);
     insertIntoCurrent();
   }
 
@@ -1071,9 +1083,9 @@ public:
   /// Remove this use of the operand.
   void drop() {
     removeFromCurrent();
-    TheValue = SILValue();
-    NextUse = nullptr;
-    Back = nullptr;
+    TheValueAndThreeBits = {SILValue(), 0};
+    NextUseAndThreeBits = {nullptr, 0};
+    BackAndThreeBits = {nullptr, 0};
     Owner = nullptr;
   }
 
@@ -1085,7 +1097,7 @@ public:
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
 
-  Operand *getNextUse() const { return NextUse; }
+  Operand *getNextUse() const { return NextUseAndThreeBits.getPointer(); }
 
   /// Return true if this operand is a type dependent operand.
   ///
@@ -1135,25 +1147,62 @@ public:
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
+  unsigned getCustomBits() const {
+    unsigned bits = 0;
+    bits |= TheValueAndThreeBits.getInt();
+    bits |= NextUseAndThreeBits.getInt() << 3;
+    bits |= BackAndThreeBits.getInt() << 2;
+    return bits;
+  }
+
+  void setCustomBits(unsigned bits) {
+    assert(bits < 256 && "Can only store a byte?!");
+    TheValueAndThreeBits.setInt(bits & 0x7);
+    NextUseAndThreeBits.setInt((bits >> 3) & 0x7);
+    BackAndThreeBits.setInt((bits >> 6) & 0x3);
+  }
+
+  // Called when transferring basic blocks from one function to another.
+  void resetBitfields() {
+    lastInitializedBitfieldID = 0;
+  }
+
+  void markAsDeleted() {
+    lastInitializedBitfieldID = -1;
+  }
+
+  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+
+  SILFunction *getFunction() const;
+
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
 
 private:
   void removeFromCurrent() {
-    if (!Back)
+    auto *back = getBack();
+    if (!back)
       return;
-    *Back = NextUse;
-    if (NextUse)
-      NextUse->Back = Back;
+    auto *nextUse = getNextUse();
+    *back = nextUse;
+    if (nextUse)
+      nextUse->setBack(back);
   }
 
   void insertIntoCurrent() {
-    Back = &TheValue->FirstUse;
-    NextUse = TheValue->FirstUse;
-    if (NextUse)
-      NextUse->Back = &NextUse;
-    TheValue->FirstUse = this;
+    auto **firstUse = &get()->FirstUse;
+    setBack(firstUse);
+    setNextUse(*firstUse);
+    if (auto *nextUse = getNextUse())
+      nextUse->setBack(NextUseAndThreeBits.getAddrOfPointer());
+    get()->FirstUse = this;
   }
+
+  void setNextUse(Operand *op) { NextUseAndThreeBits.setPointer(op); }
+
+  Operand **getBack() const { return BackAndThreeBits.getPointer(); }
+
+  void setBack(Operand **newValue) { BackAndThreeBits.setPointer(newValue); }
 
   friend class ValueBase;
   friend class ValueBaseUseIterator;
@@ -1196,7 +1245,7 @@ public:
 
   ValueBaseUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    Cur = Cur->NextUse;
+    Cur = Cur->getNextUse();
     return *this;
   }
 
@@ -1231,7 +1280,7 @@ public:
   ConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(Cur->isLifetimeEnding());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (Cur->isLifetimeEnding())
         break;
     }
@@ -1249,7 +1298,7 @@ inline ValueBase::consuming_use_iterator
 ValueBase::consuming_use_begin() const {
   auto cur = FirstUse;
   while (cur && !cur->isLifetimeEnding()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::consuming_use_iterator(cur);
 }
@@ -1264,7 +1313,7 @@ public:
   NonConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(!Cur->isLifetimeEnding());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (!Cur->isLifetimeEnding())
         break;
     }
@@ -1282,7 +1331,7 @@ inline ValueBase::non_consuming_use_iterator
 ValueBase::non_consuming_use_begin() const {
   auto cur = FirstUse;
   while (cur && cur->isLifetimeEnding()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::non_consuming_use_iterator(cur);
 }
@@ -1297,7 +1346,7 @@ public:
   explicit TypeDependentUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   TypeDependentUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (Cur->isTypeDependent())
         break;
     }
@@ -1315,7 +1364,7 @@ inline ValueBase::typedependent_use_iterator
 ValueBase::typedependent_use_begin() const {
   auto cur = FirstUse;
   while (cur && !cur->isTypeDependent()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::typedependent_use_iterator(cur);
 }
@@ -1332,7 +1381,7 @@ public:
   NonTypeDependentUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(!Cur->isTypeDependent());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (!Cur->isTypeDependent())
         break;
     }
@@ -1350,7 +1399,7 @@ inline ValueBase::non_typedependent_use_iterator
 ValueBase::non_typedependent_use_begin() const {
   auto cur = FirstUse;
   while (cur && cur->isTypeDependent()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::non_typedependent_use_iterator(cur);
 }
@@ -1606,6 +1655,15 @@ namespace llvm {
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
+  /// A SILValue can be checked if a value is present, so we can use it with
+  /// dyn_cast_or_null.
+  template <>
+  struct ValueIsPresent<swift::SILValue> {
+    using SILValue = swift::SILValue;
+    using UnwrappedType = SILValue;
+    static inline bool isPresent(const SILValue &t) { return bool(t); }
+    static inline decltype(auto) unwrapValue(SILValue &t) { return t; }
+  };
 } // end namespace llvm
 
 #endif

@@ -12,13 +12,13 @@
 // CHECK:   mutating func make42Ref<T>(_ val: inout T)
 // CHECK: }
 
-// CHECK: struct TemplateClassWithMemberTemplates<Int32> {
+// CHECK: struct TemplateClassWithMemberTemplates<CInt> {
 // CHECK:   init(_ val: Int32)
 // CHECK:   var value: Int32
 // CHECK:   mutating func setValue<U>(_ val: U)
 // CHECK: }
 
-// CHECK: typealias IntWrapper = TemplateClassWithMemberTemplates<Int32>
+// CHECK: typealias IntWrapper = TemplateClassWithMemberTemplates<CInt>
 
 // CHECK: struct HasStaticMemberTemplates {
 // CHECK:   init()
@@ -27,13 +27,13 @@
 // CHECK:   static func removeReference<T>(_ a: inout T) -> T
 // CHECK: }
 
-// CHECK: struct MyTemplatedStruct<Int32> {
+// CHECK: struct MyTemplatedStruct<CInt> {
 // CHECK:   init()
 // CHECK: }
 
 // CHECK: struct HasTemplatedField {
-// CHECK:   init(x: MyTemplatedStruct<Int32>)
-// CHECK:   var x: MyTemplatedStruct<Int32>
+// CHECK:   init(x: MyTemplatedStruct<CInt>)
+// CHECK:   var x: MyTemplatedStruct<CInt>
 // CHECK: }
 
 // CHECK: struct HasUninstantiatableTemplateMember<NoDefinition, TemplateClassWithMemberTemplates<NoDefinition>> {

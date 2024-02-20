@@ -24,7 +24,7 @@ class AStruct {
         return a + b + c
     }
 
-    func /*bar:def*/barb(first a: Int) -> (Int) -> Int {
+    func /*bar:def*/<base>bar</base>(<arglabel index=0>_</arglabel><param index=0> a</param>: Int) -> (Int) -> Int {
         return {a in a};
     }
 
@@ -46,7 +46,7 @@ let _ = /*no-label:call*/aFunc(3)
 
 let _ = aStruct . /*method:call*/foo(a: 2, b: 3, 1)
 let _ = AStruct . /*method*/foo(aStruct)(a: 1, b: 8, 10)
-let _ = aStruct . /*bar:call*/barb(/*no-args:call*/first: aFunc())(/*no-label:call*/aFunc(2))
+let _ = aStruct . /*bar:call*/<base>bar</base>(/*no-args:call*/<callcombo index=0></callcombo>aFunc())(/*no-label:call*/aFunc(2))
 
 var a = /*referenced*/bar
 var b = /*referenced*/bar(a:)

@@ -485,6 +485,11 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
                            !isNestedLexicalBeginBorrow(bbi)))
     return next;
 
+  // Borrow scopes representing a VarDecl can't be eliminated during the raw
+  // stage because they may be needed for diagnostics.
+  if (bbi->isFromVarDecl() && (bbi->getModule().getStage() == SILStage::Raw))
+    return next;
+
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not
   // optimize such cases. Otherwise, we can eliminate our borrow and instead use

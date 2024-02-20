@@ -30,7 +30,7 @@ internal func hex<T: FixedWidthInteger>(_ value: T,
   return "\(prefix)\(padding)\(digits)"
 }
 
-internal func hex(_ bytes: [UInt8]) -> String {
+internal func hex(_ bytes: some Sequence<UInt8>) -> String {
   return bytes.map{ hex($0, prefix: false) }.joined(separator: "")
 }
 

@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
-#include "swift/Basic/Dwarf.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -36,22 +36,25 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
-#include "clang/Basic/CodeGenOptions.h"
-#include "llvm/IR/IRBuilder.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/Frontend/Debug/Options.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Support/ModRef.h"
 
 #include "Callee.h"
 #include "ConformanceDescription.h"
@@ -96,26 +99,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getCodeGenOpts();
-  if (CGO.OpaquePointers) {
-    LLVMContext.setOpaquePointers(true);
-  } else {
-    LLVMContext.setOpaquePointers(false);
-  }
-
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
   CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   switch (Opts.DebugInfoFormat) {
@@ -193,7 +190,7 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
 static void sanityCheckStdlib(IRGenModule &IGM) {
   if (!IGM.getSwiftModule()->isStdlibModule()) return;
 
-  // Only run the sanity check when we're building the real stdlib.
+  // Only run the soundness check when we're building the real stdlib.
   if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
 
   if (!IGM.ObjCInterop) return;
@@ -233,6 +230,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   EnableValueNames = opts.shouldProvideValueNames();
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
+  PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
@@ -575,7 +573,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   C_CC = getOptions().PlatformCCallingConvention;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
-  SwiftCC = llvm::CallingConv::Swift;
+
+  bool isSwiftCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_Swift)
+    == clang::TargetInfo::CCCR_OK;
+  if (isSwiftCCSupported) {
+    SwiftCC = llvm::CallingConv::Swift;
+  } else {
+    SwiftCC = DefaultCC;
+  }
 
   bool isAsyncCCSupported =
     clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
@@ -604,15 +610,22 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
-  // callee and caller signature to be the same. So LLVM adds dummy arguments for
-  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
-  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
-  // argument. To count up how many dummy arguments should be added, we need to mark
-  // it as `swifterror` even though it's not in register.
-  ShouldUseSwiftError =
-    clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
-      ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    // On WebAssembly, tail optional arguments are not allowed because Wasm
+    // requires callee and caller signature to be the same. So LLVM adds dummy
+    // arguments for `swiftself` and `swifterror`. If there is `swiftself` but
+    // is no `swifterror` in a swiftcc function or invocation, then LLVM adds
+    // dummy `swifterror` parameter or argument. To count up how many dummy
+    // arguments should be added, we need to mark it as `swifterror` even though
+    // it's not in register.
+    ShouldUseSwiftError = true;
+  } else if (!isSwiftCCSupported) {
+    ShouldUseSwiftError = false;
+  } else {
+    ShouldUseSwiftError =
+        clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
+            ClangCodeGen->CGM());
+  }
 
 #ifndef NDEBUG
   sanityCheckStdlib(*this);
@@ -639,6 +652,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       createStructType(*this, "swift.accessible_function",
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
+  AccessibleProtocolRequirementFunctionRecordTy =
+      createStructType(*this, "swift.distributed_accessible_function",
+                       {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
+                        RelativeAddressTy, Int32Ty,
+                        // Extra fields, after AccessibleFunctionRecordTy fields
+                        RelativeAddressTy, RelativeAddressTy});
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
@@ -662,7 +681,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
+  SwiftTaskOptionRecordTy = createStructType(
+      *this, "swift.task_option", {
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
@@ -671,11 +691,25 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy,    // Base option record
     SwiftTaskGroupPtrTy,        // Task group
   });
+  SwiftResultTypeInfoTaskOptionRecordTy = createStructType(
+      *this, "swift.result_type_info_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SizeTy,
+    SizeTy,
+    Int8PtrTy,
+    Int8PtrTy,
+    Int8PtrTy,
+  });
   ExecutorFirstTy = SizeTy;
   ExecutorSecondTy = SizeTy;
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
+      createStructType(*this, "swift.task_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
@@ -750,28 +784,15 @@ IRGenModule::~IRGenModule() {
 // They have to be non-local because otherwise we'll get warnings when
 // a particular x-macro expansion doesn't use one.
 namespace RuntimeConstants {
-  const auto ReadNone = llvm::Attribute::ReadNone;
-  const auto ReadOnly = llvm::Attribute::ReadOnly;
-  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
+  const auto ReadNone = llvm::MemoryEffects::none();
+  const auto ReadOnly = llvm::MemoryEffects::readOnly();
+  const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
+  const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
   const auto WillReturn = llvm::Attribute::WillReturn;
-
-#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
-  const auto NoEffect = RuntimeEffect::NoEffect;
-  const auto Locking = RuntimeEffect::Locking;
-  const auto Allocating = RuntimeEffect::Allocating;
-  const auto Deallocating = RuntimeEffect::Deallocating;
-  const auto RefCounting = RuntimeEffect::RefCounting;
-  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
-  const auto Concurrency = RuntimeEffect::Concurrency;
-  const auto AutoDiff = RuntimeEffect::AutoDiff;
-  const auto MetaData = RuntimeEffect::MetaData;
-  const auto Casting = RuntimeEffect::Casting;
-  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
-#endif
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
@@ -859,6 +880,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TaskExecutorAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTaskExecutorAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
@@ -871,6 +900,14 @@ namespace RuntimeConstants {
   RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
     auto featureAvailability = context.getDifferentiationAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability TypedThrowsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTypedThrowsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -922,6 +959,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::ConditionallyAvailable;
   }
 
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -935,6 +980,16 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
+
+static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effects) {
+    if (effects.empty())
+      return llvm::MemoryEffects::unknown();
+    llvm::MemoryEffects mergedEffects = llvm::MemoryEffects::none();
+    for (auto effect : effects)
+        mergedEffects |= effect;
+    return mergedEffects;
+}
+
 
 namespace {
 bool isStandardLibrary(const llvm::Module &M) {
@@ -975,15 +1030,12 @@ llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                  /*isVararg*/ false);
 }
 
-llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
-                      llvm::Constant *&cache,
-                      const char *name,
-                      llvm::CallingConv::ID cc,
-                      RuntimeAvailability availability,
-                      llvm::ArrayRef<llvm::Type*> retTypes,
-                      llvm::ArrayRef<llvm::Type*> argTypes,
-                      ArrayRef<Attribute::AttrKind> attrs,
-                      IRGenModule *IGM) {
+llvm::Constant *swift::getRuntimeFn(
+    llvm::Module &Module, llvm::Constant *&cache, const char *name,
+    llvm::CallingConv::ID cc, RuntimeAvailability availability,
+    llvm::ArrayRef<llvm::Type *> retTypes,
+    llvm::ArrayRef<llvm::Type *> argTypes, ArrayRef<Attribute::AttrKind> attrs,
+    ArrayRef<llvm::MemoryEffects> memEffects, IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -1036,7 +1088,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     if (!isStandardLibrary(Module) && IsExternal &&
         ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-    
+
     if (IsExternal && isWeakLinked
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
@@ -1053,6 +1105,13 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
+
+    llvm::MemoryEffects mergedEffects = mergeMemoryEffects(memEffects);
+    if (mergedEffects != llvm::MemoryEffects::unknown()) {
+      buildFnAttr.addAttribute(llvm::Attribute::getWithMemoryEffects(
+          Module.getContext(), mergedEffects));
+    }
+
     fn->addFnAttrs(buildFnAttr);
     fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
@@ -1101,9 +1160,10 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT) \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), \
-                QUOTE(ATTRS), QUOTE(EFFECT))
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
+                 MEMEFFECTS)                                                   \
+  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS),       \
+                QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
@@ -1111,15 +1171,19 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
+#define UNKNOWN_MEMEFFECTS                                                     \
+  {}
+#define MEMEFFECTS(...)                                                        \
+  { __VA_ARGS__ }
 
 #define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
-                      EFFECT)                                                  \
+                      EFFECT, MEMEFFECTS)                                      \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
-                        this);                                                 \
+                        MEMEFFECTS, this);                                     \
   }                                                                            \
   FunctionPointer IRGenModule::get##ID##FunctionPointer() {                    \
     using namespace RuntimeConstants;                                          \
@@ -1134,6 +1198,12 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
         attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
       else                                                                     \
         attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
+    }                                                                          \
+    llvm::MemoryEffects effects = mergeMemoryEffects(MEMEFFECTS);              \
+    if (effects != llvm::MemoryEffects::unknown()) {                           \
+      attrs = attrs.addFnAttribute(                                            \
+          getLLVMContext(),                                                    \
+          llvm::Attribute::getWithMemoryEffects(getLLVMContext(), effects));   \
     }                                                                          \
     auto sig = Signature(fnTy, attrs, CC);                                     \
     return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,     \
@@ -1177,7 +1247,7 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
   llvm::Constant *IRGenModule::get##NAME() {                                   \
     if (NAME)                                                                  \
       return NAME;                                                             \
-    NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy);            \
+    NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
     if (useDllStorage() && !isStandardLibrary())                               \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
@@ -1381,6 +1451,12 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
+
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    Attrs.addAttribute(llvm::Attribute::NoUnwind);
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
@@ -1436,7 +1512,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_insensitive(".lib"))
+    if (!library.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
@@ -1466,21 +1542,30 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
   if (Context.LangOpts.hasFeature(Feature::Embedded))
     return;
-  
-  switch (linkLib.getKind()) {
-  case LibraryKind::Library: {
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
-  case LibraryKind::Framework: {
-    // If we're supposed to disable autolinking of this framework, bail out.
-    auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
-    if (std::find(frameworks.begin(), frameworks.end(), linkLib.getName())
-          != frameworks.end())
-      return;
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
+
+  // '-disable-autolinking' means we will not auto-link
+  // any loaded library at all.
+  if (!IRGen.Opts.DisableAllAutolinking) {
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library: {
+      auto &libraries = IRGen.Opts.DisableAutolinkLibraries;
+      if (llvm::find(libraries, linkLib.getName()) != libraries.end())
+	return;
+      AutolinkEntries.emplace_back(linkLib);
+      break;
+    }
+    case LibraryKind::Framework: {
+      // 'disable-autolink-frameworks' means we will not auto-link
+      // any loaded framework.
+      if (!IRGen.Opts.DisableFrameworkAutolinking) {
+	auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
+	if (llvm::find(frameworks, linkLib.getName()) != frameworks.end())
+	  return;
+	AutolinkEntries.emplace_back(linkLib);
+      }
+      break;
+    }
+    }
   }
 
   if (linkLib.shouldForceLoad()) {
@@ -1771,7 +1856,7 @@ void IRGenModule::emitAutolinkInfo() {
   StringRef AutolinkSectionName = Autolink.getSectionNameMetadata();
 
   auto *Metadata = Module.getOrInsertNamedMetadata(AutolinkSectionName);
-  llvm::SmallSetVector<llvm::MDNode *, 4> Entries;
+  swift::SmallSetVector<llvm::MDNode *, 4> Entries;
 
   // Collect the linker options already in the module (from ClangCodeGen).
   for (auto Entry : Metadata->operands()) {
@@ -1919,6 +2004,20 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+#define FEATURE(N, V)                                                   \
+bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {  \
+  auto deploymentAvailability                                           \
+    = AvailabilityContext::forDeploymentTarget(context);                \
+  auto runtimeAvailability                                              \
+    = AvailabilityContext::forRuntimeTarget(context);                   \
+  return deploymentAvailability.isContainedIn(                          \
+    context.get##N##Availability())                                     \
+    && runtimeAvailability.isContainedIn(                               \
+      context.get##N##RuntimeAvailability());                           \
+}
+
+#include "swift/AST/FeatureAvailability.def"
+
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
       (Triple.isOSDarwin() || Triple.isOSWindows() ||
@@ -1935,14 +2034,15 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          canPrespecializeTarget;
 }
 
-bool IRGenModule::canMakeStaticObjectsReadOnly() {
-  // Unconditionally disable this until we can fix the metadata.
-  // The trick of using the Empty array metadata for static arrays
-  // breaks Obj-C interop quite badly.
-  // rdar://101126543
-  return false;
+bool IRGenModule::canUseObjCSymbolicReferences() {
+  if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
+    return false;
+  return isObjCSymbolicReferencesFeatureAvailable(
+    getSwiftModule()->getASTContext()
+  );
+}
 
-#if 0
+bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -1951,9 +2051,33 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   if (!Triple.isOSDarwin())
     return false;
 
-  return getAvailabilityContext().isContainedIn(
-          Context.getImmortalRefCountSymbolsAvailability());
-#endif
+  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  if (!clDecl)
+    return false;
+
+  // Currently only arrays can be put into a read-only data section.
+  // "Regular" classes have dynamically initialized metadata, which needs to be
+  // stored into the isa field at runtime.
+  if (clDecl->getNameStr() != "_ContiguousArrayStorage")
+    return false;
+
+  if (!isStaticReadOnlyArraysFeatureAvailable())
+    return false;
+
+  if (!getStaticArrayStorageDecl())
+    return false;
+
+  return true;
+}
+
+ClassDecl *IRGenModule::getStaticArrayStorageDecl() {
+  SmallVector<ValueDecl *, 1> results;
+  Context.lookupInSwiftModule("__StaticArrayStorage", results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<ClassDecl>(results[0]);
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
@@ -2108,3 +2232,8 @@ bool swift::writeEmptyOutputFilesFor(
   }
   return false;
 }
+IRGenModule::AccessibleProtocolFunctionsData::AccessibleProtocolFunctionsData(
+    SILFunction *function, const std::optional<std::string> &mangledRecordName,
+    const std::optional<std::string> &concreteMangledTypeName)
+    : function(function), mangledRecordName(mangledRecordName),
+      concreteMangledTypeName(concreteMangledTypeName) {}

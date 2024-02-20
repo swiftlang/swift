@@ -225,9 +225,8 @@ public:
     }
 
     auto substErrorResult = origType->getOptionalErrorResult();
-    assert(!substErrorResult ||
-           (!substErrorResult->getInterfaceType()->hasTypeParameter() &&
-            !substErrorResult->getInterfaceType()->hasArchetype()));
+    if (substErrorResult)
+      substErrorResult = substInterface(*substErrorResult);
 
     SmallVector<SILParameterInfo, 8> substParams;
     substParams.reserve(origType->getParameters().size());
@@ -307,7 +306,7 @@ public:
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
     return SILParameterInfo(visit(orig.getInterfaceType()),
-                            orig.getConvention(), orig.getDifferentiability());
+                            orig.getConvention(), orig.getOptions());
   }
 
   CanType visitSILPackType(CanSILPackType origType) {
@@ -349,6 +348,8 @@ public:
                                 [&](Type substExpansionShape) {
       CanType substComponentType = visit(origType.getPatternType());
       if (substExpansionShape) {
+        if (auto packArchetype = substExpansionShape->getAs<PackArchetypeType>())
+          substExpansionShape = packArchetype->getReducedShape();
         substComponentType = CanPackExpansionType::get(substComponentType,
                                     substExpansionShape->getCanonicalType());
       }

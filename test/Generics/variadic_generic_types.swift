@@ -96,3 +96,23 @@ func bindAliasPrefixAndSuffix() {
   typealias Three = Bind<Int, String, Float> // OK
   typealias Four = Bind<Int, String, Float, Bool> // OK
 }
+
+func invalidPackExpansion<each X, each Y, Z>(x: repeat each X, y: repeat each Y, z: Z) {
+  typealias A<T, each U> = (T, repeat each U) // expected-note 4{{generic type 'A' declared here}}
+  typealias B<each T, U> = (repeat each T, U) // expected-note 4{{generic type 'B' declared here}}
+
+  typealias One = A<repeat each X> // expected-error {{generic type 'A' specialized with mismatched type parameter pack}}
+  typealias Two = A<repeat each X, repeat each Y> // expected-error {{generic type 'A' specialized with mismatched type parameter pack}}
+  typealias Three = A<repeat each X, Z> // expected-error {{generic type 'A' specialized with mismatched type parameter pack}}
+  typealias Four = A<repeat each X, repeat each Y, Z> // expected-error {{generic type 'A' specialized with mismatched type parameter pack}}
+
+  typealias Five = B<repeat each X> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
+  typealias Six = B<repeat each X, repeat each Y> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
+  typealias Seven = B<Z, repeat each X> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
+  typealias Eight = B<Z, repeat each X, repeat each Y> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
+}
+
+func packExpansionInScalarArgument<each T>(_: repeat each T) {
+  typealias A<U> = U
+  typealias One = A<repeat each T> // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
+}

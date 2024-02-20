@@ -28,7 +28,7 @@ EnumSynthesisTests.test("BasicEquatability/Hashability") {
   ], equalityOracle: { $0 == $1 })
 }
 
-// Not guaranteed by the semantics of Hashable, but we sanity check that the
+// Not guaranteed by the semantics of Hashable, but we soundness check that the
 // synthesized hash function is good enough to not let nearby values collide.
 EnumSynthesisTests.test("CloseValuesDoNotCollide") {
   expectNotEqual(Token.string("foo").hashValue, Token.string("goo").hashValue)

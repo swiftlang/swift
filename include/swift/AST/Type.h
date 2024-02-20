@@ -521,6 +521,9 @@ public:
     return isAnyExistentialTypeImpl(*this);
   }
 
+  /// Is this type the error existential, 'any Error'?
+  bool isErrorExistentialType() const;
+
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 

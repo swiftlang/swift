@@ -14,55 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/DriverTool/DriverTool.h"
-#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Option/Options.h"
-#include "clang/CAS/CASOptions.h"
-#include "llvm/CAS/ActionCache.h"
-#include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
-#include "llvm/CAS/ObjectStore.h"
-#include "llvm/Support/Error.h"
-#include <memory>
 
 using namespace swift::dependencies;
 
-namespace {
-/// Helper class to manage CAS/Caching from libSwiftScan C APIs.
-class SwiftScanCAS {
-public:
-  // Compute the CASID for PCH output from invocation.
-  llvm::Expected<std::string> computeCacheKey(llvm::ArrayRef<const char *> Args,
-                                              llvm::StringRef InputPath,
-                                              swift::file_types::ID OutputKind);
-
-  // Store content into CAS.
-  llvm::Expected<std::string> storeContent(llvm::StringRef Content);
-
-  // Construct SwiftScanCAS.
-  static llvm::Expected<SwiftScanCAS *>
-  createSwiftScanCAS(llvm::StringRef Path);
-
-  static llvm::Expected<SwiftScanCAS *>
-  createSwiftScanCAS(clang::CASOptions &CASOpts);
-
-private:
-  SwiftScanCAS(std::shared_ptr<llvm::cas::ObjectStore> CAS,
-               std::shared_ptr<llvm::cas::ActionCache> Cache)
-      : CAS(CAS), Cache(Cache) {}
-
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  std::shared_ptr<llvm::cas::ActionCache> Cache;
-};
-} // namespace
-
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(clang::CASOptions, swiftscan_cas_options_t)
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(SwiftScanCAS, swiftscan_cas_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
 
@@ -82,6 +43,8 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.bridging_module_dependencies);
     swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.swift_overlay_module_dependencies);
+    swiftscan_string_set_dispose(
         details_impl->swift_textual_details.command_line);
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.extra_pcm_args);
@@ -100,6 +63,10 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.module_doc_path);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_source_info_path);
+    swiftscan_string_set_dispose(
+        details_impl->swift_binary_details.swift_overlay_module_dependencies);
+    swiftscan_string_set_dispose(
+        details_impl->swift_binary_details.header_dependencies);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_cache_key);
     break;
@@ -163,9 +130,6 @@ void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
   INITIALIZE_LLVM();
-  // We must initialize the swift modules responsible for parsing functionality,
-  // such as parsing regex.
-  initializeSwiftParseModules();
   return wrap(new DependencyScanningTool());
 }
 
@@ -376,6 +340,12 @@ swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.module_source_info_path;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.swift_overlay_module_dependencies;
 }
 
 swiftscan_string_set_t *
@@ -594,7 +564,7 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
                                   std::vector<std::string> &frontendOptions) {
   if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
     auto name = table.getOptionName(id);
-    if (strlen(name) > 0) {
+    if (!name.empty()) {
       frontendOptions.push_back(std::string(name));
     }
   }
@@ -701,140 +671,6 @@ swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics){
   }
   delete[] diagnostics->diagnostics;
   delete diagnostics;
-}
-
-//=== CAS Functions ----------------------------------------------------------//
-
-swiftscan_cas_options_t swiftscan_cas_options_create() {
-  clang::CASOptions *CASOpts = new clang::CASOptions();
-  return wrap(CASOpts);
-}
-
-void swiftscan_cas_options_dispose(swiftscan_cas_options_t options) {
-  delete unwrap(options);
-}
-
-void swiftscan_cas_options_set_ondisk_path(swiftscan_cas_options_t options,
-                                           const char *path) {
-  unwrap(options)->CASPath = path;
-}
-
-void swiftscan_cas_options_set_plugin_path(swiftscan_cas_options_t options,
-                                           const char *path) {
-  unwrap(options)->PluginPath = path;
-}
-
-bool swiftscan_cas_options_set_option(swiftscan_cas_options_t options,
-                                      const char *name, const char *value,
-                                      swiftscan_string_ref_t *error) {
-  unwrap(options)->PluginOptions.emplace_back(name, value);
-  return false;
-}
-
-swiftscan_cas_t
-swiftscan_cas_create_from_options(swiftscan_cas_options_t options,
-                                  swiftscan_string_ref_t *error) {
-  clang::CASOptions *opts = unwrap(options);
-  auto cas = SwiftScanCAS::createSwiftScanCAS(*opts);
-  if (!cas) {
-    *error =
-        swift::c_string_utils::create_clone(toString(cas.takeError()).c_str());
-    return nullptr;
-  }
-  return wrap(*cas);
-}
-
-void swiftscan_cas_dispose(swiftscan_cas_t cas) { delete unwrap(cas); }
-
-swiftscan_string_ref_t swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data,
-                                           unsigned size,
-                                           swiftscan_string_ref_t *error) {
-  llvm::StringRef StrContent((char*)data, size);
-  auto ID = unwrap(cas)->storeContent(StrContent);
-  if (!ID) {
-    *error =
-        swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
-    return swift::c_string_utils::create_null();
-  }
-  return swift::c_string_utils::create_clone(ID->c_str());
-}
-
-static swift::file_types::ID
-getFileTypeFromScanOutputKind(swiftscan_output_kind_t kind) {
-  switch (kind) {
-  case SWIFTSCAN_OUTPUT_TYPE_OBJECT:
-    return swift::file_types::ID::TY_Object;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTMODULE:
-    return swift::file_types::ID::TY_SwiftModuleFile;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTINTERFACE:
-    return swift::file_types::ID::TY_SwiftModuleInterfaceFile;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTPRIVATEINTERFACE:
-    return swift::file_types::ID::TY_PrivateSwiftModuleInterfaceFile;
-  case SWIFTSCAN_OUTPUT_TYPE_CLANG_MODULE:
-    return swift::file_types::ID::TY_ClangModuleFile;
-  case SWIFTSCAN_OUTPUT_TYPE_CLANG_PCH:
-    return swift::file_types::ID::TY_PCH;
-  }
-}
-
-swiftscan_string_ref_t
-swiftscan_compute_cache_key(swiftscan_cas_t cas, int argc, const char **argv,
-                            const char *input, swiftscan_output_kind_t kind,
-                            swiftscan_string_ref_t *error) {
-  std::vector<const char *> Compilation;
-  for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
-
-  auto ID = unwrap(cas)->computeCacheKey(Compilation, input,
-                                         getFileTypeFromScanOutputKind(kind));
-  if (!ID) {
-    *error =
-        swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
-    return swift::c_string_utils::create_null();
-  }
-  return swift::c_string_utils::create_clone(ID->c_str());
-}
-
-llvm::Expected<SwiftScanCAS *>
-SwiftScanCAS::createSwiftScanCAS(llvm::StringRef Path) {
-  clang::CASOptions Opts;
-  Opts.CASPath = Path;
-
-  return createSwiftScanCAS(Opts);
-}
-
-llvm::Expected<SwiftScanCAS *>
-SwiftScanCAS::createSwiftScanCAS(clang::CASOptions &CASOpts) {
-  auto DB = CASOpts.getOrCreateDatabases();
-  if (!DB)
-    return DB.takeError();
-
-  return new SwiftScanCAS(std::move(DB->first), std::move(DB->second));
-}
-
-llvm::Expected<std::string>
-SwiftScanCAS::computeCacheKey(llvm::ArrayRef<const char *> Args,
-                              llvm::StringRef InputPath,
-                              swift::file_types::ID OutputKind) {
-  auto BaseKey = swift::createCompileJobBaseCacheKey(*CAS, Args);
-  if (!BaseKey)
-    return BaseKey.takeError();
-
-  auto Key = swift::createCompileJobCacheKeyForOutput(*CAS, *BaseKey, InputPath,
-                                                      OutputKind);
-  if (!Key)
-    return Key.takeError();
-
-  return CAS->getID(*Key).toString();
-}
-
-llvm::Expected<std::string>
-SwiftScanCAS::storeContent(llvm::StringRef Content) {
-  auto Result = CAS->storeFromString({}, Content);
-  if (!Result)
-    return Result.takeError();
-
-  return CAS->getID(*Result).toString();
 }
 
 //=== Experimental Compiler Invocation Functions ------------------------===//

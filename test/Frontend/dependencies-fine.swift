@@ -1,3 +1,5 @@
+// REQUIRES: rdar114207865
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -resolve-imports "%S/../Inputs/empty file.swift" | %FileCheck -check-prefix=CHECK-BASIC %s

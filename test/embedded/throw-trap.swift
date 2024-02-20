@@ -2,8 +2,8 @@
 // RUN: %target-swift-frontend -emit-sil %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-SIL
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-IR
 
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_in_compiler
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 enum MyError : Error {
   case a
@@ -23,7 +23,7 @@ public func catching1() {
   }
 }
 
-// CHECK-EXISTENTIALS: error: existential can cause metadata allocation or locks
+// CHECK-EXISTENTIALS: error: cannot use a value of protocol type 'any Error' in embedded Swift
 
 // CHECK-TRAPS-SIL:      sil @$s4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK-TRAPS-SIL-NEXT: bb0:

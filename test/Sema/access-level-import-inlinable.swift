@@ -18,8 +18,7 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -enable-library-evolution -swift-version 5 -verify \
 // RUN:   -package-name package
 
 //--- PublicLib.swift

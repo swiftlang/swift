@@ -170,6 +170,13 @@ import objc_implementation_private
 
   func instanceMethod1(_: CInt) {}
   func instanceMethod2(_: CInt) {}
+
+  @objc func extensionMethod(fromHeader1: CInt) {}
+  @objc func extensionMethod(fromHeader2: CInt) {}
+
+  @objc(copyWithZone:) func copy(with zone: NSZone?) -> Any { self }
+
+  let rdar122280735: (@escaping () -> ()) -> Void = { _ in }
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {

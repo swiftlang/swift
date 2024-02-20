@@ -1,5 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking  -enable-actor-data-race-checks %import-libdispatch -parse-as-library) > %t.log 2>&1
-// RUN: %FileCheck %s < %t.log
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %import-libdispatch -Xfrontend -disable-availability-checking -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
+// RUN: %target-codesign %t/a.out
+// RUN: env %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -59,14 +61,14 @@ actor MyActor {
 struct Runner {
   static func main() async {
     print("Launching a main-actor task")
-    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:23 was not called on the main thread
+    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:25 was not called on the main thread
     launchFromMainThread()
     sleep(1)
 
     let actor = MyActor()
     let actorFn = await actor.getTaskOnMyActor()
     print("Launching an actor-instance task")
-    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection.swift:52 was not called on the same actor
+    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection.swift:54 was not called on the same actor
     launchTask(actorFn)
 
     sleep(1)

@@ -2,6 +2,12 @@
 
 import Builtin
 
+class Klass {}
+@_moveOnly struct MoveOnlyPair {
+  var lhs: Klass
+  var rhs: Klass
+}
+
 // CHECK-LABEL: sil [ossa] @test_copy_release_value
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Builtin.NativeObject
@@ -52,7 +58,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: [[REGISTER_4:%[^,]+]] = move_value [allows_diagnostics] [lexical] [[REGISTER_3]]
 // CHECK-NEXT: [[REGISTER_5:%[^,]+]] = move_value [allows_diagnostics] [lexical] [[REGISTER_4]]
 // CHECK-NEXT: [[REGISTER_6:%[^,]+]] = move_value [allows_diagnostics] [lexical] [pointer_escape] [[REGISTER_5]]
-// CHECK-NEXT: return [[REGISTER_6]]
+// CHECK-NEXT: [[REGISTER_7:%[^,]+]] = move_value [var_decl] [[REGISTER_6]]
+// CHECK-NEXT: return [[REGISTER_7]]
 // CHECK-NEXT: } // end sil function 'test_movevalue_parsing'
 sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -62,7 +69,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %4 = move_value [allows_diagnostics] [lexical] %3 : $Builtin.NativeObject
   %5 = move_value [lexical] [allows_diagnostics] %4 : $Builtin.NativeObject
   %6 = move_value [pointer_escape] [lexical] [allows_diagnostics] %5 : $Builtin.NativeObject
-  return %6 : $Builtin.NativeObject
+  %7 = move_value [var_decl] %6 : $Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -217,5 +225,110 @@ bb0:
   %1 = moveonlywrapper_to_copyable_box %0 : ${ var @moveOnly Builtin.NativeObject }
   dealloc_box %1 : ${ var Builtin.NativeObject }
   %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_assign : $@convention(thin) (@in Builtin.NativeObject, @in (Builtin.NativeObject, Builtin.NativeObject)) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*Builtin.NativeObject,
+// CHECK: [[RHS:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [assign] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $*Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_assign'
+sil [ossa] @tuple_addr_constructor_assign : $@convention(thin) (@in Builtin.NativeObject, @in (Builtin.NativeObject, Builtin.NativeObject)) -> () {
+bb0(%0 : $*Builtin.NativeObject, %0a : $*(Builtin.NativeObject, Builtin.NativeObject)):
+  %1 = alloc_stack $Builtin.NativeObject
+  copy_addr %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  copy_addr [take] %0a to [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [assign] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_init : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*
+// CHECK: [[RHS:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [init] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $*Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_init'
+sil [ossa] @tuple_addr_constructor_init : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  copy_addr %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_differing_category : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*Builtin.NativeObject, [[RHS:%.*]] : @owned $Builtin.NativeObject)
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [init] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_differing_category'
+sil [ossa] @tuple_addr_constructor_differing_category : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_unfriendly_tuple : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*((), (Builtin.NativeObject, Builtin.NativeObject)) with
+sil [ossa] @tuple_addr_constructor_unfriendly_tuple : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = alloc_stack $((), (Builtin.NativeObject, Builtin.NativeObject))
+  tuple_addr_constructor [init] %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject)) with (%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  destroy_addr %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject))
+  dealloc_stack %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject))
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: [[MD1:%.*]] = mark_dependence %1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+// CHECK: [[MD2:%.*]] = mark_dependence [nonescaping] [[MD1]] : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+// CHECK: mark_dependence [unresolved] [[MD2]] : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+// CHECK: } // end sil function 'test_mark_dependence'
+sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %md1 = mark_dependence %1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+  %md2 = mark_dependence [nonescaping] %md1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+  %md3 = mark_dependence [unresolved] %md2 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+  destroy_value %md3 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: mark_unresolved_non_copyable_value [consumable_and_assignable] %{{[0-9]+}} : $*MoveOnlyPair
+// CHECK: } // end sil function 'testMarkUnresolvedNonCopyableValueInst'
+sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_box ${ var MoveOnlyPair }
+  %2 = project_box %1 : ${ var MoveOnlyPair }, 0
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*MoveOnlyPair
+  %3c = begin_access [modify] [static] %3 : $*MoveOnlyPair
+  %3a = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.lhs
+  %3b = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.rhs
+  %0a = copy_value %0 : $Klass
+  %0b = copy_value %0 : $Klass
+  store %0a to [init] %3a : $*Klass
+  store %0b to [init] %3b : $*Klass
+  end_access %3c : $*MoveOnlyPair
+
+  destroy_value %1 : ${ var MoveOnlyPair }
+
+  %9999 = tuple()
   return %9999 : $()
 }

@@ -33,16 +33,20 @@ using SILValueOwnershipField = BCFixed<2>;
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
   SIL_OBJC_SELECTOR,
-  SIL_BYTES
+  SIL_BYTES,
+  SIL_UTF8_OSLOG
 };
 
 enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PUBLIC,
   SIL_LINKAGE_PUBLIC_NON_ABI,
+  SIL_LINKAGE_PACKAGE,
+  SIL_LINKAGE_PACKAGE_NON_ABI,
   SIL_LINKAGE_HIDDEN,
   SIL_LINKAGE_SHARED,
   SIL_LINKAGE_PRIVATE,
   SIL_LINKAGE_PUBLIC_EXTERNAL,
+  SIL_LINKAGE_PACKAGE_EXTERNAL,
   SIL_LINKAGE_HIDDEN_EXTERNAL,
 };
 using SILLinkageField = BCFixed<4>;
@@ -81,6 +85,8 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
 ///
 /// \sa SIL_INDEX_BLOCK_ID
 namespace sil_index_block {
+// clang-format off
+
   // These IDs must \em not be renumbered or reordered without incrementing
   // the module version.
   enum RecordKind {
@@ -111,12 +117,16 @@ namespace sil_index_block {
     BCFixed<4>,  // record ID
     BCArray<BitOffsetField>
   >;
+
+// clang-format on
 }
 
 /// The record types within the "sil" block.
 ///
 /// \sa SIL_BLOCK_ID
 namespace sil_block {
+// clang-format off
+
   // These IDs must \em not be renumbered or reordered without incrementing
   // the module version.
   enum RecordKind : uint8_t {
@@ -128,6 +138,7 @@ namespace sil_block {
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
     SIL_ONE_TYPE_OWNERSHIP_VALUES,
+    SIL_ONE_TYPE_VALUES_CATEGORIES,
     SIL_TWO_OPERANDS,
     SIL_TAIL_ADDR,
     SIL_INST_APPLY,
@@ -301,7 +312,6 @@ namespace sil_block {
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
-                     DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      ModuleIDField, // Parent ModuleDecl *
@@ -376,10 +386,10 @@ namespace sil_block {
   // SIL instructions with one type and a list of values.
   using SILOneTypeValuesLayout = BCRecordLayout<
     SIL_ONE_TYPE_VALUES,
-    SILInstOpCodeField,
-    TypeIDField,
-    SILTypeCategoryField,
-    BCArray<ValueIDField>
+    SILInstOpCodeField,      // opcode
+    TypeIDField,             // destType
+    SILTypeCategoryField,    // destCategory
+    BCArray<ValueIDField>    // operand ids
   >;
 
   // SIL instructions with one type, forwarding ownership, and a list of values.
@@ -391,6 +401,15 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     BCArray<ValueIDField>>;
+
+  using SILOneTypeValuesCategoriesLayout = BCRecordLayout<
+    SIL_ONE_TYPE_VALUES_CATEGORIES,
+    SILInstOpCodeField,           // opcode
+    TypeIDField,                  // destType
+    SILTypeCategoryField,         // destCategory
+    BCFixed<1>,                   // options
+    BCArray<BCFixed<32>>          // operand id and categories.
+  >;
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,
@@ -408,6 +427,8 @@ namespace sil_block {
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
+    ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
+    ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
     BCArray<ValueIDField> // a list of arguments
   >;
 
@@ -419,13 +440,13 @@ namespace sil_block {
   // SIL instructions with one typed valueref. (dealloc_stack, return)
   using SILOneOperandLayout =
       BCRecordLayout<SIL_ONE_OPERAND, SILInstOpCodeField,
-                     BCFixed<3>, // Optional attributes
+                     BCFixed<4>, // Optional attributes
                      TypeIDField, SILTypeCategoryField, ValueIDField>;
 
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<6>, // Optional attributes
+    BCFixed<7>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
@@ -452,7 +473,7 @@ namespace sil_block {
   using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<6>,          // Optional attributes
+    BCFixed<7>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
@@ -566,6 +587,8 @@ namespace sil_block {
     ValueIDField,               // decl
     BCArray<IdentifierIDField>  // referenced functions
   >;
+
+// clang-format on
 }
 
 } // end namespace serialization

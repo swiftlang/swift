@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -19,6 +19,7 @@
 import Distributed
 import FakeDistributedActorSystems
 
+@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 @available(SwiftStdlib 5.9, *) // because conforming to the protocol... that has this field in 5.9?
@@ -28,7 +29,7 @@ distributed actor Worker {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     MainActor.assumeIsolated {
       print("assume: this distributed actor shares executor with MainActor")
@@ -38,6 +39,7 @@ distributed actor Worker {
 
 }
 
+@available(SwiftStdlib 5.9, *)
 @main struct Main {
   static func main() async {
     let worker = Worker(actorSystem: DefaultDistributedActorSystem())

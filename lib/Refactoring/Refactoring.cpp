@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Refactoring/Refactoring.h"
-#include "LocalRename.h"
 #include "RefactoringActions.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
@@ -156,7 +155,8 @@ swift::ide::collectRefactorings(SourceFile *SF, RangeConfig Range,
                                        DiagConsumers);
 
   // No refactorings are available within generated buffers
-  if (SF->Kind == SourceFileKind::MacroExpansion)
+  if (SF->Kind == SourceFileKind::MacroExpansion ||
+      SF->Kind == SourceFileKind::DefaultArgument)
     return {};
 
   // Prepare the tool box.
@@ -210,6 +210,7 @@ case RefactoringKind::KIND: {                                                  \
       return true;                                                             \
   }
 #include "swift/Refactoring/RefactoringKinds.def"
+    case RefactoringKind::LocalRename:
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
     case RefactoringKind::FindLocalRenameRanges:

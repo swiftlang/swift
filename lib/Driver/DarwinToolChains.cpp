@@ -14,7 +14,6 @@
 
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/PlatformKind.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -84,7 +83,8 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                      ":", options::OPT_L, context.Args,
                                      runtimeLibraryPaths);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
-                                     ":", options::OPT_F, context.Args);
+                                     ":", options::OPT_F, context.Args,
+                                     {"/System/Library/Frameworks"});
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
   return II;
 }
@@ -318,8 +318,13 @@ toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
   // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
-  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address) {
+    if (context.OI.SanitizerUseStableABI)
+      addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan_abi",
+                                       *this, false);
+    else
+      addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+  }
 
   if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
@@ -379,6 +384,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
     } else if (value.equals("5.8")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
+    } else if (value.equals("5.11")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = llvm::None;
     } else {
@@ -626,6 +633,28 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
   }
 }
 
+static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
+  llvm::VersionTuple osVersion;
+  const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
+  switch (kind) {
+  case DarwinPlatformKind::MacOS:
+    triple.getMacOSXVersion(osVersion);
+    if (osVersion < llvm::VersionTuple(10, 11))
+      return 2;
+    return 4;
+  case DarwinPlatformKind::IPhoneOSSimulator:
+  case DarwinPlatformKind::IPhoneOS:
+  case DarwinPlatformKind::TvOS:
+  case DarwinPlatformKind::TvOSSimulator:
+    osVersion = triple.getiOSVersion();
+    if (osVersion < llvm::VersionTuple(9))
+      return 2;
+    return 4;
+  default:
+    return 4;
+  }
+}
+
 void toolchains::Darwin::addCommonFrontendArgs(
     const OutputInfo &OI, const CommandOutput &output,
     const llvm::opt::ArgList &inputArgs,
@@ -644,6 +673,16 @@ void toolchains::Darwin::addCommonFrontendArgs(
           inputArgs.MakeArgString(variantSDKVersion->getAsString()));
     }
   }
+  std::string dwarfVersion;
+  {
+    llvm::raw_string_ostream os(dwarfVersion);
+    os << "-dwarf-version=";
+    if (OI.DWARFVersion)
+      os << *OI.DWARFVersion;
+    else
+      os << getDWARFVersionForTriple(getTriple());
+  }
+  arguments.push_back(inputArgs.MakeArgString(dwarfVersion));
 }
 
 /// Add the frontend arguments needed to find external plugins in standard

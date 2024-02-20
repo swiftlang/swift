@@ -380,6 +380,12 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
+public enum MultiPayloadEnumMultiLarge {
+    case empty
+    case nonEmpty(Int, SimpleClass, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+    case nonEmpty2(SimpleClass, Int, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+}
+
 public struct MixedEnumWrapper {
     let x: SinglePayloadSimpleClassEnum
     let y: MultiPayloadEnum
@@ -406,6 +412,16 @@ public struct SinglePayloadEnumExtraTagBytesWrapper {
 
     public init(x: SinglePayloadEnumExtraTagBytes, y: SimpleClass) {
         self.x = x
+        self.y = y
+    }
+}
+
+public struct NotBitwiseTakableBridge<T> {
+    let x: Int = 0
+    let y: [T]
+    weak var z: AnyObject? = nil
+
+    public init(_ y: [T]) {
         self.y = y
     }
 }
@@ -543,6 +559,41 @@ public enum PrespecializedMultiPayloadEnum<T> {
     case nonEmpty1(T, Int)
 }
 
+public enum SinglePayloadEnumExistential {
+    case a(SomeProtocol, AnyObject)
+    case b
+    case c
+}
+
+public struct TupleLargeAlignment<T> {
+    let x: AnyObject? = nil
+    let x1: AnyObject? = nil
+    let x2: AnyObject? = nil
+    let x3: (T, SIMD4<Int64>)
+
+    public init(_ t: T) {
+        self.x3 = (t, .init(Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32))
+    }
+}
+
+public enum NestedMultiPayloadInner {
+    case a(UInt)
+    case b(AnyObject)
+    case c(AnyObject)
+}
+
+public enum NestedMultiPayloadOuter {
+    case a(NestedMultiPayloadInner)
+    case b(NestedMultiPayloadInner)
+    case c(NestedMultiPayloadInner)
+}
+
+public enum MultiPayloadError {
+    case empty
+    case error1(Int, Error)
+    case error2(Int, Error)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -571,13 +622,18 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
-    ptr.assign(from: x, count: 1)
+public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
+    ptr.update(from: &x, count: 1)
 }
 
 @inline(never)
 public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
     ptr.initialize(to: x)
+}
+
+@inline(never)
+public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
+    ptr.initialize(to: consume x)
 }
 
 @inline(never)
@@ -618,10 +674,10 @@ public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) 
 
 @inline(never)
 public func testGenericArrayInitWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.initialize(fromContentsOf: src)
+    _ = dest.initialize(fromContentsOf: src)
 }
 
 @inline(never)
 public func testGenericArrayAssignWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.update(fromContentsOf: src)
+    _ = dest.update(fromContentsOf: src)
 }

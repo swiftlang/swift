@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking %s -o /dev/null -verify -emit-sil
 // RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil
-// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

@@ -90,7 +90,7 @@ doit()
 //              CHECK:   call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCySiGMb"
 //              CHECK: }
 
-//              CHECK: ; Function Attrs: noinline nounwind readnone
+//              CHECK: ; Function Attrs: noinline nounwind memory(none)
 //              CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
 //              CHECK:   [[SUPERCLASS_METADATA:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s10TestModule9Ancestor1CMa"([[INT]] 0)
 //      CHECK-unknown:   ret

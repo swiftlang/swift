@@ -306,7 +306,7 @@ public func unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil [ossa] @$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
-// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $any Error
+// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] %{{.*}} : $any Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $any Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
@@ -365,8 +365,16 @@ public struct EnumSeq<Base : Seq> : Seq {
 }
 
 extension Collection {
+  func myMap<T>(_ body: (Element) -> T) -> [T] {
+    var result = [T]()
+    for element in self {
+      result.append(body(element))
+    }
+    return result
+  }
+
   func transformEachElement<U>(_ cl: (Element) -> U) -> [U] {
-    return map(cl)
+    return myMap(cl)
   }
 }
 
@@ -501,11 +509,11 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
 // CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
 // CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
 // CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
-// CHECK:         [[YES_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[YES_VALUE]]
+// CHECK:         [[YES_LIFETIME:%[^,]+]] = move_value [lexical] [var_decl] [[YES_VALUE]]
 // CHECK:         [[YES_COPY:%[^,]+]] = copy_value [[YES_LIFETIME]]
 // CHECK:         store [[YES_COPY]] to [init] [[RESULT_STORAGE]]
 // CHECK:       [[AND_BLOCK]]([[AND_VALUE:%[^,]+]] :
-// CHECK:         [[AND_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[AND_VALUE]]
+// CHECK:         [[AND_LIFETIME:%[^,]+]] = move_value [lexical] [var_decl] [[AND_VALUE]]
 // CHECK:         [[AND_COPY:%[^,]+]] = copy_value [[AND_LIFETIME]]
 // CHECK:         store [[AND_COPY]] to [init] [[RESULT_STORAGE]]
 // CHECK-LABEL: } // end sil function 'EnumWithTwoSameAddressOnlyPayloads_getPayload'
@@ -805,7 +813,7 @@ func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
 
 // CHECK-LABEL: sil {{.*}}[ossa] @consumeExprOfLoadExprOfOwnedAddrOnlyLValue : {{.*}} {
 // CHECK:         [[VAR:%[^,]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <T>
-// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR]]
 // CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
 // CHECK:         store {{%[^,]+}} to [init] [[VAR_ADDR]]
 // CHECK:         [[VAR_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
@@ -822,4 +830,47 @@ func consumeExprOfOwnedAddrOnlyValue<T>(_ t: __owned T) {
 func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
   var t = source(ty)
   sink(consume t)
+}
+
+struct Twople<T> {
+  var storage: (T, T)
+
+// CHECK-LABEL: sil {{.*}}[ossa] @Twople_init_from_t1_t2 : {{.*}} {
+// CHECK:       bb0([[T1:%[^,]+]] : 
+// CHECK-SAME:      [[T2:%[^,]+]] : 
+// CHECK-SAME:  ):
+// CHECK:         [[VAR:%[^,]+]] = alloc_box
+// CHECK:         [[VAR_UNINIT:%[^,]+]] = mark_uninitialized [rootself] [[VAR]]
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR_UNINIT]]
+// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
+// CHECK:         [[T1_BORROW:%[^,]+]] = begin_borrow [[T1]]
+// CHECK:         [[T1_COPY:%[^,]+]] = copy_value [[T1_BORROW]]
+// CHECK:         [[T2_BORROW:%[^,]+]] = begin_borrow [[T2]]
+// CHECK:         [[T2_COPY:%[^,]+]] = copy_value [[T2_BORROW]]
+// CHECK:         [[VAR_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
+// CHECK:         [[STORAGE_ACCESS:%[^,]+]] = struct_element_addr [[VAR_ACCESS]]
+
+//                In opaque values mode, without regard to the fact that T is
+//                address-only, a tuple is constructed and assigned into the
+//                storage.
+// CHECK:         [[TUPLE:%[^,]+]] = tuple (
+// CHECK-SAME:        [[T1_COPY]]
+// CHECK-SAME:        [[T2_COPY]]
+// CHECK-SAME:    )
+// CHECK:         assign [[TUPLE]] to [[STORAGE_ACCESS]]
+
+// CHECK:         end_access [[VAR_ACCESS]]
+// CHECK:         end_borrow [[T2_BORROW]]
+// CHECK:         end_borrow [[T1_BORROW]]
+// CHECK:         [[RETVAL:%[^,]+]] = load [copy] [[VAR_ADDR]]
+// CHECK:         destroy_value [[T2]]
+// CHECK:         destroy_value [[T1]]
+// CHECK:         end_borrow [[VAR_LIFETIME]]
+// CHECK:         destroy_value [[VAR_UNINIT]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'Twople_init_from_t1_t2'
+  @_silgen_name("Twople_init_from_t1_t2")
+  init(t1: T, t2: T) {
+    self.storage = (t1, t2)
+  }
 }

@@ -124,6 +124,7 @@ public:
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
+  enum { NumMarkDependenceKindBits = 2 };
 
 protected:
   friend class SILInstruction;
@@ -241,7 +242,8 @@ protected:
 
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 fromVarDecl : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -249,6 +251,9 @@ protected:
 
     SHARED_FIELD(ExplicitCopyAddrInst, uint8_t
       isTakeOfSrc : 1,
+      isInitializationOfDest : 1);
+
+    SHARED_FIELD(TupleAddrConstructorInst, uint8_t
       isInitializationOfDest : 1);
 
     SHARED_FIELD(PointerToAddressInst, uint8_t
@@ -269,7 +274,11 @@ protected:
     SHARED_FIELD(MoveValueInst, uint8_t
                  allowDiagnostics : 1,
                  lexical : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 fromVarDecl : 1);
+
+    SHARED_FIELD(MarkDependenceInst, uint8_t
+                 dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
@@ -301,7 +310,7 @@ protected:
     SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
-                 parameterPack : 1);
+                 parameterPack : 1, hasResultDependsOn : 1);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;

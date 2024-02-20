@@ -7,7 +7,7 @@
 
 // CHECK: alloc_stack $any R, loc {{.*}}, scope [[SCOPE:[0-9]+]]
 // CHECK-NEXT: init_existential_addr {{.*}} : $*any R, $Float, loc {{.*}}, scope [[SCOPE]]
-// CHECK-NEXT: copy_addr [take] %8 to [init] {{.*}} : $*Float, loc {{.*}}, scope [[SCOPE]]
+// CHECK-NEXT: copy_addr [take] %9 to [init] {{.*}} : $*Float, loc {{.*}}, scope [[SCOPE]]
 
 protocol R {}
 extension Float: R {}

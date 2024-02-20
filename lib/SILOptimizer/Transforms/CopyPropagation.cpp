@@ -503,7 +503,7 @@ void CopyPropagation::run() {
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
     // - CanonicalizeOSSALifetime
-    // - LexicalDestroyFolder
+    // - LexicalDestroyFolding
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;

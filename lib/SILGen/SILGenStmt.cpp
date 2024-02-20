@@ -26,6 +26,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -194,11 +195,16 @@ namespace {
 
     SILBasicBlock *createBasicBlock() { return SGF.createBasicBlock(); }
 
-    template <class... Args>
-    JumpDest createJumpDest(Stmt *cleanupLoc, Args... args) {
-      return JumpDest(SGF.createBasicBlock(args...),
+    JumpDest createJumpDest(Stmt *cleanupLoc) {
+      return JumpDest(SGF.createBasicBlock(),
                       SGF.getCleanupsDepth(),
                       CleanupLocation(cleanupLoc));
+    }
+    JumpDest createThrowDest(Stmt *cleanupLoc, ThrownErrorInfo errorInfo) {
+      return JumpDest(SGF.createBasicBlock(FunctionSection::Postmatter),
+                      SGF.getCleanupsDepth(),
+                      CleanupLocation(cleanupLoc),
+                      errorInfo);
     }
   };
 } // end anonymous namespace
@@ -834,15 +840,6 @@ void StmtEmitter::visitYieldStmt(YieldStmt *S) {
 void StmtEmitter::visitThenStmt(ThenStmt *S) {
   auto *E = S->getResult();
 
-  // If we have an uninhabited type, we may not be able to use it for
-  // initialization, since we allow the conversion of Never to any other type.
-  // Instead, emit an ignored expression with an unreachable.
-  if (E->getType()->isUninhabited()) {
-    SGF.emitIgnoredExpr(E);
-    SGF.B.createUnreachable(E);
-    return;
-  }
-
   // Retrieve the initialization for the parent SingleValueStmtExpr. If we don't
   // have an init, we don't care about the result, emit an ignored expr. This is
   // the case if e.g the result is being converted to Void.
@@ -1111,19 +1108,27 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
-  Type formalExnType = S->getCatches()
-                           .front()
-                           ->getCaseLabelItems()
-                           .front()
-                           .getPattern()
-                           ->getType();
+  Type formalExnType = S->getCaughtErrorType();
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
+  SILValue exnArg;
+
+  // FIXME: opaque values
+  if (exnTL.isAddressOnly()) {
+    exnArg = SGF.B.createAllocStack(
+        S, exnTL.getLoweredType());
+    SGF.enterDeallocStackCleanup(exnArg);
+  }
+
   // Create the throw destination at the end of the function.
-  JumpDest throwDest = createJumpDest(S->getBody(),
-                                      FunctionSection::Postmatter);
-  SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
-      exnTL.getLoweredType(), OwnershipKind::Owned);
+  JumpDest throwDest = createThrowDest(S->getBody(),
+                                       ThrownErrorInfo(exnArg));
+
+  // FIXME: opaque values
+  if (!exnTL.isAddressOnly()) {
+    exnArg = throwDest.getBlock()->createPhiArgument(
+        exnTL.getLoweredType(), OwnershipKind::Owned);
+  }
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -1232,12 +1237,45 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
+
+  if (auto *expansion =
+          dyn_cast<PackExpansionExpr>(S->getTypeCheckedSequence())) {
+    auto formalPackType = dyn_cast<PackType>(
+        PackType::get(SGF.getASTContext(), expansion->getType())
+            ->getCanonicalType());
+
+    JumpDest continueDest = createJumpDest(S->getBody());
+    JumpDest breakDest = createJumpDest(S->getBody());
+
+    SGF.emitDynamicPackLoop(
+        SILLocation(expansion), formalPackType, 0,
+        expansion->getGenericEnvironment(),
+        [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+            SILValue packIndex) {
+          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+          auto letValueInit =
+              SGF.emitPatternBindingInitialization(S->getPattern(), continueDest);
+
+          SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
+
+          // Set the destinations for 'break' and 'continue'.
+          SGF.BreakContinueDestStack.push_back({S, breakDest, continueDest});
+          visit(S->getBody());
+          SGF.BreakContinueDestStack.pop_back();
+
+          return;
+        },
+        continueDest.getBlock());
+
+    emitOrDeleteBlock(SGF, breakDest, S);
+
+    return;
+  }
+
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  {
-    SGF.emitPatternBinding(S->getIteratorVar(),
-                           /*index=*/0, /*debuginfo*/ true);
-  }
+  SGF.emitPatternBinding(S->getIteratorVar(),
+                         /*index=*/0, /*debuginfo*/ true);
 
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -1457,15 +1495,20 @@ SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
                                      ExecutorBreadcrumb prevExecutor,
-                                     SILResultInfo exnResult,
+                                     SILResultInfo errorResult,
+                                     SILValue indirectErrorAddr,
                                      bool suppressErrorPath) {
-  assert(exnResult.getConvention() == ResultConvention::Owned);
-
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPhiArgument(getSILType(exnResult, fnTy),
+
+  SILValue errorValue;
+  if (errorResult.getConvention() == ResultConvention::Owned) {
+    errorValue = destBB->createPhiArgument(getSILType(errorResult, fnTy),
                                            OwnershipKind::Owned);
+  } else {
+    errorValue = indirectErrorAddr;
+  }
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
@@ -1482,7 +1525,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // We don't want to exit here with a dead cleanup on the stack,
   // so push the scope first.
   FullExpr scope(Cleanups, CleanupLocation(loc));
-  emitThrow(loc, emitManagedRValueWithCleanup(exn));
+  emitThrow(loc, emitManagedRValueWithCleanup(errorValue));
 
   return destBB;
 }
@@ -1498,19 +1541,140 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     return;
   }
 
-  // Claim the exception value.  If we need to handle throwing
-  // cleanups, the correct thing to do here is to recreate the
-  // exception's cleanup when emitting each cleanup we branch through.
-  // But for now we aren't bothering.
-  SILValue exn = exnMV.forward(*this);
+  if (auto *E = loc.getAsASTNode<Expr>()) {
+    // Check to see whether we have a counter associated with the error branch
+    // of this node, and if so emit a counter increment.
+    auto *P = F.getProfiler();
+    auto ref = ProfileCounterRef::errorBranchOf(E);
+    if (P && P->hasCounterFor(ref))
+      emitProfilerIncrement(ref);
+  }
 
-  if (emitWillThrow) {
-    // Generate a call to the 'swift_willThrow' runtime function to allow the
-    // debugger to catch the throw event.
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {exn});
+  SmallVector<SILValue, 1> args;
+
+  auto indirectErrorAddr = ThrowDest.getThrownError().IndirectErrorResult;
+
+  // If exnMV was not provided by the caller, we must have an indirect
+  // error result that already stores the thrown error.
+  assert(!exnMV.isInContext() || indirectErrorAddr);
+
+  SILValue exn;
+  if (!exnMV.isInContext()) {
+    // Whether the thrown exception is already an Error existential box.
+    SILType existentialBoxType = SILType::getExceptionType(getASTContext());
+    bool isExistentialBox = exnMV.getType() == existentialBoxType;
+
+    // If we are supposed to emit a call to swift_willThrow(Typed), do so now.
+    if (emitWillThrow) {
+      ASTContext &ctx = SGM.getASTContext();
+      if (isExistentialBox) {
+        // Generate a call to the 'swift_willThrow' runtime function to allow the
+        // debugger to catch the throw event.
+
+        // Claim the exception value.
+        exn = exnMV.forward(*this);
+
+        B.createBuiltin(loc,
+                        ctx.getIdentifier("willThrow"),
+                        SGM.Types.getEmptyTupleType(), {}, {exn});
+      } else {
+        // Call the _willThrowTyped entrypoint, which handles
+        // arbitrary error types.
+        SILValue tmpBuffer;
+        SILValue error;
+
+        FuncDecl *entrypoint = ctx.getWillThrowTyped();
+        auto genericSig = entrypoint->getGenericSignature();
+        SubstitutionMap subMap = SubstitutionMap::get(
+            genericSig, [&](SubstitutableType *dependentType) {
+              return exnMV.getType().getASTType();
+            }, LookUpConformanceInModule(getModule().getSwiftModule()));
+
+        // Generic errors are passed indirectly.
+        if (!exnMV.getType().isAddress()) {
+          // Materialize the error so we can pass the address down to the
+          // swift_willThrowTyped.
+          exnMV = exnMV.materialize(*this, loc);
+          error = exnMV.getValue();
+          exn = exnMV.forward(*this);
+        } else {
+          // Claim the exception value.
+          exn = exnMV.forward(*this);
+          error = exn;
+        }
+
+        emitApplyOfLibraryIntrinsic(
+            loc, entrypoint, subMap,
+            { ManagedValue::forForwardedRValue(*this, error) },
+            SGFContext());
+      }
+    } else {
+      // Claim the exception value.
+      exn = exnMV.forward(*this);
+    }
+  }
+
+  bool shouldDiscard = ThrowDest.getThrownError().Discard;
+  SILType exnType = exn->getType().getObjectType();
+  SILBasicBlock &throwBB = *ThrowDest.getBlock();
+  SILType destErrorType =  indirectErrorAddr
+      ? indirectErrorAddr->getType().getObjectType()
+      : !throwBB.getArguments().empty() 
+        ? throwBB.getArguments()[0]->getType().getObjectType()
+        : exnType;
+
+  // If the thrown error type differs from what the throw destination expects,
+  // perform the conversion.
+  // FIXME: Can the AST tell us what to do here?
+  if (exnType != destErrorType) {
+    assert(destErrorType == SILType::getExceptionType(getASTContext()));
+
+    ProtocolConformanceRef conformances[1] = {
+      getModule().getSwiftModule()->checkConformance(
+        exn->getType().getASTType(), getASTContext().getErrorDecl())
+    };
+
+    exn = emitExistentialErasure(
+        loc,
+        exnType.getASTType(),
+        getTypeLowering(exnType),
+        getTypeLowering(destErrorType),
+        getASTContext().AllocateCopy(conformances),
+        SGFContext(),
+        [&](SGFContext C) -> ManagedValue {
+          if (exn->getType().isAddress()) {
+            return emitLoad(loc, exn, getTypeLowering(exnType), SGFContext(),
+                            IsTake);
+          }
+
+          return ManagedValue::forForwardedRValue(*this, exn);
+        }).forward(*this);
+  }
+  assert(exn->getType().getObjectType() == destErrorType);
+
+  if (indirectErrorAddr) {
+    if (exn->getType().isAddress()) {
+      B.createCopyAddr(loc, exn, indirectErrorAddr,
+                       IsTake, IsInitialization);
+    } else {
+      // An indirect error is written into the destination error address.
+      emitSemanticStore(loc, exn, indirectErrorAddr,
+                        getTypeLowering(destErrorType), IsInitialization);
+    }
+  } else if (!throwBB.getArguments().empty()) {
+    // Load if we need to.
+    if (exn->getType().isAddress()) {
+      exn = emitLoad(loc, exn, getTypeLowering(exnType), SGFContext(), IsTake)
+         .forward(*this);
+    }
+
+    // A direct error value is passed to the epilog block as a BB argument.
+    args.push_back(exn);
+  } else if (shouldDiscard) {
+    if (exn && exn->getType().isAddress())
+      B.createDestroyAddr(loc, exn);
   }
 
   // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn, IsForUnwind);
+  Cleanups.emitBranchAndCleanups(ThrowDest, loc, args, IsForUnwind);
 }

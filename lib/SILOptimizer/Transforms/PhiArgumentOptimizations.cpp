@@ -95,7 +95,7 @@ void RedundantPhiEliminationPass::run() {
 
 #ifndef NDEBUG
 static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
-  SmallSetVector<SILPhiArgument *, 4> worklist;
+  llvm::SmallSetVector<SILPhiArgument *, 4> worklist;
   SmallVector<SILValue, 4> incomingValues;
   worklist.insert(phi);
 

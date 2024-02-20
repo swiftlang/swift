@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 public class MyClass {}
 
 // CHECK-DAG: @"$s4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfD", ptr @"$s4main7MyClassCACycfC" }>

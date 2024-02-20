@@ -32,3 +32,14 @@ module MemberLayout {
   header "member-layout.h"
   requires cplusplus
 }
+
+module MemberInheritance {
+  header "member-inheritance.h"
+  requires cplusplus
+}
+
+module DerivedFieldGetterReturnsOwnedFRT {
+  header "derived-field-getter-returns-owned-frt.h"
+  requires cplusplus
+}
+

@@ -563,7 +563,7 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
     // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
     // We shouldn't include these decls in the ABI baseline file. This line is
     // added so the checker is backward compatible.
-    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+    if (D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient))
       return;
   }
   auto &Ctx = D->getSDKContext();
@@ -668,11 +668,11 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
-        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::Available,
                                                     D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient) &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_Marker)) {
+        !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
+        !D->hasDeclAttribute(DeclAttrKind::Marker)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
     }
   }

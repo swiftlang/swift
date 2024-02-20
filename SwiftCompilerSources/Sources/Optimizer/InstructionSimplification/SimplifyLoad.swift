@@ -98,7 +98,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
 
   /// The load of a global let variable is replaced by its static initializer value.
   private func replaceLoadOfGlobalLet(_ context: SimplifyContext) -> Bool {
-    guard let globalInitVal = getGlobalInitValue(address: address) else {
+    guard let globalInitVal = getGlobalInitValue(address: address, context) else {
       return false
     }
     if !globalInitVal.canBeCopied(into: parentFunction, context) {
@@ -110,6 +110,8 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     let initVal = cloner.clone(globalInitVal)
 
     uses.replaceAll(with: initVal, context)
+    // Also erases a builtin "once" on which the global_addr depends on. This is fine
+    // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
     return true
   }
@@ -135,7 +137,10 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
       case let sea as StructElementAddrInst:
         let structType = sea.struct.type
         if structType.nominal.name == "_SwiftArrayBodyStorage" {
-          switch structType.getNominalFields(in: parentFunction).getNameOfField(withIndex: sea.fieldIndex) {
+          guard let fields = structType.getNominalFields(in: parentFunction) else {
+            return false
+          }
+          switch fields.getNameOfField(withIndex: sea.fieldIndex) {
           case "count":
             break
           case "_capacityAndFlags":
@@ -153,7 +158,10 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         case "__RawDictionaryStorage",
               "__RawSetStorage":
           // For Dictionary and Set we support "count" and "capacity".
-          switch classType.getNominalFields(in: parentFunction).getNameOfField(withIndex: rea.fieldIndex) {
+          guard let fields = classType.getNominalFields(in: parentFunction) else {
+            return false
+          }
+          switch fields.getNameOfField(withIndex: rea.fieldIndex) {
           case "_count", "_capacity":
             break
           default:
@@ -197,34 +205,55 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if context.preserveDebugInfo {
       return !uses.contains { !($0.instruction is DestroyValueInst) }
     } else {
-      return !nonDebugUses.contains { !($0.instruction is DestroyValueInst) }
+      return !uses.ignoreDebugUses.contains { !($0.instruction is DestroyValueInst) }
     }
   }
 }
 
 /// Returns the init value of a global which is loaded from `address`.
-private func getGlobalInitValue(address: Value) -> Value? {
+private func getGlobalInitValue(address: Value, _ context: SimplifyContext) -> Value? {
   switch address {
   case let gai as GlobalAddrInst:
     if gai.global.isLet {
-      return gai.global.staticInitValue
+      if let staticInitValue = gai.global.staticInitValue {
+        return staticInitValue
+      }
+      if let staticInitValue = getInitializerFromInitFunction(of: gai, context) {
+        return staticInitValue
+      }
     }
   case let pta as PointerToAddressInst:
     return globalLoadedViaAddressor(pointer: pta.pointer)?.staticInitValue
   case let sea as StructElementAddrInst:
-    if let structVal = getGlobalInitValue(address: sea.struct) as? StructInst {
+    if let structVal = getGlobalInitValue(address: sea.struct, context) as? StructInst {
       return structVal.operands[sea.fieldIndex].value
     }
   case let tea as TupleElementAddrInst:
-    if let tupleVal = getGlobalInitValue(address: tea.tuple) as? TupleInst {
+    if let tupleVal = getGlobalInitValue(address: tea.tuple, context) as? TupleInst {
       return tupleVal.operands[tea.fieldIndex].value
     }
   case let bai as BeginAccessInst:
-    return getGlobalInitValue(address: bai.address)
+    return getGlobalInitValue(address: bai.address, context)
   default:
     break
   }
   return nil
+}
+
+private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ context: SimplifyContext) -> Value? {
+  guard let dependentOn = globalAddr.dependencyToken,
+        let builtinOnce = dependentOn as? BuiltinInst,
+        builtinOnce.id == .Once,
+        let initFnRef = builtinOnce.operands[1].value as? FunctionRefInst else
+  {
+    return nil
+  }
+  let initFn = initFnRef.referencedFunction
+  context.notifyDependency(onBodyOf: initFn)
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, allowGlobalValue: true)  else {
+    return nil
+  }
+  return storeToGlobal.source
 }
 
 private func globalLoadedViaAddressor(pointer: Value) -> GlobalVariable? {
@@ -284,10 +313,11 @@ private extension Value {
   func getBaseAddressAndOffset() -> (baseAddress: Value, offset: Int)? {
     if let indexAddr = self as? IndexAddrInst {
       guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
-            indexLiteral.value.getActiveBits() <= 32 else {
+            let indexValue = indexLiteral.value else
+      {
         return nil
       }
-      return (baseAddress: indexAddr.base, offset: Int(indexLiteral.value.getZExtValue()))
+      return (baseAddress: indexAddr.base, offset: indexValue)
     }
     return (baseAddress: self, offset: 0)
   }
@@ -297,9 +327,11 @@ private extension Instruction {
   var isShiftRightByAtLeastOne: Bool {
     guard let bi = self as? BuiltinInst,
           bi.id == .LShr,
-          let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst else {
+          let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst,
+          let shiftValue = shiftLiteral.value else
+    {
       return false
     }
-    return shiftLiteral.value.isStrictlyPositive()
+    return shiftValue > 0
   }
 }

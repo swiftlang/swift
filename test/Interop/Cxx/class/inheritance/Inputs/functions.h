@@ -22,6 +22,10 @@ struct Base {
       __attribute__((swift_attr("import_unsafe"))) {
     return "Base::constInBase";
   }
+  inline const char *rvalueThisInBase() const&&
+      __attribute__((swift_attr("import_unsafe"))) {
+    return "Base::rvalueThisInBase";
+  }
   // TODO: if these are unnamed we hit an (unrelated) SILGen bug. Same for
   // subscripts.
   inline const char *takesArgsInBase(int a, int b, int c) const
@@ -109,4 +113,49 @@ struct EmptyBaseClass {
 struct DerivedFromEmptyBaseClass : EmptyBaseClass {
   int a = 42;
   int b = 42;
+};
+
+int &getCopyCounter() {
+    static int copyCounter = 0;
+    return copyCounter;
+}
+
+class CopyTrackedBaseClass {
+public:
+    CopyTrackedBaseClass(int x) : x(x) {}
+    CopyTrackedBaseClass(const CopyTrackedBaseClass &other) : x(other.x) {
+        ++getCopyCounter();
+    }
+
+    int getX() const {
+        return x;
+    }
+    int getXMut() {
+        return x;
+    }
+private:
+    int x;
+};
+
+class CopyTrackedDerivedClass: public CopyTrackedBaseClass {
+public:
+    CopyTrackedDerivedClass(int x) : CopyTrackedBaseClass(x) {}
+
+    int getDerivedX() const {
+        return getX();
+    }
+};
+
+class NonEmptyBase {
+public:
+    int getY() const {
+        return y;
+    }
+private:
+    int y = 11;
+};
+
+class CopyTrackedDerivedDerivedClass: public NonEmptyBase, public CopyTrackedDerivedClass {
+public:
+    CopyTrackedDerivedDerivedClass(int x) : CopyTrackedDerivedClass(x) {}
 };

@@ -5,5 +5,5 @@ import ClassTemplateNonTypeParameter
 let p = MagicIntPair()
 let t = MagicIntTriple()
 
-// CHECK: @"${{s4main1pSo0034MagicArrayInt32_UInt_2_zoAFhhiEngcVvp|s4main1pSo0036MagicArrayInt32_UInt(64|32)_2_JsAEiFiuomcVvp}}"
-// CHECK: @"${{s4main1tSo0034MagicArrayInt32_UInt_3_zoAFhhiEngcVvp|s4main1tSo0036MagicArrayInt32_UInt(64|32)_3_JsAEiFiuomcVvp}}"
+// CHECK: @"${{s4main1pSo0042MagicArrayCInt_CUnsignedLong_2_DFABlHknrCcVvp|s4main1pSo0047MagicArrayCInt_CUnsignedLongLong_2_ofBJmlmartjdVvp|s4main1pSo0041MagicArrayCInt_CUnsignedInt_2_yDFGkvkBqzcVvp}}"
+// CHECK: @"${{s4main1tSo0042MagicArrayCInt_CUnsignedLong_3_DFABlHknrCcVvp|s4main1tSo0047MagicArrayCInt_CUnsignedLongLong_3_ofBJmlmartjdVvp|s4main1tSo0041MagicArrayCInt_CUnsignedInt_3_yDFGkvkBqzcVvp}}"

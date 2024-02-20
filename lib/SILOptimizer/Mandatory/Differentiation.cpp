@@ -566,7 +566,7 @@ emitDerivativeFunctionReference(
             diag::autodiff_external_nondifferentiable_function);
         return llvm::None;
       }
-      // Sanity check passed. Create a new differentiability witness and
+      // Soundness check passed. Create a new differentiability witness and
       // canonicalize it.
       GenericSignature contextualDerivativeGenSig = GenericSignature();
       if (invoker.getKind() ==
@@ -576,7 +576,8 @@ emitDerivativeFunctionReference(
                 .second->getDerivativeGenericSignature();
       auto derivativeConstrainedGenSig =
           autodiff::getConstrainedDerivativeGenericSignature(
-              originalFn->getLoweredFunctionType(), desiredParameterIndices,
+              originalFn->getLoweredFunctionType(),
+              desiredParameterIndices, desiredResultIndices,
               contextualDerivativeGenSig,
               LookUpConformanceInModule(context.getModule().getSwiftModule()));
       minimalWitness = SILDifferentiabilityWitness::createDefinition(

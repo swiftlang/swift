@@ -1788,3 +1788,58 @@ bb6(%14 : $FakeBool):
   return %14 : $FakeBool
 }
 
+struct Err: Error {
+  var i: Int
+}
+
+sil @callee1 : $@convention(thin) (Int) -> @out Int
+sil @callee2 : $@convention(thin) (Int) -> (@out Int, @error_indirect Err)
+
+// CHECK-LABEL: sil [ossa] @try_apply_to_apply_with_indirect_error1 :
+// CHECK:         [[OUT:%.*]] = alloc_stack $Int
+// CHECK:         apply {{%[0-9]+}}([[OUT]], %0)
+// CHECK:       } // end sil function 'try_apply_to_apply_with_indirect_error1'
+sil [ossa] @try_apply_to_apply_with_indirect_error1 : $@convention(method) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee1 : $@convention(thin) (Int) -> @out Int
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> @out Int to $@noescape @callee_guaranteed (Int) -> @out Int
+  %3 = convert_function %2 : $@noescape @callee_guaranteed (Int) -> @out Int to $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err), forwarding: @owned
+  %4 = alloc_stack $Int
+  %5 = alloc_stack $Err
+  try_apply %3(%4, %5, %0) : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err), normal bb10, error bb11
+
+bb10(%7 : $()):
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  destroy_value %3 : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err)
+  %r = tuple ()
+  return  %r : $()
+
+bb11:
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  destroy_value %3 : $@noescape @callee_guaranteed (Int) -> (@out Int, @error_indirect Err)
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @try_apply_to_apply_with_indirect_error2 :
+// CHECK:         [[OUT:%.*]] = alloc_stack $Int
+// CHECK:         [[ERR:%.*]] = alloc_stack $Err
+// CHECK:         apply [nothrow] {{%[0-9]+}}([[OUT]], [[ERR]], %0)
+// CHECK:       } // end sil function 'try_apply_to_apply_with_indirect_error2'
+sil [ossa] @try_apply_to_apply_with_indirect_error2 : $@convention(method) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee2 : $@convention(thin) (Int) -> (@out Int, @error_indirect Err)
+  %4 = alloc_stack $Int
+  %5 = alloc_stack $Err
+  try_apply %1(%4, %5, %0) : $@convention(thin) (Int) -> (@out Int, @error_indirect Err), normal bb10, error bb11
+
+bb10(%7 : $()):
+  dealloc_stack %5 : $*Err
+  dealloc_stack %4 : $*Int
+  %r = tuple ()
+  return  %r : $()
+
+bb11:
+  unreachable
+}

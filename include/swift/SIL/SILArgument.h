@@ -366,14 +366,15 @@ class SILFunctionArgument : public SILArgument {
       ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isCapture = false,
-      bool isParameterPack = false)
+      bool isCapture = false, bool isParameterPack = false,
+      bool hasResultDependsOn = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {
     sharedUInt32().SILFunctionArgument.noImplicitCopy = isNoImplicitCopy;
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = lifetimeAnnotation;
     sharedUInt32().SILFunctionArgument.closureCapture = isCapture;
     sharedUInt32().SILFunctionArgument.parameterPack = isParameterPack;
+    sharedUInt32().SILFunctionArgument.hasResultDependsOn = hasResultDependsOn;
   }
 
   // A special constructor, only intended for use in
@@ -425,6 +426,18 @@ public:
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = newValue;
   }
 
+  bool hasResultDependsOn() const {
+    return sharedUInt32().SILFunctionArgument.hasResultDependsOn;
+  }
+
+  void setHasResultDependsOn(bool flag = true) {
+    sharedUInt32().SILFunctionArgument.hasResultDependsOn = flag;
+  }
+
+  bool isTransferring() const {
+    return getKnownParameterInfo().hasOption(SILParameterInfo::Transferring);
+  }
+
   Lifetime getLifetime() const {
     return getType()
         .getLifetime(*getFunction())
@@ -432,6 +445,8 @@ public:
   }
 
   bool isIndirectResult() const;
+
+  bool isIndirectErrorResult() const;
 
   SILArgumentConvention getArgumentConvention() const;
 

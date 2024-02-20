@@ -117,6 +117,7 @@ WARNING(nonmutating_without_mutable_fields,none,
         "attribute 'nonmutating' has no effect without any mutable fields", ())
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
+WARNING(module_map_ignored, none, "module map file '%0' will be ignored", (StringRef))
 
 WARNING(libc_not_found, none,
         "libc not found for '%0'; C stdlib may be unavailable",
@@ -134,8 +135,9 @@ WARNING(api_pattern_attr_ignored, none,
 
 ERROR(objc_implementation_two_impls, none,
       "duplicate implementation of Objective-C %select{|category %0 on }0"
-      "class %1",
-      (Identifier, ValueDecl *))
+      "%kind1",
+      (Identifier, Decl *))
+
 NOTE(previous_objc_implementation, none,
      "previously implemented by extension here", ())
 
@@ -246,6 +248,10 @@ ERROR(conforms_to_not_protocol,none,
 ERROR(move_only_requires_move_only,none,
       "use of noncopyable C++ type '%0' requires -enable-experimental-move-only",
       (StringRef))
+
+ERROR(failed_base_method_call_synthesis,none,
+      "failed to synthesize call to the base method %0 of type %0",
+      (ValueDecl *, ValueDecl *))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))

@@ -195,9 +195,6 @@ public:
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();
-
-  /// Decode (and cache) a SourceLoc.
-  SILLocation::FilenameAndLocation decodeSourceLoc(SourceLoc SL);
 };
 
 /// An RAII object that autorestores the debug location.

@@ -263,7 +263,7 @@ extension _SmallString {
   ) {
     _internalInvariant(index > 0)
     _internalInvariant(index <= _SmallString.capacity)
-    //FIXME: Verify this on big-endian architecture
+    // FIXME: Verify this on big-endian architecture
     let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* ( 8 &- Swift.min(index, 8))))
     let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- Swift.max(index, 8))))
     storage.0 &= (index <= 0) ? 0 : mask0.littleEndian
@@ -345,7 +345,7 @@ extension _SmallString {
 extension _SmallString {
   // Resiliently create from a tagged cocoa string
   //
-  @_effects(readonly) @_effects(releasenone) // @opaque
+  @_effects(readonly) // @opaque
   @usableFromInline // testable
   internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
@@ -367,7 +367,7 @@ extension _SmallString {
     self._invariantCheck()
   }
   
-  @_effects(readonly) @_effects(releasenone) // @opaque
+  @_effects(readonly) // @opaque
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
     var success = true

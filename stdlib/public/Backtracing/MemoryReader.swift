@@ -32,6 +32,11 @@ import Swift
 
   /// Fill the specified buffer with data from the specified location in
   /// the source.
+  func fetch(from address: Address,
+             into buffer: UnsafeMutableRawBufferPointer) throws
+
+  /// Fill the specified buffer with data from the specified location in
+  /// the source.
   func fetch<T>(from address: Address,
                 into buffer: UnsafeMutableBufferPointer<T>) throws
 
@@ -50,6 +55,11 @@ import Swift
 }
 
 extension MemoryReader {
+
+  public func fetch<T>(from address: Address,
+                       into buffer: UnsafeMutableBufferPointer<T>) throws {
+    try fetch(from: address, into: UnsafeMutableRawBufferPointer(buffer))
+  }
 
   public func fetch<T>(from addr: Address,
                        into pointer: UnsafeMutablePointer<T>) throws {
@@ -96,10 +106,12 @@ extension MemoryReader {
 @_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {
   public init() {}
 
-  public func fetch<T>(from address: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    buffer.baseAddress!.update(from: UnsafePointer<T>(bitPattern: UInt(address))!,
-                               count: buffer.count)
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    buffer.baseAddress!.copyMemory(
+      from: UnsafeRawPointer(bitPattern: UInt(address))!,
+      byteCount: buffer.count
+    )
   }
 }
 
@@ -116,9 +128,9 @@ extension MemoryReader {
     self.task = task as! task_t
   }
 
-  public func fetch<T>(from address: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let size = UInt64(MemoryLayout<T>.stride * buffer.count)
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let size = buffer.count
     var sizeOut = UInt64(0)
     let result = mach_vm_read_overwrite(task,
                                         UInt64(address),
@@ -138,8 +150,8 @@ extension MemoryReader {
   public typealias Address = UInt64
   public typealias Size = UInt64
 
-  public func fetch<T>(from address: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     let reader = RemoteMemoryReader(task: mach_task_self())
     return try reader.fetch(from: address, into: buffer)
   }
@@ -221,34 +233,31 @@ extension MemoryReader {
     return response
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    try buffer.withMemoryRebound(to: UInt8.self) {
-      let bytes = UnsafeMutableRawBufferPointer($0)
-      try sendRequest(for: Size(bytes.count), from: addr)
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    try sendRequest(for: Size(buffer.count), from: addr)
 
-      var done = 0
-      while done < bytes.count {
-        let reply = try receiveReply()
+    var done = 0
+    while done < buffer.count {
+      let reply = try receiveReply()
 
-        if reply.len < 0 {
-          throw MemserverError(message: "Unreadable at \(hex(addr))")
-        }
-
-        if done + Int(reply.len) > bytes.count {
-          throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(bytes.count) bytes")
-        }
-
-        let ret = try safeRead(fd,
-                               UnsafeMutableRawBufferPointer(
-                                 rebasing: bytes[done..<done+Int(reply.len)]))
-
-        if ret != reply.len {
-          throw MemserverError(message: "Channel closed prematurely")
-        }
-
-        done += Int(reply.len)
+      if reply.len < 0 {
+        throw MemserverError(message: "Unreadable at \(hex(addr))")
       }
+
+      if buffer.count - done < Int(reply.len) {
+        throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(buffer.count) bytes")
+      }
+
+      let ret = try safeRead(fd,
+                             UnsafeMutableRawBufferPointer(
+                               rebasing: buffer[done..<done+Int(reply.len)]))
+
+      if ret != reply.len {
+        throw MemserverError(message: "Channel closed prematurely")
+      }
+
+      done += Int(reply.len)
     }
   }
 }
@@ -260,9 +269,9 @@ extension MemoryReader {
     self.pid = pid as! pid_t
   }
 
-  public func fetch<T>(from address: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let size = size_t(MemoryLayout<T>.stride * buffer.count)
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let size = buffer.count
     var fromIOVec = iovec(iov_base: UnsafeMutableRawPointer(
                             bitPattern: UInt(address)),
                           iov_len: size)
@@ -281,8 +290,8 @@ extension MemoryReader {
     reader = RemoteMemoryReader(pid: getpid())
   }
 
-  public func fetch<T>(from address: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
+  public func fetch(from address: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     return try reader.fetch(from: address, into: buffer)
   }
 }

@@ -426,6 +426,6 @@ static FunctionTest LexicalDestroyHoistingTest(
       auto value = arguments.takeValue();
       hoistDestroysOfOwnedLexicalValue(value, *value->getFunction(), deleter,
                                        calleeAnalysis);
-      function.dump();
+      function.print(llvm::outs());
     });
 } // end namespace swift::test

@@ -103,13 +103,16 @@ protected:
     ClangImporterOptions clangImpOpts;
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
+    CASOptions casOpts;
     auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
-                               clangImpOpts, symbolGraphOpts, sourceMgr, diags);
+                               clangImpOpts, symbolGraphOpts, casOpts,
+                               sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
         prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
-        swift::RequireOSSAModules_t(silOpts)));
+        swift::RequireOSSAModules_t(silOpts),
+        swift::RequireNoncopyableGenerics_t(langOpts)));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(
@@ -149,7 +152,9 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules, /*requiredSDK*/StringRef());
+        bufData, silOpts.EnableOSSAModules,
+        langOpts.hasFeature(Feature::NoncopyableGenerics),
+        /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }

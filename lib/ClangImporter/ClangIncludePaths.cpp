@@ -420,7 +420,8 @@ GetWindowsAuxiliaryFile(StringRef modulemap, const SearchPathOptions &Options) {
 
 SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
     ASTContext &Context,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS) {
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
+    bool &requiresBuiltinHeadersInSystemModules) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
   const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
   SmallVector<std::pair<std::string, std::string>, 2> Mappings;
@@ -468,8 +469,21 @@ SmallVector<std::pair<std::string, std::string>, 2> GetWindowsFileMappings(
     llvm::sys::path::append(UCRTInjection, "module.modulemap");
 
     AuxiliaryFile = GetWindowsAuxiliaryFile("ucrt.modulemap", SearchPathOpts);
-    if (!AuxiliaryFile.empty())
+    if (!AuxiliaryFile.empty()) {
+      // The ucrt module map has the C standard library headers all together.
+      // That leads to module cycles with the clang _Builtin_ modules. e.g.
+      // <fenv.h> on ucrt includes <float.h>. The clang builtin <float.h>
+      // include-nexts <float.h>. When both of those UCRT headers are in the
+      // ucrt module, there's a module cycle ucrt -> _Builtin_float -> ucrt
+      // (i.e. fenv.h (ucrt) -> float.h (builtin) -> float.h (ucrt)). Until the
+      // ucrt module map is updated, the builtin headers need to join the system
+      // modules. i.e. when the builtin float.h is in the ucrt module too, the
+      // cycle goes away. Note that -fbuiltin-headers-in-system-modules does
+      // nothing to fix the same problem with C++ headers, and is generally
+      // fragile.
       Mappings.emplace_back(std::string(UCRTInjection), AuxiliaryFile);
+      requiresBuiltinHeadersInSystemModules = true;
+    }
   }
 
   struct {
@@ -515,20 +529,36 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
+  SmallVector<std::pair<std::string, std::string>, 2> libcFileMapping;
   if (triple.isOSWASI()) {
     // WASI Mappings
-    result.redirectedFiles.append(
-        getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs));
+    libcFileMapping =
+        getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
   } else {
     // Android/BSD/Linux Mappings
-    result.redirectedFiles.append(getLibcFileMapping(
-        ctx, "glibc.modulemap", StringRef("SwiftGlibc.h"), vfs));
+    libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
+                                         StringRef("SwiftGlibc.h"), vfs);
   }
+  result.redirectedFiles.append(libcFileMapping);
+  // Both libc module maps have the C standard library headers all together in a
+  // SwiftLibc module. That leads to module cycles with the clang _Builtin_
+  // modules. e.g. <inttypes.h> includes <stdint.h> on these platforms. The
+  // clang builtin <stdint.h> include-nexts <stdint.h>. When both of those
+  // platform headers are in the SwiftLibc module, there's a module cycle
+  // SwiftLibc -> _Builtin_stdint -> SwiftLibc (i.e. inttypes.h (platform) ->
+  // stdint.h (builtin) -> stdint.h (platform)). Until this can be fixed in
+  // these module maps, the clang builtin headers need to join the "system"
+  // modules (SwiftLibc). i.e. when the clang builtin stdint.h is in the
+  // SwiftLibc module too, the cycle goes away. Note that
+  // -fbuiltin-headers-in-system-modules does nothing to fix the same problem
+  // with C++ headers, and is generally fragile.
+  result.requiresBuiltinHeadersInSystemModules = !libcFileMapping.empty();
 
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs);
 
-  result.redirectedFiles.append(GetWindowsFileMappings(ctx, vfs));
+  result.redirectedFiles.append(GetWindowsFileMappings(
+      ctx, vfs, result.requiresBuiltinHeadersInSystemModules));
 
   return result;
 }

@@ -4,7 +4,6 @@
 // RUN: not %target-swift-frontend -swift-version 6 -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %s 2>&1 | %FileCheck  %s
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
 
 import CompleteSwiftTypes
 import ObjCLibraryForwardDeclaringCompleteSwiftTypes

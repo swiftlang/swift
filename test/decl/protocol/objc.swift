@@ -265,3 +265,9 @@ class C8SubRW2: C8Base {
   @objc(custom:) func g(_: Any) // expected-warning {{method 'g' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in Swift 6}}
   @objc(custom:) func h() async // expected-note 2 {{method 'h()' declared here}}
 }
+
+// We forgot to emit diagnostics in the @objc path of StructuralRequirementsRequest.
+struct MyStruct {}
+
+@objc protocol InvalidProtocol where Self: MyStruct {}
+// expected-error@-1 {{type 'Self' constrained to non-protocol, non-class type 'MyStruct'}}

@@ -93,6 +93,7 @@ public:
   }
   
   bool empty() const { return Pointer == nullptr; }
+  bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
     return str().equals(string);
@@ -180,7 +181,7 @@ public:
       return static_cast<const void *>(Pointer);
   }
   
-  static Identifier getFromOpaquePointer(void *P) {
+  static Identifier getFromOpaquePointer(const void *P) {
     return Identifier((const char*)P);
   }
 
@@ -259,11 +260,15 @@ namespace llvm {
   
 } // end namespace llvm
 
+class BridgedDeclBaseName;
+
 namespace swift {
 
 /// Wrapper that may either be an Identifier or a special name
 /// (e.g. for subscripts)
 class DeclBaseName {
+  friend class ::BridgedDeclBaseName;
+
 public:
   enum class Kind: uint8_t {
     Normal,
@@ -317,6 +322,8 @@ public:
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
   bool isSubscript() const { return getKind() == Kind::Subscript; }
+
+  bool isConstructor() const { return getKind() == Kind::Constructor; }
 
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.

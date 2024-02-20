@@ -1,3 +1,4 @@
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="test" -is-function-like -old-name "StringifyMacro" | %FileCheck %s
 

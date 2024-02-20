@@ -2,7 +2,6 @@
 //
 // REQUIRES: executable_test
 
-import CxxShim
 import StdlibUnittest
 import Fields
 
@@ -83,6 +82,33 @@ FieldsTestSuite.test("Same field from derived") {
   var derived = DerivedWithSameField()
   derived.a = 42
   expectEqual(derived.a, 42)
+}
+
+extension CopyTrackedBaseClass {
+    var swiftProp: CInt {
+        return x
+    }
+}
+
+FieldsTestSuite.test("Get field without copying base in the getter accessor") {
+  let base = CopyTrackedBaseClass(0)
+  var copyCounter = getCopyCounter().pointee
+  expectEqual(base.swiftProp, 0)
+  // Measure copy counter of a regular
+  // property access for a C++ type to compare
+  // it to see if any additional copies are
+  // needed to access the property from the base class.
+  let expectedCopyCountDiff = getCopyCounter().pointee - copyCounter
+
+  let derived = CopyTrackedDerivedClass(234)
+  copyCounter = getCopyCounter().pointee
+  expectEqual(derived.x, 234)
+  expectEqual(copyCounter, getCopyCounter().pointee - expectedCopyCountDiff)
+
+  let derivedDerived = CopyTrackedDerivedDerivedClass(-11)
+  copyCounter = getCopyCounter().pointee
+  expectEqual(derivedDerived.x, -11)
+  expectEqual(copyCounter, getCopyCounter().pointee - expectedCopyCountDiff)
 }
 
 runAllTests()

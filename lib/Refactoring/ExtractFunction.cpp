@@ -12,7 +12,6 @@
 
 #include "ExtractExprBase.h"
 #include "RefactoringActions.h"
-#include "Renamer.h"
 #include "Utils.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/IDETool/CompilerInvocation.h"
@@ -78,9 +77,9 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
   return SourceLoc();
 }
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 static std::vector<NoteRegion>
-getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
-                  bool IsFunctionLike = false, bool IsNonProtocolType = false) {
+getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
   auto InputBuffer =
       llvm::MemoryBuffer::getMemBufferCopy(SourceText, "<extract>");
 
@@ -101,22 +100,16 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  UnresolvedLoc UnresoledName{NameLoc, true};
-
-  NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved =
-      Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
+  auto Resolved = runNameMatcher(*Instance->getPrimarySourceFile(), NameLoc);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
-  RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,
-                            NameUsage::Definition, /*OldName=*/Name,
-                            /*NewName=*/"",        IsFunctionLike,
-                            IsNonProtocolType};
-  RenameRangeDetailCollector Renamer(SM, Name);
-  Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
-  auto Ranges = Renamer.Ranges;
+  RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
+                            RenameLocUsage::Definition, /*OldName=*/Name};
+  std::vector<RenameRangeDetail> Ranges =
+      getSyntacticRenameRangeDetails(SM, Name, Resolved.back(), RenameConfig)
+          .Ranges;
 
-  std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
+  std::vector<NoteRegion> NoteRegions(Ranges.size());
   llvm::transform(Ranges, NoteRegions.begin(),
                   [&SM](RenameRangeDetail &Detail) -> NoteRegion {
                     auto Start =
@@ -129,6 +122,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   return NoteRegions;
 }
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 bool RefactoringActionExtractFunction::isApplicable(
     const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
@@ -149,6 +143,11 @@ bool RefactoringActionExtractFunction::isApplicable(
 }
 
 bool RefactoringActionExtractFunction::performChange() {
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  DiagEngine.diagnose(SourceLoc(),
+                      diag::extract_function_not_supported_swiftsyntax_missing);
+  return true;
+#else
   // Check if the new name is ok.
   if (!Lexer::isIdentifier(PreferredName)) {
     DiagEngine.diagnose(SourceLoc(), diag::invalid_name, PreferredName);
@@ -165,7 +164,7 @@ bool RefactoringActionExtractFunction::performChange() {
   }
 
   // Correct the given name if collision happens.
-  PreferredName = correctNewDeclName(InsertToDC, PreferredName);
+  PreferredName = correctNewDeclName(InsertLoc, InsertToDC, PreferredName);
 
   // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;
@@ -294,13 +293,11 @@ bool RefactoringActionExtractFunction::performChange() {
 
   StringRef DeclStr(Buffer.begin() + FuncBegin, FuncEnd - FuncBegin);
   auto NotableFuncRegions =
-      getNotableRegions(DeclStr, FuncNameOffset, ExtractedFuncName,
-                        /*IsFunctionLike=*/true);
+      getNotableRegions(DeclStr, FuncNameOffset, ExtractedFuncName);
 
   StringRef CallStr(Buffer.begin() + ReplaceBegin, ReplaceEnd - ReplaceBegin);
   auto NotableCallRegions =
-      getNotableRegions(CallStr, CallNameOffset, ExtractedFuncName,
-                        /*IsFunctionLike=*/true);
+      getNotableRegions(CallStr, CallNameOffset, ExtractedFuncName);
 
   // Insert the new function's declaration.
   EditConsumer.accept(SM, InsertLoc, DeclStr, NotableFuncRegions);
@@ -309,4 +306,5 @@ bool RefactoringActionExtractFunction::performChange() {
   EditConsumer.accept(SM, RangeInfo.ContentRange, CallStr, NotableCallRegions);
 
   return false;
+#endif
 }

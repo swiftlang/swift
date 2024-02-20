@@ -253,6 +253,9 @@ struct MultipleWrappers {
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
+
+  @Clamping(min: 0, max: 255) // expected-error 2{{property wrapper can only apply to a single variable}}
+  var a = 0, b = 0
 }
 
 // ---------------------------------------------------------------------------

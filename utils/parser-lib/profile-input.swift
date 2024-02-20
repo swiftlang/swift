@@ -459,7 +459,7 @@ class BrowserViewController: UIViewController {
         assert(!Thread.current.isMainThread, "This must be called in the background.")
         self.profile.queue.getQueuedTabs() >>== { cursor in
 
-            // This assumes that the DB returns rows in some kind of sane order.
+            // This assumes that the DB returns rows in some kind of sound order.
             // It does in practice, so WFM.
             if cursor.count > 0 {
 

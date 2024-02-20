@@ -128,6 +128,8 @@ PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
      "Print SIL Instruction MemBehavior and ReleaseBehavior Information")
 PASS(BasicCalleePrinter, "basic-callee-printer",
      "Print Basic Callee Analysis for Testing")
+SWIFT_FUNCTION_PASS(BooleanLiteralFolding, "boolean-literal-folding",
+     "Constant folds initializers of boolean literals")
 PASS(CFGPrinter, "view-cfg",
      "View Function CFGs")
 PASS(COWArrayOpts, "cowarray-opt",
@@ -282,6 +284,15 @@ PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
      "Late Dead Function and Global Elimination")
+SWIFT_FUNCTION_PASS(LifetimeDependenceDiagnostics,
+      "lifetime-dependence-diagnostics",
+      "Diagnose Lifetime Dependence")
+SWIFT_FUNCTION_PASS(LifetimeDependenceInsertion,
+     "lifetime-dependence-insertion",
+     "Insert Lifetime Dependence Markers")
+SWIFT_FUNCTION_PASS(LifetimeDependenceScopeFixup,
+     "lifetime-dependence-scope-fixup",
+     "Fixup scope for lifetime dependence")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
@@ -341,6 +352,8 @@ PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
 PASS(PhiExpansion, "phi-expansion",
      "Replace Phi arguments by their only used field")
+SWIFT_FUNCTION_PASS(DeinitDevirtualizer, "deinit-devirtualizer",
+     "Devirtualizes destroys of non-copyable values")
 SWIFT_FUNCTION_PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -367,8 +380,10 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
-PASS(SendNonSendable, "send-non-sendable",
+PASS(TransferNonSendable, "transfer-non-sendable",
      "Checks calls that send non-sendable values between isolation domains")
+PASS(LowerTupleAddrConstructor, "lower-tuple-addr-constructor",
+     "Lower tuple addr constructor to tuple_element_addr+copy_addr")
 PASS(SILGenCleanup, "silgen-cleanup",
      "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
@@ -407,6 +422,8 @@ SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimizati
     "Optimize copies to an indirect return value")
 SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
     "Sets the bare flag on objects which don't need their headers")
+SWIFT_FUNCTION_PASS(AllocVectorLowering, "alloc-vector-lowering",
+     "lowering of allocVector builtins")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
@@ -470,10 +487,10 @@ PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
+PASS(RegionAnalysisInvalidationTransform, "region-analysis-invalidation-transform",
+     "Delete the analysis state associated with region analysis")
 PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
-PASS(MoveOnlyDeinitDevirtualization, "sil-move-only-deinit-devirtualization",
-     "After running move only checking, convert last destroy_values to deinit calls")
 PASS(MoveOnlyBorrowToDestructureTransform,
      "sil-move-only-borrow-to-destructure",
      "Pass that is phased ordered before move only object checking that is "
@@ -493,6 +510,8 @@ SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 SWIFT_SILCOMBINE_PASS(RetainValueInst)
 SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
+SWIFT_SILCOMBINE_PASS(CopyValueInst)
+SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

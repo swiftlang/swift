@@ -8,12 +8,16 @@
 
 swift_compiler_sources(Optimizer
   SimplifyApply.swift
+  SimplifyBeginBorrow.swift
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
+  SimplifyConvertEscapeToNoEscape.swift
+  SimplifyCopyValue.swift
   SimplifyDebugStep.swift
+  SimplifyDestroyValue.swift
   SimplifyDestructure.swift
   SimplifyGlobalValue.swift
   SimplifyInitEnumDataAddr.swift
@@ -24,6 +28,7 @@ swift_compiler_sources(Optimizer
   SimplifyRetainReleaseValue.swift
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
+  SimplifySwitchEnum.swift
   SimplifyTupleExtract.swift
   SimplifyUncheckedEnumData.swift
   SimplifyValueToBridgeObject.swift)

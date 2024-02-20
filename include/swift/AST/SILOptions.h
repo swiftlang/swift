@@ -31,9 +31,6 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert lexical markers.
-  Off = 0,
-
   // Insert lexical markers via lexical borrow scopes and the lexical flag on
   // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
   // Raw SIL.
@@ -183,8 +180,11 @@ public:
   /// when possible.
   bool EnablePackMetadataStackPromotion = true;
 
-  // The kind of function bodies to skip emitting.
+  /// The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
+
+  /// Whether to skip declarations that are internal to the module.
+  bool SkipNonExportableDecls = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -275,6 +275,12 @@ public:
   /// Warning: this is not thread safe. It can only be enabled in case there
   /// is a single SILModule in a single thread.
   bool checkSILModuleLeaks = false;
+
+  /// Are we building in embedded Swift mode?
+  bool EmbeddedSwift = false;
+
+  /// Are we building in embedded Swift + -no-allocations?
+  bool NoAllocations = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

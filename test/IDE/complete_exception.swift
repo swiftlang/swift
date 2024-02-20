@@ -42,7 +42,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT1 | %FileCheck %s -check-prefix=ERROR_DOT
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT2 | %FileCheck %s -check-prefix=ERROR_DOT
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT3 | %FileCheck %s -check-prefix=NSERROR_DOT
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | %FileCheck %s -check-prefix=INT_DOT
+// RUNFIXME: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | %FileCheck %s -check-prefix=INT_DOT
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_INSIDE_CATCH1 > %t.top_level_inside_catch1
 // RUN: %FileCheck %s -check-prefix=STMT < %t.top_level_inside_catch1
@@ -71,10 +71,10 @@ func getNSError() -> NSError { return NSError(domain: "", code: 1, userInfo: [:]
 func test001() {
   do {} catch #^CATCH1^#
 
-// CATCH1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
+// CATCH1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
@@ -98,9 +98,9 @@ func test002() {
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local:               text[#String#]; name=text{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e1[#Error1#]; name=e1{{$}}
-// THROW1-LOCAL: Decl[LocalVar]/Local/TypeRelation[Convertible]:               e2[#Error2#]; name=e2{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local:                           text[#String#]; name=text{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e1[#Error1#]; name=e1{{$}}
+// THROW1-LOCAL-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: e2[#Error2#]; name=e2{{$}}
 }
 
 func test003() {
@@ -170,7 +170,7 @@ func test009() {
   }
 
 // FIXME: we're getting parentheses around the type when it's unnamed...
-// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#(Int32)#]; name=i
+// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#<<error type>>#]; name=i
 }
 func test010() {
   do {

@@ -1,6 +1,7 @@
 module SwiftShims {
   header "AssertionReporting.h"
   header "CoreFoundationShims.h"
+  header "EmbeddedShims.h"
   header "FoundationShims.h"
   header "GlobalObjects.h"
   header "HeapObject.h"

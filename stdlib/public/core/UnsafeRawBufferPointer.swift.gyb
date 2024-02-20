@@ -430,6 +430,18 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
+#if $BitwiseCopyable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T : _BitwiseCopyable>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.load out of bounds")
+    return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+#endif
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
     fromByteOffset offset: Int = 0,
@@ -781,7 +793,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }  
 
     _debugPrecondition(
-      Int(bitPattern: base) % MemoryLayout<S.Element>.stride == 0,
+      Int(bitPattern: base) & (MemoryLayout<S.Element>.alignment-1) == 0,
       "buffer base address must be properly aligned to access S.Element"
     )
 
@@ -841,11 +853,11 @@ extension Unsafe${Mutable}RawBufferPointer {
         return .init(start: nil, count: 0)
       }
       _debugPrecondition(
-        Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+        Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
         "buffer base address must be properly aligned to access C.Element"
       )
       _precondition(
-        $0.count * MemoryLayout<C.Element>.stride < self.count,
+        $0.count * MemoryLayout<C.Element>.stride <= self.count,
         "buffer cannot contain every element from source collection."
       )
       let start = baseAddress?.initializeMemory(
@@ -866,7 +878,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
     _internalInvariant(_end != nil)
     _debugPrecondition(
-      Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+      Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
       "buffer base address must be properly aligned to access C.Element"
     )
     var iterator = source.makeIterator()
@@ -928,7 +940,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       return .init(start: nil, count: 0)
     }
     _debugPrecondition(
-      Int(bitPattern: baseAddress) % MemoryLayout<T>.stride == 0,
+      Int(bitPattern: baseAddress) & (MemoryLayout<T>.alignment-1) == 0,
       "buffer base address must be properly aligned to access T"
     )
     _precondition(
@@ -1303,6 +1315,14 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
+
+@available(*, unavailable)
+extension UnsafeRawBufferPointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeRawBufferPointer.Iterator: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutableRawBufferPointer: Sendable { }
+
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

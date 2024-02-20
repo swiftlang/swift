@@ -47,14 +47,15 @@ swift::refactoring::correctNameInternal(ASTContext &Ctx, StringRef Name,
   return Ctx.getIdentifier((llvm::Twine(Name) + SuffixToUse).str()).str();
 }
 
-llvm::StringRef swift::refactoring::correctNewDeclName(DeclContext *DC,
+llvm::StringRef swift::refactoring::correctNewDeclName(SourceLoc Loc,
+                                                       DeclContext *DC,
                                                        StringRef Name) {
 
   // Collect all visible decls in the decl context.
   llvm::SmallVector<ValueDecl *, 16> AllVisibles;
   VectorDeclConsumer Consumer(AllVisibles);
   ASTContext &Ctx = DC->getASTContext();
-  lookupVisibleDecls(Consumer, DC, true);
+  lookupVisibleDecls(Consumer, Loc, DC, /*IncludeTopLevel*/ true);
   return correctNameInternal(Ctx, Name, AllVisibles);
 }
 

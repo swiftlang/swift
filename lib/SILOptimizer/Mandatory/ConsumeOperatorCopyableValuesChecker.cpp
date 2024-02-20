@@ -55,8 +55,8 @@ namespace {
 
 struct CheckerLivenessInfo {
   GraphNodeWorklist<SILValue, 8> defUseWorklist;
-  SmallSetVector<Operand *, 8> consumingUse;
-  SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
+  llvm::SmallSetVector<Operand *, 8> consumingUse;
+  llvm::SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
   BitfieldRef<DiagnosticPrunedLiveness> liveness;
 
@@ -397,7 +397,7 @@ void ConsumeOperatorCopyableValuesChecker::emitDiagnosticForMove(
 }
 
 bool ConsumeOperatorCopyableValuesChecker::check() {
-  SmallSetVector<SILValue, 32> valuesToCheck;
+  llvm::SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
     if (arg->getOwnershipKind() == OwnershipKind::Owned &&
@@ -409,8 +409,15 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
 
   for (auto &block : *fn) {
     for (auto &ii : block) {
+      if (auto *mvi = dyn_cast<MoveValueInst>(&ii)) {
+        if (mvi->isFromVarDecl() && !mvi->getType().isMoveOnly()) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Found lexical lifetime to check: " << *mvi);
+          valuesToCheck.insert(mvi);
+        }
+      }
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical() && !bbi->getType().isMoveOnly()) {
+        if (bbi->isFromVarDecl() && !bbi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);
@@ -545,10 +552,6 @@ namespace {
 class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (fn->wasDeserializedCanonical())

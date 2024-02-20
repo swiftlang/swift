@@ -1330,7 +1330,8 @@ satisfiesLayoutConstraint(const GenericRequirementDescriptor &req,
   }
 
   // Unknown layout.
-  return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+  return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u",
+                               static_cast<uint32_t>(req.getLayout()));
 }
 
 SWIFT_CC(swift)

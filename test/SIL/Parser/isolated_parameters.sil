@@ -1,0 +1,15 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Swift
+
+public protocol AnyActor: AnyObject, Sendable {}
+public protocol Actor : AnyActor {}
+
+// CHECK-LABEL: sil @$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlFTwB : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)
+
+sil @$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlFTwB : $@convention(method) <τ_0_0 where τ_0_0 : Actor><τ_1_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@sil_isolated @guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_0, τ_1_0>, StaticString, UInt, @guaranteed τ_0_0) -> (@out τ_1_0, @error any Error)

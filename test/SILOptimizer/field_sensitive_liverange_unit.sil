@@ -15,7 +15,8 @@ sil @getC : $@convention(thin) () -> (@owned C)
 // CHECK:   def in range [0, 1) value:   [[RB:%.*]] = argument of bb3 : $C
 // CHECK-NEXT: bb2: LiveWithin
 // CHECK-NEXT: bb3: LiveWithin
-// CHECK-NEXT: last user:   br bb3([[B]] : $C)
+// All users are printed here.
+// CHECK:      last user:   br bb3([[B]] : $C)
 // CHECK-NEXT: at 1
 // CHECK-NEXT: last user:   end_borrow [[RB]] : $C
 // CHECK-NEXT: at 1

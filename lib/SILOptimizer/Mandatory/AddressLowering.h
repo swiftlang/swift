@@ -17,6 +17,10 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 /// Track an opaque value's storage. An opaque value is a SILValue with
@@ -134,7 +138,7 @@ struct ValueStorage {
 
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this
-  /// storage projects into via its "use.
+  /// storage projects into via its "use".
   uint32_t projectedStorageID = InvalidID;
 
   /// For use-projections, identifies the operand index of the composing use.
@@ -199,6 +203,7 @@ struct ValueStorage {
   }
 
 #ifndef NDEBUG
+  void print(llvm::raw_ostream &OS) const;
   void dump() const;
 #endif
 };
@@ -215,6 +220,7 @@ public:
     ValueStorage storage;
     ValueStoragePair(SILValue v, ValueStorage s) : value(v), storage(s) {}
 #ifndef NDEBUG
+    void print(llvm::raw_ostream &OS) const;
     void dump() const;
 #endif
   };
@@ -396,8 +402,10 @@ public:
   bool isComposingUseProjection(Operand *oper) const;
 
 #ifndef NDEBUG
-  void dumpProjections(SILValue value);
-  void dump();
+  void printProjections(SILValue value, llvm::raw_ostream &OS) const;
+  void dumpProjections(SILValue value) const;
+  void print(llvm::raw_ostream &OS) const;
+  void dump() const;
 #endif
 };
 

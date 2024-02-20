@@ -94,7 +94,7 @@ struct MoveOnlyChecker {
 } // namespace
 
 void MoveOnlyChecker::checkObjects() {
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
   madeChange |= searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
@@ -183,7 +183,7 @@ void MoveOnlyChecker::completeObjectLifetimes(
 
 void MoveOnlyChecker::checkAddresses() {
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
       fn, moveIntroducersToProcess, diagnosticEmitter);
@@ -214,10 +214,6 @@ namespace {
 class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())

@@ -567,7 +567,8 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
       }
     }
 
-    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser);
+        mmci && !mmci->isStrict()) {
       targets.push_back(mmci);
     }
   }
@@ -1062,7 +1063,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     // boxes, convert them from having escaping to having non-escaping
     // semantics.
     for (unsigned index : PromotedCalleeArgIndices) {
-      if (F->getArgument(index)->getType().isBoxedNonCopyableType(*F)) {
+      if (F->getArgument(index)->getType().isBoxedNonCopyableType(F)) {
         auto boxType = F->getArgument(index)->getType().castTo<SILBoxType>();
         bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
         auto checkKind = isMutable ? MarkUnresolvedNonCopyableValueInst::
@@ -1162,8 +1163,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     auto *PAI = cast<PartialApplyInst>(ApplyInst);
     return Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
-        PAI->isOnStack(),
+        PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   case ApplySiteKind::ApplyInst:

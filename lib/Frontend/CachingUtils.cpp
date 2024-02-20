@@ -14,7 +14,12 @@
 
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
+#include "swift/Frontend/CompileJobCacheResult.h"
+#include "swift/Frontend/FrontendOptions.h"
+#include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
@@ -24,9 +29,12 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Option/OptTable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
@@ -36,205 +44,217 @@
 #define DEBUG_TYPE "cache-util"
 
 using namespace swift;
+using namespace swift::cas;
 using namespace llvm;
 using namespace llvm::cas;
 using namespace llvm::vfs;
 
-namespace {
-class SwiftCASOutputFile final : public OutputFileImpl {
-public:
-  Error keep() override { return OnKeep(Path, Bytes); }
-  Error discard() override { return Error::success(); }
-  raw_pwrite_stream &getOS() override { return OS; }
-
-  using OnKeepType = llvm::unique_function<Error(StringRef, StringRef)>;
-  SwiftCASOutputFile(StringRef Path, OnKeepType OnKeep)
-      : Path(Path.str()), OS(Bytes), OnKeep(std::move(OnKeep)) {}
-
-private:
-  std::string Path;
-  SmallString<16> Bytes;
-  raw_svector_ostream OS;
-  OnKeepType OnKeep;
-};
-
-class SwiftCASOutputBackend final : public OutputBackend {
-  void anchor() override {}
-
-protected:
-  IntrusiveRefCntPtr<OutputBackend> cloneImpl() const override {
-    return makeIntrusiveRefCnt<SwiftCASOutputBackend>(CAS, Cache, BaseKey,
-                                                      InputsAndOutputs);
-  }
-
-  Expected<std::unique_ptr<OutputFileImpl>>
-  createFileImpl(StringRef ResolvedPath,
-                 Optional<OutputConfig> Config) override {
-    auto ProducingInput = OutputToInputMap.find(ResolvedPath);
-    assert(ProducingInput != OutputToInputMap.end() && "Unknown output file");
-
-    std::string InputFilename = ProducingInput->second.first.getFileName();
-    auto OutputType = ProducingInput->second.second;
-
-    // Uncached output kind.
-    if (OutputType == file_types::ID::TY_SerializedDiagnostics)
-      return std::make_unique<llvm::vfs::NullOutputFileImpl>();
-
-    return std::make_unique<SwiftCASOutputFile>(
-        ResolvedPath, [=](StringRef Path, StringRef Bytes) -> Error {
-          return storeCachedCompilerOutput(CAS, Cache, Path, Bytes, BaseKey,
-                                           InputFilename, OutputType);
-        });
-  }
-
-private:
-  void initBackend(const FrontendInputsAndOutputs &InputsAndOutputs) {
-    // FIXME: The output to input map might not be enough for example all the
-    // outputs can be written to `-`, but the backend cannot distinguish which
-    // input it actually comes from. Maybe the solution is just not to cache
-    // any commands write output to `-`.
-    file_types::ID mainOutputType = InputsAndOutputs.getPrincipalOutputType();
-    auto addInput = [&](const InputFile &Input) {
-      if (!Input.outputFilename().empty())
-        OutputToInputMap.insert(
-            {Input.outputFilename(), {Input, mainOutputType}});
-      Input.getPrimarySpecificPaths()
-          .SupplementaryOutputs.forEachSetOutputAndType(
-              [&](const std::string &Out, file_types::ID ID) {
-                OutputToInputMap.insert({Out, {Input, ID}});
-              });
-    };
-    llvm::for_each(InputsAndOutputs.getAllInputs(), addInput);
-  }
-
-  file_types::ID getOutputFileType(StringRef Path) const {
-    return file_types::lookupTypeForExtension(llvm::sys::path::extension(Path));
-  }
-
-public:
-  SwiftCASOutputBackend(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
-                        const FrontendInputsAndOutputs &InputsAndOutputs)
-      : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
-        InputsAndOutputs(InputsAndOutputs) {
-    initBackend(InputsAndOutputs);
-  }
-
-private:
-  ObjectStore &CAS;
-  ActionCache &Cache;
-  ObjectRef BaseKey;
-
-  StringMap<std::pair<const InputFile &, file_types::ID>> OutputToInputMap;
-  const FrontendInputsAndOutputs &InputsAndOutputs;
-};
-}
-
 namespace swift {
 
-llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend>
+llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend>
 createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
-    const FrontendInputsAndOutputs &InputsAndOutputs) {
+    const FrontendInputsAndOutputs &InputsAndOutputs,
+    FrontendOptions::ActionType Action) {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(CAS, Cache, BaseKey,
-                                                    InputsAndOutputs);
+                                                    InputsAndOutputs, Action);
+}
+
+Error cas::CachedResultLoader::replay(CallbackTy Callback) {
+  auto ResultProxy = CAS.getProxy(OutputRef);
+  if (!ResultProxy)
+    return ResultProxy.takeError();
+
+  {
+    swift::cas::CompileJobResultSchema Schema(CAS);
+    if (Schema.isRootNode(*ResultProxy)) {
+      auto Result = Schema.load(OutputRef);
+      if (!Result)
+        return Result.takeError();
+
+      if (auto Err = Result->forEachOutput(
+              [&](swift::cas::CompileJobCacheResult::Output Output) -> Error {
+                return Callback(Output.Kind, Output.Object);
+              }))
+        return Err;
+
+      return Error::success();
+    }
+  }
+  {
+    clang::cas::CompileJobResultSchema Schema(CAS);
+    if (Schema.isRootNode(*ResultProxy)) {
+      auto Result = Schema.load(OutputRef);
+      if (!Result)
+        return Result.takeError();
+      if (auto Err = Result->forEachOutput(
+          [&](clang::cas::CompileJobCacheResult::Output Output) -> Error {
+            file_types::ID OutputKind = file_types::ID::TY_INVALID;
+            switch (Output.Kind) {
+            case clang::cas::CompileJobCacheResult::OutputKind::MainOutput:
+              OutputKind = file_types::ID::TY_ClangModuleFile;
+              break;
+            case clang::cas::CompileJobCacheResult::OutputKind::Dependencies:
+              OutputKind = file_types::ID::TY_Dependencies;
+              break;
+            case clang::cas::CompileJobCacheResult::OutputKind::
+                SerializedDiagnostics:
+              OutputKind = file_types::ID::TY_CachedDiagnostics;
+              break;
+            }
+            assert(OutputKind != file_types::ID::TY_INVALID &&
+                   "Unexpected output kind in clang cached result");
+            return Callback(OutputKind, Output.Object);
+          }))
+        return Err;
+
+      return Error::success();
+    }
+  }
+
+  return createStringError(inconvertibleErrorCode(),
+                           "unexpected output schema for cached result");
+}
+
+static Expected<std::optional<ObjectRef>>
+lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
+  // Lookup the cache key for the input file.
+  auto OutID = CAS.getID(CacheKey);
+  auto Lookup = Cache.get(OutID);
+  if (!Lookup)
+    return Lookup.takeError();
+
+  if (!*Lookup)
+    return std::nullopt;
+
+  return CAS.getReference(**Lookup);
 }
 
 bool replayCachedCompilerOutputs(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     DiagnosticEngine &Diag, const FrontendInputsAndOutputs &InputsAndOutputs,
     CachingDiagnosticsProcessor &CDP, bool CacheRemarks) {
-  clang::cas::CompileJobResultSchema Schema(CAS);
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
-    std::string Key;
-    llvm::cas::ObjectProxy Proxy;
+    CASID Key;
+    ObjectProxy Proxy;
   };
   SmallVector<OutputEntry> OutputProxies;
+  Optional<OutputEntry> DiagnosticsOutput;
 
-  auto replayOutputFile = [&](StringRef InputName, file_types::ID OutputKind,
-                              StringRef OutputPath) -> Optional<OutputEntry> {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "DEBUG: lookup output \'" << OutputPath << "\' type \'"
-                   << file_types::getTypeName(OutputKind) << "\' input \'"
-                   << InputName << "\n";);
-
+  auto replayOutputsForInputFile = [&](const std::string &InputPath,
+                                       unsigned InputIndex,
+                                       const DenseMap<file_types::ID,
+                                                      std::string> &Outputs) {
+    auto lookupFailed = [&CanReplayAllOutput] { CanReplayAllOutput = false; };
     auto OutputKey =
-        createCompileJobCacheKeyForOutput(CAS, BaseKey, InputName, OutputKind);
+        createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
+
     if (!OutputKey) {
       Diag.diagnose(SourceLoc(), diag::error_cas,
                     toString(OutputKey.takeError()));
-      return None;
-    }
-    auto OutputKeyID = CAS.getID(*OutputKey);
-    auto Lookup = Cache.get(OutputKeyID);
-    if (!Lookup) {
-      Diag.diagnose(SourceLoc(), diag::error_cas, toString(Lookup.takeError()));
-      return None;
-    }
-    if (!*Lookup) {
-      if (CacheRemarks)
-        Diag.diagnose(SourceLoc(), diag::output_cache_miss, OutputPath,
-                      OutputKeyID.toString());
-      return None;
-    }
-    auto OutputRef = CAS.getReference(**Lookup);
-    if (!OutputRef) {
-      return None;
-    }
-    auto Result = Schema.load(*OutputRef);
-    if (!Result) {
-      Diag.diagnose(SourceLoc(), diag::error_cas, toString(Result.takeError()));
-      return None;
-    }
-    auto MainOutput = Result->getOutput(
-        clang::cas::CompileJobCacheResult::OutputKind::MainOutput);
-    if (!MainOutput) {
-      return None;
-    }
-    auto LoadedResult = CAS.getProxy(MainOutput->Object);
-    if (!LoadedResult) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
-                    toString(LoadedResult.takeError()));
-      return None;
+      return lookupFailed();
     }
 
-    return OutputEntry{OutputPath.str(), OutputKeyID.toString(), *LoadedResult};
+    auto OutID = CAS.getID(*OutputKey);
+    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
+    if (!OutputRef) {
+      Diag.diagnose(SourceLoc(), diag::error_cas,
+                    toString(OutputRef.takeError()));
+      return lookupFailed();
+    }
+
+    if (!*OutputRef) {
+      if (CacheRemarks)
+        Diag.diagnose(SourceLoc(), diag::output_cache_miss, InputPath,
+                      OutID.toString());
+      return lookupFailed();
+    }
+
+    CachedResultLoader Loader(CAS, **OutputRef);
+    LLVM_DEBUG(llvm::dbgs() << "DEBUG: lookup cache key \'" << OutID.toString()
+                            << "\' for input \'" << InputPath << "\n";);
+
+    if (auto Err = Loader.replay([&](file_types::ID Kind,
+                                     ObjectRef Ref) -> Error {
+          auto OutputPath = Outputs.find(Kind);
+          if (OutputPath == Outputs.end())
+            return createStringError(
+                inconvertibleErrorCode(),
+                "unexpected output kind in the cached output");
+          auto Proxy = CAS.getProxy(Ref);
+          if (!Proxy)
+            return Proxy.takeError();
+
+          if (Kind == file_types::ID::TY_CachedDiagnostics) {
+            assert(!DiagnosticsOutput && "more than 1 diagnotics found");
+            DiagnosticsOutput = OutputEntry{OutputPath->second, OutID, *Proxy};
+          } else
+            OutputProxies.emplace_back(
+                OutputEntry{OutputPath->second, OutID, *Proxy});
+          return Error::success();
+        })) {
+      Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+      return lookupFailed();
+    }
   };
 
-  auto replayOutputFromInput = [&](const InputFile &Input) {
+  auto replayOutputFromInput = [&](const InputFile &Input,
+                                   unsigned InputIndex) {
     auto InputPath = Input.getFileName();
-    if (!Input.outputFilename().empty()) {
-      if (auto Result = replayOutputFile(
-              InputPath, InputsAndOutputs.getPrincipalOutputType(),
-              Input.outputFilename()))
-        OutputProxies.emplace_back(*Result);
-      else
-        CanReplayAllOutput = false;
-    }
+    DenseMap<file_types::ID, std::string> Outputs;
+    if (!Input.outputFilename().empty())
+      Outputs.try_emplace(InputsAndOutputs.getPrincipalOutputType(),
+                          Input.outputFilename());
 
     Input.getPrimarySpecificPaths()
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &File, file_types::ID ID) {
-              if (ID == file_types::ID::TY_SerializedDiagnostics)
+              if (file_types::isProducedFromDiagnostics(ID))
                 return;
 
-              if (auto Result = replayOutputFile(InputPath, ID, File))
-                OutputProxies.emplace_back(*Result);
-              else
-                CanReplayAllOutput = false;
+              Outputs.try_emplace(ID, File);
             });
+
+    // If this input doesn't produce any outputs, don't try to look up cache.
+    // This can be a standalone emitModule action that only one input produces
+    // output.
+    if (Outputs.empty())
+      return;
+
+    // Add cached diagnostic entry for lookup. Output path doesn't matter here.
+    Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
+                        "<cached-diagnostics>");
+
+    return replayOutputsForInputFile(InputPath, InputIndex, Outputs);
   };
 
-  llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
+  auto AllInputs = InputsAndOutputs.getAllInputs();
+  // If there are primary inputs, look up only the primary input files.
+  // Otherwise, prepare to do cache lookup for all inputs.
+  for (unsigned Index = 0; Index < AllInputs.size(); ++Index) {
+    const auto &Input = AllInputs[Index];
+    if (InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
+      continue;
 
-  auto DiagnosticsOutput = replayOutputFile(
-      "<cached-diagnostics>", file_types::ID::TY_CachedDiagnostics,
-      "<cached-diagnostics>");
+    replayOutputFromInput(Input, Index);
+  }
+
+  if (!CanReplayAllOutput)
+    return false;
+
+  // If there is not diagnostic output, this is a job that produces no output
+  // and only diagnostics, like `typecheck-module-from-interface`, look up
+  // diagnostics from first file.
   if (!DiagnosticsOutput)
-    CanReplayAllOutput = false;
+    replayOutputsForInputFile(
+        "<cached-diagnostics>",
+        InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
+        {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
+  // Check again to make sure diagnostics is fetched successfully.
   if (!CanReplayAllOutput)
     return false;
 
@@ -245,11 +265,11 @@ bool replayCachedCompilerOutputs(
     Diag.diagnose(SourceLoc(), diag::error_replay_cached_diag,
                   toString(std::move(E)));
     return false;
-  } else {
-    if (CacheRemarks)
-      Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
-                    DiagnosticsOutput->Key);
   }
+
+  if (CacheRemarks)
+    Diag.diagnose(SourceLoc(), diag::replay_output, "<cached-diagnostics>",
+                  DiagnosticsOutput->Key.toString());
 
   // Replay the result only when everything is resolved.
   // Use on disk output backend directly here to write to disk.
@@ -268,91 +288,52 @@ bool replayCachedCompilerOutputs(
       continue;
     }
     if (CacheRemarks)
-      Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path, Output.Key);
+      Diag.diagnose(SourceLoc(), diag::replay_output, Output.Path,
+                    Output.Key.toString());
   }
 
   return true;
 }
 
-static Expected<std::unique_ptr<llvm::MemoryBuffer>>
-loadCachedCompileResultFromCacheKeyImpl(ObjectStore &CAS, ActionCache &Cache,
-                                        StringRef CacheKey,
-                                        StringRef Filename) {
-  auto ID = CAS.parseID(CacheKey);
-  if (!ID)
-    return ID.takeError();
-
-  auto Result = Cache.get(*ID);
-  if (!Result)
-    return Result.takeError();
-  if (!*Result)
-    return nullptr;
-
-  auto OutputRef = CAS.getReference(**Result);
-  if (!OutputRef)
-    return nullptr;
-  clang::cas::CompileJobResultSchema Schema(CAS);
-  auto CachedOutput = Schema.load(*OutputRef);
-
-  if (!CachedOutput)
-    return CachedOutput.takeError();
-
-  auto Output = CachedOutput->getOutput(
-      clang::cas::CompileJobCacheResult::OutputKind::MainOutput);
-  if (!Output)
-    return nullptr;
-
-  auto Proxy = CAS.getProxy(Output->Object);
-  if (!Proxy)
-    return Proxy.takeError();
-
-  return Proxy->getMemoryBuffer(Filename);
-}
-
 std::unique_ptr<llvm::MemoryBuffer>
 loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
                                     DiagnosticEngine &Diag, StringRef CacheKey,
-                                    StringRef Filename) {
-  auto Output =
-      loadCachedCompileResultFromCacheKeyImpl(CAS, Cache, CacheKey, Filename);
-  if (!Output) {
-    Diag.diagnose(SourceLoc(), diag::error_cas, toString(Output.takeError()));
+                                    file_types::ID Kind, StringRef Filename) {
+  auto failure = [&](Error Err) {
+    Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
     return nullptr;
-  }
-  return std::move(*Output);
-}
+  };
+  auto ID = CAS.parseID(CacheKey);
+  if (!ID)
+    return failure(ID.takeError());
+  auto Ref = CAS.getReference(*ID);
+  if (!Ref)
+    return nullptr;
 
-Error storeCachedCompilerOutput(llvm::cas::ObjectStore &CAS,
-                                llvm::cas::ActionCache &Cache, StringRef Path,
-                                StringRef Bytes, llvm::cas::ObjectRef BaseKey,
-                                StringRef CorrespondingInput,
-                                file_types::ID OutputKind) {
-  Optional<ObjectRef> BytesRef;
-  if (Error E = CAS.storeFromString(None, Bytes).moveInto(BytesRef))
-    return E;
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  if (!OutputRef)
+    return failure(OutputRef.takeError());
 
-  auto CacheKey = createCompileJobCacheKeyForOutput(
-      CAS, BaseKey, CorrespondingInput, OutputKind);
-  if (!CacheKey)
-    return CacheKey.takeError();
+  if (!*OutputRef)
+    return nullptr;
 
-  LLVM_DEBUG(llvm::dbgs() << "DEBUG: writing output \'" << Path << "\' type \'"
-                          << file_types::getTypeName(OutputKind)
-                          << "\' input \'" << CorrespondingInput << "\' hash \'"
-                          << CAS.getID(*CacheKey).toString() << "\'\n";);
+  CachedResultLoader Loader(CAS, **OutputRef);
+  std::unique_ptr<llvm::MemoryBuffer> Buffer;
+  if (auto Err =
+          Loader.replay([&](file_types::ID Type, ObjectRef Ref) -> Error {
+            if (Kind != Type)
+              return Error::success();
 
-  // Use clang compiler job output for now.
-  clang::cas::CompileJobCacheResult::Builder Builder;
-  Builder.addOutput(clang::cas::CompileJobCacheResult::OutputKind::MainOutput,
-                    *BytesRef);
-  auto Result = Builder.build(CAS);
-  if (!Result)
-    return Result.takeError();
+            auto Proxy = CAS.getProxy(Ref);
+            if (!Proxy)
+              return Proxy.takeError();
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result)))
-    return E;
+            Buffer = Proxy->getMemoryBuffer(Filename);
+            return Error::success();
+          }))
+    return failure(std::move(Err));
 
-  return Error::success();
+  return Buffer;
 }
 
 static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
@@ -421,6 +402,38 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
   }
 
   return CASFS;
+}
+
+std::vector<std::string> remapPathsFromCommandLine(
+    ArrayRef<std::string> commandLine,
+    llvm::function_ref<std::string(StringRef)> RemapCallback) {
+  // parse and remap options that is path and not cache invariant.
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  std::vector<const char *> Args;
+  std::for_each(commandLine.begin(), commandLine.end(),
+                [&](const std::string &arg) { Args.push_back(arg.c_str()); });
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+  llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
+      Args, MissingIndex, MissingCount, options::FrontendOption);
+  SmallVector<const char *, 16> newArgs;
+  std::vector<std::string> newCommandLine;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  for (auto *Arg : ParsedArgs) {
+    Arg->render(ParsedArgs, newArgs);
+    const auto &Opt = Arg->getOption();
+    if (Opt.matches(options::OPT_INPUT) ||
+        (!Opt.hasFlag(options::CacheInvariant) &&
+         Opt.hasFlag(options::ArgumentIsPath))) {
+      StringRef newPath = Saver.save(RemapCallback(Arg->getValue()));
+      newArgs.back() = newPath.data();
+    }
+  }
+  std::for_each(newArgs.begin(), newArgs.end(),
+                [&](const char *arg) { newCommandLine.emplace_back(arg); });
+
+  return newCommandLine;
 }
 
 } // namespace swift

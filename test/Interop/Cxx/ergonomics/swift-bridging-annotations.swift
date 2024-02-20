@@ -8,6 +8,8 @@
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -enable-experimental-cxx-interop -Xcc -DINCMOD | %FileCheck %s
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -cxx-interoperability-mode=upcoming-swift -Xcc -DINCMOD | %FileCheck --check-prefixes=CHECK,CHECKLATEST %s
+
 // Test through the use of the bridging header
 // RUN: %target-swift-frontend -emit-ir -I %t -import-objc-header %t/Inputs/header.h -I %swift_src_root/lib/ClangImporter -enable-experimental-cxx-interop -DBRIDGING_HEADER_TEST -disable-availability-checking %t/SwiftMod.swift
 
@@ -80,6 +82,19 @@ class SWIFT_CONFORMS_TO_PROTOCOL(SwiftMod.Proto) ConformsTo {
 public:
 };
 
+class SWIFT_UNCHECKED_SENDABLE UnsafeSendable {
+public:
+};
+
+class SWIFT_NONCOPYABLE NonCopyableCopyable {
+public:
+    NonCopyableCopyable(const NonCopyableCopyable &other) = default;
+    NonCopyableCopyable(NonCopyableCopyable &&other);
+    ~NonCopyableCopyable();
+private:
+    int x;
+};
+
 
 // CHECK: struct SelfContained {
 
@@ -101,3 +116,6 @@ public:
 
 // CHECK: struct ConformsTo : Proto {
 
+// CHECK: struct UnsafeSendable : @unchecked Sendable {
+
+// CHECKLATEST: struct NonCopyableCopyable

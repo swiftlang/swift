@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -require-explicit-sendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -require-explicit-sendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: asserts
 
@@ -112,7 +112,7 @@ open class TestThing {}
 open class TestSubThing : TestThing {}
 
 @available(SwiftStdlib 5.1, *)
-@MainActor(unsafe)
+@MainActor(unsafe) // expected-warning {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 open class TestThing2 {}
 
 @available(SwiftStdlib 5.1, *)

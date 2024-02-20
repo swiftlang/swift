@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_MACRO_DEFINITION_H
 #define SWIFT_AST_MACRO_DEFINITION_H
 
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -26,14 +27,25 @@ class ASTContext;
 
 /// A reference to an external macro definition that is understood by ASTGen.
 struct ExternalMacroDefinition {
-  enum class PluginKind {
+  enum class PluginKind : int8_t {
     InProcess = 0,
     Executable = 1,
+    Error = -1,
   };
   PluginKind kind;
   /// ASTGen's notion of an macro definition, which is opaque to the C++ part
-  /// of the compiler.
-  void *opaqueHandle = nullptr;
+  /// of the compiler. If 'kind' is 'PluginKind::Error', this is a C-string to
+  /// the error message
+  const void *opaqueHandle = nullptr;
+
+  static ExternalMacroDefinition error(NullTerminatedStringRef message) {
+    return ExternalMacroDefinition{PluginKind::Error,
+                                   static_cast<const void *>(message.data())};
+  }
+  bool isError() const { return kind == PluginKind::Error; }
+  NullTerminatedStringRef getErrorMessage() const {
+    return static_cast<const char *>(opaqueHandle);
+  }
 };
 
 /// A reference to an external macro.
@@ -46,6 +58,8 @@ struct ExternalMacroReference {
 enum class BuiltinMacroKind: uint8_t {
   /// #externalMacro, which references an external macro.
   ExternalMacro,
+  /// #isolation, which produces the isolation of the current context
+  IsolationMacro,
 };
 
 /// A single replacement
@@ -64,16 +78,25 @@ class ExpandedMacroDefinition {
   /// The macro replacements, ASTContext-allocated.
   ArrayRef<ExpandedMacroReplacement> replacements;
 
+  /// Same as above but for generic argument replacements
+  ArrayRef<ExpandedMacroReplacement> genericReplacements;
+
   ExpandedMacroDefinition(
     StringRef expansionText,
-    ArrayRef<ExpandedMacroReplacement> replacements
-  ) : expansionText(expansionText), replacements(replacements) { }
+    ArrayRef<ExpandedMacroReplacement> replacements,
+    ArrayRef<ExpandedMacroReplacement> genericReplacements
+  ) : expansionText(expansionText),
+          replacements(replacements),
+          genericReplacements(genericReplacements) { }
 
 public:
   StringRef getExpansionText() const { return expansionText; }
 
   ArrayRef<ExpandedMacroReplacement> getReplacements() const {
     return replacements;
+  }
+  ArrayRef<ExpandedMacroReplacement> getGenericReplacements() const {
+    return genericReplacements;
   }
 };
 
@@ -148,7 +171,8 @@ public:
   static MacroDefinition forExpanded(
       ASTContext &ctx,
       StringRef expansionText,
-      ArrayRef<ExpandedMacroReplacement> replacements
+      ArrayRef<ExpandedMacroReplacement> replacements,
+      ArrayRef<ExpandedMacroReplacement> genericReplacements
   );
 
   /// Retrieve the external macro being referenced.

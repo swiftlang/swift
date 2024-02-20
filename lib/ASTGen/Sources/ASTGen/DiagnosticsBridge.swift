@@ -1,4 +1,17 @@
-import CASTBridging
+//===--- DiagnosticsBridge.swift ------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import ASTBridging
+import BasicBridging
 import SwiftDiagnostics
 import SwiftSyntax
 
@@ -21,17 +34,19 @@ fileprivate func emitDiagnosticParts(
   // Emit the diagnostic
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
-    Diagnostic_create(
-      diagnosticEngine, bridgedSeverity, bridgedSourceLoc(at: position),
-      bridgedMessage
+    BridgedDiagnostic(
+      at: bridgedSourceLoc(at: position),
+      message: bridgedMessage,
+      severity: bridgedSeverity,
+      engine: diagnosticEngine
     )
   }
 
   // Emit highlights
   for highlight in highlights {
-    Diagnostic_highlight(
-      diag, bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
-      bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
+    diag.highlight(
+      start: bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      end: bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
@@ -50,24 +65,31 @@ fileprivate func emitDiagnosticParts(
     case .replaceLeadingTrivia(let oldToken, let newTrivia):
       replaceStartLoc = bridgedSourceLoc(at: oldToken.position)
       replaceEndLoc = bridgedSourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia)
+        at: oldToken.positionAfterSkippingLeadingTrivia
+      )
       newText = newTrivia.description
 
     case .replaceTrailingTrivia(let oldToken, let newTrivia):
       replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
       replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
       newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     newText.withBridgedString { bridgedMessage in
-      Diagnostic_fixItReplace(
-        diag, replaceStartLoc, replaceEndLoc,
-        bridgedMessage
+      diag.fixItReplace(
+        start: replaceStartLoc,
+        end: replaceEndLoc,
+        replacement: bridgedMessage
       )
     }
   }
 
-  Diagnostic_finish(diag);
+  diag.finish();
 }
 
 /// Emit the given diagnostic via the diagnostic engine.
@@ -115,11 +137,11 @@ func emitDiagnostic(
 extension DiagnosticSeverity {
   var bridged: BridgedDiagnosticSeverity {
     switch self {
-      case .error: return .error
-      case .note: return .note
-      case .warning: return .warning
-      case .remark: return .remark
-      @unknown default: return .error
+    case .error: return .error
+    case .note: return .note
+    case .warning: return .warning
+    case .remark: return .remark
+    @unknown default: return .error
     }
   }
 }
@@ -139,19 +161,19 @@ extension SourceManager {
     // Emit the diagnostic
     var mutableMessage = message
     let diag = mutableMessage.withBridgedString { bridgedMessage in
-      Diagnostic_create(
-        bridgedDiagEngine, bridgedSeverity,
-        bridgedSourceLoc(for: node, at: position),
-        bridgedMessage
+      BridgedDiagnostic(
+        at: bridgedSourceLoc(for: node, at: position),
+        message: bridgedMessage,
+        severity: bridgedSeverity,
+        engine: bridgedDiagEngine
       )
     }
 
     // Emit highlights
     for highlight in highlights {
-      Diagnostic_highlight(
-        diag,
-        bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
-        bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
+      diag.highlight(
+        start: bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
+        end: bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
       )
     }
 
@@ -184,23 +206,30 @@ extension SourceManager {
       case .replaceTrailingTrivia(let oldToken, let newTrivia):
         replaceStartLoc = bridgedSourceLoc(
           for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia)
+          at: oldToken.endPositionBeforeTrailingTrivia
+        )
         replaceEndLoc = bridgedSourceLoc(
           for: oldToken,
           at: oldToken.endPosition
         )
         newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
 
       newText.withBridgedString { bridgedMessage in
-        Diagnostic_fixItReplace(
-          diag, replaceStartLoc, replaceEndLoc,
-          bridgedMessage
+        diag.fixItReplace(
+          start: replaceStartLoc,
+          end: replaceEndLoc,
+          replacement: bridgedMessage
         )
       }
     }
 
-    Diagnostic_finish(diag);
+    diag.finish();
   }
 
   /// Emit a diagnostic via the C++ diagnostic engine.
@@ -220,11 +249,11 @@ extension SourceManager {
     // Emit Fix-Its.
     for fixIt in diagnostic.fixIts {
       diagnoseSingle(
-          message: fixIt.message.message,
-          severity: .note,
-          node: diagnostic.node,
-          position: diagnostic.position,
-          fixItChanges: fixIt.changes
+        message: fixIt.message.message,
+        severity: .note,
+        node: diagnostic.node,
+        position: diagnostic.position,
+        fixItChanges: fixIt.changes
       )
     }
 
@@ -262,17 +291,16 @@ public func createQueuedDiagnostics() -> UnsafeRawPointer {
 /// Destroy the queued diagnostics.
 @_cdecl("swift_ASTGen_destroyQueuedDiagnostics")
 public func destroyQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer
 ) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    for (_, sourceFileID) in queuedDiagnostics.pointee.sourceFileIDs {
-      sourceFileID.deinitialize(count: 1)
-      sourceFileID.deallocate()
-    }
-
-    queuedDiagnostics.deinitialize(count: 1)
-    queuedDiagnostics.deallocate()
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+  for (_, sourceFileID) in queuedDiagnostics.pointee.sourceFileIDs {
+    sourceFileID.deinitialize(count: 1)
+    sourceFileID.deallocate()
   }
+
+  queuedDiagnostics.deinitialize(count: 1)
+  queuedDiagnostics.deallocate()
 }
 
 /// Diagnostic message used for thrown errors.
@@ -314,7 +342,8 @@ public func addQueuedSourceFile(
   // Determine the parent link, for a child buffer.
   let parent: (GroupedDiagnostics.SourceFileID, AbsolutePosition)?
   if parentID >= 0,
-      let parentSourceFileID = queuedDiagnostics.pointee.sourceFileIDs[parentID] {
+    let parentSourceFileID = queuedDiagnostics.pointee.sourceFileIDs[parentID]
+  {
     parent = (parentSourceFileID.pointee, AbsolutePosition(utf8Offset: positionInParent))
   } else {
     parent = nil
@@ -332,6 +361,7 @@ public func addQueuedSourceFile(
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
   let sourceFileID = queuedDiagnostics.pointee.grouped.addSourceFile(
     tree: sourceFile.pointee.syntax,
+    sourceLocationConverter: sourceFile.pointee.sourceLocationConverter,
     displayName: displayName,
     parent: parent
   )
@@ -358,7 +388,7 @@ public func addQueuedDiagnostic(
     to: QueuedDiagnostics.self
   )
 
-  guard let rawPosition = position.raw else {
+  guard let rawPosition = position.getOpaquePointerValue() else {
     return
   }
 
@@ -386,17 +416,20 @@ public func addQueuedDiagnostic(
   // Map the highlights.
   var highlights: [Syntax] = []
   let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
-    start: highlightRangesPtr, count: numHighlightRanges * 2
+    start: highlightRangesPtr,
+    count: numHighlightRanges * 2
   )
   for index in 0..<numHighlightRanges {
     // Make sure both the start and the end land within this source file.
-    guard let start = highlightRanges[index * 2].raw,
-          let end = highlightRanges[index * 2 + 1].raw  else {
+    guard let start = highlightRanges[index * 2].getOpaquePointerValue(),
+      let end = highlightRanges[index * 2 + 1].getOpaquePointerValue()
+    else {
       continue
     }
 
     guard start >= sourceFileBaseAddress && start < sourceFileEndAddress,
-          end >= sourceFileBaseAddress && end <= sourceFileEndAddress else {
+      end >= sourceFileBaseAddress && end <= sourceFileEndAddress
+    else {
       continue
     }
 
@@ -413,8 +446,9 @@ public func addQueuedDiagnostic(
     while true {
       // If this syntax matches our starting/ending positions, add the
       // highlight and we're done.
-      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos &&
-          highlightSyntax.endPositionBeforeTrailingTrivia == endPos {
+      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos
+        && highlightSyntax.endPositionBeforeTrailingTrivia == endPos
+      {
         highlights.append(highlightSyntax)
         break
       }
@@ -444,17 +478,14 @@ public func addQueuedDiagnostic(
 /// Render the queued diagnostics into a UTF-8 string.
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
 public func renderQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>,
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   contextSize: Int,
   colorize: Int,
-  renderedPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  renderedLength: UnsafeMutablePointer<Int>
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    let formatter = DiagnosticsFormatter(contextSize: contextSize, colorize: colorize != 0)
-    let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+  let formatter = DiagnosticsFormatter(contextSize: contextSize, colorize: colorize != 0)
+  let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
-    (renderedPointer.pointee, renderedLength.pointee) =
-        allocateUTF8String(renderedStr)
-  }
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
 }

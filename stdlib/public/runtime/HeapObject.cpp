@@ -107,15 +107,38 @@ static void _swift_release_n_(HeapObject *object, uint32_t n)
   asm("__swift_release_n_");
 static HeapObject *_swift_tryRetain_(HeapObject *object)
   asm("__swift_tryRetain_");
+
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+
 #define CALL_IMPL(name, args) do { \
-    void *fptr; \
-    memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
-    extern char _ ## name ## _as_char asm("__" #name "_"); \
-    fptr = __ptrauth_swift_runtime_function_entry_strip(fptr); \
-    if (SWIFT_UNLIKELY(fptr != &_ ## name ## _as_char)) \
-      return _ ## name args; \
-    return _ ## name ## _ args; \
+  if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
+    return _ ## name args; \
+  return _ ## name ## _ args; \
 } while(0)
+
+#define CALL_IMPL_CHECK(name, args) do { \
+  void *fptr; \
+  memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
+  extern char _ ## name ## _as_char asm("__" #name "_"); \
+  fptr = __ptrauth_swift_runtime_function_entry_strip(fptr); \
+  if (SWIFT_UNLIKELY(fptr != &_ ## name ## _as_char)) { \
+    if (SWIFT_UNLIKELY(!_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) { \
+      _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.store(true, std::memory_order_relaxed); \
+    } \
+    return _ ## name args; \
+  } \
+  return _ ## name ## _ args; \
+  } while(0)
+#else
+
+// If retain/release etc. aren't overridable, just call the real implementation.
+#define CALL_IMPL(name, args) \
+    return _ ## name ## _ args;
+
+#define CALL_IMPL_CHECK(name, args) \
+    return _ ## name ## _ args;
+
+#endif
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
 static malloc_type_summary_t
@@ -212,6 +235,38 @@ static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
 }
 #endif // SWIFT_STDLIB_HAS_MALLOC_TYPE
 
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
+    HeapMetadata const *metadata, size_t requiredSize,
+    size_t requiredAlignmentMask) = _swift_allocObject_;
+
+SWIFT_RUNTIME_EXPORT
+std::atomic<bool> _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly = false;
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
+    _swift_retain_;
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain_n)(
+    HeapObject *object, uint32_t n) = _swift_retain_n_;
+
+SWIFT_RUNTIME_EXPORT
+void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
+    _swift_release_;
+
+SWIFT_RUNTIME_EXPORT
+void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object,
+                                                uint32_t n) = _swift_release_n_;
+
+SWIFT_RUNTIME_EXPORT
+HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_tryRetain)(HeapObject *object) =
+    _swift_tryRetain_;
+
+#endif // SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
@@ -240,13 +295,8 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
 HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
                                      size_t requiredSize,
                                      size_t requiredAlignmentMask) {
-  CALL_IMPL(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
+  CALL_IMPL_CHECK(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
 }
-
-SWIFT_RUNTIME_EXPORT
-HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
-    HeapMetadata const *metadata, size_t requiredSize,
-    size_t requiredAlignmentMask) = _swift_allocObject_;
 
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
@@ -465,10 +515,6 @@ HeapObject *swift::swift_retain(HeapObject *object) {
 
 CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_retain)
 
-SWIFT_RUNTIME_EXPORT
-HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
-    _swift_retain_;
-
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
   if (isValidPointerForNativeRetain(object))
@@ -491,10 +537,6 @@ HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
   CALL_IMPL(swift_retain_n, (object, n));
 #endif
 }
-
-SWIFT_RUNTIME_EXPORT
-HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain_n)(
-    HeapObject *object, uint32_t n) = _swift_retain_n_;
 
 HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain_n);
@@ -520,10 +562,6 @@ void swift::swift_release(HeapObject *object) {
 
 CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_release)
 
-SWIFT_RUNTIME_EXPORT
-void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
-    _swift_release_;
-
 void swift::swift_nonatomic_release(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release);
   if (isValidPointerForNativeRetain(object))
@@ -544,10 +582,6 @@ void swift::swift_release_n(HeapObject *object, uint32_t n) {
   CALL_IMPL(swift_release_n, (object, n));
 #endif
 }
-
-SWIFT_RUNTIME_EXPORT
-void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object,
-                                                uint32_t n) = _swift_release_n_;
 
 void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release_n);
@@ -705,10 +739,6 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
 HeapObject *swift::swift_tryRetain(HeapObject *object) {
   CALL_IMPL(swift_tryRetain, (object));
 }
-
-SWIFT_RUNTIME_EXPORT
-HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_tryRetain)(HeapObject *object) =
-    _swift_tryRetain_;
 
 bool swift::swift_isDeallocating(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))

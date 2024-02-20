@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-sns- -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-sns- -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -160,9 +160,9 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 // rdar://86653457 - Crash due to missing Sendable conformances.
 // expected-warning @+1 {{non-final class 'Klass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
 class Klass<Output: Sendable>: Sendable {}
-// expected-complete-and-sns-warning @+1 {{type 'S' does not conform to the 'Sendable' protocol}}
+// expected-complete-and-tns-warning @+1 {{type 'S' does not conform to the 'Sendable' protocol}}
 final class SubKlass: Klass<[S]> {}
-// expected-complete-and-sns-note @+1 {{consider making struct 'S' conform to the 'Sendable' protocol}}
+// expected-complete-and-tns-note @+1 {{consider making struct 'S' conform to the 'Sendable' protocol}}
 public struct S {}
 
 // rdar://88700507 - redundant conformance of @MainActor-isolated subclass to 'Sendable'

@@ -135,8 +135,8 @@ private func constructLetInitRegion(
   // root-class initializer).
   initRegion.insert(markUninitialized)
 
-  var beginBorrows = Stack<BeginBorrowInst>(context)
-  defer { beginBorrows.deinitialize() }
+  var borrows = Stack<BorrowIntroducingInstruction>(context)
+  defer { borrows.deinitialize() }
 
   for inst in markUninitialized.parentFunction.instructions {
     switch inst {
@@ -161,8 +161,13 @@ private func constructLetInitRegion(
       // Include let-field partial de-initializations in the region.
       initRegion.insert(inst)
 
-    case let beginBorrow as BeginBorrowInst:
-      beginBorrows.append(beginBorrow)
+    case let beginBorrow as BeginBorrowInst
+         where beginBorrow.borrowedValue.referenceRoot == markUninitialized:
+      borrows.append(beginBorrow)
+
+    case let storeBorrow as StoreBorrowInst
+         where storeBorrow.source.referenceRoot == markUninitialized:
+      borrows.append(storeBorrow)
 
     default:
       break
@@ -171,8 +176,8 @@ private func constructLetInitRegion(
 
   // Extend the region to whole borrow scopes to avoid that we insert an `end_init_let_ref` in the
   // middle of a borrow scope.
-  for beginBorrow in beginBorrows where initRegion.contains(beginBorrow) {
-    initRegion.insert(contentsOf: beginBorrow.endBorrows)
+  for borrow in borrows where initRegion.contains(borrow) {
+    initRegion.insert(borrowScopeOf: borrow, context)
   }
 }
 

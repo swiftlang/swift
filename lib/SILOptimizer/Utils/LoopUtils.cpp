@@ -251,6 +251,15 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
 
     return alloc && L->contains(alloc);
   }
+  // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
+  // prevent it from being cloned so OSSA lowering can directly convert it to a
+  // single allocation.
+  if (auto *PA = dyn_cast<PartialApplyInst>(I)) {
+    if (PA->isOnStack()) {
+      assert(PA->getFunction()->hasOwnership());
+      return false;
+    }
+  }
 
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {
@@ -275,7 +284,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
     return true;
   }
 
-  if (isa<ThrowInst>(I))
+  if (isa<ThrowInst>(I) || isa<ThrowAddrInst>(I))
     return false;
 
   // The entire access must be within the loop.
@@ -298,6 +307,11 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
         return false;
     }
     return true;
+  }
+
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+      return false;
   }
 
   if (isa<DynamicMethodBranchInst>(I))

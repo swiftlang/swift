@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Enum_SinglePayload_generic1
 // RUN: %target-codesign %t/reflect_Enum_SinglePayload_generic1
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_SinglePayload_generic1 | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK --check-prefix=X%target-ptrsize --dump-input=fail
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_SinglePayload_generic1 | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK --check-prefix=X%target-ptrsize %add_num_extra_inhabitants --dump-input=fail
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
@@ -31,7 +31,7 @@ reflect(enum: SimplePayload1<ClassTypeA>.b(ClassTypeA()))
 // (Unlike MPEs, SPEs do not automatically use a tag just because they're generic)
 
 // CHECK: Type info:
-// X64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483645 bitwise_takable=1
+// X64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[#num_extra_inhabitants_64bit-2]] bitwise_takable=1
 // X32-NEXT: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
 // CHECK-NEXT:   (case name=b index=0 offset=0
 // CHECK-NEXT:     (reference kind=strong refcounting=native))

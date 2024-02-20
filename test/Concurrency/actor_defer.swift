@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=complete
-// RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -enable-actor-data-race-checks -o - %s | %FileCheck %s
 

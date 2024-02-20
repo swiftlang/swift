@@ -70,7 +70,8 @@ sil @propagate_with_get_element_returning_direct_result : $@convention(thin) () 
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
-  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   debug_value %7 : $MyArray<MyInt>
   debug_value %8 : $UnsafeMutablePointer<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
@@ -144,7 +145,8 @@ sil @repeated_initialization : $@convention(thin) () -> () {
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
-  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
@@ -193,7 +195,8 @@ sil @unknown_use : $@convention(thin) () -> () {
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
-  %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
@@ -240,7 +243,8 @@ sil @append_contentsOf_int : $@convention(thin) () -> () {
   %5 = function_ref @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
   %7 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 0
-  %8 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8a = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $Array<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 27
@@ -289,7 +293,8 @@ bb0(%0 : $*Array<Hello>, %1 : $Hello):
   %9 = function_ref @adoptStorageHello : $@convention(method) (@owned _ContiguousArrayStorage<Hello>, MyInt, @thin Array<Hello>.Type) -> (@owned Array<Hello>, UnsafeMutablePointer<Hello>)
   %10 = apply %9(%7, %6, %8) : $@convention(method) (@owned _ContiguousArrayStorage<Hello>, MyInt, @thin Array<Hello>.Type) -> (@owned Array<Hello>, UnsafeMutablePointer<Hello>)
   %11 = tuple_extract %10 : $(Array<Hello>, UnsafeMutablePointer<Hello>), 0
-  %12 = tuple_extract %10 : $(Array<Hello>, UnsafeMutablePointer<Hello>), 1
+  %12a = tuple_extract %10 : $(Array<Hello>, UnsafeMutablePointer<Hello>), 1
+  %12 = mark_dependence %12a : $UnsafeMutablePointer<Hello> on %7 : $_ContiguousArrayStorage<Hello>
   %13 = struct_extract %12 : $UnsafeMutablePointer<Hello>, #UnsafeMutablePointer._rawValue
   %22 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Hello
   strong_retain %1 : $Hello

@@ -1,27 +1,27 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang -x c -c %S/Inputs/tiny-runtime-dummy-refcounting.c -o %t/runtime.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/main.o %t/runtime.o %t/print.o -o %t/a.out -dead_strip
+// RUN: %target-clang %t/main.o %t/print.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 @_silgen_name("putchar")
-func putchar(_: UInt8)
+@discardableResult
+func putchar(_: CInt) -> CInt
 
 public func print(_ s: StaticString, terminator: StaticString = "\n") {
   var p = s.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
   p = terminator.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
 }

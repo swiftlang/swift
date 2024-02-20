@@ -91,7 +91,6 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     return {};
 
   case BodyKind::TypeChecked:
@@ -172,7 +171,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       parser.CurDeclContext = generatedInfo->declContext;
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::DeclarationMacroExpansion:
+    case GeneratedSourceInfo::CodeItemMacroExpansion:
       if (parser.CurDeclContext->isTypeContext()) {
         parser.parseExpandedMemberList(items);
       } else {
@@ -181,9 +181,26 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
 
     case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::PreambleMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
-    case GeneratedSourceInfo::PrettyPrinted: {
+    case GeneratedSourceInfo::PrettyPrinted:
+    case GeneratedSourceInfo::DefaultArgument: {
       parser.parseTopLevelItems(items);
+      break;
+    }
+
+    case GeneratedSourceInfo::BodyMacroExpansion: {
+      // Prime the lexer.
+      if (parser.Tok.is(tok::NUM_TOKENS))
+        parser.consumeTokenWithoutFeedingReceiver();
+
+      if (parser.Tok.is(tok::l_brace)) {
+        if (auto body =
+                parser.parseBraceItemList(diag::invalid_diagnostic)
+                  .getPtrOrNull())
+          items.push_back(body);
+      }
+
       break;
     }
 

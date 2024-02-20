@@ -328,7 +328,7 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     // properties, because that would require to make the field decl public -
     // which keeps more metadata alive.
     return !conservative ||
-           REAI->getField()->getEffectiveAccess() >= AccessLevel::Public;
+           REAI->getField()->getEffectiveAccess() >= AccessLevel::Package;
   }
   return true;
 }
@@ -365,7 +365,7 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
       CanType subType = rawSubType->getCanonicalType();
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
       
-        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Public) {
+        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
           return true;
         }
       
@@ -433,6 +433,7 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
   switch (function->getLinkage()) {
   case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
   case SILLinkage::HiddenExternal:
     return false;
   case SILLinkage::Shared:
@@ -441,9 +442,11 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
       return true;
     return false;
   case SILLinkage::Public:
+  case SILLinkage::Package:
   case SILLinkage::Hidden:
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
     break;
   }
   return true;
@@ -596,7 +599,7 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 
 /// Make a nominal type, including it's context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
-  if (decl->getEffectiveAccess() >= AccessLevel::Public)
+  if (decl->getEffectiveAccess() >= AccessLevel::Package)
     return;
 
   // We must not modify decls which are defined in other modules.
@@ -611,6 +614,30 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     decl->getAttrs().add(attr);
+
+    if (everything) {
+      // Serialize vtables, their superclass vtables, and make all vfunctions
+      // usable from inline.
+      if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+        auto *vTable = M.lookUpVTable(classDecl);
+        vTable->setSerialized(IsSerialized);
+        for (auto &entry : vTable->getEntries()) {
+          makeFunctionUsableFromInline(entry.getImplementation());
+        }
+
+        classDecl->walkSuperclasses([&](ClassDecl *superClassDecl) {
+          auto *vTable = M.lookUpVTable(superClassDecl);
+          if (!vTable) {
+            return TypeWalker::Action::Stop;
+          }
+          vTable->setSerialized(IsSerialized);
+          for (auto &entry : vTable->getEntries()) {
+            makeFunctionUsableFromInline(entry.getImplementation());
+          }
+          return TypeWalker::Action::Continue;
+        });
+      }
+    }
   }
   if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
     makeDeclUsableFromInline(nominalCtx);

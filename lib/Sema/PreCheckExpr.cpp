@@ -20,6 +20,7 @@
 #include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -829,7 +830,7 @@ VarDecl *
 TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                    UnresolvedDotExpr *ctorRef) {
   // If the reference isn't to a constructor, we're done.
-  if (ctorRef->getName().getBaseName() != DeclBaseName::createConstructor())
+  if (!ctorRef->getName().getBaseName().isConstructor())
     return nullptr;
 
   if (auto ctorContext =
@@ -844,6 +845,83 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
+}
+
+/// Diagnoses an unqualified `init` expression.
+///
+/// \param initExpr The \c init expression.
+/// \param dc The declaration context of \p initExpr.
+///
+/// \returns An expression matching `self.init` or `super.init` that can be used
+/// to recover, or `nullptr` if cannot recover.
+static UnresolvedDotExpr *
+diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
+                        ASTContext &ctx) {
+  const auto loc = initExpr->getLoc();
+
+  enum class Suggestion : unsigned {
+    None = 0,
+    Self = 1,
+    Super = 2,
+  };
+
+  Suggestion suggestion = [dc]() {
+    NominalTypeDecl *nominal = nullptr;
+    {
+      auto *typeDC = dc->getInnermostTypeContext();
+      if (!typeDC) {
+        // No type context--no suggestion.
+        return Suggestion::None;
+      }
+
+      nominal = typeDC->getSelfNominalTypeDecl();
+    }
+
+    auto *classDecl = dyn_cast<ClassDecl>(nominal);
+    if (!classDecl || !classDecl->hasSuperclass()) {
+      // No class or no superclass--suggest 'self.'.
+      return Suggestion::Self;
+    }
+
+    if (auto *initDecl = dyn_cast<ConstructorDecl>(dc)) {
+      if (initDecl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+        // Innermost context is a convenience initializer--suggest 'self.'.
+        return Suggestion::Self;
+      } else {
+        // Innermost context is a designated initializer--suggest 'super.'.
+        return Suggestion::Super;
+      }
+    }
+
+    // Class context but innermost context is not an initializer--suggest
+    // 'self.'. 'super.' might be possible too, but is far lesss likely to be
+    // the right answer.
+    return Suggestion::Self;
+  }();
+
+  auto diag =
+      ctx.Diags.diagnose(loc, diag::unqualified_init, (unsigned)suggestion);
+
+  Expr *base = nullptr;
+  switch (suggestion) {
+  case Suggestion::None:
+    return nullptr;
+  case Suggestion::Self:
+    diag.fixItInsert(loc, "self.");
+    base = new (ctx)
+        UnresolvedDeclRefExpr(DeclNameRef(ctx.Id_self), DeclRefKind::Ordinary,
+                              initExpr->getNameLoc());
+    base->setImplicit(true);
+    break;
+  case Suggestion::Super:
+    diag.fixItInsert(loc, "super.");
+    base = new (ctx) SuperRefExpr(/*Self=*/nullptr, loc, /*Implicit=*/true);
+    break;
+  }
+
+  return new (ctx)
+      UnresolvedDotExpr(base, /*dotloc=*/SourceLoc(), initExpr->getName(),
+                        initExpr->getNameLoc(), /*implicit=*/true);
 }
 
 namespace {
@@ -938,8 +1016,6 @@ namespace {
     /// implicit `ErrorExpr` in place of invalid references.
     bool UseErrorExprs;
 
-    bool LeaveClosureBodiesUnchecked;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1008,11 +1084,9 @@ namespace {
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors,
-                       bool leaveClosureBodiesUnchecked)
-        : Ctx(dc->getASTContext()), DC(dc),
-          ParentExpr(parent), UseErrorExprs(replaceInvalidRefsWithErrors),
-          LeaveClosureBodiesUnchecked(leaveClosureBodiesUnchecked) {}
+                       bool replaceInvalidRefsWithErrors)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
+          UseErrorExprs(replaceInvalidRefsWithErrors) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1063,7 +1137,7 @@ namespace {
             SequenceExprDepth++;
           ExprStack.push_back(expr);
         }
-        return Action::VisitChildrenIf(recursive, expr);
+        return Action::VisitNodeIf(recursive, expr);
       };
 
       // Resolve 'super' references.
@@ -1093,6 +1167,17 @@ namespace {
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
+
+        if (unresolved->getName().getBaseName().isConstructor()) {
+          if (auto *recoveryExpr =
+                  diagnoseUnqualifiedInit(unresolved, DC, Ctx)) {
+            return finish(true, recoveryExpr);
+          }
+
+          return finish(false,
+                        new (Ctx) ErrorExpr(unresolved->getSourceRange()));
+        }
+
         auto *refExpr =
             TypeChecker::resolveDeclRefExpr(unresolved, DC, UseErrorExprs);
 
@@ -1187,10 +1272,6 @@ namespace {
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
 
-      // Mark the direct callee as being a callee.
-      if (auto *call = dyn_cast<ApplyExpr>(expr))
-        markDirectCallee(call->getFn());
-
       // Fold sequence expressions.
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TypeChecker::foldSequence(seqExpr, DC);
@@ -1218,52 +1299,39 @@ namespace {
       if (isa<SingleValueStmtExpr>(expr))
         SingleValueStmtExprDepth -= 1;
 
-      // A 'self.init' or 'super.init' application inside a constructor will
-      // evaluate to void, with the initializer's result implicitly rebound
-      // to 'self'. Recognize the unresolved constructor expression and
-      // determine where to place the RebindSelfInConstructorExpr node.
-      // When updating this logic, also update
-      // RebindSelfInConstructorExpr::getCalledConstructor.
-      auto &ctx = getASTContext();
-      if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
-        if (auto self = TypeChecker::getSelfForInitDelegationInConstructor(
-                DC, unresolvedDot)) {
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        // Mark the direct callee as being a callee.
+        markDirectCallee(apply->getFn());
+
+        // A 'self.init' or 'super.init' application inside a constructor will
+        // evaluate to void, with the initializer's result implicitly rebound
+        // to 'self'. Recognize the unresolved constructor expression and
+        // determine where to place the RebindSelfInConstructorExpr node.
+        //
+        // When updating this logic, also may need to also update
+        // RebindSelfInConstructorExpr::getCalledConstructor.
+        VarDecl *self = nullptr;
+        if (auto *unresolvedDot =
+                dyn_cast<UnresolvedDotExpr>(apply->getSemanticFn())) {
+          self = TypeChecker::getSelfForInitDelegationInConstructor(
+              DC, unresolvedDot);
+        }
+
+        if (self) {
           // Walk our ancestor expressions looking for the appropriate place
           // to insert the RebindSelfInConstructorExpr.
-          Expr *target = nullptr;
-          bool foundApply = false;
-          bool foundRebind = false;
+          Expr *target = apply;
           for (auto ancestor : llvm::reverse(ExprStack)) {
-            if (isa<RebindSelfInConstructorExpr>(ancestor)) {
-              // If we already have a rebind, then we're re-typechecking an
-              // expression and are done.
-              foundRebind = true;
-              break;
-            }
-
-            // Recognize applications.
-            if (auto apply = dyn_cast<ApplyExpr>(ancestor)) {
-              // If we already saw an application, we're done.
-              if (foundApply)
-                break;
-
-              // If the function being called is not our unresolved initializer
-              // reference, we're done.
-              if (apply->getSemanticFn() != unresolvedDot)
-                break;
-
-              foundApply = true;
+            if (isa<IdentityExpr>(ancestor) || isa<ForceValueExpr>(ancestor) ||
+                isa<AnyTryExpr>(ancestor)) {
               target = ancestor;
               continue;
             }
 
-            // Look through identity, force-value, and 'try' expressions.
-            if (isa<IdentityExpr>(ancestor) ||
-                isa<ForceValueExpr>(ancestor) ||
-                isa<AnyTryExpr>(ancestor)) {
-              if (target)
-                target = ancestor;
-              continue;
+            if (isa<RebindSelfInConstructorExpr>(ancestor)) {
+              // If we already have a rebind, then we're re-typechecking an
+              // expression and are done.
+              target = nullptr;
             }
 
             // No other expression kinds are permitted.
@@ -1271,12 +1339,14 @@ namespace {
           }
 
           // If we found a rebind target, note the insertion point.
-          if (target && !foundRebind) {
+          if (target) {
             UnresolvedCtorRebindTarget = target;
             UnresolvedCtorSelf = self;
           }
         }
       }
+
+      auto &ctx = getASTContext();
 
       // If the expression we've found is the intended target of an
       // RebindSelfInConstructorExpr, wrap it in the
@@ -1376,14 +1446,14 @@ namespace {
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
       // Constraint generation is responsible for pattern verification and
       // type-checking in the body of the closure and single value stmt expr,
       // so there is no need to walk into patterns.
-      return Action::SkipChildrenIf(
+      return Action::SkipNodeIf(
           isa<ClosureExpr>(DC) || SingleValueStmtExprDepth > 0, pattern);
     }
   };
@@ -1392,26 +1462,9 @@ namespace {
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
-  // If we have a single statement that can become an expression, turn it
-  // into an expression now. This needs to happen before we check
-  // LeaveClosureBodiesUnchecked, as the closure may become a single expression
-  // closure.
-  auto *body = closure->getBody();
-  if (auto *S = body->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(Ctx)) {
-      auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-          Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
-      auto *RS = new (Ctx) ReturnStmt(SourceLoc(), SVE);
-      body->setLastElement(RS);
-      closure->setBody(body, /*isSingleExpression*/ true);
-    }
-  }
-
-  // If we won't be checking the body of the closure, don't walk into it here.
-  if (!closure->hasSingleExpressionBody()) {
-    if (LeaveClosureBodiesUnchecked)
-      return false;
-  }
+  // Pre-check the closure body.
+  (void)evaluateOrDefault(Ctx.evaluator, PreCheckClosureBodyRequest{closure},
+                          nullptr);
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -1629,7 +1682,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
 
     virtual PreWalkAction walkToDeclPre(Decl *D) override {
       // We don't want to look inside decls.
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1721,7 +1774,7 @@ bool PreCheckExpression::correctInterpolationIfStrange(
       // There is never a CallExpr between an InterpolatedStringLiteralExpr
       // and an un-typechecked appendInterpolation(...) call, so whether we
       // changed E or not, we don't need to recurse any deeper.
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   };
 
@@ -1944,14 +1997,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!AE->isFolded()) return nullptr;
 
     auto diagnoseMissingParens = [](ASTContext &ctx, TypeRepr *tyR) {
-      bool isVoid = false;
-      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getNameRef().isSimpleName(ctx.Id_Void)) {
-          isVoid = true;
-        }
-      }
-
-      if (isVoid) {
+      if (tyR->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
         ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .fixItReplace(tyR->getStartLoc(), "()");
       } else {
@@ -2009,22 +2055,29 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       Ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
                          diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = new (Ctx) ErrorTypeRepr(ArgRange);
+      auto ErrRepr = ErrorTypeRepr::create(Ctx, ArgRange);
       ArgsTypeRepr =
           TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
+    }
+
+    TypeRepr *ThrownTypeRepr = nullptr;
+    if (auto thrownTypeExpr = AE->getThrownTypeExpr()) {
+      ThrownTypeRepr = extractTypeRepr(thrownTypeExpr);
+      assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
                          diag::expected_type_after_arrow);
-      ResultTypeRepr = new (Ctx)
-          ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
+      ResultTypeRepr =
+          ErrorTypeRepr::create(Ctx, AE->getResultExpr()->getSourceRange());
     }
 
     auto NewTypeRepr = new (Ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), AE->getArrowLoc(), ResultTypeRepr);
+                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
+                         ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
   
@@ -2226,7 +2279,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   std::reverse(components.begin(), components.end());
 
-  KPE->setRootType(rootType);
+  KPE->setExplicitRootType(rootType);
   KPE->setComponents(getASTContext(), components);
 }
 
@@ -2302,15 +2355,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
-                                      bool replaceInvalidRefsWithErrors,
-                                      bool leaveClosureBodiesUnchecked) {
+                                      bool replaceInvalidRefsWithErrors) {
   auto *DC = target.getDeclContext();
 
   bool hadErrors = false;
 
   if (auto *expr = target.getAsExpr()) {
-    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
-                                    leaveClosureBodiesUnchecked);
+    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors);
     // Even if the pre-check fails, expression still has to be re-set.
     target.setExpr(expr);
   }
@@ -2322,13 +2373,11 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
     auto *whereExpr = stmt->getWhere();
 
     hadErrors |= preCheckExpression(sequenceExpr, DC,
-                                    /*replaceInvalidRefsWithErrors=*/true,
-                                    /*leaveClosureBodiesUnchecked=*/false);
+                                    /*replaceInvalidRefsWithErrors=*/true);
 
     if (whereExpr) {
       hadErrors |= preCheckExpression(whereExpr, DC,
-                                      /*replaceInvalidRefsWithErrors=*/true,
-                                      /*leaveClosureBodiesUnchecked=*/false);
+                                      /*replaceInvalidRefsWithErrors=*/true);
     }
 
     // Update sequence and where expressions to pre-checked versions.
@@ -2346,14 +2395,11 @@ bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors,
-                                          bool leaveClosureBodiesUnchecked) {
+                                          bool replaceInvalidRefsWithErrors) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr,
-                              replaceInvalidRefsWithErrors,
-                              leaveClosureBodiesUnchecked);
+  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
 
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {

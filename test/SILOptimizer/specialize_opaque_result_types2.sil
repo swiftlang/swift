@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -primary-file %S/Inputs/specialize_opaque_result_types.swift -enable-library-evolution -module-name A -emit-sib -o %t/A.sib
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -enable-library-evolution -O -module-name A %t/A.sib -o - | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 sil_stage canonical
 

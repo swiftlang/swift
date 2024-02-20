@@ -393,6 +393,10 @@ private:
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
 
+  // True if a DeserializationNotificationHandler is set for
+  // AccessMarkerElimination.
+  bool hasAccessMarkerHandler;
+
   bool prespecializedFunctionDeclsImported;
 
   /// Action to be executed for serializing the SILModule.
@@ -445,6 +449,13 @@ public:
     regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
+  bool checkHasAccessMarkerHandler() {
+    return hasAccessMarkerHandler;
+  }
+  void setHasAccessMarkerHandler() {
+    hasAccessMarkerHandler = true;
+  }
+
   /// Returns the instruction which defines the given root local archetype,
   /// e.g. an open_existential_addr.
   ///
@@ -462,7 +473,7 @@ public:
   SingleValueInstruction *
   getRootLocalArchetypeDefInst(CanLocalArchetypeType archetype,
                                SILFunction *inFunction) {
-    return cast<SingleValueInstruction>(
+    return dyn_cast<SingleValueInstruction>(
         getRootLocalArchetypeDef(archetype, inFunction));
   }
 
@@ -915,7 +926,7 @@ public:
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify(SILPassManager *passManager,
+  void verify(CalleeCache *calleeCache,
               bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
@@ -1064,10 +1075,9 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
   case SILStage::Raw:
-    // In raw SIL, lexical markers are used for diagnostics.  These markers are
-    // present as long as the lexical lifetimes feature is not disabled
-    // entirely.
-    return LexicalLifetimes != LexicalLifetimesOption::Off;
+    // In raw SIL, lexical markers are used for diagnostics and are always
+    // present.
+    return true;
   case SILStage::Canonical:
   case SILStage::Lowered:
     // In Canonical SIL, lexical markers are used to ensure that object

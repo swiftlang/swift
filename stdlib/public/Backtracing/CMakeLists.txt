@@ -25,6 +25,7 @@ set(BACKTRACING_SOURCES
   Backtrace.swift
   BacktraceFormatter.swift
   ByteSwapping.swift
+  CachingMemoryReader.swift
   Context.swift
   Compression.swift
   CoreSymbolication.swift
@@ -78,7 +79,7 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   SWIFT_MODULE_DEPENDS ${concurrency}
 
-  LINK_LIBRARIES ${swift_backtracing_link_libraries}
+  PRIVATE_LINK_LIBRARIES ${swift_backtracing_link_libraries}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

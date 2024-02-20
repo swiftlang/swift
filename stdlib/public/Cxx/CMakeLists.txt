@@ -7,6 +7,7 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
 endif()
 
 add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS_FRAGILE
+    CxxConvertibleToBool.swift
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift
@@ -18,10 +19,12 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS
     UnsafeCxxIterators.swift
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -Xfrontend -enable-experimental-cxx-interop
+    -cxx-interoperability-mode=default
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
+
+    DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     DEPENDS ${SWIFT_CXX_DEPS}

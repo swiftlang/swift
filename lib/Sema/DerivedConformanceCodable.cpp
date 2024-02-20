@@ -269,8 +269,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getParentModule())) {
+  if (!derived.getParentModule()->lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -337,8 +336,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     // We have a property to map to. Ensure it's {En,De}codable.
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
-    if (TypeChecker::conformsToProtocol(target, derived.Protocol,
-                                        derived.getParentModule())
+    if (derived.getParentModule()->checkConformance(target, derived.Protocol)
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
@@ -1240,7 +1238,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto *const encodeDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/true, /*GenericParams=*/nullptr, params, returnType,
+      /*Throws=*/true, /*ThrownType=*/Type(),
+      /*GenericParams=*/nullptr, params, returnType,
       conformanceDC);
   encodeDecl->setSynthesized();
 
@@ -1675,8 +1674,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           C, VarDecl::Introducer::Let,
           NamedPattern::createImplicit(C, theKeyDecl));
 
-      guardElements.emplace_back(SourceLoc(), theKeyPattern,
-                                 allKeysPopFirstCallExpr);
+      guardElements.emplace_back(ConditionalPatternBindingInfo::create(
+          C, SourceLoc(), theKeyPattern, allKeysPopFirstCallExpr));
 
       // generate: allKeys.isEmpty;
       auto *allKeysIsEmptyExpr =
@@ -1889,10 +1888,12 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
-                              /*Failable=*/false,SourceLoc(),
+                              /*Failable=*/false, SourceLoc(),
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                              /*Throws=*/true, SourceLoc(), paramList,
-                              /*GenericParams=*/nullptr, conformanceDC);
+                              /*Throws=*/true, SourceLoc(),
+                              /*ThrownType=*/TypeLoc(), paramList,
+                              /*GenericParams=*/nullptr, conformanceDC,
+                              /*LifetimeDependentReturnTypeRepr*/ nullptr);
   initDecl->setImplicit();
   initDecl->setSynthesized();
 
@@ -1942,8 +1943,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (TypeChecker::conformsToProtocol(superType, proto,
-                                          derived.getParentModule())) {
+      if (derived.getParentModule()->checkConformance(superType, proto)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {
@@ -2086,12 +2086,6 @@ static bool canDeriveCodable(NominalTypeDecl *NTD,
     return false;
   }
 
-  // Actor-isolated structs and classes cannot derive encodable/decodable
-  // unless all of their stored properties are immutable.
-  if ((isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) &&
-      memberwiseAccessorsRequireActorIsolation(NTD))
-    return false;
-
   return true;
 }
 
@@ -2140,7 +2134,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
       !isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
+  if (!requirement->getBaseName().isConstructor()) {
     // Unknown requirement.
     requirement->diagnose(diag::broken_decodable_requirement);
     return nullptr;

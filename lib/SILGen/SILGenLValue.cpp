@@ -342,6 +342,8 @@ public:
 
   // Expressions that wrap lvalues
   
+  LValue visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
+                        LValueOptions options);
   LValue visitInOutExpr(InOutExpr *e, SGFAccessKind accessKind,
                         LValueOptions options);
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
@@ -1193,9 +1195,11 @@ namespace {
 
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
-      assert(base
-             && base.getType().isAddress()
-             && "should have an address base to borrow from");
+      // If the base is already loaded, we just need to borrow it.
+      if (!base.getType().isAddress()) {
+        return base.formalAccessBorrow(SGF, loc);
+      }
+
       // If the base value is address-only then we can borrow from the
       // address in-place.
       if (!base.getType().isLoadable(SGF.F)) {
@@ -1219,7 +1223,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     const DeclName name = dre->getDecl()->getName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName() == DeclBaseName::createConstructor() &&
+            name.getBaseName().isConstructor() &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -2009,6 +2013,25 @@ namespace {
   class AddressorComponent
       : public AccessorBasedComponent<PhysicalPathComponent> {
     SILType SubstFieldType;
+    
+    static SGFAccessKind getAccessKindForAddressor(SGFAccessKind accessKind) {
+      // Addressors cannot be consumed through.
+      switch (accessKind) {
+      case SGFAccessKind::IgnoredRead:
+      case SGFAccessKind::BorrowedAddressRead:
+      case SGFAccessKind::BorrowedObjectRead:
+      case SGFAccessKind::OwnedAddressRead:
+      case SGFAccessKind::OwnedObjectRead:
+      case SGFAccessKind::Write:
+      case SGFAccessKind::ReadWrite:
+        return accessKind;
+        
+      case SGFAccessKind::OwnedAddressConsume:
+      case SGFAccessKind::OwnedObjectConsume:
+        return SGFAccessKind::ReadWrite;
+      }
+      llvm_unreachable("uncovered switch");
+    }
   public:
      AddressorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
                         bool isSuper,
@@ -2048,8 +2071,20 @@ namespace {
 
       // Enter an unsafe access scope for the access.
       addr =
-          enterAccessScope(SGF, loc, base, addr, getTypeData(), getAccessKind(),
+          enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                           getAccessKindForAddressor(getAccessKind()),
                            SILAccessEnforcement::Unsafe, ActorIso);
+
+      // Validate the use of the access if it's noncopyable.
+      if (addr.getType().isMoveOnly()) {
+        MarkUnresolvedNonCopyableValueInst::CheckKind kind
+          = getAccessorDecl()->getAccessorKind() == AccessorKind::MutableAddress
+              ? MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable
+              : MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign;
+        auto checkedAddr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, addr.getValue(), kind);
+        addr = std::move(addr).transform(checkedAddr);
+      }
 
       return addr;
     }
@@ -2289,31 +2324,37 @@ namespace {
 
       auto keyPathValue = KeyPath;
 
-      SmallVector<Type, 2> typeArgs;
-      typeArgs.push_back(BaseFormalType);
+      GenericSignature sig;
+      SmallVector<Type, 2> replacementTypes;
+
       if (TypeKind == KPTK_AnyKeyPath) {
         projectFn = SGF.getASTContext().getGetAtAnyKeyPath();
+        sig = projectFn->getGenericSignature();
+        replacementTypes.push_back(BaseFormalType);
       } else if (TypeKind == KPTK_PartialKeyPath) {
         projectFn = SGF.getASTContext().getGetAtPartialKeyPath();
+        sig = projectFn->getGenericSignature();
+        replacementTypes.push_back(BaseFormalType);
       } else if (TypeKind == KPTK_KeyPath ||
                  TypeKind == KPTK_WritableKeyPath ||
                  TypeKind == KPTK_ReferenceWritableKeyPath) {
         projectFn = SGF.getASTContext().getGetAtKeyPath();
+        sig = projectFn->getGenericSignature();
 
         auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
         assert(keyPathTy->getGenericArgs().size() == 2);
         assert(keyPathTy->getGenericArgs()[0]->getCanonicalType() ==
                BaseFormalType->getCanonicalType());
-        typeArgs.push_back(keyPathTy->getGenericArgs()[1]);
+        replacementTypes.push_back(keyPathTy->getGenericArgs()[0]);
+        replacementTypes.push_back(keyPathTy->getGenericArgs()[1]);
 
         keyPathValue = emitUpcastToKeyPath(SGF, loc, TypeKind, keyPathValue);
       } else {
         llvm_unreachable("bad key path kind for this component");
       }
 
-      auto subs = SubstitutionMap::get(projectFn->getGenericSignature(),
-                                       ArrayRef<Type>(typeArgs),
-                                       ArrayRef<ProtocolConformanceRef>());
+      auto subs = SubstitutionMap::get(sig, replacementTypes,
+                  LookUpConformanceInModule{SGF.getModule().getSwiftModule()});
 
       base = makeBaseConsumableMaterializedRValue(SGF, loc, base);
 
@@ -2338,9 +2379,9 @@ namespace {
       }
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = SubstitutionMap::get(setFn->getGenericSignature(),
-                                       keyPathTy->getGenericArgs(),
-                                       ArrayRef<ProtocolConformanceRef>());
+      auto subs = keyPathTy->getContextSubstitutionMap(
+          keyPathTy->getDecl()->getParentModule(),
+          keyPathTy->getDecl());
 
       auto origType = AbstractionPattern::getOpaque();
       auto loweredTy = SGF.getLoweredType(origType, value.getSubstRValueType());
@@ -2414,9 +2455,9 @@ namespace {
       auto projectFnType = projectFn->getLoweredFunctionType();
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = SubstitutionMap::get(
-                                 projectFnType->getInvocationGenericSignature(),
-                                 keyPathTy->getGenericArgs(), {});
+      auto subs = keyPathTy->getContextSubstitutionMap(
+          keyPathTy->getDecl()->getParentModule(),
+          keyPathTy->getDecl());
 
       auto substFnType = projectFnType->substGenericArgs(
           SGF.SGM.M, subs, SGF.getTypeExpansionContext());
@@ -2931,14 +2972,14 @@ class LLVM_LIBRARY_VISIBILITY SILGenBorrowedBaseVisitor
 public:
   SILGenLValue &SGL;
   SILGenFunction &SGF;
+  AbstractionPattern Orig;
 
-  SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF)
-      : SGL(SGL), SGF(SGF) {}
+  SILGenBorrowedBaseVisitor(SILGenLValue &SGL,
+                            SILGenFunction &SGF,
+                            AbstractionPattern Orig)
+      : SGL(SGL), SGF(SGF), Orig(Orig) {}
 
-  /// Returns the subexpr
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
-    if (auto *le = dyn_cast<LoadExpr>(e))
-      return le->getType()->isNoncopyable();
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
@@ -2949,14 +2990,53 @@ public:
       return m->getType()->isNoncopyable() ||
           m->getBase()->getType()->isNoncopyable();
     }
-    if (auto *d = dyn_cast<DeclRefExpr>(e))
-      return e->getType()->isNoncopyable();
+
+    if (auto *le = dyn_cast<LoadExpr>(e)) {
+      // Noncopyable type is obviously noncopyable.
+      if (le->getType()->isNoncopyable()) {
+        return true;
+      }
+      // Otherwise, check if the thing we're loading from is a noncopyable
+      // param decl.
+      e = le->getSubExpr();
+      // fall through...
+    }
+    
+    if (auto *de = dyn_cast<DeclRefExpr>(e)) {
+      // Noncopyable type is obviously noncopyable.
+      if (de->getType()->isNoncopyable()) {
+        return true;
+      }
+      // If the decl ref refers to a parameter with an explicit ownership
+      // modifier, it is not implicitly copyable.
+      if (auto pd = dyn_cast<ParamDecl>(de->getDecl())) {
+        switch (pd->getSpecifier()) {
+        case ParamSpecifier::Borrowing:
+        case ParamSpecifier::Consuming:
+          return true;
+        case ParamSpecifier::Default:
+        case ParamSpecifier::InOut:
+        case ParamSpecifier::LegacyShared:
+        case ParamSpecifier::LegacyOwned:
+        case ParamSpecifier::ImplicitlyCopyableConsuming:
+          return false;
+        }
+        if (pd->hasResultDependsOn()) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 
+  /// For any other Expr's that this SILGenBorrowedBaseVisitor doesn't already
+  /// define a visitor stub, defer back to SILGenLValue's visitRec as it is
+  /// most-likely a non-lvalue root expression.
   LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options) {
-    e->dump(llvm::errs());
-    llvm::report_fatal_error("Unimplemented node!");
+    assert(!isNonCopyableBaseBorrow(SGF, e)
+            && "unexpected recursion in SILGenLValue::visitRec!");
+
+    return SGL.visitRec(e, accessKind, options, Orig);
   }
 
   LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
@@ -2984,6 +3064,9 @@ public:
                              options, e->isSuper(), accessKind, strategy,
                              getSubstFormalRValueType(e),
                              false /*is on self parameter*/, actorIso);
+
+    SGF.SGM.noteMemberRefExpr(e);
+
     return lv;
   }
 
@@ -3046,10 +3129,10 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
   if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e)) {
-    SILGenBorrowedBaseVisitor visitor(*this, SGF);
+    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
-    if (e->getType()->is<LValueType>())
-      accessKind = SGFAccessKind::BorrowedAddressRead;
+    assert(!e->getType()->is<LValueType>()
+        && "maybe need SGFAccessKind::BorrowedAddressRead ?");
     return visitor.visit(e, accessKind, options);
   }
 
@@ -3299,9 +3382,15 @@ void LValue::addNonMemberVarComponent(
                "local var should not be actor isolated!");
       }
 
-      assert(address.isLValue() &&
-             "Must have a physical copyable lvalue decl ref that "
-             "evaluates to an address");
+      if (!address.isLValue()) {
+        assert((AccessKind == SGFAccessKind::BorrowedObjectRead
+                || AccessKind == SGFAccessKind::BorrowedAddressRead)
+               && "non-borrow component requires an address base");
+        LV.add<ValueComponent>(address, std::nullopt, typeData,
+                               /*rvalue*/ true);
+        LV.add<BorrowValueComponent>(typeData);
+        return;
+      }
 
       llvm::Optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
@@ -3793,6 +3882,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
                            options, e->isSuper(), accessKind, strategy,
                            substFormalRValueType, isOnSelfParameter, actorIso);
+
+  SGF.SGM.noteMemberRefExpr(e);
+
   return lv;
 }
 
@@ -4171,7 +4263,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
   // Visit the subexpression.
   LValue lv = visitRec(e->getSubExpr(), accessKind, options);
 
-  // Sanity check that we did see the OpaqueValueExpr.
+  // Soundness check that we did see the OpaqueValueExpr.
   assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
          "opened existential not removed?");
   return lv;
@@ -4243,6 +4335,11 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
 LValue SILGenLValue::visitInOutExpr(InOutExpr *e, SGFAccessKind accessKind,
                                     LValueOptions options) {
   return visitRec(e->getSubExpr(), accessKind, options);
+}
+
+LValue SILGenLValue::visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
+                               LValueOptions options) {
+  return visit(e->getSubExpr(), accessKind, options);
 }
 
 LValue SILGenLValue::visitConsumeExpr(ConsumeExpr *e, SGFAccessKind accessKind,

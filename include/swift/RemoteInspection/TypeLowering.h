@@ -23,6 +23,7 @@
 #include "llvm/Support/Casting.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Remote/TypeInfoProvider.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 
 #include <memory>
 
@@ -174,7 +175,7 @@ class BuiltinTypeInfo : public TypeInfo {
 
 public:
   explicit BuiltinTypeInfo(TypeRefBuilder &builder,
-                           RemoteRef<BuiltinTypeDescriptor> descriptor);
+                           BuiltinTypeDescriptorBase &descriptor);
 
   /// Construct an empty builtin type info.
   BuiltinTypeInfo()

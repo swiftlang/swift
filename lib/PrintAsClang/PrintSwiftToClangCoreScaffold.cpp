@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
+#include "clang/Basic/AddressSpaces.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -178,7 +179,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   auto &clangTI =
       astContext.getClangModuleLoader()->getClangASTContext().getTargetInfo();
   bool isSwiftIntLong =
-      clangTI.getPtrDiffType(0) == clang::TransferrableTargetInfo::SignedLong;
+      clangTI.getPtrDiffType(clang::LangAS::Default) == clang::TransferrableTargetInfo::SignedLong;
   bool isInt64Long =
       clangTI.getInt64Type() == clang::TransferrableTargetInfo::SignedLong;
   if (!(isSwiftIntLong && !isInt64Long))

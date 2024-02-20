@@ -17,7 +17,7 @@
 #ifndef SWIFT_REFLECTION_RECORDS_H
 #define SWIFT_REFLECTION_RECORDS_H
 
-#include "swift/Basic/RelativePointer.h"
+#include "swift/ABI/TargetLayout.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -82,24 +82,25 @@ public:
   }
 };
 
-class FieldRecord {
+template <typename Runtime>
+class TargetFieldRecord {
   const FieldRecordFlags Flags;
 
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
-  const RelativeDirectPointer<const char> FieldName;
+  const TargetRelativeDirectPointer<Runtime, const char> MangledTypeName;
+  const TargetRelativeDirectPointer<Runtime, const char> FieldName;
 
-  FieldRecord() = delete;
+  TargetFieldRecord() = delete;
 
   bool hasMangledTypeName() const {
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
-  StringRef getFieldName() const {
+  llvm::StringRef getFieldName() const {
     return FieldName.get();
   }
 
@@ -111,35 +112,36 @@ public:
     return Flags.isVar();
   }
 };
+using FieldRecord = TargetFieldRecord<InProcess>;
 
-struct FieldRecordIterator {
-  const FieldRecord *Cur;
-  const FieldRecord * const End;
+template <typename Runtime>
+struct TargetFieldRecordIterator {
+  const TargetFieldRecord<Runtime> *Cur;
+  const TargetFieldRecord<Runtime> *const End;
 
-  FieldRecordIterator(const FieldRecord *Cur, const FieldRecord * const End)
-    : Cur(Cur), End(End) {}
+  TargetFieldRecordIterator(const TargetFieldRecord<Runtime> *Cur,
+                            const TargetFieldRecord<Runtime> *const End)
+      : Cur(Cur), End(End) {}
 
-  const FieldRecord &operator*() const {
-    return *Cur;
-  }
+  const TargetFieldRecord<Runtime> &operator*() const { return *Cur; }
 
-  const FieldRecord *operator->() const {
-    return Cur;
-  }
+  const TargetFieldRecord<Runtime> *operator->() const { return Cur; }
 
-  FieldRecordIterator &operator++() {
+  TargetFieldRecordIterator &operator++() {
     ++Cur;
     return *this;
   }
 
-  bool operator==(const FieldRecordIterator &other) const {
+  bool operator==(const TargetFieldRecordIterator &other) const {
     return Cur == other.Cur && End == other.End;
   }
 
-  bool operator!=(const FieldRecordIterator &other) const {
+  bool operator!=(const TargetFieldRecordIterator &other) const {
     return !(*this == other);
   }
 };
+
+using FieldRecordIterator = TargetFieldRecordIterator<InProcess>;
 
 enum class FieldDescriptorKind : uint16_t {
   // Swift nominal types.
@@ -173,16 +175,17 @@ enum class FieldDescriptorKind : uint16_t {
 
 // Field descriptors contain a collection of field records for a single
 // class, struct or enum declaration.
-class FieldDescriptor {
-  const FieldRecord *getFieldRecordBuffer() const {
-    return reinterpret_cast<const FieldRecord *>(this + 1);
+template <typename Runtime>
+class TargetFieldDescriptor {
+  const TargetFieldRecord<Runtime> *getFieldRecordBuffer() const {
+    return reinterpret_cast<const TargetFieldRecord<Runtime> *>(this + 1);
   }
 
 public:
-  const RelativeDirectPointer<const char> MangledTypeName;
-  const RelativeDirectPointer<const char> Superclass;
+  const TargetRelativeDirectPointer<Runtime, const char> MangledTypeName;
+  const TargetRelativeDirectPointer<Runtime, const char> Superclass;
 
-  FieldDescriptor() = delete;
+  TargetFieldDescriptor() = delete;
 
   const FieldDescriptorKind Kind;
   const uint16_t FieldRecordSize;
@@ -222,7 +225,7 @@ public:
     return const_iterator { End, End };
   }
 
-  llvm::ArrayRef<FieldRecord> getFields() const {
+  llvm::ArrayRef<TargetFieldRecord<Runtime>> getFields() const {
     return {getFieldRecordBuffer(), NumFields};
   }
 
@@ -230,7 +233,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -238,10 +241,11 @@ public:
     return Superclass;
   }
 
-  StringRef getSuperclass() const {
+  llvm::StringRef getSuperclass() const {
     return Demangle::makeSymbolicMangledNameStringRef(Superclass.get());
   }
 };
+using FieldDescriptor = TargetFieldDescriptor<InProcess>;
 
 // Associated type records describe the mapping from an associated
 // type to the type witness of a conformance.
@@ -250,11 +254,11 @@ public:
   const RelativeDirectPointer<const char> Name;
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
-  StringRef getName() const {
+  llvm::StringRef getName() const {
     return Name.get();
   }
 
-  StringRef getMangledSubstitutedTypeName() const {
+  llvm::StringRef getMangledSubstitutedTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                     SubstitutedTypeName.get());
   }
@@ -332,11 +336,11 @@ public:
     return const_iterator { End, End };
   }
 
-  StringRef getMangledProtocolTypeName() const {
+  llvm::StringRef getMangledProtocolTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ProtocolTypeName.get());
   }
 
-  StringRef getMangledConformingTypeName() const {
+  llvm::StringRef getMangledConformingTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ConformingTypeName.get());
   }
 };
@@ -369,7 +373,7 @@ public:
     return TypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
   }
 };
@@ -489,7 +493,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 };
@@ -535,7 +539,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -543,7 +547,7 @@ public:
     return MangledMetadataSource;
   }
 
-  StringRef getMangledMetadataSource() const {
+  llvm::StringRef getMangledMetadataSource() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                    MangledMetadataSource.get());
   }

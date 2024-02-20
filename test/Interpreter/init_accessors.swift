@@ -865,6 +865,7 @@ do {
 
   struct TestNonMutatingSetNoDefault {
     var _count: Int
+    var _other: String = ""
 
     var count: Int {
       @storageRestrictions(initializes: _count)
@@ -917,7 +918,39 @@ do {
 // CHECK-NEXT: test-nonmutating-set-2: TestNonMutatingSetDefault(_count: 0)
 // CHECK-NEXT: init accessor is called: -1
 // CHECK-NEXT: nonmutating set called: 0
-// CHECK-NEXT: test-nonmutating-set-3: TestNonMutatingSetNoDefault(_count: -1)
+// CHECK-NEXT: test-nonmutating-set-3: TestNonMutatingSetNoDefault(_count: -1, _other: "")
 // CHECK-NEXT: init accessor is called: 42
 // CHECK-NEXT: nonmutating set called: 0
 // CHECK-NEXT: test-nonmutating-set-4: TestNonMutatingSetCustom(_count: 42)
+
+do {
+  class Base {
+    var _count: Int
+
+    var count: Int {
+      @storageRestrictions(initializes: _count)
+      init {
+        print("init accessor with Self = \(Self.self)")
+        _count = newValue
+      }
+
+      get { _count }
+
+      set {}
+    }
+
+    init() {
+      count = 42
+    }
+  }
+
+  class Sub: Base {}
+
+  print("- init accessor vs dynamic Self")
+  _ = Base()
+  _ = Sub()
+}
+
+// CHECK-NEXT: - init accessor vs dynamic Self
+// CHECK-NEXT: init accessor with Self = Base
+// CHECK-NEXT: init accessor with Self = Sub

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -11,7 +11,7 @@
 
 
 extension Executor {
-  func enqueue(_ job: UnownedJob) { // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'NoneExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) { // no warning, we don't deprecate this just yet. It was deprecated in 5.9.0 but we undid this.
     fatalError()
   }
 }

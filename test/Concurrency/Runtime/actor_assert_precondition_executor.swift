@@ -12,6 +12,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
+// rdar://119743909 fails in optimze tests.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 import StdlibUnittest
 
 func checkPreconditionMainActor() /* synchronous! */ {
@@ -61,6 +65,17 @@ actor Someone {
   }
 }
 
+@MainActor let global = TestStaticVar()
+
+@MainActor
+struct TestStaticVar {
+  @MainActor static let shared = TestStaticVar()
+
+  init() {
+    checkPreconditionMainActor()
+  }
+}
+
 @main struct Main {
   static func main() async {
     let tests = TestSuite("AssertPreconditionActorExecutor")
@@ -76,6 +91,11 @@ actor Someone {
 
       tests.test("MainActor.preconditionIsolated(): from Main friend") {
         await MainFriend().callCheckMainActor()
+      }
+
+      tests.test("MainActor.assertIsolated() from static let initializer") {
+        _ = await TestStaticVar.shared
+        _ = await global
       }
 
       #if !os(WASI)

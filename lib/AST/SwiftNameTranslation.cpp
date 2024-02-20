@@ -139,7 +139,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
 bool swift::objc_translation::
 isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
                 bool checkParent) {
-  if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
+  if (!(VD->isObjC() || !VD->getCDeclName().empty()))
     return false;
   if (VD->getFormalAccess() >= minRequiredAccess) {
     return true;
@@ -158,9 +158,9 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
                                       CustomNamesOnly_t customNamesOnly) {
   ASTContext& ctx = VD->getASTContext();
 
-  if (const auto *Expose = VD->getAttrs().getAttribute<ExposeAttr>()) {
-    if (!Expose->Name.empty())
-      return Expose->Name;
+  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
+    if (EA->getExposureKind() == ExposureKind::Cxx && !EA->Name.empty())
+      return EA->Name;
   }
 
   if (customNamesOnly)
@@ -215,7 +215,7 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     return {Unsupported, UnrepresentableObjC};
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
-  llvm::Optional<CanGenericSignature> genericSignature;
+  GenericSignature genericSignature;
   // Don't expose @_alwaysEmitIntoClient decls as they require their
   // bodies to be emitted into client.
   if (VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
@@ -228,19 +228,18 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
     if (AFD->isGeneric())
-      genericSignature = AFD->getGenericSignature().getCanonicalSignature();
+      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl))
       return {Unsupported, UnrepresentableProtocol};
     // Swift's consume semantics are not yet supported in C++.
-    if (typeDecl->isMoveOnly())
+    if (!typeDecl->canBeCopyable())
       return {Unsupported, UnrepresentableMoveOnly};
     if (typeDecl->isGeneric()) {
       if (isa<ClassDecl>(VD))
         return {Unsupported, UnrepresentableGeneric};
-      genericSignature =
-          typeDecl->getGenericSignature().getCanonicalSignature();
+      genericSignature = typeDecl->getGenericSignature();
     }
     // Nested types are not yet supported.
     if (!typeDecl->hasClangNode() &&
@@ -280,9 +279,24 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       }
     }
   }
+
   // Generic requirements are not yet supported in C++.
-  if (genericSignature && !genericSignature->getRequirements().empty())
-    return {Unsupported, UnrepresentableGenericRequirements};
+  if (genericSignature) {
+
+    // FIXME: We're using getRequirementsWithInverses() here as a shortcut for
+    // checking for "no requirements except the implied Copyable ones".
+    //
+    // Eventually you don't want to call getRequirementsWithInverses() at all;
+    // instead, the code here should walk the desugared requirements of the
+    // signature directly and handle everything.
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+    if (!reqs.empty())
+      return {Unsupported, UnrepresentableGenericRequirements};
+  }
+
   return {Representable, llvm::None};
 }
 

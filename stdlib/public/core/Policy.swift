@@ -166,7 +166,7 @@ public typealias StringLiteralType = String
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
 //===----------------------------------------------------------------------===//
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64

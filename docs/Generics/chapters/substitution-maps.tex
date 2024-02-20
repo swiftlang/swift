@@ -66,7 +66,7 @@ value.nonGenericMethod()
 \end{listing}
 
 \begin{example}
-We will often variations on the Greek letter $\Sigma$ to denote substitution maps. For example, $\Sigma$, $\Sigma_1$, $\Sigma_2$, $\Sigma^\prime$, etc. For now we'll just work with the single substitution map defined above, so let's denote it by $\Sigma$:
+We often use the Greek letter $\Sigma$, in various forms, to denote substitution maps. For example, $\Sigma$, $\Sigma_1$, $\Sigma_2$, $\Sigma^\prime$, etc. For now we'll just work with the single substitution map defined above, so let's denote it by $\Sigma$:
 \[
 \Sigma := \SubstMapLongC{
 \SubstType{A}{String}\\
@@ -599,7 +599,7 @@ Nominal type declarations can appear inside other declaration contexts, subject 
 \begin{enumerate}
 \item Structs, enums and classes cannot be nested in generic local contexts.
 \item Structs, enums and classes cannot be nested in protocols or protocol extensions.
-\item Protocols cannot be nested in any declaration context other than a source file.
+\item Protocols cannot be nested in generic contexts.
 \end{enumerate}
 We're going to explore the implementation limitations behind these restrictions, and possible future directions for lifting them. (The rest of the book talks about what the compiler does, but this section is about what the compiler \emph{doesn't} do.)
 
@@ -646,8 +646,10 @@ Luckily, this ``flat'' representation is already implemented in the Swift runtim
 protocol P {}
 
 extension P {
+  typealias Me = Self
+
   struct Nested {  // error
-    let value: Self
+    let value: Me  // because what would this mean?
 
     func method() {
       print(value)
@@ -659,7 +661,8 @@ extension P {
   }
 }
 
-struct S: P {}
+struct S1: P {}
+struct S2: P {}  // are S1.Nested and S2.Nested distinct?
 \end{Verbatim}
 \end{listing}
 If the nested type captures \texttt{Self}, the code shown in Listing~\ref{nominal type in generic local context} would become valid. With this model, the \texttt{Nested} struct depends on \texttt{Self}, so it would not make sense to reference it as a member of the protocol itself, like \texttt{P.Nested}. Instead, \texttt{Nested} would behave as if it was a member of every \index{conforming type}conforming type, like \texttt{S.Nested} above (or even \texttt{T.Nested}, if \texttt{T} is a generic parameter conforming to \texttt{P}). At the implementation level, the generic signature of a nominal type nested inside of a protocol context would include the protocol \texttt{Self} type, and the \emph{entire} parent type, for example \texttt{S} in \texttt{S.Nested}, would become the replacement type for \texttt{Self} in the context substitution map.
@@ -669,15 +672,14 @@ The alternative is to prohibit the nested type from referencing the protocol \te
 \begin{listing}\captionabove{Protocol declaration nested inside other declaration contexts}\label{protocol nested inside type}
 \begin{Verbatim}
 struct Outer {
-  protocol P {  // error
-    func f()
-  }
+  protocol P {}  // allowed as of SE-0404
 }
+
+struct S: Outer.P {}
 
 func generic<T>(_: T) {
   protocol P {  // error
-    // What does this mean?
-    func f(_: T)
+    func f(_: T)  // because what would this mean?
   }
 }
 \end{Verbatim}
@@ -686,12 +688,12 @@ func generic<T>(_: T) {
 \Index{protocol Self type@protocol \texttt{Self} type}
 \index{Haskell}
 \index{multi-parameter type class}
-\paragraph{Protocols in other declaration contexts} The final generalization is the ability to nest protocols inside other declaration contexts, such as functions or nominal types. This can be broken down into two cases; Listing~\ref{protocol nested inside type} shows both possibilities:
+\paragraph{Protocols in other declaration contexts} The final possibility is the nesting of protocols inside other declaration contexts, such as functions or nominal types. This breaks down into two cases, illustrated in Listing~\ref{protocol nested inside type}:
 \begin{enumerate}
 \item Protocols inside non-generic declaration contexts.
 \item Protocols inside generic declaration contexts.
 \end{enumerate}
-The first case is a relatively straightforward; the non-generic declaration contexts acts as a namespace to which the protocol declaration is scoped. In contrast, the second case would introduce significant complexity to the language design, by allowing ``generic protocols'' with more generic parameters than just the protocol \texttt{Self} type. Such a protocol would be what \index{Haskell}Haskell calls a ``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example type inference becomes undecidable \cite{mptc}.
+The first case was originally prohibited, but is now permitted as of Swift~5.10 \cite{se0404}; the non-generic declaration context acts as a namespace to which the protocol declaration is scoped, but apart from the interaction with name lookup this has no other semantic consequences. The second case is more subtle. If we were to allow a ``generic protocol'' to be parameterized by its outer generic parameters in addition to just the protocol \texttt{Self} type, we would get what \index{Haskell}Haskell calls a ``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example undecidable type inference~\cite{mptc}.
 
 \section{Source Code Reference}\label{substmapsourcecoderef}
 

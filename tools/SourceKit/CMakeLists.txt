@@ -8,6 +8,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(SEND_ERROR "SourceKit cannot be built standalone")
 endif()
 
+set(SOURCEKIT_SWIFT_SWAP_COMPILER FALSE)
 include(SwiftWindowsSupport)
 swift_swap_compiler_if_needed("SourceKit")
 

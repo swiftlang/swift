@@ -337,21 +337,3 @@ ImplicitReturnLocation::ImplicitReturnLocation(SILLocation L)
          L.isASTNode<PatternBindingDecl>() ||
          L.isNull());
 }
-
-std::string SILDebugLocation::getDebugDescription() const {
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  SILLocation loc = getLocation();
-  loc.print(os);
-#ifndef NDEBUG
-  if (const SILDebugScope *scope = getScope()) {
-    if (DeclContext *dc = loc.getAsDeclContext()) {
-      os << ", scope=";
-      scope->print(dc->getASTContext().SourceMgr, os, /*indent*/ 2);
-    } else {
-      os << ", scope=?";
-    }
-  }
-#endif
-  return str;
-}

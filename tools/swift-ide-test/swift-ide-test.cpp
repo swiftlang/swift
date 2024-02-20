@@ -407,23 +407,6 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
-static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
-    "code-complete-call-pattern-heuristics",
-    llvm::cl::desc(
-        "Use heuristics to guess whether we want call pattern completions"),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-ObjCForwardDeclarations("enable-objc-forward-declarations",
-    llvm::cl::desc("Import Objective-C forward declarations when possible"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-EnableSwift3ObjCInference("enable-swift3-objc-inference",
-    llvm::cl::desc("Enable Swift 3's @objc inference rules"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
@@ -796,6 +779,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+    CxxInteropVersion("cxx-interoperability-mode",
+                      llvm::cl::desc("C++ interop mode."),
+                      llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
@@ -864,6 +852,11 @@ static llvm::cl::list<std::string>
   EnableExperimentalFeatures("enable-experimental-feature",
                              llvm::cl::desc("Enable an experimental feature"),
                              llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+  EnableUpcomingFeatures("enable-upcoming-feature",
+      llvm::cl::desc("Enable a feature that will be introduced in an upcoming language version"),
+      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
@@ -1142,8 +1135,9 @@ static bool performWithCompletionLikeOperationParams(
 }
 
 template <typename ResultType>
-static int printResult(CancellableResult<ResultType> Result,
-                       llvm::function_ref<int(ResultType &)> PrintSuccess) {
+static int
+printResult(CancellableResult<ResultType> Result,
+            llvm::function_ref<int(const ResultType &)> PrintSuccess) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     return PrintSuccess(Result.getResult());
@@ -1161,7 +1155,7 @@ static int printResult(CancellableResult<ResultType> Result,
 static int printTypeContextInfo(
     CancellableResult<TypeContextInfoResult> CancellableResult) {
   return printResult<TypeContextInfoResult>(
-      CancellableResult, [](TypeContextInfoResult &Result) {
+      CancellableResult, [](const TypeContextInfoResult &Result) {
         llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
         for (auto resultItem : Result.Results) {
           llvm::outs() << "- TypeName: ";
@@ -1222,7 +1216,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 static int printConformingMethodList(
     CancellableResult<ConformingMethodListResults> CancellableResult) {
   return printResult<ConformingMethodListResults>(
-      CancellableResult, [](ConformingMethodListResults &Results) {
+      CancellableResult, [](const ConformingMethodListResults &Results) {
         auto Result = Results.Result;
         if (!Result) {
           return 0;
@@ -1378,9 +1372,17 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   if (names.empty())
     return;
 
+  SmallVector<NullTerminatedStringRef, 2> sortedNames;
+  sortedNames.append(names.begin(), names.end());
+  llvm::sort(sortedNames,
+     [](NullTerminatedStringRef a, NullTerminatedStringRef b) {
+        return a.compare(b) <= 0;
+  });
+
   OS << "LookedupTypeNames: [";
   llvm::interleave(
-      names.begin(), names.end(), [&](auto name) { OS << "'" << name << "'"; },
+      sortedNames.begin(), sortedNames.end(),
+      [&](auto name) { OS << "'" << name << "'"; },
       [&]() { OS << ", "; });
   OS << "]\n";
 }
@@ -1391,7 +1393,7 @@ static int printCodeCompletionResults(
     bool PrintAnnotatedDescription) {
   llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
-      CancellableResult, [&](CodeCompleteResult &Result) {
+      CancellableResult, [&](const CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
             IncludeSourceText, PrintAnnotatedDescription,
@@ -1409,7 +1411,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
-                 bool CodeCompletionCallPatternHeuristics,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
                  bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
@@ -1421,7 +1422,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -1452,7 +1452,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
-                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
@@ -1581,8 +1580,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     ide::CodeCompletionContext CompletionContext(CompletionCache);
     CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-    CompletionContext.setCallPatternHeuristics(
-        CodeCompletionCallPatternHeuristics);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -4354,6 +4351,20 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().enableFeature(*feature);
+    }
+  }
+
+  for (const auto &featureArg : options::EnableUpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureArg)) {
+      InitInvok.getLangOptions().enableFeature(*feature);
+    }
+  }
+
+  // NOTE: 'setMainExecutablePath' must be after 'Features' because
+  // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
@@ -4383,6 +4394,14 @@ int main(int argc, char *argv[]) {
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
   }
+  if (!options::CxxInteropVersion.empty()) {
+    InitInvok.getLangOptions().EnableCXXInterop = true;
+    if (options::CxxInteropVersion == "upcoming-swift")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else
+      llvm::errs() << "invalid CxxInteropVersion\n";
+  }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
   }
@@ -4408,17 +4427,11 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
+    InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
+    InitInvok.getLangOptions().enableFeature(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
-  }
-
-  for (const auto &featureArg : options::EnableExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
   }
 
   if (!options::Triple.empty())
@@ -4473,10 +4486,13 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =
     options::EnableDeserializationSafety;
-  InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference;
+  // The manner in which swift-ide-test constructs its CompilerInvocation does
+  // not hit the codepath in arg parsing that would normally construct
+  // ClangImporter options based on enabled language features etc. Explicitly
+  // enable them here.
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
-    options::ObjCForwardDeclarations;
+      InitInvok.getLangOptions().hasFeature(
+          Feature::ImportObjcForwardDeclarations);
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
@@ -4622,7 +4638,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;
@@ -4638,7 +4653,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;

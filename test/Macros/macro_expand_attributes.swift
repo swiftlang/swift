@@ -150,3 +150,16 @@ typealias A = Int
 func noMembers() {}
 // expected-error@-2{{'memberAttribute' macro cannot be attached to global function ('noMembers')}}
 #endif
+
+@attached(memberAttribute)
+public macro AddMemberPeers() = #externalMacro(module: "MacroDefinition", type: "AddMemberPeersMacro")
+
+@attached(peer, names: suffixed(_special))
+public macro _AddPeer() = #externalMacro(module: "MacroDefinition", type: "_AddPeerMacro")
+
+@AddMemberPeers
+struct User {
+    var name: String {
+        "mario"
+    }
+}

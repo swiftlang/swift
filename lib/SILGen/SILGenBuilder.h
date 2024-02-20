@@ -91,13 +91,17 @@ public:
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention);
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                    SILFunctionTypeIsolation::Unknown);
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention) {
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                    SILFunctionTypeIsolation::Unknown) {
     return createPartialApply(loc, fn.getValue(), subs, args,
-                              calleeConvention);
+                              calleeConvention, resultIsolation);
   }
 
   using SILBuilder::createStructExtract;
@@ -461,7 +465,8 @@ public:
 
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
-                                    ManagedValue base);
+                                    ManagedValue base,
+                                    MarkDependenceKind dependencekind);
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
@@ -492,7 +497,9 @@ public:
   using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
   ManagedValue createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, ManagedValue value,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
@@ -504,6 +511,19 @@ public:
   using SILBuilder::createEndLifetime;
   void createEndLifetime(SILLocation loc, ManagedValue selfValue) {
     createEndLifetime(loc, selfValue.forward(SGF));
+  }
+
+  using SILBuilder::createTupleAddrConstructor;
+
+  void createTupleAddrConstructor(SILLocation loc, SILValue destAddr,
+                                  ArrayRef<ManagedValue> elements,
+                                  IsInitialization_t isInitOfDest) {
+    SmallVector<SILValue, 8> values;
+    for (auto mv : elements) {
+      values.push_back(mv.forward(SGF));
+    }
+
+    createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
 };
 

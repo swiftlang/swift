@@ -83,6 +83,23 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
     }
   }
 
+  if (roles.contains(MacroRole::Preamble)) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto bufferIDs =
+          evaluateOrDefault(ctx.evaluator, ExpandPreambleMacroRequest{func}, {});
+      allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+    }
+  }
+
+  if (roles.contains(MacroRole::Body)) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto bufferID =
+          evaluateOrDefault(ctx.evaluator, ExpandBodyMacroRequest{func}, {});
+      if (bufferID)
+        allBufferIDs.push_back(*bufferID);
+    }
+  }
+
   // Drop any buffers that come from other macros. We could eliminate this
   // step by adding more fine-grained requests above, which only expand for a
   // single custom attribute.

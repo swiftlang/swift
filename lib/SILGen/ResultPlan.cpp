@@ -119,7 +119,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   }
 
   const auto mappedSubs = SubstitutionMap::get(
-      swift::buildGenericSignature(ctx, nullptr, params, requirements),
+      swift::buildGenericSignature(ctx, nullptr, params, requirements,
+                                   /*allowInverses=*/false),
       [&](SubstitutableType *t) -> Type {
         return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
       },
@@ -136,7 +137,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
         if (auto *dmt =
                 archTy->getInterfaceType()->getAs<DependentMemberType>()) {
           return dmt->substRootParam(params[index],
-                                     MakeAbstractConformanceForGenericType());
+                                     MakeAbstractConformanceForGenericType(),
+                                     llvm::None);
         }
 
         return params[index];
@@ -528,9 +530,13 @@ public:
     auto eltPatternTy =
       PackAddr->getType().castTo<SILPackType>()
                          ->getSILElementType(ComponentIndex);
-    auto result = SGF.createOpenedElementValueEnvironment(eltPatternTy);
-    auto openedEnv = result.first;
-    auto eltAddrTy = result.second;
+    auto substPatternType = FormalPackType.getElementType(ComponentIndex);
+
+    SILType eltAddrTy;
+    CanType substEltType;
+    auto openedEnv =
+      SGF.createOpenedElementValueEnvironment({eltPatternTy}, {&eltAddrTy},
+                                              {substPatternType}, {&substEltType});
 
     // Loop over the pack, initializing each value with the appropriate
     // element.
@@ -559,18 +565,10 @@ public:
           return eltMV;
         }();
 
-        // Map the formal type into the generic environment.
-        auto substType = FormalPackType.getElementType(ComponentIndex);
-        substType = cast<PackExpansionType>(substType).getPatternType();
-        if (openedEnv) {
-          substType = openedEnv->mapContextualPackTypeIntoElementContext(
-                        substType);
-        }
-
         // Finish in the normal way for scalar results.
         RValue rvalue =
           ScalarResultPlan::finish(SGF, loc, eltMV, OrigPatternType,
-                                   substType, eltInit, Rep);
+                                   substEltType, eltInit, Rep);
         assert(rvalue.isInContext()); (void) rvalue;
       });
     });
@@ -785,16 +783,19 @@ public:
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
 
+      auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+          continuationTy, ctx.TheAnyType);
+
       // In this case block storage captures `Any` which would be initialized
       // with an checked continuation.
       auto underlyingContinuationAddr =
           SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
                                           SGF.getLoweredType(continuationTy),
-                                          /*conformances=*/{});
+                                          conformances);
 
       auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
                                        {calleeTypeInfo.substResultType},
-                                       ArrayRef<ProtocolConformanceRef>{});
+                                       conformances);
 
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
@@ -971,7 +972,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,

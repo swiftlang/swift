@@ -1,3 +1,8 @@
+if(SWIFT_BUILD_SDK_OVERLAY)
+set(swift_stdlib_unittest_darwin_dependencies Darwin)
+else()
+set(swift_stdlib_unittest_darwin_dependencies)
+endif()
 
 set(swift_stdlib_unittest_compile_flags
   "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
@@ -50,11 +55,11 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   TypeIndexed.swift
 
   SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivateThreadExtras SwiftPrivateLibcExtras ${swift_stdlib_unittest_modules}
-  SWIFT_MODULE_DEPENDS_IOS Darwin
-  SWIFT_MODULE_DEPENDS_OSX Darwin
-  SWIFT_MODULE_DEPENDS_TVOS Darwin
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-  SWIFT_MODULE_DEPENDS_MACCATALYST Darwin
+  SWIFT_MODULE_DEPENDS_IOS ${swift_stdlib_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_stdlib_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_stdlib_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_stdlib_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_stdlib_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc

@@ -44,6 +44,11 @@ config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
 
+config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
+config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
+config.c_flags = r'''@CMAKE_C_FLAGS@'''
+config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
+
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
@@ -138,6 +143,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
+if "@SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS@" == "TRUE":
+    config.available_features.add('noncopyable_generics')
 if "@SWIFT_STDLIB_STATIC_PRINT@" == "TRUE":
     config.available_features.add('stdlib_static_print')
 if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA" == "TRUE":
@@ -148,6 +155,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION@" == "TRUE":
     config.available_features.add('observation')
 if "@SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE@" == "TRUE":
     config.available_features.add('swift_stdlib_debug_preconditions_in_release')
+if "@SWIFT_ENABLE_SYNCHRONIZATION@" == "TRUE":
+    config.available_features.add('synchronization')
 
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_stdlib_use_relative_protocol_witness_tables = "@SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES@" == "TRUE"
@@ -166,7 +175,7 @@ elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':
 elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING-WITH-HOSTLIBS':
   config.available_features.add('bootstrapping_with_hostlibs_mode')
 
-if '@SWIFT_SWIFT_PARSER@' == 'TRUE':
+if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
 
 # Let the main config do the real work.

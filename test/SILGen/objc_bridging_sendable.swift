@@ -9,3 +9,7 @@
 public func passSendableToObjC(_ s: Sendable) {
   NSBlah().takeSendable(s)
 }
+
+public func useSendableProperty(_ ns: NSBlah) {
+  _ = ns.x
+}

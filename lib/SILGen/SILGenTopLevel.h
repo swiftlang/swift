@@ -49,6 +49,7 @@ private:
     /// Emit `mark_function_escape` SIL instructions into `SGF` for encountered
     /// escape points.
     TypeVisitor(SILGenFunction &SGF);
+    void visit(Decl *D);
     void visitDecl(Decl *D) {}
     void emit(IterableDeclContext *Ctx);
     virtual void visitPatternBindingDecl(PatternBindingDecl *PD);

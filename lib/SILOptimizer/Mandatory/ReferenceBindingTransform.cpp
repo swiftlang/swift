@@ -173,35 +173,47 @@ CopyAddrInst *ReferenceBindingProcessor::findInit() {
   // Thus to find our initialization, we need to find a project_box use of our
   // target that directly initializes the value.
   CopyAddrInst *initInst = nullptr;
-  for (auto *use : mark->getUses()) {
-    LLVM_DEBUG(llvm::dbgs() << "Visiting use: " << *use->getUser());
+  InstructionWorklist worklist(mark->getFunction());
+  for (auto *user : mark->getUsers()) {
+    worklist.push(user);
+  }
+  while (auto *user = worklist.pop()) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting use: " << *user);
 
-    if (auto *pbi = dyn_cast<ProjectBoxInst>(use->getUser())) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found project_box! Visiting pbi uses!\n");
-
-      for (auto *pbiUse : pbi->getUses()) {
-        LLVM_DEBUG(llvm::dbgs() << "    Pbi Use: " << *pbiUse->getUser());
-        auto *cai = dyn_cast<CopyAddrInst>(pbiUse->getUser());
-        if (!cai || cai->getDest() != pbi) {
-          LLVM_DEBUG(llvm::dbgs() << "    Either not a copy_addr or dest is "
-                                     "not the project_box! Skipping!\n");
-          continue;
-        }
-
-        if (initInst || !cai->isInitializationOfDest() || cai->isTakeOfSrc()) {
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "    Either already found an init inst or is an assign of a "
-                 "dest or a take of src... emitting unknown pattern!\n");
-          diagnosticEmitter.diagnoseUnknownPattern(mark);
-          return nullptr;
-        }
-        assert(!initInst && "Init twice?!");
-        assert(!cai->isTakeOfSrc());
-        initInst = cai;
-        LLVM_DEBUG(llvm::dbgs()
-                   << "    Found our init! Checking for other inits!\n");
+    auto *bbi = dyn_cast<BeginBorrowInst>(user);
+    if (bbi && bbi->isFromVarDecl()) {
+      for (auto *user : bbi->getUsers()) {
+        worklist.push(user);
       }
+      continue;
+    }
+    auto *pbi = dyn_cast<ProjectBoxInst>(user);
+    if (!pbi)
+      continue;
+    LLVM_DEBUG(llvm::dbgs() << "    Found project_box! Visiting pbi uses!\n");
+
+    for (auto *pbiUse : pbi->getUses()) {
+      LLVM_DEBUG(llvm::dbgs() << "    Pbi Use: " << *pbiUse->getUser());
+      auto *cai = dyn_cast<CopyAddrInst>(pbiUse->getUser());
+      if (!cai || cai->getDest() != pbi) {
+        LLVM_DEBUG(llvm::dbgs() << "    Either not a copy_addr or dest is "
+                                   "not the project_box! Skipping!\n");
+        continue;
+      }
+
+      if (initInst || !cai->isInitializationOfDest() || cai->isTakeOfSrc()) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    Either already found an init inst or is an assign of a "
+               "dest or a take of src... emitting unknown pattern!\n");
+        diagnosticEmitter.diagnoseUnknownPattern(mark);
+        return nullptr;
+      }
+      assert(!initInst && "Init twice?!");
+      assert(!cai->isTakeOfSrc());
+      initInst = cai;
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Found our init! Checking for other inits!\n");
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "Final Init: " << *initInst);

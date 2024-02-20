@@ -81,8 +81,8 @@ func testVariadicKeypathAsFunc() {
 
   // These are not okay, the KeyPath should have a base that matches the
   // internal parameter type of the function, i.e (S...).
-  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
-  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
+  let _: (S...) -> Int = \S.i // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
 }
 
 // rdar://problem/54322807
@@ -230,11 +230,11 @@ func issue_65965() {
 	
   let refKP: ReferenceWritableKeyPath<S, String>
   refKP = \.s
-  // expected-error@-1 {{key path value type 'WritableKeyPath<S, String>' cannot be converted to contextual type 'ReferenceWritableKeyPath<S, String>'}}
-	
+  // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<S, String>' to contextual type 'ReferenceWritableKeyPath<S, String>'}}
+
   let writeKP: WritableKeyPath<S, String>
   writeKP = \.v
-  // expected-error@-1 {{key path value type 'KeyPath<S, String>' cannot be converted to contextual type 'WritableKeyPath<S, String>'}}
+  // expected-error@-1 {{cannot convert key path type 'KeyPath<S, String>' to contextual type 'WritableKeyPath<S, String>'}}
 }
 
 func test_any_key_path() {
@@ -255,11 +255,66 @@ func rdar32101765() {
   }
   
   let _: KeyPath<R32101765, Float> = \.prop32101765
-  // expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<R32101765, Int>' to type 'KeyPath<R32101765, Float>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and 'Float') are expected to be equal}}
   let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
-  // expected-error@-1 {{key path value type 'Int' cannot be converted to contextual type 'Float'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<R32101765, Int>' to type 'KeyPath<R32101765, Float>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and 'Float') are expected to be equal}}
   let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
   // expected-error@-1 {{type 'Int' has no member 'unknown'}}
   let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
   // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+}
+
+// https://github.com/apple/swift/issues/69795
+func test_invalid_argument_to_keypath_subscript() {
+  func test(x: Int) {
+    x[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  let _: (Int) -> Void = {
+    let y = $0
+    y[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  func ambiguous(_: (String) -> Void) {}
+  func ambiguous(_: (Int) -> Void) {}
+
+  // FIXME(diagnostic): This is not properly diagnosed in a general case and key path application is even more
+  // complicated because overloads anchored on 'SubscriptExpr -> subscript member' do not point to declarations.
+  // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
+  // for a key path subscript.
+  ambiguous {
+    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    $0[keyPath: 5]
+  }
+
+  class A {
+  }
+
+  func test_invalid_existential_protocol(base: String, v: any BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'any BinaryInteger' as a key path subscript index; argument must be a key path}}
+  }
+
+  func test_invalid_existential_composition(base: String, v: any A & BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'A' as a key path subscript index; argument must be a key path}}
+  }
+}
+
+extension Collection {
+  func prefix<R: RangeExpression>(
+    _ range: R,
+    while predicate: ((Element) -> Bool)? = nil
+  ) -> SubSequence where R.Bound == Self.Index {
+    fatalError()
+  }
+}
+
+// https://github.com/apple/swift/issues/56393
+func keypathToFunctionWithOptional() {
+  _ = Array("").prefix(1...4, while: \.isNumber) // Ok
 }

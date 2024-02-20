@@ -284,6 +284,8 @@ public:
     return is<BuiltinVectorType>();
   }
 
+  bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
+
   SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
@@ -340,6 +342,13 @@ public:
     return isAddressOnly(type, tc, sig, TypeExpansionContext::minimal());
   }
 
+  /// Return true if this type must be thrown indirectly.
+  static bool isFormallyThrownIndirectly(CanType type,
+                                         Lowering::TypeConverter &tc,
+                                         CanGenericSignature sig) {
+    return isAddressOnly(type, tc, sig, TypeExpansionContext::minimal());
+  }
+
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
   bool isLoadable(const SILFunction &F) const {
@@ -385,6 +394,9 @@ public:
 
   /// Whether the type contains any flavor of pack.
   bool hasAnyPack() const { return getASTType()->hasAnyPack(); }
+
+  /// Whether the type's layout is known to include some flavor of pack.
+  bool isOrContainsPack(const SILFunction &F) const;
 
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
@@ -751,9 +763,13 @@ public:
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
 
-  /// Returns true if this type is a first class move only type or a move only
-  /// wrapped type.
-  bool isMoveOnly() const;
+  /// Returns true if this type is a noncopyable type. Otherwise, if the type
+  /// satisfies \c isMoveOnlyWrapped(), then it returns true iff \c orWrapped
+  /// is true. That is,
+  ///
+  /// orWrapped == false -->  isNoncopyable
+  /// orWrapped == true  -->  isNoncopyable || isMoveOnlyWrapped
+  bool isMoveOnly(bool orWrapped=true) const;
 
   /// Return true if this is a value type (struct/enum) that requires
   /// deinitialization beyond destruction of its members.
@@ -855,10 +871,6 @@ public:
     return getSILBoxFieldType(fn).isMoveOnly();
   }
 
-  bool isBoxedNonCopyableType(const SILFunction &fn) const {
-    return isBoxedNonCopyableType(&fn);
-  }
-
   bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {
     if (!this->is<SILBoxType>())
       return false;
@@ -878,8 +890,20 @@ public:
 
   bool isMarkedAsImmortal() const;
 
-  ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
-                                            ProtocolDecl *protocol) const;
+  bool isActor() const { return getASTType()->isActorType(); }
+
+  /// Returns true if this function conforms to the Sendable protocol.
+  bool isSendable(SILFunction *fn) const;
+
+  /// False if SILValues of this type cannot be used outside the scope of their
+  /// lifetime dependence.
+  bool isEscapable() const;
+
+  /// True for (isEscapable && !isNoEscapeFunction)
+  ///
+  /// Equivalent to getASTType()->mayEscape(), but handles SIL-specific types,
+  /// namely SILFunctionType.
+  bool mayEscape() const { return !isNoEscapeFunction() && isEscapable(); }
 
   //
   // Accessors for types used in SIL instructions:
@@ -915,6 +939,9 @@ public:
 
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
+
+  /// Get the type for opaque actor isolation values.
+  static SILType getOpaqueIsolationType(const ASTContext &C);
 
   //
   // Utilities for treating SILType as a pointer-like type.

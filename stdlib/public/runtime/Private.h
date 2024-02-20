@@ -280,6 +280,13 @@ public:
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                           Demangle::Demangler &Dem);
 
+  /// Build the demangling for the generic type that's created by specializing
+  /// the given type context descriptor with the given arguments.
+  Demangle::NodePointer
+  _buildDemanglingForGenericType(const TypeContextDescriptor *description,
+                                 const void *const *arguments,
+                                 Demangle::Demangler &Dem);
+
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   ///
@@ -508,6 +515,17 @@ public:
                                           unsigned depth, unsigned index,
                                           llvm::ArrayRef<unsigned> paramCounts);
 
+  /// Gathers all of the written generic parameters needed for
+  /// '_gatherGenericParameters'. This takes a list of key arguments and fills
+  /// in the generic arguments with all generic arguments.
+  ///
+  /// \returns true if the operation succeeded.
+  bool _gatherWrittenGenericParameters(
+      const TypeContextDescriptor *descriptor,
+      llvm::ArrayRef<const void *> keyArgs,
+      llvm::SmallVectorImpl<MetadataOrPack> &genericArgs,
+      Demangle::Demangler &Dem);
+
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for
   /// the caller.
@@ -572,6 +590,16 @@ public:
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
+
+  // Compare two pieces of metadata that should be identical. Returns true if
+  // they are, false if they are not equal. Dumps the metadata contents to
+  // stderr if they are not equal.
+  bool compareGenericMetadata(const Metadata *original,
+                              const Metadata *newMetadata);
+
+  void validateExternalGenericMetadataBuilder(
+      const Metadata *original, const TypeContextDescriptor *description,
+      const void * const *arguments);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,

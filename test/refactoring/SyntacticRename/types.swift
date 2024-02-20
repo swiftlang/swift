@@ -52,32 +52,33 @@ enum /*enum-WithValue:def*/WithValue: Int {
 }
 var _ = /*enum-WithValue*/WithValue . /*case-one*/one
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="class-Foo" -is-non-protocol-type -old-name "Foo" -new-name "MoreFoo" >> %t.result/types_class-Foo.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="class-Foo" -is-non-protocol-type -old-name "Foo" > %t.result/types_class-Foo.swift
 // RUN: diff -u %S/Outputs/types/class-Foo.swift.expected %t.result/types_class-Foo.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="protocol-Proto" -old-name "Proto" -new-name "NextProto" >> %t.result/types_protocol-Proto.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="protocol-Proto" -old-name "Proto" > %t.result/types_protocol-Proto.swift
 // RUN: diff -u %S/Outputs/types/protocol-Proto.swift.expected %t.result/types_protocol-Proto.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="class-Bar" -is-non-protocol-type -old-name "Bar" -new-name "MoreBar" >> %t.result/types_class-Bar.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="class-Bar" -is-non-protocol-type -old-name "Bar" > %t.result/types_class-Bar.swift
 // RUN: diff -u %S/Outputs/types/class-Bar.swift.expected %t.result/types_class-Bar.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="associated-Item" -old-name "Item" -new-name "Element" >> %t.result/types_associated-Item.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="associated-Item" -old-name "Item" > %t.result/types_associated-Item.swift
 // RUN: diff -u %S/Outputs/types/associated-Item.swift.expected %t.result/types_associated-Item.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="alias-FuncType" -old-name "FuncType" -new-name "FuncType2" >> %t.result/types_alias-FuncType.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="alias-FuncType" -old-name "FuncType" > %t.result/types_alias-FuncType.swift
 // RUN: diff -u %S/Outputs/types/alias-FuncType.swift.expected %t.result/types_alias-FuncType.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="class-Animal" -is-non-protocol-type -old-name "Animal" -new-name "Gonzo" >> %t.result/types_class-Animal.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="class-Animal" -is-non-protocol-type -old-name "Animal" > %t.result/types_class-Animal.swift
 // RUN: diff -u %S/Outputs/types/class-Animal.swift.expected %t.result/types_class-Animal.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="generic-T" -is-non-protocol-type -old-name "T" -new-name "Tee" >> %t.result/types_generic-T.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="generic-T" -is-non-protocol-type -old-name "T" > %t.result/types_generic-T.swift
 // RUN: diff -u %S/Outputs/types/generic-T.swift.expected %t.result/types_generic-T.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="generic-U" -is-non-protocol-type -old-name "U" -new-name "Ewe" >> %t.result/types_generic-U.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="generic-U" -is-non-protocol-type -old-name "U" > %t.result/types_generic-U.swift
 // RUN: diff -u %S/Outputs/types/generic-U.swift.expected %t.result/types_generic-U.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="enum-Barcode" -is-non-protocol-type -old-name "Barcode" -new-name "BetterBarcode" >> %t.result/types_enum-Barcode.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="enum-Barcode" -is-non-protocol-type -old-name "Barcode" > %t.result/types_enum-Barcode.swift
 // RUN: diff -u %S/Outputs/types/enum-Barcode.swift.expected %t.result/types_enum-Barcode.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="case-qrCode" -is-function-like -old-name "qrCode(code:)" -new-name "QRCode(_:)" >> %t.result/types_case-qrCode.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="case-qrCode" -is-function-like -old-name "qrCode(code:)" >> %t.result/types_case-qrCode.swift
 // RUN: diff -u %S/Outputs/types/case-qrCode.swift.expected %t.result/types_case-qrCode.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="case-other" -is-function-like -old-name "other(_:)" -new-name "Other(x:)" >> %t.result/types_case-other.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="case-other" -is-function-like -old-name "other(_:)" >> %t.result/types_case-other.swift
 // RUN: diff -u %S/Outputs/types/case-other.swift.expected %t.result/types_case-other.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="case-another" -old-name "another" -new-name "Another" >> %t.result/types_case-another.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="case-another" -old-name "another" > %t.result/types_case-another.swift
 // RUN: diff -u %S/Outputs/types/case-another.swift.expected %t.result/types_case-another.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="enum-WithValue" -is-non-protocol-type -old-name "WithValue" -new-name "NewName" >> %t.result/types_enum-WithValue.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="enum-WithValue" -is-non-protocol-type -old-name "WithValue" > %t.result/types_enum-WithValue.swift
 // RUN: diff -u %S/Outputs/types/enum-WithValue.swift.expected %t.result/types_enum-WithValue.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="case-one" -old-name "one" -new-name "two" >> %t.result/types_case-one.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="case-one" -old-name "one" > %t.result/types_case-one.swift
 // RUN: diff -u %S/Outputs/types/case-one.swift.expected %t.result/types_case-one.swift

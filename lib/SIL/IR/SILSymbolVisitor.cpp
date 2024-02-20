@@ -103,17 +103,29 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (!ignoreLinkage) {
       auto linkage = effectiveLinkageForClassMember(
           declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
-      if (Ctx.getOpts().PublicSymbolsOnly && linkage != SILLinkage::Public)
+      if (shouldSkipVisit(linkage))
         return;
     }
 
     Visitor.addFunction(declRef);
   }
 
+  bool shouldSkipVisit(SILLinkage linkage) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly &&
+    !(linkage == SILLinkage::Public || linkage == SILLinkage::Package);
+  }
+  bool shouldSkipVisit(SILDeclRef declRef) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly && !declRef.isSerialized();
+  }
+  bool shouldSkipVisit(FormalLinkage formalLinkage) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly &&
+    !(formalLinkage == FormalLinkage::PublicUnique || formalLinkage == FormalLinkage::PackageUnique);
+  }
+
   void addAsyncFunctionPointer(SILDeclRef declRef) {
     auto silLinkage = effectiveLinkageForClassMember(
         declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
-    if (Ctx.getOpts().PublicSymbolsOnly && silLinkage != SILLinkage::Public)
+    if (shouldSkipVisit(silLinkage))
       return;
 
     Visitor.addAsyncFunctionPointer(declRef);
@@ -128,7 +140,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
 
     // Linear maps are public only when the original function is serialized. So
     // if we're only including public symbols and it's not serialized, bail.
-    if (Ctx.getOpts().PublicSymbolsOnly && !declRef.isSerialized())
+    if (shouldSkipVisit(declRef))
       return;
 
     // Differential functions are emitted only when forward-mode is enabled.
@@ -181,8 +193,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto originalLinkage = declRef.getLinkage(ForDefinition);
     if (foreign)
       originalLinkage = stripExternalFromLinkage(originalLinkage);
-    if (Ctx.getOpts().PublicSymbolsOnly &&
-        originalLinkage != SILLinkage::Public)
+    if (shouldSkipVisit(originalLinkage))
       return;
 
     auto *silParamIndices = autodiff::getLoweredParameterIndices(
@@ -272,7 +283,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                       ValueDecl *witnessDecl) {
         auto witnessRef = SILDeclRef(witnessDecl);
-        if (Ctx.getOpts().PublicSymbolsOnly) {
+        if (Ctx.getOpts().PublicOrPackageSymbolsOnly) {
           if (!conformanceIsFixed)
             return;
 
@@ -322,8 +333,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     // Metaclasses and ObjC classes (duh) are an ObjC thing, and so are not
     // needed in build artifacts/for classes which can't touch ObjC.
     if (objCCompatible) {
-      if (isObjC || CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+      if (isObjC)
         Visitor.addObjCInterface(CD);
+      else if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+        // If an ObjCInterface was not added, an external ObjC Metaclass can
+        // still be needed for subclassing.
+        Visitor.addObjCMetaclass(CD);
       else
         Visitor.addSwiftMetaclassStub(CD);
     }
@@ -370,7 +385,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
   /// Returns `true` if the neither the nominal nor its members have any symbols
   /// that need to be visited because it has non-public linkage.
   bool canSkipNominal(const NominalTypeDecl *NTD) {
-    if (!Ctx.getOpts().PublicSymbolsOnly)
+    if (!Ctx.getOpts().PublicOrPackageSymbolsOnly)
       return false;
 
     // Don't skip nominals from clang modules; they have PublicNonUnique
@@ -378,7 +393,8 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (isa<ClangModuleUnit>(NTD->getDeclContext()->getModuleScopeContext()))
       return false;
 
-    return getDeclLinkage(NTD) != FormalLinkage::PublicUnique;
+    return !(getDeclLinkage(NTD) == FormalLinkage::PublicUnique ||
+             getDeclLinkage(NTD) == FormalLinkage::PackageUnique);
   }
 
 public:
@@ -420,9 +436,14 @@ public:
 
   void visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
     auto moduleDecl = VD->getModuleContext();
-    auto publicDefaultArgGenerators = moduleDecl->isTestingEnabled() ||
-                                      moduleDecl->arePrivateImportsEnabled();
-    if (Ctx.getOpts().PublicSymbolsOnly && !publicDefaultArgGenerators)
+    // Check if symbols should be more visible than their declared access level.
+    // In case of `package` access level, the symbol should be visible by an
+    // external module in the same package, thus the default argument should be
+    // generated and its linkage emitted.
+    auto shouldGenerateDefaultArgs = moduleDecl->isTestingEnabled() ||
+                                     moduleDecl->arePrivateImportsEnabled() ||
+                                     VD->getFormalAccess() >= AccessLevel::Package;
+    if (Ctx.getOpts().PublicOrPackageSymbolsOnly && !shouldGenerateDefaultArgs)
       return;
 
     // In Swift 3 (or under -enable-testing), default arguments (of public
@@ -567,8 +588,7 @@ public:
 
       // Statically/globally stored variables have some special handling.
       if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-        if (!Ctx.getOpts().PublicSymbolsOnly ||
-            getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        if (!shouldSkipVisit(getDeclLinkage(VD))) {
           Visitor.addGlobalVar(VD);
         }
 
@@ -646,19 +666,24 @@ public:
       void addMethod(SILDeclRef method) {
         assert(method.getDecl()->getDeclContext() == CD);
 
-        if (VirtualFunctionElimination || CD->hasResilientMetadata()) {
-          if (FirstTime) {
-            FirstTime = false;
+        // If the class is itself resilient and has at least one vtable
+        // entry, it has a method lookup function.
+        bool hasLookupFunc =
+            VirtualFunctionElimination || CD->hasResilientMetadata();
+        if (FirstTime) {
+          FirstTime = false;
 
-            // If the class is itself resilient and has at least one vtable
-            // entry, it has a method lookup function.
+          if (hasLookupFunc)
             Visitor.addMethodLookupFunction(CD);
-          }
-
-          Visitor.addDispatchThunk(method);
         }
 
+        if (!Visitor.willVisitDecl(method.getDecl()))
+          return;
+        if (hasLookupFunc)
+          Visitor.addDispatchThunk(method);
+
         Visitor.addMethodDescriptor(method);
+        Visitor.didVisitDecl(method.getDecl());
       }
 
       void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}

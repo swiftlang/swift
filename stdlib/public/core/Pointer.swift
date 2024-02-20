@@ -26,7 +26,8 @@ public typealias _CustomDebugStringConvertibleOrNone = Any
 /// UnsafeMutablePointer, UnsafePointer, UnsafeRawPointer,
 /// UnsafeMutableRawPointer, and AutoreleasingUnsafeMutablePointer.
 public protocol _Pointer
-: Hashable, Strideable, _CustomDebugStringConvertibleOrNone, _CustomReflectableOrNone {
+: Hashable, Strideable, _CustomDebugStringConvertibleOrNone, _CustomReflectableOrNone
+, _BitwiseCopyable {
   /// A type that represents the distance between two pointers.
   typealias Distance = Int
   

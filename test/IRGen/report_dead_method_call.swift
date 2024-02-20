@@ -15,6 +15,8 @@
 // UNSUPPORTED: freestanding
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// WebAssembly support only in-process testing for now.
+// UNSUPPORTED: CPU=wasm32
 
 // UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 // UNSUPPORTED: swift_test_mode_optimize_with_implicit_dynamic

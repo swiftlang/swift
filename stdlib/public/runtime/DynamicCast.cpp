@@ -126,9 +126,9 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  const char * const msg = "Found unexpected null pointer value"
-                    " while trying to cast value of type '%s' (%p)"
-                    " to '%s' (%p)%s\n";
+  const char * const msg = "Found a null pointer in a value of type '%s' (%p)."
+                    " Non-Optional values are not allowed to hold null pointers."
+                    " (Detected while casting to '%s' (%p))%s\n";
   if (runtime::bincompat::useLegacyPermissiveObjCNullSemanticsInCasting()) {
     // In backwards compatibility mode, this code will warn and return the null
     // reference anyway: If you examine the calls to the function, you'll see
@@ -208,9 +208,8 @@ PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  static const auto bridgeableProtocol
-    = &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
-  auto w = swift_conformsToProtocolCommon(T, bridgeableProtocol);
+  auto w = swift_conformsToProtocolCommon(
+      T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
   return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
 }
 
@@ -324,7 +323,7 @@ tryCastFromClassToObjCBridgeable(
     return DynamicCastResult::Failure;
   }
 
-  // 1. Sanity check whether the source object can cast to the
+  // 1. Soundness check whether the source object can cast to the
   // type expected by the target.
 
   auto targetBridgedClass =

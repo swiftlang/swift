@@ -20,6 +20,7 @@
 #include "LocalTypeDataKind.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
+#include "LocalTypeDataKind.h"
 
 namespace llvm {
   class Value;

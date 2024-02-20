@@ -4,7 +4,7 @@
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.printed.txt %s
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.printed.txt -check-prefix=NEGATIVE -check-prefix=NEGATIVE-WITHOUT-FORWARD-DECLS %s
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=ObjectiveC.NSObject -function-definitions=false -enable-objc-forward-declarations > %t/ObjectiveC.NSObject.forward-decls.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=ObjectiveC.NSObject -function-definitions=false -enable-upcoming-feature ImportObjcForwardDeclarations > %t/ObjectiveC.NSObject.forward-decls.txt
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.forward-decls.txt -check-prefix=CHECK -check-prefix=CHECK-WITH-FORWARD-DECLS %s
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.forward-decls.txt -check-prefix=NEGATIVE %s
 

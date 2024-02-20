@@ -379,7 +379,7 @@ public:
     // analysis assumes memory is deinitialized on all paths, which is not the
     // case for discarded values. Eventually copyable types may also be
     // discarded; to support that, we will leave a drop_deinit_addr in place.
-    if (ASI->getType().getASTType()->isNoncopyable()) {
+    if (ASI->getType().isMoveOnly(/*orWrapped=*/false)) {
       LegalUsers = false;
       return;
     }
@@ -861,37 +861,6 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Add an `unreachable` to be the new terminator for this block
   Builder.setInsertionPoint(CFI->getParent());
   Builder.createUnreachable(ArtificialUnreachableLocation());
-
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
-  assert(cvi->getFunction()->hasOwnership());
-
-  // Sometimes when RAUWing code we get copy_value on .none values (consider
-  // transformations around function types that result in given a copy_value a
-  // thin_to_thick_function argument). In such a case, just RAUW with the
-  // copy_value's operand since it is a no-op.
-  if (cvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
-    replaceInstUsesWith(*cvi, cvi->getOperand());
-    return eraseInstFromFunction(*cvi);
-  }
-
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
-  assert(dvi->getFunction()->hasOwnership());
-
-  // Sometimes when RAUWing code we get destroy_value on .none values. In such a
-  // case, just delete the destroy_value.
-  //
-  // As an example, consider transformations around function types that result
-  // in a thin_to_thick_function being passed to a destroy_value.
-  if (dvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
-    eraseInstFromFunction(*dvi);
-    return nullptr;
-  }
 
   return nullptr;
 }

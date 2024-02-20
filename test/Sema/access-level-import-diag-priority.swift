@@ -14,14 +14,11 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name pkg
+// RUN:   -package-name pkg -verify
 // RUN: %target-swift-frontend -typecheck %t/PackageTypeImportedAsPackageClient.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name pkg
+// RUN:   -package-name pkg -verify
 // RUN: %target-swift-frontend -typecheck %t/LocalVsImportClient.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name pkg
+// RUN:   -package-name pkg -verify
 
 //--- PublicLib.swift
 public struct PublicImportType {}
@@ -91,7 +88,6 @@ public func publicFuncUsesPackageLevelPackageImportedType(_ a: PackageLevelPacka
 
 /// Local vs imports
 //--- LocalVsImportClient.swift
-public import PublicLib
 internal import InternalLib
 fileprivate import FileprivateLib // expected-note {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
 

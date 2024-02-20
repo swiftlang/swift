@@ -62,7 +62,7 @@ bool SyntacticMacroExpansionInstance::setup(
       invocation.getLangOptions(), invocation.getTypeCheckerOptions(),
       invocation.getSILOptions(), invocation.getSearchPathOptions(),
       invocation.getClangImporterOptions(), invocation.getSymbolGraphOptions(),
-      SourceMgr, Diags));
+      invocation.getCASOptions(), SourceMgr, Diags));
   registerParseRequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
 
@@ -286,6 +286,15 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     if (isa<NominalTypeDecl>(attachedDecl))
       evaluate(attachedDecl, /*passParent=*/false, MacroRole::Extension);
   }
+  if (roles.contains(MacroRole::Preamble)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Preamble);
+  }
+  if (roles.contains(MacroRole::Body)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Body);
+  }
+
   return bufferIDs;
 }
 
@@ -341,7 +350,7 @@ public:
     // include its attribute ranges (because attributes are part of PBD.)
     if (!isa<VarDecl>(D) &&
         !rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     // Check the attributes.
@@ -371,7 +380,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (!rangeContainsLocToResolve(E->getSourceRange())) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     // Check 'MacroExpansionExpr'.
@@ -389,26 +398,26 @@ public:
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (!rangeContainsLocToResolve(S->getSourceRange())) {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     return Action::Continue(S);
   }
   PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *AL) override {
     if (!rangeContainsLocToResolve(AL->getSourceRange())) {
-      return Action::SkipChildren(AL);
+      return Action::SkipNode(AL);
     }
     return Action::Continue(AL);
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
     if (!rangeContainsLocToResolve(PL->getSourceRange())) {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     return Action::Continue();
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     // TypeRepr cannot have macro expansions in it.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // namespace

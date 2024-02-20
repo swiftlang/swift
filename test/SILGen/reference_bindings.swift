@@ -13,10 +13,12 @@ func doSomething() {}
 //
 // CHECK-LABEL: sil hidden [ossa] @$s18reference_bindings13testBindToVaryyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
-// CHECK: [[PROJECT:%.*]] = project_box %0
+// CHECK: [[LIFETIME:%.*]] = begin_borrow [var_decl] %0
+// CHECK: [[PROJECT:%.*]] = project_box [[LIFETIME]]
 // CHECK: [[INOUT_BOX:%.*]] = alloc_box ${ var Int }, var, name "x2"
 // CHECK: [[UNRESOLVED_BINDING:%.*]] = mark_unresolved_reference_binding [inout] [[INOUT_BOX]]
-// CHECK: [[INOUT_PROJECT:%.*]] = project_box [[UNRESOLVED_BINDING]]
+// CHECK: [[INOUT_LIFETIME:%.*]] = begin_borrow [var_decl] [[UNRESOLVED_BINDING]]
+// CHECK: [[INOUT_PROJECT:%.*]] = project_box [[INOUT_LIFETIME]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: copy_addr [[ACCESS]] to [init] [[INOUT_PROJECT]]
 // CHECK: end_access [[ACCESS]]
@@ -47,7 +49,8 @@ func testBindToVar() {
 // CHECK: bb0([[ARG:%.*]] : $*String):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }
 // CHECK:   [[MARK:%.*]] = mark_unresolved_reference_binding [inout] [[BOX]]
-// CHECK:   [[PROJECT:%.*]] = project_box [[MARK]]
+// CHECK:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[MARK]]
+// CHECK:   [[PROJECT:%.*]] = project_box [[LIFETIME]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARG]]
 // CHECK:   copy_addr [[ACCESS]] to [init] [[PROJECT]]
 // CHECK:   end_access [[ACCESS]]

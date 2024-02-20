@@ -36,6 +36,7 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
 #include <unordered_map>
@@ -122,6 +123,10 @@ using ModuleDependencyIDSetVector =
 
 namespace dependencies {
   std::string createEncodedModuleKindAndName(ModuleDependencyID id);
+  bool checkImportNotTautological(const ImportPath::Module, 
+                                  const SourceLoc,
+                                  const SourceFile&,
+                                  bool);
 }
 
 /// Base class for the variant storage of ModuleDependencyInfo.
@@ -160,6 +165,10 @@ public:
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
   std::vector<ModuleDependencyID> resolvedDirectModuleDependencies;
 
+  /// Dependencies comprised of Swift overlay modules of direct and
+  /// transitive Clang dependencies.
+  std::vector<ModuleDependencyID> swiftOverlayDependencies;
+
   /// The cache key for the produced module.
   std::string moduleCacheKey;
 
@@ -191,10 +200,6 @@ struct CommonSwiftTextualModuleDependencyDetails {
 
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
-
-  /// Dependencies comprised of Swift overlay modules of direct and
-  /// transitive Clang dependencies.
-  std::vector<ModuleDependencyID> swiftOverlayDependencies;
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
@@ -581,29 +586,12 @@ public:
 
   /// Set this module's set of Swift Overlay dependencies
   void setOverlayDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
-    assert(isSwiftSourceModule() || isSwiftInterfaceModule());
-    CommonSwiftTextualModuleDependencyDetails *textualModuleDetails;
-    if (auto sourceDetailsStorage = dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())) {
-      textualModuleDetails = &sourceDetailsStorage->textualModuleDetails;
-    } else if (auto interfaceDetailsStorage = dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())) {
-      textualModuleDetails = &interfaceDetailsStorage->textualModuleDetails;
-    } else {
-      llvm_unreachable("Unknown kind of dependency module info.");
-    }
-    textualModuleDetails->swiftOverlayDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
+    assert(isSwiftModule());
+    storage->swiftOverlayDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
   }
 
   const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
-    CommonSwiftTextualModuleDependencyDetails *textualModuleDetails = nullptr;
-    if (auto sourceDetailsStorage = dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-      textualModuleDetails = &sourceDetailsStorage->textualModuleDetails;
-    else if (auto interfaceDetailsStorage = dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-      textualModuleDetails = &interfaceDetailsStorage->textualModuleDetails;
-
-    if (textualModuleDetails)
-      return textualModuleDetails->swiftOverlayDependencies;
-    else
-      return {};
+    return storage->swiftOverlayDependencies;
   }
 
   std::vector<std::string> getCommandline() const {
@@ -724,7 +712,7 @@ public:
       // Special case: a submodule named "Foo.Private" can be moved to a top-level
       // module named "Foo_Private". ClangImporter has special support for this.
       if (submoduleComponent.Item.str() == "Private")
-        ImportedModuleName = ImportedModuleName + "_Private";
+        addOptionalModuleImport(ImportedModuleName + "_Private", alreadyAddedModules);
     }
 
     addModuleImport(ImportedModuleName, alreadyAddedModules);
@@ -790,16 +778,18 @@ using ModuleDependenciesKindRefMap =
 /// Track swift dependency
 class SwiftDependencyTracker {
 public:
-  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS)
-      : FS(FS.createProxyFS()) {}
+  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS,
+                         llvm::TreePathPrefixMapper *Mapper)
+      : FS(FS.createProxyFS()), Mapper(Mapper) {}
 
   void startTracking();
-  void addCommonSearchPathDeps(const SearchPathOptions& Opts);
+  void addCommonSearchPathDeps(const SearchPathOptions &Opts);
   void trackFile(const Twine &path) { (void)FS->status(path); }
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 
 private:
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
+  llvm::TreePathPrefixMapper *Mapper;
 };
 
 // MARK: SwiftDependencyScanningService
@@ -839,6 +829,9 @@ class SwiftDependencyScanningService {
 
   /// The common dependencies that is needed for every swift compiler instance.
   std::vector<std::string> CommonDependencyFiles;
+
+  /// File prefix mapper.
+  std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
 
   /// The global file system cache.
   llvm::Optional<
@@ -894,11 +887,11 @@ public:
     return *CacheFS;
   }
 
-  llvm::Optional<SwiftDependencyTracker> createSwiftDependencyTracker() const {
+  llvm::Optional<SwiftDependencyTracker> createSwiftDependencyTracker() {
     if (!CacheFS)
       return llvm::None;
 
-    return SwiftDependencyTracker(*CacheFS);
+    return SwiftDependencyTracker(*CacheFS, Mapper.get());
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
@@ -912,9 +905,15 @@ public:
     return llvm::vfs::createPhysicalFileSystem();
   }
 
-  /// Wrap the filesystem on the specified `CompilerInstance` with a
-  /// caching `DependencyScanningWorkerFilesystem`
-  void overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance);
+  bool hasPathMapping() const {
+    return Mapper && !Mapper->getMappings().empty();
+  }
+  llvm::TreePathPrefixMapper *getPrefixMapper() const { return Mapper.get(); }
+  std::string remapPath(StringRef Path) const {
+    if (!Mapper)
+      return Path.str();
+    return Mapper->mapToString(Path);
+  }
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
@@ -1037,6 +1036,14 @@ public:
   std::vector<ModuleDependencyID>
   getAllDependencies(const ModuleDependencyID &moduleID) const;
 
+  /// Query only direct import dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyDirectDependencies(const ModuleDependencyID &moduleID) const;
+
+  /// Query only Swift overlay dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getOnlyOverlayDependencies(const ModuleDependencyID &moduleID) const;
+
   /// Look for module dependencies for a module with the given ID
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
@@ -1074,7 +1081,7 @@ public:
 
   /// Resolve a dependency module's set of Swift module dependencies
   /// that are Swift overlays of Clang module dependencies.
-  void setSwiftOverlayDependencues(ModuleDependencyID moduleID,
+  void setSwiftOverlayDependencies(ModuleDependencyID moduleID,
                                    const ArrayRef<ModuleDependencyID> dependencyIDs);
   
   StringRef getMainModuleName() const {

@@ -13,6 +13,20 @@ class Bar {
   func foo() -> Int
 }
 
+sil @cl : $@convention(thin) () -> Int
+
+// CHECK-LABEL: sil [ossa] @thick_to_thin :
+// CHECK:         [[F:%.*]] = function_ref @cl
+// CHECK:         apply [[F]]() : $@convention(thin
+// CHECK:       } // end sil function 'thick_to_thin'
+sil [ossa] @thick_to_thin : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
+  %2 = apply %1() : $@callee_guaranteed () -> Int
+  return %2 : $Int
+}
+
 // CHECK-LABEL: sil @devirt_class_method :
 // CHECK:         [[F:%.*]] = function_ref @bar_foo
 // CHECK:         apply [[F]]

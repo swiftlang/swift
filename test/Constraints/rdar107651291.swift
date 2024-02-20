@@ -7,6 +7,6 @@ func foo(xs: [String: [String]], ys: [String: [String]]) {
     for (a, b) in zip(xs, ys) {}
     // expected-error@-1 {{type 'Dictionary<String, [String]>.Element' (aka '(key: String, value: Array<String>)') cannot conform to 'Sequence'}}
     // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-3 {{required by referencing instance method 'next()'}}
+    // expected-note@-3 {{required by global function 'zip' where 'Sequence2' = 'Dictionary<String, [String]>.Element' (aka '(key: String, value: Array<String>)')}}
   }
 }

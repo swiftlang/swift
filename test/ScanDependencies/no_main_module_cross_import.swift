@@ -9,7 +9,7 @@
 
 // Ordinarily, importing `E` and `SubE` triggers a cross-import of `_cross_import_E`, but not here, because we are building `SubE` Swift module itself.
 import EWrapper
-import SubE
+@_exported import SubE
 
 // CHECK:  "directDependencies": [
 // CHECK-DAG:   "swift": "EWrapper"

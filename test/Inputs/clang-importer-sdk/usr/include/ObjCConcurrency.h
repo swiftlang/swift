@@ -82,6 +82,7 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
 -(void)doSomethingDangerousNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
+-(void)doSomethingUnspecifiedNullablyWithCompletionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
 
 // rdar://72604599
 - (void)stopRecordingWithHandler:(nullable void (^)(NSObject *_Nullable_result x, NSError *_Nullable error))handler __attribute__((swift_async_name("stopRecording()"))) __attribute__((swift_async(not_swift_private, 1)));
@@ -225,6 +226,9 @@ SENDABLE @interface AuditedSendable : NSObject @end
 @interface AuditedNonSendable : NSObject @end
 NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
 
+SENDABLE @protocol SendableProtocol @end
+@protocol SendableProtocolRefined <SendableProtocol> @end
+
 typedef NS_ENUM(unsigned, SendableEnum) {
   SendableEnumFoo, SendableEnumBar
 };
@@ -325,6 +329,19 @@ UI_ACTOR
 @protocol CoffeeDelegate <NSObject>
 @optional
 - (void)icedMochaService:(NSObject *)mochaService generateMochaWithCompletion:(void (^)(NSObject *_Nullable ingredient1, NSObject *ingredient2, NSObject *ingredient3))completionHandler;
+@end
+
+MAIN_ACTOR
+@interface MyView : NSObject
+- (void)display;
+@property(readonly) BOOL isVisible;
+@end
+
+// rdar://114049646
+MAIN_ACTOR
+@protocol HotdogCompetitor
+- (nullable NSString *)pileOfHotdogsToEatWithLimit:(NSObject *)limit
+                                                   error:(NSError * __autoreleasing *)error;
 @end
 
 #pragma clang assume_nonnull end

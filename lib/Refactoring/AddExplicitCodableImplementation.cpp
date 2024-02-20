@@ -89,7 +89,7 @@ public:
   PreWalkAction walkToDeclPre(Decl *D) override {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (!VD->isSynthesized()) {
       return Action::Continue();
@@ -102,7 +102,7 @@ public:
         isa<EnumDecl>(VD) || name == "init(from:)" || name == "encode(to:)";
     if (!shouldPrint) {
       // Some other synthesized decl that we don't want to print.
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     Printer.printNewline();
@@ -122,7 +122,7 @@ public:
       }
       Printer.printNewline();
       Printer << "}";
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     PrintOptions Options;
@@ -131,12 +131,12 @@ public:
     Options.VarInitializers = true;
     Options.PrintExprs = true;
     Options.TypeDefinitions = true;
-    Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
 
     Printer.printNewline();
     D->print(Printer, Options);
 
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 

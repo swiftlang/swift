@@ -305,7 +305,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
     Action walkToTypePre(Type component) override {
       if (!component->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       if (!component->isTypeParameter())
         return Action::Continue;
@@ -327,7 +327,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
       // The parent of a reduced type parameter might be non-reduced
       // because it is concrete.
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
   };
 
@@ -346,7 +346,8 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
                                        prefixType, sig);
   return memberType->substBaseType(substBaseType,
-                                   LookUpConformanceInSignature(sig.getPointer()));
+                                   LookUpConformanceInSignature(sig.getPointer()),
+                                   llvm::None);
 }
 
 /// Unlike most other queries, the input type can be any type, not just a

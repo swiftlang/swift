@@ -3,6 +3,7 @@
 // RUN: env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --implicit-check-not='ThreadSanitizer'
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
+// UNSUPPORTED: threading_none
 
 // rdar://101876380
 // UNSUPPORTED: OS=ios

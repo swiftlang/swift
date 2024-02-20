@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PrefixMapper.h"
 
 namespace swift {
 class ModuleFile;
@@ -61,11 +62,17 @@ struct SerializedModuleBaseName {
   /// Gets the filename with a particular extension appended to it.
   std::string getName(file_types::ID fileTy) const;
 
-  /// If the interface with \p baseName exists, returns its path (which may be
-  /// the private interface if there is one). Return an empty optional
-  /// otherwise.
+  /// If the interface with \p baseName exists, returns its path (which may be the
+  /// package interface if applicable (in the same package as the main module) or
+  /// private interface if there is one, else public). Return an empty optional otherwise.
   llvm::Optional<std::string>
-  findInterfacePath(llvm::vfs::FileSystem &fs) const;
+  findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const;
+  
+  /// Returns the .package.swiftinterface path if its package-name also applies to
+  /// the the importing module. Returns an empty optional otherwise.
+  llvm::Optional<std::string>
+  getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
+                                         ASTContext &ctx) const;
 };
 
 /// Common functionality shared between \c ImplicitSerializedModuleLoader,
@@ -169,6 +176,7 @@ protected:
                      ModuleLoadingBehavior transitiveBehavior,
                      bool isFramework,
                      bool isRequiredOSSAModules,
+                     bool isRequiredNoncopyableGenerics,
                      StringRef SDKName,
                      StringRef packageName,
                      llvm::vfs::FileSystem *fileSystem,
@@ -177,6 +185,7 @@ protected:
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
   getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
+  
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
@@ -197,6 +206,7 @@ public:
           bool isFramework);
 
   bool isRequiredOSSAModules() const;
+  bool isRequiredNoncopyableGenerics() const;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.
@@ -242,11 +252,12 @@ public:
   virtual void verifyAllModules() override;
 
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
                         llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper,
                         bool isTestableImport) override;
 };
 
@@ -389,7 +400,7 @@ public:
 
   /// Returns the language version that was used to compile the contents of this
   /// file.
-  const version::Version &getLanguageVersionBuiltWith() const;
+  virtual version::Version getLanguageVersionBuiltWith() const override;
 
   virtual bool hadLoadError() const override;
 

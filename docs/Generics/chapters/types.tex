@@ -256,7 +256,7 @@ A \IndexDefinition{nominal type}\emph{nominal type} is declared by a non-generic
 \end{tikzpicture}
 \end{wrapfigure}
 
-We have yet to see an example of a nominal type with a non-empty parent type, so let's look at one now. Given the below declarations, we can form the nominal type \texttt{Outer<Float>.Inner}:
+The parent type records the generic arguments of outer nominal type declarations. For example, with the below declarations, we can form the nominal type \texttt{Outer<Float>.Inner}:
 
 \medskip
 
@@ -271,7 +271,7 @@ struct Outer<T> {
 
 \medskip
 
-The parent type contains the generic arguments for the parent type declaration. Thus, each combination of generic arguments, for a nominal type and its parents, defines a \index{specialized type}\emph{specialized type}.
+A nominal type declaration defines a family of nominal types, all sharing the same declaration and parent type structure, but having different generic arguments. Each of these types is a \index{specialized type}\emph{specialized type} of the nominal type declaration.
 
 \begin{wrapfigure}[13]{l}{5cm}
 \begin{center}\textbf{Declared interface type}\end{center}
@@ -289,7 +289,7 @@ The parent type contains the generic arguments for the parent type declaration. 
 
 \smallskip
 
- When neither the nominal type declaration nor its parents are generic, there is just one such specialized type; it is \index{fully concrete type}fully concrete. The specialized type with the corresponding generic parameter type as each generic argument is the \index{declared interface type}\emph{declared interface type} of the nominal type declaration. The declared interface type is ``universal''; every specialized type can be obtained from the declared interface type by substitution with a suitable choice of replacement type for each generic parameter type. Such an assignment is known as a \index{substitution map}\emph{substitution map}, and the substitution map defined by the generic arguments of a specialized type is its \index{context substitution map}\emph{context substitution map}. This is explained in Section~\ref{contextsubstmap}.
+The specialized type where each generic argument is set to the corresponding generic parameter type is the \index{declared interface type}\emph{declared interface type} of the nominal type declaration. It is ``universal'': any specialized type is obtainable from the declared interface type by assigning a replacement type to each generic parameter type. This assignment is known as a \index{substitution map}\emph{substitution map}, and the substitution map defined by the generic arguments of a specialized type is its \index{context substitution map}\emph{context substitution map} (Section~\ref{contextsubstmap}). Finally, in the case where neither the nominal type declaration nor any of its parents are generic, the declaration defines just one \index{fully concrete type}\emph{fully concrete} specialized type, with an empty context substitution map.
 
 
 \begin{figure}[b!]\captionabove{Bound and unbound dependent member types}\label{type params fig}
@@ -358,7 +358,7 @@ Unbound dependent member types fit in somewhere in between type representations 
 
 If \ttbf{T} is the base type, \texttt{P} is a protocol and \texttt{A} is an associated type declared inside this protocol, we denote the bound dependent member type by \texttt{\textbf{T}.[P]A}, and the unbound dependent member type by \texttt{\textbf{T}.A}. The base type \ttbf{T} may be another dependent member type, so we can have a series of member type accesses, like \texttt{\ttgp{0}{0}.[P]A.[Q]B}. Figure~\ref{type params fig} shows the recursive structure of two dependent member types, bound and unbound.
 
-Note that a dependent member type is ``dependent'' in the C++ sense, \emph{not} a \index{dependent type}type that is dependent a value from the \index{lambda cube}``lambda cube.'' Generic parameter types and dependent member types are together known as \emph{type parameters}. A type that might contain type parameters but is not necessarily a type parameter itself is called an \IndexDefinition{interface type}\emph{interface type}. The above summary necessarily leaves many questions unanswered, and understanding the behaviors of type parameters is a recurring theme throughout the book:
+A dependent member type is ``dependent'' in the C++ sense, \emph{not} a \index{dependent type}type  dependent on a value in the \index{lambda cube}``lambda cube'' sense. Generic parameter types and dependent member types are together known as \emph{type parameters}. A type that might contain type parameters but is not necessarily a type parameter itself is called an \IndexDefinition{interface type}\emph{interface type}. The above summary necessarily leaves many questions unanswered, and understanding the behaviors of type parameters is a recurring theme throughout the book:
 \begin{itemize}
 \item What it means for a type parameter to be semantically valid (Section~\ref{derived req}).
 \item Generic signature queries (Section~\ref{genericsigqueries}).
@@ -369,16 +369,14 @@ Note that a dependent member type is ``dependent'' in the C++ sense, \emph{not} 
 \paragraph{Archetype types.}
 Type parameters derive their meaning from the requirements of a generic signature; they are only ``names'' of external entities, in a sense. \IndexDefinition{archetype type}Archetypes are an alternate ``self-describing'' representation. Archetypes are instantiated from a \emph{generic environment}, which stores a generic signature together with other information (Chapter~\ref{genericenv}).
 
-Archetypes appear in place of type parameters inside the types of \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (Section~\ref{opaquearchetype}) and the type of the payload inside of an existential (Section~\ref{open existential archetypes}). In diagnostics, an archetype is printed as the type parameter it represents. To distinguish an archetype from its type parameter \texttt{T}, we use the notation $\archetype{T}$ for the archetype. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
+Archetypes occur inside \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (Section~\ref{opaquearchetype}) and the type of the payload inside of an existential (Section~\ref{open existential archetypes}). In diagnostics, an archetype is printed as the type parameter it represents. We will denote by $\archetype{T}$ the archetype for the type parameter \texttt{T} in some generic environment understood from context. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
 
 \medskip
 
-The fundamental type kinds we surveyed above---nominal types, type parameters, and archetypes---can also be characterized as  \emph{the Swift types that can conform to protocols}. In other words, they can satisfy the left-hand side of a \index{conformance requirement}confomance requirement. (How conformance lookup behaves on each kind of type is explained in Section~\ref{conformance lookup}.) Also important are the types appearing on the \emph{right hand side} of a conformance requirement. These are called \index{constraint type}\emph{constraint types}.
+The fundamental type kinds we surveyed above---nominal types, type parameters, and archetypes---are \textsl{the Swift types that can conform to protocols}. In other words, they can satisfy the left-hand side of a \index{conformance requirement}conformance requirement, with the details for each type given later in Section~\ref{conformance lookup}. Also important are \index{constraint type}\emph{constraint types}, appearing on the \emph{right hand side} of a conformance requirement. Constraint types themselves are never the types of value-producing expressions. (We will see shortly that type-erased values are represented by an existential type, wrapping a constraint type in a level of indirection.)
 
 \paragraph{Protocol types.}
-A \IndexDefinition{protocol type}protocol type represents a conformance requirement to its protocol declaration. Protocols are the most fundamental of the constraint types; a conformance requirement involving any other kind of constraint type can always be split up into a series of simpler requirements (Section~\ref{requirement desugaring}).
-
-Protocol types are nominal types, but they never have generic arguments or parent types, and so there is exactly one protocol type for a given protocol declaration. They also differ from other nominal types in that a protocol type is never directly the type of a value in Swift; the concept of a type-erased container is represented by wrapping the protocol type inside of an existential type, to be described shortly.
+A protocol type is the most fundamental kind of constraint type; a conformance requirement involving any other kind of constraint type can always be split up into simpler conformance requirements. A \IndexDefinition{protocol type}protocol type is a kind of \index{nominal type}nominal type, so it will have a \index{parent type}parent type if the protocol declaration is nested inside of another nominal type declaration. Unlike other nominal types, protocols cannot be nested in generic contexts (Section~\ref{nested nominal types}), so neither the protocol type itself nor any of its parents can have generic arguments. Thus, there is exactly one protocol type corresponding to each protocol declaration.
 
 \paragraph{Protocol composition types.}
 A \IndexDefinition{protocol composition type}protocol composition type is a constraint type with a list of members. On the right hand side of a conformance requirement, protocol compositions \emph{expand} into a series of requirements for each member of the composition (Section~\ref{requirement desugaring}). The members can include protocol types, a class type (at most one), and the \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} layout constraint:

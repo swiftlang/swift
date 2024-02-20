@@ -54,11 +54,14 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// The thrown error of a closure.
+SIMPLE_LOCATOR_PATH_ELT(ClosureThrownError)
+
 /// FIXME: Misleading name: this locator is used only for single-expression
 /// closure returns.
 ///
 /// The type of a closure body.
-CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
+SIMPLE_LOCATOR_PATH_ELT(ClosureBody)
 
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
@@ -127,6 +130,9 @@ SIMPLE_LOCATOR_PATH_ELT(KeyPathType)
 
 /// The value of a key path.
 SIMPLE_LOCATOR_PATH_ELT(KeyPathValue)
+
+/// The index parameter of a special `subscript(keyPath: KeyPath<...>)`.
+SIMPLE_LOCATOR_PATH_ELT(KeyPathSubscriptIndex)
 
 /// An implicit @lvalue-to-inout conversion; only valid for operator
 /// arguments.
@@ -272,8 +278,14 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
 /// A function type global actor.
 SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
 
+/// The thrown error of a function type.
+SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
+
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
+
+/// A fallback type for some AST location (i.e. key path literal).
+SIMPLE_LOCATOR_PATH_ELT(FallbackType)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

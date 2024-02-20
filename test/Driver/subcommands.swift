@@ -34,5 +34,5 @@
 // RUN: echo "#!/bin/sh" > %t.dir/swift-foo
 // RUN: echo "echo \"exec: \$0\"" >> %t.dir/swift-foo
 // RUN: chmod +x %t.dir/swift-foo
-// RUN: env PATH=%t.dir %swift_driver_plain foo | %FileCheck -check-prefix=CHECK-SWIFT-SUBCOMMAND %s
+// RUN: env PATH=%t.dir SWIFT_USE_OLD_DRIVER=1 %swift_driver_plain foo | %FileCheck -check-prefix=CHECK-SWIFT-SUBCOMMAND %s
 // CHECK-SWIFT-SUBCOMMAND: exec: {{.*}}/swift-foo

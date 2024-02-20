@@ -73,10 +73,11 @@ tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA,
                      bool isMandatory = false);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool canDevirtualizeClassMethod(FullApplySite AI, ClassDecl *CD,
+                                CanType ClassType,
                                 OptRemark::Emitter *ORE = nullptr,
                                 bool isEffectivelyFinalMethod = false);
 SILFunction *getTargetClassMethod(SILModule &M, ClassDecl *CD,
-                                  MethodInst *MI);
+                                  CanType ClassType, MethodInst *MI);
 CanType getSelfInstanceType(CanType ClassOrMetatypeType);
 
 /// Devirtualize the given apply site, which is known to be devirtualizable.
@@ -84,10 +85,9 @@ CanType getSelfInstanceType(CanType ClassOrMetatypeType);
 /// The caller must call deleteDevirtualizedApply on the original apply site.
 ///
 /// Return the new apply and true if the CFG was also modified.
-std::pair<FullApplySite, bool> devirtualizeClassMethod(FullApplySite AI,
-                                                       SILValue ClassInstance,
-                                                       ClassDecl *CD,
-                                                       OptRemark::Emitter *ORE);
+std::pair<FullApplySite, bool>
+devirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance, ClassDecl *CD,
+                        CanType classType, OptRemark::Emitter *ORE);
 
 /// Attempt to devirtualize the given apply site, which is known to be
 /// of a class method.  If this fails, the returned FullApplySite will be null.
@@ -98,7 +98,8 @@ std::pair<FullApplySite, bool> devirtualizeClassMethod(FullApplySite AI,
 /// Return the new apply and true if the CFG was also modified.
 std::pair<FullApplySite, bool>
 tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
-                           ClassDecl *CD, OptRemark::Emitter *ORE,
+                           ClassDecl *CD, CanType ClassType,
+                           OptRemark::Emitter *ORE,
                            bool isEffectivelyFinalMethod = false);
 
 /// Attempt to devirtualize the given apply site, which is known to be

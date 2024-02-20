@@ -819,7 +819,7 @@ void BBEnumTagDataflowState::dump() const {
   llvm::dbgs() << "Dumping state for BB" << BB.get()->getDebugID() << "\n";
   llvm::dbgs() << "Block States:\n";
   for (auto &P : ValueToCaseMap) {
-    if (!P.hasValue()) {
+    if (!P) {
       llvm::dbgs() << "  Skipping blotted value.\n";
       continue;
     }
@@ -835,7 +835,7 @@ void BBEnumTagDataflowState::dump() const {
   llvm::dbgs() << "Predecessor States:\n";
   // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
   for (auto &P : EnumToEnumBBCaseListMap) {
-    if (!P.hasValue()) {
+    if (!P) {
       llvm::dbgs() << "  Skipping blotted value.\n";
       continue;
     }

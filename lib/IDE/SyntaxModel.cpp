@@ -134,9 +134,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
       // Type attribute, decl attribute, or '@unknown' for swift case statement.
-      if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count ||
-          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count ||
-          Tok.getText() == "unknown")  {
+      if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value() ||
+          DeclAttribute::getAttrKindFromString(Tok.getText()).has_value() ||
+          Tok.getText() == "unknown") {
         // It's a known attribute, so treat it as a syntactic attribute node for
         // syntax coloring. If swift gets user attributes then all identifiers
         // will be treated as syntactic attribute nodes.
@@ -402,15 +402,21 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
   PreWalkAction walkToDeclPre(Decl *D) override;
   PostWalkAction walkToDeclPost(Decl *D) override;
+
+  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
+    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
+
   bool shouldWalkIntoGenericParams() override { return true; }
 
 private:
   static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
                                  std::regex& Regex);
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
-  bool handleAttrs(const OrigDeclAttributes &Attrs);
-  bool handleAttrs(const TypeAttributes &Attrs);
+  bool handleAttrs(const ParsedDeclAttributes &Attrs);
+  bool handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs);
 
   using DeclAttributeAndRange = std::pair<const DeclAttribute *, SourceRange>;
 
@@ -503,7 +509,7 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
 
 static void setDecl(SyntaxStructureNode &N, Decl *D) {
   N.Dcl = D;
-  N.Attrs = D->getOriginalAttrs();
+  N.Attrs = D->getParsedAttrs();
   N.DocRange = D->getRawComment().getCharSourceRange();
 }
 
@@ -537,7 +543,7 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
 ASTWalker::PreWalkAction
 ModelASTWalker::walkToArgumentPre(const Argument &Arg) {
   if (isVisitedBefore(Arg.getExpr()))
-    return Action::SkipChildren();
+    return Action::SkipNode();
 
   auto *Elem = Arg.getExpr();
   if (isa<DefaultArgumentExpr>(Elem))
@@ -564,7 +570,7 @@ ModelASTWalker::walkToArgumentPre(const Argument &Arg) {
 
 ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
 
   if (E->isImplicit())
     return Action::Continue(E);
@@ -672,17 +678,8 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
       subExpr->walk(*this);
     }
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(SE);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipChildren(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    // We already visited the children.
+    return Action::SkipChildren(SE);
   } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
     // Don't visit the child expressions directly. Instead visit the arguments
     // of each appendStringLiteral/appendInterpolation CallExpr so we don't
@@ -694,17 +691,7 @@ ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
           arg.getExpr()->walk(*this);
       }
     });
-    // TODO: We should consider changing Action::SkipChildren to still call
-    // walkToExprPost, which would eliminate the need for this.
-    auto postWalkResult = walkToExprPost(E);
-    switch (postWalkResult.Action.Action) {
-    case PostWalkAction::Stop:
-      return Action::Stop();
-    case PostWalkAction::Continue:
-      // We already visited the children.
-      return Action::SkipChildren(*postWalkResult.Value);
-    }
-    llvm_unreachable("Unhandled case in switch!");
+    return Action::SkipChildren(E);
   }
 
   return Action::Continue(E);
@@ -720,7 +707,7 @@ ASTWalker::PostWalkResult<Expr *> ModelASTWalker::walkToExprPost(Expr *E) {
 
 ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   if (isVisitedBefore(S)) {
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
                          SyntaxStructureNode &SN) {
@@ -845,7 +832,6 @@ ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         assert(RetS == Body);
         (void)RetS;
       }
-      walkToStmtPost(DeferS);
     }
     // Already walked children.
     return Action::SkipChildren(DeferS);
@@ -864,17 +850,17 @@ ASTWalker::PostWalkResult<Stmt *> ModelASTWalker::walkToStmtPost(Stmt *S) {
 
 ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   if (isVisitedBefore(D))
-    return Action::SkipChildren();
+    return Action::SkipNode();
   if (D->isImplicit())
-    return Action::SkipChildren();
+    return Action::SkipNode();
 
   // The attributes of EnumElementDecls and VarDecls are handled when visiting
   // their parent EnumCaseDecl/PatternBindingDecl (which the attributes are
   // attached to syntactically).
   if (!isa<EnumElementDecl>(D) &&
       !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
-    if (!handleAttrs(D->getOriginalAttrs()))
-      return Action::SkipChildren();
+    if (!handleAttrs(D->getParsedAttrs()))
+      return Action::SkipNode();
   }
 
   if (isa<AccessorDecl>(D)) {
@@ -956,7 +942,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
     }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
-    SN.Attrs = PD->getOriginalAttrs();
+    SN.Attrs = PD->getParsedAttrs();
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                       PD->getTypeSourceRangeForDiagnostics());
     pushStructureNode(SN, PD);
@@ -970,8 +956,8 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
         Contained = VD;
       });
       if (Contained) {
-        if (!handleAttrs(Contained->getOriginalAttrs()))
-          return Action::SkipChildren();
+        if (!handleAttrs(Contained->getParsedAttrs()))
+          return Action::SkipNode();
         break;
       }
     }
@@ -1018,7 +1004,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     for (auto &Clause : ConfigD->getClauses()) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
       for (auto &Element : Clause.Elements) {
@@ -1042,8 +1028,8 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
     if (auto *element = EnumCaseD->getFirstElement()) {
-      if (!handleAttrs(element->getOriginalAttrs()))
-        return Action::SkipChildren();
+      if (!handleAttrs(element->getParsedAttrs()))
+        return Action::SkipNode();
     }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not
@@ -1140,17 +1126,17 @@ ASTWalker::PostWalkAction ModelASTWalker::walkToDeclPost(swift::Decl *D) {
 ASTWalker::PreWalkAction ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
   if (auto AttrT = dyn_cast<AttributedTypeRepr>(T)) {
     if (!handleAttrs(AttrT->getAttrs()))
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
-  } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
-    if (!passTokenNodesUntil(IdT->getStartLoc(),
-                             ExcludeNodeAtLocation).shouldContinue)
-      return Action::SkipChildren();
+  } else if (auto *DeclRefT = dyn_cast<DeclRefTypeRepr>(T)) {
+    if (!passTokenNodesUntil(DeclRefT->getLoc(), ExcludeNodeAtLocation)
+             .shouldContinue)
+      return Action::SkipNode();
     if (TokenNodes.empty() ||
-        TokenNodes.front().Range.getStart() != IdT->getStartLoc())
-      return Action::SkipChildren();
+        TokenNodes.front().Range.getStart() != DeclRefT->getLoc())
+      return Action::SkipNode();
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
-      return Action::SkipChildren();
+      return Action::SkipNode();
     TokenNodes = TokenNodes.slice(1);
   }
   return Action::Continue();
@@ -1240,7 +1226,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
   return false;
 }
 
-bool ModelASTWalker::handleAttrs(const OrigDeclAttributes &Attrs) {
+bool ModelASTWalker::handleAttrs(const ParsedDeclAttributes &Attrs) {
   SmallVector<DeclAttributeAndRange, 4> DeclRanges;
   for (auto *At : Attrs) {
     if (At->getRangeWithAt().isValid())
@@ -1249,12 +1235,16 @@ bool ModelASTWalker::handleAttrs(const OrigDeclAttributes &Attrs) {
   return handleAttrRanges(DeclRanges);
 }
 
-bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
-  SmallVector<SourceLoc, 4> AttrLocs;
-  Attrs.getAttrLocs(AttrLocs);
+bool ModelASTWalker::handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs) {
   SmallVector<DeclAttributeAndRange, 4> DeclRanges;
-  for (auto AttrLoc : AttrLocs) {
-    DeclRanges.push_back(std::make_pair(nullptr, SourceRange(AttrLoc)));
+  for (auto Attr : Attrs) {
+    if (auto CA = Attr.dyn_cast<CustomAttr*>()) {
+      DeclRanges.push_back(std::make_pair(CA, CA->getRangeWithAt()));
+    } else {
+      auto TA = Attr.get<TypeAttribute*>();
+      // TODO: Use the structure in the TypeAttribute
+      DeclRanges.push_back(std::make_pair(nullptr, SourceRange(TA->getStartLoc())));
+    }
   }
   return handleAttrRanges(DeclRanges);
 }

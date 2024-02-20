@@ -580,9 +580,8 @@ class С_43383 {
 extension С_43383 {
     print("The room where it happened, the room where it happened")
     // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
-    // expected-error @-2 {{expected '{' in body of function declaration}}
-    // expected-error @-3 {{invalid redeclaration of 'print()'}}
-    // expected-error @-4 {{expected parameter name followed by ':'}}
+    // expected-error @-2 {{invalid redeclaration of 'print()'}}
+    // expected-error @-3 {{expected parameter name followed by ':'}}
 }
 
 

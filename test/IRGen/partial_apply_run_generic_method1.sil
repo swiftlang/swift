@@ -190,8 +190,7 @@ bb0(%0 : $@thin Main.Type):
 
 
 
-sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil [ossa] @main : $@convention(c) () -> Int32 {
   %2 = metatype $@thin Main.Type                  
   
   %3 = function_ref @$s4main4MainV5$mainyyFZ : $@convention(method) (@thin Main.Type) -> () 

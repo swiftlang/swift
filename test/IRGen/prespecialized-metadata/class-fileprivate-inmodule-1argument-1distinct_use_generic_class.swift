@@ -92,13 +92,25 @@ func consume<T>(_ t: T) {
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4:[0-9A-Z_]+]]LLCyAA3BoxACLLCySiGGMb"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {
   consume( Value(first: Box(value: 13)) )
 }
 doit()
+
+//         CHECK: ; Function Attrs: noinline nounwind memory(none)
+//         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
+//         CHECK: entry:
+// CHECK-unknown: ret
+//   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
+//    CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMf
+//              :   )
+//   CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
+//   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
+//   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
+//         CHECK: }
 
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
@@ -110,16 +122,4 @@ doit()
 // CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMn
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 //      CHECK: }
-
-//         CHECK: ; Function Attrs: noinline nounwind readnone
-//         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
-//         CHECK: entry:
-// CHECK-unknown: ret
-//   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
-//    CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMf
-//              :   )
-//   CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
-//   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
-//   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
-//         CHECK: }
 

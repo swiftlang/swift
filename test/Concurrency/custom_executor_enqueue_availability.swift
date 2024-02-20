@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -40,7 +40,7 @@ final class BothExecutorOldStdlib: SerialExecutor {
 /// that it can be dropped.
 @available(SwiftStdlib 5.9, *)
 final class BothExecutorNewStdlib: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'BothExecutorNewStdlib' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) {} // no warning, we're not deprecating the UnownedJob enqueue method yet
 
   func enqueue(_ job: __owned ExecutorJob) {}
 
@@ -51,7 +51,7 @@ final class BothExecutorNewStdlib: SerialExecutor {
 
 @available(SwiftStdlib 5.9, *)
 final class TripleExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: UnownedJob) {} // no warning, we're not deprecating the UnownedJob enqueue method yet
 
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}

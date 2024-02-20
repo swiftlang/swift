@@ -39,10 +39,10 @@ func doEquality<T: Equatable>(_: T) {}
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s30synthesized_conformance_future8equalityyyF"()
 public func equality() {
     // CHECK: [[TMP:%.*]] = alloca %TSi
-    // CHECK: call swiftcc void @"$s30synthesized_conformance_future6StructV1xACyxGx_tcfC"(ptr noalias nocapture {{[^,]*}}, ptr noalias nocapture [[TMP]], ptr @"$sSiN")
+    // CHECK: call swiftcc void @"$s30synthesized_conformance_future6StructV1xACyxGx_tcfC"(ptr noalias {{[^,]*}}, ptr noalias [[TMP]], ptr @"$sSiN")
     // CHECK: [[Struct_Equatable:%.*]] = call ptr @"$s30synthesized_conformance_future6StructVySiGACyxGSQAASQRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future10doEqualityyyxSQRzlF"(
-    // CHECK-SAME:   ptr noalias nocapture {{[^,]*}},
+    // CHECK-SAME:   ptr noalias {{[^,]*}},
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
@@ -54,7 +54,7 @@ public func equality() {
     doEquality(Struct(x: 1))
     // CHECK: [[Enum_Equatable:%.*]] = call ptr @"$s30synthesized_conformance_future4EnumOySiGACyxGSQAASQRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future10doEqualityyyxSQRzlF"(
-    // CHECK-SAME:   ptr noalias nocapture {{%[^,]+}}, 
+    // CHECK-SAME:   ptr noalias {{%[^,]+}}, 
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future4EnumOySiGMf",
@@ -71,7 +71,7 @@ func doEncodable<T: Encodable>(_: T) {}
 public func encodable() {
     // CHECK: [[Struct_Encodable:%.*]] = call ptr @"$s30synthesized_conformance_future6StructVySiGACyxGSEAASeRzSERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(
-    // CHECK-SAME:   ptr noalias nocapture {{[^,]*}}, 
+    // CHECK-SAME:   ptr noalias {{[^,]*}}, 
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
@@ -83,7 +83,7 @@ public func encodable() {
     doEncodable(Struct(x: 1))
     // CHECK: [[Enum_Encodable:%.*]] = call ptr @"$s30synthesized_conformance_future4EnumOySiGACyxGSEAASeRzSERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(
-    // CHECK-SAME:   ptr noalias nocapture {{[^,]*}},
+    // CHECK-SAME:   ptr noalias {{[^,]*}},
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future4EnumOySiGMf"
@@ -94,9 +94,9 @@ public func encodable() {
     // CHECK-SAME: )
     doEncodable(Enum.a(1))
     // CHECK: [[Final_Encodable:%.*]] = call ptr @"$s30synthesized_conformance_future5FinalCySiGACyxGSEAASERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Final_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Final_Encodable]])
     doEncodable(Final(x: 1))
     // CHECK: [[Nonfinal_Encodable:%.*]] = call ptr @"$s30synthesized_conformance_future8NonfinalCySiGACyxGSEAASERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Nonfinal_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Nonfinal_Encodable]])
     doEncodable(Nonfinal(x: 1))
 }

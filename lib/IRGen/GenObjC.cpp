@@ -397,6 +397,42 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   return pair;
 }
 
+llvm::Constant *
+IRGenModule::getObjCProtocolRefSymRefDescriptor(ProtocolDecl *protocol) {
+  // See whether we already emitted this protocol reference.
+  auto found = ObjCProtocolSymRefs.find(protocol);
+  if (found != ObjCProtocolSymRefs.end()) {
+    return found->second;
+  }
+
+  ConstantInitBuilder InitBuilder(*this);
+  ConstantStructBuilder B(InitBuilder.beginStruct());
+  B.setPacked(true);
+  auto protocolRef = getAddrOfObjCProtocolRef(protocol, NotForDefinition);
+  B.addRelativeAddress(cast<llvm::Constant>(protocolRef.getAddress()));
+  auto ty = protocol->getDeclaredType()->getCanonicalType();
+  auto typeRef =
+      getTypeRef(ty, CanGenericSignature(), MangledTypeRefRole::FlatUnique)
+          .first;
+  B.addRelativeAddress(typeRef);
+  auto future = B.finishAndCreateFuture();
+
+  llvm::SmallString<64> nameBuffer;
+  StringRef protocolName = protocol->getObjCRuntimeName(nameBuffer);
+  auto *protocolSymRef = new llvm::GlobalVariable(
+      Module, future.getType(), /*constant*/ true,
+      llvm::GlobalValue::LinkOnceAnyLinkage, nullptr,
+      llvm::Twine("\01l_OBJC_PROTOCOL_SYMREF_$_") + protocolName);
+  future.installInGlobal(protocolSymRef);
+  protocolSymRef->setAlignment(
+      llvm::MaybeAlign(getPointerAlignment().getValue()));
+  protocolSymRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
+
+  ObjCProtocolSymRefs.insert({protocol, protocolSymRef});
+
+  return protocolSymRef;
+}
+
 static std::pair<uint64_t, llvm::ConstantArray *>
 getProtocolRefsList(llvm::Constant *protocol) {
   // We expect to see a structure like this.
@@ -423,20 +459,7 @@ getProtocolRefsList(llvm::Constant *protocol) {
     return std::make_pair(0, nullptr);
   }
 
-  if (!protocol->getContext().supportsTypedPointers()) {
-    auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
-    auto sizeListPair =
-        cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
-    auto size =
-        cast<llvm::ConstantInt>(sizeListPair->getOperand(0))->getZExtValue();
-    auto protocolRefsList =
-        cast<llvm::ConstantArray>(sizeListPair->getOperand(1));
-    return std::make_pair(size, protocolRefsList);
-  }
-
-  auto bitcast = cast<llvm::ConstantExpr>(objCProtocolList);
-  assert(bitcast->getOpcode() == llvm::Instruction::BitCast);
-  auto protocolRefsVar = cast<llvm::GlobalVariable>(bitcast->getOperand(0));
+  auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
   auto sizeListPair =
       cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
   auto size =
@@ -570,7 +593,7 @@ void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {
 
   // Move the new record to the placeholder's position.
   Module.removeGlobalVariable(record);
-  Module.insertGlobalVariable(placeholder->getIterator(), record);
+  Module.insertGlobalVariable(std::next(placeholder->getIterator()), record);
   // Replace and destroy the placeholder.
   placeholder->replaceAllUsesWith(
                             llvm::ConstantExpr::getBitCast(record, Int8PtrTy));

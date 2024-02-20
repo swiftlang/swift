@@ -70,7 +70,7 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
 /// Synthesizes the
 ///
 /// \verbatim
-/// static resolve(_ address: ActorAddress,
+/// static resolve(id: ActorID,
 ///                using system: DistributedActorSystem) throws -> Self {
 ///   <filled in by SILGenDistributed>
 /// }
@@ -108,6 +108,7 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
                                name, SourceLoc(),
                                /*async=*/false,
                                /*throws=*/true,
+                               /*ThrownType=*/Type(),
                                /*genericParams=*/nullptr,
                                params,
                                /*returnType*/decl->getDeclaredInterfaceType(),
@@ -118,315 +119,6 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
 
   derived.addMembersToConformanceContext({factoryDecl});
   return factoryDecl;
-}
-
-/******************************************************************************/
-/*************** INVOKE HANDLER ON-RETURN FUNCTION ****************************/
-/******************************************************************************/
-
-namespace {
-struct DoInvokeOnReturnContext {
-  ParamDecl *handlerParam;
-  ParamDecl *resultBufferParam;
-};
-} // namespace
-
-static std::pair<BraceStmt *, bool>
-deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
-  auto &C = afd->getASTContext();
-  auto *context = static_cast<DoInvokeOnReturnContext *>(arg);
-
-  // mock locations, we're a thunk and don't really need detailed locations
-  const SourceLoc sloc = SourceLoc();
-  const DeclNameLoc dloc = DeclNameLoc();
-  bool implicit = true;
-
-  auto returnTypeParam = afd->getParameters()->get(0);
-  SmallVector<ASTNode, 8> stmts;
-
-  VarDecl *resultVar =
-      new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                      C.getIdentifier("result"), afd);
-  {
-    auto resultLoadCall = CallExpr::createImplicit(
-        C,
-        UnresolvedDotExpr::createImplicit(
-            C,
-            /*base=*/
-            new (C) DeclRefExpr(ConcreteDeclRef(context->resultBufferParam),
-                                dloc, implicit),
-            /*baseName=*/DeclBaseName(C.getIdentifier("load")),
-            /*argLabels=*/
-            {C.getIdentifier("fromByteOffset"), C.getIdentifier("as")}),
-        ArgumentList::createImplicit(
-            C, {Argument(sloc, C.getIdentifier("as"),
-                         new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
-                                             dloc, implicit))}));
-
-    auto resultPattern = NamedPattern::createImplicit(C, resultVar);
-    auto resultPB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None, resultPattern,
-        /*expr=*/resultLoadCall, afd);
-
-    stmts.push_back(resultPB);
-    stmts.push_back(resultVar);
-  }
-
-  // call the ad-hoc `handler.onReturn`
-  {
-    // Find the ad-hoc requirement ensured function on the concrete handler:
-    auto onReturnFunc = C.getOnReturnOnDistributedTargetInvocationResultHandler(
-        context->handlerParam->getInterfaceType()->getAnyNominal());
-    assert(onReturnFunc && "did not find ad-hoc requirement witness!");
-
-    Expr *callExpr = CallExpr::createImplicit(
-        C,
-        UnresolvedDotExpr::createImplicit(
-            C,
-            /*base=*/
-            new (C) DeclRefExpr(ConcreteDeclRef(context->handlerParam), dloc,
-                                implicit),
-            /*baseName=*/onReturnFunc->getBaseName(),
-            /*paramList=*/onReturnFunc->getParameters()),
-        ArgumentList::forImplicitCallTo(
-            DeclNameRef(onReturnFunc->getName()),
-            {new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit)},
-            C));
-    callExpr = TryExpr::createImplicit(C, sloc, callExpr);
-    callExpr = AwaitExpr::createImplicit(C, sloc, callExpr);
-
-    stmts.push_back(callExpr);
-  }
-
-  auto body = BraceStmt::create(C, sloc, {stmts}, sloc, implicit);
-  return {body, /*isTypeChecked=*/false};
-}
-
-// Create local function:
-//    func invokeOnReturn<R: Self.SerializationRequirement>(
-//        _ returnType: R.Type
-//    ) async throws {
-//      let value = resultBuffer.load(as: returnType)
-//      try await handler.onReturn(value: value)
-//    }
-static FuncDecl* createLocalFunc_doInvokeOnReturn(
-    ASTContext& C, FuncDecl* parentFunc,
-    NominalTypeDecl* systemNominal,
-    ParamDecl* handlerParam,
-    ParamDecl* resultBufParam) {
-  auto DC = parentFunc;
-  auto DAS = C.getDistributedActorSystemDecl();
-  auto doInvokeLocalFuncIdent = C.getIdentifier("doInvokeOnReturn");
-
-  // mock locations, we're a synthesized func and don't need real locations
-  const SourceLoc sloc = SourceLoc();
-
-  // <R: Self.SerializationRequirement>
-  // We create the generic param at invalid depth, which means it'll be filled
-  // by semantic analysis.
-  auto *resultGenericParamDecl = GenericTypeParamDecl::createImplicit(
-      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0);
-  GenericParamList *doInvokeGenericParamList =
-      GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
-
-  auto returnTypeIdent = C.getIdentifier("returnType");
-  auto resultTyParamDecl =
-      ParamDecl::createImplicit(C,
-                                /*argument=*/returnTypeIdent,
-                                /*parameter=*/returnTypeIdent,
-                                resultGenericParamDecl->getInterfaceType(), DC);
-  ParameterList *doInvokeParamsList =
-      ParameterList::create(C, {resultTyParamDecl});
-
-  SmallVector<Requirement, 2> requirements;
-  for (auto p : getDistributedSerializationRequirementProtocols(systemNominal, DAS)) {
-    auto requirement =
-        Requirement(RequirementKind::Conformance,
-                    resultGenericParamDecl->getDeclaredInterfaceType(),
-                    p->getDeclaredInterfaceType());
-    requirements.push_back(requirement);
-  }
-  GenericSignature doInvokeGenSig =
-      buildGenericSignature(C, parentFunc->getGenericSignature(),
-                            {resultGenericParamDecl->getDeclaredInterfaceType()
-                                 ->castTo<GenericTypeParamType>()},
-                            std::move(requirements));
-
-  FuncDecl *doInvokeOnReturnFunc = FuncDecl::createImplicit(
-      C, swift::StaticSpellingKind::None,
-      DeclName(C, doInvokeLocalFuncIdent, doInvokeParamsList),
-      sloc,
-      /*async=*/true,
-      /*throws=*/true, doInvokeGenericParamList, doInvokeParamsList,
-      /*returnType=*/C.TheEmptyTupleType, parentFunc);
-  doInvokeOnReturnFunc->setImplicit();
-  doInvokeOnReturnFunc->setSynthesized();
-  doInvokeOnReturnFunc->setGenericSignature(doInvokeGenSig);
-
-  auto *doInvokeContext = C.Allocate<DoInvokeOnReturnContext>();
-  doInvokeContext->handlerParam = handlerParam;
-  doInvokeContext->resultBufferParam = resultBufParam;
-  doInvokeOnReturnFunc->setBodySynthesizer(
-      deriveBodyDistributed_doInvokeOnReturn, doInvokeContext);
-
-  return doInvokeOnReturnFunc;
-}
-
-static std::pair<BraceStmt *, bool>
-deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
-                                            void *context) {
-  auto implicit = true;
-  ASTContext &C = afd->getASTContext();
-  auto DC = afd->getDeclContext();
-  auto DAS = C.getDistributedActorSystemDecl();
-
-  // mock locations, we're a thunk and don't really need detailed locations
-  const SourceLoc sloc = SourceLoc();
-  const DeclNameLoc dloc = DeclNameLoc();
-
-  NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(DC);
-  assert(nominal);
-
-  auto func = dyn_cast<FuncDecl>(afd);
-  assert(func);
-
-  // === parameters
-  auto params = func->getParameters();
-  assert(params->size() == 3);
-  auto handlerParam = params->get(0);
-  auto resultBufParam = params->get(1);
-  auto metatypeParam = params->get(2);
-
-  auto serializationRequirementTypeTy =
-      getDistributedSerializationRequirementType(nominal, DAS);
-
-  auto serializationRequirementMetaTypeTy =
-      ExistentialMetatypeType::get(serializationRequirementTypeTy);
-
-  // Statements
-  SmallVector<ASTNode, 8> stmts;
-
-  // --- `let m = metatype as! SerializationRequirement.Type`
-  VarDecl *metatypeVar =
-      new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                      C.getIdentifier("m"), func);
-  {
-    metatypeVar->setImplicit();
-    metatypeVar->setSynthesized();
-
-    // metatype as! <<concrete SerializationRequirement.Type>>
-    auto metatypeRef =
-        new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
-    auto metatypeSRCastExpr = ForcedCheckedCastExpr::createImplicit(
-        C, metatypeRef, serializationRequirementMetaTypeTy);
-
-    auto metatypePattern = NamedPattern::createImplicit(C, metatypeVar);
-    auto metatypePB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None, metatypePattern,
-        /*expr=*/metatypeSRCastExpr, func);
-
-    stmts.push_back(metatypePB);
-    stmts.push_back(metatypeVar);
-  }
-
-  // --- Declare the local function `doInvokeOnReturn`...
-  FuncDecl *doInvokeOnReturnFunc = createLocalFunc_doInvokeOnReturn(
-      C, func,
-      nominal, handlerParam, resultBufParam);
-  stmts.push_back(doInvokeOnReturnFunc);
-
-  // --- try await _openExistential(metatypeVar, do: <<doInvokeLocalFunc>>)
-  {
-    auto openExistentialBaseIdent = C.getIdentifier("_openExistential");
-    auto doIdent = C.getIdentifier("do");
-
-    auto openExArgs = ArgumentList::createImplicit(
-        C, {
-               Argument(sloc, Identifier(),
-                        new (C) DeclRefExpr(ConcreteDeclRef(metatypeVar), dloc,
-                                            implicit)),
-               Argument(sloc, doIdent,
-                        new (C) DeclRefExpr(ConcreteDeclRef(doInvokeOnReturnFunc),
-                                            dloc, implicit)),
-           });
-    Expr *tryAwaitDoOpenExistential =
-        CallExpr::createImplicit(C,
-                                 UnresolvedDeclRefExpr::createImplicit(
-                                     C, openExistentialBaseIdent),
-                                 openExArgs);
-
-    tryAwaitDoOpenExistential =
-        AwaitExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
-    tryAwaitDoOpenExistential =
-        TryExpr::createImplicit(C, sloc, tryAwaitDoOpenExistential);
-
-    stmts.push_back(tryAwaitDoOpenExistential);
-  }
-
-  auto body = BraceStmt::create(C, sloc, {stmts}, sloc, implicit);
-  return {body, /*isTypeChecked=*/false};
-}
-
-/// Synthesizes the
-///
-/// \verbatim
-/// static func invokeHandlerOnReturn(
-////    handler: ResultHandler,
-////    resultBuffer: UnsafeRawPointer,
-////    metatype _metatype: Any.Type
-////  ) async throws
-/// \endverbatim
-static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
-    DerivedConformance &derived) {
-  auto system = derived.Nominal;
-  auto &C = system->getASTContext();
-
-  // auto serializationRequirementType = getDistributedActorSystemType(decl);
-  auto resultHandlerType = getDistributedActorSystemResultHandlerType(system);
-  auto unsafeRawPointerType = C.getUnsafeRawPointerType();
-  auto anyTypeType = ExistentialMetatypeType::get(C.TheAnyType); // Any.Type
-
-  //  auto serializationRequirementType =
-  //  getDistributedSerializationRequirementType(system, DAS);
-
-  // params:
-  // - handler: Self.ResultHandler
-  // - resultBuffer:
-  // - metatype _metatype: Any.Type
-  auto *params = ParameterList::create(
-      C,
-      /*LParenLoc=*/SourceLoc(),
-      /*params=*/
-      {
-          ParamDecl::createImplicit(
-              C, C.Id_handler, C.Id_handler,
-              system->mapTypeIntoContext(resultHandlerType), system),
-          ParamDecl::createImplicit(
-              C, C.Id_resultBuffer, C.Id_resultBuffer,
-              unsafeRawPointerType, system),
-          ParamDecl::createImplicit(
-              C, C.Id_metatype, C.Id_metatype,
-              anyTypeType, system)
-      },
-      /*RParenLoc=*/SourceLoc());
-
-  // Func name: invokeHandlerOnReturn(handler:resultBuffer:metatype)
-  DeclName name(C, C.Id_invokeHandlerOnReturn, params);
-
-  // Expected type: (Self.ResultHandler, UnsafeRawPointer, any Any.Type) async
-  // throws -> ()
-  auto *funcDecl =
-      FuncDecl::createImplicit(C, StaticSpellingKind::None, name, SourceLoc(),
-                               /*async=*/true,
-                               /*throws=*/true,
-                               /*genericParams=*/nullptr, params,
-                               /*returnType*/ TupleType::getEmpty(C), system);
-  funcDecl->setSynthesized(true);
-  funcDecl->copyFormalAccessFrom(system, /*sourceIsParentContext=*/true);
-  funcDecl->setBodySynthesizer(deriveBodyDistributed_invokeHandlerOnReturn);
-
-  derived.addMembersToConformanceContext({funcDecl});
-  return funcDecl;
 }
 
 /******************************************************************************/
@@ -451,7 +143,7 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
   derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
@@ -480,7 +172,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // IMPORTANT: `id` MUST be the first field of a distributed actor, and
   // `actorSystem` MUST be the second field, because for a remote instance
@@ -615,14 +307,14 @@ static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
     auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
                                                     ctorAppliedType);
     selfApply->setImplicit(true);
-    selfApply->setThrows(false);
+    selfApply->setThrows(nullptr);
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
     auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
-    call->setThrows(false);
+    call->setThrows(nullptr);
     return call;
   }
 
@@ -640,6 +332,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   //   }
   // }
   ASTContext &ctx = getter->getASTContext();
+
+  auto *module = getter->getParentModule();
 
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
@@ -660,7 +354,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   auto builtinCall =
       DerivedConformance::createBuiltinCall(ctx,
                                             BuiltinValueKind::BuildDefaultActorExecutorRef,
-                                            {selfType}, {}, {selfArg});
+                                            {selfType}, {selfArg});
   // Turn that into an UnownedSerialExecutor.
   auto initCall = constructDistributedUnownedSerialExecutor(ctx, builtinCall);
   if (!initCall) return failure();
@@ -676,12 +370,17 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
                                               ctx.getBoolType()));
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
+
+  auto conformances = module->collectExistentialConformances(selfType->getCanonicalType(),
+                                                             ctx.getAnyObjectType());
   auto *argListForIsLocal =
       ArgumentList::forImplicitSingle(ctx, Identifier(),
-                                      ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
+                                      ErasureExpr::create(ctx, selfForIsLocalArg,
+                                                          ctx.getAnyObjectType(),
+                                                          conformances, {}));
   CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
   isLocalActorCall->setType(ctx.getBoolType());
-  isLocalActorCall->setThrows(false);
+  isLocalActorCall->setThrows(nullptr);
 
   GuardStmt* guardElseRemoteReturnExec;
   {
@@ -720,10 +419,10 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     CallExpr *buildRemoteExecutorCall = CallExpr::createImplicit(ctx, buildRemoteExecutorExpr,
                                                                  argListForBuildRemoteExecutor);
     buildRemoteExecutorCall->setType(ctx.getUnownedSerialExecutorType());
-    buildRemoteExecutorCall->setThrows(false);
+    buildRemoteExecutorCall->setThrows(nullptr);
 
     SmallVector<ASTNode, 1> statements = {
-        new(ctx) ReturnStmt(SourceLoc(), buildRemoteExecutorCall)
+      ReturnStmt::createImplicit(ctx, buildRemoteExecutorCall)
     };
 
     SmallVector<StmtConditionElement, 1> conditions = {
@@ -738,7 +437,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
   // Finalize preparing the unowned executor for returning.
   // auto wrappedCall = new (ctx) InjectIntoOptionalExpr(initCall, initCall->getType());
-  auto returnDefaultExec = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit=*/true);
+  auto *returnDefaultExec = ReturnStmt::createImplicit(ctx, initCall);
 
   auto body = BraceStmt::create(
       ctx, SourceLoc(), { guardElseRemoteReturnExec, returnDefaultExec }, SourceLoc(), /*implicit=*/true);
@@ -778,7 +477,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
                                                    /*implicit*/ true));
-  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+  property->getAttrs().add(
+      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // Make the property implicitly final.
   property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
@@ -822,50 +522,6 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
 
-/// Asserts that the synthesized fields appear in the expected order.
-///
-/// The `id` and `actorSystem` MUST be the first two fields of a distributed actor,
-/// because we assume their location in IRGen, and also when we allocate a distributed remote actor,
-/// we're able to allocate memory ONLY for those and without allocating any of the storage for the actor's
-/// properties.
-///         [id, actorSystem]
-/// followed by the executor fields for a default distributed actor.
-///
-static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, ValueDecl *derivedValue) {
-#ifndef NDEBUG
-  if (derivedValue) {
-    auto Nominal = derived.Nominal;
-    auto &Context = derived.Context;
-    if (auto id = Nominal->getDistributedActorIDProperty()) {
-      if (auto system = Nominal->getDistributedActorSystemProperty()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
-          if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
-            int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
-            int idx = 0;
-            for (auto member: Nominal->getMembers()) {
-              if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
-                if (binding->getSingleVar()->getName() == Context.Id_id) {
-                  idIdx = idx;
-                } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
-                  actorSystemIdx = idx;
-                } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
-                  unownedExecutorIdx = idx;
-                }
-                idx += 1;
-              }
-            }
-            if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
-              // we have found all the necessary fields, let's assert their order
-              assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
-            }
-          }
-        }
-      }
-    }
-  }
-#endif
-}
-
 // !!!!!!!!!!!!! IMPORTANT WHEN MAKING CHANGES TO REQUIREMENTS !!!!!!!!!!!!!!!!!
 // !! Remember to update DerivedConformance::getDerivableRequirement          !!
 // !! any time the signatures or list of derived requirements change.         !!
@@ -882,7 +538,9 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
     }
 
-    assertRequiredSynthesizedPropertyOrder(*this, derivedValue);
+    if (derivedValue) {
+      assertRequiredSynthesizedPropertyOrder(Context, Nominal);
+    }
     return derivedValue;
   }
 
@@ -923,14 +581,6 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
 
 ValueDecl *
 DerivedConformance::deriveDistributedActorSystem(ValueDecl *requirement) {
-  if (auto func = dyn_cast<FuncDecl>(requirement)) {
-    // just a simple name check is enough here,
-    // if we are invoked here we know for sure it is for the "right" function
-    if (func->getName().getBaseName() == Context.Id_invokeHandlerOnReturn) {
-      return deriveDistributedActorSystem_invokeHandlerOnReturn(*this);
-    }
-  }
-
   return nullptr;
 }
 

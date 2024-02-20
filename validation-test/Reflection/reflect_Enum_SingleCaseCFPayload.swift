@@ -6,6 +6,7 @@
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest

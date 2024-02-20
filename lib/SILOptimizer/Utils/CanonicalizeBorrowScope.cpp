@@ -867,6 +867,6 @@ static FunctionTest CanonicalizeBorrowScopeTest(
       InstructionDeleter deleter;
       CanonicalizeBorrowScope canonicalizer(value->getFunction(), deleter);
       canonicalizer.canonicalizeBorrowScope(borrowedValue);
-      function.dump();
+      function.print(llvm::outs());
     });
 } // end namespace swift::test

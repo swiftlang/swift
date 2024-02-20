@@ -1,4 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   func successor() -> ConstIterator
@@ -86,24 +87,24 @@
 // CHECK-NOT: struct HasNoPreIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoDereferenceOperator : UnsafeCxxInputIterator
 
-// CHECK: struct TemplatedIterator<Int32> : UnsafeCxxInputIterator {
-// CHECK:   func successor() -> TemplatedIterator<Int32>
+// CHECK: struct TemplatedIterator<CInt> : UnsafeCxxInputIterator {
+// CHECK:   func successor() -> TemplatedIterator<CInt>
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   typealias Pointee = Int32
-// CHECK:   static func == (lhs: TemplatedIterator<Int32>, other: TemplatedIterator<Int32>) -> Bool
+// CHECK:   static func == (lhs: TemplatedIterator<CInt>, other: TemplatedIterator<CInt>) -> Bool
 // CHECK: }
 
-// CHECK: struct TemplatedIteratorOutOfLineEq<Int32> : UnsafeCxxInputIterator {
-// CHECK:   func successor() -> TemplatedIteratorOutOfLineEq<Int32>
+// CHECK: struct TemplatedIteratorOutOfLineEq<CInt> : UnsafeCxxInputIterator {
+// CHECK:   func successor() -> TemplatedIteratorOutOfLineEq<CInt>
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   typealias Pointee = Int32
 // CHECK: }
 
-// CHECK: struct TemplatedRACIteratorOutOfLineEq<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
-// CHECK:   func successor() -> TemplatedRACIteratorOutOfLineEq<Int32>
+// CHECK: struct TemplatedRACIteratorOutOfLineEq<CInt> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   func successor() -> TemplatedRACIteratorOutOfLineEq<CInt>
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = TemplatedRACIteratorOutOfLineEq<Int32>.difference_type
+// CHECK:   typealias Distance = TemplatedRACIteratorOutOfLineEq<CInt>.difference_type
 // CHECK: }
 
 // CHECK: struct BaseIntIterator {
@@ -113,17 +114,17 @@
 
 // CHECK: struct InheritedTemplatedConstIterator<T> {
 // CHECK: }
-// CHECK: struct InheritedTemplatedConstIterator<Int32> : UnsafeCxxInputIterator {
+// CHECK: struct InheritedTemplatedConstIterator<CInt> : UnsafeCxxInputIterator {
 // CHECK: }
 
 // CHECK: struct InheritedTemplatedConstRACIterator<T> {
 // CHECK: }
-// CHECK: struct InheritedTemplatedConstRACIterator<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: struct InheritedTemplatedConstRACIterator<CInt> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK: }
 
 // CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<T> {
 // CHECK: }
-// CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: struct InheritedTemplatedConstRACIteratorOutOfLineOps<CInt> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK: }
 
 // CHECK: struct InputOutputIterator : UnsafeCxxMutableInputIterator {

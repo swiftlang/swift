@@ -33,9 +33,6 @@ using namespace semanticarc;
 //===----------------------------------------------------------------------===//
 
 bool SemanticARCOptVisitor::visitMoveValueInst(MoveValueInst *mvi) {
-  if (ctx.onlyMandatoryOpts)
-    return false;
-
   if (!ctx.shouldPerform(ARCTransformKind::RedundantMoveValueElim))
     return false;
 

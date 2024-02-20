@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
@@ -148,7 +148,6 @@ extension GenericClass : P3 where T : P3 { }
 
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
-// expected-warning@-2{{redundant conformance constraint 'GenericClass<T>' : 'P3'}}
 
 protocol P4 {
   associatedtype T

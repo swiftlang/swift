@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Evaluator.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
@@ -155,6 +156,13 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
   // module.
   if (!scope.isPublic())
     return false;
+
+  // Make sure any implicit constructors are synthesized.
+  (void)evaluateOrDefault(
+      evaluator,
+      ResolveImplicitMemberRequest{subject,
+                                   ImplicitMemberAction::ResolveImplicitInit},
+      {});
 
   auto constructors = subject->lookupDirect(DeclBaseName::createConstructor());
   return llvm::any_of(constructors, [&](ValueDecl *decl) {

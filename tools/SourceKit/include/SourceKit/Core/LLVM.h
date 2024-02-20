@@ -34,8 +34,8 @@ namespace llvm {
   template<typename T> class ArrayRef;
   template<unsigned InternalLen> class SmallString;
   template<typename T, unsigned N> class SmallVector;
-  template<typename T> class SmallVectorImpl;
-  template<typename T> class Optional;
+  template <typename T>
+  class SmallVectorImpl;
 
   template<typename T>
   struct SaveAndRestore;

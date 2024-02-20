@@ -73,12 +73,6 @@ class SwiftPassInvocation {
 
   SILSSAUpdater *ssaUpdater = nullptr;
 
-  /// IRGen module for passes that request it (e.g. simplification pass)
-  irgen::IRGenModule *irgenModule = nullptr;
-
-  /// IRGenerator used by IRGenModule above
-  irgen::IRGenerator *irgen = nullptr;
-
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
@@ -99,6 +93,10 @@ public:
   SwiftPassInvocation(SILPassManager *passManager, SILFunction *function,
                          SILCombiner *silCombiner) :
     passManager(passManager), function(function), silCombiner(silCombiner) {}
+
+  SwiftPassInvocation(SILPassManager *passManager, SILTransform *transform,
+                      SILFunction *function) :
+    passManager(passManager), transform(transform), function(function) {}
 
   SwiftPassInvocation(SILPassManager *passManager) :
     passManager(passManager) {}
@@ -180,6 +178,7 @@ class SILPassManager {
 
   /// An optional IRGenModule associated with this PassManager.
   irgen::IRGenModule *IRMod;
+  irgen::IRGenerator *irgen;
 
   /// The list of transformations to run.
   llvm::SmallVector<SILTransform *, 16> Transformations;
@@ -286,7 +285,7 @@ public:
 
   /// \returns the associated IGenModule or null if this is not an IRGen
   /// pass manager.
-  irgen::IRGenModule *getIRGenModule() { return IRMod; }
+  irgen::IRGenModule *getIRGenModule();
 
   SwiftPassInvocation *getSwiftPassInvocation() {
     return &swiftPassInvocation;
@@ -419,6 +418,8 @@ public:
   static bool disablePassesForFunction(SILFunction *function);
 
 private:
+  void parsePassCount(StringRef countsStr);
+
   bool doPrintBefore(SILTransform *T, SILFunction *F);
 
   bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL);

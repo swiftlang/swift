@@ -251,4 +251,15 @@ struct HasMethodThatReturnsIteratorBox {
   IteratorBox getIteratorBox() const;
 };
 
+struct __attribute__((swift_attr("~Copyable"))) StructCopyableMovableAnnotatedNonCopyable {
+  inline StructCopyableMovableAnnotatedNonCopyable() {}
+  StructCopyableMovableAnnotatedNonCopyable(const StructCopyableMovableAnnotatedNonCopyable &) = default;
+  StructCopyableMovableAnnotatedNonCopyable(StructCopyableMovableAnnotatedNonCopyable &&) = default;
+  StructCopyableMovableAnnotatedNonCopyable &
+  operator=(const StructCopyableMovableAnnotatedNonCopyable &) = default;
+    StructCopyableMovableAnnotatedNonCopyable &
+  operator=(StructCopyableMovableAnnotatedNonCopyable &&) = default;
+  ~StructCopyableMovableAnnotatedNonCopyable() = default;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

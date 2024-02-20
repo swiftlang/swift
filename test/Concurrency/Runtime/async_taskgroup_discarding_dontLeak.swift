@@ -8,6 +8,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
 
+// FIXME: this test is flaky; rdar://115756502
+// ALLOW_RETRIES: 1
+
 // FIXME: enable discarding taskgroup on windows; rdar://104762037
 // UNSUPPORTED: OS=windows-msvc
 

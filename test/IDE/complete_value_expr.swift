@@ -588,8 +588,8 @@ func testInsideFunctionCall11(_ x: inout FooStruct) {
 // INSIDE_FUNCTION_CALL_11B: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#Int#}, {#b: &Double#}[')'][#Void#];
 }
 func testInsideFunctionCall12(_ x: inout FooStruct) {
-  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12?check=INSIDE_FUNCTION_CALL_4^#<#placeholder#>
-// INSIDE_FUNCTION_CALL_12-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
+// INSIDE_FUNCTION_CALL_12: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#]; name=0
 }
 
 func testInsideVarargFunctionCall1() {
@@ -1616,7 +1616,7 @@ func testThrows006() {
 
 
 // rdar://21346928
-// Just sample some String API to sanity check.
+// Just sample some String API to soundness check.
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}unicodeScalars[#String.UnicodeScalarView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal{{.*}}:      {{.*}}utf16[#String.UTF16View#]
 func testWithAutoClosure1(_ x: String?) {

@@ -47,6 +47,7 @@ enum _dyld_section_location_kind {
   _dyld_section_location_text_swift5_replace,
   _dyld_section_location_text_swift5_replace2,
   _dyld_section_location_text_swift5_ac_funcs,
+  _dyld_section_location_text_swift5_ac_p_funcs,
 };
 
 #endif
@@ -59,6 +60,7 @@ enum _dyld_section_location_kind {
 #define _dyld_section_location_text_swift5_replace 3
 #define _dyld_section_location_text_swift5_replace2 4
 #define _dyld_section_location_text_swift5_ac_funcs 5
+#define _dyld_section_location_text_swift5_ac_p_funcs 6
 
 #if OBJC_ADDLOADIMAGEFUNC2_DEFINED
 // Redefine _dyld_lookup_section_info as weak so we can build against it but
@@ -91,6 +93,8 @@ constexpr const char DynamicReplacementSomeSection[] =
     MachODynamicReplacementSomeSection;
 constexpr const char AccessibleFunctionsSection[] =
     MachOAccessibleFunctionsSection;
+constexpr const char AccessibleProtocolFunctionsSection[] =
+    MachOAccessibleProtocolFunctionsSection;
 constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
@@ -286,6 +290,10 @@ void swift::initializeAccessibleFunctionsLookup() {
       addImageCallback<TextSegment, AccessibleFunctionsSection,
                        _dyld_section_location_text_swift5_ac_funcs,
                        addImageAccessibleFunctionsBlockCallbackUnsafe>);
+  REGISTER_FUNC(
+      addImageCallback<TextSegment, AccessibleProtocolFunctionsSection,
+                       _dyld_section_location_text_swift5_ac_p_funcs,
+                       addImageAccessibleProtocolFunctionsBlockCallbackUnsafe>);
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&

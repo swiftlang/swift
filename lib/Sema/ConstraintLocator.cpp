@@ -45,6 +45,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ApplyFunction:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureThrownError:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::ConstructorMemberType:
@@ -108,6 +109,9 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::GlobalActorType:
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
+  case ConstraintLocator::ThrownErrorType:
+  case ConstraintLocator::FallbackType:
+  case ConstraintLocator::KeyPathSubscriptIndex:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -185,6 +189,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::ClosureResult:
     out << "closure result";
+    break;
+
+  case ConstraintLocator::ClosureThrownError:
+    out << "closure thrown error";
     break;
 
   case ConstraintLocator::ClosureBody:
@@ -514,6 +522,18 @@ void LocatorPathElt::dump(raw_ostream &out) const {
         << expansionElt.getOpenedType()->getString(PO) << ")";
     break;
   }
+  case ConstraintLocator::ThrownErrorType: {
+    out << "thrown error type";
+    break;
+  }
+  case ConstraintLocator::FallbackType: {
+    out << "fallback type";
+    break;
+
+  case ConstraintLocator::KeyPathSubscriptIndex:
+    out << "key path subscript index parameter";
+    break;
+  }
   }
 }
 
@@ -618,6 +638,11 @@ bool ConstraintLocator::isForContextualType() const {
   return isLastElement<LocatorPathElt::ContextualType>();
 }
 
+bool ConstraintLocator::isForContextualType(ContextualTypePurpose ctp) const {
+  auto elt = getLastElementAs<LocatorPathElt::ContextualType>();
+  return elt && elt->getPurpose() == ctp;
+}
+
 bool ConstraintLocator::isForAssignment() const {
   return directlyAt<AssignExpr>();
 }
@@ -661,7 +686,8 @@ bool ConstraintLocator::isForSingleValueStmtConjunction() const {
 }
 
 bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
-  if (!isExpr<SingleValueStmtExpr>(getAnchor()))
+  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
+  if (!SVE)
     return false;
 
   auto path = getPath();
@@ -672,11 +698,17 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
       continue;
     }
 
-    // Ignore a SyntaticElement path element for a case statement of a switch.
+    // Ignore a SyntaticElement path element for a case statement of a switch,
+    // or the catch of a do-catch, or the brace of a do-statement.
     if (auto elt = path.back().getAs<LocatorPathElt::SyntacticElement>()) {
       if (elt->getElement().isStmt(StmtKind::Case)) {
         path = path.drop_back();
-        continue;
+        break;
+      }
+      if (elt->getElement().isStmt(StmtKind::Brace) &&
+          isa<DoCatchStmt>(SVE->getStmt())) {
+        path = path.drop_back();
+        break;
       }
     }
     break;
@@ -684,35 +716,19 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
   return ::isForSingleValueStmtConjunction(getAnchor(), path);
 }
 
-llvm::Optional<SingleValueStmtBranchKind>
-ConstraintLocator::isForSingleValueStmtBranch() const {
+bool ConstraintLocator::isForSingleValueStmtBranch() const {
+  if (!isExpr<SingleValueStmtExpr>(getAnchor()))
+    return false;
+
   // Ignore a trailing ContextualType path element.
   auto path = getPath();
   if (isLastElement<LocatorPathElt::ContextualType>())
     path = path.drop_back();
 
   if (path.empty())
-    return llvm::None;
+    return false;
 
-  auto resultElt = path.back().getAs<LocatorPathElt::SingleValueStmtResult>();
-  if (!resultElt)
-    return llvm::None;
-
-  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
-  if (!SVE)
-    return llvm::None;
-
-  // Check to see if we have an explicit result, i.e 'then <expr>'.
-  SmallVector<ThenStmt *, 4> scratch;
-  auto *TS = SVE->getThenStmts(scratch)[resultElt->getIndex()];
-  if (!TS->isImplicit())
-    return SingleValueStmtBranchKind::Explicit;
-
-  if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext())) {
-    if (CE->hasSingleExpressionBody() && !hasExplicitResult(CE))
-      return SingleValueStmtBranchKind::ImplicitInSingleExprClosure;
-  }
-  return SingleValueStmtBranchKind::Implicit;
+  return path.back().is<LocatorPathElt::SingleValueStmtResult>();
 }
 
 NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {

@@ -116,11 +116,11 @@ public:
                                  unsigned ordinal) = 0;
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
-    // Sanity check: obviously invalid arguments.
+    // Soundness check: obviously invalid arguments.
     if (!type || memberName.empty())
       return Result<uint64_t>::emplaceFailure(Failure::BadArgument);
 
-    // Sanity check: if the caller gave us a dependent type, there's no way
+    // Soundness check: if the caller gave us a dependent type, there's no way
     // we can handle that.
     if (type->hasTypeParameter() || type->hasArchetype())
       return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);

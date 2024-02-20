@@ -150,6 +150,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
 
       case TermKind::UnreachableInst:
       case TermKind::UnwindInst:
+      case TermKind::ThrowAddrInst:
         llvm_unreachable("Should never be used");
       case TermKind::SwitchEnumInst:
       case TermKind::SwitchValueInst:
@@ -198,7 +199,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
-        isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user)) {
+        isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
+        isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -257,6 +259,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::GenericXor:
         case BuiltinValueKind::TaskRunInline:
         case BuiltinValueKind::ZeroInitializer:
+        case BuiltinValueKind::GetEnumTag:
+        case BuiltinValueKind::InjectEnumTag:
           callVisitUse(op);
           continue;
         default:

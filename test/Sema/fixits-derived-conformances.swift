@@ -4,18 +4,18 @@
 
 import Types
 
-extension GenericEnum: Equatable { }
+extension GenericEnum: @retroactive Equatable { }
 // expected-error@-1 {{extension outside of file declaring generic enum 'GenericEnum' prevents automatic synthesis of '==' for protocol 'Equatable'}}
-// expected-note@-2 {{add stubs for conformance}}{{35-35=\n    public static func == (lhs: GenericEnum, rhs: GenericEnum) -> Bool {\n        <#code#>\n    \}\n}}
+// expected-note@-2 {{add stubs for conformance}}{{48-48=\n    public static func == (lhs: GenericEnum, rhs: GenericEnum) -> Bool {\n        <#code#>\n    \}\n}}
 
-extension Struct: Equatable { }
+extension Struct: @retroactive Equatable { }
 // expected-error@-1 {{extension outside of file declaring struct 'Struct' prevents automatic synthesis of '==' for protocol 'Equatable'}}
-// expected-note@-2 {{add stubs for conformance}}{{30-30=\n    public static func == (lhs: Struct, rhs: Struct) -> Bool {\n        <#code#>\n    \}\n}}
-extension GenericStruct: Equatable { }
+// expected-note@-2 {{add stubs for conformance}}{{43-43=\n    public static func == (lhs: Struct, rhs: Struct) -> Bool {\n        <#code#>\n    \}\n}}
+extension GenericStruct: @retroactive Equatable { }
 // expected-error@-1 {{extension outside of file declaring generic struct 'GenericStruct' prevents automatic synthesis of '==' for protocol 'Equatable'}}
-// expected-note@-2 {{add stubs for conformance}}{{37-37=\n    public static func == (lhs: GenericStruct, rhs: GenericStruct) -> Bool {\n        <#code#>\n    \}\n}}
+// expected-note@-2 {{add stubs for conformance}}{{50-50=\n    public static func == (lhs: GenericStruct, rhs: GenericStruct) -> Bool {\n        <#code#>\n    \}\n}}
 
-extension Enum: CaseIterable { }
+extension Enum: @retroactive CaseIterable { }
 // expected-error@-1 {{extension outside of file declaring enum 'Enum' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}}
-// expected-note@-2 {{add stubs for conformance}}{{31-31=\n    public static var allCases: [Enum]\n}}
+// expected-note@-2 {{add stubs for conformance}}{{44-44=\n    public static var allCases: [Enum]\n}}
 

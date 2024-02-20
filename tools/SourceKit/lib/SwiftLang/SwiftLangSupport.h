@@ -24,12 +24,13 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Indenting.h"
-#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDETool/CompileInstance.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/Index/IndexSymbol.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -270,20 +271,6 @@ public:
   ~RequestRefactoringEditConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
-  void handleDiagnostic(swift::SourceManager &SM,
-                        const swift::DiagnosticInfo &Info) override;
-};
-
-class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
-                                   public swift::DiagnosticConsumer {
-  class Implementation;
-  Implementation &Impl;
-
-public:
-  RequestRenameRangeConsumer(CategorizedRenameRangesReceiver Receiver);
-  ~RequestRenameRangeConsumer();
-  void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
-              ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
   void handleDiagnostic(swift::SourceManager &SM,
                         const swift::DiagnosticInfo &Info) override;
 };
@@ -665,6 +652,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) override;
 
+  void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver)
+      override;
+
   void getNameInfo(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       NameTranslatingInfo &Input, ArrayRef<const char *> Args,
@@ -688,9 +682,9 @@ public:
 
   void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver)
       override;
 
   void findActiveRegionsInFile(
@@ -699,15 +693,10 @@ public:
       std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
       override;
 
-  void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                       ArrayRef<RenameLocations> RenameLocations,
-                       ArrayRef<const char*> Args,
-                       CategorizedEditsReceiver Receiver) override;
-
-  void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                        ArrayRef<RenameLocations> RenameLocations,
-                        ArrayRef<const char *> Args,
-                        CategorizedRenameRangesReceiver Receiver) override;
+  CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLoc> RenameLocations,
+                   ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                              unsigned Length, ArrayRef<const char *> Args,
@@ -811,6 +800,10 @@ public:
 
 /// Disable expensive SIL options which do not affect indexing or diagnostics.
 void disableExpensiveSILOptions(swift::SILOptions &Opts);
+
+swift::SourceFile *retrieveInputFile(StringRef inputBufferName,
+                                     const swift::CompilerInstance &CI,
+                                     bool haveRealPath = false);
 
 } // namespace SourceKit
 

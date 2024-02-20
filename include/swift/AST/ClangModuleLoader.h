@@ -283,6 +283,8 @@ public:
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
+  virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
   virtual llvm::Optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
@@ -305,6 +307,9 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
+
+  virtual const clang::TypedefType *
+  getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
 
   virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
 };

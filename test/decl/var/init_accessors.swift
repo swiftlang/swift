@@ -621,6 +621,7 @@ func test_invalid_storage_restrictions() {
     var c: Int {
       @storageRestrictions(initializes: a, initializes: b)
       // expected-error@-1 {{duplicate label 'initializes' in @storageRestrictions attribute}}
+      // expected-error@-2 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
       init {}
 
       get { 0 }
@@ -629,6 +630,7 @@ func test_invalid_storage_restrictions() {
     var d: Int {
       @storageRestrictions(accesses: a, accesses: c)
       // expected-error@-1 {{duplicate label 'accesses' in @storageRestrictions attribute}}
+      // expected-error@-2 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
       init {}
 
       get { 0 }

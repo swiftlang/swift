@@ -51,6 +51,7 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.dc = dc;
   expression.contextualInfo = contextualInfo;
   expression.pattern = nullptr;
+  expression.parentReturnStmt = nullptr;
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
@@ -165,9 +166,12 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
 }
 
 SyntacticElementTarget SyntacticElementTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType,
-    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
-    bool bindPatternVarsOneWay) {
+    Expr *initializer, Type patternType, PatternBindingDecl *patternBinding,
+    unsigned patternBindingIndex, bool bindPatternVarsOneWay) {
+  auto *dc = patternBinding->getDeclContext();
+  if (auto *initContext = patternBinding->getInitContext(patternBindingIndex))
+    dc = initContext;
+
   auto result = forInitialization(
       initializer, dc, patternType,
       patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
@@ -177,10 +181,22 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 }
 
 SyntacticElementTarget
+SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
+                                  DeclContext *dc) {
+  assert(contextTy);
+  assert(returnStmt->hasResult() && "Must have result to be type-checked");
+  ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
+  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
+                                /*isDiscarded*/ false);
+  target.expression.parentReturnStmt = returnStmt;
+  return target;
+}
+
+SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool bindPatternVarsOneWay) {
-  SyntacticElementTarget target(
-      stmt, dc, bindPatternVarsOneWay || bool(stmt->getWhere()));
+                                       bool ignoreWhereClause,
+                                       GenericEnvironment *packElementEnv) {
+  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
   return target;
 }
 
@@ -240,7 +256,6 @@ bool SyntacticElementTarget::infersOpaqueReturnType() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
     if (Type convertType = getExprContextualType())
       return convertType->hasOpaqueArchetype();
     return false;
@@ -258,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
     return true;
   case CTP_Unused:
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
   case CTP_YieldByValue:
   case CTP_YieldByReference:
   case CTP_CaseStmt:

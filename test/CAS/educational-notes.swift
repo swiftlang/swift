@@ -1,8 +1,18 @@
 // RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
+// RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
+// RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
+// RUN: echo "\"-parse-stdlib\"" >> %t/MyApp.cmd
+
 // RUN: not %target-swift-frontend -color-diagnostics -diagnostic-style=llvm -print-educational-notes -diagnostic-documentation-path %S/../diagnostics/test-docs/ \
-// RUN:   -emit-module -emit-module-path %t/test.module -allow-unstable-cache-key-for-testing %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
+// RUN:   -emit-module -emit-module-path %t/test.module @%t/MyApp.cmd %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
 // RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/../diagnostics/test-docs/ \
-// RUN:   -emit-module -emit-module-path %t/test.module -allow-unstable-cache-key-for-testing %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
+// RUN:   -emit-module -emit-module-path %t/test.module @%t/MyApp.cmd %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
 
 // A diagnostic with no educational notes
 let x = 1 +

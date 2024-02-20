@@ -409,6 +409,12 @@ class MyObject : NSObject {}
     @objc @objcMembers class DeeperIn {}
   }
 
+  // CHECK-LABEL: SWIFT_CLASS_NAMED("CustomNameInner")
+  // CHECK-NEXT: @interface MyInnerClass
+  // CHECK-NEXT: init
+  // CHECK-NEXT: @end
+  @objc(MyInnerClass) @objcMembers class CustomNameInner {}
+
   // CHECK-LABEL: @interface AnotherInner : A1
   // CHECK-NEXT: init
   // CHECK-NEXT: @end

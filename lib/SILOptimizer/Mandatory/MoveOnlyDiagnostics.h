@@ -20,6 +20,7 @@
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYDIAGNOSTICS_H
 
 #include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyTypeUtils.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -143,10 +144,29 @@ public:
     return valuesWithDiagnostics.count(markedValue);
   }
 
-  void emitAddressDiagnostic(MarkUnresolvedNonCopyableValueInst *markedValue,
-                             SILInstruction *lastLiveUse,
-                             SILInstruction *violatingUse, bool isUseConsuming,
-                             bool isInOutEndOfFunction = false);
+  /// The kind of scope at the end of which an address must be initialized.
+  enum class ScopeRequiringFinalInit {
+    /// The scope for an inout argument.
+    ///
+    /// The whole function.
+    InoutArgument,
+    /// The scope for an address yielded by a coroutine.
+    ///
+    /// It begins at the begin_apply and ends at all corresponding
+    /// end_apply/abort_apply instructions.
+    Coroutine,
+    /// The scope for an address done through an access scope marker.
+    ///
+    /// It begins at the begin_access and ends at all corresponding end_access
+    /// instructions.
+    ModifyMemoryAccess,
+  };
+
+  void emitAddressDiagnostic(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      SILInstruction *lastLiveUse, SILInstruction *violatingUse,
+      bool isUseConsuming,
+      llvm::Optional<ScopeRequiringFinalInit> scopeKind = llvm::None);
   void emitInOutEndOfFunctionDiagnostic(
       MarkUnresolvedNonCopyableValueInst *markedValue,
       SILInstruction *violatingUse);
@@ -187,15 +207,10 @@ public:
   emitPromotedBoxArgumentError(MarkUnresolvedNonCopyableValueInst *markedValue,
                                SILFunctionArgument *arg);
 
-  void emitCannotPartiallyConsumeError(
-      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-      NominalTypeDecl *nominal, SILInstruction *consumingUser,
-      bool dueToDeinit);
-
-  void emitCannotPartiallyReinitError(
-      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-      NominalTypeDecl *nominal, SILInstruction *initUser,
-      SILInstruction *consumingUser, bool dueToDeinit);
+  void emitCannotPartiallyMutateError(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      PartialMutationError error, SILInstruction *user,
+      TypeTreeLeafTypeRange usedBits, PartialMutation kind);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

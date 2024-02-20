@@ -1,0 +1,1 @@
+void funcYPrivate(void);

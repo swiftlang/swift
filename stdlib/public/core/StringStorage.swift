@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -181,14 +181,12 @@ fileprivate func _allocate<T: AnyObject>(
 ) -> (T, realNumTailBytes: Int) {
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
-  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
-
   let numBytes = numHeaderBytes + numTailBytes
 
   let linearBucketThreshold = 128
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16
-    let realNumBytes = roundUp(numBytes)
+    let realNumBytes = _mallocGoodSize(for: numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
     let object = tailAllocator(realNumTailBytes)
@@ -202,21 +200,10 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let total = roundUp(numHeaderBytes + growTailBytes)
+  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
   let totalTailBytes = total - numHeaderBytes
 
-  let object = tailAllocator(totalTailBytes)
-  if let allocSize = _mallocSize(ofAllocation:
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(object))) {
-    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
-
-    let realNumTailBytes = allocSize - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-
-    return (object, realNumTailBytes)
-  } else {
-    return (object, totalTailBytes)
-  }
+  return (tailAllocator(totalTailBytes), totalTailBytes)
 }
 
 fileprivate func _allocateStringStorage(
@@ -681,6 +668,8 @@ final internal class __SharedStringStorage
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
+  internal var immortal = false
+
   internal var count: Int { _countAndFlags.count }
 
   internal init(
@@ -689,6 +678,7 @@ final internal class __SharedStringStorage
   ) {
     self._owner = nil
     self.start = ptr
+    self.immortal = true
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
 #elseif _pointerBitWidth(_32)
@@ -707,6 +697,32 @@ final internal class __SharedStringStorage
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
       return String(_StringGuts(self))
+    }
+  }
+
+  internal init(
+    _mortal ptr: UnsafePointer<UInt8>,
+    countAndFlags: _StringObject.CountAndFlags
+  ) {
+    // ptr *must* be the start of an allocation
+    self._owner = nil
+    self.start = ptr
+    self.immortal = false
+#if _pointerBitWidth(_64)
+    self._countAndFlags = countAndFlags
+#elseif _pointerBitWidth(_32)
+    self._count = countAndFlags.count
+    self._countFlags = countAndFlags.flags
+#else
+#error("Unknown platform")
+#endif
+    super.init()
+    self._invariantCheck()
+  }
+
+  deinit {
+    if (_owner == nil) && !immortal {
+      start.deallocate()
     }
   }
 }

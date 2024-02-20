@@ -814,6 +814,6 @@ static FunctionTest LexicalDestroyFoldingTest(
       auto *bbi = cast<BeginBorrowInst>(value);
       InstructionDeleter deleter;
       foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
-      function.dump();
+      function.print(llvm::outs());
     });
 } // end namespace swift::test

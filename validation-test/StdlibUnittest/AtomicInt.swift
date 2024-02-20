@@ -5,7 +5,7 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import SwiftPrivate
 import StdlibUnittest

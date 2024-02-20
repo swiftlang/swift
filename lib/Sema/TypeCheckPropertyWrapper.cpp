@@ -95,9 +95,12 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
         nominal->getName());
     return nullptr;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("variable cannot have erased isolation");
+
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     break;
   }
@@ -437,8 +440,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   auto dc = var->getDeclContext();
   llvm::TinyPtrVector<CustomAttr *> result;
 
-  auto attachedAttrs = var->getSemanticAttrs();
-  for (auto attr : attachedAttrs.getAttributes<CustomAttr>()) {
+  for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto *nominal = evaluateOrDefault(
@@ -479,6 +481,9 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_let);
       continue;
     }
+
+    // Note: Getting the semantic attrs here would trigger a request cycle.
+    auto attachedAttrs = var->getAttrs();
 
     // Check for conflicting attributes.
     if (attachedAttrs.hasAttribute<LazyAttr>() ||

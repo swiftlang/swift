@@ -183,6 +183,16 @@ func doit() {
 }
 doit()
 
+// CHECK:; Function Attrs: noinline nounwind memory(none)
+//         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMb"([[INT]] [[REQUEST:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
+// CHECK-unknown:    ret
+//   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
+//    CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMf
+//   CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
+//   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
+//   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
+// CHECK: }
+
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
 //      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
@@ -195,12 +205,3 @@ doit()
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 //      CHECK: }
 
-// CHECK:; Function Attrs: noinline nounwind readnone
-//         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMb"([[INT]] [[REQUEST:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
-// CHECK-unknown:    ret
-//   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
-//    CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMf
-//   CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
-//   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
-//   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
-// CHECK: }

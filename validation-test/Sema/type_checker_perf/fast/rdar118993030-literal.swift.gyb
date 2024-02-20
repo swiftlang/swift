@@ -1,0 +1,60 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumConstraintScopes %s
+// REQUIRES: asserts,no_asan
+
+struct Root {
+  enum E: Int, Comparable {
+    case test = 0
+    static func < (_ lhs: Self, _ rhs: Self) -> Bool { false }
+  }
+
+  let word: String
+  let maybeWord: String?
+  let e: E
+  let maybeE: E?
+}
+
+enum Order {
+  case forward
+}
+
+protocol P {
+}
+
+struct Descriptor<Base> {
+  public init<Value>(_ keyPath: KeyPath<Base, Value>, order: Order = .forward) where Value: Comparable { fatalError() }
+  public init<Value>(_ keyPath: KeyPath<Base, Value?>, order: Order = .forward) where Value: Comparable { fatalError() }
+
+  public init(_ keyPath: KeyPath<Base, Double>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Double?>, order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Float>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Float?>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, String>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, String?>, order: Order = .forward) { fatalError() }
+
+  public init(_ keyPath: KeyPath<Base, Int8>,    order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int8?>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int16>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int16?>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int32>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int32?>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int64>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, Int64?>,  order: Order = .forward) { fatalError() }
+
+  public init(_ keyPath: KeyPath<Base, UInt8>,   order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt8?>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt16>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt16?>, order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt32>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt32?>, order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt64>,  order: Order = .forward) { fatalError() }
+  public init(_ keyPath: KeyPath<Base, UInt64?>, order: Order = .forward) { fatalError() }
+}
+
+let _ = [
+%for i in range(0, N):
+  Descriptor(\Root.word),
+  Descriptor(\Root.maybeWord),
+  Descriptor(\Root.e),
+  Descriptor(\Root.maybeE),
+%end
+]

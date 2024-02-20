@@ -51,17 +51,18 @@ enum Algebraic {
 func nop() {}
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f2
-func f2(_ x : Algebraic) -> Int32 { // CHECK-NEXT: [[@LINE]]:35 -> [[@LINE+15]]:2 : 0
+func f2(_ x : Algebraic) -> Int32 { // CHECK-NEXT: [[@LINE]]:35 -> [[@LINE+16]]:2 : 0
   switch(x) {                       // CHECK-NEXT: [[@LINE]]:9 -> [[@LINE]]:12 : 0
   case let .Type1(y, z):            // CHECK-NEXT: [[@LINE]]:3 -> [[@LINE+1]]:10 : 1
     nop()
   case .Type2(let b):               // CHECK-NEXT: [[@LINE]]:3 -> [[@LINE+2]]:16 : 2
     nop()
     fallthrough
-  case .Type3:                      // CHECK-NEXT: [[@LINE]]:3 -> [[@LINE+3]]:6 : (2 + 3)
+  case .Type3:                      // CHECK-NEXT: [[@LINE]]:3 -> [[@LINE+4]]:7 : (2 + 3)
     if (false) {                    // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE]]:15 : (2 + 3)
       fallthrough                   // CHECK-NEXT: [[@LINE-1]]:16 -> [[@LINE+1]]:6 : 4
-    }                               // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE]]:6 : ((2 + 3) - 4)
+    }                               // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+1]]:7 : ((2 + 3) - 4)
+    () // Here to make sure this region is non empty ^
   case .Type4:                      // CHECK-NEXT: [[@LINE]]:3 -> [[@LINE+1]]:10 : (4 + 5)
     break
   } // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:11 : (((1 + 2) + 3) + 5)
@@ -91,23 +92,25 @@ f2(Algebraic.Type3)
 f3(Simple.Second)
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f4
-func f4(_ x: Int) throws -> Int { // CHECK-NEXT: [[@LINE]]:33 -> [[@LINE+21]]:2 : 0
-  y: do {                         // CHECK-NEXT: [[@LINE]]:9 -> [[@LINE+18]]:4 : 0
+func f4(_ x: Int) throws -> Int { // CHECK-NEXT: [[@LINE]]:33 -> [[@LINE+23]]:2 : 0
+  y: do {                         // CHECK-NEXT: [[@LINE]]:9 -> [[@LINE+20]]:4 : 0
     switch x {                    // CHECK-NEXT: [[@LINE]]:12 -> [[@LINE]]:13 : 0
     case 1, 2, 3:                 // CHECK-NEXT: [[@LINE]]:5 -> [[@LINE+4]]:18 : 1
       if .random() {              // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE]]:19 : 1
         return 5                  // CHECK-NEXT: [[@LINE-1]]:20 -> [[@LINE+1]]:8 : 2
       }                           // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE+1]]:18 : (1 - 2)
       fallthrough
-    case 4:                       // CHECK-NEXT: [[@LINE]]:5 -> [[@LINE+4]]:8 : ((1 + 3) - 2)
+    case 4:                       // CHECK-NEXT: [[@LINE]]:5 -> [[@LINE+5]]:9 : ((1 + 3) - 2)
       if .random() {              // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE]]:19 : ((1 + 3) - 2)
         struct E : Error {}       // CHECK-NEXT: [[@LINE-1]]:20 -> [[@LINE+2]]:8 : 4
         throw E()
-      }                           // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE]]:8 : (((1 + 3) - 2) - 4)
-    default:                      // CHECK-NEXT: [[@LINE]]:5 -> [[@LINE+3]]:8 : 5
+      }                           // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE+1]]:9 : (((1 + 3) - 2) - 4)
+      () // Here to make sure this region is non empty ^
+    default:                      // CHECK-NEXT: [[@LINE]]:5 -> [[@LINE+4]]:9 : 5
       if .random() {              // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE]]:19 : 5
         break y                   // CHECK-NEXT: [[@LINE-1]]:20 -> [[@LINE+1]]:8 : 6
-      }                           // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE]]:8 : (5 - 6)
+      }                           // CHECK-NEXT: [[@LINE]]:8 -> [[@LINE+1]]:9 : (5 - 6)
+      () // Here to make sure this region is non empty ^
     }
     f1(0)                         // CHECK-NEXT: [[@LINE-1]]:6 -> [[@LINE+1]]:4 : (((((1 + 3) + 5) - 2) - 4) - 6)
   }

@@ -272,6 +272,12 @@ struct MaterializedLValue {
       callbackStorage(callbackStorage) {}
 };
 
+/// The kind of operation under which we are querying a storage reference.
+enum class StorageReferenceOperationKind {
+  Borrow,
+  Consume
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -389,8 +395,12 @@ public:
   JumpDest FailDest = JumpDest::invalid();
 
   /// The destination for throws.  The block will always be in the
-  /// postmatter and takes a BB argument of the exception type.
+  /// postmatter. For a direct error return, it takes a BB argument
+  /// of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
+
+  /// Support for typed throws.
+  SILArgument *IndirectErrorResult = nullptr;
 
   /// The destination for coroutine unwinds.  The block will always
   /// be in the postmatter.
@@ -769,6 +779,9 @@ public:
   /// application based on a main type and optionally a main type.
   void emitArtificialTopLevel(Decl *mainDecl);
 
+  /// Generate code for calling the given main function.
+  void emitCallToMain(FuncDecl *mainDecl);
+
   /// Generate code into @main for starting the async main on the main thread.
   void emitAsyncMainThreadStart(SILDeclRef entryPoint);
 
@@ -901,6 +914,17 @@ public:
   /// new task.
   SILFunction *emitNativeAsyncToForeignThunk(SILDeclRef thunk);
 
+  /// Generates a thunk that contains a runtime precondition that
+  /// the given function is called on the expected executor.
+  ManagedValue emitActorIsolationErasureThunk(SILLocation loc,
+                                              ManagedValue func,
+                                              CanAnyFunctionType isolatedType,
+                                              CanAnyFunctionType nonIsolatedType);
+
+  ManagedValue emitExtractFunctionIsolation(SILLocation loc,
+                                            ArgumentSource &&fnSource,
+                                            SGFContext C);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.
@@ -942,12 +966,16 @@ public:
   ///
   /// This is used for both concrete witness thunks and default witness
   /// thunks.
+  ///
+  /// \param isPreconcurrency If the conformance is marked as `@preconcurrency`
+  /// instead of a hop (when entering isolation) emit a dynamic check to make
+  /// sure that witness has been unsed in the expected context.
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement, SubstitutionMap reqtSubs,
                            SILDeclRef witness, SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance,
+                           bool isSelfConformance, bool isPreconcurrency,
                            llvm::Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
@@ -1077,6 +1105,9 @@ public:
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
+  ///
+  /// This hop instruction may take into account current tasks' executor
+  /// preference.
   ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
                                              SILValue executor);
 
@@ -1144,17 +1175,21 @@ public:
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void
-  emitProlog(CaptureInfo captureInfo, ParameterList *paramList,
-             ParamDecl *selfParam, DeclContext *DC, Type resultType,
-             bool throws, SourceLoc throwsLoc,
+  emitProlog(DeclContext *DC, CaptureInfo captureInfo, ParameterList *paramList,
+             ParamDecl *selfParam, Type resultType,
+             llvm::Optional<Type> errorType, SourceLoc throwsLoc,
              llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(
-      ParameterList *paramList, ParamDecl *selfParam, Type resultType,
-      DeclContext *DC, bool throws, SourceLoc throwsLoc,
+      DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
+      Type resultType, llvm::Optional<Type> errorType, SourceLoc throwsLoc,
       unsigned numIgnoredTrailingParameters,
       llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
+
+  /// Set up the ExpectedExecutor field for the current function and emit
+  /// whatever hops or assertions are locally expected.
+  void emitExpectedExecutor();
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1169,15 +1204,25 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
+  /// \param dc  The declaration context whose generic signature to use for
+  ///            interpreting interface types.
   /// \param directResultType  If given a value, the epilog block will be
   ///                    created with arguments for each direct result of this
   ///                    function, corresponding to the formal return type.
-  /// \param isThrowing  If true, create an error epilog block.
+  /// \param errorType  If not None, create an error epilog block with the given
+  ///                   thrown error type.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(llvm::Optional<Type> directResultType, bool isThrowing,
-                     CleanupLocation L);
-  void prepareRethrowEpilog(CleanupLocation l);
+  /// \param origClosureType Overrides the abstraction pattern for lowering the
+  ///                        error type.
+  void prepareEpilog(DeclContext *dc,
+                     llvm::Optional<Type> directResultType, 
+                     llvm::Optional<Type> errorType,
+                     CleanupLocation L,
+                     llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
+  void prepareRethrowEpilog(DeclContext *dc,
+                            AbstractionPattern origErrorType,
+                            Type errorType, CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
   /// Branch to and emit the epilog basic block. This will fuse
@@ -1259,7 +1304,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   ManagedValue emitInjectEnum(SILLocation loc,
-                              ArgumentSource &&payload,
+                              MutableArrayRef<ArgumentSource> payload,
                               SILType enumTy,
                               EnumElementDecl *element,
                               SGFContext C);
@@ -1487,6 +1532,12 @@ public:
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
 
+  /// Given an expression, find the subexpression that can be emitted as a borrow formal access, if
+  /// any.
+  Expr *findStorageReferenceExprForMoveOnly(Expr *argExpr,
+                                            StorageReferenceOperationKind kind);
+  Expr *findStorageReferenceExprForBorrowExpr(Expr *argExpr);
+
   /// Emit the given expression as a +1 r-value.
   ///
   /// *NOTE* This creates the +1 r-value and then pushes that +1 r-value through
@@ -1514,6 +1565,22 @@ public:
                                    const Conversion &conversion,
                                    SGFContext C,
                                    ValueProducerRef produceValue);
+
+  /// Call the produceValue function and convert the result to the given
+  /// original abstraction pattern.
+  ///
+  /// The SGFContext provided to the produceValue function includes the
+  /// conversion, if it's non-trivial, and thus permits it to be peepholed
+  /// and combined with other conversions.  This can result in substantially
+  /// more efficient code than just emitting the value and reabstracting
+  /// it afterwards.
+  ///
+  /// If the provided SGFContext includes an initialization, the result
+  /// will always be ManagedValue::forInContext().
+  ManagedValue emitAsOrig(SILLocation loc, AbstractionPattern origType,
+                          CanType substType, SILType expectedTy,
+                          SGFContext C,
+                          ValueProducerRef produceValue);
 
   /// Emit the given expression as an r-value that follows the
   /// abstraction patterns of the original type.
@@ -1905,6 +1972,7 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
+                                        bool implicitlyAsync,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(
@@ -1969,13 +2037,17 @@ public:
   void emitEndApplyWithRethrow(SILLocation loc,
                                MultipleValueInstructionResult *token);
 
+  ManagedValue emitExtractFunctionIsolation(SILLocation loc,
+                                        ArgumentSource &&fnValue);
+
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo exnResult,
+                                      SILResultInfo errorResult,
+                                      SILValue indirectErrorAddr,
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
@@ -2257,7 +2329,8 @@ public:
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
-      SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -2677,6 +2750,11 @@ public:
   GenericEnvironment *
   createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
                                       ArrayRef<SILType*> eltTys);
+  GenericEnvironment *
+  createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
+                                      ArrayRef<SILType*> eltTys,
+                                      ArrayRef<CanType> formalPackExpansionTys,
+                                      ArrayRef<CanType*> formalEltTys);
 
   /// Emit a dynamic loop over a single pack-expansion component of a pack.
   ///
@@ -2707,26 +2785,24 @@ public:
   ///
   ///   This function will be called within a cleanups scope and with
   ///   InnermostPackExpansion set up properly for the context.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           SILValue startingAfterIndexWithinComponent,
-                           SILValue limitWithinComponent,
-                           GenericEnvironment *openedElementEnv,
-                           bool reverse,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      SILValue startingAfterIndexWithinComponent, SILValue limitWithinComponent,
+      GenericEnvironment *openedElementEnv, bool reverse,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// A convenience version of dynamic pack loop that visits an entire
   /// pack expansion component in forward order.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           GenericEnvironment *openedElementEnv,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      GenericEnvironment *openedElementEnv,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

@@ -142,7 +142,7 @@ namespace swift {
     SILDifferentiabilityWitness *
     getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
 
-    SILFunction *getFuncForReference(StringRef Name, SILType Ty);
+    SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);

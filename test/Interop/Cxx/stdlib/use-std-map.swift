@@ -1,11 +1,20 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-//
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+
+// Also test this with a bridging header instead of the StdMap module.
+// RUN: %empty-directory(%t2)
+// RUN: cp %S/Inputs/std-map.h %t2/std-map-bridging-header.h
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-map-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+
 // REQUIRES: executable_test
 //
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
+#if !BRIDGING_HEADER
 import StdMap
+#endif
 import CxxStdlib
 import Cxx
 
@@ -86,6 +95,38 @@ StdMapTestSuite.test("UnorderedMap.subscript") {
   m[-1] = nil
   expectNil(m[-1])
   expectNil(m[-1])
+}
+
+StdMapTestSuite.test("Map.filter") {
+  var m = initMap()
+  var n = initEmptyMap()
+
+  expectNotNil(m[1])
+  expectEqual(n.size(), 0)
+
+  m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in false }
+ 
+  expectNil(m[1])
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+  expectTrue(n.empty())
+}
+
+StdMapTestSuite.test("UnorderedMap.filter") {
+  var m = initUnorderedMap()
+  var n = initEmptyUnorderedMap()
+
+  expectNotNil(m[1])
+  expectEqual(n.size(), 0)
+
+  m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in false }
+
+  expectNil(m[1])
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+  expectTrue(n.empty())
 }
 
 StdMapTestSuite.test("Map.erase") {

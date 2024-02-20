@@ -12,6 +12,7 @@
 
 #include "ImageInspectionCommon.h"
 #include "swift/shims/MetadataSections.h"
+#include "swift/Runtime/Backtrace.h"
 
 #include <cstddef>
 #include <new>
@@ -22,6 +23,13 @@ extern "C" const char __dso_handle[];
 // NOTE: Multi images in a single process is not yet
 // stabilized in WebAssembly toolchain outside of Emscripten.
 static constexpr const void *__dso_handle = nullptr;
+#endif
+
+#if SWIFT_ENABLE_BACKTRACING
+// Drag in a symbol from the backtracer, to force the static linker to include
+// the code.
+static const void *__backtraceRef __attribute__((used))
+  = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
 #endif
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
@@ -53,7 +61,9 @@ DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
 DECLARE_SWIFT_SECTION(swift5_mpenum)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
+DECLARE_SWIFT_SECTION(swift5_accessible_protocol_requirement_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
+DECLARE_SWIFT_SECTION(swift5_tests)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -89,7 +99,9 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_capture),
       SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
+      SWIFT_SECTION_RANGE(swift5_accessible_protocol_requirement_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
+      SWIFT_SECTION_RANGE(swift5_tests),
   };
 
 #undef SWIFT_SECTION_RANGE

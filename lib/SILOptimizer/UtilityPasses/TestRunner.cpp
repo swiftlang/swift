@@ -60,11 +60,16 @@ class TestRunner : public SILFunctionTransform {
       : public test::FunctionTest::Dependencies {
     TestRunner *pass;
     SILFunction *function;
+    SwiftPassInvocation swiftPassInvocation;
     FunctionTestDependenciesImpl(TestRunner *pass, SILFunction *function)
-        : pass(pass), function(function) {}
+        : pass(pass), function(function),
+          swiftPassInvocation(pass->getPassManager(), pass, function) {}
     DominanceInfo *getDominanceInfo() override {
       auto *dominanceAnalysis = pass->getAnalysis<DominanceAnalysis>();
       return dominanceAnalysis->get(function);
+    }
+    SwiftPassInvocation *getSwiftPassInvocation() override {
+      return &swiftPassInvocation;
     }
     SILPassManager *getPassManager() override { return pass->getPassManager(); }
     ~FunctionTestDependenciesImpl() {}
@@ -75,7 +80,7 @@ void TestRunner::printTestLifetime(bool begin, unsigned testIndex,
                                    unsigned testCount, StringRef name,
                                    ArrayRef<StringRef> components) {
   StringRef word = begin ? "\nbegin" : "end";
-  llvm::errs() << word << " running test " << testIndex + 1 << " of "
+  llvm::outs() << word << " running test " << testIndex + 1 << " of "
                << testCount << " on " << getFunction()->getName() << ": "
                << name << " with: ";
   for (unsigned long index = 0, size = components.size(); index < size;
@@ -84,23 +89,19 @@ void TestRunner::printTestLifetime(bool begin, unsigned testIndex,
     if (componentString.empty())
       continue;
 
-    llvm::errs() << componentString;
+    llvm::outs() << componentString;
     if (index != size - 1) {
-      llvm::errs() << ", ";
+      llvm::outs() << ", ";
     }
   }
-  llvm::errs() << "\n";
+  llvm::outs() << "\n";
 }
 
 void TestRunner::runTest(StringRef name, Arguments &arguments) {
-  auto *test = FunctionTest::get(name);
-  if (!test) {
-    llvm::errs() << "No test named: " << name << "\n";
-    assert(false && "Invalid test name");
-  }
+  FunctionTest test = FunctionTest::get(name);
   auto *function = getFunction();
   FunctionTestDependenciesImpl dependencies(this, function);
-  test->run(*function, arguments, *this, dependencies);
+  test.run(*function, arguments, *this, dependencies);
 }
 
 void TestRunner::run() {
@@ -135,96 +136,9 @@ void TestRunner::run() {
 // - the function
 static FunctionTest DumpFunctionTest("dump-function",
                                      [](auto &function, auto &, auto &) {
-                                       function.dump();
+                                       function.print(llvm::outs());
                                      });
 
-// Arguments: NONE
-// Dumps: the index of the self argument of the current function
-static FunctionTest FunctionGetSelfArgumentIndex(
-    "function-get-self-argument-index", [](auto &function, auto &, auto &) {
-      auto index = BridgedFunction{&function}.getSelfArgumentIndex();
-      llvm::errs() << "self argument index = " << index << "\n";
-    });
-
-// Arguments:
-// - string: list of characters, each of which specifies subsequent arguments
-//           - A: (block) argument
-//           - F: function
-//           - B: block
-//           - I: instruction
-//           - V: value
-//           - O: operand
-//           - b: boolean
-//           - u: unsigned
-//           - s: string
-// - ...
-// - an argument of the type specified in the initial string
-// - ...
-// Dumps:
-// - for each argument (after the initial string)
-//   - its type
-//   - something to identify the instance (mostly this means calling dump)
-static FunctionTest TestSpecificationTest(
-    "test-specification-parsing",
-    [](auto &function, auto &arguments, auto &test) {
-      auto expectedFields = arguments.takeString();
-      for (auto expectedField : expectedFields) {
-        switch (expectedField) {
-        case 'A': {
-          auto *argument = arguments.takeBlockArgument();
-          llvm::errs() << "argument:\n";
-          argument->dump();
-          break;
-        }
-        case 'F': {
-          auto *function = arguments.takeFunction();
-          llvm::errs() << "function: " << function->getName() << "\n";
-          break;
-        }
-        case 'B': {
-          auto *block = arguments.takeBlock();
-          llvm::errs() << "block:\n";
-          block->dump();
-          break;
-        }
-        case 'I': {
-          auto *instruction = arguments.takeInstruction();
-          llvm::errs() << "instruction: ";
-          instruction->dump();
-          break;
-        }
-        case 'V': {
-          auto value = arguments.takeValue();
-          llvm::errs() << "value: ";
-          value->dump();
-          break;
-        }
-        case 'O': {
-          auto *operand = arguments.takeOperand();
-          llvm::errs() << "operand: ";
-          operand->print(llvm::errs());
-          break;
-        }
-        case 'u': {
-          auto u = arguments.takeUInt();
-          llvm::errs() << "uint: " << u << "\n";
-          break;
-        }
-        case 'b': {
-          auto b = arguments.takeBool();
-          llvm::errs() << "bool: " << b << "\n";
-          break;
-        }
-        case 's': {
-          auto s = arguments.takeString();
-          llvm::errs() << "string: " << s << "\n";
-          break;
-        }
-        default:
-          llvm_unreachable("unknown field type was expected?!");
-        }
-      }
-    });
 } // namespace swift::test
 
 //===----------------------------------------------------------------------===//

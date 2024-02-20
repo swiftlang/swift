@@ -47,6 +47,11 @@ void emitBuildMainActorExecutorRef(IRGenFunction &IGF, Explosion &out);
 void emitBuildDefaultActorExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
                                       Explosion &out);
 
+/// Emit the buildOrdinaryTaskExecutorRef builtin.
+void emitBuildOrdinaryTaskExecutorRef(
+    IRGenFunction &IGF, llvm::Value *executor, CanType executorType,
+    ProtocolConformanceRef executorConformance, Explosion &out);
+
 /// Emit the buildOrdinarySerialExecutorRef builtin.
 void emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                         llvm::Value *executor,

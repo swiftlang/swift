@@ -83,6 +83,10 @@ class PartialApply : Gizmo {
 // CHECK: @objc_msgSendSuper2
 // CHECK: }
 
+// CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](ptr swiftself %0) {{.*}} {
+// CHECK: s10objc_super12PartialApplyC4frobyyFyycfu_
+// CHECK: }
+
 class GenericRuncer<T> : Gizmo {
   var x: Gizmo? = nil
   var y: T?
@@ -120,7 +124,3 @@ class GenericRuncer<T> : Gizmo {
     super.runce()
   }
 }
-
-// CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](ptr swiftself %0) {{.*}} {
-// CHECK: @"$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXElFxAFXEfU_yt_Tgq5"
-// CHECK: }

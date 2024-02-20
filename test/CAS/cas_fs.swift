@@ -2,11 +2,11 @@
 // RUN: mkdir -p %t/empty
 // RUN: mkdir -p %t/cas
 
-// RUN: llvm-cas --cas %t/cas --ingest --data %t/empty > %t/empty.casid
+// RUN: llvm-cas --cas %t/cas --ingest %t/empty > %t/empty.casid
 // RUN: not %target-swift-frontend -typecheck -cache-compile-job -cas-fs @%t/empty.casid -cas-path %t/cas %s 2>&1 | %FileCheck %s --check-prefix NO-INPUTS
 // NO-INPUTS: error: error opening input file
 
-// RUN: llvm-cas --cas %t/cas --ingest --data %s > %t/source.casid
+// RUN: llvm-cas --cas %t/cas --ingest %s > %t/source.casid
 // RUN: not %target-swift-frontend -typecheck -cache-compile-job -cas-fs @%t/source.casid -cas-path %t/cas %s 2>&1 | %FileCheck %s --check-prefix NO-RESOURCES
 // NO-RESOURCES: error: unable to load standard library
 

@@ -242,6 +242,12 @@ void swift::bindExtensions(ModuleDecl &mod) {
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
+  if (SF.getASTContext().TypeCheckerOpts.EnableLazyTypecheck) {
+    // Skip eager type checking. Instead, let later stages of compilation drive
+    // type checking as needed through request evaluation.
+    return;
+  }
+
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
@@ -284,38 +290,64 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // Type-check macro-generated extensions.
+    // Type-check macro-generated or implicitly-synthesized decls.
     if (auto *synthesizedSF = SF->getSynthesizedFile()) {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
-        if (!decl->isImplicit()) {
-          assert(isa<ExtensionDecl>(decl));
-          TypeChecker::typeCheckDecl(decl);
+        assert(isa<ExtensionDecl>(decl) || isa<ProtocolDecl>(decl));
+
+        // Limit typechecking of synthesized _implicit_ extensions to
+        // conformance checking. This is done because a conditional
+        // conformance to Copyable is synthesized as an extension, based on
+        // the markings of ~Copyable in a value type. This call to
+        // checkConformancesInContext will the actual check to verify that
+        // the conditional extension is correct, as it may be an invalid
+        // conformance.
+        if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+          if (extension->isImplicit()) {
+            TypeChecker::checkConformancesInContext(extension);
+            continue;
+          }
         }
+
+        // For other kinds of decls, do normal typechecking.
+        TypeChecker::typeCheckDecl(decl);
       }
     }
     SF->typeCheckDelayedFunctions();
   }
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);
+  diagnoseUnnecessaryPublicImports(*SF);
 
   // Check to see if there are any inconsistent imports.
+  // Whole-module @_implementationOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
 
+  // Whole-module @_spiOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentSPIOnlyImportsRequest{SF},
       {});
 
-  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+  // Whole-module ambiguous bare imports defaulting to public, when other
+  // imports are marked 'internal'.
+  if (!Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
     evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentAccessLevelOnImport{SF},
       {});
   }
 
+  // Per-file inconsistent access-levels on imports of the same module.
+  evaluateOrDefault(
+    Ctx.evaluator,
+    CheckInconsistentAccessLevelOnImportSameFileRequest{SF},
+    {});
+
+  // Whole-module inconsistent @_weakLinked.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
@@ -330,7 +362,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // Playground transform knows to look out for PCMacro's changes and not
   // to playground log them.
   if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
-    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundHighPerformance);
+    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundOptions);
 
   return std::make_tuple<>();
 }
@@ -340,6 +372,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
@@ -386,6 +419,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   };
 
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
@@ -455,14 +489,13 @@ namespace {
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
-        auto name = identBase->getNameRef().getBaseIdentifier();
-        if (auto *paramDecl = params->lookUpGenericParam(name))
-          identBase->setValue(paramDecl, dc);
+      // Only unqualified identifiers can reference generic parameters.
+      if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        auto name = simpleIdentTR->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name)) {
+          simpleIdentTR->setValue(paramDecl, dc);
+        }
       }
-    }
 
       return Action::Continue();
     }
@@ -472,7 +505,7 @@ namespace {
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC) {
+                              DeclContext *DC, bool allowInverses) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -497,26 +530,23 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   auto request = InferredGenericSignatureRequest{
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
-      {}, {}, /*allowConcreteGenericParams=*/true};
+      {}, {}, genericParams->getLAngleLoc(),
+      /*isExtension=*/false,
+      allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                    unsigned bindingIndex,
-                                    bool leaveClosureBodiesUnchecked) {
+                                    unsigned bindingIndex) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&
          PBD->getInit(bindingIndex));
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeCheckExprOptions options;
-  if (leaveClosureBodiesUnchecked)
-    options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex,
-                                       /*patternType=*/Type(), options);
+                                       /*patternType=*/Type());
 }
 
 bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,

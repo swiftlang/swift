@@ -24,7 +24,7 @@ func borrowConsumeVal(_ x: borrowing SingleElt, _ y: consuming SingleElt) {}
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure27testGlobalClosureCaptureVaryyF : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s16moveonly_closure23globalClosureCaptureVaryycvp
 // CHECK: [[BOX:%.*]] = alloc_box ${ var SingleElt }
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure27testGlobalClosureCaptureVaryyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> ()
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -85,12 +85,13 @@ func testGlobalClosureCaptureVar() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure29testLocalLetClosureCaptureVaryyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -153,7 +154,7 @@ func testLocalLetClosureCaptureVar() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure026testLocalVarClosureCaptureE0yyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
@@ -212,7 +213,7 @@ func testLocalVarClosureCaptureVar() {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure026testInOutVarClosureCaptureF0yyyyczF : $@convention(thin) (@inout @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[F:%.*]] : $*@callee_guaranteed () -> ()):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var SingleElt }
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure026testInOutVarClosureCaptureF0yyyyczFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> ()
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -274,12 +275,13 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
+// CHECK:   [[FUNC_LIFETIME:%.*]] = begin_borrow [var_decl] [[FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_LIFETIME]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
 // CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
-// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt })
 // CHECK:   [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -347,7 +349,7 @@ func testConsumingEscapeClosureCaptureVar(_ f: consuming @escaping () -> ()) {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure27testGlobalClosureCaptureLetyyF : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s16moveonly_closure23globalClosureCaptureLetyycvp
 // CHECK: [[BOX:%.*]] = alloc_box ${ let SingleElt }
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure27testGlobalClosureCaptureLetyyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> ()
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -394,12 +396,13 @@ func testGlobalClosureCaptureLet() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure026testLocalLetClosureCaptureE0yyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -444,7 +447,7 @@ func testLocalLetClosureCaptureLet() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure29testLocalVarClosureCaptureLetyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
@@ -490,7 +493,7 @@ func testLocalVarClosureCaptureLet() {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure29testInOutVarClosureCaptureLetyyyyczF : $@convention(thin) (@inout @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[F:%.*]] : $*@callee_guaranteed () -> ()):
 // CHECK: [[BOX:%.*]] = alloc_box ${ let SingleElt }
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure29testInOutVarClosureCaptureLetyyyyczFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> ()
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -539,12 +542,13 @@ func testInOutVarClosureCaptureLet(_ f: inout () -> ()) {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
-// CHECK:   [[PROJECT:%.*]] = project_box [[FUNC_BOX]]
+// CHECK:   [[FUNC_LIFETIME:%.*]] = begin_borrow [var_decl] [[FUNC_BOX]]
+// CHECK:   [[PROJECT:%.*]] = project_box [[FUNC_LIFETIME]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
 // CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
-// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt })
 // CHECK:   [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -698,7 +702,7 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // CHECK: [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK: [[FUNC_BOX_BORROW:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
+// CHECK: [[FUNC_BOX_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[FUNC_BOX]]
 // CHECK: [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX_BORROW]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> ()
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[MARKED]])
@@ -796,7 +800,8 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF : $@convention(thin) (@owned @callee_guaranteed () -> (), @inout SingleElt) -> () {
 // CHECK: bb0([[FUNC_ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
+// CHECK:   [[FUNC_LIFETIME:%.*]] = begin_borrow [var_decl] [[FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_LIFETIME]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
 // CHECK:   store [[FUNC_ARG]] to [init] [[UNWRAP]]
 //
@@ -855,7 +860,7 @@ func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure33testGlobalClosureCaptureConsumingyyAA9SingleEltVnF : $@convention(thin) (@owned SingleElt) -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s16moveonly_closure29globalClosureCaptureConsumingyycvp
 // CHECK: [[BOX:%.*]] = alloc_box ${ var SingleElt }
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure33testGlobalClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> ()
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -914,12 +919,13 @@ func testGlobalClosureCaptureConsuming(_ x: consuming SingleElt) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure35testLocalLetClosureCaptureConsumingyyAA9SingleEltVnF : $@convention(thin) (@owned SingleElt) -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -993,7 +999,7 @@ func testLocalLetClosureCaptureConsuming2(_ x: consuming SingleElt) -> (() -> ()
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure35testLocalVarClosureCaptureConsumingyyAA9SingleEltVnF : $@convention(thin) (@owned SingleElt) -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
@@ -1051,12 +1057,13 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
+// CHECK:   [[FUNC_LIFETIME:%.*]] = begin_borrow [var_decl] [[FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_LIFETIME]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
 // CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
-// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[CLOSURE:%.*]] = function_ref @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> ()
 // CHECK:   [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
@@ -1171,7 +1178,8 @@ func testGlobalClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -1306,7 +1314,8 @@ func testInOutVarClosureCaptureOwned(_ f: inout () -> (), _ x: __owned SingleElt
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @_eagerMove @owned $@callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @moveOnly @callee_guaranteed () -> () }
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
+// CHECK:   [[FUNC_LIFETIME:%.*]] = begin_borrow [var_decl] [[FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_LIFETIME]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[FUNC_PROJECT]]
 // CHECK:   store [[ARG]] to [init] [[UNWRAP]]
 //

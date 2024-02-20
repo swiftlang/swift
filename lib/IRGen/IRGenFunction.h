@@ -28,6 +28,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/CallingConv.h"
 
 namespace llvm {
@@ -73,6 +74,7 @@ public:
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
+  bool isPerformanceConstraint;
 
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
@@ -81,6 +83,7 @@ public:
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 llvm::Optional<SILLocation> DbgLoc = llvm::None);
@@ -90,7 +93,7 @@ public:
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync);
+  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -122,14 +125,20 @@ public:
   ///
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
-  Address getCalleeErrorResultSlot(SILType errorType);
-  Address getAsyncCalleeErrorResultSlot(SILType errorType);
+  Address getCalleeErrorResultSlot(SILType errorType,
+                                   bool isTypedError);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
 
   /// Set the error result slot for the current function.
   void setCallerErrorResultSlot(Address address);
+  /// Set the error result slot for a typed throw for the current function.
+  void setCallerTypedErrorResultSlot(Address address);
+
+  Address getCallerTypedErrorResultSlot();
+  Address getCalleeTypedErrorResultSlot(SILType errorType);
+  void setCalleeTypedErrorResultSlot(Address addr);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -198,6 +207,8 @@ private:
   Address CalleeErrorResultSlot;
   Address AsyncCalleeErrorResultSlot;
   Address CallerErrorResultSlot;
+  Address CallerTypedErrorResultSlot;
+  Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
@@ -242,6 +253,8 @@ public:
   /// Whether metadata/wtable packs allocated on the stack must be eagerly
   /// heapified.
   bool canStackPromotePackMetadata() const;
+
+  bool outliningCanCallValueWitnesses() const;
 
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
@@ -665,7 +678,8 @@ public:
   MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
                                                DynamicMetadataRequest request);
   void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
-  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value,
+                              bool mayEmitDebugInfo = true);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.

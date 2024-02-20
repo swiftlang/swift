@@ -166,9 +166,9 @@ static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
                                                    auto &test) {
   auto value = arguments.takeValue();
   auto isLexical = value->isLexical();
-  value->dump();
+  value->print(llvm::outs());
   auto *boolString = isLexical ? "true" : "false";
-  llvm::errs() << boolString << "\n";
+  llvm::outs() << boolString << "\n";
 });
 } // end namespace swift::test
 
@@ -472,6 +472,10 @@ void Operand::print(llvm::raw_ostream &os) const {
      << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
      << '\n'
      << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
+SILFunction *Operand::getFunction() const {
+  return getUser()->getFunction();
 }
 
 //===----------------------------------------------------------------------===//

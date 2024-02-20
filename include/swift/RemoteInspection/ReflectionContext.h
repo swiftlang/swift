@@ -30,6 +30,7 @@
 #include "swift/Concurrency/Actor.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/RuntimeInternals.h"
@@ -121,7 +122,10 @@ class ReflectionContext
   using super::readMetadata;
   using super::readObjCClassName;
   using super::readResolvedPointerValue;
-  llvm::DenseMap<typename super::StoredPointer, const RecordTypeInfo *> Cache;
+  llvm::DenseMap<std::pair<typename super::StoredPointer,
+                           remote::TypeInfoProvider::IdType>,
+                 const RecordTypeInfo *>
+      Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
   /// when this object is destroyed.
@@ -214,8 +218,9 @@ public:
 
   explicit ReflectionContext(
       std::shared_ptr<MemoryReader> reader,
-      remote::ExternalTypeRefCache *externalCache = nullptr)
-      : super(std::move(reader), *this, externalCache) {}
+      remote::ExternalTypeRefCache *externalCache = nullptr,
+      reflection::DescriptorFinder *descriptorFinder = nullptr)
+      : super(std::move(reader), *this, externalCache, descriptorFinder) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
@@ -369,12 +374,13 @@ public:
       if (!CmdBuf)
         return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      // Look for any segment name starting with __DATA.
-      if (strncmp(CmdHdr->segname, "__DATA", 6) == 0) {
+      // Look for any segment name starting with __DATA or __AUTH.
+      if (strncmp(CmdHdr->segname, "__DATA", 6) == 0 ||
+          strncmp(CmdHdr->segname, "__AUTH", 6) == 0) {
         auto DataSegmentStart = Slide + CmdHdr->vmaddr;
         auto DataSegmentEnd = DataSegmentStart + CmdHdr->vmsize;
         assert(DataSegmentStart > ImageStart.getAddressData() &&
-               "invalid range for __DATA");
+               "invalid range for __DATA/__AUTH");
         dataRanges.push_back(std::make_tuple(RemoteAddress(DataSegmentStart),
                                              RemoteAddress(DataSegmentEnd)));
       }
@@ -852,24 +858,25 @@ public:
 
   /// Returns true if the address is known to the reflection context.
   /// Currently, that means that either the address falls within the text or
-  /// data segments of a registered image, or the address points to a Metadata
-  /// whose type context descriptor is within the text segment of a registered
-  /// image.
-  bool ownsAddress(RemoteAddress Address) {
+  /// data segments of a registered image, or optionally, the address points
+  /// to a Metadata whose type context descriptor is within the text segment
+  /// of a registered image.
+  bool ownsAddress(RemoteAddress Address, bool checkMetadataDescriptor = true) {
     if (ownsAddress(Address, textRanges))
       return true;
     if (ownsAddress(Address, dataRanges))
       return true;
 
-    // This is usually called on a Metadata address which might have been
-    // on the heap. Try reading it and looking up its type context descriptor
-    // instead.
-    if (auto Metadata = readMetadata(Address.getAddressData()))
-      if (auto DescriptorAddress =
-          super::readAddressOfNominalTypeDescriptor(Metadata, true))
-        if (ownsAddress(RemoteAddress(DescriptorAddress), textRanges))
-          return true;
-
+    if (checkMetadataDescriptor) {
+      // This is usually called on a Metadata address which might have been
+      // on the heap. Try reading it and looking up its type context descriptor
+      // instead.
+      if (auto Metadata = readMetadata(Address.getAddressData()))
+        if (auto DescriptorAddress =
+            super::readAddressOfNominalTypeDescriptor(Metadata, true))
+          if (ownsAddress(RemoteAddress(DescriptorAddress), textRanges))
+            return true;
+    }
     return false;
   }
 
@@ -888,7 +895,8 @@ public:
   getMetadataTypeInfo(StoredPointer MetadataAddress,
                       remote::TypeInfoProvider *ExternalTypeInfo) {
     // See if we cached the layout already
-    auto found = Cache.find(MetadataAddress);
+    auto ExternalTypeInfoId = ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
+    auto found = Cache.find({MetadataAddress, ExternalTypeInfoId});
     if (found != Cache.end())
       return found->second;
 
@@ -904,7 +912,7 @@ public:
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
         auto start =
-            this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
+            this->readInstanceStartFromClassMetadata(MetadataAddress);
 
         // Perform layout
         if (start)
@@ -918,7 +926,7 @@ public:
     }
 
     // Cache the result for future lookups
-    Cache[MetadataAddress] = TI;
+    Cache[{MetadataAddress, ExternalTypeInfoId}] = TI;
     return TI;
   }
 
@@ -1173,7 +1181,7 @@ public:
   bool projectEnumValue(RemoteAddress EnumAddress, const TypeRef *EnumTR,
                         int *CaseIndex,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
-    // Get the TypeInfo and sanity-check it
+    // Get the TypeInfo and soundness-check it
     if (EnumTR == nullptr) {
       return false;
     }
@@ -1198,8 +1206,41 @@ public:
     }
   }
 
-  const RecordTypeInfo *getRecordTypeInfo(const TypeRef *TR,
-                              remote::TypeInfoProvider *ExternalTypeInfo) {
+  /// Given a typeref, attempt to calculate the unaligned start of this
+  /// instance's fields. For example, for a type without a superclass, the start
+  /// of the instance fields would after the word for the isa pointer and the
+  /// word for the refcount field. For a subclass the start would be the after
+  /// the superclass's fields. For a version of this function that performs the
+  /// same job but starting out with an instance pointer check
+  /// MetadataReader::readInstanceStartFromClassMetadata.
+  llvm::Optional<unsigned>
+  computeUnalignedFieldStartOffset(const TypeRef *TR) {
+    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+
+    const TypeRef *superclass = getBuilder().lookupSuperclass(TR);
+    if (!superclass)
+      // If there is no superclass the stat of the instance's field is right
+      // after the isa and retain fields.
+      return isaAndRetainCountSize;
+
+    auto superclassStart =
+        computeUnalignedFieldStartOffset(superclass);
+    if (!superclassStart)
+      return llvm::None;
+
+    auto *superTI = getBuilder().getTypeConverter().getClassInstanceTypeInfo(
+        superclass, *superclassStart, nullptr);
+    if (!superTI)
+      return llvm::None;
+
+    // The start of the subclass's fields is right after the super class's ones.
+    size_t start = superTI->getSize();
+    return start;
+  }
+
+  const RecordTypeInfo *
+  getRecordTypeInfo(const TypeRef *TR,
+                    remote::TypeInfoProvider *ExternalTypeInfo) {
     auto *TypeInfo = getTypeInfo(TR, ExternalTypeInfo);
     return dyn_cast_or_null<const RecordTypeInfo>(TypeInfo);
   }

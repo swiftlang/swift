@@ -103,7 +103,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  // If the target is a parameterized protocol type, conformsToProtocol
+  // If the target is a parameterized protocol type, checkConformance
   // is insufficient to prove the feasibility of the cast as it does not
   // check the additional requirements.
   // FIXME: This is a weak predicate that doesn't take into account
@@ -111,9 +111,9 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (isa<ParameterizedProtocolType>(unwrapExistential(target)))
     return DynamicCastFeasibility::MaySucceed;
 
-  // If conformsToProtocol returns a valid conformance, then all requirements
-  // were proven by the type checker.
-  if (M->conformsToProtocol(source, TargetProtocol))
+  // If checkConformance() returns a valid conformance, then all conditional
+  // requirements were satisfied.
+  if (M->checkConformance(source, TargetProtocol))
     return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
@@ -141,14 +141,14 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   }
 
   // The WillFail conditions below assume any possible conformance on the
-  // nominal source type has been ruled out. The prior conformsToProtocol query
+  // nominal source type has been ruled out. The prior checkConformance query
   // identified any definite conformance. Now check if there is already a known
   // conditional conformance on the nominal type with requirements that were
   // not proven.
   //
   // TODO: The TypeChecker can easily prove that some requirements cannot be
   // met. Returning WillFail in those cases would be more optimal. To do that,
-  // the conformsToProtocol interface needs to be reformulated as a query, and
+  // the checkConformance interface needs to be reformulated as a query, and
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
   if (auto conformance = M->lookupConformance(source, TargetProtocol)) {

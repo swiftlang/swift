@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
+// RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
 
 // RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import other_global_actor_inference
 
@@ -69,11 +68,13 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
 
+  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped // expected-note {{property declared here}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
+    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -115,7 +116,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0
+  @WrapperActor var actorSynced: Int = 0 // expected-error{{'nonisolated' is not supported on properties with property wrappers}}
 
   func testActorSynced() {
     _ = actorSynced

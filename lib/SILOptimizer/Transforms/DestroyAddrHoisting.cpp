@@ -113,7 +113,7 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
-  SmallSetVector<SILInstruction *, 4> originalDestroys;
+  llvm::SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
 
   KnownStorageUses(AccessStorage storage, SILFunction *function)
@@ -199,17 +199,17 @@ class DeinitBarriers final {
 public:
   // Instructions beyond which a destroy_addr cannot be hoisted, reachable from
   // a destroy_addr.  Deinit barriers or storage uses.
-  SmallSetVector<SILInstruction *, 4> barrierInstructions;
+  llvm::SmallSetVector<SILInstruction *, 4> barrierInstructions;
 
   // Phis beyond which a destroy_addr cannot be hoisted, reachable from a
   // destroy_addr.
-  SmallSetVector<SILBasicBlock *, 4> barrierPhis;
+  llvm::SmallSetVector<SILBasicBlock *, 4> barrierPhis;
 
   // Blocks beyond the end of which a destroy_addr cannot be hoisted.
-  SmallSetVector<SILBasicBlock *, 4> barrierBlocks;
+  llvm::SmallSetVector<SILBasicBlock *, 4> barrierBlocks;
 
   // Debug instructions that are no longer within this lifetime after shrinking.
-  SmallSetVector<SILInstruction *, 4> deadUsers;
+  llvm::SmallSetVector<SILInstruction *, 4> deadUsers;
 
   // The access scopes which are hoisting barriers.
   //
@@ -560,7 +560,6 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier,
                                 const AccessStorage &storage,
                                 const DeinitBarriers &deinitBarriers) {
-
   // The load [copy]s which will be folded into load [take]s if folding is
   // possible.
   llvm::SmallVector<LoadInst *, 4> loads;
@@ -592,12 +591,19 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
   // it.
   SmallPtrSet<AccessPath::PathNode, 16> trivialLeaves;
 
-  visitProductLeafAccessPathNodes(storageRoot, typeExpansionContext, module,
-                                  [&](AccessPath::PathNode node, SILType ty) {
-                                    if (ty.isTrivial(*function))
-                                      return;
-                                    leaves.insert(node);
-                                  });
+  bool succeeded = visitProductLeafAccessPathNodes(
+      storageRoot, typeExpansionContext, module,
+      [&](AccessPath::PathNode node, SILType ty) {
+        if (ty.isTrivial(*function))
+          return;
+        leaves.insert(node);
+      });
+  if (!succeeded) {
+    // [invalid_access_path] The access path to storageRoot isn't understood.
+    // It can't be determined whether all of its leaves have been visited, so
+    // foldability can't be determined. Bail.
+    return false;
+  }
 
   for (auto *instruction = barrier; instruction != nullptr;
        instruction = instruction->getPreviousInstruction()) {
@@ -746,7 +752,7 @@ bool HoistDestroys::checkFoldingBarrier(
     // leaves of the root storage which we're wating to see.
     bool alreadySawLeaf = false;
     bool alreadySawTrivialSubleaf = false;
-    visitProductLeafAccessPathNodes(
+    auto succeeded = visitProductLeafAccessPathNodes(
         address, typeExpansionContext, module,
         [&](AccessPath::PathNode node, SILType ty) {
           if (ty.isTrivial(*function)) {
@@ -757,6 +763,11 @@ bool HoistDestroys::checkFoldingBarrier(
           bool erased = leaves.erase(node);
           alreadySawLeaf = alreadySawLeaf || !erased;
         });
+    (void)succeeded;
+    // [invalid_access_path] The access path to storageRoot was understood, and
+    // address has identical storage to its storage.  The access path to address
+    // must be valid.
+    assert(succeeded);
     if (alreadySawLeaf) {
       // We saw this non-trivial product leaf already.  That means there are
       // multiple load [copy]s or copy_addrs of at least one product leaf
@@ -1008,6 +1019,17 @@ void DestroyAddrHoisting::run() {
   // blocks and pushing begin_access as we see them and then popping them off
   // the end will result in hoisting inner begin_access' destroy_addrs first.
   for (auto *bai : llvm::reverse(bais)) {
+    // [exclusive_modify_scope_hoisting] Hoisting within modify access scopes
+    // doesn't respect deinit barriers because
+    //
+    //   Mutable variable lifetimes that are formally modified in the middle of
+    //   a lexical scope are anchored to the beginning of the lexical scope
+    //   rather than to the end.
+    //
+    // TODO: If the performance issues associated with failing to hoist
+    //       destroys within an exclusive modify scope are otherwise addressed,
+    //       it may be less confusing not to make use of the above rule and
+    //       respect deinit barriers here also ( rdar://116335154 ).
     changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
                              remainingDestroyAddrs, deleter, calleeAnalysis);
   }
@@ -1028,6 +1050,10 @@ void DestroyAddrHoisting::run() {
       //
       // but communicates the rationale: in order to ignore deinit barriers, the
       // address must be exclusively accessed and be a modification.
+      //
+      // The situation with inout parameters is analogous to that with
+      // mutable exclusive access scopes [exclusive_modify_scope_hoisting], so
+      // deinit barriers are not respected.
       bool ignoredByConvention = convention.isInoutConvention() &&
                                  convention.isExclusiveIndirectParameter();
       auto lifetime = arg->getLifetime();

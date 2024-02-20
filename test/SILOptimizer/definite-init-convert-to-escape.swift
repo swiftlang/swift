@@ -67,7 +67,6 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:   [[BLOCK_PROJ:%.*]] = project_block_storage [[BLOCK_SLOT]]
 // CHECK:   store [[MDI]] to [[BLOCK_PROJ]]
 // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_SLOT]]
-// CHECK:   release_value [[NONE]]
 // CHECK:   [[SOME_2:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
 // CHECK:   [[BLOCK_SOME:%.*]]  = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[BLOCK_COPY]]

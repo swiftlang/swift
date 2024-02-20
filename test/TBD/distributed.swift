@@ -3,8 +3,8 @@
 // REQUIRES: distributed
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-testing -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd -emit-tbd-path %t/test.tbd -I %t
-// RUN cat %t/test.tbd | %FileCheck %s --dump-input=always
+// RUN: %target-swift-frontend %s -enable-testing -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd -emit-tbd-path %t/test.tbd -I %t -tbd-install_name distributed
+// RUN %llvm-nm -g %t/test.tbd | %FileCheck %s --dump-input=always
 
 import Distributed
 
@@ -82,7 +82,7 @@ public struct FakeActorSystem: DistributedActorSystem {
     .init()
   }
 
-  func remoteCall<Act, Err, Res>(
+  public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
@@ -97,7 +97,7 @@ public struct FakeActorSystem: DistributedActorSystem {
     return "<REMOTE CALL>" as! Res
   }
 
-  func remoteCallVoid<Act, Err>(
+  public func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,

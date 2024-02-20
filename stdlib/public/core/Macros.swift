@@ -71,4 +71,4 @@ public macro warning(_ message: String) = Builtin.WarningMacro
 @freestanding(declaration)
 public macro error(_ message: String) = Builtin.ErrorMacro
 
-#endif
+#endif // $Macros && hasAttribute(attached)

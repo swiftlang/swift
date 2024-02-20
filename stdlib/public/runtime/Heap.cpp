@@ -104,7 +104,13 @@ void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
       p = malloc_type_malloc(size, typeId);
     } else {
       size_t alignment = computeAlignment(alignMask);
-      p = malloc_type_aligned_alloc(alignment, size, typeId);
+
+      // Do not use malloc_type_aligned_alloc() here, because we want this
+      // to work if `size` is not an integer multiple of `alignment`, which
+      // was a requirement of the latter in C11 (but not C17 and later).
+      int err = malloc_type_posix_memalign(&p, alignment, size, typeId);
+      if (err != 0)
+        p = nullptr;
     }
     if (!p) swift::crash("Could not allocate memory.");
     return p;

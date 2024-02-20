@@ -21,7 +21,6 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -298,7 +297,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
-  SmallSetVector<SILValue, 16> defsToCanonicalize;
+  llvm::SmallSetVector<SILValue, 16> defsToCanonicalize;
 
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
   // produced by the visitor. Find the canonical def.
@@ -421,6 +420,12 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       MadeChange = true;
       continue;
     }
+#ifndef NDEBUG
+    std::string OrigIStr;
+#endif
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
+               OrigIStr = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     // Canonicalize the instruction.
     if (scCanonicalize.tryCanonicalize(I)) {
@@ -456,13 +461,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // Then begin... SILCombine.
     Builder.setInsertionPoint(I);
-
-#ifndef NDEBUG
-    std::string OrigIStr;
-#endif
-    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
-               OrigIStr = SS.str(););
-    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     SILInstruction *currentInst = I;
     if (SILInstruction *Result = visit(I)) {
@@ -540,9 +538,9 @@ static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
-void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
+void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[instClassName] = runFn;
+  swiftInstPasses[instClassName.unbridged()] = runFn;
   passesRegistered = true;
 }
 

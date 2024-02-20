@@ -227,8 +227,8 @@ protected:
                                    buildBlockArguments);
     }
     if (builder.supports(ctx.Id_buildExpression)) {
-      expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
-                               {Identifier()});
+      expr = builder.buildCall(expr->getStartLoc(), ctx.Id_buildExpression,
+                               {expr}, {Identifier()});
     }
 
     if (isa<CodeCompletionExpr>(expr)) {
@@ -367,8 +367,8 @@ protected:
                               {buildBlockResult}, {Identifier()});
       }
 
-      elements.push_back(new (ctx) ReturnStmt(resultLoc, buildBlockResult,
-                                              /*Implicit=*/true));
+      elements.push_back(
+          ReturnStmt::createImplicit(ctx, resultLoc, buildBlockResult));
     }
 
     return std::make_pair(false, UnsupportedElt());
@@ -494,7 +494,7 @@ protected:
         availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
 
     NullablePtr<Expr> thenVarRef;
-    NullablePtr<Stmt> thenBranch;
+    NullablePtr<BraceStmt> thenBranch;
     {
       SmallVector<ASTNode, 4> thenBody;
 
@@ -1297,7 +1297,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
 
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
@@ -1310,8 +1310,7 @@ public:
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/false);
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
 
       HasError |= transaction.hasErrors();
 
@@ -1324,7 +1323,7 @@ public:
       if (HasError)
         return Action::Stop();
 
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
   }
 
@@ -1333,7 +1332,7 @@ public:
     if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
       if (!returnStmt->isImplicit()) {
         ReturnStmts.push_back(returnStmt);
-        return Action::SkipChildren(S);
+        return Action::SkipNode(S);
       }
     }
 
@@ -1366,7 +1365,7 @@ public:
 
   /// Ignore patterns.
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-    return Action::SkipChildren(pat);
+    return Action::SkipNode(pat);
   }
 };
 

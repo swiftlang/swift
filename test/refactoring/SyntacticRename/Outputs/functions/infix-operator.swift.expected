@@ -28,7 +28,7 @@ class AStruct {
         return {a in a};
     }
 
-    static func /*infix-operator:def*/- (left: AStruct, right: AStruct) -> AStruct {
+    static func /*infix-operator:def*/<base>+</base> (left: AStruct, right: AStruct) -> AStruct {
         return AStruct()
     }
 
@@ -37,7 +37,7 @@ class AStruct {
     }
 }
 
-let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/- AStruct()
+let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/<base>+</base> AStruct()
 /*no-args:call*/aFunc()
 /*param-label:call*/aFunc(a: 2)
 /*arg-label:call*/aFunc(b: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())

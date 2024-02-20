@@ -24,8 +24,8 @@ func consume<T>(_ t: T) {
 //       themselves generic (Outer<Inner<Int>>, here), a direct reference to
 //       the prespecialized metadata should be emitted here.
 // CHECK: call swiftcc void @"$s4main5OuterV5firstACyxGx_tcfC"(
-// CHECK-SAME:   ptr noalias nocapture sret({{.*}}) %{{[0-9]+}},
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias sret({{.*}}) %{{[0-9]+}},
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5InnerVySiGMf
@@ -39,7 +39,7 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5OuterVMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
@@ -52,7 +52,7 @@ doit()
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5InnerVMa"([[INT]] %0, ptr [[TYPE:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(

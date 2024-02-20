@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
-// '-swift-version 6' is currently asserts-only
-// REQUIRES: asserts
-
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
   AnySequence(arr.map { $0 })

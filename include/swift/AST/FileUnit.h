@@ -17,6 +17,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Version.h"
 
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -122,7 +123,7 @@ public:
   /// collecting the identifiers in \p spiGroups.
   virtual void lookupImportedSPIGroups(
                             const ModuleDecl *importedModule,
-                            SmallSetVector<Identifier, 4> &spiGroups) const {};
+                            llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
   /// Checks whether this file imports \c module as \c @_weakLinked.
   virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {
@@ -417,6 +418,10 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 public:
+  /// Returns the language version that was used to compile the contents of this
+  /// file. An empty `Version` is returned if the information is not available.
+  virtual version::Version getLanguageVersionBuiltWith() const = 0;
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.

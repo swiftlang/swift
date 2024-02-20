@@ -5,7 +5,7 @@
 
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -no-toolchain-stdlib-rpath -swift-version 5
 
-// RUN: %target-swift-emit-module-interface(%t/Macros.swiftinterface) -enable-experimental-feature ExtensionMacros -module-name Macros %s -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-emit-module-interface(%t/Macros.swiftinterface) -module-name Macros %s -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: %FileCheck %s < %t/Macros.swiftinterface --check-prefix CHECK
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Macros.swiftinterface -o %t/Macros.swiftmodule
 
@@ -64,8 +64,35 @@ macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", 
 
 let world = 17
 
-// CHECK-NOT: structWithUnqualifiedLookup
 public
 #structWithUnqualifiedLookup
-
+// CHECK-NOT: structWithUnqualifiedLookup
+// CHECK-NOT: struct StructWithUnqualifiedLookup
 // CHECK: struct StructWithUnqualifiedLookup
+// CHECK-NOT: struct StructWithUnqualifiedLookup
+
+@attached(peer, names: named(_foo))
+macro AddPeerStoredProperty() = #externalMacro(module: "MacroDefinition", type: "AddPeerStoredPropertyMacro")
+
+@AddPeerStoredProperty
+public var test: Int = 10
+// CHECK: var test
+// CHECK-NOT: var _foo
+// CHECK: var _foo
+// CHECK-NOT: var _foo
+
+// CHECK: struct TestStruct {
+public struct TestStruct {
+  public #structWithUnqualifiedLookup
+  // CHECK-NOT: structWithUnqualifiedLookup
+  // CHECK-NOT: struct StructWithUnqualifiedLookup
+  // CHECK: struct StructWithUnqualifiedLookup
+  // CHECK-NOT: struct StructWithUnqualifiedLookup
+
+  @AddPeerStoredProperty
+  public var test: Int = 10
+  // CHECK: var test
+  // CHECK-NOT: var _foo
+  // CHECK: var _foo
+  // CHECK-NOT: var _foo
+}

@@ -313,6 +313,10 @@ def apply_default_arguments(toolchain, args):
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
+    # Enable test colors if we're on a tty and aren't generating for Xcode.
+    if args.color_in_tests and sys.stdout.isatty() and args.cmake_generator != "Xcode":
+        args.lit_args += " --param color_output"
+
     # Set the default stdlib-deployment-targets, if none were provided.
     if args.stdlib_deployment_targets is None:
         stdlib_targets = default_stdlib_deployment_targets(args)

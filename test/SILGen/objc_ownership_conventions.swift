@@ -33,7 +33,7 @@ func test5(_ g: Gizmo) {
   Gizmo.inspect(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -57,7 +57,7 @@ func test6(_ g: Gizmo) {
   Gizmo.consume(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -83,7 +83,7 @@ func test7(_ g: Gizmo) {
   g.fork()
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]

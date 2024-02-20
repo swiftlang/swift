@@ -39,8 +39,10 @@
 
 #define DEBUG_TYPE "infinite-recursion"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/BasicBlockData.h"
@@ -89,7 +91,7 @@ static bool isRecursiveCall(FullApplySite applySite) {
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
-    SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
+    SILFunction *method = getTargetClassMethod(module, classDecl, classType, CMI);
     if (method != parentFunc)
       return false;
 
@@ -525,7 +527,7 @@ public:
   }
 };
 
-typedef SmallSetVector<Invariants, 4> InvariantsSet;
+typedef swift::SmallSetVector<Invariants, 4> InvariantsSet;
 
 /// Collect invariants with which we should try the analysis and return true if
 /// there is at least one recursive call in the function.

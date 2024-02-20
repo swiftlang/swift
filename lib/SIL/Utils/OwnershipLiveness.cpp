@@ -378,8 +378,8 @@ static FunctionTest LinearLivenessTest("linear-liveness", [](auto &function,
                                                              auto &arguments,
                                                              auto &test) {
   SILValue value = arguments.takeValue();
-  function.dump();
-  llvm::dbgs() << "Linear liveness: " << value;
+  function.print(llvm::outs());
+  llvm::outs() << "Linear liveness: " << value;
   LinearLiveness liveness(value);
   liveness.compute();
   liveness.print(llvm::outs());
@@ -399,8 +399,8 @@ static FunctionTest
     InteriorLivenessTest("interior-liveness",
                          [](auto &function, auto &arguments, auto &test) {
                            SILValue value = arguments.takeValue();
-                           function.dump();
-                           llvm::dbgs() << "Interior liveness: " << value;
+                           function.print(llvm::outs());
+                           llvm::outs() << "Interior liveness: " << value;
                            auto *domTree = test.getDominanceInfo();
                            InteriorLiveness liveness(value);
                            auto handleInnerScope = [](SILValue innerBorrow) {
@@ -423,8 +423,8 @@ static FunctionTest
 static FunctionTest ExtendedLinearLivenessTest(
     "extended-liveness", [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
-      function.dump();
-      llvm::dbgs() << "Extended liveness: " << value;
+      function.print(llvm::outs());
+      llvm::outs() << "Extended liveness: " << value;
       ExtendedLinearLiveness liveness(value);
       liveness.compute();
       liveness.print(llvm::outs());

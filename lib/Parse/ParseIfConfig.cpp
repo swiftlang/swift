@@ -380,7 +380,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -422,6 +422,8 @@ public:
         DiagName = "target environment"; break;
       case PlatformConditionKind::PtrAuth:
         DiagName = "pointer authentication scheme"; break;
+      case PlatformConditionKind::HasAtomicBitWidth:
+        DiagName = "has atomic bit width"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
@@ -554,25 +556,13 @@ public:
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     auto Name = getDeclRefStr(E);
+    if (Name.empty())
+      return false;
 
-    // Check whether this is any one of the known compiler features.
-    const auto &langOpts = Ctx.LangOpts;
-#if SWIFT_SWIFT_PARSER
-    const bool hasSwiftSwiftParser = true;
-#else
-    const bool hasSwiftSwiftParser = false;
-#endif
-    bool isKnownFeature = llvm::StringSwitch<bool>(Name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-        .Case("$" #FeatureName, Option)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
-#include "swift/Basic/Features.def"
-        .Default(false);
-
-    if (isKnownFeature)
+    if (Name.startswith("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
-    
-    return langOpts.isCustomConditionalCompilationFlagSet(Name);
+
+    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {
@@ -783,6 +773,7 @@ Result Parser::parseIfConfigRaw(
                             bool isActive, IfConfigElementsRole role)>
       parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
+  auto startLoc = Tok.getLoc();
   assert(Tok.is(tok::pound_if));
 
   Parser::StructureMarkerRAII ParsingDecl(
@@ -822,6 +813,7 @@ Result Parser::parseIfConfigRaw(
 
   bool foundActive = false;
   bool isVersionCondition = false;
+  CharSourceRange activeBodyRange;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
@@ -879,6 +871,7 @@ Result Parser::parseIfConfigRaw(
     }
 
     // Parse elements
+    auto bodyStart = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
@@ -897,6 +890,12 @@ Result Parser::parseIfConfigRaw(
           ClauseLoc, Condition, isActive, IfConfigElementsRole::Skipped);
     }
 
+    // Record the active body range for the SourceManager.
+    if (shouldEvaluate && isActive) {
+      assert(!activeBodyRange.isValid() && "Multiple active regions?");
+      activeBodyRange = CharSourceRange(SourceMgr, bodyStart, Tok.getLoc());
+    }
+
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
@@ -907,6 +906,12 @@ Result Parser::parseIfConfigRaw(
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
+  // Record the #if ranges on the SourceManager.
+  if (!HadMissingEnd && shouldEvaluate) {
+    auto wholeRange = Lexer::getCharSourceRangeFromSourceRange(
+        SourceMgr, SourceRange(startLoc, EndLoc));
+    SF.recordIfConfigRangeInfo({wholeRange, activeBodyRange});
+  }
   return finish(EndLoc, HadMissingEnd);
 }
 

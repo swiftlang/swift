@@ -1067,6 +1067,30 @@ bb0(%0 : @owned $C1):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @end_cow_mutation_of_cast :
+// CHECK:         %1 = end_cow_mutation %0
+// CHECK-NEXT:    %2 = upcast %1
+// CHECK-NEXT:    return %2
+// CHECK: } // end sil function 'end_cow_mutation_of_cast'
+sil [ossa] @end_cow_mutation_of_cast : $@convention(thin) (@owned C2) -> @owned C1 {
+bb0(%0 : @owned $C2):
+  %1 = upcast %0 : $C2 to $C1
+  %2 = end_cow_mutation %1 : $C1
+  return %2 : $C1
+}
+
+// CHECK-LABEL: sil [ossa] @end_cow_mutation_of_cast2 :
+// CHECK:         %1 = end_cow_mutation [keep_unique] %0
+// CHECK-NEXT:    %2 = upcast %1
+// CHECK-NEXT:    return %2
+// CHECK: } // end sil function 'end_cow_mutation_of_cast2'
+sil [ossa] @end_cow_mutation_of_cast2 : $@convention(thin) (@owned C2) -> @owned C1 {
+bb0(%0 : @owned $C2):
+  %1 = upcast %0 : $C2 to $C1
+  %2 = end_cow_mutation [keep_unique] %1 : $C1
+  return %2 : $C1
+}
+
 struct XS {
   var m: Int
   var k: Float
@@ -1548,11 +1572,8 @@ bb0(%0 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] : @owned $B):
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_owned'
 sil [ossa] @unchecked_ref_cast_formation_owned : $@convention(thin) (@owned B) -> @owned F {
 bb0(%0 : @owned $B):
@@ -1565,11 +1586,8 @@ bb0(%0 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] : @guaranteed $B):
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_guaranteed'
 sil [ossa] @unchecked_ref_cast_formation_guaranteed : $@convention(thin) (@guaranteed B) -> @owned F {
 bb0(%0 : @guaranteed $B):
@@ -1581,11 +1599,8 @@ bb0(%0 : @guaranteed $B):
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
 // CHECK: bb0([[INPUT_REF:%[0-9]+]] :
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: unchecked_ref_cast
-// CHECK-NOT: ref_to_raw_pointer
-// CHECK-NOT: raw_pointer_to_ref
+// CHECK: ref_to_raw_pointer
+// CHECK: raw_pointer_to_ref
 // CHECK: } // end sil function 'unchecked_ref_cast_formation_unowned'
 sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
 bb0(%0 : @unowned $B):

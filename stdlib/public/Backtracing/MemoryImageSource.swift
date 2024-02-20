@@ -28,8 +28,8 @@ class MemoryImageSource<M: MemoryReader>: ImageSource {
     self.reader = reader
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     try reader.fetch(from: addr, into: buffer)
   }
 }

@@ -21,6 +21,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -276,7 +277,9 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // Create a borrow scope and a mark_dependence to prevent the enum being
   // optimized away.
   auto *borrow = lifetimeExtendBuilder.createBeginBorrow(loc, optionalSome);
-  auto *mdi = lifetimeExtendBuilder.createMarkDependence(loc, cvt, borrow);
+  auto *mdi =
+    lifetimeExtendBuilder.createMarkDependence(loc, cvt, borrow,
+                                               MarkDependenceKind::Escaping);
 
   // Replace all uses of the non escaping closure with mark_dependence
   SmallVector<Operand *, 4> convertUses;
@@ -401,7 +404,8 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
     if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(arg.get()))
       if (m->hasGuaranteedInitialKind())
         continue;
-    curr = b.createMarkDependence(pai->getLoc(), curr, arg.get());
+    curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
+                                  MarkDependenceKind::Escaping);
   }
 
   return curr;
@@ -640,7 +644,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // Convert to a partial_apply [stack].
   auto newPA = b.createPartialApply(
       origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
-      origPA->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      origPA->getCalleeConvention(), origPA->getResultIsolation(),
       PartialApplyInst::OnStackKind::OnStack);
 
   // Insert mark_dependence for any non-trivial address operands to the
@@ -722,9 +726,12 @@ static SILValue tryRewriteToPartialApplyStack(
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   SSAPrunedLiveness closureLiveness(cvt->getFunction(), &discoveredBlocks);
   closureLiveness.initializeDef(closureOp);
-  
-  SmallSetVector<SILValue, 4> borrowedOriginals;
-  
+
+  llvm::SmallSetVector<SILValue, 4> borrowedOriginals;
+
+  unsigned appliedArgStartIdx =
+        newPA->getOrigCalleeType()->getNumParameters() - newPA->getNumArguments();
+
   for (unsigned i : indices(newPA->getArgumentOperands())) {
     auto &arg = newPA->getArgumentOperands()[i];
     SILValue copy = arg.get();
@@ -747,11 +754,12 @@ static SILValue tryRewriteToPartialApplyStack(
     }
     
     // Is the capture a borrow?
-    auto paramIndex = newPA
-      ->getArgumentIndexForOperandIndex(i + newPA->getArgumentOperandNumber())
-      .value();
-    if (!newPA->getOrigCalleeType()->getParameters()[paramIndex]
-          .isIndirectInGuaranteed()) {
+
+    auto paramIndex = i + appliedArgStartIdx;
+    auto param = newPA->getOrigCalleeType()->getParameters()[paramIndex];
+    LLVM_DEBUG(param.print(llvm::dbgs());
+               llvm::dbgs() << '\n');
+    if (!param.isIndirectInGuaranteed()) {
       LLVM_DEBUG(llvm::dbgs() << "-- not an in_guaranteed parameter\n";
                  newPA->getOrigCalleeType()->getParameters()[paramIndex]
                    .print(llvm::dbgs());
@@ -891,10 +899,11 @@ static SILValue tryRewriteToPartialApplyStack(
     SILBuilderWithScope builder(std::next(destroy->getIterator()));
     // This getCapturedArg hack attempts to perfectly compensate for all the
     // other hacks involved in gathering new arguments above.
+    // argValue may be 'undef'
     auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
       // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
       // careful not to emit an extra destroy of the original.
-      if (argValue->getType().isTrivial(argValue->getFunction()))
+      if (argValue->getType().isTrivial(destroy->getFunction()))
         return SILValue();
 
       // We may have inserted a new begin_borrow->moveonlywrapper_to_copyvalue
@@ -1477,7 +1486,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
       }
       invalidateAnalysis(analysisInvalidationKind(modifiedCFG));
     }
-    LLVM_DEBUG(getFunction()->verify(getPassManager()));
+    LLVM_DEBUG(getFunction()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache()));
 
   }
 

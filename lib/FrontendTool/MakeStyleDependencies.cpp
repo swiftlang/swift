@@ -132,6 +132,12 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     dependencyString.push_back(' ');
     dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
   }
+  auto macroPluginDependencyPath =
+      reversePathSortedFilenames(depTracker->getMacroPluginDependencyPaths());
+  for (auto const &path : macroPluginDependencyPath) {
+    dependencyString.push_back(' ');
+    dependencyString.append(frontend::utils::escapeForMake(path, buffer).str());
+  }
 
   // FIXME: Xcode can't currently handle multiple targets in a single
   // dependency line.

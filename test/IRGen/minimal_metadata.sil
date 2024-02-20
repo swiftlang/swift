@@ -1,0 +1,306 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+protocol P {
+  associatedtype Assoc
+}
+
+struct Box<T> {
+  var t: T
+}
+
+sil @getBox : $<T> (@thick T.Type) -> (@out Box<T>)
+sil @getBoxBox : $<T> (@thick T.Type) -> (@out Box<Box<T>>)
+
+enum Affirm<T> {
+  case yes(T)
+}
+
+sil @getAffirm : $<T> (@thick T.Type) -> (@out Affirm<T>)
+sil @getAffirmAffirm : $<T> (@thick T.Type) -> (@out Affirm<Affirm<T>>)
+
+class K<T> {
+  var t: T
+}
+
+sil @getK : $<T> (@thick T.Type) -> (@out K<T>)
+sil @getKK : $<T> (@thick T.Type) -> (@out K<K<T>>)
+
+sil @getTuple : $<T> (@thick T.Type) -> (@out (T, Builtin.Int1))
+sil @getTupleTuple : $<T> (@thick T.Type) -> (@out ((T, Builtin.Int1), Builtin.Int1))
+
+struct Vari<each T> {
+  var ts : (repeat each T)
+}
+
+sil @getVari : $<each T> () -> (@out Vari<each T>)
+
+sil @takeTy : $<T> (@thick T.Type) -> ()
+
+// CHECK-LABEL: define {{.*}}@test_struct(ptr %T, ptr %T.P)
+//                // The metadata for T.Assoc is for obtained in state ::Abstract            VVVVVVV
+//                %0 = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 255, ptr %T.P, ptr %T, ...
+//                %T.Assoc = extractvalue %swift.metadata_response %0, 0
+//                // It's used to obtain the metadata for Box<T.Assoc> in state ::Complete
+//                %2 = call swiftcc %swift.metadata_response @"$s4main3BoxVMa"(i64 0, ptr %T.Assoc)
+//                // Now that we have the complete metadata for Box<T.Assoc>, the metadata for T.Assoc is also complete.
+//
+//                // Verify that the metadata for T.Assoc isn't spuriously completed again.
+// CHECK-NOT:     call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, ptr %T.Assoc)
+//                // Verify that the metadata for T.Assoc from swift_getAssociatedTypeWitness is reused directly in the getBox call.
+// CHECK:         call swiftcc void @getBox(ptr noalias sret(%swift.opaque) %{{.*}}, ptr %T.Assoc, ptr %T.Assoc)
+//              }
+sil @test_struct : $@convention(thin) <T : P> () -> () {
+entry:
+  %box = alloc_stack $Box<T.Assoc>
+  cond_br undef, left, right
+
+left:
+  %mt = metatype $@thick T.Assoc.Type
+  %getBox = function_ref @getBox : $@convention(thin) <T> (@thick T.Type) -> (@out Box<T>)
+  apply %getBox<T.Assoc>(%box, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out Box<T>)
+  destroy_addr %box : $*Box<T.Assoc>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %box : $*Box<T.Assoc>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_struct_nested(ptr %T, ptr %T.P)
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getBox
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getBoxBox
+//              }
+sil @test_struct_nested : $@convention(thin) <T : P> () -> () {
+entry:
+  %box = alloc_stack $Box<Box<T.Assoc>>
+  cond_br undef, left, right
+
+left:
+  %mtb = metatype $@thick Box<T.Assoc>.Type
+  %getBox = function_ref @getBox : $@convention(thin) <T> (@thick T.Type) -> (@out Box<T>)
+  apply %getBox<Box<T.Assoc>>(%box, %mtb)  : $@convention(thin) <T> (@thick T.Type) -> (@out Box<T>)
+  destroy_addr %box : $*Box<Box<T.Assoc>>
+
+  %mt = metatype $@thick T.Assoc.Type
+  %getBoxBox = function_ref @getBoxBox : $@convention(thin) <T> (@thick T.Type) -> (@out Box<Box<T>>)
+  apply %getBoxBox<T.Assoc>(%box, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out Box<Box<T>>)
+  destroy_addr %box : $*Box<Box<T.Assoc>>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %box : $*Box<Box<T.Assoc>>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_enum(ptr %T, ptr %T.P)
+// CHECK-NOT:     call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, ptr %T.Assoc)
+// CHECK:         call swiftcc void @getAffirm
+//              }
+sil @test_enum : $@convention(thin) <T : P> () -> () {
+entry:
+  %affirm = alloc_stack $Affirm<T.Assoc>
+  cond_br undef, left, right
+
+left:
+  %mt = metatype $@thick T.Assoc.Type
+  %getAffirm = function_ref @getAffirm : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<T>)
+  apply %getAffirm<T.Assoc>(%affirm, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<T>)
+  destroy_addr %affirm : $*Affirm<T.Assoc>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %affirm : $*Affirm<T.Assoc>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_enum_nested(ptr %T, ptr %T.P)
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getAffirm
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getAffirmAffirm
+//              }
+sil @test_enum_nested : $@convention(thin) <T : P> () -> () {
+entry:
+  %affirm = alloc_stack $Affirm<Affirm<T.Assoc>>
+  cond_br undef, left, right
+
+left:
+  %mtb = metatype $@thick Affirm<T.Assoc>.Type
+  %getAffirm = function_ref @getAffirm : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<T>)
+  apply %getAffirm<Affirm<T.Assoc>>(%affirm, %mtb)  : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<T>)
+  destroy_addr %affirm : $*Affirm<Affirm<T.Assoc>>
+
+  %mt = metatype $@thick T.Assoc.Type
+  %getAffirmAffirm = function_ref @getAffirmAffirm : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<Affirm<T>>)
+  apply %getAffirmAffirm<T.Assoc>(%affirm, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out Affirm<Affirm<T>>)
+  destroy_addr %affirm : $*Affirm<Affirm<T.Assoc>>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %affirm : $*Affirm<Affirm<T.Assoc>>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_class(ptr %T, ptr %T.P)
+// CHECK-NOT:     call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, ptr %T.Assoc)
+// CHECK:         call swiftcc void @getK
+//              }
+sil @test_class : $@convention(thin) <T : P> () -> () {
+entry:
+  %k = alloc_stack $K<T.Assoc>
+  cond_br undef, left, right
+
+left:
+  %mt = metatype $@thick T.Assoc.Type
+  %getK = function_ref @getK : $@convention(thin) <T> (@thick T.Type) -> (@out K<T>)
+  apply %getK<T.Assoc>(%k, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out K<T>)
+  destroy_addr %k : $*K<T.Assoc>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %k : $*K<T.Assoc>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_class_nested(ptr %T, ptr %T.P)
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getK
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getKK
+//              }
+sil @test_class_nested : $@convention(thin) <T : P> () -> () {
+entry:
+  %k = alloc_stack $K<K<T.Assoc>>
+  cond_br undef, left, right
+
+left:
+  %mtb = metatype $@thick K<T.Assoc>.Type
+  %getK = function_ref @getK : $@convention(thin) <T> (@thick T.Type) -> (@out K<T>)
+  apply %getK<K<T.Assoc>>(%k, %mtb)  : $@convention(thin) <T> (@thick T.Type) -> (@out K<T>)
+  destroy_addr %k : $*K<K<T.Assoc>>
+
+  %mt = metatype $@thick T.Assoc.Type
+  %getKK = function_ref @getKK : $@convention(thin) <T> (@thick T.Type) -> (@out K<K<T>>)
+  apply %getKK<T.Assoc>(%k, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out K<K<T>>)
+  destroy_addr %k : $*K<K<T.Assoc>>
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %k : $*K<K<T.Assoc>>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_tuple(ptr %T, ptr %T.P)
+// CHECK-NOT:     call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, ptr %T.Assoc)
+// CHECK:         call swiftcc void @getTuple
+//              }
+sil @test_tuple : $@convention(thin) <T : P> () -> () {
+entry:
+  %tuple = alloc_stack $(T.Assoc, Builtin.Int1)
+  cond_br undef, left, right
+
+left:
+  %mt = metatype $@thick T.Assoc.Type
+  %get = function_ref @getTuple : $@convention(thin) <T> (@thick T.Type) -> (@out (T, Builtin.Int1))
+  apply %get<T.Assoc>(%tuple, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out (T, Builtin.Int1))
+  destroy_addr %tuple : $*(T.Assoc, Builtin.Int1)
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %tuple : $*(T.Assoc, Builtin.Int1)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_tuple_nested(ptr %T, ptr %T.P)
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getTuple
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @getTupleTuple
+//              }
+sil @test_tuple_nested : $@convention(thin) <T : P> () -> () {
+entry:
+  %tuple = alloc_stack $((T.Assoc, Builtin.Int1), Builtin.Int1)
+  cond_br undef, left, right
+
+left:
+  %mtb = metatype $@thick (T.Assoc, Builtin.Int1).Type
+  %get = function_ref @getTuple : $@convention(thin) <T> (@thick T.Type) -> (@out (T, Builtin.Int1))
+  apply %get<(T.Assoc, Builtin.Int1)>(%tuple, %mtb)  : $@convention(thin) <T> (@thick T.Type) -> (@out (T, Builtin.Int1))
+  destroy_addr %tuple : $*((T.Assoc, Builtin.Int1), Builtin.Int1)
+
+  %mt = metatype $@thick T.Assoc.Type
+  %getTupleTuple = function_ref @getTupleTuple : $@convention(thin) <T> (@thick T.Type) -> (@out ((T, Builtin.Int1), Builtin.Int1))
+  apply %getTupleTuple<T.Assoc>(%tuple, %mt)  : $@convention(thin) <T> (@thick T.Type) -> (@out ((T, Builtin.Int1), Builtin.Int1))
+  destroy_addr %tuple : $*((T.Assoc, Builtin.Int1), Builtin.Int1)
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %tuple : $*((T.Assoc, Builtin.Int1), Builtin.Int1)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_variadic_struct(ptr %T, ptr %U, ptr %T.P, ptr %U.P)
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @takeTy
+// CHECK-NOT:     @swift_checkMetadataState
+// CHECK:         call swiftcc void @takeTy
+//              }
+sil @test_variadic_struct : $@convention(thin) <T : P, U : P> () -> () {
+entry:
+  %vari = alloc_stack $Vari<T.Assoc, U.Assoc>
+  cond_br undef, left, right
+
+left:
+  %mt = metatype $@thick T.Assoc.Type
+  %takeTy = function_ref @takeTy : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %takeTy<T.Assoc>(%mt) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %mu = metatype $@thick U.Assoc.Type
+  apply %takeTy<U.Assoc>(%mu) : $@convention(thin) <T> (@thick T.Type) -> ()
+  br exit
+
+right:
+  br exit
+
+exit:
+  dealloc_stack %vari : $*Vari<T.Assoc, U.Assoc>
+  %retval = tuple ()
+  return %retval : $()
+}

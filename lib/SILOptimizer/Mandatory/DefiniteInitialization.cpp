@@ -662,14 +662,32 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
   // This is safe to ignore because assign_by_wrapper/assign_or_init will
   // only be re-written to use the setter if the value is fully initialized.
   if (auto *load = dyn_cast<SingleValueInstruction>(Inst)) {
-    if (auto Op = load->getSingleUse()) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
-        if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
-              return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
-                     isa<AssignOrInitInst>(PAIUse->getUser());
-            }) != PAI->use_end()) {
-          return false;
-        }
+    auto isOnlyUsedByPartialApply =
+        [&](const SingleValueInstruction *inst) -> PartialApplyInst * {
+      Operand *result = nullptr;
+      for (auto *op : inst->getUses()) {
+        auto *user = op->getUser();
+
+        // Ignore copies, destroys and borrows because they'd be
+        // erased together with the setter.
+        if (isa<DestroyValueInst>(user) || isa<CopyValueInst>(user) ||
+            isa<BeginBorrowInst>(user) || isa<EndBorrowInst>(user))
+          continue;
+
+        if (result)
+          return nullptr;
+
+        result = op;
+      }
+      return result ? dyn_cast<PartialApplyInst>(result->getUser()) : nullptr;
+    };
+
+    if (auto *PAI = isOnlyUsedByPartialApply(load)) {
+      if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
+            return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
+                   isa<AssignOrInitInst>(PAIUse->getUser());
+          }) != PAI->use_end()) {
+        return false;
       }
     }
   }
@@ -1026,9 +1044,12 @@ void LifetimeChecker::injectActorHops() {
   case ActorIsolation::ActorInstance:
     break;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("constructor cannot have erased isolation");
+
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::GlobalActorUnsafe:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
     return;
   }
@@ -2510,6 +2531,30 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return;
   }
 
+  if (auto *TACI = dyn_cast<TupleAddrConstructorInst>(Inst)) {
+    assert(!TACI->isInitializationOfDest() &&
+           "should not modify copy_addr that already knows it is initialized");
+    TACI->setIsInitializationOfDest(InitKind);
+    if (InitKind == IsInitialization)
+      setStaticInitAccess(TACI->getDest());
+
+    // If we had an initialization and had an assignable_but_not_consumable
+    // noncopyable type, convert it to be an initable_but_not_consumable so that
+    // we do not consume an uninitialized value.
+    if (InitKind == IsInitialization) {
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAccessMarkers(TACI->getDest()))) {
+        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
+                                        CheckKind::AssignableButNotConsumable) {
+          mmci->setCheckKind(MarkUnresolvedNonCopyableValueInst::CheckKind::
+                                 InitableButNotConsumable);
+        }
+      }
+    }
+
+    return;
+  }
+
   // Ignore non-stores for SelfInits.
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
@@ -2729,7 +2774,7 @@ static void updateControlVariable(SILLocation Loc,
   
   // If the mask is all ones, do a simple store, otherwise do a
   // load/or/store sequence to mask in the bits.
-  if (!Bitmask.isAllOnesValue()) {
+  if (!Bitmask.isAllOnes()) {
     SILValue Tmp =
         B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Trivial);
     if (!OrFn.get())
@@ -2985,7 +3030,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 ///
 ///    %box = alloc_box
 ///    %mark_uninit = mark_uninitialized %box
-///    %lifetime = begin_borrow [lexical] %mark_uninit
+///    %lifetime = begin_borrow [var_decl] %mark_uninit
 ///    %proj_box = project_box %lifetime
 ///
 /// We are replacing a
@@ -3005,7 +3050,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// Consequently, it's not sufficient to just replace the destroy_value
 /// %mark_uninit with a destroy_addr %proj_box (or to replace it with a diamond
 /// where one branch has that destroy_addr) because the destroy_addr is a use
-/// of %proj_box which must be within the lexical lifetime of the box.
+/// of %proj_box which must be within the var_decl lifetime of the box.
 ///
 /// On the other side, we are hemmed in by the fact that the end_borrow must
 /// precede the dealloc_box which will be created in the diamond.  So we
@@ -3041,12 +3086,12 @@ static bool adjustAllocBoxEndBorrow(SILInstruction *previous,
   if (!pbi)
     return false;
 
-  // This fixup only applies if we're destroying a project_box of the lexical
+  // This fixup only applies if we're destroying a project_box of the var_decl
   // lifetime of an alloc_box.
   auto *lifetime = dyn_cast<BeginBorrowInst>(pbi->getOperand());
   if (!lifetime)
     return false;
-  assert(lifetime->isLexical());
+  assert(lifetime->isFromVarDecl());
   assert(isa<AllocBoxInst>(
       cast<MarkUninitializedInst>(lifetime->getOperand())->getOperand()));
 

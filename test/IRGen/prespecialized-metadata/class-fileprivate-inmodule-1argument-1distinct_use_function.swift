@@ -26,11 +26,11 @@ func consume<T>(_ t: T) {
 //      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
 // CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCySSSicGMD"
 //      CHECK:   {{%[0-9]+}} = call swiftcc ptr @"$s4main5Value[[UNIQUE_ID_1]]LLC5firstADyxGx_tcfC"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr swiftself [[METADATA]]
 // CHECK-SAME:   )
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {

@@ -328,7 +328,7 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
                                     AllocRefInstBase *allocRef) {
   // Get the number of destroyed elements.
   auto *literal = dyn_cast<IntegerLiteralInst>(destroyArray->getArguments()[2]);
-  if (!literal || literal->getValue().getMinSignedBits() > 32)
+  if (!literal || literal->getValue().getSignificantBits() > 32)
     return false;
   int numDestroyed = literal->getValue().getSExtValue();
   
@@ -614,6 +614,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       addStore(Store, StoreAddrNode);
 
       AllUsers.insert(User);
+      continue;
+    }
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
+      if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
       continue;
     }
     if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
@@ -1163,9 +1170,15 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
+  auto *ARI = dyn_cast<AllocRefInst>(AI->getArgument(0));
+
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
+  }
+
+  if (ARI) {
+    deleter.forceDeleteWithUsers(ARI);
   }
 
   ++DeadAllocApplyEliminated;

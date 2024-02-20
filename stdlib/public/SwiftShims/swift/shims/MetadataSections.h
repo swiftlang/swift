@@ -97,7 +97,9 @@ struct MetadataSections {
   MetadataSectionRange swift5_capture;
   MetadataSectionRange swift5_mpenum;
   MetadataSectionRange swift5_accessible_functions;
+  MetadataSectionRange swift5_accessible_protocol_requirement_functions;
   MetadataSectionRange swift5_runtime_attributes;
+  MetadataSectionRange swift5_tests;
 };
 
 #ifdef __cplusplus

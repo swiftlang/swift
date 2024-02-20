@@ -54,6 +54,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    SILFunctionTypeIsolation resultIsolation,
     PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -68,6 +69,7 @@ SILType SILBuilder::getPartialApplyResultType(
       FTI->getExtInfo()
           .intoBuilder()
           .withRepresentation(SILFunctionType::Representation::Thick)
+          .withIsolation(resultIsolation)
           .withIsPseudogeneric(false);
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
@@ -252,6 +254,24 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   auto *NewBB = BB->split(InsertPt);
   InsertPt = BB->end();
   return NewBB;
+}
+
+llvm::Optional<SILDebugVariable>
+SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
+                                    llvm::Optional<SILDebugVariable> Var,
+                                    SILLocation Loc) {
+  if (Var && shouldDropVariable(*Var, Loc))
+    return {};
+  if (!Var || !Var->ArgNo || !Var->Name.empty())
+    return Var;
+
+  auto *VD = Loc.getAsASTNode<VarDecl>();
+  if (VD && !VD->getName().empty())
+    return Var;
+
+  llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
+  Var->Name = Name;
+  return Var;
 }
 
 static bool setAccessToDeinit(BeginAccessInst *beginAccess) {

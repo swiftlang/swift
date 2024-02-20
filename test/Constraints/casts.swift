@@ -741,3 +741,20 @@ do {
     assert(Set(b.map { $0 as A }) == Set(a)) // Ok
   }
 }
+
+// https://github.com/apple/swift/issues/68825
+do {
+  func x(a: Any) { // expected-note 2 {{'a' declared here}}
+    _ = a is a // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    _ = a as a // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    _ = a is Issue68825 // expected-error {{cannot find type 'Issue68825' in scope}}
+    _ = a is String // OK
+  }
+}
+
+// rdar://115603144 - casting `any Sendable` to a collection warns about cast failure although the cast could succeed at runtime
+func test_existential_sendable_cast(v: any Sendable) {
+  let _ = v as! [Any] // Ok
+  let _ = v as! [String: Any] // Ok
+  let _ = v as! Set<Int> // Ok
+}

@@ -109,6 +109,10 @@ public typealias CLongDouble = Float80
 #else
 #error("CLongDouble needs to be defined for this FreeBSD architecture")
 #endif
+#elseif $Embedded
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Double
+#endif
 #else
 // TODO: define CLongDouble for other OSes
 #endif
@@ -116,7 +120,11 @@ public typealias CLongDouble = Float80
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
+#if os(Windows)
+public typealias CWideChar = UInt16
+#else
 public typealias CWideChar = Unicode.Scalar
+#endif
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
@@ -206,6 +214,9 @@ extension OpaquePointer: Hashable {
     hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
+
+@available(*, unavailable)
+extension OpaquePointer : Sendable { }
 
 @_unavailableInEmbedded
 extension OpaquePointer: CustomDebugStringConvertible {
@@ -299,6 +310,9 @@ extension CVaListPointer: CustomDebugStringConvertible {
 }
 
 #endif
+
+@available(*, unavailable)
+extension CVaListPointer: Sendable { }
 
 /// Copy `size` bytes of memory from `src` into `dest`.
 ///

@@ -44,6 +44,13 @@ open class ManagedBuffer<Header, Element> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   public final var header: Header
 
+  #if $Embedded
+  // In embedded mode this initializer has to be public, otherwise derived
+  // classes cannot be specialized.
+  public init(_doNotCallMe: ()) {
+    _internalInvariantFailure("Only initialize these by calling create")
+  }
+  #else
   // This is really unfortunate. In Swift 5.0, the method descriptor for this
   // initializer was public and subclasses would "inherit" it, referencing its
   // method descriptor from their class override table.
@@ -51,6 +58,7 @@ open class ManagedBuffer<Header, Element> {
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
+  #endif
 
   @inlinable
   deinit {}

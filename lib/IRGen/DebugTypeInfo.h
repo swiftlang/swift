@@ -45,6 +45,7 @@ protected:
   /// the storage type for undefined variables.
   llvm::Type *FragmentStorageType = nullptr;
   llvm::Optional<Size::int_type> SizeInBits;
+  std::optional<uint32_t> NumExtraInhabitants;
   Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
@@ -57,7 +58,8 @@ public:
                 llvm::Optional<Size::int_type> SizeInBits = {},
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false);
+                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false,
+                std::optional<uint32_t> NumExtraInhabitants = {});
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -119,6 +121,9 @@ public:
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isSizeFragmentSize() const { return SizeIsFragmentSize; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
+  std::optional<uint32_t> getNumExtraInhabitants() const {
+    return NumExtraInhabitants;
+  }
 
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;

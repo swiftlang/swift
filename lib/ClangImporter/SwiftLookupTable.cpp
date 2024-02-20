@@ -1965,6 +1965,10 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       isa<clang::ObjCCategoryDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
+      if (auto friendDecl = dyn_cast<clang::FriendDecl>(member))
+        if (auto underlyingDecl = friendDecl->getFriendDecl())
+          member = underlyingDecl;
+
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
         addEntryToLookupTable(table, namedMember, nameImporter);
     }
@@ -1989,6 +1993,12 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
       }
+    }
+  }
+  if (auto usingDecl = dyn_cast<clang::UsingDecl>(named)) {
+    for (auto usingShadowDecl : usingDecl->shadows()) {
+      if (isa<clang::CXXMethodDecl>(usingShadowDecl->getTargetDecl()))
+        addEntryToLookupTable(table, usingShadowDecl, nameImporter);
     }
   }
 }

@@ -123,7 +123,7 @@ function(add_swift_unittest test_dirname)
       APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}")
   endif()
 
-  if (SWIFT_SWIFT_PARSER AND NOT ASU_IS_TARGET_TEST)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND NOT ASU_IS_TARGET_TEST)
     # Link to stdlib the compiler uses.
     _add_swift_runtime_link_flags(${test_dirname} "${relative_lib_path}" "")
 
