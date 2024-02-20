@@ -3008,6 +3008,8 @@ static bool usesFeatureExpressionMacroDefaultArguments(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinStoreRaw(Decl *decl) { return false; }
+
 static bool usesFeatureCodeItemMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)
