@@ -4358,8 +4358,13 @@ static bool isBindable(TypeVariableType *typeVar, Type type) {
   // what the \c type is, because contextual type is just a hint
   // in this situation and type variable would be bound to its
   // opened type instead.
+  //
+  // Note that although inference doesn't allow direct bindings to
+  // type variables, they can still get through via `matchTypes`
+  // when type is a partially resolved pack expansion that simplifies
+  // down to a type variable.
   return typeVar->getImpl().isPackExpansion() ||
-         !type->is<DependentMemberType>();
+         !(type->is<TypeVariableType>() || type->is<DependentMemberType>());
 }
 
 ConstraintSystem::TypeMatchResult
