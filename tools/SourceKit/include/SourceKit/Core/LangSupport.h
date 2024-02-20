@@ -912,6 +912,11 @@ struct CategorizedRenameRanges {
 struct IndexStoreOptions {
   std::string IndexStorePath;
   std::string IndexUnitOutputPath;
+  bool IgnoreClangModules = false;
+  bool IncludeSystemModules = false;
+  bool IgnoreStdlib = false;
+  bool DisableImplicitModules = false;
+  bool IncludeLocals = false;
 };
 
 struct IndexStoreInfo{};

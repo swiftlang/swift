@@ -1159,6 +1159,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyIndexStorePath, Opts.IndexStorePath.c_str());
     sourcekitd_request_dictionary_set_string(Req, KeyIndexUnitOutputPath, Opts.IndexUnitOutputPath.c_str());
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndexToStore);
+    addRequestOptionsDirect(Req, Opts);
     break;
   }
 
