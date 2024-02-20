@@ -971,7 +971,7 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring %0 could cause a race",
+      "transferring %0 may cause a race",
       (Identifier))
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",

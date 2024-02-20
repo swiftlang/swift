@@ -65,7 +65,7 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
     x = secondList.listHead!.next!
   }
 
-  await transferToMainActor(x) // expected-tns-warning {{transferring 'x' could cause a race}}
+  await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a race}}
   // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
@@ -106,7 +106,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue() // expected-tns-note {{variable defined here}}
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' could cause a race}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
   // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
@@ -117,7 +117,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x.x = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' could cause a race}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
   // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'GlobalActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 

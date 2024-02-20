@@ -39,7 +39,7 @@ class NotSendable {
   let ns = NotSendable(x: 0)
   MyActor.ns = ns
 
-  // expected-region-isolation-warning @+2 {{transferring 'ns' could cause a race}}
+  // expected-region-isolation-warning @+2 {{transferring 'ns' may cause a race}}
   // expected-region-isolation-note @+1 {{transferring global actor 'MyActor'-isolated 'ns' to global actor 'YourActor'-isolated callee could cause races between global actor 'YourActor'-isolated and global actor 'MyActor'-isolated uses}}
   await { @YourActor in
     // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}

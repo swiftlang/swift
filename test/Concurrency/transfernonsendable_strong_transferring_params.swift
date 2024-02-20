@@ -93,14 +93,14 @@ func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) 
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
   // expected-note @-1:54 {{variable defined here}}
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   await transferToMain(x) // expected-note {{access here could race}}
 }
 
 func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
   // expected-note @-1 {{variable defined here}}
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   useValue(x) // expected-note {{access here could race}}
 }
@@ -116,14 +116,14 @@ actor MyActor {
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
     // expected-note @-1 {{variable defined here}}
-    await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+    await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
     // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     await transferToMain(x) // expected-note {{access here could race}}
   }
 
   func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
     // expected-note @-1 {{variable defined here}}
-    await transferToMain(x)  // expected-warning {{transferring 'x' could cause a race}}
+    await transferToMain(x)  // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     useValue(x) // expected-note {{access here could race}}
   }
@@ -138,7 +138,7 @@ actor MyActor {
   // Once we assign into the actor, we cannot transfer further.
   func assignTransferringIntoActor2(_ x: transferring Klass) async {
     field = x
-    await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+    await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
     // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 }
@@ -149,12 +149,12 @@ actor MyActor {
 
 @MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
   globalKlass = x
-  await transferToCustom(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{transferring 'globalKlass' could cause a race}}
+  await transferToCustom(globalKlass) // expected-warning {{transferring 'globalKlass' may cause a race}}
   // expected-note @-1 {{transferring main actor-isolated 'globalKlass' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
@@ -166,7 +166,7 @@ func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
 func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
   // expected-note @-1 {{variable defined here}}
   let _ = x
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   let _ = x // expected-note {{access here could race}}
 }
@@ -229,7 +229,7 @@ func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
   x = y
 
   // TODO: This should refer to the transferring parameter.
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   useValue(x) // expected-note {{access here could race}}
@@ -259,7 +259,7 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.
@@ -277,7 +277,7 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.

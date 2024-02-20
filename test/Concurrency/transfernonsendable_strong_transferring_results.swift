@@ -68,7 +68,7 @@ func simpleTest() async {
 func simpleTest2() async {
   let x = NonSendableKlass() // expected-note {{variable defined here}}
   let y = transferResultWithArg(x)
-  await transferToMainDirect(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   useValue(y)
   useValue(x) // expected-note {{access here could race}}
@@ -79,14 +79,14 @@ func simpleTest3() async {
   let x = NonSendableKlass()
   let y = transferResultWithArg(x) // expected-note {{variable defined here}}
   await transferToMainDirect(x)
-  await transferToMainDirect(y) // expected-warning {{transferring 'y' could cause a race}}
+  await transferToMainDirect(y) // expected-warning {{transferring 'y' may cause a race}}
   // expected-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee}}
   useValue(y) // expected-note {{access here could race}}
 }
 
 func transferResult() async -> transferring NonSendableKlass {
   let x = NonSendableKlass() // expected-note {{variable defined here}}
-  await transferToMainDirect(x) // expected-warning {{transferring 'x' could cause a race}}
+  await transferToMainDirect(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   return x // expected-note {{access here could race}}
 }
