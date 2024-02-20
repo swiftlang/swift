@@ -2852,10 +2852,13 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
                                              ExtensionDecl *ExtDecl) {
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
+    Sig->getRequirementsWithInverses(requirements, inverses);
     printSingleDepthOfGenericSignature(Sig.getGenericParams(),
-                                       Sig.getRequirements(),
-                                       /*inverses=*/{},
+                                       requirements,
+                                       inverses,
                                        IsFirst,
                                        PrintRequirements | PrintInverseRequirements,
                                        [](const Requirement &Req){
