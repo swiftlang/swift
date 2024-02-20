@@ -963,6 +963,7 @@ public:
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
     PrintInverseRequirements = 32,
+    IncludeOuterInverses = 64,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -1666,6 +1667,17 @@ void PrintAST::printGenericSignature(
   } else {
     requirements.append(genericSig.getRequirements().begin(),
                         genericSig.getRequirements().end());
+  }
+
+  // Unless `IncludeOuterInverses` is enabled, limit inverses to the
+  // innermost generic parameters.
+  if (!(flags & IncludeOuterInverses) && !inverses.empty()) {
+    auto innerParams = genericSig.getInnermostGenericParams();
+    SmallPtrSet<TypeBase *, 4> innerParamSet(innerParams.begin(),
+                                             innerParams.end());
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
+      return !innerParamSet.contains(inverse.subject.getPointer());
+    });
   }
 
   if (flags & InnermostOnly) {
@@ -2696,9 +2708,17 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   if (parentSig && parentSig->isEqual(genericSig))
     return;
 
+  unsigned flags = PrintRequirements | PrintInverseRequirements;
+
+  // In many cases, inverses should not be printed for outer generic parameters.
+  // Exceptions to that include extensions, as it's valid to write an inverse
+  // on the generic parameters they get from the extended nominal.
+  if (isa<ExtensionDecl>(decl))
+    flags |= IncludeOuterInverses;
+
   Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
   printGenericSignature(genericSig,
-                        PrintRequirements | PrintInverseRequirements,
+                        flags,
                         [parentSig](const Requirement &req) {
                           if (parentSig)
                             return !parentSig->isRequirementSatisfied(req);
@@ -2852,10 +2872,13 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
                                              ExtensionDecl *ExtDecl) {
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<InverseRequirement, 2> inverses;
     auto Sig = ED->getGenericSignature();
+    Sig->getRequirementsWithInverses(requirements, inverses);
     printSingleDepthOfGenericSignature(Sig.getGenericParams(),
-                                       Sig.getRequirements(),
-                                       /*inverses=*/{},
+                                       requirements,
+                                       inverses,
                                        IsFirst,
                                        PrintRequirements | PrintInverseRequirements,
                                        [](const Requirement &Req){
@@ -2956,7 +2979,9 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
       printGenericSignature(genericSig,
-                            PrintRequirements | PrintInverseRequirements,
+                            PrintRequirements
+                              | PrintInverseRequirements
+                              | IncludeOuterInverses,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
