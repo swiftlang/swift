@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -enable-library-evolution
 
 // REQUIRES: concurrency
+// UNSUPPORTED: CPU=wasm32
 
 // CHECK: "$s5async1fyyYaF"
 public func f() async { }
