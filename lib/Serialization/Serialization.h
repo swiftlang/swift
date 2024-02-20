@@ -579,6 +579,10 @@ private:
   /// If the declaration is invalid, records that an error occurred and returns
   /// true if the decl should be skipped.
   bool skipDeclIfInvalid(const Decl *decl);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, TypeRepr *tyRepr);
 };
 
 } // end namespace serialization

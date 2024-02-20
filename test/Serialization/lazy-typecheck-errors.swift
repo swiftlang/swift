@@ -16,3 +16,7 @@ public func returnsInvalidType() -> InvalidType { fatalError() }
 public func takesInvalidType(_ x: InvalidType) {}
 // expected-error@-1 {{cannot find type 'InvalidType' in scope}}
 // expected-serialization-remark@-2 {{serialization skipped invalid global function 'takesInvalidType'}}
+
+@InvalidCustomAttr public struct HasInvalidCustomAttr {}
+// FIXME: An error should be emitted for the invalid attribute
+// expected-serialization-remark@-2 {{serialization skipped for invalid type 'InvalidCustomAttr'}}

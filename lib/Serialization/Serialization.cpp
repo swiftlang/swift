@@ -3048,12 +3048,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
-      auto typeID = S.addTypeRef(
-          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr)));
-      if (!typeID && !S.allowCompilerErrors()) {
-        llvm::PrettyStackTraceString message("CustomAttr has no type");
-        abort();
-      }
+      auto attrType =
+          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr));
+      if (S.skipTypeIfInvalid(attrType, theAttr->getTypeRepr()))
+        return;
+
+      auto typeID = S.addTypeRef(attrType);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
                                        typeID, theAttr->isArgUnsafe());
@@ -6806,6 +6806,19 @@ bool Serializer::skipDeclIfInvalid(const Decl *decl) {
   if (Options.EnableSerializationRemarks) {
     getASTContext().Diags.diagnose(
         decl->getLoc(), diag::serialization_skipped_invalid_decl, decl);
+  }
+
+  hadError = true;
+  return true;
+}
+
+bool Serializer::skipTypeIfInvalid(Type ty, TypeRepr *tyRepr) {
+  if (ty || allowCompilerErrors())
+    return false;
+
+  if (Options.EnableSerializationRemarks) {
+    getASTContext().Diags.diagnose(
+        tyRepr->getLoc(), diag::serialization_skipped_invalid_type, tyRepr);
   }
 
   hadError = true;
