@@ -574,6 +574,50 @@ TypeRefBuilder::getBuiltinTypeDescriptor(const TypeRef *TR) {
   return nullptr;
 }
 
+namespace {
+/// A builtin type descriptor implementation that wraps a reflection builtin
+/// type descriptor.
+class MultiPayloadEnumDescriptorImpl : public MultiPayloadEnumDescriptorBase {
+  RemoteRef<MultiPayloadEnumDescriptor> MPED;
+  TypeRefBuilder &Builder;
+
+public:
+  MultiPayloadEnumDescriptorImpl(RemoteRef<MultiPayloadEnumDescriptor> MPED,
+                                 TypeRefBuilder &Builder)
+      : MultiPayloadEnumDescriptorBase(), MPED(MPED), Builder(Builder) {}
+
+  ~MultiPayloadEnumDescriptorImpl() override {}
+
+  StringRef getMangledTypeName() override {
+    return Builder.getTypeRefString(Builder.readTypeRef(MPED, MPED->TypeName));
+  };
+
+  uint32_t getContentsSizeInWords() const override {
+    return MPED->getContentsSizeInWords();
+  }
+
+  size_t getSizeInBytes() const override { return MPED->getSizeInBytes(); }
+
+  uint32_t getFlags() const override { return MPED->getFlags(); }
+
+  bool usesPayloadSpareBits() const override {
+    return MPED->usesPayloadSpareBits();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteOffset() const override {
+    return MPED->getPayloadSpareBitMaskByteOffset();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteCount() const override {
+    return MPED->getPayloadSpareBitMaskByteCount();
+  }
+
+  const uint8_t *getPayloadSpareBits() const override {
+    return MPED->getPayloadSpareBits();
+  }
+};
+} // namespace
+  
 RemoteRef<MultiPayloadEnumDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
     const TypeRef *TR) {
@@ -616,6 +660,23 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
       return MultiPayloadEnumDescriptor;
     }
   }
+
+  return nullptr;
+}
+
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumDescriptor(
+    const TypeRef *TR) {
+  if (auto BTI = getMultiPayloadEnumInfo(TR))
+    return std::make_unique<MultiPayloadEnumDescriptorImpl>(BTI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::getMultiPayloadEnumDescriptor(const TypeRef *TR) {
+  for (auto *DF : getDescriptorFinders())
+    if (auto descriptor = DF->getMultiPayloadEnumDescriptor(TR))
+      return descriptor;
 
   return nullptr;
 }
