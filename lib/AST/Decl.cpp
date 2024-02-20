@@ -4206,10 +4206,8 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
   return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
-          getModuleContext()->inSamePackage(accessingModule) &&
-          !getModuleContext()->isBuiltFromInterface() &&
-          getFormalAccessScope(/*useDC=*/nullptr,
-                               /*treatUsableFromInlineAsPublic=*/true).isPackage();
+         getModuleContext()->inSamePackage(accessingModule) &&
+         !getModuleContext()->isBuiltFromInterface();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
