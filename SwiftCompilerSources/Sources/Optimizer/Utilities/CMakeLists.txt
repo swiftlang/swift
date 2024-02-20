@@ -15,6 +15,7 @@ swift_compiler_sources(Optimizer
   ForwardingUtils.swift
   FunctionSignatureTransforms.swift
   LifetimeDependenceUtils.swift
+  LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
   SSAUpdater.swift

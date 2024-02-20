@@ -386,7 +386,7 @@ extension NonEscapingClosureDefUseWalker: ForwardingDefUseWalker {
   mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
     // Nonescaping closures may be moved, copied, or borrowed.
     if let transition = operand.instruction as? OwnershipTransitionInstruction {
-      return walkDownUses(of: transition, using: operand)
+      return walkDownUses(of: transition.ownershipResult, using: operand)
     }
     // Otherwise, assume the use cannot propagate the closure context.
     return closureContextLeafUse(of: operand)
