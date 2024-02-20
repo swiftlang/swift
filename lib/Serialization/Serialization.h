@@ -583,6 +583,10 @@ private:
   /// If the type is invalid, records that an error occurred and returns
   /// true if the type should be skipped.
   bool skipTypeIfInvalid(Type ty, TypeRepr *tyRepr);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, SourceLoc loc);
 };
 
 } // end namespace serialization

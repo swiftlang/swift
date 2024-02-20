@@ -3659,27 +3659,37 @@ private:
     }
     case PatternKind::Named: {
       auto named = cast<NamedPattern>(pattern);
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, named->getLoc()))
+        break;
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[NamedPatternLayout::Code];
       NamedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addDeclRef(named->getDecl()),
-                                     S.addTypeRef(getPatternType()));
+                                     S.addTypeRef(ty));
       break;
     }
     case PatternKind::Any: {
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, pattern->getLoc()))
+        break;
+
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
       auto anyPattern = cast<AnyPattern>(pattern);
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()),
+                                   S.addTypeRef(ty),
                                    anyPattern->isAsyncLet());
       break;
     }
     case PatternKind::Typed: {
       auto typed = cast<TypedPattern>(pattern);
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, typed->getTypeRepr()))
+        break;
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[TypedPatternLayout::Code];
       TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addTypeRef(getPatternType()));
+                                     S.addTypeRef(ty));
       writePattern(typed->getSubPattern());
       break;
     }
@@ -6813,12 +6823,25 @@ bool Serializer::skipDeclIfInvalid(const Decl *decl) {
 }
 
 bool Serializer::skipTypeIfInvalid(Type ty, TypeRepr *tyRepr) {
-  if (ty || allowCompilerErrors())
+  if ((ty && !ty->hasError()) || allowCompilerErrors())
     return false;
 
   if (Options.EnableSerializationRemarks) {
     getASTContext().Diags.diagnose(
         tyRepr->getLoc(), diag::serialization_skipped_invalid_type, tyRepr);
+  }
+
+  hadError = true;
+  return true;
+}
+
+bool Serializer::skipTypeIfInvalid(Type ty, SourceLoc loc) {
+  if ((ty && !ty->hasError()) || allowCompilerErrors())
+    return false;
+
+  if (Options.EnableSerializationRemarks) {
+    getASTContext().Diags.diagnose(
+        loc, diag::serialization_skipped_invalid_type_unknown_name);
   }
 
   hadError = true;

@@ -814,6 +814,9 @@ REMARK(serialization_skipped_invalid_decl,none,
 REMARK(serialization_skipped_invalid_type,none,
        "serialization skipped for invalid type %0",
        (TypeRepr *))
+REMARK(serialization_skipped_invalid_type_unknown_name,none,
+       "serialization skipped for invalid type",
+       ())
 ERROR(serialization_failed,none,
       "serialization of module %0 failed due to the errors above",
       (const ModuleDecl *))

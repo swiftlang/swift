@@ -20,3 +20,15 @@ public func takesInvalidType(_ x: InvalidType) {}
 @InvalidCustomAttr public struct HasInvalidCustomAttr {}
 // FIXME: An error should be emitted for the invalid attribute
 // expected-serialization-remark@-2 {{serialization skipped for invalid type 'InvalidCustomAttr'}}
+
+public var varWithExplicitInvalidType: InvalidType
+// expected-error@-1 {{cannot find type 'InvalidType' in scope}}
+// expected-serialization-remark@-2 {{serialization skipped invalid var 'varWithExplicitInvalidType'}}
+// expected-serialization-remark@-3 {{serialization skipped for invalid type 'InvalidType'}}
+
+public var varWithImplicitInvalidType = (1 as InvalidType)
+// expected-error@-1 {{cannot find type 'InvalidType' in scope}}
+// expected-serialization-remark@-2 {{serialization skipped invalid var 'varWithImplicitInvalidType'}}
+// expected-serialization-remark@-3 {{serialization skipped for invalid type}}
+
+public var _: InvalidType
