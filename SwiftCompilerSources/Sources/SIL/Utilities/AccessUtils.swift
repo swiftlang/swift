@@ -158,15 +158,15 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
-  /// True, if the address is immediately produced by an allocation in its function.
+  /// True, if the address is produced by an allocation in its function.
   public var isLocal: Bool {
     switch self {
-      case .box(let pbi):      return pbi.box is AllocBoxInst
-      case .class(let rea):    return rea.instance is AllocRefInstBase
-      case .tail(let rta):     return rta.instance is AllocRefInstBase
-      case .stack:             return true
-      case .global, .argument, .yield, .pointer, .unidentified:
-        return false
+    case .box(let pbi):      return pbi.box.referenceRoot is AllocBoxInst
+    case .class(let rea):    return rea.instance.referenceRoot is AllocRefInstBase
+    case .tail(let rta):     return rta.instance.referenceRoot is AllocRefInstBase
+    case .stack:             return true
+    case .global, .argument, .yield, .pointer, .unidentified:
+      return false
     }
   }
 
@@ -241,7 +241,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     // First handle all pairs of the same kind (except `yield` and `pointer`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
-             isDifferentAllocation(pb.box, otherPb.box)
+        isDifferentAllocation(pb.box.referenceRoot, otherPb.box.referenceRoot)
     case (.stack(let asi), .stack(let otherAsi)):
       return asi != otherAsi
     case (.global(let global), .global(let otherGlobal)):
@@ -542,7 +542,7 @@ extension Value {
     return .base(walker.result.base)
   }
 
-  /// The root definition of a reference, obtained by skipping casts, etc.
+  /// The root definition of a reference, obtained by skipping ownership forwarding and ownership transition.
   public var referenceRoot: Value {
     var value: Value = self
     while true {
