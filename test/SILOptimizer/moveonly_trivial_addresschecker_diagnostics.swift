@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
 
 //////////////////
 // Declarations //
