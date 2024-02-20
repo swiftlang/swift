@@ -852,6 +852,12 @@ ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleTransferringResultFunctionType(Node *node,
+                                                              unsigned depth) {
+  Buffer << "YT";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleFieldOffset(Node *node, unsigned depth) {
   Buffer << "Wv";
   return mangleChildNodes(node, depth + 1); // directness, entity
@@ -1785,6 +1791,16 @@ Remangler::mangleImplParameterResultDifferentiability(Node *node,
   return MANGLING_ERROR(ManglingError::InvalidImplDifferentiability, node);
 }
 
+ManglingError Remangler::mangleImplParameterTransferring(Node *node,
+                                                         unsigned depth) {
+  StringRef text = node->getText();
+  if (text == "transferring") {
+    Buffer << 'T';
+    return ManglingError::Success;
+  }
+  return MANGLING_ERROR(ManglingError::InvalidImplParameterTransferring, node);
+}
+
 ManglingError Remangler::mangleDynamicSelf(Node *node, unsigned depth) {
   Buffer << 'D';
   return mangleSingleChildNode(node, depth + 1); // type
@@ -1884,6 +1900,11 @@ ManglingError Remangler::mangleInOut(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   Buffer << "Yi";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
+ManglingError Remangler::mangleTransferring(Node *node, unsigned depth) {
+  Buffer << "Yu";
   return mangleSingleChildNode(node, depth + 1); // type
 }
 

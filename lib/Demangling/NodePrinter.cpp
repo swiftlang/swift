@@ -427,6 +427,7 @@ private:
     case Node::Kind::ImplErasedIsolation:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
+    case Node::Kind::ImplParameterTransferring:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
@@ -442,6 +443,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
+    case Node::Kind::Transferring:
     case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
@@ -559,6 +561,7 @@ private:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::TransferringResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::TypedThrowsAnnotation:
@@ -878,7 +881,7 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false;
+    bool isSendable = false, isAsync = false, hasTransferringResult = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
@@ -923,6 +926,11 @@ private:
       ++startIndex;
       isAsync = true;
     }
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::TransferringResultFunctionType) {
+      ++startIndex;
+      hasTransferringResult = true;
+    }
 
     switch (diffKind) {
     case MangledDifferentiabilityKind::Forward:
@@ -956,6 +964,11 @@ private:
     if (thrownErrorNode) {
       print(thrownErrorNode, depth + 1);
     }
+
+    Printer << " -> ";
+
+    if (hasTransferringResult)
+      Printer << "transferring ";
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1674,9 +1687,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
-      Printer << " -> " << Node->getText();
+      Printer << Node->getText();
     else {
-      Printer << " -> ";
       printChildren(Node, depth);
     }
     return nullptr;
@@ -1700,6 +1712,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::Isolated:
     Printer << "isolated ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::Transferring:
+    Printer << "transferring ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CompileTimeConst:
@@ -2748,6 +2764,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Otherwise, print with trailing space.
     Printer << Node->getText() << ' ';
     return nullptr;
+  case Node::Kind::ImplParameterTransferring:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with trailing space.
+    Printer << Node->getText() << ' ';
+    return nullptr;
   case Node::Kind::ImplFunctionAttribute:
     Printer << Node->getText();
     return nullptr;
@@ -2787,6 +2810,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Print differentiability, if it exists.
     if (Node->getNumChildren() == 3)
       print(Node->getChild(1), depth + 1);
+    // Print differentiability and transferring if it exists.
+    if (Node->getNumChildren() == 4) {
+      print(Node->getChild(1), depth + 1);
+      print(Node->getChild(2), depth + 1);
+    }
     // Print type.
     print(Node->getLastChild(), depth + 1);
     return nullptr;
@@ -2965,6 +2993,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::IsolatedAnyFunctionType:
     Printer << "@isolated(any) ";
+    return nullptr;
+  case Node::Kind::TransferringResultFunctionType:
+    Printer << "transferring ";
     return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer << " async";

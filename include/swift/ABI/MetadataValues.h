@@ -1187,6 +1187,9 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
+
+    // Values if we have a transferring result.
+    HasTransferringResult  = 0x00000010U,
   };
   int_type Data;
 
@@ -1211,10 +1214,21 @@ public:
               (Data & ~IsolationMask) | IsolatedAny);
   }
 
+  const TargetExtendedFunctionTypeFlags<int_type>
+  withTransferringResult(bool newValue = true) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~HasTransferringResult) |
+        (newValue ? HasTransferringResult : 0));
+  }
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
     return (Data & IsolationMask) == IsolatedAny;
+  }
+
+  bool hasTransferringResult() const {
+    return bool(Data & HasTransferringResult);
   }
 
   int_type getIntValue() const {
@@ -1242,6 +1256,7 @@ class TargetParameterTypeFlags {
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
     IsolatedMask          = 0x400,
+    TransferringMask      = 0x800,
   };
   int_type Data;
 
@@ -1280,11 +1295,18 @@ public:
         (Data & ~IsolatedMask) | (isIsolated ? IsolatedMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withTransferring(bool isTransferring) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~TransferringMask) | (isTransferring ? TransferringMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   bool isNoDerivative() const { return Data & NoDerivativeMask; }
   bool isIsolated() const { return Data & IsolatedMask; }
+  bool isTransferring() const { return Data & TransferringMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);

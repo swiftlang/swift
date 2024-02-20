@@ -414,7 +414,8 @@ Type ASTBuilder::createFunctionType(
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative())
-                              .withIsolated(flags.isIsolated());
+                              .withIsolated(flags.isIsolated())
+                              .withTransferring(flags.isTransferring());
 
     hasIsolatedParameter |= flags.isIsolated();
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
@@ -472,7 +473,7 @@ Type ASTBuilder::createFunctionType(
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
-                   LifetimeDependenceInfo(), false /*is transferring*/)
+                   LifetimeDependenceInfo(), extFlags.hasTransferringResult())
                    .withAsync(flags.isAsync())
                    .withConcurrent(flags.isSendable())
                    .build();
@@ -515,6 +516,11 @@ getParameterOptions(ImplParameterInfoOptions implOptions) {
   if (implOptions.contains(ImplParameterInfoFlags::NotDifferentiable)) {
     implOptions -= ImplParameterInfoFlags::NotDifferentiable;
     result |= SILParameterInfo::NotDifferentiable;
+  }
+
+  if (implOptions.contains(ImplParameterInfoFlags::Transferring)) {
+    implOptions -= ImplParameterInfoFlags::Transferring;
+    result |= SILParameterInfo::Transferring;
   }
 
   // If we did not handle all flags in implOptions, this code was not updated
@@ -659,7 +665,7 @@ Type ASTBuilder::createImplFunctionType(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), unimplementable,
                    isolation, diffKind, clangFnType, LifetimeDependenceInfo(),
-                   false /*has transferring result*/)
+                   flags.hasTransferringResult())
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
