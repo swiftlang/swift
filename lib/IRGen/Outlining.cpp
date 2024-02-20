@@ -135,24 +135,35 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
           env->getGenericSignature().getCanonicalSignature()};
 }
 
-void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
-                                SILType T, IsInitialization_t isInit,
-                                IsTake_t isTake) const {
+bool TypeInfo::withMetadataCollector(
+    IRGenFunction &IGF, SILType T,
+    llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
   if (!T.hasLocalArchetype() &&
       !IGF.outliningCanCallValueWitnesses()) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
     }
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
-    return;
+    invocation(collector);
+    return true;
   }
 
   if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
+    // The implementation will call vwt in this case.
     OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+    invocation(collector);
+    return true;
+  }
+
+  return false;
+}
+
+void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                                SILType T, IsInitialization_t isInit,
+                                IsTake_t isTake) const {
+  if (withMetadataCollector(IGF, T, [&](auto collector) {
+        collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+      })) {
     return;
   }
 
@@ -345,21 +356,9 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (!T.hasLocalArchetype() &&
-      !IGF.outliningCanCallValueWitnesses()) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
+  if (withMetadataCollector(IGF, T, [&](auto collector) {
+        collector.emitCallToOutlinedDestroy(addr, T, *this);
+      })) {
     return;
   }
 
