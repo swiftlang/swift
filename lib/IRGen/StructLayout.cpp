@@ -387,6 +387,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
   IsLoadable &= eltTI.isLoadable();
+  IsKnownCopyable &= eltTI.isCopyable(ResilienceExpansion::Maximal);
 
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
