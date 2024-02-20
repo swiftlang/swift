@@ -125,10 +125,15 @@ public:
 
 private:
   void drainVariableNamePath();
+  void popSingleVariableName();
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.
   SILValue findDebugInfoProvidingValue(SILValue searchValue);
+
+  /// Do not call this directly. Used just to improve logging for
+  /// findDebugInfoProvidingValue.
+  SILValue findDebugInfoProvidingValueHelper(SILValue searchValue);
 
   /// Given an initialized once allocation inst without a ValueDecl or a
   /// DebugVariable provided name, attempt to find a root value from its
