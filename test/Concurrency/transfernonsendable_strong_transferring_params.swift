@@ -138,7 +138,8 @@ actor MyActor {
   // Once we assign into the actor, we cannot transfer further.
   func assignTransferringIntoActor2(_ x: transferring Klass) async {
     field = x
-    await transferToMain(x) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await transferToMain(x) // expected-warning {{transferring 'x' could cause a race}}
+    // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 }
 
@@ -148,11 +149,13 @@ actor MyActor {
 
 @MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
   globalKlass = x
-  await transferToCustom(x) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(x) // expected-warning {{transferring 'x' could cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(globalKlass) // expected-warning {{transferring 'globalKlass' could cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'globalKlass' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
