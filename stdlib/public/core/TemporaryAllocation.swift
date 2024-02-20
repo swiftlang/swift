@@ -178,8 +178,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   _ body: (Builtin.RawPointer) throws -> R
 ) rethrows -> R {
   // How many bytes do we need to allocate?
-  //let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
-  let byteCount = MemoryLayout<T>.stride &* capacity
+  let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
 
   guard _isStackAllocationSafe(byteCount: byteCount, alignment: alignment) else {
     return try _fallBackToHeapAllocation(byteCount: byteCount, alignment: alignment, body)
@@ -295,7 +294,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable>(
     alignment: alignment
   ) { pointer in
     let buffer = UnsafeMutableRawBufferPointer(
-      _uncheckedStart: .init(pointer),
+      start: .init(pointer),
       count: byteCount
     )
     return try body(buffer)
@@ -375,7 +374,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
   ) { pointer in
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
     let buffer = UnsafeMutableBufferPointer<T>(
-      _uncheckedStart: .init(pointer),
+      start: .init(pointer),
       count: capacity
     )
     return try body(buffer)
