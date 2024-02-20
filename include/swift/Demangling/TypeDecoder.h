@@ -73,8 +73,8 @@ public:
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setAutoClosure() { Flags = Flags.withAutoClosure(true); }
-  void setValueOwnership(ValueOwnership ownership) {
-    Flags = Flags.withValueOwnership(ownership);
+  void setOwnership(ParameterOwnership ownership) {
+    Flags = Flags.withOwnership(ownership);
   }
   void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setIsolated() { Flags = Flags.withIsolated(true); }
@@ -1701,19 +1701,19 @@ private:
       while (recurse) {
         switch (node->getKind()) {
         case NodeKind::InOut:
-          param.setValueOwnership(ValueOwnership::InOut);
+          param.setOwnership(ParameterOwnership::InOut);
           node = node->getFirstChild();
           hasParamFlags = true;
           break;
 
         case NodeKind::Shared:
-          param.setValueOwnership(ValueOwnership::Shared);
+          param.setOwnership(ParameterOwnership::Shared);
           node = node->getFirstChild();
           hasParamFlags = true;
           break;
 
         case NodeKind::Owned:
-          param.setValueOwnership(ValueOwnership::Owned);
+          param.setOwnership(ParameterOwnership::Owned);
           node = node->getFirstChild();
           hasParamFlags = true;
           break;

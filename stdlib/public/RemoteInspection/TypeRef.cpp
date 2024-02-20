@@ -192,17 +192,17 @@ public:
         stream << "\n";
       }
 
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         printHeader("inout");
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         printHeader("shared");
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         printHeader("owned");
         break;
       }
@@ -681,17 +681,17 @@ public:
       if (flags.isNoDerivative()) {
         wrapInput(Node::Kind::NoDerivative);
       }
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         wrapInput(Node::Kind::InOut);
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         wrapInput(Node::Kind::Shared);
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
       }
