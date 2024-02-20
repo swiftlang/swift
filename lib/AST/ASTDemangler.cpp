@@ -408,7 +408,7 @@ Type ASTBuilder::createFunctionType(
     auto label = Ctx.getIdentifier(param.getLabel());
     auto flags = param.getFlags();
     auto ownership =
-      ParamDecl::getParameterSpecifierForValueOwnership(flags.getValueOwnership());
+      ParamDecl::getParameterSpecifierForValueOwnership(asValueOwnership(flags.getOwnership()));
     auto parameterFlags = ParameterTypeFlags()
                               .withOwnershipSpecifier(ownership)
                               .withVariadic(flags.isVariadic())

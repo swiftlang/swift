@@ -1379,7 +1379,7 @@ static llvm::Value *getFunctionParameterRef(IRGenFunction &IGF,
 /// Mapping type-level parameter flags to ABI parameter flags.
 ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
   return ParameterFlags()
-      .withValueOwnership(flags.getValueOwnership())
+      .withOwnership(asParameterOwnership(flags.getValueOwnership()))
       .withVariadic(flags.isVariadic())
       .withAutoClosure(flags.isAutoClosure())
       .withNoDerivative(flags.isNoDerivative())

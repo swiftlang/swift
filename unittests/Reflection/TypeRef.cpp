@@ -160,10 +160,10 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   // Test parameter with and without inout/shared/variadic and/or label.
   ParameterFlags paramFlags;
-  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
+  auto inoutFlags = paramFlags.withOwnership(ParameterOwnership::InOut);
   auto variadicFlags = paramFlags.withVariadic(true);
-  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
-  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
+  auto sharedFlags = paramFlags.withOwnership(ParameterOwnership::Shared);
+  auto ownedFlags = paramFlags.withOwnership(ParameterOwnership::Owned);
 
   auto F6 = Builder.createFunctionType(
       {Param1.withFlags(inoutFlags)}, Result, FunctionTypeFlags(),

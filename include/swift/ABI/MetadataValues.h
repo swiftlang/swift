@@ -14,6 +14,10 @@
 // includes target-independent information which can be usefully shared
 // between them.
 //
+// This header ought not to include any compiler-specific headers (such as
+// those from `swift/AST`, `swift/SIL`, etc.) since doing so may introduce
+// accidental ABI dependencies on compiler internals.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_ABI_METADATAVALUES_H
@@ -21,7 +25,11 @@
 
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
+
+// FIXME: this include shouldn't be here, but removing it causes symbol
+// mangling mismatches on Windows for some reason?
 #include "swift/AST/Ownership.h"
+
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
@@ -1248,10 +1256,25 @@ public:
 };
 using ExtendedFunctionTypeFlags = TargetExtendedFunctionTypeFlags<uint32_t>;
 
+/// Different kinds of value ownership supported by function types.
+enum class ParameterOwnership : uint8_t {
+  /// the context-dependent default ownership (sometimes shared,
+  /// sometimes owned)
+  Default,
+  /// an 'inout' exclusive, mutating borrow
+  InOut,
+  /// a 'borrowing' nonexclusive, usually nonmutating borrow
+  Shared,
+  /// a 'consuming' ownership transfer
+  Owned,
+
+  Last_Kind = Owned
+};
+
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
-    ValueOwnershipMask    = 0x7F,
+    OwnershipMask         = 0x7F,
     VariadicMask          = 0x80,
     AutoClosureMask       = 0x100,
     NoDerivativeMask      = 0x200,
@@ -1266,8 +1289,8 @@ public:
   constexpr TargetParameterTypeFlags() : Data(0) {}
 
   constexpr TargetParameterTypeFlags<int_type>
-  withValueOwnership(ValueOwnership ownership) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~ValueOwnershipMask) |
+  withOwnership(ParameterOwnership ownership) const {
+    return TargetParameterTypeFlags<int_type>((Data & ~OwnershipMask) |
                                               (int_type)ownership);
   }
 
@@ -1308,8 +1331,8 @@ public:
   bool isIsolated() const { return Data & IsolatedMask; }
   bool isTransferring() const { return Data & TransferringMask; }
 
-  ValueOwnership getValueOwnership() const {
-    return (ValueOwnership)(Data & ValueOwnershipMask);
+  ParameterOwnership getOwnership() const {
+    return (ParameterOwnership)(Data & OwnershipMask);
   }
 
   int_type getIntValue() const { return Data; }
