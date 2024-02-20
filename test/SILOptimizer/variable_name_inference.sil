@@ -1,11 +1,28 @@
-// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -module-name infer -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
 
-class Klass {}
+//===----------------------------------------------------------------------===//
+//                             MARK: Declarations
+//===----------------------------------------------------------------------===//
+
+class Klass {
+}
+
+class ContainsKlass {
+  var computedKlass: Klass { get }
+  final var klass: Klass
+
+  init()
+}
 
 sil @getKlass : $@convention(thin) () -> @owned Klass
+sil @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
 sil @useIndirect : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on simple_test_case: variable-name-inference with: @trace[0]
 // CHECK: Input Value:   %1 = apply %0() : $@convention(thin) () -> @owned Klass
@@ -73,4 +90,26 @@ bb0:
   dealloc_stack %temp : $*Klass
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on look_through_accessors_get: variable-name-inference with: @trace[0]
+// CHECK: Name: 'myName.computedKlass'
+// CHECK: Root: %2 = move_value [lexical] [var_decl]
+// CHECK: end running test {{.*}} of {{.*}} on look_through_accessors_get: variable-name-inference with: @trace[0]
+sil [ossa] @look_through_accessors_get : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %0 = function_ref @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned ContainsKlass
+  %3 = move_value [lexical] [var_decl] %1 : $ContainsKlass
+  debug_value %3 : $ContainsKlass, let, name "myName"
+  %5 = begin_borrow %3 : $ContainsKlass
+  %6 = class_method %5 : $ContainsKlass, #ContainsKlass.computedKlass!getter : (ContainsKlass) -> () -> Klass, $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  debug_value [trace] %7 : $Klass
+  end_borrow %5 : $ContainsKlass
+  destroy_value %7 : $Klass
+  destroy_value %3 : $ContainsKlass
+  %13 = tuple ()
+  return %13 : $()
 }

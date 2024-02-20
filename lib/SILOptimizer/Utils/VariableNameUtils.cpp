@@ -124,27 +124,37 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
     }
 
     auto getNamePathComponentFromCallee =
-        [&](FullApplySite call) -> std::optional<SILValue> {
+        [&](FullApplySite call) -> SILValue {
       // Use the name of the property being accessed if we can get to it.
       if (isa<FunctionRefBaseInst>(call.getCallee()) ||
           isa<MethodInst>(call.getCallee())) {
-        variableNamePath.push_back(call.getCallee()->getDefiningInstruction());
-        // Try to name the base of the property if this is a method.
         if (call.getSubstCalleeType()->hasSelfParam()) {
+          variableNamePath.push_back(call.getCallee()->getDefiningInstruction());
           return call.getSelfArgument();
         }
 
         return SILValue();
       }
-      return {};
+
+      return SILValue();
     };
 
     // Read or modify accessor.
     if (auto bai = dyn_cast_or_null<BeginApplyInst>(
             searchValue->getDefiningInstruction())) {
       if (auto selfParam = getNamePathComponentFromCallee(bai)) {
-        searchValue = *selfParam;
+        searchValue = selfParam;
         continue;
+      }
+    }
+
+    if (options.contains(Flag::InferSelfThroughAllAccessors)) {
+      if (auto fas =
+              FullApplySite::isa(searchValue->getDefiningInstruction())) {
+        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+          searchValue = selfParam;
+          continue;
+        }
       }
     }
 
@@ -164,7 +174,7 @@ VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
       if (addressorInvocation) {
         if (auto selfParam =
                 getNamePathComponentFromCallee(addressorInvocation)) {
-          searchValue = *selfParam;
+          searchValue = selfParam;
           continue;
         }
       }
@@ -263,7 +273,9 @@ static FunctionTest VariableNameInferrerTests(
     "variable-name-inference", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       SmallString<64> finalString;
-      VariableNameInferrer inferrer(&function, finalString);
+      VariableNameInferrer::Options options;
+      options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+      VariableNameInferrer inferrer(&function, options, finalString);
       SILValue rootValue =
           inferrer.inferByWalkingUsesToDefsReturningRoot(value);
       llvm::outs() << "Input Value: " << *value;
