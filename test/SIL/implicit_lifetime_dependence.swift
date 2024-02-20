@@ -7,9 +7,6 @@
 // RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
 // REQUIRES: asserts
 
-
-import Builtin
-
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
@@ -116,3 +113,50 @@ struct Container2 : ~Copyable {
   }
 }
 
+
+struct FakeRange<Bound> {
+  public let lowerBound: Bound
+  public let upperBound: Bound
+}
+
+struct GenericBufferView<Element> : ~Escapable {
+  typealias Index = Int
+  typealias Pointer = UnsafeRawPointer
+
+  let baseAddress: Pointer
+  let count: Int
+
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(1) @owned GenericBufferView<Element> {
+  init<Storage>(baseAddress: Pointer,
+                count: Int,
+                dependsOn: borrowing Storage) {
+    self = GenericBufferView<Element>(baseAddress: baseAddress,
+                                      count: count)
+  }
+  // unsafe private API
+  @_unsafeNonescapableResult
+  init(baseAddress: Pointer, count: Int) {
+    precondition(count >= 0, "Count must not be negative")
+    self.baseAddress = baseAddress
+    self.count = count
+  } 
+  subscript(position: Pointer) -> Element {
+    get {
+      if _isPOD(Element.self) {
+        return position.loadUnaligned(as: Element.self)
+      }
+      else {
+        return position.load(as: Element.self)
+      }
+    }
+  }
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _scope(0) @owned GenericBufferView<Element> {
+  subscript(bounds: FakeRange<Pointer>) -> Self {
+    get {
+      GenericBufferView(
+        baseAddress: UnsafeRawPointer(bounds.lowerBound),
+        count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
+      )
+    }
+  }
+}
