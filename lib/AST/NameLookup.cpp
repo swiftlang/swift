@@ -1844,13 +1844,18 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
   auto containerDecl = container.getAsDecl();
   forEachPotentialAttachedMacro(containerDecl, MacroRole::Member, nameTracker);
 
-  // If the container is an extension that was created from an extension macro,
-  // look at the nominal declaration to find any extension macros.
-  if (auto ext = dyn_cast<ExtensionDecl>(containerDecl)) {
-    if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
-      forEachPotentialAttachedMacro(
-          nominal, MacroRole::Extension, nameTracker);
-    }
+  // Extension macros on the type or extension.
+  {
+    NominalTypeDecl *nominal = nullptr;
+    // If the container is an extension that was created from an extension
+    // macro, look at the nominal declaration to find any extension macros.
+    if (auto ext = dyn_cast<ExtensionDecl>(containerDecl))
+      nominal = nominalForExpandedExtensionDecl(ext);
+    else
+      nominal = container.getBaseNominal();
+
+    if (nominal)
+      forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
   }
 
   // Peer and freestanding declaration macros.
@@ -1911,15 +1916,20 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
   // names match.
   {
     MacroIntroducedNameTracker nameTracker;
-    if (auto ext = dyn_cast<ExtensionDecl>(container.getAsDecl())) {
-      if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
-        forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
-        if (nameTracker.shouldExpandForName(name)) {
-          (void)evaluateOrDefault(
-              ctx.evaluator,
-              ExpandExtensionMacros{nominal},
-              false);
-        }
+    NominalTypeDecl *nominal = nullptr;
+    // If the container is an extension that was created from an extension
+    // macro, look at the nominal declaration to find any extension macros.
+    if (auto ext = dyn_cast<ExtensionDecl>(container.getAsDecl()))
+      nominal = nominalForExpandedExtensionDecl(ext);
+    else
+      nominal = container.getBaseNominal();
+
+    if (nominal) {
+      forEachPotentialAttachedMacro(nominal,
+                                  MacroRole::Extension, nameTracker);
+      if (nameTracker.shouldExpandForName(name)) {
+        (void)evaluateOrDefault(ctx.evaluator, ExpandExtensionMacros{nominal},
+                                false);
       }
     }
   }
