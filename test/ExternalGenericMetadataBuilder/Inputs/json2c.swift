@@ -14,6 +14,7 @@ struct Ptrauth: Decodable {
 }
 
 struct Fixup: Decodable {
+  var kind: String
   var target: String
   var addend: Int64
   var authPtr: Ptrauth?
@@ -108,7 +109,7 @@ func printDeclarations(_ document: Document) {
           print("  uint8_t \(name)[\(bytes.count)];")
         case .pointer(let fixup):
           let ptrauthQualifier: String
-          if let ptrauth = fixup.authPtr {
+          if fixup.kind == "arm64_auth_ptr", let ptrauth = fixup.authPtr {
             ptrauthQualifier = """
               __ptrauth(\(ptrauth.key),
                         \(ptrauth.addr ? 1 : 0),

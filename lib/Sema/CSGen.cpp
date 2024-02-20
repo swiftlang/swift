@@ -3923,6 +3923,13 @@ namespace {
     }
 
     Type visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+      // If this was expanded from the builtin `#isolation` macro, it
+      // already has a type.
+      if (auto type = E->getType())
+        return type;
+
+      // Otherwise, this was created for a `for await` loop, where its
+      // type is always `(any Actor)?`.
       auto actorProto = CS.getASTContext().getProtocol(
           KnownProtocolKind::Actor);
       return OptionalType::get(actorProto->getDeclaredExistentialType());

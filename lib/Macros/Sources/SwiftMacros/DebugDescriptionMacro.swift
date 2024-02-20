@@ -213,9 +213,8 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
     // Serialize the type summary into a global record, in a custom section, for LLDB to load.
     let decl: DeclSyntax = """
+        #if !os(Windows)
         #if os(Linux)
-        @_section(".lldbsummaries")
-        #elseif os(Windows)
         @_section(".lldbsummaries")
         #else
         @_section("__TEXT,__lldbsummaries")
@@ -224,6 +223,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
         static let _lldb_summary = (
             \(raw: encodeTypeSummaryRecord(typeIdentifier, summaryString))
         )
+        #endif
         """
 
     return [decl]

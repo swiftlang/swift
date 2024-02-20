@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature OptionalIsolatedParameters %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature OptionalIsolatedParameters %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: swift_swift_parser
 
 @available(SwiftStdlib 5.1, *)

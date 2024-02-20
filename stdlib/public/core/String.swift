@@ -1169,7 +1169,7 @@ extension _StringGutsSlice {
   }
 
   internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
-    _guts.withFastUTF8 { utf8 in
+    withFastUTF8 { utf8 in
       var position = 0
 
       while position < utf8.count {

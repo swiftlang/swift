@@ -697,7 +697,7 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
 }
 
 namespace {
-  static constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+  constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
        {"-I",
         "-F",
         "-fmodule-map-file=",
@@ -714,6 +714,23 @@ namespace {
         "-ivfsoverlay",
         "-working-directory=",
         "-working-directory"};
+
+constexpr std::array<std::string_view, 15> knownClangDependencyIgnorablePrefiexes =
+     {"-I",
+      "-F",
+      "-fmodule-map-file=",
+      "-iquote",
+      "-idirafter",
+      "-iframeworkwithsysroot",
+      "-iframework",
+      "-iprefix",
+      "-iwithprefixbefore",
+      "-iwithprefix",
+      "-isystemafter",
+      "-isystem",
+      "-isysroot",
+      "-working-directory=",
+      "-working-directory"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
@@ -756,7 +773,7 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
 std::vector<std::string>
 ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
   auto matchIncludeOption = [](StringRef &arg) {
-    for (const auto &option : knownSearchPathPrefiexes)
+    for (const auto &option : knownClangDependencyIgnorablePrefiexes)
       if (arg.consume_front(option))
         return true;
     return false;
