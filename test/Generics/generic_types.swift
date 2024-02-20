@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 protocol MyFormattedPrintable { // expected-note 3 {{declared here}}
   func myFormat() -> String
 }

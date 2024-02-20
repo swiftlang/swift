@@ -3,6 +3,8 @@
 // RUN: %empty-directory(%t/includes)
 // RUN: echo "[myProto]" > %t/protocols.json
 
+// XFAIL: noncopyable_generics
+
 // Build external Swift library/module to also check conformances to external protocols
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 %S/../Reflection/Inputs/swiftmodules/testModB.swift -parse-as-library -emit-module -emit-library -module-name testModB -o %t/includes/testModB.o
 

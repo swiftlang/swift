@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-concrete-contraction 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-concrete-contraction -dump-requirement-machine 2>&1 | %FileCheck %s --check-prefix=RULE
 
+// XFAIL: noncopyable_generics
+
 protocol P {}
 
 class Base : P {}

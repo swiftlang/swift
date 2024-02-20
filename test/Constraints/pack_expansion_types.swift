@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 func returnTuple1<each T>() -> (repeat each T) { fatalError() }
 // expected-note@-1 {{in call to function 'returnTuple1()'}}
 

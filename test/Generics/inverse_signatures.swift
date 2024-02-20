@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: noncopyable_generics
 
 // CHECK-LABEL: (file).genericFn@

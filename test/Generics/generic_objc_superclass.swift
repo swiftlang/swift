@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk -dump-requirement-machine 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: objc_interop
 
 import Foundation

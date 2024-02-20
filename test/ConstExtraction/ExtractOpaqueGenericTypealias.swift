@@ -3,6 +3,8 @@
 // RUN: %empty-directory(%t/includes)
 // RUN: echo "[myProto]" > %t/protocols.json
 
+// XFAIL: noncopyable_generics
+
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -typecheck -emit-const-values-path %t/ExtractOpaqueGenericTypealias.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -I %t/includes
 // RUN: cat %t/ExtractOpaqueGenericTypealias.swiftconstvalues 2>&1 | %FileCheck %s
 

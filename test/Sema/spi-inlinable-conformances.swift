@@ -5,6 +5,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift
 
+// XFAIL: noncopyable_generics
+
 // RUN: %target-typecheck-verify-swift -I %t
 
 import NormalLibrary

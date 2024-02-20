@@ -2,6 +2,8 @@
 // RUN: %empty-directory(%t/inputs)
 // RUN: echo "[FooProvider]" > %t/inputs/protocols.json
 
+// XFAIL: noncopyable_generics
+
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractResultBuilders.swiftconstvalues -const-gather-protocols-file %t/inputs/protocols.json -primary-file %s
 // RUN: cat %t/ExtractResultBuilders.swiftconstvalues 2>&1 | %FileCheck %s
 

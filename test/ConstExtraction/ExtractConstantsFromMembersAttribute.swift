@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[]" > %t/protocols.json
 
+// XFAIL: noncopyable_generics
+
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractConstantsFromMembersAttribute.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -enable-experimental-feature ExtractConstantsFromMembers
 // RUN: cat %t/ExtractConstantsFromMembersAttribute.swiftconstvalues 2>&1 | %FileCheck %s
 

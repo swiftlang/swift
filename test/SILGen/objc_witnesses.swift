@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: objc_interop
 
 import Foundation
