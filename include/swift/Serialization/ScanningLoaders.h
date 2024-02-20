@@ -34,8 +34,7 @@ private:
 
   /// Scan the given interface file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework,
-                    bool isTestableImport);
+  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework);
 
   InterfaceSubContextDelegate &astDelegate;
 
