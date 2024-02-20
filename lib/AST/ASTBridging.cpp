@@ -2233,15 +2233,19 @@ BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
                                SourceRange{lParen, rParen});
 }
 
-BridgedTypeRepr
-BridgedMemberTypeRepr_createParsed(BridgedASTContext cContext,
-                                   BridgedTypeRepr baseComponent,
-                                   BridgedArrayRef bridgedMemberComponents) {
+BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedIdentifier cName,
+    BridgedSourceLoc cLoc, BridgedArrayRef cGenericArguments,
+    BridgedSourceRange cAngleRange) {
   ASTContext &context = cContext.unbridged();
-  auto memberComponents = bridgedMemberComponents.unbridged<IdentTypeRepr *>();
+  auto genericArguments = cGenericArguments.unbridged<TypeRepr *>();
+  auto angleRange = cAngleRange.unbridged();
 
-  return MemberTypeRepr::create(context, baseComponent.unbridged(),
-                                memberComponents);
+  assert(angleRange.isValid() || genericArguments.empty());
+
+  return DeclRefTypeRepr::create(
+      context, cBase.unbridged(), DeclNameLoc(cLoc.unbridged()),
+      DeclNameRef(cName.unbridged()), genericArguments, angleRange);
 }
 
 BridgedCompositionTypeRepr

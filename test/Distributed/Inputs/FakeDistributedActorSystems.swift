@@ -274,7 +274,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
           Res: SerializationRequirement {
     print("  >> remoteCall: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType)), returning:\(String(reflecting: returnType))")
     guard let targetActor = activeActors[actor.id] else {
-      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
+      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor: \(target.identifier)")
     }
 
     func doIt<A: DistributedActor>(active: A) async throws -> Res {
@@ -292,7 +292,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       var decoder = invocation.makeDecoder()
 
-      print(" > execute distributed target: \(target)")
+      print(" > execute distributed target: \(target), identifier: \(target.identifier)")
       try await executeDistributedTarget(
         on: active,
         target: target,

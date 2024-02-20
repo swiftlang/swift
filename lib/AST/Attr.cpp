@@ -1898,6 +1898,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_section";
   case DeclAttrKind::Documentation:
     return "_documentation";
+  case DeclAttrKind::DistributedThunkTarget:
+    return "_distributedThunkTarget";
   case DeclAttrKind::Nonisolated:
     if (cast<NonisolatedAttr>(this)->isUnsafe()) {
         return "nonisolated(unsafe)";
@@ -2747,18 +2749,18 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
       CustomAttr(atLoc, range, type, initContext, argList, implicit);
 }
 
-std::pair<IdentTypeRepr *, IdentTypeRepr *> CustomAttr::destructureMacroRef() {
+std::pair<IdentTypeRepr *, DeclRefTypeRepr *>
+CustomAttr::destructureMacroRef() {
   TypeRepr *typeRepr = getTypeRepr();
   if (!typeRepr)
     return {nullptr, nullptr};
   if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
     return {nullptr, identType};
-  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
-    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
-      if (memType->getMemberComponents().size() == 1)
-        if (auto first =
-                dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))
-          return {base, first};
+  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr)) {
+    if (auto *base = dyn_cast<SimpleIdentTypeRepr>(memType->getBase())) {
+      return {base, memType};
+    }
+  }
   return {nullptr, nullptr};
 }
 

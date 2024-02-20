@@ -7198,6 +7198,14 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
+  auto *bitwiseCopyableProtocol =
+      IGM.getSwiftModule()->getASTContext().getProtocol(
+          KnownProtocolKind::BitwiseCopyable);
+  if (bitwiseCopyableProtocol &&
+      IGM.getSwiftModule()->lookupConformance(
+          theEnum->getDeclaredInterfaceType(), bitwiseCopyableProtocol)) {
+    return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
+  }
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(

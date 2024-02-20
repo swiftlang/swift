@@ -482,7 +482,9 @@ public:
   }
 
   bool inSamePackage(ModuleDecl *other) {
-    return !getPackageName().empty() && getPackageName() == other->getPackageName();
+    return other != nullptr &&
+           !getPackageName().empty() &&
+           getPackageName() == other->getPackageName();
   }
 
   /// Get the package associated with this module

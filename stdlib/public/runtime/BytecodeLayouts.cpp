@@ -248,9 +248,12 @@ static void handleEnd(const Metadata *metadata,
 
 static void errorDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
-  SwiftError *error = *(SwiftError**)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(SwiftError*);
-  swift_errorRelease(error);
+  swift_errorRelease((SwiftError *)object);
 }
 
 static void nativeStrongDestroy(const Metadata *metadata,
@@ -899,10 +902,13 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
 static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *object = *(SwiftError **)(src + _addrOffset);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRetain(object);
+  swift_errorRetain((SwiftError *)object);
 }
 
 static void nativeStrongRetain(const Metadata *metadata,
@@ -1286,12 +1292,21 @@ static void errorAssignWithCopy(const Metadata *metadata,
                                 uintptr_t &addrOffset, uint8_t *dest,
                                 uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *destObject = *(SwiftError **)(dest + _addrOffset);
-  SwiftError *srcObject = *(SwiftError **)(src + _addrOffset);
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+
   memcpy(dest + _addrOffset, &srcObject, sizeof(SwiftError *));
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRelease(destObject);
-  swift_errorRetain(srcObject);
+
+  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    swift_errorRelease((SwiftError *)destObject);
+  }
+
+  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+    swift_errorRetain((SwiftError *)srcObject);
+  }
 }
 
 static void nativeStrongAssignWithCopy(const Metadata *metadata,

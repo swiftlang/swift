@@ -147,3 +147,51 @@ public struct ConformsHasAlias: HasAlias {
   public func f1(_: Self.A, _: Self.B) {}
   public func f2(_: Self.A, _: Int) {}
 }
+
+public protocol P10a {
+  associatedtype R
+}
+public protocol P10b {
+  associatedtype T: P10a where T == T.R
+  var a: T { get }
+  var b: T { get }
+  var c: T { get }
+}
+public struct Conformer10: P10b {
+  public struct A: P10a {
+    public typealias R = A
+  }
+
+  public let a: A
+  public let b: T.R
+  public let c: T.R
+}
+
+public protocol P11 {
+  associatedtype T
+  associatedtype U
+  var a: T { get }
+  var b: T { get }
+  var c: T { get }
+  var d: U { get }
+}
+public struct Conformer11a: P11 {
+  public struct A<T> {
+    public struct B<U> {}
+  }
+
+  public let a: A<Int>.B<Int>
+  public let b: A<Self.U>.B<Int>
+  public let c: A<U>.B<Int>
+  public let d: Int
+}
+public struct Conformer11b: P11 {
+  public struct A<T> {
+    public struct B<U> {}
+  }
+
+  public let a: A<Int>.B<Int>
+  public let b: A<Int>.B<U>
+  public let c: A<Int>.B<Self.U>
+  public let d: Int
+}

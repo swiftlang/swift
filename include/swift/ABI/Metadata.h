@@ -4970,7 +4970,7 @@ public:
 /// and then called through a fully-abstracted entry point whose arguments
 /// can be constructed in code.
 template <typename Runtime>
-struct TargetAccessibleFunctionRecord final {
+struct TargetAccessibleFunctionRecord {
 public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
@@ -4992,7 +4992,24 @@ public:
   AccessibleFunctionFlags Flags;
 };
 
+/// More advanced than AccessibleFunctionRecord and contains Actor name
+template <typename Runtime>
+struct TargetAccessibleProtocolRequirementFunctionRecord
+    : public TargetAccessibleFunctionRecord<Runtime> {
+public:
+  /// The concrete Actor type for this accessor.
+  RelativeDirectPointer<const char, /*nullable*/ false> ConcreteActorName;
+
+  /// The concrete witness method mangled name.
+  /// The record name for such record is the mangled name of the protocol
+  /// method. This is the mangled name of the concrete witness method.
+  RelativeDirectPointer<const char, /*nullable*/ false>
+      ConcreteWitnessMethodName;
+};
+
 using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
+using AccessibleProtocolRequirementFunctionRecord =
+    TargetAccessibleProtocolRequirementFunctionRecord<InProcess>;
 
 enum class PackLifetime : uint8_t {
   OnStack = 0,

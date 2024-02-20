@@ -6767,10 +6767,11 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     auto diagnostic = emitDiagnosticAt(
         baseType->getLoc(), diag::unbound_generic_parameter_explicit_fix);
 
-    if (auto *genericTy = dyn_cast<GenericIdentTypeRepr>(baseType)) {
-      // If some of the eneric arguments have been specified, we need to
+    auto *declRefTR = dyn_cast<DeclRefTypeRepr>(baseType);
+    if (declRefTR && declRefTR->getAngleBrackets().isValid()) {
+      // If some of the generic arguments have been specified, we need to
       // replace existing signature with a new one.
-      diagnostic.fixItReplace(genericTy->getAngleBrackets(), paramsAsString);
+      diagnostic.fixItReplace(declRefTR->getAngleBrackets(), paramsAsString);
     } else {
       // Otherwise we can simply insert new generic signature.
       diagnostic.fixItInsertAfter(baseType->getEndLoc(), paramsAsString);
@@ -6780,7 +6781,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
 bool MissingGenericArgumentsFailure::findArgumentLocations(
     llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback) {
-  using Callback = llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)>;
+  using Callback = decltype(callback);
 
   auto *const typeRepr = [this]() -> TypeRepr * {
     const auto anchor = getRawAnchor();
@@ -6809,14 +6810,14 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      if (Params.empty())
-        return Action::SkipNode();
+      if (allParamsAssigned())
+        return Action::Stop();
 
-      auto *ident = dyn_cast<IdentTypeRepr>(T);
-      if (!ident)
+      auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
+      if (!declRefTR)
         return Action::Continue();
 
-      auto *decl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+      auto *decl = dyn_cast_or_null<GenericTypeDecl>(declRefTR->getBoundDecl());
       if (!decl)
         return Action::Continue();
 
@@ -6827,9 +6828,8 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
       // There could a situation like `S<S>()`, so we need to be
       // careful not to point at first `S` because it has all of
       // its generic parameters specified.
-      if (auto *generic = dyn_cast<GenericIdentTypeRepr>(ident)) {
-        if (paramList->size() == generic->getNumGenericArgs())
-          return Action::Continue();
+      if (paramList->size() == declRefTR->getNumGenericArgs()) {
+        return Action::Continue();
       }
 
       for (auto *candidate : paramList->getParams()) {
@@ -6839,7 +6839,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
             });
 
         if (result != Params.end()) {
-          Fn(ident, *result);
+          Fn(declRefTR, *result);
           Params.erase(result);
         }
       }
@@ -9355,7 +9355,7 @@ bool InvalidTypeSpecializationArity::diagnoseAsError() {
   diagnoseInvalidGenericArguments(getLoc(), D,
                                   NumArgs, NumParams,
                                   HasParameterPack,
-                                  /*generic=*/nullptr);
+                                  /*angleBrackets=*/SourceRange());
   return true;
 }
 

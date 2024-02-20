@@ -304,6 +304,7 @@ void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
   assert(target->isDistributed());
 
   auto *f = getAddrOfDistributedTargetAccessor(target, ForDefinition);
+
   if (!f->isDeclaration())
     return;
 

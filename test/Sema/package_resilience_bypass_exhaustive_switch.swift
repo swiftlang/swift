@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/ClientDefault.swift -I %t -swift-version 5 -package-name mypkg -verify
 
-// RUN: %target-swift-frontend -typecheck %t/ClientOptimized.swift -I %t -swift-version 5 -package-name mypkg -package-bypass-resilience-optimization -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientOptimized.swift -I %t -swift-version 5 -package-name mypkg -experimental-package-bypass-resilience -verify
 
 //--- Utils.swift
 

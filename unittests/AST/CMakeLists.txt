@@ -1,6 +1,7 @@
 add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
   ASTDumperTests.cpp
+  ASTWalkerTests.cpp
   IndexSubsetTests.cpp
   DiagnosticConsumerTests.cpp
   SourceLocTests.cpp

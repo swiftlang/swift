@@ -27,6 +27,11 @@ public struct GenericField<T, U> {
   var int: Int
 }
 
+// The protocol conformance puts a symbol into __DATA_CONST which the builder
+// can use as the base symbol for references to other data.
+public protocol PublicProto {}
+extension GenericStruct: PublicProto {}
+
 ExternalGenericMetadataBuilderTests.test("JSON output") {
   let builder = swift_externalMetadataBuilder_create(1, "arm64")
 
@@ -206,22 +211,22 @@ var expectedJSON: String {
             "contents": [
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1032,
+                    "addend": 432,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1376,
+                    "addend": 776,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1536,
+                    "addend": 936,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1768,
+                    "addend": 1168,
                     "kind": "ptr64"
                 },
                 {
@@ -231,17 +236,17 @@ var expectedJSON: String {
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2200,
+                    "addend": 1600,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2420,
+                    "addend": 1820,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2864,
+                    "addend": 2264,
                     "kind": "ptr64"
                 },
                 "2000000000000000200000000000000007000300FFFFFF7F"
@@ -253,22 +258,22 @@ var expectedJSON: String {
             "contents": [
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 3520,
+                    "addend": 2920,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 3892,
+                    "addend": 3292,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4052,
+                    "addend": 3452,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4312,
+                    "addend": 3712,
                     "kind": "ptr64"
                 },
                 {
@@ -278,17 +283,17 @@ var expectedJSON: String {
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4796,
+                    "addend": 4196,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 5044,
+                    "addend": 4444,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 5160,
+                    "addend": 4560,
                     "kind": "ptr64"
                 },
                 "2800000000000000280000000000000007000300FFFFFF7F"

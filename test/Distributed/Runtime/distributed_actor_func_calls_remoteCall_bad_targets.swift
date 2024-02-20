@@ -50,7 +50,7 @@ func test() async throws {
 
   do {
     // CHECK: >> remoteCall: on:main.Greeter, target:BADMODULE.Greeter.greet(name:)
-    let call = try await system.remoteCall(
+    _ = try await system.remoteCall(
       on: local,
       target: badTarget,
       invocation: &invocation,

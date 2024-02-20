@@ -2773,6 +2773,12 @@ public:
     Bits.ValueDecl.Synthesized = value;
   }
 
+  /// Does this have a 'distributed' modifier?
+  ///
+  /// Only member methods and computed properties of a `distributed actor`
+  /// can be distributed.
+  bool isDistributed() const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
@@ -2923,6 +2929,11 @@ public:
   /// This is mostly only useful when considering requirements on an override:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
+
+  /// True if opted in for bypassing resilience within a package. Allowed only on
+  /// access from the \p accessingModule to a package decl in the defining
+  /// binary (not interface) module within the same package.
+  bool bypassResilienceInPackage(ModuleDecl *accessingModule) const;
 
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
@@ -5869,9 +5880,6 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
-  /// Does this have a 'distributed' modifier?
-  bool isDistributed() const;
-
   /// Return a distributed thunk if this computed property is marked as
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
@@ -7379,9 +7387,6 @@ public:
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
 
-  /// Returns 'true' if the function is distributed.
-  bool isDistributed() const;
-
   /// Is this a thunk function used to access a distributed method
   /// or computed property outside of its actor isolation context?
   bool isDistributedThunk() const {
@@ -7527,6 +7532,15 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize &&
            getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
+
+  /// Return a vector of distributed requirements that this distributed method
+  /// is implementing.
+  ///
+  /// If the method is witness to multiple requirements this is incorrect and
+  /// should be diagnosed during type-checking as it may make remoteCalls
+  /// ambiguous.
+  llvm::ArrayRef<ValueDecl *>
+  getDistributedMethodWitnessedProtocolRequirements() const;
 
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the

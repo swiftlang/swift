@@ -771,6 +771,9 @@ public:
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
+  llvm::StructType
+      *AccessibleProtocolRequirementFunctionRecordTy; // { i32*, i32*, i32*,
+                                                      // i32, i32*, i32*}
 
   // clang-format off
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
@@ -1149,12 +1152,21 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
   void addAccessibleFunction(SILFunction *func);
+  void addAccessibleFunctionDistributedAliased(
+      std::string mangledRecordName,
+      std::optional<std::string> mangledActorTypeName,
+      SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
   llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
 
   void emitAccessibleFunctions();
+  void emitAccessibleFunction(StringRef sectionName,
+                              std::string mangledRecordName,
+                              std::optional<std::string> mangledActorName,
+                              std::string mangledFunctionName,
+                              SILFunction *func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1297,9 +1309,29 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
+
+  struct AccessibleProtocolFunctionsData {
+    SILFunction *function;
+    /// Mangled name of the requirement function.
+    std::optional<std::string> mangledRecordName;
+    std::optional<std::string> concreteMangledTypeName;
+    AccessibleProtocolFunctionsData(
+        SILFunction *function,
+        const std::optional<std::string> &mangledRecordName,
+        const std::optional<std::string> &concreteMangledTypeName);
+  };
+  /// List of all functions which are protocol *requirements* which may be
+  /// looked up by name at runtime. The record can be used to pair
+  /// a concrete implementation type with the protocol (record) name,
+  /// in order to locate the *witness* function name on this specific type.
+  ///
+  /// The witness function name can then be used to look up the witness at
+  /// runtime by inspecting `AccessibleFunctions`.
+  SmallVector<AccessibleProtocolFunctionsData, 4> AccessibleProtocolFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.

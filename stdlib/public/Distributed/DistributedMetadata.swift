@@ -67,6 +67,7 @@ func __getParameterTypeInfo(
 ) -> Int32
 
 @available(SwiftStdlib 5.7, *)
+@available(*, deprecated, message: "Use `__getReturnTypeInfo(_:_:_:_:)` directly")
 public // SPI Distributed
 func _getReturnTypeInfo(
   mangledMethodName name: String,
@@ -90,9 +91,30 @@ func __getReturnTypeInfo(
     _ genericArguments: UnsafeRawPointer?
 ) -> Any.Type?
 
+/// Typealias for Swift `TypeNamePair` and similar ones which Swift runtime
+/// uses to return String data/length pairs.
+typealias _SwiftNamePair = (UnsafePointer<UInt8>, Int)
+
+@available(SwiftStdlib 5.11, *)
+@_silgen_name("swift_distributed_getConcreteAccessibleWitnessName")
+func _getConcreteAccessibleWitnessName(
+  on actor: AnyObject, // : DistributedActor
+  _ targetNameStart: UnsafePointer<UInt8>,
+  _ targetNameLength: UInt
+) -> _SwiftNamePair
 
 /// Retrieve a generic environment descriptor associated with
-/// the given distributed target
+/// the given distributed target.
+@available(SwiftStdlib 5.11, *)
+@_silgen_name("swift_distributed_getGenericEnvironmentForConcreteActor")
+// SPI Distributed
+func _getGenericEnvironmentOfDistributedTarget(
+    on actor: AnyObject, // : DistributedActor
+    _ targetNameStart: UnsafePointer<UInt8>,
+    _ targetNameLength: UInt
+) -> UnsafeRawPointer?
+
+/// Deprecated SPI: Instead use the entry point with the actor parameter passed.
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")
 public // SPI Distributed

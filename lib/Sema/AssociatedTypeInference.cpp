@@ -1152,12 +1152,13 @@ namespace {
 
 /// Try to avoid situations where resolving the type of a witness calls back
 /// into associated type inference.
-struct TypeReprCycleCheckWalker : ASTWalker {
+class TypeReprCycleCheckWalker : private ASTWalker {
   ASTContext &ctx;
   llvm::SmallDenseSet<Identifier, 2> circularNames;
   ValueDecl *witness;
   bool found;
 
+public:
   TypeReprCycleCheckWalker(
       ASTContext &ctx,
       const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved)
@@ -1167,11 +1168,10 @@ struct TypeReprCycleCheckWalker : ASTWalker {
     }
   }
 
+private:
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    // FIXME: Visit generic arguments.
-
+    // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
     if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(T)) {
-      // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
       if (circularNames.count(identTyR->getNameRef().getBaseIdentifier()) > 0) {
         // If unqualified lookup can find a type with this name without looking
         // into protocol members, don't skip the witness, since this type might
@@ -1190,40 +1190,41 @@ struct TypeReprCycleCheckWalker : ASTWalker {
           return Action::Stop();
         }
       }
+
+      return Action::Continue();
     }
 
-    if (auto *memberTyR = dyn_cast<MemberTypeRepr>(T)) {
-      // If we're looking at a member type`Foo.Bar`, check `Foo` recursively.
-      auto *baseTyR = memberTyR->getBaseComponent();
-      baseTyR->walk(*this);
+    // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
+    auto *memberTyR = dyn_cast<MemberTypeRepr>(T);
+    if (!memberTyR || memberTyR->hasGenericArgList()) {
+      return Action::Continue();
+    }
 
-      // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
-      if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(baseTyR)) {
-        if (identTyR->getNameRef().getBaseIdentifier() == ctx.Id_Self &&
-            circularNames.count(memberTyR->getNameRef().getBaseIdentifier()) > 0) {
-          // But if qualified lookup can find a type with this name without
-          // looking into protocol members, don't skip the witness, since this
-          // type might be a candidate witness.
-          SmallVector<ValueDecl *, 2> results;
-          witness->getInnermostDeclContext()->lookupQualified(
-              witness->getDeclContext()->getSelfTypeInContext(),
-              identTyR->getNameRef(), SourceLoc(), NLOptions(), results);
+    if (!memberTyR->getBase()->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
+      return Action::Continue();
+    }
 
-          // Ok, resolving this member type would trigger associated type
-          // inference recursively. We're going to skip this witness.
-          if (results.empty()) {
-            found = true;
-            return Action::Stop();
-          }
-        }
+    if (circularNames.count(memberTyR->getNameRef().getBaseIdentifier()) > 0) {
+      // But if qualified lookup can find a type with this name without looking
+      // into protocol members, don't skip the witness, since this type might
+      // be a candidate witness.
+      SmallVector<ValueDecl *, 2> results;
+      witness->getInnermostDeclContext()->lookupQualified(
+          witness->getDeclContext()->getSelfTypeInContext(),
+          memberTyR->getNameRef(), SourceLoc(), NLOptions(), results);
+
+      // Ok, resolving this member type would trigger associated type
+      // inference recursively. We're going to skip this witness.
+      if (results.empty()) {
+        found = true;
+        return Action::Stop();
       }
-
-      return Action::SkipNode();
     }
 
-    return Action::Continue();
+    return Action::SkipNode();
   }
 
+public:
   bool checkForPotentialCycle(ValueDecl *witness) {
     // Don't do this for protocol extension members, because we have a
     // mini "solver" that avoids similar issues instead.
@@ -1292,7 +1293,7 @@ struct TypeReprCycleCheckWalker : ASTWalker {
   }
 };
 
-}
+} // end anonymous namespace
 
 static bool isExtensionUsableForInference(const ExtensionDecl *extension,
                                           NormalProtocolConformance *conformance) {

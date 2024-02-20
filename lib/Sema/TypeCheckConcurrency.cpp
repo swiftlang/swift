@@ -4295,7 +4295,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
 
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
-  auto conformances = idc->getLocalConformances(
+  auto conformances = idc->getLocalConformances( // note this
       ConformanceLookupKind::NonStructural);
   using IsolatedRequirement =
       std::tuple<ProtocolConformance *, ActorIsolation, ValueDecl *>;

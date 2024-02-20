@@ -43,6 +43,10 @@ public struct InferredPreconcurrencyMainActor: PreconcurrencyMainProtocol {
   public func requirement() {}
 }
 
+// rdar://122965951
+public struct UncheckedSendable: @unchecked Sendable {}
+extension UnsafePointer : @retroactive @unchecked Sendable {}
+
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -I %t
 
 #else
@@ -54,7 +58,7 @@ func callFn() async {
 }
 #endif
 
-// RUN: %FileCheck %s < %t/Library.swiftinterface
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK-TYPECHECKED %s < %t/Library.swiftinterface
 // CHECK: // swift-module-flags:{{.*}} -enable-experimental-concurrency
 // CHECK: public func fn() async
 // CHECK: public func reasyncFn(_: () async -> ()) reasync
@@ -77,7 +81,12 @@ func callFn() async {
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
 // CHECK-NEXT: }
 
+// CHECK-TYPECHECKED: public struct UncheckedSendable : @unchecked Swift.Sendable
+// CHECK-ASWRITTEN: public struct UncheckedSendable : @unchecked Sendable
+
+// CHECK-TYPECHECKED: extension Swift.UnsafePointer : @unchecked @retroactive Swift.Sendable
+// CHECK-ASWRITTEN: extension UnsafePointer : @retroactive @unchecked Sendable
 
 // RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) -enable-experimental-concurrency
-// RUN: %FileCheck %s < %t/LibraryPreserveTypesAsWritten.swiftinterface
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ASWRITTEN %s < %t/LibraryPreserveTypesAsWritten.swiftinterface

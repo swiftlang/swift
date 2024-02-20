@@ -256,4 +256,5 @@ Added: __swift_pod_indirect_initializeBufferWithCopyOfBuffer
 Added: __swift_validatePrespecializedMetadata
 Added: __swift_exceptionPersonality
 Added: _swift_willThrowTypedImpl
+Added: __swift_willThrowTypedImpl
 Added: __swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
