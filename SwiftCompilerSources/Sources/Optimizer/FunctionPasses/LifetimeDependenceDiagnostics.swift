@@ -317,13 +317,14 @@ private struct LifetimeVariable {
 private struct DiagnoseDependenceWalker {
   let context: Context
   var diagnostics: DiagnoseDependence
+  let localReachabilityCache = LocalVariableReachabilityCache()
   var visitedValues: ValueSet
 
   var function: Function { diagnostics.function }
   
   init(_ diagnostics: DiagnoseDependence, _ context: Context) {
-    self.diagnostics = diagnostics
     self.context = context
+    self.diagnostics = diagnostics
     self.visitedValues = ValueSet(context)
   }
   
