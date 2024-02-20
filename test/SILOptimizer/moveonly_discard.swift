@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
+// RUN: %target-swift-frontend  -enable-experimental-feature NoncopyableGenerics -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
+
 
 func posix_close(_ t: Int) {}
 

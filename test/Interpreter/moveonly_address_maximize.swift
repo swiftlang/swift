@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
 
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
+
 // REQUIRES: executable_test
 
 struct S : ~Copyable {
@@ -306,4 +309,3 @@ simpleTestVar6a(false)
 simpleTestVar6a(true)
 simpleTestVar6b(false)
 simpleTestVar6b(true)
-
