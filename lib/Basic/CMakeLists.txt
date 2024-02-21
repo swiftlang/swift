@@ -67,6 +67,7 @@ add_swift_host_library(swiftBasic STATIC
   Program.cpp
   QuotedString.cpp
   Sandbox.cpp
+  SmallBitVector.cpp
   SourceLoc.cpp
   StableHasher.cpp
   Statistic.cpp
