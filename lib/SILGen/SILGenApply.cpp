@@ -5992,8 +5992,18 @@ void SILGenFunction::emitRawYield(SILLocation loc,
                                   JumpDest unwindDest,
                                   bool isUniqueYield) {
   SmallVector<SILValue, 4> yieldValues;
-  for (auto arg : yieldArgs)
-    yieldValues.push_back(arg.getValue());
+  for (auto arg : yieldArgs) {
+    auto value = arg.getValue();
+    if (value->getType().isMoveOnlyWrapped()) {
+      if (value->getType().isAddress()) {
+        value = B.createMoveOnlyWrapperToCopyableAddr(loc, value);
+      } else {
+        value = B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
+      }
+    }
+    
+    yieldValues.push_back(value);
+  }
 
   // The normal continuation block.
   auto resumeBB = createBasicBlock();
