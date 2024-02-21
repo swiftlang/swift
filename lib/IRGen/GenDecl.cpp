@@ -3466,6 +3466,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     return ctorAddress;
   }
 
+  // Check whether we've created the thunk already.
+  if (auto *thunkFn = IGM.Module.getFunction(name))
+    return thunkFn;
+
   llvm::Function *thunk = llvm::Function::Create(
       assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
 
@@ -3546,10 +3550,15 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   LinkEntity entity =
       LinkEntity::forSILFunction(f, shouldCallPreviousImplementation);
 
-  // Check whether we've created the function already.
+  auto clangDecl = f->getClangDecl();
+  auto cxxCtor = dyn_cast_or_null<clang::CXXConstructorDecl>(clangDecl);
+
+  // Check whether we've created the function already. If the function is a C++
+  // constructor, don't return the constructor here as a thunk might be needed
+  // to call the constructor.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   llvm::Function *fn = Module.getFunction(entity.mangleAsString());
-  if (fn) {
+  if (fn && !cxxCtor) {
     if (forDefinition) {
       updateLinkageForDefinition(*this, fn, entity);
     }
@@ -3561,7 +3570,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // the insert-before point.
   llvm::Constant *clangAddr = nullptr;
   bool isObjCDirect = false;
-  if (auto clangDecl = f->getClangDecl()) {
+  if (clangDecl) {
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
     if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
@@ -3572,7 +3581,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
     }
 
-    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+    if (cxxCtor) {
       Signature signature = getSignature(f->getLoweredFunctionType());
 
       // The thunk has private linkage, so it doesn't need to have a predictable
@@ -3582,7 +3591,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       stream << "__swift_cxx_ctor";
       entity.mangle(stream);
 
-      clangAddr = emitCXXConstructorThunkIfNeeded(*this, signature, ctor, name,
+      clangAddr = emitCXXConstructorThunkIfNeeded(*this, signature, cxxCtor, name,
                                                   clangAddr);
     }
   }
