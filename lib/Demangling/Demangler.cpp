@@ -951,6 +951,11 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeConst, popTypeAndGetChild()));
+  case 'T':
+    return createNode(Node::Kind::TransferringResultFunctionType);
+  case 'u':
+    return createType(
+        createWithChild(Node::Kind::Transferring, popTypeAndGetChild()));
   case 'l':
     return demangleLifetimeDependenceKind(/*isSelfDependence*/ false);
   case 'L':
@@ -1556,6 +1561,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   addChild(FuncType, ClangType);
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
+  addChild(FuncType, popNode(Node::Kind::TransferringResultFunctionType));
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
   addChild(FuncType, popNode([](Node::Kind kind) {
     return kind == Node::Kind::ThrowsAnnotation ||
@@ -1601,6 +1607,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::IsolatedAnyFunctionType)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind() ==
+      Node::Kind::TransferringResultFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)
@@ -2155,6 +2164,14 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
+NodePointer Demangler::demangleImplParameterTransferring() {
+  // Empty string represents default differentiability.
+  if (!nextIf('T'))
+    return nullptr;
+  const char *attr = "transferring";
+  return createNode(Node::Kind::ImplParameterTransferring, attr);
+}
+
 NodePointer Demangler::demangleImplParameterResultDifferentiability() {
   // Empty string represents default differentiability.
   const char *attr = "";
@@ -2298,6 +2315,8 @@ NodePointer Demangler::demangleImplFunctionType() {
     type = addChild(type, Param);
     if (NodePointer Diff = demangleImplParameterResultDifferentiability())
       Param = addChild(Param, Diff);
+    if (auto Transferring = demangleImplParameterTransferring())
+      Param = addChild(Param, Transferring);
     ++NumTypesToAdd;
   }
   while (NodePointer Result = demangleImplResultConvention(

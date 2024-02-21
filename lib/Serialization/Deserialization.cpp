@@ -1180,7 +1180,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
 static llvm::Optional<RequirementKind>
 getActualRequirementKind(uint64_t rawKind) {
 #define CASE(KIND)                   \
-  case GenericRequirementKind::KIND: \
+  case serialization::GenericRequirementKind::KIND: \
     return RequirementKind::KIND;
 
   switch (rawKind) {

@@ -18,6 +18,7 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -6609,4 +6610,25 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
+}
+
+/// Map a `ValueOwnership` to the corresponding ABI-stable constant used by
+/// runtime metadata.
+ParameterOwnership swift::asParameterOwnership(ValueOwnership o) {
+  switch (o) {
+  case ValueOwnership::Default: return ParameterOwnership::Default;
+  case ValueOwnership::Shared:  return ParameterOwnership::Shared;
+  case ValueOwnership::InOut:   return ParameterOwnership::InOut;
+  case ValueOwnership::Owned:   return ParameterOwnership::Owned;
+  }
+  llvm_unreachable("exhaustive switch");
+}
+ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
+  switch (o) {
+  case ParameterOwnership::Default: return ValueOwnership::Default;
+  case ParameterOwnership::Shared:  return ValueOwnership::Shared;
+  case ParameterOwnership::InOut:   return ValueOwnership::InOut;
+  case ParameterOwnership::Owned:   return ValueOwnership::Owned;
+  }
+  llvm_unreachable("exhaustive switch");
 }

@@ -157,3 +157,21 @@ struct NestedMacroExpansion {}
 func callNestedExpansionMember() {
   NestedMacroExpansion.member()
 }
+
+@attached(peer, names: prefixed(`__`)) // introduces `__GenerateStubsForProtocolRequirements
+@attached(extension, names: arbitrary) // introduces `extension GenerateStubsForProtocolRequirements`
+macro GenerateStubsForProtocolRequirements() = #externalMacro(module: "MacroDefinition", type: "GenerateStubsForProtocolRequirementsMacro")
+
+protocol _TestStub {} // used by 'GenerateStubsForProtocolRequirements'
+
+@GenerateStubsForProtocolRequirements
+protocol MacroExpansionRequirements {
+  func hello(name: String) -> String
+}
+// struct __MacroExpansionRequirements: _TestStub where ...
+// extension MacroExpansionRequirements where Self: _TestStub ...
+
+func testWitnessStub() {
+  let stub: any MacroExpansionRequirements = __MacroExpansionRequirements()
+  _ = stub.hello(name: "Caplin")
+}

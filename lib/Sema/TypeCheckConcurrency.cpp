@@ -5009,7 +5009,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
             CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
         value->getAttrs().add(attr);
 
-        if (inferred.preconcurrency()) {
+        if (inferred.preconcurrency() &&
+            !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
           auto preconcurrency =
               new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
           value->getAttrs().add(preconcurrency);

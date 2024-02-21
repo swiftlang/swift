@@ -18,6 +18,6 @@ func main() {
   let y = test(x)
 }
 
-// CHECK-LABEL: sil @$s17transferring_test0B0yS2SnF : $@convention(thin) (@sil_transferring @owned String) -> transferring @owned String
+// CHECK-LABEL: sil @$s17transferring_test0B0yS2SnYuYTF : $@convention(thin) (@sil_transferring @owned String) -> transferring @owned String
 
 // AST-LABEL: func test(_ x: transferring String) -> transferring String

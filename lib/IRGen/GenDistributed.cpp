@@ -230,14 +230,9 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
 
   // actor
 
-  auto actorTypeParam =
-      GenericTypeParamType::get(/*isParameterPack=*/false,
-                                /*depth=*/0, /*index=*/1, Context);
+  auto actorTypeParam = Context.getAnyObjectType();
     parameters.push_back(
         GenericFunctionType::Param(actorTypeParam));
-  auto distributedActorTy =
-        Context.getDistributedActorDecl()
-        ->getDeclaredInterfaceType();
 
   auto decoderProtocolTy =
       Context
@@ -250,20 +245,12 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
     SmallVector<GenericTypeParamType *, 4> genericParams;
     SmallVector<Requirement, 4> genericRequirements;
 
-    assert(getDistributedActorOf(Target) &&
-           "target must be declared inside distributed actor");
-
     // Add a generic parameter `D` which stands for decoder type in the
     // accessor signature - `inout D`.
     genericParams.push_back(decoderType);
     // Add a requirement that decoder conforms to the expected protocol.
     genericRequirements.push_back(
         {RequirementKind::Conformance, decoderType, decoderProtocolTy});
-
-    genericRequirements.push_back(
-        {RequirementKind::Conformance, actorTypeParam, distributedActorTy});
-
-    genericParams.push_back(actorTypeParam);
 
     signature = buildGenericSignature(Context, GenericSignature(),
                                       std::move(genericParams),
@@ -604,14 +591,8 @@ void DistributedAccessor::emit() {
   // Metadata that represents passed in the invocation decoder.
   auto *decoderType = params.claimNext();
 
-  // Metadata that represents the actor the invocation is on.
-  auto *actorType = params.claimNext();
-  (void)actorType;
-
   // Witness table for decoder conformance to DistributedTargetInvocationDecoder
   auto *decoderProtocolWitness = params.claimNext();
-  auto *distributedActorWitness = params.claimNext();
-  (void)distributedActorWitness;
 
   // Preliminary: Setup async context for this accessor.
   {

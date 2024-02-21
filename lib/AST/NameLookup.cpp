@@ -1844,13 +1844,18 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
   auto containerDecl = container.getAsDecl();
   forEachPotentialAttachedMacro(containerDecl, MacroRole::Member, nameTracker);
 
-  // If the container is an extension that was created from an extension macro,
-  // look at the nominal declaration to find any extension macros.
-  if (auto ext = dyn_cast<ExtensionDecl>(containerDecl)) {
-    if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
-      forEachPotentialAttachedMacro(
-          nominal, MacroRole::Extension, nameTracker);
-    }
+  // Extension macros on the type or extension.
+  {
+    NominalTypeDecl *nominal = nullptr;
+    // If the container is an extension that was created from an extension
+    // macro, look at the nominal declaration to find any extension macros.
+    if (auto ext = dyn_cast<ExtensionDecl>(containerDecl))
+      nominal = nominalForExpandedExtensionDecl(ext);
+    else
+      nominal = container.getBaseNominal();
+
+    if (nominal)
+      forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
   }
 
   // Peer and freestanding declaration macros.
@@ -1911,15 +1916,20 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
   // names match.
   {
     MacroIntroducedNameTracker nameTracker;
-    if (auto ext = dyn_cast<ExtensionDecl>(container.getAsDecl())) {
-      if (auto nominal = nominalForExpandedExtensionDecl(ext)) {
-        forEachPotentialAttachedMacro(nominal, MacroRole::Extension, nameTracker);
-        if (nameTracker.shouldExpandForName(name)) {
-          (void)evaluateOrDefault(
-              ctx.evaluator,
-              ExpandExtensionMacros{nominal},
-              false);
-        }
+    NominalTypeDecl *nominal = nullptr;
+    // If the container is an extension that was created from an extension
+    // macro, look at the nominal declaration to find any extension macros.
+    if (auto ext = dyn_cast<ExtensionDecl>(container.getAsDecl()))
+      nominal = nominalForExpandedExtensionDecl(ext);
+    else
+      nominal = container.getBaseNominal();
+
+    if (nominal) {
+      forEachPotentialAttachedMacro(nominal,
+                                  MacroRole::Extension, nameTracker);
+      if (nameTracker.shouldExpandForName(name)) {
+        (void)evaluateOrDefault(ctx.evaluator, ExpandExtensionMacros{nominal},
+                                false);
       }
     }
   }
@@ -3303,6 +3313,29 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
 bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc){
   auto &ctx = dc->getASTContext();
     return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc));
+}
+
+bool TypeRepr::isInverseOf(InvertibleProtocolKind target, DeclContext *dc) {
+  if (auto inverseTypeRepr = dyn_cast<InverseTypeRepr>(this)) {
+    auto *constraint = inverseTypeRepr->getConstraint();
+
+    auto &ctx = dc->getASTContext();
+    return llvm::any_of(
+        directReferencesForTypeRepr(ctx.evaluator, ctx, constraint, dc),
+        [&](const TypeDecl *decl) {
+          if (auto *P = dyn_cast<ProtocolDecl>(decl))
+            return P->getInvertibleProtocolKind() == target;
+          return false;
+        });
+  }
+
+  if (auto *composition = dyn_cast<CompositionTypeRepr>(this)) {
+    return llvm::any_of(composition->getTypes(), [&](TypeRepr *member) {
+      return member->isInverseOf(target, dc);
+    });
+  }
+
+  return false;
 }
 
 static GenericParamList *

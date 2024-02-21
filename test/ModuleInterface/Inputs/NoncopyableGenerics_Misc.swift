@@ -80,3 +80,19 @@ public func noInversesEND() {}
 public func checkAnyInv1<Result>(_ t: borrowing Result) where Result: Any & ~Copyable {}
 public func checkAnyInv2<Result: Any>(_ t: borrowing Result) where Result: ~Copyable & ~Escapable {}
 public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+
+// coverage for rdar://123281976
+public struct Outer<A: ~Copyable> {
+  public func innerFn<B: ~Copyable>(_ b: borrowing B) {}
+  public struct InnerStruct<C: ~Copyable> {
+    public func g<D>(_ d: borrowing D) where D: ~Copyable {}
+  }
+  public struct InnerVariation1<D: ~Copyable>: ~Escapable {}
+  public struct InnerVariation2<D: ~Escapable>: ~Copyable {}
+}
+
+extension Outer.InnerStruct {
+    public func hello<T: ~Escapable>(_ t: T) {}
+}
+
+public struct Freestanding<T: ~Copyable> where T: ~Escapable {}

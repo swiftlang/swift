@@ -505,8 +505,7 @@ namespace {
       TypeSubstitutionMap subs;
       auto substType = witnessType->substituteBindingsTo(
         refType,
-        [&](ArchetypeType *origType, CanType substType,
-            ArchetypeType*, ArrayRef<ProtocolConformanceRef>) -> CanType {
+        [&](ArchetypeType *origType, CanType substType) -> CanType {
           if (auto gpType = dyn_cast<GenericTypeParamType>(
                 origType->getInterfaceType()->getCanonicalType()))
             subs[gpType] = substType;
