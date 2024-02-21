@@ -6608,18 +6608,12 @@ bool ProtocolDecl::walkInheritedProtocols(
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   assert(super);
 
+  // Fast path.
   if (this == super)
     return false;
 
-  if (auto ip = super->getInvertibleProtocolKind())
-    return requiresInvertible(*ip);
-
-  return walkInheritedProtocols([super](ProtocolDecl *inherited) {
-    if (inherited == super)
-      return TypeWalker::Action::Stop;
-
-    return TypeWalker::Action::Continue;
-  });
+  auto allInherited = getAllInheritedProtocols();
+  return (llvm::find(allInherited, super) != allInherited.end());
 }
 
 static void findInheritedType(
