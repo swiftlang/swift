@@ -2190,8 +2190,7 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(
-                version::getUpcomingCxxInteropCompatVersion())) {
+        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
           if (decl->isInStdNamespace() && decl->getName() == "promise") {
             // Do not import std::promise.
             return nullptr;
@@ -2658,8 +2657,7 @@ namespace {
       if (!decl->isBeingDefined() && !decl->isDependentContext() &&
           areRecordFieldsComplete(decl)) {
         if (decl->hasInheritedConstructor() &&
-            Impl.isCxxInteropCompatVersionAtLeast(
-                version::getUpcomingCxxInteropCompatVersion())) {
+            Impl.isCxxInteropCompatVersionAtLeast(6)) {
           for (auto member : decl->decls()) {
             if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
               for (auto usingShadowDecl : usingDecl->shadows()) {
@@ -2830,8 +2828,7 @@ namespace {
     void
     addExplicitProtocolConformances(NominalTypeDecl *decl,
                                     const clang::CXXRecordDecl *clangDecl) {
-      if (Impl.isCxxInteropCompatVersionAtLeast(
-              version::getUpcomingCxxInteropCompatVersion())) {
+      if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
         // Propagate conforms_to attribute from public base classes.
         for (auto base : clangDecl->bases()) {
           if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
@@ -3755,8 +3752,7 @@ namespace {
       }
 
       if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(
-                version::getUpcomingCxxInteropCompatVersion())) {
+        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
           if (auto dc = method->getDeclContext();
               !decl->isPure() &&
               isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
@@ -4044,8 +4040,7 @@ namespace {
       //   2. C++ methods from privately inherited base classes
       if (!isa<clang::TypeDecl>(decl->getTargetDecl()) &&
           !(isa<clang::CXXMethodDecl>(decl->getTargetDecl()) &&
-            Impl.isCxxInteropCompatVersionAtLeast(
-                version::getUpcomingCxxInteropCompatVersion())))
+            Impl.isCxxInteropCompatVersionAtLeast(6)))
         return nullptr;
       // Constructors (e.g. `using BaseClass::BaseClass`) are handled in
       // VisitCXXRecordDecl, since we need them to determine whether a struct
