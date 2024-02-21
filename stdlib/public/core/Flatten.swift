@@ -303,7 +303,7 @@ extension FlattenCollection: Collection {
     }
     
     // The following combines the distance of three sections.
-    let range = start <= end ? start ... end : end ... start
+    let range = start <= end ? start ..< end : end ..< start
     var outer = range.lowerBound._outer
     var count = 0 as Int // 0...Int.max
     
