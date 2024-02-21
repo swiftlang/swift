@@ -2179,13 +2179,14 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 
   case MagicIdentifierLiteralExpr::Line:
   case MagicIdentifierLiteralExpr::Column: {
-    auto Loc = getLocInOutermostSourceFile(SGF.getSourceManager(),
-                                           magicLiteral->getStartLoc());
     unsigned Value = 0;
-    if (Loc.isValid()) {
-      Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
-                  ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
-                  : ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
+    if (auto Loc = magicLiteral->getStartLoc()) {
+      Loc = getLocInOutermostSourceFile(SGF.getSourceManager(), Loc);
+      if (Loc.isValid()) {
+        Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
+                    ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
+                    : ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
+      }
     }
 
     auto silTy = SILType::getBuiltinIntegerLiteralType(ctx);
