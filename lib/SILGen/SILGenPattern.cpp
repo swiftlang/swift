@@ -1289,8 +1289,8 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
 
 void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
                                                   ArgArray args,
-                                                   bool forIrrefutableRow,
-                                                   bool hasMultipleItems) {
+                                                  bool forIrrefutableRow,
+                                                  bool hasMultipleItems) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
     if (!row[i]) // We use null patterns to mean artificial AnyPatterns
@@ -1446,7 +1446,7 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
     auto access = SGF.B.createBeginAccess(pattern, bindValue.getValue(),
                                           SILAccessKind::Read,
                                           SILAccessEnforcement::Static,
-                                          false, false);
+                                          /*no nested conflict*/ true, false);
     SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
     bindValue = ManagedValue::forBorrowedAddressRValue(access);
   }
@@ -2797,11 +2797,23 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     // Create a scope to break down the subject value.
     Scope caseScope(SGF, pattern);
     
+    // If the subject value is in memory, enter a deinit access for the memory.
+    // This saves the move-only-checker from trying to analyze the payload
+    // decomposition as a potential partial consume. We always fully consume
+    // the subject on this path.
+    auto origSubject = NoncopyableConsumableValue.forward(SGF);
+    if (origSubject->getType().isAddress()) {
+      origSubject = SGF.B.createBeginAccess(pattern, origSubject,
+                                            SILAccessKind::Deinit,
+                                            SILAccessEnforcement::Static,
+                                            /*no nested conflict*/ true, false);
+      SGF.Cleanups.pushCleanup<EndAccessCleanup>(origSubject);
+    }
+    
     // Clone the original subject's cleanup state so that it will be reliably
     // consumed in this scope, while leaving the original for other case
     // blocks to re-consume.
-    ManagedValue subject = SGF.emitManagedRValueWithCleanup(
-                                     NoncopyableConsumableValue.forward(SGF));
+    ManagedValue subject = SGF.emitManagedRValueWithCleanup(origSubject);
 
     // TODO: handle fallthroughs and multiple cases bindings
     // In those cases we'd need to forward bindings through the shared case
@@ -3428,7 +3440,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
               // match is not allowed to modify it.
               auto access = B.createBeginAccess(S, subjectMV.getValue(),
                 SILAccessKind::Read,
-                SILAccessEnforcement::Static, false, false);
+                SILAccessEnforcement::Static,
+                /*no nested conflict*/ true, false);
               Cleanups.pushCleanup<EndAccessCleanup>(access);
               subjectMV = ManagedValue::forBorrowedAddressRValue(access);
             }
