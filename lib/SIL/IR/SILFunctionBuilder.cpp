@@ -274,6 +274,15 @@ void SILFunctionBuilder::addFunctionAttributes(
 
       F->setDynamicallyReplacedFunction(replacedFunc);
     }
+  } else if (constant.isDistributedThunk()) {
+    auto decodeFuncDecl =
+            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                decl);
+    assert(decodeFuncDecl && "decodeNextArgument function not found!");
+
+    auto decodeRef = SILDeclRef(decodeFuncDecl);
+    auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+    F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
   }
 }
 
