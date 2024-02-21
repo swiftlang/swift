@@ -77,6 +77,7 @@ void DependencyScannerDiagnosticCollectingConsumer::handleDiagnostic(SourceManag
 }
 
 void DependencyScannerDiagnosticCollectingConsumer::addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Info.Kind) {
@@ -217,6 +218,13 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 void DependencyScanningTool::resetCache() {
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   ScanningService.reset(new SwiftDependencyScanningService());
+}
+
+std::vector<
+    DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo>
+DependencyScanningTool::getDiagnostics() {
+  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
+  return CDC.Diagnostics;
 }
 
 void DependencyScanningTool::resetDiagnostics() {
