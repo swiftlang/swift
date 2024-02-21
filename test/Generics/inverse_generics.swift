@@ -29,9 +29,11 @@ func checkAliases<C, NC: ~Copyable>(_ a: AlwaysCopyable<C>, _ b: AlwaysCopyable<
   checkCopyable(b)
 }
 
+protocol NeedsCopyable {}
+// expected-note@-1 {{type 'TryInferCopyable' does not conform to inherited protocol 'Copyable'}}
+
 struct TryInferCopyable: ~Copyable, NeedsCopyable {}
-// expected-error@-1 {{type 'TryInferCopyable' does not conform to protocol 'NeedsCopyable'}}
-// expected-error@-2 {{type 'TryInferCopyable' does not conform to protocol 'Copyable'}}
+// expected-error@-1 {{type 'TryInferCopyable' does not conform to protocol 'Copyable'}}
 
 protocol Removed: ~Copyable {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
@@ -165,8 +167,6 @@ func chk(_ t: CornerCase<NC>) {}
 
 /// MARK: tests that we diagnose ~Copyable that became invalid because it's required to be copyable
 
-protocol NeedsCopyable {}
-
 struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required to be 'Copyable' but is marked with '~Copyable'}}
 enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
 
@@ -175,10 +175,6 @@ class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Co
 
 @_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
                                        // expected-error@-1 {{class 'NiceTry2' required to be 'Copyable' but is marked with '~Copyable'}}
-
-struct OopsConformance1: ~Copyable, NeedsCopyable {}
-// expected-error@-1 {{type 'OopsConformance1' does not conform to protocol 'NeedsCopyable'}}
-// expected-error@-2 {{type 'OopsConformance1' does not conform to protocol 'Copyable'}}
 
 
 struct Extendo: ~Copyable {}
@@ -344,8 +340,8 @@ func conflict10<T>(_ t: T, _ u: some ~Copyable & Copyable)
         T: ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
-// FIXME: this is bogus (rdar://119345796)
 protocol Conflict11: ~Copyable, Copyable {}
+// expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 struct Conflict12: ~Copyable, Copyable {}
 // expected-error@-1 {{struct 'Conflict12' required to be 'Copyable' but is marked with '~Copyable'}}

@@ -2047,35 +2047,40 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 /// want 'Other' to appear in the inheritance clause of 'Bar', so that
 /// name lookup on Bar can find members of Other.
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
-  auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
-      proto->getSelfInterfaceType());
-  const bool EnabledNoncopyableGenerics =
-      proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
+  auto &ctx = proto->getASTContext();
+  auto selfTy = proto->getSelfInterfaceType();
+  auto genericSig = proto->getGenericSignature();
 
+  const bool EnabledNoncopyableGenerics =
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
+
+  // If we make a ~P marking but our protocol Self type still conforms to P,
+  // diagnose an error.
+  //
+  // FIXME: This duplicates logic from computeRequirementDiagnostics().
+  if (EnabledNoncopyableGenerics) {
+    // Get the list of written inverses.
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void) getDirectlyInheritedNominalTypeDecls(proto, inverses, anyObject);
+
+    for (auto ip : inverses) {
+      auto kp = getKnownProtocolKind(ip);
+      auto *otherProto = ctx.getProtocol(kp);
+      if (!genericSig->requiresProtocol(selfTy, otherProto))
+        continue;
+
+      ctx.Diags.diagnose(proto,
+                         diag::inverse_generic_but_also_conforms,
+                         selfTy, getProtocolName(kp));
+    }
+  }
+
+  auto requiredProtos = genericSig->getRequiredProtocols(selfTy);
   for (auto *otherProto : requiredProtos) {
     // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
     if (otherProto == proto)
       continue;
-
-    // For every invertible protocol IP and any protocol 'P', there is an
-    // implied requirement 'Self: IP', unless it was suppressed via
-    // `Self: ~IP`. So if this suppression annotation exists yet IP was
-    // implied anyway, emit a diagnostic.
-    if (EnabledNoncopyableGenerics) {
-      if (auto kp = otherProto->getKnownProtocolKind()) {
-        if (auto ip = getInvertibleProtocolKind(*kp)) {
-          auto inverse = proto->hasInverseMarking(*ip);
-          if (!inverse)
-            continue; // no ~IP annotation
-
-          auto &Diags = proto->getASTContext().Diags;
-          Diags.diagnose(inverse.getLoc(),
-                         diag::inverse_generic_but_also_conforms,
-                         proto->getSelfInterfaceType(), getProtocolName(*kp));
-          continue;
-        }
-      }
-    }
 
     // SIMDScalar in the standard library currently emits this warning for:
     // 'Hashable', 'Encodable', and 'Decodable'. This is unfortunate, but we
