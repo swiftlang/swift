@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 protocol P1 {
   associatedtype A : P1
   associatedtype B : P1

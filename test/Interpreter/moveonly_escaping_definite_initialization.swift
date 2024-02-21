@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
+// RUN: %target-run-simple-swift -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all) | %FileCheck %s
+
 // REQUIRES: executable_test
 
 @_moveOnly
@@ -70,4 +73,3 @@ closure = {}
 
 // CHECK-NEXT: done
 print("done")
-

@@ -1301,9 +1301,10 @@ bool GenericContext::isComputingGenericSignature() const {
 
 /// If we hit a cycle while building the generic signature, we can't return
 /// nullptr, since this breaks invariants elsewhere. Instead, build a dummy
-/// signature with no requirements.
+/// signature where everything is Copyable and Escapable, to avoid spurious
+/// downstream diagnostics concerning move-only types.
 static GenericSignature getPlaceholderGenericSignature(
-    const DeclContext *DC) {
+    ASTContext &ctx, const DeclContext *DC) {
   SmallVector<GenericParamList *, 2> gpLists;
   DC->forEachGenericContext([&](GenericParamList *genericParams) {
     gpLists.push_back(genericParams);
@@ -1316,23 +1317,32 @@ static GenericSignature getPlaceholderGenericSignature(
   for (unsigned i : indices(gpLists))
     gpLists[i]->setDepth(i);
 
-  SmallVector<GenericTypeParamType *, 2> result;
-  for (auto *genericParams : gpLists) {
-    for (auto *genericParam : *genericParams) {
-      result.push_back(genericParam->getDeclaredInterfaceType()
-                                   ->castTo<GenericTypeParamType>());
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  SmallVector<Requirement, 2> requirements;
+
+  for (auto *gpList : gpLists) {
+    for (auto *genericParam : *gpList) {
+      auto type = genericParam->getDeclaredInterfaceType();
+      genericParams.push_back(type->castTo<GenericTypeParamType>());
+
+      if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+        for (auto ip : InvertibleProtocolSet::full()) {
+          auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+          requirements.emplace_back(RequirementKind::Conformance, type,
+                                    proto->getDeclaredInterfaceType());
+        }
+      }
     }
   }
 
-  return GenericSignature::get(result, {});
+  return GenericSignature::get(genericParams, requirements);
 }
 
 GenericSignature GenericContext::getGenericSignature() const {
-  // Don't use evaluateOrDefault() here, because getting the 'default value'
-  // is slightly expensive here so we don't want to do it eagerly.
-  return getASTContext().evaluator(
+  auto &ctx = getASTContext();
+  return ctx.evaluator(
       GenericSignatureRequest{const_cast<GenericContext *>(this)},
-      [this]() { return getPlaceholderGenericSignature(this); });
+      [&ctx, this]() { return getPlaceholderGenericSignature(ctx, this); });
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
@@ -6912,10 +6922,46 @@ ProtocolDecl::getProtocolDependencies() const {
       llvm::None);
 }
 
+/// If we hit a request cycle, give the protocol a requirement signature where
+/// everything is Copyable and Escapable. Otherwise, we'll get spurious
+/// downstream diagnostics concerning move-only types.
+static RequirementSignature getPlaceholderRequirementSignature(
+    const ProtocolDecl *proto) {
+  auto &ctx = proto->getASTContext();
+
+  SmallVector<Requirement, 2> requirements;
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto add = [&](Type type) {
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        requirements.emplace_back(RequirementKind::Conformance, type,
+                                  proto->getDeclaredInterfaceType());
+      }
+    };
+
+    add(proto->getSelfInterfaceType());
+
+    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
+      add(assocTypeDecl->getDeclaredInterfaceType());
+  }
+
+  // Maintain invariants.
+  llvm::array_pod_sort(requirements.begin(), requirements.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
+
+  return RequirementSignature(ctx.AllocateCopy(requirements),
+                              ArrayRef<ProtocolTypeAlias>());
+}
+
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
-  return evaluateOrDefault(getASTContext().evaluator,
+  return getASTContext().evaluator(
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
-               RequirementSignature());
+               [this]() {
+                 return getPlaceholderRequirementSignature(this);
+               });
 }
 
 bool ProtocolDecl::isComputingRequirementSignature() const {

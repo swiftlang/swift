@@ -5116,7 +5116,7 @@ namespace {
           !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
-        componentTy = leafTy;
+        componentTy = OptionalType::get(componentTy);
       }
 
       // Set the resolved components, and cache their types.
@@ -5132,13 +5132,23 @@ namespace {
 
       // If we've gotten here, the user has used key path literal syntax to form
       // a closure. The type checker has given E a function type to indicate
-      // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
-      // then wrap it in a larger closure expression with the appropriate type.
+      // this.
+      //
+      // Since functions support more conversions than generic types, we may
+      // have ended up with a type of (baseTy) -> leafTy, where the actual type
+      // of the key path is some subclass of KeyPath<baseTy, componentTy>, and
+      // with componentTy: leafTy.
+      //
+      // We're going to change E's type to KeyPath<baseTy, componentTy> and
+      // then wrap it in a larger closure expression which we will convert to
+      // appropriate type.
+
+      auto kpResultTy = componentTy->getWithoutSpecifierType();
 
       // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
       auto kpDecl = cs.getASTContext().getKeyPathDecl();
       auto keyPathTy =
-          BoundGenericType::get(kpDecl, nullptr, { baseTy, leafTy });
+          BoundGenericType::get(kpDecl, nullptr, { baseTy, kpResultTy });
       E->setType(keyPathTy);
       cs.cacheType(E);
 
@@ -5153,9 +5163,10 @@ namespace {
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
-          FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
+          FunctionType::get({FunctionType::Param(baseTy)}, kpResultTy,
+                            closureInfo);
       auto closure = new (ctx)
-          AutoClosureExpr(/*set body later*/nullptr, leafTy, dc);
+          AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);
 
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
@@ -5207,7 +5218,7 @@ namespace {
       auto *application = new (ctx)
           KeyPathApplicationExpr(paramRef,
                                  E->getStartLoc(), outerParamRef, E->getEndLoc(),
-                                 leafTy, /*implicit=*/true);
+                                 kpResultTy, /*implicit=*/true);
       cs.cacheType(application);
 
       // Finish up the inner closure.

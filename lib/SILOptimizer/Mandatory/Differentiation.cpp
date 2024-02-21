@@ -1175,18 +1175,18 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     // If derivative function value's type is not ABI-compatible with the
     // expected derivative function type (i.e. parameter and result conventions
     // do not match), perform reabstraction.
-    auto abiCompatibility = expectedDerivativeFnTy->isABICompatibleWith(
-        derivativeFn->getType().castTo<SILFunctionType>(), *dfi->getFunction());
+    auto abiCompatibility =
+        derivativeFn->getType().castTo<SILFunctionType>()->isABICompatibleWith(
+          expectedDerivativeFnTy, *dfi->getFunction());
     if (!abiCompatibility.isCompatible()) {
       SILOptFunctionBuilder fb(context.getTransform());
       auto newDerivativeFn = reabstractFunction(
           builder, fb, loc, derivativeFn, expectedDerivativeFnTy,
           [](SubstitutionMap substMap) { return substMap; });
       derivativeFn = newDerivativeFn;
-      assert(expectedDerivativeFnTy
-                 ->isABICompatibleWith(
-                     derivativeFn->getType().castTo<SILFunctionType>(),
-                     *dfi->getFunction())
+      assert(derivativeFn->getType().castTo<SILFunctionType>()
+                 ->isABICompatibleWith(expectedDerivativeFnTy,
+                                       *dfi->getFunction())
                  .isCompatible());
     }
 

@@ -1566,6 +1566,16 @@ public:
                             bool ignoreFinalParam,
     llvm::function_ref<void(FunctionParamGenerator &param)> function) const;
 
+  /// Return the start index of the given formal parameter in the lowered
+  /// parameter sequence corresponding to a function with this abstraction
+  /// pattern.
+  unsigned getLoweredParamIndex(unsigned formalIndex) const;
+
+  /// If this abstraction pattern is recursively expanded and flattened
+  /// in the normal way for parameters and results, how many values does
+  /// it correspond to?
+  unsigned getFlattenedValueCount() const;
+
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
   AbstractionPattern getOptionalObjectType() const;

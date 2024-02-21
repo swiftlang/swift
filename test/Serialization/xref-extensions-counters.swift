@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 
+// XFAIL: noncopyable_generics
+
 // This check uses -parse-stdlib in order to have an exact count of declarations
 // imported.
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_xref_extensions.swift -parse-stdlib

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
 
 struct Payload: ~Copyable {
     var x: Int
@@ -236,8 +237,8 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
         break
     }
 
-    switch bas {
-    case _borrowing x: // expected-warning{{}} expected-note{{used here}}
+    switch bas { // expected-note{{used here}}
+    case _borrowing x: // expected-warning{{}}
         break
     }
 }
@@ -351,4 +352,3 @@ extension ChonkyList {
     }
 */
 }
-

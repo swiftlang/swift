@@ -517,12 +517,29 @@ public:
         // 'resolved' points to a struct of two relative addresses.
         // The second entry is a relative address to the mangled protocol
         // without symbolic references.
+
+        // lldb might return an unresolved remote absolute pointer from its
+        // resolvePointerAsSymbol implementation -- workaround this.
+        if (!resolved.isResolved()) {
+          auto remoteAddr = RemoteAddress(remoteAddress);
+          resolved =
+            RemoteAbsolutePointer("", remoteAddr.getAddressData());
+        }
+
         auto addr =
             resolved.getResolvedAddress().getAddressData() + sizeof(int32_t);
         int32_t offset;
         Reader->readInteger(RemoteAddress(addr), &offset);
         auto addrOfTypeRef = addr + offset;
         resolved = Reader->getSymbol(RemoteAddress(addrOfTypeRef));
+
+        // lldb might return an unresolved remote absolute pointer from its
+        // resolvePointerAsSymbol implementation -- workaround this.
+        if (!resolved.isResolved()) {
+          auto remoteAddr = RemoteAddress(addrOfTypeRef);
+          resolved =
+            RemoteAbsolutePointer("", remoteAddr.getAddressData());
+        }
 
         // Dig out the protocol from the protocol list.
         auto protocolList = readMangledName(resolved.getResolvedAddress(),

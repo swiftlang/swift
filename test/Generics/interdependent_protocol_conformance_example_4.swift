@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -disable-requirement-machine-reuse 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 // CHECK-LABEL: .NonEmptyProtocol@
 // CHECK-NEXT: Requirement signature: <Self where Self : Collection, Self.[NonEmptyProtocol]C : Collection, Self.[Sequence]Element == Self.[NonEmptyProtocol]C.[Sequence]Element, Self.[Collection]Index == Self.[NonEmptyProtocol]C.[Collection]Index>
 

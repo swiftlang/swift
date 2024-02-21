@@ -1399,6 +1399,48 @@ static void handleRequestIndex(const RequestDict &Req,
   });
 }
 
+static std::optional<IndexStoreOptions>
+getIndexStoreOpts(const RequestDict &Req, ResponseReceiver Rec) {
+  IndexStoreOptions Opts;
+  if (auto IndexStorePath = Req.getString(KeyIndexStorePath))
+    Opts.IndexStorePath = IndexStorePath->str();
+  else {
+    Rec(createErrorRequestInvalid("'key.index_store_path' is required"));
+    return std::nullopt;
+  }
+
+  if (auto IndexUnitOutputPath = Req.getString(KeyIndexUnitOutputPath))
+    Opts.IndexUnitOutputPath = IndexUnitOutputPath->str();
+  else {
+    Rec(createErrorRequestInvalid("'key.index_unit_output_path' is required"));
+    return std::nullopt;
+  }
+
+  if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
+    Opts.IncludeLocals = IncludeLocals.value() > 0;
+  }
+
+  if (auto IgnoreClangModules = Req.getOptionalInt64(KeyIgnoreClangModules)) {
+    Opts.IgnoreClangModules = IgnoreClangModules.value() > 0;
+  }
+
+  if (auto IncludeSystemModules =
+          Req.getOptionalInt64(KeyIncludeSystemModules)) {
+    Opts.IncludeSystemModules = IncludeSystemModules.value() > 0;
+  }
+
+  if (auto IgnoreStdlib = Req.getOptionalInt64(KeyIgnoreStdlib)) {
+    Opts.IgnoreStdlib = IgnoreStdlib.value() > 0;
+  }
+
+  if (auto DisableImplicitModules =
+          Req.getOptionalInt64(KeyDisableImplicitModules)) {
+    Opts.DisableImplicitModules = DisableImplicitModules.value() > 0;
+  }
+
+  return Opts;
+}
+
 static void handleRequestIndexToStore(
     const RequestDict &Req, SourceKitCancellationToken CancellationToken,
     ResponseReceiver Rec) {
@@ -1411,22 +1453,15 @@ static void handleRequestIndexToStore(
     if (!PrimaryFilePath)
       return;
 
-    IndexStoreOptions Opts;
-    if (auto IndexStorePath = Req.getString(KeyIndexStorePath))
-      Opts.IndexStorePath = IndexStorePath->str();
-    else
-      return Rec(createErrorRequestInvalid("'key.index_store_path' is required"));
-
-    if (auto IndexUnitOutputPath = Req.getString(KeyIndexUnitOutputPath))
-      Opts.IndexUnitOutputPath = IndexUnitOutputPath->str();
-    else
-      return Rec(createErrorRequestInvalid("'key.index_unit_output_path' is required"));
+    std::optional<IndexStoreOptions> Opts = getIndexStoreOpts(Req, Rec);
+    if (!Opts)
+      return;
 
     SmallVector<const char *, 0> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    Lang.indexToStore(*PrimaryFilePath, Args, std::move(Opts),
+    Lang.indexToStore(*PrimaryFilePath, Args, std::move(*Opts),
       CancellationToken,
       [Rec](const RequestResult<IndexStoreInfo> &Result) {
         if (Result.isCancelled())

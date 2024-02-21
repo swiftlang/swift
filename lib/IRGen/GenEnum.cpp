@@ -1953,7 +1953,8 @@ namespace {
              "extra inhabitant zero");
         
         unsigned numTags = ElementsWithNoPayload.size();
-        if (payloadTI.canValueWitnessExtraInhabitantsUpTo(IGM, numTags-1)) {
+        if (payloadTI.canValueWitnessExtraInhabitantsUpTo(IGM, numTags - 1) &&
+            payloadTI.isCopyable(ResilienceExpansion::Maximal)) {
           CopyDestroyKind = ForwardToPayload;
         }
       }

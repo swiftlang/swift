@@ -7,5 +7,4 @@
 -lwasi-emulated-signal
 -lwasi-emulated-process-clocks
 -Xlinker --error-limit=0
--Xlinker --no-gc-sections
 -Xlinker --threads=1

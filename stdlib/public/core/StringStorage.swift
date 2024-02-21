@@ -181,12 +181,14 @@ fileprivate func _allocate<T: AnyObject>(
 ) -> (T, realNumTailBytes: Int) {
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 
+  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
+
   let numBytes = numHeaderBytes + numTailBytes
 
   let linearBucketThreshold = 128
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16
-    let realNumBytes = _mallocGoodSize(for: numBytes)
+    let realNumBytes = roundUp(numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
     let object = tailAllocator(realNumTailBytes)
@@ -200,10 +202,21 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
+  let total = roundUp(numHeaderBytes + growTailBytes)
   let totalTailBytes = total - numHeaderBytes
 
-  return (tailAllocator(totalTailBytes), totalTailBytes)
+  let object = tailAllocator(totalTailBytes)
+  if let allocSize = _mallocSize(ofAllocation:
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(object))) {
+    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
+
+    let realNumTailBytes = allocSize - numHeaderBytes
+    _internalInvariant(realNumTailBytes >= numTailBytes)
+
+    return (object, realNumTailBytes)
+  } else {
+    return (object, totalTailBytes)
+  }
 }
 
 fileprivate func _allocateStringStorage(

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 // This test focuses on the prevention of users from _writing_ types where
 // a move-only type is substituted for a generic parameter.
 //

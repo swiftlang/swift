@@ -780,7 +780,7 @@ extension LifetimeDependenceUseDefWalker {
 ///   escapingDependence(on operand: Operand) -> WalkResult
 ///   returnedDependence(result: Operand) -> WalkResult
 ///   returnedDependence(address: FunctionArgument, using: Operand) -> WalkResult
-///
+///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
 ///   walkDown(root: Value)
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
@@ -796,6 +796,8 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 
   mutating func returnedDependence(address: FunctionArgument, using: Operand)
     -> WalkResult
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult
 }
 
 extension LifetimeDependenceDefUseWalker {
@@ -840,6 +842,9 @@ extension LifetimeDependenceDefUseWalker {
     }
     if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
       return returnedDependence(result: operand)
+    }
+    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+      return yieldedDependence(result: operand)
     }
     return escapingDependence(on: operand)
   }
@@ -1008,6 +1013,9 @@ extension LifetimeDependenceDefUseWalker {
     }
     if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
       return returnedDependence(result: operand)
+    }
+    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+      return yieldedDependence(result: operand)
     }
     return escapingDependence(on: operand)
   }
@@ -1206,6 +1214,11 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
   mutating func returnedDependence(address: FunctionArgument,
                                    using operand: Operand) -> WalkResult {
     print("Returned use: \(operand) in: \(address)")
+    return .continueWalk
+  }
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult {
+    print("Yielded use: \(result)")
     return .continueWalk
   }
 }

@@ -313,6 +313,8 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   case SILInstructionKind::LoadInst:
     return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
            LoadOwnershipQualifier::Take;
+  case SILInstructionKind::BeginAccessInst:
+    return cast<BeginAccessInst>(memInst)->getAccessKind() == SILAccessKind::Deinit;
   }
 }
 

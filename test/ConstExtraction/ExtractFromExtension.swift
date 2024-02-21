@@ -31,3 +31,6 @@ extension MyType {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ]
+
+// XFAIL: noncopyable_generics
+

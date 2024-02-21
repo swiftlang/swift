@@ -3957,15 +3957,18 @@ public:
 };
 
 /// Extract the isolation of an @isolated(any) function value.
+///
+/// The operand and result must always have guaranteed ownership.
 class FunctionExtractIsolationInst
     : public UnaryInstructionBase<SILInstructionKind::FunctionExtractIsolationInst,
-                                  SingleValueInstruction>
+                                  OwnershipForwardingSingleValueInstruction>
 {
   friend SILBuilder;
 
   FunctionExtractIsolationInst(SILDebugLocation debugLoc, SILValue fnValue,
                                SILType type)
-      : UnaryInstructionBase(debugLoc, fnValue, type) { }
+      : UnaryInstructionBase(debugLoc, fnValue, type,
+                             OwnershipKind::Guaranteed) { }
 
 public:
   SILValue getFunction() const { return getOperand(); }
@@ -11047,6 +11050,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
     return true;
   default:
     return false;

@@ -168,5 +168,9 @@ private struct LifetimeDependenceScopeFixupWalker : LifetimeDependenceDefUseWalk
                                    using operand: Operand) -> WalkResult {
     return .continueWalk
   }
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult {
+    return .continueWalk
+  }
 }
 

@@ -1165,6 +1165,24 @@ public:
   /// \returns a value which can be used with hop_to_executor
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
+  /// Generates the code to call .shared on the given global actor type.
+  ManagedValue emitLoadOfGlobalActorShared(SILLocation loc,
+                                           CanType globalActorType);
+
+  /// Generates the code to obtain the executor for the actor stored in
+  /// an @isolated(any) function value.
+  SILValue emitLoadErasedExecutor(SILLocation loc, ManagedValue fn);
+
+  /// Generates the code to obtain the actor reference for the actor
+  /// stored in an @isolated(any) function value.
+  ManagedValue emitLoadErasedIsolation(SILLocation loc, ManagedValue fn);
+
+  /// Generates the code to obtain the actor reference (as a opaque
+  /// isolation) for a function value with the given formal isolation.
+  ManagedValue emitLoadOfFunctionIsolation(SILLocation loc,
+                                           FunctionTypeIsolation isolation,
+                                           ManagedValue fn);
+
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//

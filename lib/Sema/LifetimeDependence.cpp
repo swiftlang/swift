@@ -274,8 +274,16 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   auto returnTypeRepr = afd->getResultTypeRepr();
   auto returnLoc = returnTypeRepr ? returnTypeRepr->getLoc() : afd->getLoc();
   Type returnTyInContext = afd->mapTypeIntoContext(resultType);
+  std::optional<Type> yieldTyInContext;
 
-  if (returnTyInContext->isEscapable()) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
+    if (accessor->isCoroutine()) {
+      yieldTyInContext = accessor->getStorage()->getValueInterfaceType();
+      yieldTyInContext = accessor->mapTypeIntoContext(*yieldTyInContext);
+    }
+  }
+  if (returnTyInContext->isEscapable() &&
+      (!yieldTyInContext.has_value() || (*yieldTyInContext)->isEscapable())) {
     return llvm::None;
   }
   if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
@@ -285,21 +293,25 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
     ValueOwnership ownership = ValueOwnership::Default;
     if (auto *AD = dyn_cast<AccessorDecl>(afd)) {
-      if (AD->getAccessorKind() == AccessorKind::Get) {
+      if (AD->getAccessorKind() == AccessorKind::Get ||
+          AD->getAccessorKind() == AccessorKind::Read) {
         // We don't support "borrowing/consuming" ownership modifiers on
-        // getters, by default they are guaranteed for now.
+        // getters/_read accessors, they are guaranteed by default for now.
         ownership = ValueOwnership::Shared;
       }
+      if (AD->getAccessorKind() == AccessorKind::Modify) {
+        ownership = ValueOwnership::InOut;
+      }
     } else {
+      assert(afd->getKind() == DeclKind::Func);
       ownership = afd->getImplicitSelfDecl()->getValueOwnership();
-    }
-
-    if (ownership == ValueOwnership::Default) {
-      diags.diagnose(
-          returnLoc,
-          diag::
-              lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method);
-      return llvm::None;
+      if (ownership == ValueOwnership::Default) {
+        diags.diagnose(
+            returnLoc,
+            diag::
+                lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method);
+        return llvm::None;
+      }
     }
     return LifetimeDependenceInfo::getForParamIndex(afd, /*selfIndex*/ 0,
                                                     ownership);
