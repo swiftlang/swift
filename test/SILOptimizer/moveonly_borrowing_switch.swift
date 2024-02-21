@@ -299,10 +299,6 @@ extension List {
         }
     }
 
-/*
-    TODO: type mismatch because of `@moveOnly` wrapper. yield needs to peel it
-    off
-
     var head: Element {
         _read {
             switch self {
@@ -313,7 +309,6 @@ extension List {
             }
         }
     }
-*/
 }
 
 extension ChonkyList {
@@ -335,10 +330,6 @@ extension ChonkyList {
         }
     }
 
-/*
-    TODO: type mismatch because of `@moveOnly` wrapper. yield needs to peel it
-    off
-
     var head: Element {
         _read {
             switch self {
@@ -349,6 +340,5 @@ extension ChonkyList {
             }
         }
     }
-*/
 }
 
