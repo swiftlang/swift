@@ -2654,6 +2654,11 @@ public:
       if (!var->hasInterfaceType())
         return;
 
+      // The types for imported vars are produced lazily and
+      // could fail to import.
+      if (var->getClangDecl() && var->isInvalid())
+        return;
+
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
       // Variables must have materializable type.
