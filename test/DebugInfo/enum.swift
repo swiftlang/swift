@@ -93,14 +93,14 @@ public func foo(_ empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "$s4enum4RoseOyxG{{z?}}D"
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // DWARF: !DICompositeType({{.*}}name: "$s4enum4RoseOyxGD",{{.*}}flags: DIFlagFwdDecl{{.*}}
+  // DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Rose",  {{.*}}identifier: "$s4enum4RoseOyxGD"
 	case IORose(() -> Rose<A>)
 }
 
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "$s4enum5TupleOyxGD"
-// DWARF: !DICompositeType({{.*}}name: "$s4enum5TupleOyxG{{z?}}D"
+// DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}identifier: "$s4enum5TupleOyxGD"
 public enum Tuple<P> {
 	case C(P, () -> Tuple)
 }
