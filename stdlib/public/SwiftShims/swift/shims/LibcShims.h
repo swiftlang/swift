@@ -129,15 +129,6 @@ static inline __swift_bool _swift_stdlib_has_malloc_size() {
   return HAS_MALLOC_SIZE != 0;
 }
 
-static inline __swift_size_t _swift_stdlib_malloc_good_size(__swift_size_t sz) {
-#if defined(__APPLE__)
-  extern __swift_size_t malloc_good_size(__swift_size_t);
-  return malloc_good_size(sz);
-#else
-  return (sz + 15) & ~15; //round up to the nearest 16 byte alignment, at least
-#endif
-}
-
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_remainderf(float _self, float _other) {
