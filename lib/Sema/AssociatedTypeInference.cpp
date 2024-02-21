@@ -1017,6 +1017,10 @@ private:
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
+  /// See if we have a generic parameter named the same as this associated
+  /// type.
+  Type computeGenericParamWitness(AssociatedTypeDecl *assocType) const;
+
   /// Compute a type witness without using a specific potential witness.
   llvm::Optional<AbstractTypeWitness>
   computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
@@ -2657,6 +2661,28 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   return llvm::None;
 }
 
+/// Look for a generic parameter that matches the name of the
+/// associated type.
+Type AssociatedTypeInference::computeGenericParamWitness(
+    AssociatedTypeDecl *assocType) const {
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
+    // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
+    // AsyncSequence.Failure.
+    if (!isAsyncIteratorProtocolFailure(assocType)) {
+      for (auto *gp : genericSig.getInnermostGenericParams()) {
+        // Packs cannot witness associated type requirements.
+        if (gp->isParameterPack())
+          continue;
+
+        if (gp->getName() == assocType->getName())
+          return dc->mapTypeIntoContext(gp);
+      }
+    }
+  }
+
+  return Type();
+}
+
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
@@ -2705,39 +2731,14 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
     if (system.hasResolvedTypeWitness(assocType->getName()))
       continue;
 
-    bool found = false;
-
-    // Look for a generic parameter that matches the name of the
-    // associated type.
-    if (auto genericSig = dc->getGenericSignatureOfContext()) {
-      // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
-      // AsyncSequence.Failure.
-      if (!isAsyncIteratorProtocolFailure(assocType)) {
-        for (auto *gp : genericSig.getInnermostGenericParams()) {
-          // Packs cannot witness associated type requirements.
-          if (gp->isParameterPack())
-            continue;
-
-          if (gp->getName() == assocType->getName()) {
-            system.addTypeWitness(assocType->getName(),
-                                  dc->mapTypeIntoContext(gp),
-                                  /*preferred=*/true);
-            found = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!found) {
-      // If we find a default type definition, feed it to the system.
-      if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
-        bool preferred = (typeWitness->getDefaultedAssocType()->getDeclContext()
-                          == conformance->getProtocol());
-        system.addDefaultTypeWitness(typeWitness->getType(),
-                                     typeWitness->getDefaultedAssocType(),
-                                     preferred);
-      }
+    if (auto gpType = computeGenericParamWitness(assocType)) {
+      system.addTypeWitness(assocType->getName(), gpType, /*preferred=*/true);
+    } else if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
+      bool preferred = (typeWitness->getDefaultedAssocType()->getDeclContext()
+                        == conformance->getProtocol());
+      system.addDefaultTypeWitness(typeWitness->getType(),
+                                   typeWitness->getDefaultedAssocType(),
+                                   preferred);
     }
   }
 }
@@ -3156,8 +3157,15 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
     // If simplification failed, give up.
     if (type->hasTypeParameter()) {
-      LLVM_DEBUG(llvm::dbgs() << "-- Simplification failed: " << type << "\n");
-      return assocType;
+      if (auto gpType = computeGenericParamWitness(assocType)) {
+        LLVM_DEBUG(llvm::dbgs() << "-- Found generic parameter as last resort: "
+                                << gpType << "\n");
+        type = gpType;
+        typeWitnesses.insert(assocType, {type, reqDepth});
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "-- Simplification failed: " << type << "\n");
+        return assocType;
+      }
     }
 
     if (const auto failed =
