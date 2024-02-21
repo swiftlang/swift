@@ -1978,17 +1978,13 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
 } // end anonymous namespace
 
 bool GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
-  // If an access is checked by its own strict mark_unresolved_noncopyable
-  // instruction, then treat the access as an opaque borrowing use from the
-  // outside.
+  // If an access is static and marked as "no nested conflict", we use that
+  // in switch codegen to mark an opaque sub-access that move-only checking
+  // should not look through.
   if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
-    for (auto accessUse : ba->getUses()) {
-      if (auto mark
-         = dyn_cast<MarkUnresolvedNonCopyableValueInst>(accessUse->getUser())) {
-        if (mark->isStrict()) {
-          return true;
-        }
-      }
+    if (ba->getEnforcement() == SILAccessEnforcement::Static
+        && ba->hasNoNestedConflict()) {
+      return true;
     }
   }
   return false;
@@ -2548,20 +2544,29 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
   
-  // Treat an opaque read access as a borrow liveness use for the duration
-  // of the access.
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
-    assert(access->getAccessKind() == SILAccessKind::Read);
-    LLVM_DEBUG(llvm::dbgs() << "begin_access use\n");
-    
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange) {
-      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
-      return false;
-    }
+    switch (access->getAccessKind()) {
+    // Treat an opaque read access as a borrow liveness use for the duration
+    // of the access.
+    case SILAccessKind::Read: {
+      LLVM_DEBUG(llvm::dbgs() << "begin_access [read]\n");
+      
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
 
-    useState.recordLivenessUse(user, *leafRange);
-    return true;
+      useState.recordLivenessUse(user, *leafRange);
+      return true;
+    }
+    // Treat a deinit access as a consume of the entire value.
+    case SILAccessKind::Deinit:
+      llvm_unreachable("should have been handled by `memInstMustConsume`");
+    case SILAccessKind::Init:
+    case SILAccessKind::Modify:
+      llvm_unreachable("should look through these kinds of accesses currently");
+    }
   }
 
   // If we don't fit into any of those categories, just track as a liveness
