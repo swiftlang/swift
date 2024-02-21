@@ -429,7 +429,7 @@ public:
                 ++EI;
               }
             }
-          } else if (shouldLogType(AE->getSrc()->getType())) {
+          } else if (shouldLog(AE->getSrc())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(AE->getSrc());
             DeclRefExpr *DRE = new (Context)
@@ -521,7 +521,7 @@ public:
             }
             Handled = true; // Never log ()
           }
-          if (!Handled && shouldLogType(E->getType())) {
+          if (!Handled && shouldLog(E)) {
             // do the same as for all other expressions
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
@@ -539,7 +539,7 @@ public:
             }
           }
         } else {
-          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType && shouldLogType(E->getType())) {
+          if (E->getType()->getCanonicalType() != Context.TheEmptyTupleType && shouldLog(E)) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(E);
             Added<Stmt *> Log = buildLoggerCall(
@@ -559,7 +559,7 @@ public:
       } else if (auto *S = Element.dyn_cast<Stmt *>()) {
         S->walk(CF);
         if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-          if (RS->hasResult() && shouldLogType(RS->getResult()->getType())) {
+          if (RS->hasResult() && shouldLog(RS->getResult())) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(RS->getResult());
             DeclRefExpr *DRE = new (Context) DeclRefExpr(
@@ -621,7 +621,7 @@ public:
     if (PL && Options.LogFunctionParameters) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
-        if (PD->hasName() && shouldLogType(PD->getInterfaceType())) {
+        if (PD->hasName() && shouldLog(PD)) {
           DeclBaseName Name = PD->getName();
           Expr *PVVarRef = new (Context)
               DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
@@ -658,7 +658,7 @@ public:
   // after or instead of the expression they're looking at.  Only call this
   // if the variable has an initializer.
   Added<Stmt *> logVarDecl(VarDecl *VD) {
-    if (!shouldLogType(VD->getInterfaceType())) {
+    if (!shouldLog(VD)) {
       return nullptr;
     }
 
@@ -678,7 +678,7 @@ public:
     if (auto *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
 
-      if (!shouldLogType(VD->getInterfaceType())) {
+      if (!shouldLog(VD)) {
         return nullptr;
       }
 
@@ -694,9 +694,8 @@ public:
     } else if (auto *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
-      VarDecl *VD = cast<VarDecl>(M.getDecl());
 
-      if (!shouldLogType(VD->getInterfaceType())) {
+      if (!shouldLog(M.getDecl())) {
         return nullptr;
       }
 
@@ -799,11 +798,12 @@ public:
     return std::make_pair(PBD, VD);
   }
 
-  bool shouldLogType(Type Ty) {
+  bool shouldLog(ASTNode node) {
     // Don't try to log ~Copyable types, as we can't pass them to the generic logging functions yet.
-    if (Ty->isNoncopyable()) {
-      return false;
-    }
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>()))
+      return VD->hasInterfaceType() ? !VD->getInterfaceType()->isNoncopyable() : true;
+    if (auto *E = node.dyn_cast<Expr *>())
+      return !E->getType()->isNoncopyable();
     return true;
   }
 
