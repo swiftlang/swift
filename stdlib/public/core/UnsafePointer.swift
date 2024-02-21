@@ -905,14 +905,6 @@ extension UnsafeMutablePointer {
   }
 }
 
-#if true // Builtin.initialize doesn't support noncopyable types (rdar://123253877)
-extension UnsafeMutablePointer {
-  @_alwaysEmitIntoClient
-  public func initialize(to value: consuming Pointee) {
-    Builtin.initialize(value, self._rawValue)
-  }
-}
-#else
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Initializes this pointer's memory with a single instance of the given
   /// value.
@@ -937,7 +929,6 @@ extension UnsafeMutablePointer {
     Builtin.initialize(value, self._rawValue)
   }
 }
-#endif
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Retrieves and returns the referenced instance, returning the pointer's
@@ -1055,37 +1046,6 @@ extension UnsafeMutablePointer {
   }
 }
 
-#if true // Builtin.takeArray* don't support noncopyable types (rdar://123253877)
-extension UnsafeMutablePointer {
-  @_alwaysEmitIntoClient
-  public func moveInitialize(
-    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
-  ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
-    if self < source || self >= source + count {
-      // initialize forward from a disjoint or following overlapping range.
-      Builtin.takeArrayFrontToBack(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // for i in 0..<count {
-      //   (self + i).initialize(to: (source + i).move())
-      // }
-    }
-    else if self != source {
-      // initialize backward from a non-following overlapping range.
-      Builtin.takeArrayBackToFront(
-        Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-      // This builtin is equivalent to:
-      // var src = source + count
-      // var dst = self + count
-      // while dst != self {
-      //   (--dst).initialize(to: (--src).move())
-      // }
-    }
-  }
-}
-#else
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Moves instances from initialized source memory into the uninitialized
   /// memory referenced by this pointer, leaving the source memory
@@ -1165,7 +1125,6 @@ extension UnsafeMutablePointer {
     }
   }
 }
-#endif
 
 extension UnsafeMutablePointer {
   /// Initializes the memory referenced by this pointer with the values
@@ -1201,26 +1160,6 @@ extension UnsafeMutablePointer {
   }
 }
 
-#if true // Builtin.assignTakeArray doesn't support noncopyable types (rdar://123253877)
-extension UnsafeMutablePointer {
-  @_alwaysEmitIntoClient
-  public func moveUpdate(
-    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
-  ) {
-    _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveUpdate(from:) with negative count")
-    _debugPrecondition(
-      self + count <= source || source + count <= self,
-      "moveUpdate overlapping range")
-    Builtin.assignTakeArray(
-      Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
-    // These builtins are equivalent to:
-    // for i in 0..<count {
-    //   self[i] = (source + i).move()
-    // }
-  }
-}
-#else
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Update this pointer's initialized memory by moving the specified number
   /// of instances the source pointer's memory, leaving the source memory
@@ -1288,21 +1227,7 @@ extension UnsafeMutablePointer {
     moveUpdate(from: source, count: count)
   }
 }
-#endif
 
-#if true // Builtin.destroyArray doesn't support noncopyable types (rdar://123253877)
-extension UnsafeMutablePointer {
-  @_alwaysEmitIntoClient
-  @discardableResult
-  public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
-    // TODO: IRGen optimization when `count` value is statically known to be 1,
-    //       then call `Builtin.destroy(Pointee.self, _rawValue)` instead.
-    Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
-    return UnsafeMutableRawPointer(self)
-  }
-}
-#else
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deinitializes the specified number of values starting at this pointer.
   ///
@@ -1338,7 +1263,6 @@ extension UnsafeMutablePointer {
     return UnsafeMutableRawPointer(self)
   }
 }
-#endif
 
 extension UnsafeMutablePointer /* where Pointee: ~Copyable */ {
   // FIXME: We want this to have the constraint above, but that triggers a .swiftinterface issue.
