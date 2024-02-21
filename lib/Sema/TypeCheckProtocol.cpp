@@ -2210,6 +2210,13 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
+/// Determine whether a conformance to this protocol can be determined at
+/// runtime for an arbitrary type.
+static bool hasRuntimeConformanceInfo(ProtocolDecl *proto) {
+  return !proto->isMarkerProtocol()
+      || proto->isSpecificProtocol(KnownProtocolKind::Copyable);
+}
+
 static void ensureRequirementsAreSatisfied(ASTContext &ctx,
                                            NormalProtocolConformance *conformance);
 
@@ -2354,11 +2361,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
     // If the protocol to which we are conditionally conforming is not a marker
     // protocol, the conditional requirements must not involve conformance to a
-    // marker protocol. We cannot evaluate such a conformance at runtime.
+    // protocol that cannot be evaluated at runtime, like most marker protocols.
     if (!Proto->isMarkerProtocol()) {
       for (const auto &req : conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
-            req.getProtocolDecl()->isMarkerProtocol()) {
+            !hasRuntimeConformanceInfo(req.getProtocolDecl())) {
           Context.Diags.diagnose(
             ComplainLoc, diag::marker_protocol_conditional_conformance,
             Proto->getName(), req.getFirstType(),
