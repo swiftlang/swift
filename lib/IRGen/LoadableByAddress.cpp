@@ -4245,11 +4245,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
       if (&bb == entryBB) {
         for (auto *arg : bb.getArguments()) {
           auto ty = arg->getType();
-          // This is an idiosyncrasy of the large loadable types pass which
-          // ignores tuple types (considers them always "small").
           if (assignment.isLargeLoadableType(ty)) {
-            assert(isa<TupleType>(ty.getASTType()));
-            ;
             auto addr = assignment.createAllocStack(ty);
             assignment.mapValueToAddress(arg, addr);
             // We will emit the store to initialize after parsing all other
