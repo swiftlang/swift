@@ -221,8 +221,14 @@ static void swift::enumerateUnsafeArgv(const F& body) { }
 // we don't need to take advantage of that here and can stick to things that
 // are defined in the ABI specs.)
 
-// We'll need this in a minute
-extern char **environ;
+#include <unistd.h>
+
+#define DEBUG_ARGVGRABBER 0
+#if DEBUG_ARGVGRABBER
+#define ARGVDEBUG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define ARGVDEBUG(...)
+#endif
 
 namespace {
 
@@ -248,8 +254,10 @@ private:
 // Find the stack by looking at /proc/self/maps
 ArgvGrabber::stack ArgvGrabber::findStack(void) {
   FILE *maps = fopen("/proc/self/maps", "r");
-  if (!maps)
+  if (!maps) {
+    ARGVDEBUG("unable to open maps - %d\n", errno);
     return stack();
+  }
 
   char line[256];
   void *base = NULL, *top = NULL;
@@ -260,34 +268,69 @@ ArgvGrabber::stack ArgvGrabber::findStack(void) {
     //
     // Note that we can't look for [stack], because Rosetta and qemu
     // set up a separate stack for the emulated code.
-    if (sscanf(line, "%p-%p", &base, &top) == 2
-        && (void *)line >= base && (void *)line < top) {
-      found = true;
-      break;
+    //
+    // We also need to glom on extra VM ranges after the first one
+    // we find, because *sometimes* we end up with an extra range.
+    void *lo, *hi;
+    if (sscanf(line, "%p-%p", &lo, &hi) == 2) {
+      if ((void *)line >= lo && (void *)line < hi) {
+        base = lo;
+        top = hi;
+        found = true;
+      } else if (found && top == lo) {
+        top = hi;
+      }
     }
   }
 
   fclose(maps);
 
-  if (!found)
+  if (!found) {
+    ARGVDEBUG("stack not found in maps\n");
     return stack();
+  }
 
   return stack(base, top);
 }
 
+#if DEBUG_ARGVGRABBER
+void printMaps() {
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps) {
+    fprintf(stderr, "unable to open maps - %d\n", errno);
+    return;
+  }
+
+  char line[256];
+  while (fgets(line, sizeof(line), maps)) {
+    fputs(line, stderr);
+  }
+
+  fclose(maps);
+}
+#endif
+
 // Find argv by walking backwards from environ
 void ArgvGrabber::findArgv(ArgvGrabber::stack stack) {
-  if (!stack.base)
+  if (!stack.base) {
+    ARGVDEBUG("no stack\n");
     return;
+  }
 
   // Check that environ points to the stack
   char **envp = environ;
-  if ((void *)envp < stack.base || (void *)envp >= stack.top)
+  if ((void *)envp < stack.base || (void *)envp >= stack.top) {
+    ARGVDEBUG("envp = %p, stack is from %p to %p\n",
+              envp, stack.base, stack.top);
+#if DEBUG_ARGVGRABBER
+    printMaps();
+#endif
     return;
+  }
 
   char **ptr = envp - 1;
 
-// We're now pointing at the NULL that terminates argv.  Keep going back
+  // We're now pointing at the NULL that terminates argv.  Keep going back
   // while we're seeing pointers (values greater than envp).
   while ((void *)(ptr - 1) > stack.base) {
     --ptr;
@@ -299,10 +342,20 @@ void ArgvGrabber::findArgv(ArgvGrabber::stack stack) {
       return;
     }
   }
+
+  ARGVDEBUG("didn't find argc\n");
 }
 
 ArgvGrabber::ArgvGrabber() : argv(nullptr), argc(0) {
+  ARGVDEBUG("***GRABBING ARGV for %d***\n", getpid());
   findArgv(findStack());
+#if DEBUG_ARGVGRABBER
+  fprintf(stderr, "ARGV is at %p with count %d\n", argv, argc);
+  for (int i = 0; i < argc; ++i) {
+    fprintf(stderr, "  argv[%d] = \"%s\"\n", i, argv[i]);
+  }
+  fprintf(stderr, "***ARGV GRABBED***\n");
+#endif
 }
 
 ArgvGrabber argvGrabber;
