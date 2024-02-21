@@ -41,31 +41,3 @@ internal let _fastEnumerationStorageMutationsPtr =
 internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
   return _swift_stdlib_has_malloc_size() ? _swift_stdlib_malloc_size(ptr) : nil
 }
-
-/*
- Invariant:
- malloc_size(malloc(malloc_good_size(size))) >= malloc_good_size(size)
- 
- Usually:
- malloc_size(malloc(malloc_good_size(size))) == malloc_good_size(size)
- */
-@_effects(readnone) @inline(__always)
-internal func _mallocGoodSize(for size: Int) -> Int {
-  precondition(size >= 0)
-  // Not all allocators will see benefits from rounding up to 16/32 byte aligned
-  // but it'll never cause misbehavior, and many reasonable ones will benefit
-  if (size <= 128) {
-    return (size &+ 15) & ~15;
-  }
-  if (size <= 256) {
-    return (size &+ 31) & ~31;
-  }
-  return _mallocGoodSizeLarge(for: size)
-}
-
-@_effects(readnone)
-internal func _mallocGoodSizeLarge(for size: Int) -> Int {
-  let goodSize = _swift_stdlib_malloc_good_size(size)
-  precondition(goodSize >= size)
-  return goodSize
-}
