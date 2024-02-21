@@ -68,6 +68,8 @@ public:
                                  const TypeInfo &ti) const;
 
 private:
+  void collectRepresentationTypeMetadata(SILType ty);
+
   void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
   void addMetadataParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
   void bindMetadataParameters(IRGenFunction &helperIGF,

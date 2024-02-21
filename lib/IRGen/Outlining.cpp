@@ -59,12 +59,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return collectFormalTypeMetadata(formalType);
   }
 
-  auto key = LocalTypeDataKey(type.getASTType(),
-                            LocalTypeDataKind::forRepresentationTypeMetadata());
-  if (Values.count(key)) return;
-
-  auto metadata = IGF.emitTypeMetadataRefForLayout(type);
-  Values.insert({key, metadata});
+  collectRepresentationTypeMetadata(type);
 }
 
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
@@ -78,6 +73,15 @@ void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
   Values.insert({key, metadata});
 }
 
+void OutliningMetadataCollector::collectRepresentationTypeMetadata(SILType ty) {
+  auto key = LocalTypeDataKey(
+      ty.getASTType(), LocalTypeDataKind::forRepresentationTypeMetadata());
+  if (Values.count(key))
+    return;
+
+  auto metadata = IGF.emitTypeMetadataRefForLayout(ty);
+  Values.insert({key, metadata});
+}
 
 void OutliningMetadataCollector::addMetadataArguments(
                                     SmallVectorImpl<llvm::Value*> &args) const {
