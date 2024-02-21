@@ -747,10 +747,6 @@ public:
   /// Override the witness for a given requirement.
   void overrideWitness(ValueDecl *requirement, Witness newWitness);
 
-  /// Populate the signature conformances without checking if they satisfy
-  /// requirements. Can only be used with parsed or imported conformances.
-  void finishSignatureConformances();
-
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {

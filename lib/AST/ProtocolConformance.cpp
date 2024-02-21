@@ -563,14 +563,6 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   forEachAssociatedConformance(
       [&](Type t, ProtocolDecl *p, unsigned index) {
         if (t->isEqual(assocType) && p == protocol) {
-          if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
-            // Fill in the signature conformances, if we haven't done so yet.
-            if (!hasComputedAssociatedConformances()) {
-              const_cast<NormalProtocolConformance *>(this)
-                  ->finishSignatureConformances();
-            }
-          }
-
           // Not strictly necessary, but avoids a bit of request evaluator
           // overhead in the happy case.
           if (hasComputedAssociatedConformances()) {
@@ -630,28 +622,6 @@ void NormalProtocolConformance::setAssociatedConformance(
 
   assert(!AssociatedConformances[index]);
   AssociatedConformances[index] = assocConf;
-}
-
-/// Collect conformances for the requirement signature.
-void NormalProtocolConformance::finishSignatureConformances() {
-  if (Loader)
-    resolveLazyInfo();
-
-  if (hasComputedAssociatedConformances())
-    return;
-
-  createAssociatedConformanceArray();
-
-  auto &ctx = getDeclContext()->getASTContext();
-
-  forEachAssociatedConformance(
-    [&](Type origTy, ProtocolDecl *reqProto, unsigned index) {
-      auto canTy = origTy->getCanonicalType();
-      evaluateOrDefault(ctx.evaluator,
-                        AssociatedConformanceRequest{this, canTy, reqProto, index},
-                        ProtocolConformanceRef::forInvalid());
-      return false;
-    });
 }
 
 Witness RootProtocolConformance::getWitness(ValueDecl *requirement) const {

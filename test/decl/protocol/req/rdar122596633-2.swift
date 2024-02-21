@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference -disable-availability-checking
-// RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 public protocol P<A> {
     associatedtype A
