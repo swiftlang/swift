@@ -12,7 +12,7 @@
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
-// RUN:     %S/Inputs/Swiftskell.swift
+// RUN:     %S/../Inputs/Swiftskell.swift
 
 // Check the interfaces
 
