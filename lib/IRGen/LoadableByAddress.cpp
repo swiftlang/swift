@@ -3306,7 +3306,7 @@ bool Peepholes::optimizeLoad(SILBasicBlock &BB, SILInstruction *I) {
     if (next2It == BB.end())
       return false;
     auto *store = dyn_cast<StoreInst>(&*next2It);
-    if (!store)
+    if (!store || store->getSrc() != LI)
       return false;
     if (ignore(store))
       return false;
