@@ -530,6 +530,9 @@ void DistributedAccessor::lookupWitnessTables(
   auto conformsToProtocol = IGM.getConformsToProtocolFunctionPointer();
 
   for (auto *protocol : protocols) {
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+      continue;
+
     auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
     auto *witnessTable =
         IGF.Builder.CreateCall(conformsToProtocol, {value, protocolDescriptor});
