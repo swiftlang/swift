@@ -42,9 +42,20 @@ public var globalVar = S()
 
 public enum Uninhabited {}
 
-//
 // CHECK-LABEL: sil{{.*}}@$s4Test28unavailableTakingUninhabitedyyAA0D0OF : $@convention(thin) (Uninhabited) -> () {
 // CHECK:         unreachable
 // CHECK:       } // end sil function '$s4Test28unavailableTakingUninhabitedyyAA0D0OF'
 @available(*, unavailable)
 public func unavailableTakingUninhabited(_ u: Uninhabited) {}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test17obsoletedInSwift1yyF : $@convention(thin) () -> () {
+// CHECK-NOT:     ss36_diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test17obsoletedInSwift1yyF'
+@available(swift, obsoleted: 1)
+public func obsoletedInSwift1() {}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test17obsoletedInSwift5yyF : $@convention(thin) () -> () {
+// CHECK-NOT:     ss36_diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test17obsoletedInSwift5yyF'
+@available(swift, obsoleted: 5)
+public func obsoletedInSwift5() {}
