@@ -43,7 +43,7 @@ entry(%fn : $@callee_guaranteed @isolated(any) () -> ()):
 // CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @extract_closure_isolation
 // CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32 } @extract_closure_isolation
 // CHECK-64:   [[ISO_ADDR:%.*]] = getelementptr inbounds i8, ptr %1, i32 16
-// CHECK-32:   [[ISO_ADDR:%.*]] = getelementptr inbounds i8, ptr %1, i32 16
+// CHECK-32:   [[ISO_ADDR:%.*]] = getelementptr inbounds i8, ptr %1, i32 8
 // CHECK-NEXT: [[ISO_REF_ADDR:%.*]] = getelementptr inbounds { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[ISO_REF:%.*]] = load [[INT]], ptr [[ISO_REF_ADDR]], align
 // CHECK-NEXT: [[ISO_WT_ADDR:%.*]] = getelementptr inbounds { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 1
