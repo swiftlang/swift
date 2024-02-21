@@ -176,7 +176,7 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     assert(size() == 2 && Components[0] == 4 && Components[1] == 2);
     return Version{4, 2};
   case 5:
-    return Version{5};
+    return Version{5, 10};
   case 6:
     static_assert(SWIFT_VERSION_MAJOR == 6,
                   "getCurrentLanguageVersion is no longer correct here");
