@@ -111,7 +111,7 @@ enum class SGFAccessKind : uint8_t {
   /// The access is a read that would prefer the address of a borrowed value.
   /// This should only be used when it is semantically acceptable to borrow
   /// the value, not just because the caller would benefit from a borrowed
-  /// value.  See shouldEmitSelfAsRValue.
+  /// value.  See shouldEmitSelfAsRValue in SILGenLValue.cpp.
   ///
   /// The caller will be calling emitAddressOfLValue or emitLoadOfLValue
   /// on the l-value.  The latter may be less efficient than an access
@@ -121,7 +121,7 @@ enum class SGFAccessKind : uint8_t {
   /// The access is a read that would prefer a loaded borrowed value.
   /// This should only be used when it is semantically acceptable to borrow
   /// the value, not just because the caller would benefit from a borrowed
-  /// value.  See shouldEmitSelfAsRValue.
+  /// value.  See shouldEmitSelfAsRValue in SILGenLValue.cpp.
   ///
   /// There isn't yet a way to emit the access that takes advantage of this.
   BorrowedObjectRead,

@@ -1338,7 +1338,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
                                        AbstractStorageDecl *member,
                                        SGFAccessKind accessKind,
                                        AccessStrategy strategy,
-                                       CanType baseFormalType);
+                                       CanType baseFormalType,
+                                       bool forBorrowExpr);
 
 namespace {
   /// A helper class for implementing components that involve accessing
@@ -1977,7 +1978,8 @@ namespace {
         if (!base) return LValue();
         auto baseAccessKind =
           getBaseAccessKind(SGF.SGM, Storage, accessKind, strategy,
-                            BaseFormalType);
+                            BaseFormalType,
+                            /*for borrow*/ false);
         return LValue::forValue(baseAccessKind, base, BaseFormalType);
       }();
 
@@ -3055,7 +3057,8 @@ public:
     auto baseFormalType = getBaseFormalType(e->getBase());
     LValue lv = visit(
         e->getBase(),
-        getBaseAccessKind(SGF.SGM, var, accessKind, strategy, baseFormalType),
+        getBaseAccessKind(SGF.SGM, var, accessKind, strategy, baseFormalType,
+                          /*for borrow*/ true),
         getBaseOptions(options, strategy));
     llvm::Optional<ActorIsolation> actorIso;
     if (e->isImplicitlyAsync())
@@ -3724,14 +3727,50 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
   return visitRec(e->getRHS(), accessKind, options);
 }
 
+/// Should the self argument of the given method always be emitted as
+/// an r-value (meaning that it can be borrowed only if that is not
+/// semantically detectable), or it acceptable to emit it as a borrowed
+/// storage reference?
+static bool shouldEmitSelfAsRValue(AccessorDecl *fn, CanType selfType,
+                                   bool forBorrowExpr) {
+  if (fn->isStatic())
+    return true;
+
+  switch (fn->getSelfAccessKind()) {
+  case SelfAccessKind::Mutating:
+    return false;
+  case SelfAccessKind::Borrowing:
+  case SelfAccessKind::NonMutating:
+    // If the accessor is a coroutine, we may want to access the projected
+    // value through a borrow of the base. But if it's a regular get/set then
+    // there isn't any real benefit to doing so.
+    if (!fn->isCoroutine()) {
+      return true;
+    }
+    // Normally we'll copy the base to minimize accesses. But if the base
+    // is noncopyable, or we're accessing it in a `borrow` expression, then
+    // we want to keep the access nested on the original base.
+    if (forBorrowExpr || selfType->isNoncopyable()) {
+      return false;
+    }
+    return true;
+
+  case SelfAccessKind::LegacyConsuming:
+  case SelfAccessKind::Consuming:
+    return true;
+  }
+  llvm_unreachable("bad self-access kind");
+}
+
 static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
                                                   AccessorDecl *accessor,
-                                                  CanType baseFormalType) {
+                                                  CanType baseFormalType,
+                                                  bool forBorrowExpr) {
   if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
 
   auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
-  if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
+  if (shouldEmitSelfAsRValue(accessor, baseFormalType, forBorrowExpr)) {
     return SGM.isNonMutatingSelfIndirect(declRef)
                ? SGFAccessKind::OwnedAddressRead
                : SGFAccessKind::OwnedObjectRead;
@@ -3755,7 +3794,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
                                        AbstractStorageDecl *member,
                                        SGFAccessKind accessKind,
                                        AccessStrategy strategy,
-                                       CanType baseFormalType) {
+                                       CanType baseFormalType,
+                                       bool forBorrowExpr) {
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
     return getBaseAccessKindForStorage(accessKind);
@@ -3764,7 +3804,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
     assert(accessKind == SGFAccessKind::ReadWrite);
     auto writeBaseKind = getBaseAccessKind(SGM, member, SGFAccessKind::Write,
                                            strategy.getWriteStrategy(),
-                                           baseFormalType);
+                                           baseFormalType,
+                                           /*for borrow*/ false);
 
     // Fast path for the common case that the write will need to mutate
     // the base.
@@ -3774,7 +3815,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
     auto readBaseKind = getBaseAccessKind(SGM, member,
                                           SGFAccessKind::OwnedAddressRead,
                                           strategy.getReadStrategy(),
-                                          baseFormalType);
+                                          baseFormalType,
+                                          /*for borrow*/ false);
 
     // If they're the same kind, just use that.
     if (readBaseKind == writeBaseKind)
@@ -3793,7 +3835,8 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::DispatchToDistributedThunk: {
     auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
-    return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
+    return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType,
+                                        forBorrowExpr);
   }
   }
   llvm_unreachable("bad access strategy");
@@ -3870,7 +3913,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, var, accessKind, strategy,
-                                         getBaseFormalType(e->getBase())),
+                                         getBaseFormalType(e->getBase()),
+                                         /* for borrow */ false),
                        getBaseOptions(options, strategy));
   assert(lv.isValid());
 
@@ -4075,7 +4119,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, decl, accessKind, strategy,
-                                         getBaseFormalType(e->getBase())),
+                                         getBaseFormalType(e->getBase()),
+                                         /*for borrow*/ false),
                        getBaseOptions(options, strategy));
   assert(lv.isValid());
 
@@ -4432,7 +4477,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
                             F.getResilienceExpansion());
 
   auto baseAccessKind =
-    getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType);
+    getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
+                      /*for borrow*/ false);
 
   LValueTypeData baseTypeData =
     getValueTypeData(baseAccessKind, baseFormalType, base.getValue());
@@ -5155,7 +5201,8 @@ RValue SILGenFunction::emitRValueForStorageLoad(
       if (!base) return LValue();
 
       auto baseAccess = getBaseAccessKind(SGM, storage, accessKind,
-                                          strategy, baseFormalType);
+                                          strategy, baseFormalType,
+                                          /*for borrow*/ false);
       return LValue::forValue(baseAccess, base, baseFormalType);
     }();
 
