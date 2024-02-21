@@ -5172,6 +5172,10 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Retrieve the transitive closure of the inherited protocols, not including
+  /// this protocol itself.
+  ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 

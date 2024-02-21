@@ -3323,6 +3323,20 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return ctx.AllocateCopy(inherited.getArrayRef());
 }
 
+ArrayRef<ProtocolDecl *>
+AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *PD) const {
+  llvm::SmallSetVector<ProtocolDecl *, 2> result;
+
+  PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+    if (inherited != PD)
+      result.insert(inherited);
+    return TypeWalker::Action::Continue;
+  });
+
+  return PD->getASTContext().AllocateCopy(result.getArrayRef());
+}
+
 ArrayRef<ValueDecl *>
 ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *PD) const {

@@ -6470,6 +6470,13 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
                            {});
 }
 
+ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AllInheritedProtocolsRequest{mutThis},
+                           {});
+}
+
 ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   if (Bits.ProtocolDecl.HasAssociatedTypes)

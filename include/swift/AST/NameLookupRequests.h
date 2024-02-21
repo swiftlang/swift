@@ -199,6 +199,25 @@ public:
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
+class AllInheritedProtocolsRequest
+    : public SimpleRequest<
+          AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 class ProtocolRequirementsRequest
     : public SimpleRequest<ProtocolRequirementsRequest,
                            ArrayRef<ValueDecl *>(ProtocolDecl *),
