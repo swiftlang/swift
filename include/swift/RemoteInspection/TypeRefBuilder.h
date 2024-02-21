@@ -490,8 +490,8 @@ public:
     ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
     /// Get the multipayload enum projection information for a given TR
-    RemoteRef<MultiPayloadEnumDescriptor>
-    getMultiPayloadEnumInfo(const TypeRef *TR);
+    std::unique_ptr<MultiPayloadEnumDescriptorBase>
+    getMultiPayloadEnumDescriptor(const TypeRef *TR) override;
 
     const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
                                      const std::string &Member,
@@ -514,6 +514,8 @@ public:
 
     /// Load unsubstituted field types for a nominal type.
     RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
+
+    RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
 
     void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
 
@@ -1565,14 +1567,15 @@ public:
   }
 
   /// Get the multipayload enum projection information for a given TR
-  RemoteRef<MultiPayloadEnumDescriptor>
-  getMultiPayloadEnumInfo(const TypeRef *TR) {
-    return RDF.getMultiPayloadEnumInfo(TR);
-  }
+  std::unique_ptr<MultiPayloadEnumDescriptorBase>
+  getMultiPayloadEnumDescriptor(const TypeRef *TR);
 
 private:
   /// Get the primitive type lowering for a builtin type.
   RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+
+  RemoteRef<MultiPayloadEnumDescriptor>
+  getMultiPayloadEnumInfo(const TypeRef *TR);
 
   llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
 
