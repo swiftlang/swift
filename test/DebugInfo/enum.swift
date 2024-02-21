@@ -28,6 +28,22 @@ enum Either {
 // CHECK: ![[EMPTY:.*]] = !{}
 let E : Either = .Neither;
 
+class C {}
+enum EitherWithSpareBits {
+  case Left(C), Right(Int32)
+// DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "EitherWithSpareBits", 
+// DWARF-SAME:             size: 64,
+// DWARF-SAME:             runtimeLang: DW_LANG_Swift, identifier: "$s4enum19EitherWithSpareBitsOD")
+
+// DWARF: !DICompositeType(tag: DW_TAG_variant_part,
+// DWARF-SAME:             size: 64, offset: 56, spare_bits_mask: {{240|255}}
+
+// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Left"
+
+// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Right"
+}
+let Right: EitherWithSpareBits = .Right(32)
+
 // CHECK: !DICompositeType({{.*}}name: "Color",
 // CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
@@ -77,14 +93,14 @@ public func foo(_ empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "$s4enum4RoseOyxG{{z?}}D"
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // DWARF: !DICompositeType({{.*}}name: "$s4enum4RoseOyxGD",{{.*}}flags: DIFlagFwdDecl{{.*}}
+  // DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Rose",  {{.*}}identifier: "$s4enum4RoseOyxGD"
 	case IORose(() -> Rose<A>)
 }
 
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "$s4enum5TupleOyxGD"
-// DWARF: !DICompositeType({{.*}}name: "$s4enum5TupleOyxG{{z?}}D"
+// DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}identifier: "$s4enum5TupleOyxGD"
 public enum Tuple<P> {
 	case C(P, () -> Tuple)
 }
@@ -102,3 +118,6 @@ public enum List<T> {
 // CHECK-DAG: ![[LIST_MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[LIST:[0-9]+]]
 // CHECK-DAG: ![[LIST]] = !DICompositeType({{.*}}name: "$s4enum4ListOyxGD",{{.*}}DIFlagFwdDecl
 }
+
+
+
