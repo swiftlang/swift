@@ -229,3 +229,22 @@ bb0(%0 : $SamplesType):
   %t = tuple ()
   return %t : $()
 }
+
+// In this test case Container type is identified as not large but contained
+// type is.
+sil @test9 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $_ContainerType
+  %1 = load %0 : $*_ContainerType
+  %2 = alloc_stack $(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+
+  %3 = struct_extract %1 : $_ContainerType, #_ContainerType.l
+  store %3 to %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %0 : $*_ContainerType
+  %t = tuple ()
+  return %t : $()
+}
