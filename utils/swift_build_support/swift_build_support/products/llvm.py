@@ -185,6 +185,20 @@ class LLVM(cmake_product.CMakeProduct):
                         elif self.args.verbose_build:
                             print('no file exists at {}', host_sim_lib_path)
 
+                os.makedirs(os.path.join(dest_builtins_dir, 'macho_embedded'),
+                            exist_ok=True)
+                for _flavor in ['hard_pic', 'hard_static', 'soft_pic', 'soft_static']:
+                    # Copy over the macho_embedded .a when necessary
+                    lib_name = os.path.join('macho_embedded', 'libclang_rt.{}.a'.format(
+                        _flavor))
+                    host_lib_path = os.path.join(host_cxx_builtins_dir, lib_name)
+                    dest_lib_path = os.path.join(dest_builtins_dir, lib_name)
+                    if not os.path.isfile(dest_lib_path):
+                        if os.path.isfile(host_lib_path):
+                            shutil.copy(host_lib_path, dest_lib_path)
+                        elif self.args.verbose_build:
+                            print('no file exists at {}'.format(host_lib_path))
+
     def should_build(self, host_target):
         """should_build() -> Bool
 
