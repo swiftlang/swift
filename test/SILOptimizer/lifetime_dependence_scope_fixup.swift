@@ -112,6 +112,19 @@ func test1(_ a: Array<Int>) {
   }
 }
 
+// CHECK-LABEL: sil private @$s31lifetime_dependence_scope_fixup5test2yySaySiGFySWXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeRawBufferPointer) -> (@out τ_0_0, @error any Error) for <()> {
+// CHECK:   [[CONT:%.*]] = alloc_stack [lexical] $NCContainer, var, name "x"
+// CHECK:   [[BA:%.*]] = begin_access [read] [static] [[CONT]] : $*NCContainer
+// CHECK:   [[LD:%.*]] = load [[CONT]] : $*NCContainer
+// CHECK:   [[FUNC:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup16getBorrowingViewyAA0G0VAA11NCContainerVYlsF : $@convention(thin) (@guaranteed NCContainer) -> _scope(1) @owned View
+// CHECK:   [[VIEW:%.*]] = apply [[FUNC]]([[LD]]) : $@convention(thin) (@guaranteed NCContainer) -> _scope(1) @owned View
+// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[VIEW]] : $View on [[BA]] : $*NCContainer
+// CHECK:   [[USE:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup3useyyAA4ViewVF : $@convention(thin) (@guaranteed View) -> ()
+// CHECK:   apply [[USE]]([[MDI]]) : $@convention(thin) (@guaranteed View) -> ()
+// CHECK:   [[CONSUME:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup7consumeyyAA4ViewVnF : $@convention(thin) (@owned View) -> ()
+// CHECK:   apply [[CONSUME]]([[VIEW]]) : $@convention(thin) (@owned View) -> ()
+// CHECK:   end_access [[BA]] : $*NCContainer
+// CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup5test2yySaySiGFySWXEfU_'
 func test2(_ a: Array<Int>) {
   a.withUnsafeBytes {
     var x = NCContainer($0, a.count)
@@ -166,6 +179,18 @@ func test6(_ a: Array<Int>) {
   use(p!)
 }
 
+// CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup5test7yySWF : $@convention(thin) (UnsafeRawBufferPointer) -> () {
+// CHECK:   [[CONT:%.*]] = alloc_stack $NEContainer, var, name "x"
+// CHECK:   [[BA:%.*]] = begin_access [read] [static] [[CONT]] : $*NEContainer
+// CHECK:   [[LD:%.*]] = load [[BA]] : $*NEContainer
+// CHECK:   [[FUNC:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup16getBorrowingViewyAA0G0VAA11NEContainerVYlsF : $@convention(thin) (@guaranteed NEContainer) -> _scope(1) @owned View
+// CHECK:   [[VIEW:%.*]] = apply [[FUNC]]([[LD]]) : $@convention(thin) (@guaranteed NEContainer) -> _scope(1) @owned View
+// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[VIEW]] : $View on [[BA]] : $*NEContainer
+// CHECK:   [[USE:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup3useyyAA4ViewVF : $@convention(thin) (@guaranteed View) -> ()
+// CHECK:   apply [[USE]]([[MDI]]) : $@convention(thin) (@guaranteed View) -> ()
+// CHECK:   release_value [[MDI]] : $View
+// CHECK:   end_access [[BA]] : $*NEContainer
+// CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup5test7yySWF'
 func test7(_ a: UnsafeRawBufferPointer) {
   var x = NEContainer(a, a.count)
   do {
