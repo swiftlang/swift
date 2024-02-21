@@ -5095,6 +5095,9 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
+  if (tryEmitDestroyUsingDeinit(*this, addr, addrTy)) {
+    return;
+  }
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
