@@ -3166,7 +3166,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
     if (fn->getLoweredFunctionType()->isPseudogeneric())
       extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
-  // Add the function type as the parameter.
+  // Add the formal parameters of the expected type to the thunk.
   auto contextConvention =
       fn->getTypeLowering(sourceType).isTrivial()
           ? ParameterConvention::Direct_Unowned
@@ -3175,6 +3175,17 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
 
+  // Thunk functions can never be @isolated(any); we have to erase to that
+  // by partial application.  Remove the attribute and add the capture
+  // parameter.  This must always be the first capture.
+  if (extInfoBuilder.hasErasedIsolation()) {
+    extInfoBuilder = extInfoBuilder.withErasedIsolation(false);
+    auto paramTy = SILType::getOpaqueIsolationType(fn->getASTContext());
+    params.push_back({paramTy.getASTType(),
+                      ParameterConvention::Direct_Guaranteed});
+  }
+
+  // The next capture is the source function.
   if (!differentiationThunkKind ||
       *differentiationThunkKind == DifferentiationThunkKind::Reabstraction) {
     params.push_back({sourceType,
@@ -4839,6 +4850,10 @@ using ABICompatibilityCheckResult =
 ABICompatibilityCheckResult
 SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
                                      SILFunction &context) const {
+  // Most of the checks here are symmetric, but for those that aren't,
+  // the question is whether the ABI makes it safe to use a value of
+  // this type as if it had type `other`.
+
   // The calling convention and function representation can't be changed.
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
@@ -4853,8 +4868,8 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   }
 
   // @isolated(any) imposes an additional requirement on the context
-  // storage and cannot be added.
-  if (other->hasErasedIsolation() != hasErasedIsolation())
+  // storage and cannot be added.  It can safely be removed, however.
+  if (other->hasErasedIsolation() && !hasErasedIsolation())
     return ABICompatibilityCheckResult::DifferentErasedIsolation;
 
   // Check the results.
@@ -4908,10 +4923,13 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
 
     if (param1.getConvention() != param2.getConvention())
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
+    // Note that the diretionality here is reversed from the other cases
+    // because of contravariance: parameters of the *second* type will be
+    // trivially converted to be parameters of the *first* type.
     if (!areABICompatibleParamsOrReturns(
-            param1.getSILStorageType(context.getModule(), this,
-                                     context.getTypeExpansionContext()),
             param2.getSILStorageType(context.getModule(), other,
+                                     context.getTypeExpansionContext()),
+            param1.getSILStorageType(context.getModule(), this,
                                      context.getTypeExpansionContext()),
             &context))
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};

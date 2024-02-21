@@ -5503,10 +5503,10 @@ public:
     StringRef getMessage() const;
   };
 
-  /// Returns no-error if this SILFunctionType is ABI compatible with \p
-  /// other. Otherwise, it returns a true error with a message in
-  /// std::error_code. This is only meant to be used in assertions. When
-  /// assertions are disabled, this just returns true.
+  /// Returns no-error if this SILFunctionType can be trivially
+  /// converted (i.e. without introducing a thunk) to the given
+  /// function type.  Otherwise, it returns an error with a message in
+  /// std::error_code.
   ABICompatibilityCheckResult
   isABICompatibleWith(CanSILFunctionType other,
                       SILFunction &context) const;
