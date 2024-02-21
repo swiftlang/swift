@@ -8,8 +8,6 @@
 // RUN: %api-digester -dump-sdk -module main -o %t.dump.json -module-cache-path %t.module-cache -swift-only -I %t.mod -I %S/Inputs/ClangCake %clang-importer-sdk-nosource
 // RUN: %FileCheck %s < %t.dump.json
 
-// XFAIL: noncopyable_generics
-
 import cake
 
 // CHECK: publicSymbol

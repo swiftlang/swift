@@ -527,6 +527,8 @@ void ConformanceLookupTable::addMacroGeneratedProtocols(
 
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc) {
+  ASTContext &ctx = nominal->getASTContext();
+
   // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
@@ -546,7 +548,6 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
         cast<EnumDecl>(nominal)->hasCases() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
-      ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
             = ctx.getProtocol(KnownProtocolKind::BridgedNSError)) {
         addProtocol(bridgedNSError, SourceLoc(),
@@ -554,8 +555,16 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       }
     }
 
-    addInheritedProtocols(conformingProtocol,
-                          ConformanceSource::forImplied(conformanceEntry));
+    auto source = ConformanceSource::forImplied(conformanceEntry);
+    for (auto *inherited : conformingProtocol->getInheritedProtocols()) {
+      // Conforming a ~Copyable nominal to a protocol that inherits Copyable
+      // should not imply a Copyable conformance on the nominal.
+      if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+        if (inherited->getInvertibleProtocolKind())
+          continue;
+
+      addProtocol(inherited, SourceLoc(), source);
+    }
   }
 }
 

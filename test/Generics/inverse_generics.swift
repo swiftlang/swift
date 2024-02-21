@@ -446,17 +446,19 @@ public struct Record<Output> {
 protocol P {}
 extension Record : Decodable where Output : P {}
 
-// Expect that if Copyable is an inherited protocol, then conditional
-// conformances carry that through, making the Blahaj conditionally Copyable.
 struct Blahaj<Value>: ~Copyable {
-  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'Blahaj' that conforms to 'Copyable'}}
+  deinit {} // this is OK
 }
 extension Blahaj: Q where Value: Q {}
+// expected-error@-1 {{type 'Blahaj<Value>' does not conform to protocol 'Copyable'}}
 protocol Q: Copyable {}
+// expected-note@-1 {{type 'Blahaj<Value>' does not conform to inherited protocol 'Copyable'}}
 
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'Blahaj<T>' must specify ownership}}
 func testBlahaj<T, U: Q>(_ x: Blahaj<T>,
+// expected-note@+2 3{{add}}
+// expected-error@+1 {{parameter of noncopyable type 'Blahaj<U>' must specify ownership}}
                          _ y: Blahaj<U>) {}
 
 extension Int: NeedsCopyable {}
