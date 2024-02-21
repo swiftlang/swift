@@ -260,6 +260,11 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
+# Freestanding and Linux builds both have failures to resolve.
+if(NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+  list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
+endif()
+
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
@@ -309,6 +314,10 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+
+list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
+  "${CMAKE_BINARY_DIR}/lib/swift/host/plugins#${CMAKE_BINARY_DIR}/bin/swift-plugin-server")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
