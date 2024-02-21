@@ -3290,7 +3290,34 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
         inherited.insert(proto);
     }
 
-    // FIXME: Apply inverses
+    // Apply inverses.
+    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      bool skipInverses = false;
+
+      // ... except for these protocols, so that Copyable does not have to
+      // inherit ~Copyable, etc.
+      if (auto kp = PD->getKnownProtocolKind()) {
+        switch (*kp) {
+        case KnownProtocolKind::Sendable:
+        case KnownProtocolKind::Copyable:
+        case KnownProtocolKind::Escapable:
+          skipInverses = true;
+          break;
+
+        default:
+          break;
+        }
+      }
+
+      if (!skipInverses) {
+        for (auto ip : InvertibleProtocolSet::full()) {
+          // Unless the user wrote ~P in the syntactic inheritance clause, the
+          // semantic inherited list includes P.
+          if (!inverses.contains(ip))
+            inherited.insert(ctx.getProtocol(getKnownProtocolKind(ip)));
+        }
+      }
+    }
   }
 
   return ctx.AllocateCopy(inherited.getArrayRef());
