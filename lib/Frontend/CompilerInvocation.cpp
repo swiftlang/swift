@@ -3112,7 +3112,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_conditional_runtime_records)) {
+    assert(!Args.hasArg(OPT_safe_conditional_runtime_records) &&
+           "Do not use both -conditional-runtime-records and "
+           "-safe-conditional-runtime-records");
     Opts.ConditionalRuntimeRecords = true;
+  }
+
+  if (Args.hasArg(OPT_safe_conditional_runtime_records)) {
+    assert(!Args.hasArg(OPT_conditional_runtime_records) &&
+           "Do not use both -conditional-runtime-records and "
+           "-safe-conditional-runtime-records");
+    Opts.SafeConditionalRuntimeRecords = true;
   }
 
   if (Args.hasArg(OPT_internalize_at_link)) {

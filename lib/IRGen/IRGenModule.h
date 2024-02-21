@@ -1692,6 +1692,11 @@ public:
   void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                                       const ProtocolConformance *conformance);
 
+  void createConditionallyLiveRecord(llvm::GlobalVariable *var,
+                                     llvm::Constant *dependsOn);
+  void createConditionallyLiveRecord(llvm::GlobalVariable *var,
+                                     const ProtocolConformance *conformance);
+
   void setColocateMetadataSection(llvm::Function *f);
   void setColocateTypeDescriptorSection(llvm::GlobalVariable *v);
 

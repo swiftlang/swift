@@ -444,6 +444,8 @@ public:
 
   unsigned ConditionalRuntimeRecords : 1;
 
+  unsigned SafeConditionalRuntimeRecords : 1;
+
   unsigned InternalizeAtLink : 1;
 
   /// Internalize symbols (static library) - do not export any public symbols.
@@ -553,12 +555,13 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        InternalizeAtLink(false), InternalizeSymbols(false),
-        EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
+        SafeConditionalRuntimeRecords(false), InternalizeAtLink(false),
+        InternalizeSymbols(false), EmitGenericRODatas(false),
+        NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
-        UseFragileResilientProtocolWitnesses(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        UseFragileResilientProtocolWitnesses(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {

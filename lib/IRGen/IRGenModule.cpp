@@ -1971,7 +1971,6 @@ bool IRGenModule::finalize() {
   emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
-  emitUsedConditionals();
   cleanupClangCodeGenMetadata();
 
   // Clean up DSOLocal & DLLImport attributes, they cannot be applied together.

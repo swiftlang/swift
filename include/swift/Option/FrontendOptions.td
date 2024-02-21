@@ -723,6 +723,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
+def safe_conditional_runtime_records : Flag<["-"], "safe-conditional-runtime-records">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"A form of conditional runtime records that is intended to be safe with Objective-C interop">;
+
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;

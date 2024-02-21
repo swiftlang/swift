@@ -640,10 +640,15 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
           IGM.addUsedGlobal(var);
       }
 
+      // Keep classes and categories around for potential ObjC interop.
+      if (IGM.IRGen.Opts.SafeConditionalRuntimeRecords &&
+          name != "objc_classes" && name != "objc_categories")
+        IGM.createConditionallyLiveRecord(var, elt->stripPointerCasts());
+
       if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
         // Allow dead-stripping `var` (the runtime record from the global list)
         // when `handle` / `elt` (the underlaying entity) is not referenced.
-        IGM.appendLLVMUsedConditionalEntry(var, elt->stripPointerCasts());
+        IGM.createConditionallyLiveRecord(var, elt->stripPointerCasts());
       }
     }
     return nullptr;
@@ -1012,6 +1017,7 @@ static void markGlobalAsUsedBasedOnLinkage(IRGenModule &IGM, LinkInfo &link,
     IGM.addUsedGlobal(global);
   else if (!IGM.IRGen.Opts.shouldOptimize() &&
            !IGM.IRGen.Opts.ConditionalRuntimeRecords &&
+           !IGM.IRGen.Opts.SafeConditionalRuntimeRecords &&
            !IGM.IRGen.Opts.VirtualFunctionElimination &&
            !IGM.IRGen.Opts.WitnessMethodElimination &&
            !global->isDeclaration()) {
@@ -4254,76 +4260,57 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
   return relativeAddr;
 }
 
-/// Expresses that `var` is removable (dead-strippable) when `dependsOn` is not
-/// referenced.
-void IRGenModule::appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
-                                                 llvm::Constant *dependsOn) {
-  llvm::Metadata *metadata[] = {
-      // (1) which variable is being conditionalized, "target"
-      llvm::ConstantAsMetadata::get(var),
-      // (2) type, not relevant for a single-edge condition
-      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-          llvm::Type::getInt32Ty(Module.getContext()), 0)),
-      // (3) the "edge" that holds the target alive, if it's missing the target
-      // is allowed to be removed
-      llvm::MDNode::get(Module.getContext(),
-                        {
-                            llvm::ConstantAsMetadata::get(dependsOn),
-                        }),
-  };
-  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
+void IRGenModule::createConditionallyLiveRecord(llvm::GlobalVariable *var,
+                                                llvm::Constant *dependsOn) {
+  ConstantInitBuilder builder(*this);
+  llvm::StructType *RecordType = llvm::StructType::get(
+      Module.getContext(),
+      {var->getType(), llvm::Type::getInt64Ty(Module.getContext()),
+       dependsOn->getType()},
+      /* isPacked */ false);
+  auto RecordBuilder = builder.beginStruct(RecordType);
+  RecordBuilder.add(var);
+  RecordBuilder.add(
+      llvm::ConstantInt::get(llvm::Type::getInt64Ty(Module.getContext()), 1));
+  RecordBuilder.add(dependsOn);
+  std::string RecordName = "__";
+  RecordName += var->getName();
+  RecordName += "_cl";
+  auto Record = RecordBuilder.finishAndCreateGlobal(
+      RecordName, Alignment(getPointerSize()), /* isConstant */ true,
+      llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+  Record->setSection("__DATA,__llvm_condlive");
+  addCompilerUsedGlobal(Record);
 }
 
-/// Expresses that `var` is removable (dead-strippable) when either the protocol
-/// from `record` is not referenced or the type from `record` is not referenced.
-void IRGenModule::appendLLVMUsedConditionalEntry(
+void IRGenModule::createConditionallyLiveRecord(
     llvm::GlobalVariable *var, const ProtocolConformance *conformance) {
   auto *protocol = getAddrOfProtocolDescriptor(conformance->getProtocol())
                        ->stripPointerCasts();
   auto *type = getAddrOfTypeContextDescriptor(
-                   conformance->getDeclContext()->getSelfNominalTypeDecl(),
-                   DontRequireMetadata)->stripPointerCasts();
+                   conformance->getType()->getAnyNominal(), DontRequireMetadata)
+                   ->stripPointerCasts();
 
-  llvm::Metadata *metadata[] = {
-      // (1) which variable is being conditionalized, "target"
-      llvm::ConstantAsMetadata::get(var),
-      // (2) type, "1" = if either edge is missing, the target is allowed to be
-      // removed.
-      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-          llvm::Type::getInt32Ty(Module.getContext()), 1)),
-      // (3) list of edges
-      llvm::MDNode::get(Module.getContext(),
-                        {
-                            llvm::ConstantAsMetadata::get(protocol),
-                            llvm::ConstantAsMetadata::get(type),
-                        }),
-  };
-  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
-}
-
-void IRGenModule::emitUsedConditionals() {
-  if (UsedConditionals.empty())
-    return;
-
-  auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-
-  for (auto *M : UsedConditionals) {
-    // Process the dependencies ("edges") and strip any pointer casts on them.
-    // Those might appear when a dependency is originally added against a
-    // declaration only, and later the declaration is RAUW'd with a definition
-    // causing a bitcast to get added to the metadata entry in the dependency.
-    auto *DependenciesMD =
-        dyn_cast_or_null<llvm::MDNode>(M->getOperand(2).get());
-    for (unsigned int I = 0; I < DependenciesMD->getNumOperands(); I++) {
-      auto *Dependency = DependenciesMD->getOperand(I).get();
-      auto *C = llvm::mdconst::extract_or_null<llvm::Constant>(Dependency)
-                    ->stripPointerCasts();
-      DependenciesMD->replaceOperandWith(I, llvm::ConstantAsMetadata::get(C));
-    }
-
-    usedConditional->addOperand(M);
-  }
+  ConstantInitBuilder builder(*this);
+  llvm::StructType *RecordType = llvm::StructType::get(
+      Module.getContext(),
+      {var->getType(), llvm::Type::getInt64Ty(Module.getContext()),
+       protocol->getType(), type->getType()},
+      /* isPacked */ false);
+  auto RecordBuilder = builder.beginStruct(RecordType);
+  RecordBuilder.add(var);
+  RecordBuilder.add(
+      llvm::ConstantInt::get(llvm::Type::getInt64Ty(Module.getContext()), 2));
+  RecordBuilder.add(protocol);
+  RecordBuilder.add(type);
+  std::string RecordName = "__";
+  RecordName += var->getName();
+  RecordName += "_cl";
+  auto Record = RecordBuilder.finishAndCreateGlobal(
+      RecordName, Alignment(getPointerSize()), /* isConstant */ true,
+      llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+  Record->setSection("__DATA,__llvm_condlive");
+  addCompilerUsedGlobal(Record);
 }
 
 /// Emit the protocol descriptors list and return it (if asContiguousArray is
@@ -4404,10 +4391,9 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
     disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
 
-    if (IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the protocol record) when the protocol
-      // (descriptorRef) is not referenced.
-      appendLLVMUsedConditionalEntry(var, descriptorRef.getValue());
+    if (IRGen.Opts.ConditionalRuntimeRecords ||
+        IRGen.Opts.SafeConditionalRuntimeRecords) {
+      createConditionallyLiveRecord(var, descriptorRef.getValue());
     }
   }
 
@@ -4546,11 +4532,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
     disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
 
-    if (IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the conformance record) when the protocol
-      // or type (from the conformance) is not referenced.
-      appendLLVMUsedConditionalEntry(var, record.conformance);
-    }
+    if (IRGen.Opts.SafeConditionalRuntimeRecords ||
+        IRGen.Opts.ConditionalRuntimeRecords)
+      createConditionallyLiveRecord(var, record.conformance);
   }
 
   return nullptr;
@@ -4675,11 +4659,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
       disableAddressSanitizer(*this, var);
       addUsedGlobal(var);
 
-      if (IRGen.Opts.ConditionalRuntimeRecords) {
-        // Allow dead-stripping `var` (the type record) when the type (`ref`) is
-        // not referenced.
-        appendLLVMUsedConditionalEntry(var, ref.getValue());
-      }
+      if (IRGen.Opts.SafeConditionalRuntimeRecords ||
+          IRGen.Opts.ConditionalRuntimeRecords)
+        createConditionallyLiveRecord(var, ref.getValue());
     }
   };
 

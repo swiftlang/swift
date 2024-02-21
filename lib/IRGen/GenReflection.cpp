@@ -805,11 +805,9 @@ public:
         },
         section);
 
-    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the reflection record) when the protocol
-      // or type (from the conformance) is not referenced.
-      IGM.appendLLVMUsedConditionalEntry(var, Conformance);
-    }
+    if (IGM.IRGen.Opts.SafeConditionalRuntimeRecords ||
+        IGM.IRGen.Opts.ConditionalRuntimeRecords)
+      IGM.createConditionallyLiveRecord(var, Conformance);
 
     return var;
   }
@@ -1009,13 +1007,11 @@ public:
         },
         section);
 
-    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the reflection record) when the type
-      // (NTD) is not referenced.
+    if (IGM.IRGen.Opts.SafeConditionalRuntimeRecords ||
+        IGM.IRGen.Opts.ConditionalRuntimeRecords) {
       auto ref = IGM.getTypeEntityReference(const_cast<NominalTypeDecl *>(NTD));
-      IGM.appendLLVMUsedConditionalEntry(var, ref.getValue());
+      IGM.createConditionallyLiveRecord(var, ref.getValue());
     }
-
     return var;
   }
 };
