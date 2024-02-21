@@ -886,7 +886,10 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
-      } else if (Node->getChild(firstChildIdx)->getKind() ==
+        ++firstChildIdx;
+      }
+      
+      if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::TransferringResultFunctionType) {
         extFlags = extFlags.withTransferringResult();
         ++firstChildIdx;

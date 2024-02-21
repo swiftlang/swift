@@ -130,6 +130,10 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
 
+ERROR(without_actually_escaping_on_isolated_any,none,
+      "withoutActuallyEscaping is currently unimplemented for @isolated(any) "
+      "function values", ())
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))

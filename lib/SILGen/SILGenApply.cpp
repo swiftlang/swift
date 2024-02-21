@@ -2249,35 +2249,13 @@ ManagedValue SILGenFunction::emitStringLiteral(SILLocation loc,
 
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
-static unsigned getFlattenedValueCount(AbstractionPattern origType) {
-  // The count is always 1 unless the original type is a tuple.
-  if (!origType.isTuple())
-    return 1;
-
-  // Add up the elements.
-  unsigned count = 0;
-  for (auto elt : origType.getTupleElementTypes()) {
-    // Expansion components turn into a single pack parameter.
-    if (elt.isPackExpansion()) {
-      count++;
-
-    // Recursively expand scalar components.
-    } else {
-      count += getFlattenedValueCount(elt);
-    }
-  }
-  return count;
-}
-
-/// Count the number of SILParameterInfos that are needed in order to
-/// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
                                        ImportAsMemberStatus foreignSelf) {
   // C functions imported as static methods don't consume any real arguments.
   if (foreignSelf.isStatic())
     return 0;
 
-  return getFlattenedValueCount(origType);
+  return origType.getFlattenedValueCount();
 }
 
 namespace {
@@ -3756,7 +3734,7 @@ private:
 
   void emitExpandedBorrowed(Expr *arg, AbstractionPattern origParamType) {
     CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType);
+    auto count = origParamType.getFlattenedValueCount();
     auto claimedParams = claimNextParameters(count);
 
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
@@ -5642,7 +5620,9 @@ RValue SILGenFunction::emitApply(
     case ActorIsolation::ActorInstance:
       if (unsigned paramIndex =
               implicitActorHopTarget->getActorInstanceParameter()) {
-        executor = emitLoadActorExecutor(loc, args[paramIndex-1]);
+        auto isolatedIndex = calleeTypeInfo.origFormalType
+          ->getLoweredParamIndex(paramIndex - 1);
+        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
       } else {
         executor = emitLoadActorExecutor(loc, args.back());
       }
@@ -5654,7 +5634,8 @@ RValue SILGenFunction::emitApply(
       break;
 
     case ActorIsolation::Erased:
-      llvm_unreachable("hop to erased isolation currently unimplemented");
+      executor = emitLoadErasedExecutor(loc, fn);
+      break;
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:

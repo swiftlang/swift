@@ -1540,7 +1540,7 @@ private:
            !param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
-               ->getGlobalActor().isNull());
+               ->getIsolation().isNonIsolated());
 
     ConditionalEffectKind conditional;
 
