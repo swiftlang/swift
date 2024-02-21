@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
 
 sil_stage canonical
 
@@ -212,6 +212,20 @@ bb0(%0 : $*Y):
   %4 = struct_extract %2 : $Y, #Y.y1
   store %4 to %1 : $*X
   dealloc_stack %1 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test8
+// CHECK: bb0(%0 : $SamplesType):
+// CHECK:   %1 = alloc_stack $SamplesType
+// CHECK:   store %0 to %1 : $*SamplesType
+sil @helper : $@convention(thin) (SamplesType) -> ()
+
+sil @test8 : $@convention(c) (SamplesType) -> () {
+bb0(%0 : $SamplesType):
+  %1 = function_ref @helper : $@convention(thin) (SamplesType) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (SamplesType) -> ()
   %t = tuple ()
   return %t : $()
 }
