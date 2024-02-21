@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 // a concrete move-only type
 @_moveOnly struct MO {
   var x: Int?

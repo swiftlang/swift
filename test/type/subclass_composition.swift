@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 protocol P1 {
   typealias DependentInConcreteConformance = Self
 }

@@ -3,6 +3,8 @@
 // RUN: %target-swift-symbolgraph-extract -module-name Arguments -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/Arguments.symbols.json
 
+// XFAIL: noncopyable_generics
+
 public struct MyStruct<T> {
   public var x: T
   public init(x: T) {

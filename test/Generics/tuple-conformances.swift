@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
+// XFAIL: noncopyable_generics
+
 // Because of -enable-experimental-feature TupleConformances
 // REQUIRES: asserts
 

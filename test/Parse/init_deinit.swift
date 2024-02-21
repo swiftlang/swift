@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
   // expected-error@-1{{initializer requires a body}}

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 var global = 42
 
 @dynamicMemberLookup

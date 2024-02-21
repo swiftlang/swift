@@ -751,8 +751,6 @@ extInfoRemovingThrownError(AnyFunctionType *fnType) {
 
 /// Remove the thrown error type.
 static CanType removeThrownError(Type type) {
-  ASTContext &ctx = type->getASTContext();
-
   return type.transformRec([](TypeBase *type) -> std::optional<Type> {
     if (auto funcTy = dyn_cast<FunctionType>(type)) {
       if (auto newExtInfo = extInfoRemovingThrownError(funcTy)) {

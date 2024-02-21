@@ -14,6 +14,9 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
+
+// XFAIL: noncopyable_generics
+
 // REQUIRES: executable_test
 
 import StdlibUnittest

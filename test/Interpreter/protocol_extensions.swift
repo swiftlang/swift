@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -enable-experimental-feature NoncopyableGenerics
 // REQUIRES: executable_test
 
 import StdlibUnittest
