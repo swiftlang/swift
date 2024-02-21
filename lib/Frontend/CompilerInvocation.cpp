@@ -3276,6 +3276,10 @@ bool CompilerInvocation::parseArgs(
     SILOpts.EmbeddedSwift = true;
     // OSSA modules are required for deinit de-virtualization.
     SILOpts.EnableOSSAModules = true;
+    // -g is promoted to -gdwarf-types in embedded Swift
+    if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
+      IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
+    }
   } else {
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
