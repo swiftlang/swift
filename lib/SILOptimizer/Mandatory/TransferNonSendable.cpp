@@ -88,6 +88,34 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
   return foundExpr;
 }
 
+static std::optional<Identifier> inferNameFromValue(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefsReturningRoot(value))
+    return {};
+  return fn->getASTContext().getIdentifier(resultingName);
+}
+
+static std::optional<std::pair<Identifier, SILValue>>
+inferNameAndRootFromValue(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  SILValue rootValue = inferrer.inferByWalkingUsesToDefsReturningRoot(value);
+  if (!rootValue)
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: Diagnostics
 //===----------------------------------------------------------------------===//
@@ -748,25 +776,19 @@ void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
     // Before we do anything further, see if we can find a name and emit a name
     // error.
-    SmallString<64> resultingName;
-    VariableNameInferrer::Options options;
-    options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
-    VariableNameInferrer inferrer(op->getFunction(), options, resultingName);
-    auto &astContext = op->getFunction()->getASTContext();
-    if (auto rootValue =
-            inferrer.inferByWalkingUsesToDefsReturningRoot(op->get())) {
-      if (auto *svi = dyn_cast<SingleValueInstruction>(rootValue)) {
+    if (auto rootValueAndName = inferNameAndRootFromValue(op->get())) {
+      if (auto *svi =
+              dyn_cast<SingleValueInstruction>(rootValueAndName->second)) {
         return appendUseInfo(UseDiagnosticInfo::forNamedIsolationCrossing(
-            baseLoc, svi->getLoc(),
-            astContext.getIdentifier(inferrer.getName()),
+            baseLoc, svi->getLoc(), rootValueAndName->first,
             *sourceApply->getIsolationCrossing()));
       }
 
-      if (auto *fArg = dyn_cast<SILFunctionArgument>(rootValue)) {
+      if (auto *fArg =
+              dyn_cast<SILFunctionArgument>(rootValueAndName->second)) {
         return appendUseInfo(UseDiagnosticInfo::forNamedIsolationCrossing(
             baseLoc, RegularLocation(fArg->getDecl()->getLoc()),
-            astContext.getIdentifier(inferrer.getName()),
-            *sourceApply->getIsolationCrossing()));
+            rootValueAndName->first, *sourceApply->getIsolationCrossing()));
       }
     }
 
@@ -1105,13 +1127,8 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
     // See if we can infer a name from the value.
     SmallString<64> resultingName;
-    VariableNameInferrer::Options options;
-    options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
-    VariableNameInferrer inferrer(op->getFunction(), options, resultingName);
-    if (inferrer.inferByWalkingUsesToDefsReturningRoot(op->get())) {
-      auto &astContext = op->getFunction()->getASTContext();
-      diagnosticInfo = UseDiagnosticInfo::forNamed(
-          astContext.getIdentifier(inferrer.getName()), *isolation);
+    if (auto name = inferNameFromValue(op->get())) {
+      diagnosticInfo = UseDiagnosticInfo::forNamed(*name, *isolation);
       return true;
     }
 
