@@ -563,7 +563,7 @@ namespace swift {
     bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = false;
+    bool EnableExperimentalLifetimeDependenceInference = true;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;

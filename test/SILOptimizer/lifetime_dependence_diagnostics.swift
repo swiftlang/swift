@@ -13,6 +13,11 @@
 struct BV {
   let p: UnsafeRawPointer
   let c: Int
+  @_unsafeNonescapableResult
+  init(_ p: UnsafeRawPointer, _ c: Int) {
+    self.p = p
+    self.c = c
+  }
 }
 
 func bv_copy(_ bv: borrowing BV) -> _copy(bv) BV {

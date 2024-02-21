@@ -317,6 +317,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
                                                     ownership);
   }
 
+  auto *cd = dyn_cast<ConstructorDecl>(afd);
+  if (cd && cd->isImplicit() && cd->getParameters()->size() == 0) {
+    return std::nullopt;
+  }
+
   LifetimeDependenceInfo lifetimeDependenceInfo;
   ParamDecl *candidateParam = nullptr;
   unsigned paramIndex = 0;
@@ -348,6 +353,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
         afd, paramIndex + 1, param->getValueOwnership());
 
     paramIndex++;
+  }
+  if (cd && cd->isImplicit()) {
+    diags.diagnose(cd->getLoc(),
+                   diag::lifetime_dependence_cannot_infer_implicit_init);
+    return std::nullopt;
   }
   if (!candidateParam && !hasParamError) {
     diags.diagnose(returnLoc,
