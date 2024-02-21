@@ -499,6 +499,8 @@ validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "upcoming-swift")
     return {CxxCompatMode::enabled,
             version::Version({version::getUpcomingCxxInteropCompatVersion()})};
+  if (mode == "swift-6")
+    return {CxxCompatMode::enabled, version::Version({6})};
   // Swift-5.9 corresponds to the Swift 5 language mode when
   // Swift 5 is the default language version.
   if (mode == "swift-5.9")
@@ -513,7 +515,8 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
                  verArg->getAsString(Args), verArg->getValue());
 
   // Note valid C++ interoperability modes.
-  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default")};
+  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default"),
+                    llvm::StringRef("swift-6"), llvm::StringRef("swift-5.9")};
   auto versStr = "'" + llvm::join(validVers, "', '") + "'";
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
