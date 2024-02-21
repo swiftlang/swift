@@ -337,6 +337,13 @@ public:
     return false;
   }
 
+  /// Determine whether this locator points directly to a given statement.
+  template <typename E> bool directlyAtStmt() const {
+    if (auto *stmt = getAnchor().dyn_cast<Stmt *>())
+      return isa<E>(stmt) && getPath().empty();
+    return false;
+  }
+
   /// Check whether the first element in the path of this locator (if any)
   /// is a given \c LocatorPathElt subclass.
   template <class T>

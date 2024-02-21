@@ -19,7 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-
+#include "swift/AST/ASTNode.h"
 namespace swift {
 
 /// An AST node that represents a point where a thrown error can be caught and
@@ -44,6 +44,8 @@ public:
   /// Returns the explicitly-caught type, or a NULL type if the caught type
   /// needs to be inferred.
   Type getExplicitCaughtType(ASTContext &ctx) const;
+
+  explicit operator ASTNode() const;
 
   friend llvm::hash_code hash_value(CatchNode catchNode) {
     using llvm::hash_value;

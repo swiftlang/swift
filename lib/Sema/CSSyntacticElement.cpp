@@ -324,6 +324,17 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     isIsolated = true;
   }
 
+  if (auto syntacticElement =
+        locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
+    // If we are at a do..catch, and we're inferring a throw error type for
+    // the do..catch, we're now in a position to finalize the thrown type.
+    if (auto doCatch = dyn_cast_or_null<DoCatchStmt>(
+                         syntacticElement->getElement().dyn_cast<Stmt *>())) {
+      if (cs.getCaughtErrorType(doCatch)->is<TypeVariableType>())
+        isIsolated = true;
+    }
+  }
+
   if (locator->isForSingleValueStmtConjunction()) {
     auto *SVE = castToExpr<SingleValueStmtExpr>(locator->getAnchor());
     referencedVars.push_back(cs.getType(SVE)->castTo<TypeVariableType>());
@@ -367,15 +378,23 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
         cs, element, context, elementLoc, isDiscarded));
   }
 
+  // If the body of the closure is being used to infer the thrown error type
+  // of that closure, introduce a constraint to do so.
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+    if (auto thrownError = cs.getCaughtErrorType(closure))
+      paramCollector.inferTypeVars(thrownError);
+  }
+
+  for (auto *externalVar : paramCollector.getTypeVars())
+    referencedVars.push_back(externalVar);
+
   // It's possible that there are no viable elements in the body,
   // because e.g. whole body is an `#if` statement or it only has
   // declarations that are checked during solution application.
   // In such cases, let's avoid creating a conjunction.
   if (constraints.empty())
     return;
-
-  for (auto *externalVar : paramCollector.getTypeVars())
-    referencedVars.push_back(externalVar);
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
       cs, constraints, isIsolated, locator, referencedVars));
@@ -1028,12 +1047,18 @@ private:
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
     SmallVector<ElementInfo, 4> elements;
 
+    auto myLocator = locator;
+    if (cs.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows)) {
+      myLocator = cs.getConstraintLocator(
+          locator, LocatorPathElt::SyntacticElement(doStmt));
+    }
+
     // First, let's record a body of `do` statement. Note we need to add a
     // SyntaticElement locator path element here to avoid treating the inner
     // brace conjunction as being isolated if 'doLoc' is for an isolated
     // conjunction (as is the case with 'do' expressions).
     auto *doBodyLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::SyntacticElement(doStmt->getBody()));
+        myLocator, LocatorPathElt::SyntacticElement(doStmt->getBody()));
     elements.push_back(makeElement(doStmt->getBody(), doBodyLoc));
 
     // After that has been type-checked, let's switch to
@@ -1041,7 +1066,7 @@ private:
     for (auto *catchStmt : doStmt->getCatches())
       elements.push_back(makeElement(catchStmt, locator));
 
-    createConjunction(elements, locator);
+    createConjunction(elements, myLocator);
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
@@ -1089,10 +1114,11 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
+    ClosureExpr *closure = nullptr;
     CaptureListExpr *captureList = nullptr;
     {
       if (locator->directlyAt<ClosureExpr>()) {
-        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+        closure = castToExpr<ClosureExpr>(locator->getAnchor());
         captureList = getAsExpr<CaptureListExpr>(cs.getParentExpr(closure));
       }
     }
@@ -1126,6 +1152,11 @@ private:
           visitDecl(node.get<Decl *>());
         }
       }
+
+      if (closure) {
+        cs.finalizeCaughtErrorType(closure);
+      }
+
       return;
     }
 

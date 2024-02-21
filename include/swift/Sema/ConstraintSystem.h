@@ -1446,6 +1446,15 @@ struct MatchCallArgumentResult {
 /// `x.y` is a potential throw site.
 struct PotentialThrowSite {
   enum Kind {
+    /// The caught type variable for this catch node, which is a stand-in
+    /// for the type that will be caught by the particular catch node.
+    ///
+    /// This is not strictly a potential throw site, but is convenient
+    /// to represent it as such so we don't need a separate mapping
+    /// from catch node -> caught type variable in the constraint solver's
+    /// state.
+    CaughtTypeVariable,
+
     /// The application of a function or subscript.
     Application,
 
@@ -3425,8 +3434,13 @@ public:
       PotentialThrowSite::Kind kind, Type type,
       ConstraintLocatorBuilder locator);
 
-  /// Determine the caught error type for the given catch node.
+  /// Retrieve the caught error type for the given catch node, which could be
+  /// a type variable if the caught error type is going to be inferred.
   Type getCaughtErrorType(CatchNode node);
+
+  /// Finalize the caught error type type once all of the potential throw
+  /// sites are known.
+  void finalizeCaughtErrorType(CatchNode node);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
@@ -5206,6 +5220,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Compute the caught error type for a given catch node.
+  SolutionKind
+  simplifyCaughtErrorConstraint(Type caughtError, CatchNode catchNode,
+                                TypeMatchOptions flags,
+                                ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
@@ -6449,6 +6469,9 @@ public:
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
+
+  /// Infer the referenced type variables from a type.
+  void inferTypeVars(Type type);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;

@@ -1679,18 +1679,22 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out.indent(indent) << "Potential throw sites:\n";
     interleave(potentialThrowSites, [&](const auto &throwSite) {
       out.indent(indent + 2);
+      out << " -" << throwSite.second.type->getString(PO) << " is ";
       switch (throwSite.second.kind) {
+      case PotentialThrowSite::CaughtTypeVariable:
+        out << "caught type variable @ ";
+        break;
       case PotentialThrowSite::Application:
-        out << "- application @ ";
+        out << "application @ ";
         break;
       case PotentialThrowSite::ExplicitThrow:
-        out << " - explicit throw @ ";
+        out << "explicit throw @ ";
         break;
       case PotentialThrowSite::NonExhaustiveDoCatch:
-        out << " - non-exhaustive do..catch @ ";
+        out << "non-exhaustive do..catch @ ";
         break;
       case PotentialThrowSite::PropertyAccess:
-        out << " - property access @ ";
+        out << "property access @ ";
         break;
       }
 
@@ -1699,7 +1703,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out << "\n";
     });
     out << "\n";
-
   }
 }
 

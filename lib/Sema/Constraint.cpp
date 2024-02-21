@@ -120,6 +120,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("Syntactic element constraint should use create()");
+
+  case ConstraintKind::CaughtError:
+    llvm_unreachable("Caught error constraint should use createCaughtError()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -175,6 +178,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -282,6 +286,19 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
+Constraint::Constraint(Type type, CatchNode catchNode,
+                       ConstraintLocator *locator,
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+    : Kind(ConstraintKind::CaughtError), TheFix(nullptr),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      IsIsolated(false),
+      NumTypeVariables(typeVars.size()), 
+      CaughtError{type, catchNode},
+      Locator(locator) {
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
@@ -364,6 +381,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::SyntacticElement:
     return createSyntacticElement(cs, getSyntacticElement(), getLocator(),
                                   isDiscardedElement());
+
+  case ConstraintKind::CaughtError:
+    return createCaughtError(cs, getFirstType(), getCatchNode(), getLocator(),
+                             getTypeVariables());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -592,6 +613,11 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     llvm_unreachable("conjunction handled above");
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("syntactic element handled above");
+  case ConstraintKind::CaughtError:
+    Out << " caught error type for ";
+    simple_display(Out, getCatchNode());
+    skipSecond = true;
+    break;
   }
 
   if (!skipSecond)
@@ -771,6 +797,7 @@ gatherReferencedTypeVars(Constraint *constraint,
     break;
 
   case ConstraintKind::SyntacticElement:
+  case ConstraintKind::CaughtError:
     typeVars.insert(constraint->getTypeVariables().begin(),
                     constraint->getTypeVariables().end());
     break;
@@ -1116,6 +1143,18 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
+}
+
+Constraint *Constraint::createCaughtError(
+    ConstraintSystem &cs,
+    Type type, CatchNode catchNode,
+    ConstraintLocator *locator,
+    ArrayRef<TypeVariableType *> referencedVars) {
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  typeVars.insert(referencedVars.begin(), referencedVars.end());
+  unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(type, catchNode, locator, typeVars);
 }
 
 llvm::Optional<TrailingClosureMatching>

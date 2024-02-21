@@ -2311,6 +2311,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2672,6 +2673,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     return true;
   }
 
@@ -3294,6 +3296,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -7089,6 +7092,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ExplicitGenericArguments:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::CaughtError:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -13017,9 +13021,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // Local function to form an unsolved result.
   auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
+      auto fixedLocator = getConstraintLocator(locator);
       auto *application = Constraint::createApplicableFunction(
           *this, type1, type2, trailingClosureMatching,
-          getConstraintLocator(locator));
+          fixedLocator);
 
       addUnsolvedConstraint(application);
       if (activate)
@@ -13049,10 +13054,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // is not valid for operators though, where an inout parameter does not
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
-    // Note that this could throw.
-    recordPotentialThrowSite(
-        PotentialThrowSite::Application, Type(desugar2), outerLocator);
-
     if (!isOperator || !hasInOut()) {
       recordMatchCallArgumentResult(
           getConstraintLocator(
@@ -13103,10 +13104,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a function, bind the output and convert the argument to the input.
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
-    // Note that this could throw.
-    recordPotentialThrowSite(
-        PotentialThrowSite::Application, Type(desugar2), outerLocator);
-
     ConstraintKind subKind = (isOperator
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);
@@ -13840,6 +13837,20 @@ ConstraintSystem::simplifyMaterializePackExpansionConstraint(
   }
 
   return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyCaughtErrorConstraint(
+    Type type,
+    CatchNode catchNode,
+    TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  // Keep the constraint around until it simplifies beyond a type variable.
+  Type simplified = simplifyType(type);
+  if (simplified->is<TypeVariableType>())
+    return SolutionKind::Unsolved;
+
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -15499,6 +15510,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::FallbackType:
   case ConstraintKind::SyntacticElement:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -15708,6 +15720,14 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored) {
+  // When adding a function-application constraint, make sure to introduce
+  // a potential throw site.
+  if (kind == ConstraintKind::ApplicableFunction) {
+    recordPotentialThrowSite(
+        PotentialThrowSite::Application, second,
+        getConstraintLocator(locator));
+  }
+
   switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
@@ -16083,6 +16103,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::MaterializePackExpansion:
     return simplifyMaterializePackExpansionConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
+
+  case ConstraintKind::CaughtError:
+    return simplifyCaughtErrorConstraint(
+        constraint.getFirstType(), constraint.getCatchNode(),
         /*flags*/ llvm::None, constraint.getLocator());
   }
 

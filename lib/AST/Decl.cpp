@@ -12328,6 +12328,18 @@ Type CatchNode::getExplicitCaughtType(ASTContext &ctx) const {
       ctx.evaluator, ExplicitCaughtTypeRequest{&ctx, *this}, Type());
 }
 
+CatchNode::operator ASTNode() const {
+  if (auto func = dyn_cast<AbstractFunctionDecl *>())
+    return func;
+  if (auto closure = dyn_cast<ClosureExpr *>())
+    return closure;
+  if (auto doCatch = dyn_cast<DoCatchStmt *>())
+    return doCatch;
+  if (auto anyTry = dyn_cast<AnyTryExpr *>())
+    return anyTry;
+  llvm_unreachable("Unhandled catch node");
+}
+
 void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {
   out << "catch node";
 }

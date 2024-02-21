@@ -426,17 +426,55 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
     return explicitCaughtType;
   }
 
-  // Retrieve the thrown error type of a closure.
-  // FIXME: This will need to change when we do inference of thrown error
-  // types in closures.
+  // Retrieve the thrown error type of a closure, which will be in the
+  // constraint system already.
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
     return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
   }
 
+  // At this point, if we aren't doing full typed throws inference, the caught
+  // error type is always 'any Error'.
   if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
     return ctx.getErrorExistentialType();
 
-  // Handle inference of caught error types.
+  // Look for a record that we already created the caught error type of this
+  // catch node.
+  // FIXME: This is horribly inefficient linear scan, because we need a new
+  // data structure for potentialThrowSites.
+  for (const auto &potentialThrowSite : llvm::reverse(potentialThrowSites)) {
+    if (potentialThrowSite.first == catchNode &&
+        potentialThrowSite.second.kind ==
+            PotentialThrowSite::CaughtTypeVariable) {
+      return potentialThrowSite.second.type;
+    }
+  }
+
+  // Create a type variable to represent the caught error.
+  // FIXME: How do we know when it's safe to simplify this constraint?
+  // FIXME: Can we reactivate based on whether we've visited the body?
+  auto caughtTypeVariableLocator = getConstraintLocator(ASTNode(catchNode));
+  auto caughtTypeVariable = createTypeVariable(caughtTypeVariableLocator, 0);
+  auto constraint = Constraint::createCaughtError(
+      *this, Type(caughtTypeVariable), catchNode,
+      caughtTypeVariableLocator, { });
+  addUnsolvedConstraint(constraint);
+
+  // Record this type variable in the list of potential throw sites,
+  // so we can find it again later rather than creating a new one.
+  // This is effectively using the potential throw sites as a
+  // CatchNode -> TypeVariableType * map, without requiring a separate
+  // data structure.
+  potentialThrowSites.push_back(
+    {catchNode,
+      PotentialThrowSite{PotentialThrowSite::CaughtTypeVariable,
+                         Type(caughtTypeVariable),
+                         caughtTypeVariableLocator}});
+
+  return Type(caughtTypeVariable);
+}
+
+void ConstraintSystem::finalizeCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
 
   // Collect all of the potential throw sites for this catch node.
   SmallVector<PotentialThrowSite, 2> throwSites;
@@ -446,15 +484,32 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
     }
   }
 
+  /// The caught error type thus far, which starts at Never because Never
+  /// doesn't contribute to throwing anything.
   Type caughtErrorType = ctx.getNeverType();
+  TypeVariableType *caughtTypeVariable = nullptr;
   for (const auto &throwSite : throwSites) {
     Type type = simplifyType(throwSite.type);
-
     Type thrownErrorType;
     switch (throwSite.kind) {
+    case PotentialThrowSite::CaughtTypeVariable:
+      // Keep track of the caught type variable.
+      caughtTypeVariable = throwSite.type->castTo<TypeVariableType>();
+
+      // Ignore the caught type variable; it contributes nothing.
+      continue;
+
     case PotentialThrowSite::Application: {
-      auto fnType = type->castTo<AnyFunctionType>();
-      thrownErrorType = fnType->getEffectiveThrownErrorTypeOrNever();
+      auto fnType = type->getAs<AnyFunctionType>();
+      if (!fnType) {
+        // This applicable function constraint either still involves type
+        // variables or wasn't actually a function.
+        continue;
+      }
+
+      // Dig out the thrown error type from the function type.
+      thrownErrorType =
+          simplifyType(fnType->getEffectiveThrownErrorTypeOrNever());
       break;
     }
 
@@ -478,7 +533,21 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
       break;
   }
 
-  return caughtErrorType;
+  // If we didn't record a caught type variable, check whether this is a
+  // closure that infers its type variable.
+  if (!caughtTypeVariable) {
+    if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+      caughtTypeVariable = getClosureType(closure)
+          ->getEffectiveThrownErrorTypeOrNever()->getAs<TypeVariableType>();
+    }
+  }
+
+  // If we have a type variable, bind it to the caught error type.
+  if (caughtTypeVariable) {
+    addConstraint(
+        ConstraintKind::Bind, caughtTypeVariable, caughtErrorType,
+        getConstraintLocator(ASTNode(catchNode)));
+  }
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
@@ -3981,6 +4050,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // If accessing this declaration could throw an error, record this as a
   // potential throw site.
   if (thrownErrorTypeOnAccess) {
+    // FIXME: We likely need to do this before overload resolution,
+    // otherwise we might establish the thrown error type too early.
     recordPotentialThrowSite(
         PotentialThrowSite::PropertyAccess, thrownErrorTypeOnAccess, locator);
   }

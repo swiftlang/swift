@@ -865,8 +865,12 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
   if (!ty)
     return;
 
+  inferTypeVars(ty);
+}
+
+void TypeVarRefCollector::inferTypeVars(Type type) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-  ty->getTypeVariables(typeVars);
+  type->getTypeVariables(typeVars);
   TypeVars.insert(typeVars.begin(), typeVars.end());
 }
 
@@ -915,7 +919,12 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
     if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
         !Locator->directlyAt<ClosureExpr>()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
-      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
+      auto closureType = CS.getClosureType(CE);
+      closureType->getResult()->getTypeVariables(typeVars);
+
+      if (auto thrownErrorType = closureType->getThrownError())
+        thrownErrorType->getTypeVariables(typeVars);
+
       TypeVars.insert(typeVars.begin(), typeVars.end());
     }
   }
@@ -2466,6 +2475,14 @@ namespace {
         // semantically equivalent.
         if (closure->getThrowsLoc().isValid())
           return Type();
+
+        // If we are inferring thrown error types, create a type variable
+        // to capture the thrown error type. This will be resolved based on the
+        // throw sites that occur within the body of the closure.
+        if (CS.getASTContext().LangOpts.hasFeature(
+                Feature::FullTypedThrows)) {
+          return Type(CS.createTypeVariable(thrownErrorLocator, 0));
+        }
 
         // Thrown type inferred from context.
         if (auto contextualType = CS.getContextualType(
