@@ -6510,7 +6510,7 @@ Type ClangImporter::importVarDeclType(
                       getImportTypeAttrs(decl));
 
   if (!importedType)
-    return nullptr;
+    return ErrorType::get(Impl.SwiftContext);
 
   if (importedType.isImplicitlyUnwrapped())
     swiftDecl->setImplicitlyUnwrappedOptional(true);
