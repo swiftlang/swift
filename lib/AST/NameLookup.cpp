@@ -3813,35 +3813,17 @@ swift::getDirectlyInheritedNominalTypeDecls(
     InvertibleProtocolSet &inverses, bool &anyObject) {
   SmallVector<InheritedNominalEntry, 4> result;
 
-  // For a deserialized protocol, the syntactic representations are not going to
-  // tell us anything. Ask the requirement signature instead.
-  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
-  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
-  if (protoDecl && protoDecl->wasDeserialized()) {
-    auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto req : protoDecl->getRequirementSignature().getRequirements()) {
-      // Dig out a conformance requirement...
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      // constraining Self.
-      if (!req.getFirstType()->isEqual(protoSelfTy))
-        continue;
-
-      result.emplace_back(req.getProtocolDecl(),
-                          SourceLoc(), SourceLoc(), SourceLoc());
-    }
-    return result;
-  }
-
-  // Gather results from all of the inherited types.
   auto inheritedTypes = InheritedTypes(decl);
   for (unsigned i : inheritedTypes.getIndices()) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, inverses, anyObject);
   }
 
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
   if (!protoDecl)
     return result;
+
+  assert(!protoDecl->wasDeserialized() && "Use getInheritedProtocols()");
 
   // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
   // these to add `Sendable` conformances to protocols without modifying the
