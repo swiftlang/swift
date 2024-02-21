@@ -995,12 +995,17 @@ public:
 
     /// Used if we have a named variable.
     NamedIsolation = 5,
+
+    /// Used if a non-transferring function argument is assigned to a
+    /// transferring function argument.
+    FunctionArgumentAssignedToStronglyTransferredParam = 6,
   };
 
   class UseDiagnosticInfo {
     UseDiagnosticInfoKind kind;
     std::optional<ApplyIsolationCrossing> transferredIsolationCrossing = {};
     llvm::PointerUnion<Type, Identifier> inferredTypeOrIdentifier = {};
+    std::optional<Identifier> transferredParamIdentifier = {};
 
   public:
     UseDiagnosticInfoKind getKind() const { return kind; }
@@ -1009,6 +1014,9 @@ public:
     }
     Identifier getName() const {
       return inferredTypeOrIdentifier.get<Identifier>();
+    }
+    Identifier getTransferredParamIdentifier() const {
+      return transferredParamIdentifier.value();
     }
     Type getType() const { return inferredTypeOrIdentifier.get<Type>(); }
 
@@ -1038,24 +1046,37 @@ public:
       return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred};
     }
 
+    static UseDiagnosticInfo
+    forFunctionArgumentAssignedToStronglyTransferredParam(
+        Identifier funcArgName, Identifier transferredParam) {
+      return {UseDiagnosticInfoKind::
+                  FunctionArgumentAssignedToStronglyTransferredParam,
+              {},
+              funcArgName,
+              transferredParam};
+    }
+
   private:
     UseDiagnosticInfo(
         UseDiagnosticInfoKind kind,
         std::optional<ApplyIsolationCrossing> isolation = {},
-        llvm::PointerUnion<Type, Identifier> inferredTypeOrIdentifier = {})
+        llvm::PointerUnion<Type, Identifier> inferredTypeOrIdentifier = {},
+        std::optional<Identifier> transferredParamIdentifier = {})
         : kind(kind), transferredIsolationCrossing(isolation),
-          inferredTypeOrIdentifier(inferredTypeOrIdentifier) {}
+          inferredTypeOrIdentifier(inferredTypeOrIdentifier),
+          transferredParamIdentifier(transferredParamIdentifier) {}
   };
 
 private:
+  RegionAnalysisValueMap &valueMap;
   TransferredNonTransferrableInfo info;
   std::optional<UseDiagnosticInfo> diagnosticInfo;
   SourceLoc loc;
 
 public:
   TransferNonTransferrableDiagnosticInferrer(
-      TransferredNonTransferrableInfo info)
-      : info(info),
+      RegionAnalysisValueMap &valueMap, TransferredNonTransferrableInfo info)
+      : valueMap(valueMap), info(info),
         loc(info.transferredOperand->getUser()->getLoc().getSourceLoc()) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
@@ -1098,6 +1119,28 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
   // We need to find the isolation info.
   auto *op = info.transferredOperand;
   auto loc = info.transferredOperand->getUser()->getLoc();
+
+  // Before we do anything, see if the transfer instruction was into a
+  // transferring parameter alloc_stack. In such a case, we emit a special
+  // message.
+  if (auto destValue = getDestOfStoreOrCopyAddr(op)) {
+    auto trackedValue = valueMap.getTrackableValue(destValue);
+    if (trackedValue.isTransferringParameter()) {
+      auto valueName = inferNameFromValue(op->get());
+      auto paramName =
+          inferNameFromValue(trackedValue.getRepresentative().getValue());
+      if (!valueName || !paramName) {
+        diagnoseError(op->getUser(),
+                      diag::regionbasedisolation_unknown_pattern);
+        return false;
+      }
+
+      diagnosticInfo = UseDiagnosticInfo::
+          forFunctionArgumentAssignedToStronglyTransferredParam(*valueName,
+                                                                *paramName);
+      return true;
+    }
+  }
 
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
     std::optional<ApplyIsolationCrossing> isolation = {};
@@ -1182,7 +1225,8 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
   auto &astContext = regionInfo->getFunction()->getASTContext();
   for (auto info : transferredNonTransferrable) {
     auto *op = info.transferredOperand;
-    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(info);
+    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(
+        regionInfo->getValueMap(), info);
     if (!diagnosticInferrer.run())
       continue;
 
@@ -1253,6 +1297,20 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
           diagnosticInfo.getName(),
           diagnosticInfo.getIsolationCrossing().getCallerIsolation(),
           diagnosticInfo.getIsolationCrossing().getCalleeIsolation());
+      break;
+    case UseDiagnosticInfoKind::
+        FunctionArgumentAssignedToStronglyTransferredParam:
+      diagnoseError(
+          astContext, loc,
+          diag::
+              regionbasedisolation_stronglytransfer_assignment_yields_race_name,
+          diagnosticInfo.getName(),
+          diagnosticInfo.getTransferredParamIdentifier());
+      diagnoseNote(
+          astContext, loc,
+          diag::regionbasedisolation_stronglytransfer_taskisolated_assign_note,
+          diagnosticInfo.getName(),
+          diagnosticInfo.getTransferredParamIdentifier());
       break;
     }
   }

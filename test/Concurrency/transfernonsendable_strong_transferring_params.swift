@@ -13,6 +13,26 @@ struct NonSendableStruct {
   var second = Klass()
 }
 
+class KlassWithNonSendableStructPair {
+  var ns1: NonSendableStruct
+  var ns2: (NonSendableStruct, NonSendableStruct)
+
+  init() {
+    ns1 = NonSendableStruct()
+    ns2 = (ns1, ns1)
+  }
+}
+
+final class FinalKlassWithNonSendableStructPair {
+  var ns1: NonSendableStruct
+  var ns2: (NonSendableStruct, NonSendableStruct)
+
+  init() {
+    ns1 = NonSendableStruct()
+    ns2 = (ns1, ns1)
+  }
+}
+
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
 
@@ -298,4 +318,31 @@ func testTransferSrc(_ x: transferring Klass) async {
   let y = Klass()
   await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
   x = y // expected-note {{access here could race}}
+}
+
+func testTransferOtherParam(_ x: transferring Klass, y: Klass) async {
+  x = y // expected-warning {{assigning 'y' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y'}}
+}
+
+func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) async {
+  x = y.0 // expected-warning {{assigning 'y.0' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.0' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.0'}}
+}
+
+func testTransferOtherParamStruct(_ x: transferring Klass, y: NonSendableStruct) async {
+  x = y.first // expected-warning {{assigning 'y.first' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.first' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.first'}}
+}
+
+func testTransferOtherParamTupleStruct(_ x: transferring Klass, y: (NonSendableStruct, NonSendableStruct)) async {
+  x = y.1.second // expected-warning {{assigning 'y.1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.1.second'}}
+}
+
+func testTransferOtherParamClassStructTuple(_ x: transferring Klass, y: KlassWithNonSendableStructPair) async {
+  x = y.ns1.second // expected-warning {{assigning 'y.ns1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.ns1.second' is a task isolated value that is assigned into transferring parameter 'x'}}
+  x = y.ns2.1.second // expected-warning {{assigning 'y.ns2.1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.ns2.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.ns2.1.second'}}
 }
