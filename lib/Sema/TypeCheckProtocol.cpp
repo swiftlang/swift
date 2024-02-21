@@ -4943,6 +4943,8 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 
 void ConformanceChecker::resolveValueWitnesses() {
   bool usesPreconcurrencyConformance = false;
+  auto objcRequirementMap = getObjCRequirementMap(Proto);
+
   for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
@@ -5077,6 +5079,23 @@ void ConformanceChecker::resolveValueWitnesses() {
     // Make sure we've got an interface type.
     if (requirement->isInvalid()) {
       Conformance->setInvalid();
+      continue;
+    }
+
+    // If this requirement is part of a pair of imported async requirements,
+    // where one has already been witnessed, we can skip it.
+    //
+    // This situation primarily arises when the ClangImporter translates an
+    // async-looking ObjC protocol method requirement into two Swift protocol
+    // requirements: an async version and a sync version. Exactly one of the two
+    // must be witnessed by the conformer.
+    if (!requirement->isImplicit() &&
+        getObjCRequirementSibling(
+            Proto, requirement, objcRequirementMap,
+            [this](AbstractFunctionDecl *cand) {
+              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
+                     !cand->isImplicit() && this->Conformance->hasWitness(cand);
+            })) {
       continue;
     }
 

@@ -344,4 +344,15 @@ MAIN_ACTOR
                                                    error:(NSError * __autoreleasing *)error;
 @end
 
+@protocol Loadable
+- (void)loadStuffWithIdentifier:(NSInteger)identifier reply:(void (^)())reply;
+- (void)loadStuffWithOtherIdentifier:(NSInteger)otherIdentifier reply:(void (^)())reply;
+- (void)loadStuffWithGroupID:(NSInteger)groupID reply:(void (^)())reply;
+@end
+
+@interface ImplementsLoadable : NSObject
+- (void)loadStuffWithIdentifier:(NSInteger)identifier reply:(void (^)())reply;
+- (void)loadStuffWithGroupID:(NSInteger)groupID reply:(void (^)())reply;
+@end
+
 #pragma clang assume_nonnull end
