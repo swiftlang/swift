@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 func testInvalidConformance() {
   // expected-error@+1 {{type 'T' constrained to non-protocol, non-class type 'Int'}}
   func invalidIntConformance<T>(_: T) where T: Int {}

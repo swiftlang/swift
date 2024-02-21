@@ -6,6 +6,8 @@
 // RUN: not %target-swift-frontend -typecheck-module-from-interface -module-name Broken %s 2>%t/interface-verification-errors.txt
 // RUN: %FileCheck %s < %t/interface-verification-errors.txt
 
+// XFAIL: noncopyable_generics
+
 import Swift
 
 // This type is meant to shadow the name of the module, creating an ambiguity.

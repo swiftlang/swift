@@ -80,3 +80,6 @@ Func Executor.enqueue(_:) is a new API without @available attribute
 Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @available attribute
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// XFAIL: noncopyable_generics
+

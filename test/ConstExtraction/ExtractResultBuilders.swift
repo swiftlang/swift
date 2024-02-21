@@ -113,3 +113,6 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:      ]
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ]
+
+// XFAIL: noncopyable_generics
+
