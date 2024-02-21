@@ -657,14 +657,6 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_associated_type_inference :
-  Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference improvements">;
-
-def disable_experimental_associated_type_inference :
-  Flag<["-"], "disable-experimental-associated-type-inference">,
-  HelpText<"Disable experimental associated type inference improvements">;
-
 def enable_experimental_lifetime_dependence_inference :
   Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
   HelpText<"Enable experimental lifetime dependence inference">;
