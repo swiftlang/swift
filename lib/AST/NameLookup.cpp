@@ -3263,19 +3263,37 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
+  auto &ctx = PD->getASTContext();
+
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
-  InvertibleProtocolSet inverses;
-  bool anyObject = false;
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(
-            PD, inverses, anyObject)) {
-    auto proto = dyn_cast<ProtocolDecl>(found.Item);
-    if (proto && proto != PD)
-      inherited.insert(proto);
+
+  if (PD->wasDeserialized()) {
+    auto protoSelfTy = PD->getSelfInterfaceType();
+    for (auto req : PD->getRequirementSignature().getRequirements()) {
+      // Dig out a conformance requirement...
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // constraining Self.
+      if (!req.getFirstType()->isEqual(protoSelfTy))
+        continue;
+
+      inherited.insert(req.getProtocolDecl());
+    }
+  } else {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    for (const auto &found : getDirectlyInheritedNominalTypeDecls(
+              PD, inverses, anyObject)) {
+      auto proto = dyn_cast<ProtocolDecl>(found.Item);
+      if (proto && proto != PD)
+        inherited.insert(proto);
+    }
+
+    // FIXME: Apply inverses
   }
 
-  // FIXME: Apply inverses
-
-  return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
+  return ctx.AllocateCopy(inherited.getArrayRef());
 }
 
 ArrayRef<ValueDecl *>
