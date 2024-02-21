@@ -650,11 +650,11 @@ public struct UTFTest {
   public let loc: SourceLoc
 
   public var utf32: [UInt32] {
-    return unicodeScalars.map { UInt32($0) }
+    return unicodeScalars.map(UInt32.init)
   }
 
   public var utf32RepairedTail: [UInt32] {
-    return unicodeScalarsRepairedTail.map { UInt32($0) }
+    return unicodeScalarsRepairedTail.map(UInt32.init)
   }
 
   public init(
