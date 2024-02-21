@@ -9,8 +9,6 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: noncopyable_generics
 
-// Incrementally testing https://github.pie.apple.com/guillaume-l/BufferView with lifetime dependence
-
 // TODO: Use real Range
 public struct FakeRange<Bound> {
   public let lowerBound: Bound
@@ -65,6 +63,7 @@ public struct BufferView<Element> : ~Escapable {
   public let count: Int
   private var baseAddress: UnsafeRawPointer { start._rawValue }
   
+// CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Owner> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
   public init<Owner>(
       baseAddress: UnsafeRawPointer,
       count: Int,
@@ -74,6 +73,7 @@ public struct BufferView<Element> : ~Escapable {
         start: .init(rawValue: baseAddress), count: count, dependsOn: owner
       )
   }
+// CHECK: sil hidden @$s31lifetime_dependence_scope_fixup10BufferViewV5start5count9dependsOnACyxGAA0eF5IndexVyxGYls_Siqd__htclufC : $@convention(method) <Element><Owner> (BufferViewIndex<Element>, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
   init<Owner>(
     start index: BufferViewIndex<Element>,
     count: Int,
@@ -122,6 +122,7 @@ extension BufferView {
     }
   }
  
+// CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewVyACyxGAA9FakeRangeVyAA0eF5IndexVyxGGcig : $@convention(method) <Element> (FakeRange<BufferViewIndex<Element>>, @guaranteed BufferView<Element>) -> _scope(0) @owned BufferView<Element> {
   public subscript(bounds: FakeRange<BufferViewIndex<Element>>) -> Self {
     get {
       BufferView(
@@ -140,6 +141,7 @@ extension Array {
   // }
   // TODO: Implementation of getter should not need a temporary
   // rdar://123071321
+// CHECK: sil hidden @$sSa31lifetime_dependence_scope_fixupE4viewAA10BufferViewVyxGvg : $@convention(method) <Element> (@guaranteed Array<Element>) -> _scope(0) @owned BufferView<Element> {
   var view: BufferView<Element> {
     var _view : BufferView<Element>? 
     withUnsafePointer(to:self) {
