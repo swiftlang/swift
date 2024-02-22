@@ -108,11 +108,20 @@ private func extendAccessScopes(dependence: LifetimeDependence, _ context: Funct
 private func extendAccessScope(beginAccess: BeginAccessInst, range: inout InstructionRange,
                                _ context: FunctionPassContext) -> FunctionArgument? {
   var endAcceses = [Instruction]()
-  // Collect the original end_access instructions and extend the range to to cover them. The access scope should only be
-  // extended here; it may protect other memory operations.
+  // Collect the original end_access instructions and extend the range to to cover them. The resulting access scope must
+  // cover the original scope because it may protect other memory operations.
+  var requiresExtension = false
   for end in beginAccess.endInstructions {
     endAcceses.append(end)
-    range.insert(end)
+    if range.contains(end) {
+      // If any end_access is inside the new range, then all end_accesses must be rewritten.
+      requiresExtension = true
+    } else {
+      range.insert(end)
+    }
+  }
+  if !requiresExtension {
+    return nil
   }
   assert(!range.ends.isEmpty)
 
