@@ -8193,29 +8193,42 @@ bool UnableToInferGenericPackElementType::diagnoseAsError() {
   auto path = locator->getPath();
 
   if (path.size() > 1) {
+  
     const auto applyArgToParamElt = (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
+    const auto packElementElt = (path.end() - 1)->getAs<LocatorPathElt::PackElement>();
 
     if (!applyArgToParamElt)
       return false;
 
-    unsigned eltIdx = applyArgToParamElt->getArgIdx();
     auto anchor = getAnchor();
-
 
     // `nil` appears as an element of generic pack params, let's record a
     // specify contextual type for nil fix.
     if (isExpr<NilLiteralExpr>(anchor)) {
       emitDiagnostic(diag::unresolved_nil_literal);
-      return true;
+    }
+    else {
+      // unable to infer the type of an element of generic pack params
+      emitDiagnostic(diag::could_not_infer_pack_element, packElementElt->getIndex());
     }
 
-    // unable to infer the type of an element of generic pack params
-    emitDiagnostic(diag::could_not_infer_pack_element, eltIdx);
+    // emit callee side diagnostics
+    auto applyExpr = castToExpr<ApplyExpr>(locator->getAnchor());
+    if (auto* Fn = applyExpr->getFn()) {
+      if (const auto DeclRef = Fn->getReferencedDecl()) {
+        auto paramDecl = getParameterAt(DeclRef, applyArgToParamElt->getParamIdx());
+        emitDiagnosticAt(
+          paramDecl->getLoc(), diag::note_in_opening_pack_element,
+          packElementElt->getIndex() + 1, paramDecl->getNameStr());
+      }
+    }
+
     return true;
   }
 
   return false;
 }
+
 
 
 static std::pair<StringRef, StringRef>
