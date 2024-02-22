@@ -5496,18 +5496,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
         return true;
 
-      ValueOwnershipKind forwardingOwnership =
-          F && F->hasOwnership() ? mergeSILValueOwnership(OpList)
-                                 : ValueOwnershipKind(OwnershipKind::None);
-      if (parseForwardingOwnershipKind(forwardingOwnership)
-          || parseSILDebugLocation(InstLoc, B)) {
-        return true;
-      }
       if (Opcode == SILInstructionKind::StructInst) {
+        ValueOwnershipKind forwardingOwnership =
+            F && F->hasOwnership() ? mergeSILValueOwnership(OpList)
+                                   : ValueOwnershipKind(OwnershipKind::None);
+        if (parseForwardingOwnershipKind(forwardingOwnership)
+             || parseSILDebugLocation(InstLoc, B)) {
+          return true;
+        }
         ResultVal = B.createStruct(InstLoc, Ty, OpList, forwardingOwnership);
       } else {
-        ResultVal = B.createObject(InstLoc, Ty, OpList, NumBaseElems,
-                                   forwardingOwnership);
+        if (parseSILDebugLocation(InstLoc, B))
+          return true;
+        ResultVal = B.createObject(InstLoc, Ty, OpList, NumBaseElems  );
       }
       break;
     }

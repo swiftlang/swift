@@ -128,6 +128,12 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
+struct BridgedUtilities {
+  typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
+
+  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
+};
+
 struct BridgedBasicBlockSet {
   swift::BasicBlockSet * _Nonnull set;
 

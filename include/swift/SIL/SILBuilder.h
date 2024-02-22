@@ -1615,19 +1615,8 @@ public:
   ObjectInst *createObject(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements,
                            unsigned NumBaseElements) {
-    return createObject(Loc, Ty, Elements, NumBaseElements,
-                        hasOwnership()
-                            ? mergeSILValueOwnership(Elements)
-                            : ValueOwnershipKind(OwnershipKind::None));
-  }
-
-  ObjectInst *createObject(SILLocation Loc, SILType Ty,
-                           ArrayRef<SILValue> Elements,
-                           unsigned NumBaseElements,
-                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(ObjectInst::create(getSILDebugLocation(Loc), Ty, Elements,
-                                     NumBaseElements, getModule(),
-                                     forwardingOwnershipKind));
+                                     NumBaseElements, getModule()));
   }
 
   VectorInst *createVector(SILLocation Loc, ArrayRef<SILValue> Elements) {

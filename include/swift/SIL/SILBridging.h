@@ -770,6 +770,7 @@ struct BridgedInstruction {
   bool mayLoadWeakOrUnowned() const;
   bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
+  BRIDGED_INLINE bool shouldBeForwarding() const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
