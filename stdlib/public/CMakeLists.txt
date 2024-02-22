@@ -250,6 +250,10 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   # In some internal Apple configurations we have the need
   # to build Core and Onone separately from the rest
   # of the stdlib
+  if(SWIFT_BUILD_CLANG_OVERLAYS)
+    add_subdirectory(ClangOverlays)
+  endif()
+
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(Differentiation)
   endif()

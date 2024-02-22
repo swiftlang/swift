@@ -238,6 +238,10 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
+option(SWIFT_BUILD_CLANG_OVERLAYS
+  "Build Swift overlays for the clang builtin modules"
+  TRUE)
+
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
     TRUE)
