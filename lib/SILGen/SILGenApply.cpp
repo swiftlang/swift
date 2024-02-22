@@ -5434,22 +5434,6 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
   return emission;
 }
 
-bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
-  if (fn->isStatic())
-    return true;
-
-  switch (fn->getSelfAccessKind()) {
-  case SelfAccessKind::Mutating:
-    return false;
-  case SelfAccessKind::NonMutating:
-  case SelfAccessKind::LegacyConsuming:
-  case SelfAccessKind::Consuming:
-  case SelfAccessKind::Borrowing:
-    return true;
-  }
-  llvm_unreachable("bad self-access kind");
-}
-
 bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   auto method = methodRef.getFuncDecl();
   if (method->isStatic())
