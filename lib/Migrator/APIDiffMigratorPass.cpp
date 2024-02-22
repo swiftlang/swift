@@ -839,7 +839,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
 
     std::string Rename;
-    llvm::Optional<NodeAnnotation> Kind;
+    std::optional<NodeAnnotation> Kind;
     StringRef LeftComment;
     StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
@@ -1058,7 +1058,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   void handleResultTypeChange(ValueDecl *FD, Expr *Call) {
-    llvm::Optional<NodeAnnotation> ChangeKind;
+    std::optional<NodeAnnotation> ChangeKind;
 
     // look for related change item for the function decl.
     for (auto Item: getRelatedDiffItems(FD)) {

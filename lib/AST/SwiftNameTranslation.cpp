@@ -297,7 +297,7 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       return {Unsupported, UnrepresentableGenericRequirements};
   }
 
-  return {Representable, llvm::None};
+  return {Representable, std::nullopt};
 }
 
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,

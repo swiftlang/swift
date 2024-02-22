@@ -412,7 +412,7 @@ class HoistAllocStack {
   /// instructions in the function.
   InstructionIndices stackInstructionIndices;
 
-  llvm::Optional<SILAnalysis::InvalidationKind> InvalidationKind = llvm::None;
+  std::optional<SILAnalysis::InvalidationKind> InvalidationKind = std::nullopt;
 
   DominanceInfo *DomInfoToUpdate = nullptr;
 
@@ -423,7 +423,7 @@ public:
   /// Try to hoist generic alloc_stack instructions to the entry block.  Returns
   /// none if the function was not changed. Otherwise, returns the analysis
   /// invalidation kind to use if the function was changed.
-  llvm::Optional<SILAnalysis::InvalidationKind> run();
+  std::optional<SILAnalysis::InvalidationKind> run();
 
   void setDominanceToUpdate(DominanceInfo *DI) { DomInfoToUpdate = DI; }
 
@@ -520,7 +520,7 @@ void HoistAllocStack::hoist() {
 
 /// Try to hoist generic alloc_stack instructions to the entry block.
 /// Returns true if the function was changed.
-llvm::Optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
+std::optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
   collectHoistableInstructions();
 
   // Nothing to hoist?

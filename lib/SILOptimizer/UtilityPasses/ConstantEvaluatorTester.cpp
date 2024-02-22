@@ -78,8 +78,8 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
         break;
       }
 
-      llvm::Optional<SILBasicBlock::iterator> nextInstOpt;
-      llvm::Optional<SymbolicValue> errorVal;
+      std::optional<SILBasicBlock::iterator> nextInstOpt;
+      std::optional<SymbolicValue> errorVal;
 
       // If the instruction is marked as skip, skip it and make its effects
       // non-constant. Otherwise, try evaluating the instruction and if the

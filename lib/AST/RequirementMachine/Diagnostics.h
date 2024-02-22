@@ -64,18 +64,18 @@ public:
 
   /// A requirement that conflicts with \c requirement. Both
   /// requirements will have the same subject type.
-  llvm::Optional<Requirement> conflictingRequirement;
+  std::optional<Requirement> conflictingRequirement;
 
   SourceLoc loc;
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
       : kind(kind), requirement(requirement),
-        conflictingRequirement(llvm::None), loc(loc) {}
+        conflictingRequirement(std::nullopt), loc(loc) {}
 
   RequirementError(Kind kind, InverseRequirement inverse, SourceLoc loc)
-      : kind(kind), inverse(inverse),
-        conflictingRequirement(llvm::None), loc(loc) {}
+      : kind(kind), inverse(inverse), conflictingRequirement(std::nullopt),
+        loc(loc) {}
 
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,

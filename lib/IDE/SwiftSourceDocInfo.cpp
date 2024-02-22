@@ -37,26 +37,26 @@
 using namespace swift;
 using namespace swift::ide;
 
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 swift::ide::parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
   size_t ColonIdx = LineCol.find(':');
   if (ColonIdx == StringRef::npos) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
   if (LineCol.substr(0, ColonIdx).getAsInteger(10, Line)) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
   if (LineCol.substr(ColonIdx+1).getAsInteger(10, Col)) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (Line == 0 || Col == 0) {
     llvm::errs() << "wrong pos format, line/col should start from 1\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   return std::make_pair(Line, Col);
@@ -240,13 +240,13 @@ getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind) {
   return InfoVec;
 }
 
-std::pair<std::vector<CharSourceRange>, llvm::Optional<unsigned>>
+std::pair<std::vector<CharSourceRange>, std::optional<unsigned>>
 swift::ide::getCallArgLabelRanges(SourceManager &SM, ArgumentList *Args,
                                   LabelRangeEndAt EndKind) {
   std::vector<CharSourceRange> Ranges;
   auto InfoVec = getCallArgInfo(SM, Args, EndKind);
 
-  llvm::Optional<unsigned> FirstTrailing;
+  std::optional<unsigned> FirstTrailing;
   auto I = std::find_if(InfoVec.begin(), InfoVec.end(), [](CallArgInfo &Info) {
     return Info.IsTrailingClosure;
   });

@@ -256,9 +256,9 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   return NewBB;
 }
 
-llvm::Optional<SILDebugVariable>
+std::optional<SILDebugVariable>
 SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
-                                    llvm::Optional<SILDebugVariable> Var,
+                                    std::optional<SILDebugVariable> Var,
                                     SILLocation Loc) {
   if (Var && shouldDropVariable(*Var, Loc))
     return {};
@@ -639,7 +639,7 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
   llvm::SmallString<4> Name;
 
   // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, llvm::None};
+  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
   return insert(DebugValueInst::create(getSILDebugLocation(Loc, true), src,
                                        getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
@@ -655,7 +655,7 @@ DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
   llvm::SmallString<4> Name;
 
   // Debug location overrides cannot apply to debug addr instructions.
-  DebugLocOverrideRAII LocOverride{*this, llvm::None};
+  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
   return insert(DebugValueInst::createAddr(
       getSILDebugLocation(Loc, true), src, getModule(),
       *substituteAnonymousArgs(Name, Var, Loc), wasMoved, trace));
@@ -726,7 +726,7 @@ static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
 SwitchEnumInst *SILBuilder::createSwitchEnum(
     SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-    llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
+    std::optional<ArrayRef<ProfileCounter>> CaseCounts,
     ProfileCounter DefaultCount) {
   // Consider the operand's type to be the target's type since a switch
   // covers all cases including the default argument.

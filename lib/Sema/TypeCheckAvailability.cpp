@@ -45,7 +45,7 @@ using namespace swift;
 ExportContext::ExportContext(
     DeclContext *DC, AvailabilityContext runningOSVersion,
     FragileFunctionKind kind, bool spi, bool exported, bool implicit,
-    bool deprecated, llvm::Optional<PlatformKind> unavailablePlatformKind)
+    bool deprecated, std::optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
   Exported = exported;
@@ -181,9 +181,10 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   }
 }
 
-static void computeExportContextBits(
-    ASTContext &Ctx, Decl *D, bool *spi, bool *implicit, bool *deprecated,
-    llvm::Optional<PlatformKind> *unavailablePlatformKind) {
+static void
+computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
+                         bool *deprecated,
+                         std::optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
@@ -223,7 +224,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
-  llvm::Optional<PlatformKind> unavailablePlatformKind;
+  std::optional<PlatformKind> unavailablePlatformKind;
   computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
                            &unavailablePlatformKind);
   forEachOuterDecl(D->getDeclContext(),
@@ -252,7 +253,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
-  llvm::Optional<PlatformKind> unavailablePlatformKind;
+  std::optional<PlatformKind> unavailablePlatformKind;
   forEachOuterDecl(DC,
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
@@ -290,21 +291,21 @@ ExportContext ExportContext::withExported(bool exported) const {
   return copy;
 }
 
-llvm::Optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
+std::optional<PlatformKind> ExportContext::getUnavailablePlatformKind() const {
   if (Unavailable)
     return PlatformKind(Platform);
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
 }
 
-llvm::Optional<ExportabilityReason>
+std::optional<ExportabilityReason>
 ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Returns the first availability attribute on the declaration that is active
@@ -882,8 +883,8 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
-    llvm::Optional<AvailabilityContext> ThenRange;
-    llvm::Optional<AvailabilityContext> ElseRange;
+    std::optional<AvailabilityContext> ThenRange;
+    std::optional<AvailabilityContext> ElseRange;
     std::tie(ThenRange, ElseRange) =
         buildStmtConditionRefinementContext(IS->getCond());
 
@@ -928,7 +929,7 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    llvm::Optional<AvailabilityContext> BodyRange =
+    std::optional<AvailabilityContext> BodyRange =
         buildStmtConditionRefinementContext(WS->getCond()).first;
 
     if (BodyRange.has_value()) {
@@ -958,8 +959,8 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
-    llvm::Optional<AvailabilityContext> FallthroughRange;
-    llvm::Optional<AvailabilityContext> ElseRange;
+    std::optional<AvailabilityContext> FallthroughRange;
+    std::optional<AvailabilityContext> ElseRange;
     std::tie(FallthroughRange, ElseRange) =
         buildStmtConditionRefinementContext(GS->getCond());
 
@@ -992,8 +993,8 @@ private:
   /// of optional version ranges, the first for the true branch and the second
   /// for the false branch. A value of None for a given branch indicates that
   /// the branch does not introduce a new refinement.
-  std::pair<llvm::Optional<AvailabilityContext>,
-            llvm::Optional<AvailabilityContext>>
+  std::pair<std::optional<AvailabilityContext>,
+            std::optional<AvailabilityContext>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1011,7 +1012,7 @@ private:
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
     // Tracks if we're refining for availability or unavailability.
-    llvm::Optional<bool> isUnavailability = llvm::None;
+    std::optional<bool> isUnavailability = std::nullopt;
 
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
@@ -1036,7 +1037,7 @@ private:
       // condition elements following it.
       auto *Query = Element.getAvailability();
 
-      if (isUnavailability == llvm::None) {
+      if (isUnavailability == std::nullopt) {
         isUnavailability = Query->isUnavailability();
       } else if (isUnavailability != Query->isUnavailability()) {
         // Mixing availability with unavailability in the same statement will
@@ -1145,7 +1146,7 @@ private:
       ++NestedCount;
     }
 
-    llvm::Optional<AvailabilityContext> FalseRefinement = llvm::None;
+    std::optional<AvailabilityContext> FalseRefinement = std::nullopt;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
     assert(FalseFlow.isContainedIn(StartingTRC->getAvailabilityInfo()));
@@ -1159,18 +1160,18 @@ private:
       FalseRefinement = FalseFlow;
     }
 
-    auto makeResult = [isUnavailability](
-                          llvm::Optional<AvailabilityContext> TrueRefinement,
-                          llvm::Optional<AvailabilityContext> FalseRefinement) {
-      if (isUnavailability.has_value() && isUnavailability.value()) {
-        // If this is an unavailability check, invert the result.
-        return std::make_pair(FalseRefinement, TrueRefinement);
-      }
-      return std::make_pair(TrueRefinement, FalseRefinement);
-    };
+    auto makeResult =
+        [isUnavailability](std::optional<AvailabilityContext> TrueRefinement,
+                           std::optional<AvailabilityContext> FalseRefinement) {
+          if (isUnavailability.has_value() && isUnavailability.value()) {
+            // If this is an unavailability check, invert the result.
+            return std::make_pair(FalseRefinement, TrueRefinement);
+          }
+          return std::make_pair(TrueRefinement, FalseRefinement);
+        };
 
     if (NestedCount == 0)
-      return makeResult(llvm::None, FalseRefinement);
+      return makeResult(std::nullopt, FalseRefinement);
 
     TypeRefinementContext *NestedTRC = getCurrentTRC();
     while (NestedCount-- > 0)
@@ -1352,7 +1353,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 
     loc = D->getLoc();
 
-    llvm::Optional<AvailabilityContext> Info =
+    std::optional<AvailabilityContext> Info =
         AvailabilityInference::annotatedAvailableRange(D, Context);
 
     if (Info.has_value()) {
@@ -1407,14 +1408,14 @@ bool TypeChecker::isDeclarationUnavailable(
   return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
 }
 
-llvm::Optional<UnavailabilityReason>
+std::optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(const Decl *D,
                                           const ExportContext &Where) {
   // Skip computing potential unavailability if the declaration is explicitly
   // unavailable and the context is also unavailable.
   if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))
     if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
-      return llvm::None;
+      return std::nullopt;
 
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
         return Where.getAvailabilityContext();
@@ -1427,10 +1428,10 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
     return UnavailabilityReason::requiresVersionRange(version);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<UnavailabilityReason>
+std::optional<UnavailabilityReason>
 TypeChecker::checkConformanceAvailability(const RootProtocolConformance *conf,
                                           const ExtensionDecl *ext,
                                           const ExportContext &where) {
@@ -1458,7 +1459,7 @@ private:
   const MatchPredicate Predicate;
 
   bool FoundTarget = false;
-  llvm::Optional<ASTNode> InnermostMatchingNode;
+  std::optional<ASTNode> InnermostMatchingNode;
 
 public:
   InnermostAncestorFinder(SourceRange TargetRange, const SourceManager &SM,
@@ -1471,7 +1472,7 @@ public:
 
   /// Returns the innermost node containing the target range that matches
   /// the predicate.
-  llvm::Optional<ASTNode> getInnermostMatchingNode() {
+  std::optional<ASTNode> getInnermostMatchingNode() {
     return InnermostMatchingNode;
   }
 
@@ -1562,7 +1563,7 @@ public:
 
 /// Starting from SearchRoot, finds the innermost node containing ChildRange
 /// for which Predicate returns true. Returns None if no such root is found.
-static llvm::Optional<ASTNode> findInnermostAncestor(
+static std::optional<ASTNode> findInnermostAncestor(
     SourceRange ChildRange, const SourceManager &SM, ASTNode SearchRoot,
     const InnermostAncestorFinder::MatchPredicate &Predicate) {
   InnermostAncestorFinder Finder(ChildRange, SM, SearchRoot, Predicate);
@@ -1746,9 +1747,9 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// @available attribute would fix the unavailable reference.
 static void findAvailabilityFixItNodes(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const SourceManager &SM, llvm::Optional<ASTNode> &FoundVersionCheckNode,
+    const SourceManager &SM, std::optional<ASTNode> &FoundVersionCheckNode,
     const Decl *&FoundMemberLevelDecl, const Decl *&FoundTypeLevelDecl) {
-  FoundVersionCheckNode = llvm::None;
+  FoundVersionCheckNode = std::nullopt;
   FoundMemberLevelDecl = nullptr;
   FoundTypeLevelDecl = nullptr;
 
@@ -1993,7 +1994,7 @@ static void fixAvailability(SourceRange ReferenceRange,
   if (ReferenceRange.isInvalid())
     return;
 
-  llvm::Optional<ASTNode> NodeToWrapInVersionCheck;
+  std::optional<ASTNode> NodeToWrapInVersionCheck;
   const Decl *FoundMemberDecl = nullptr;
   const Decl *FoundTypeLevelDecl = nullptr;
 
@@ -2580,12 +2581,12 @@ namespace {
   };
 } // end anonymous namespace
 
-static llvm::Optional<ReplacementDeclKind>
+static std::optional<ReplacementDeclKind>
 describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
                SmallVectorImpl<char> &nameBuf) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
   if (!parsed)
-    return llvm::None;
+    return std::nullopt;
 
   // Only produce special descriptions for renames to
   // - instance members
@@ -2598,7 +2599,7 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
         (parsed.isMember() && parsed.IsFunctionName) ||
         (parsed.BaseName == "init" &&
          !dyn_cast_or_null<ConstructorDecl>(D)))) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   llvm::raw_svector_ostream name(nameBuf);
@@ -2667,7 +2668,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   SmallString<32> newNameBuf;
-  llvm::Optional<ReplacementDeclKind> replacementDeclKind =
+  std::optional<ReplacementDeclKind> replacementDeclKind =
       describeRename(Context, Attr, /*decl*/ nullptr, newNameBuf);
   StringRef newName = replacementDeclKind ? newNameBuf.str() : Attr->Rename;
 
@@ -2772,7 +2773,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   ExportContext where = ExportContext::forDeclSignature(override);
   diagnoseExplicitUnavailability(
       base, override->getLoc(), where,
-      /*Flags*/ llvm::None, [&](InFlightDiagnostic &diag) {
+      /*Flags*/ std::nullopt, [&](InFlightDiagnostic &diag) {
         ParsedDeclName parsedName = parseDeclName(attr->Rename);
         if (!parsedName || parsedName.isPropertyAccessor() ||
             parsedName.isMember() || parsedName.isOperator()) {
@@ -3081,7 +3082,7 @@ bool swift::diagnoseExplicitUnavailability(
 
   if (!Attr->Rename.empty()) {
     SmallString<32> newNameBuf;
-    llvm::Optional<ReplacementDeclKind> replaceKind =
+    std::optional<ReplacementDeclKind> replaceKind =
         describeRename(ctx, Attr, D, newNameBuf);
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.value_or(ReplacementDeclKind::None));
@@ -3194,7 +3195,7 @@ public:
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
-                                  getEnclosingApplyExpr(), llvm::None);
+                                  getEnclosingApplyExpr(), std::nullopt);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
@@ -3321,7 +3322,7 @@ public:
   bool
   diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
                               const Expr *call = nullptr,
-                              DeclAvailabilityFlags flags = llvm::None) const;
+                              DeclAvailabilityFlags flags = std::nullopt) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -3388,7 +3389,7 @@ private:
     ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
     if (diagnoseDeclRefAvailability(DR, E->getNameLoc().getSourceRange(),
-                                    getEnclosingApplyExpr(), llvm::None))
+                                    getEnclosingApplyExpr(), std::nullopt))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
@@ -3485,12 +3486,12 @@ private:
     switch (AccessContext) {
     case MemberAccessContext::Getter:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
-                               ReferenceRange, ReferenceDC, llvm::None);
+                               ReferenceRange, ReferenceDC, std::nullopt);
       break;
 
     case MemberAccessContext::Setter:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC, llvm::None);
+                               ReferenceRange, ReferenceDC, std::nullopt);
       break;
 
     case MemberAccessContext::InOut:

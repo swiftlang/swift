@@ -125,7 +125,7 @@ static const char *class_getName(const ClassMetadata* type) {
 }
 
 template<> void ProtocolConformanceDescriptor::dump() const {
-  llvm::Optional<SymbolInfo> info;
+  std::optional<SymbolInfo> info;
   auto symbolName = [&](const void *addr) -> const char * {
     info = SymbolInfo::lookup(addr);
     if (info.has_value() && info->getSymbolName()) {
@@ -207,7 +207,7 @@ tryGetCompleteMetadataNonblocking(const Metadata *metadata) {
 /// MetadataState::Abstract} to indicate that there's an uninstantiated
 /// superclass that was not returned.
 static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
-    const Metadata *metadata, llvm::Optional<MetadataState> knownMetadataState,
+    const Metadata *metadata, std::optional<MetadataState> knownMetadataState,
     bool instantiateSuperclassMetadata) {
   const ClassMetadata *classMetadata = dyn_cast<ClassMetadata>(metadata);
   if (!classMetadata)
@@ -262,12 +262,12 @@ static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
 
 struct MaybeIncompleteSuperclassIterator {
   const Metadata *metadata;
-  llvm::Optional<MetadataState> state;
+  std::optional<MetadataState> state;
   bool instantiateSuperclassMetadata;
 
   MaybeIncompleteSuperclassIterator(const Metadata *metadata,
                                     bool instantiateSuperclassMetadata)
-      : metadata(metadata), state(llvm::None),
+      : metadata(metadata), state(std::nullopt),
         instantiateSuperclassMetadata(instantiateSuperclassMetadata) {}
 
   MaybeIncompleteSuperclassIterator &operator++() {
@@ -720,7 +720,7 @@ namespace {
     /// be a superclass of the given type. Returns null if this type does not
     /// match this conformance, along with the final metadata state of the
     /// superclass iterator.
-    std::pair<const Metadata *, llvm::Optional<MetadataState>>
+    std::pair<const Metadata *, std::optional<MetadataState>>
     getMatchingType(const Metadata *conformingType,
                     bool instantiateSuperclassMetadata) const {
       MaybeIncompleteSuperclassIterator superclassIterator{
@@ -728,7 +728,7 @@ namespace {
       for (; auto conformingType = superclassIterator.metadata;
            ++superclassIterator) {
         if (matches(conformingType))
-          return {conformingType, llvm::None};
+          return {conformingType, std::nullopt};
       }
 
       return {nullptr, superclassIterator.state};
@@ -992,7 +992,7 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   // only look at the state after the last iteration, we might have hit a false
   // negative before that no longer shows up.
   bool hasUninstantiatedSuperclass = false;
-  auto noteFinalMetadataState = [&](llvm::Optional<MetadataState> state) {
+  auto noteFinalMetadataState = [&](std::optional<MetadataState> state) {
     hasUninstantiatedSuperclass =
         hasUninstantiatedSuperclass || state == MetadataState::Abstract;
   };
@@ -1069,7 +1069,7 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
       // always cache them.
       ConformanceCandidate candidate(descriptor);
       const Metadata *matchingType;
-      llvm::Optional<MetadataState> finalState;
+      std::optional<MetadataState> finalState;
       std::tie(matchingType, finalState) =
           candidate.getMatchingType(type, instantiateSuperclassMetadata);
       noteFinalMetadataState(finalState);
@@ -1217,7 +1217,7 @@ bool isSwiftClassMetadataSubclass(const ClassMetadata *subclass,
   assert(subclass);
   assert(superclass);
 
-  llvm::Optional<MetadataState> subclassState = llvm::None;
+  std::optional<MetadataState> subclassState = std::nullopt;
   while (true) {
     auto response = getSuperclassForMaybeIncompleteMetadata(
         subclass, subclassState, true /*instantiateSuperclassMetadata*/);
@@ -1316,7 +1316,7 @@ static bool isSubclassOrExistential(const Metadata *subclass,
   return isSubclass(subclass, superclass);
 }
 
-static llvm::Optional<TypeLookupError>
+static std::optional<TypeLookupError>
 satisfiesLayoutConstraint(const GenericRequirementDescriptor &req,
                           const Metadata *subjectType) {
   switch (req.getLayout()) {
@@ -1326,7 +1326,7 @@ satisfiesLayoutConstraint(const GenericRequirementDescriptor &req,
           "subject type %.*s does not satisfy class constraint",
           (int)req.getParam().size(), req.getParam().data());
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Unknown layout.
@@ -1341,7 +1341,7 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
   return isSubclass(subclass, superclass);
 }
 
-static llvm::Optional<TypeLookupError>
+static std::optional<TypeLookupError>
 checkGenericRequirement(const GenericRequirementDescriptor &req,
                         llvm::SmallVectorImpl<const void *> &extraArguments,
                         SubstGenericParameterFn substGenericParam,
@@ -1379,7 +1379,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
       extraArguments.push_back(witnessTable);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameType: {
@@ -1399,7 +1399,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
           req.getMangledTypeName().data());
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::Layout: {
@@ -1421,12 +1421,12 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
           req.getParam().data(), (int)req.getMangledTypeName().size(),
           req.getMangledTypeName().data());
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameConformance: {
     // FIXME: Implement this check.
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameShape: {
@@ -1440,7 +1440,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
                                (unsigned)req.getKind());
 }
 
-static llvm::Optional<TypeLookupError>
+static std::optional<TypeLookupError>
 checkGenericPackRequirement(const GenericRequirementDescriptor &req,
                             llvm::SmallVectorImpl<const void *> &extraArguments,
                             SubstGenericParameterFn substGenericParam,
@@ -1491,7 +1491,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
       extraArguments.push_back(pack);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameType: {
@@ -1524,7 +1524,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::Layout: {
@@ -1534,7 +1534,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
         return result;
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::BaseClass: {
@@ -1558,12 +1558,12 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
           req.getMangledTypeName().data(), i);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameConformance: {
     // FIXME: Implement this check.
-    return llvm::None;
+    return std::nullopt;
   }
 
   case GenericRequirementKind::SameShape: {
@@ -1582,7 +1582,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
                                    otherType.getNumElements() );
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
   }
 
@@ -1591,7 +1591,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
                                (unsigned)req.getKind());
 }
 
-llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
+std::optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
@@ -1613,7 +1613,7 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
   }
 
   // Success!
-  return llvm::None;
+  return std::nullopt;
 }
 
 const Metadata *swift::findConformingSuperclass(

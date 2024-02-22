@@ -134,7 +134,7 @@ struct ValueStorage {
 
   /// The latest instruction which opens an archetype involved in the value's
   /// type.  Just a cache of getLatestOpeningInst(value).
-  mutable llvm::Optional<SILInstruction *> latestOpeningInst = llvm::None;
+  mutable std::optional<SILInstruction *> latestOpeningInst = std::nullopt;
 
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this

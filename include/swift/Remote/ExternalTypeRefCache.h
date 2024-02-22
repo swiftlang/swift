@@ -22,7 +22,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include <string>
 
@@ -62,7 +62,7 @@ struct ExternalTypeRefCache {
 
   /// Retrieve a pair representing the reflection info id and the offset of a
   /// field descriptor in the field section buffer, if available.
-  virtual llvm::Optional<FieldDescriptorLocator>
+  virtual std::optional<FieldDescriptorLocator>
   getFieldDescriptorLocator(const std::string &Name) = 0;
 
   /// Returns whether the reflection info with the corresponding ID has been

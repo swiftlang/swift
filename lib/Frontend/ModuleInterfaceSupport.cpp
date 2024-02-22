@@ -432,8 +432,7 @@ class InheritedProtocolCollector {
 
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
-  getAvailabilityAttrs(const Decl *D,
-                       llvm::Optional<AvailableAttrList> &cache) {
+  getAvailabilityAttrs(const Decl *D, std::optional<AvailableAttrList> &cache) {
     if (cache.has_value())
       return cache.value();
 
@@ -488,7 +487,7 @@ class InheritedProtocolCollector {
   /// protocols.
   void recordProtocols(InheritedTypes directlyInherited, const Decl *D,
                        bool skipExtra = false) {
-    llvm::Optional<AvailableAttrList> availableAttrs;
+    std::optional<AvailableAttrList> availableAttrs;
 
     for (int i : directlyInherited.getIndices()) {
       Type inheritedTy = directlyInherited.getResolvedType(i);

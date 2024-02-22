@@ -102,7 +102,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
 }
 
-llvm::Optional<LifetimeDependenceInfo>
+std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {
   auto *dc = afd->getDeclContext();
@@ -196,7 +196,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                   afd->mapTypeIntoContext(
                       param->toFunctionParam().getParameterType()),
                   param->getValueOwnership())) {
-            return llvm::None;
+            return std::nullopt;
           }
           break;
         }
@@ -206,7 +206,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
         diags.diagnose(specifier.getLoc(),
                        diag::lifetime_dependence_invalid_param_name,
                        specifier.getName());
-        return llvm::None;
+        return std::nullopt;
       }
       break;
     }
@@ -215,7 +215,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       if (index > afd->getParameters()->size()) {
         diags.diagnose(specifier.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
-        return llvm::None;
+        return std::nullopt;
       }
       if (index != 0) {
         auto param = afd->getParameters()->get(index - 1);
@@ -223,7 +223,7 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
         auto type = afd->mapTypeIntoContext(
             param->toFunctionParam().getParameterType());
         if (updateLifetimeDependenceInfo(specifier, index, type, ownership)) {
-          return llvm::None;
+          return std::nullopt;
         }
         break;
       }
@@ -233,13 +233,13 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
       if (!afd->hasImplicitSelfDecl()) {
         diags.diagnose(specifier.getLoc(),
                        diag::lifetime_dependence_invalid_self);
-        return llvm::None;
+        return std::nullopt;
       }
       if (updateLifetimeDependenceInfo(
               specifier, /*selfIndex*/ 0,
               afd->getImplicitSelfDecl()->getTypeInContext(),
               afd->getImplicitSelfDecl()->getValueOwnership())) {
-        return llvm::None;
+        return std::nullopt;
       }
       break;
     }
@@ -255,19 +255,19 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
           : nullptr);
 }
 
-llvm::Optional<LifetimeDependenceInfo>
+std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
 
   if (!ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Perform lifetime dependence inference under a flag only. Currently all
   // stdlib types can appear is ~Escapable and ~Copyable.
   if (!ctx.LangOpts.EnableExperimentalLifetimeDependenceInference) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   auto &diags = ctx.Diags;
@@ -284,10 +284,10 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   }
   if (returnTyInContext->isEscapable() &&
       (!yieldTyInContext.has_value() || (*yieldTyInContext)->isEscapable())) {
-    return llvm::None;
+    return std::nullopt;
   }
   if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (afd->getKind() != DeclKind::Constructor && afd->hasImplicitSelfDecl()) {
@@ -310,7 +310,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
             returnLoc,
             diag::
                 lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method);
-        return llvm::None;
+        return std::nullopt;
       }
     }
     return LifetimeDependenceInfo::getForParamIndex(afd, /*selfIndex*/ 0,
@@ -341,7 +341,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
       diags.diagnose(
           returnLoc,
           diag::lifetime_dependence_cannot_infer_ambiguous_candidate);
-      return llvm::None;
+      return std::nullopt;
     }
     candidateParam = param;
     lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
@@ -352,12 +352,12 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   if (!candidateParam && !hasParamError) {
     diags.diagnose(returnLoc,
                    diag::lifetime_dependence_cannot_infer_no_candidates);
-    return llvm::None;
+    return std::nullopt;
   }
   return lifetimeDependenceInfo;
 }
 
-llvm::Optional<LifetimeDependenceInfo>
+std::optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
                             bool allowIndex) {
   auto *returnTypeRepr = afd->getResultTypeRepr();

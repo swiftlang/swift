@@ -626,7 +626,7 @@ public:
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
-    NestedApplyInfo info{config, /*originalPullbackType*/ llvm::None};
+    NestedApplyInfo info{config, /*originalPullbackType*/ std::nullopt};
     auto insertion = context.getNestedApplyInfo().try_emplace(ai, info);
     auto &nestedApplyInfo = insertion.first->getSecond();
     nestedApplyInfo = info;
@@ -992,7 +992,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto *pbGenericEnv = pbGenericSig.getGenericEnvironment();
   auto pbType = SILFunctionType::get(
       pbGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
-      origTy->getCalleeConvention(), pbParams, {}, adjResults, llvm::None,
+      origTy->getCalleeConvention(), pbParams, {}, adjResults, std::nullopt,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 

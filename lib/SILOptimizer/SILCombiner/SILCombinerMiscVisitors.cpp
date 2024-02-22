@@ -1691,34 +1691,34 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
   return nullptr;
 }
 
-static llvm::Optional<SILType>
+static std::optional<SILType>
 shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
                                                    CanType storageMetaTy) {
   auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
   if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
-    return llvm::None;
+    return std::nullopt;
 
   auto storageTy = metaTy.getInstanceType()->getCanonicalType();
   if (!storageTy->is_ContiguousArrayStorage())
-    return llvm::None;
+    return std::nullopt;
 
   auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
   if (!boundGenericTy)
-    return llvm::None;
+    return std::nullopt;
 
   // On SwiftStdlib 5.7 we can replace the call.
   auto &ctxt = storageMetaTy->getASTContext();
   auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
   if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
-    return llvm::None;
+    return std::nullopt;
 
   auto genericArgs = boundGenericTy->getGenericArgs();
   if (genericArgs.size() != 1)
-    return llvm::None;
+    return std::nullopt;
 
   auto ty = genericArgs[0]->getCanonicalType();
   if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
-    return llvm::None;
+    return std::nullopt;
 
   auto anyObjectTy = ctxt.getAnyObjectType();
   auto arrayStorageTy =

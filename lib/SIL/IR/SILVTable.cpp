@@ -53,8 +53,8 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class, SILType classType,
   return vt;
 }
 
-llvm::Optional<SILVTable::Entry> SILVTable::getEntry(SILModule &M,
-                                                     SILDeclRef method) const {
+std::optional<SILVTable::Entry> SILVTable::getEntry(SILModule &M,
+                                                    SILDeclRef method) const {
   SILDeclRef m = method;
   do {
     auto entryIter = M.VTableEntryCache.find({this, m});
@@ -62,7 +62,7 @@ llvm::Optional<SILVTable::Entry> SILVTable::getEntry(SILModule &M,
       return (*entryIter).second;
     }
   } while ((m = m.getOverridden()));
-  return llvm::None;
+  return std::nullopt;
 }
 
 void SILVTable::removeFromVTableCache(Entry &entry) {

@@ -100,11 +100,11 @@ public:
                  SILBuilder *Builder)
       : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
 
-  static llvm::Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
-                                            SILBuilder *Builder) {
+  static std::optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
+                                           SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
-      return llvm::None;
+      return std::nullopt;
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
@@ -276,7 +276,7 @@ class SILInlineCloner
   // The original, noninlined apply site. These become invalid after fixUp,
   // which is called as the last step in SILCloner::cloneFunctionBody.
   FullApplySite Apply;
-  llvm::Optional<BeginApplySite> BeginApply;
+  std::optional<BeginApplySite> BeginApply;
 
   InstructionDeleter &deleter;
 

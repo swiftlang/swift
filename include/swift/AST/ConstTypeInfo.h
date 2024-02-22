@@ -106,7 +106,7 @@ private:
 };
 
 struct TupleElement {
-  llvm::Optional<std::string> Label;
+  std::optional<std::string> Label;
   swift::Type Type;
   std::shared_ptr<CompileTimeValue> Value;
 };
@@ -166,12 +166,12 @@ private:
 class EnumValue : public CompileTimeValue {
 public:
   EnumValue(std::string Identifier,
-            llvm::Optional<std::vector<FunctionParameter>> Parameters)
+            std::optional<std::vector<FunctionParameter>> Parameters)
       : CompileTimeValue(ValueKind::Enum), Identifier(Identifier),
         Parameters(Parameters) {}
 
   std::string getIdentifier() const { return Identifier; }
-  llvm::Optional<std::vector<FunctionParameter>> getParameters() const {
+  std::optional<std::vector<FunctionParameter>> getParameters() const {
     return Parameters;
   }
 
@@ -181,7 +181,7 @@ public:
 
 private:
   std::string Identifier;
-  llvm::Optional<std::vector<FunctionParameter>> Parameters;
+  std::optional<std::vector<FunctionParameter>> Parameters;
 };
 
 /// An type value representation
@@ -217,40 +217,38 @@ struct CustomAttrValue {
 
 /// A representation of a single associated value for an enumeration case.
 struct EnumElementParameterValue {
-  llvm::Optional<std::string> Label;
+  std::optional<std::string> Label;
   swift::Type Type;
 };
 
 /// A representation of a single enumeration case.
 struct EnumElementDeclValue {
   std::string Name;
-  llvm::Optional<std::string> RawValue;
-  llvm::Optional<std::vector<EnumElementParameterValue>> Parameters;
+  std::optional<std::string> RawValue;
+  std::optional<std::vector<EnumElementParameterValue>> Parameters;
 };
 
 using AttrValueVector = llvm::SmallVector<CustomAttrValue, 2>;
 struct ConstValueTypePropertyInfo {
   swift::VarDecl *VarDecl;
   std::shared_ptr<CompileTimeValue> Value;
-  llvm::Optional<AttrValueVector> PropertyWrappers;
+  std::optional<AttrValueVector> PropertyWrappers;
 
-  ConstValueTypePropertyInfo(
-      swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
-      llvm::Optional<AttrValueVector> PropertyWrappers)
-      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers)
-    {}
+  ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
+                             std::shared_ptr<CompileTimeValue> Value,
+                             std::optional<AttrValueVector> PropertyWrappers)
+      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers) {}
 
   ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
                              std::shared_ptr<CompileTimeValue> Value)
       : VarDecl(VarDecl), Value(Value),
-        PropertyWrappers(llvm::Optional<AttrValueVector>())
-    {}
+        PropertyWrappers(std::optional<AttrValueVector>()) {}
 };
 
 struct ConstValueTypeInfo {
   swift::NominalTypeDecl *TypeDecl;
   std::vector<ConstValueTypePropertyInfo> Properties;
-  llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements;
+  std::optional<std::vector<EnumElementDeclValue>> EnumElements;
 };
 } // namespace swift
 #endif

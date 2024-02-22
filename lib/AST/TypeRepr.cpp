@@ -857,7 +857,7 @@ void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
 
   // Consume and emit the diagnostic.
   Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
-  DelayedDiag = llvm::None;
+  DelayedDiag = std::nullopt;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

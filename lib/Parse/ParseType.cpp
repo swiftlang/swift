@@ -491,9 +491,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     MutableArrayRef<TypeRepr *> patternSubsTypes;
     if (isInSILMode()) {
       auto parseSubstitutions =
-          [&](MutableArrayRef<TypeRepr *> &subs) -> llvm::Optional<bool> {
+          [&](MutableArrayRef<TypeRepr *> &subs) -> std::optional<bool> {
         if (!consumeIf(tok::kw_for))
-          return llvm::None;
+          return std::nullopt;
 
         if (!startsWithLess(Tok)) {
           diagnose(Tok, diag::sil_function_subst_expected_l_angle);
@@ -1166,7 +1166,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // 'inout' here can be a obsoleted use of the marker in an argument list,
     // consume it in backtracking context so we can determine it's really a
     // deprecated use of it.
-    llvm::Optional<CancellableBacktrackingScope> Backtracking;
+    std::optional<CancellableBacktrackingScope> Backtracking;
     SourceLoc ObsoletedInOutLoc;
     if (Tok.is(tok::kw_inout)) {
       Backtracking.emplace(*this);

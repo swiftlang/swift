@@ -65,25 +65,25 @@ struct DocStructureArrayBuilder::Implementation {
   typedef CompactArrayBuilder<unsigned> StructureArrayBuilder;
   SmallVector<char, 256> structureArrayBuffer;
 
-  CompactArrayBuilder<unsigned,            // Offset
-                      unsigned,            // Length
-                      UIdent,              // Kind
-                      UIdent,              // AccessLevel
-                      UIdent,              // SetterAccessLevel
-                      unsigned,            // NameOffset
-                      unsigned,            // NameLength
-                      unsigned,            // BodyOffset
-                      unsigned,            // BodyLength
-                      unsigned,            // DocOffset
-                      unsigned,            // DocLength
-                      Optional<StringRef>, // DisplayName
-                      Optional<StringRef>, // TypeName
-                      Optional<StringRef>, // RuntimeName
-                      Optional<StringRef>, // SelectorName
-                      unsigned,            // InheritedTypesOffset
-                      unsigned,            // AttrsOffset
-                      unsigned,            // ElementsOffset
-                      unsigned             // ChildrenOffset
+  CompactArrayBuilder<unsigned,                 // Offset
+                      unsigned,                 // Length
+                      UIdent,                   // Kind
+                      UIdent,                   // AccessLevel
+                      UIdent,                   // SetterAccessLevel
+                      unsigned,                 // NameOffset
+                      unsigned,                 // NameLength
+                      unsigned,                 // BodyOffset
+                      unsigned,                 // BodyLength
+                      unsigned,                 // DocOffset
+                      unsigned,                 // DocLength
+                      std::optional<StringRef>, // DisplayName
+                      std::optional<StringRef>, // TypeName
+                      std::optional<StringRef>, // RuntimeName
+                      std::optional<StringRef>, // SelectorName
+                      unsigned,                 // InheritedTypesOffset
+                      unsigned,                 // AttrsOffset
+                      unsigned,                 // ElementsOffset
+                      unsigned                  // ChildrenOffset
                       >
       structureBuilder;
 
@@ -220,9 +220,9 @@ void DocStructureArrayBuilder::endSubStructure() {
     impl.topIndices.push_back(index);
   }
 
-  // Canonicalize empty strings to None for the CompactArray.
-  auto str = [](StringRef str) -> Optional<StringRef> {
-    return str.empty() ? None : Optional<StringRef>(str);
+  // Canonicalize empty strings to std::nullopt for the CompactArray.
+  auto str = [](StringRef str) -> std::optional<StringRef> {
+    return str.empty() ? std::nullopt : std::optional<StringRef>(str);
   };
 
   impl.structureBuilder.addEntry(

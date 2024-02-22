@@ -526,15 +526,15 @@ public:
     basicBlockNames[block] = name.str();
 #endif
   }
-  llvm::Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+  std::optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
 #ifndef NDEBUG
     auto Known = basicBlockNames.find(block);
     if (Known == basicBlockNames.end())
-      return llvm::None;
+      return std::nullopt;
 
     return StringRef(Known->second);
 #else
-    return llvm::None;
+    return std::nullopt;
 #endif
   }
 
@@ -791,7 +791,7 @@ public:
   /// If \p linkage is provided, the deserialized function is required to have
   /// that linkage. Returns null, if this is not the case.
   SILFunction *loadFunction(StringRef name, LinkingMode LinkMode,
-                            llvm::Optional<SILLinkage> linkage = llvm::None);
+                            std::optional<SILLinkage> linkage = std::nullopt);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.

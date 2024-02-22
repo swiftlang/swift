@@ -270,7 +270,7 @@ struct RequirementCheck {
 /// Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
-                   llvm::Optional<RequirementEnvironment> env = llvm::None)
+                   std::optional<RequirementEnvironment> env = std::nullopt)
       : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
     assert(!hasWitnessType() && "Should have witness type");
   }
@@ -278,13 +278,13 @@ struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    const DeclAttribute *attr)
       : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
-        ReqEnv(llvm::None) {
+        ReqEnv(std::nullopt) {
     assert(!hasWitnessType() && "Should have witness type");
     assert(hasUnmetAttribute() && "Should have unmet attribute");
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind, Type witnessType,
-                   llvm::Optional<RequirementEnvironment> env = llvm::None,
+                   std::optional<RequirementEnvironment> env = std::nullopt,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {},
                    GenericSignature derivativeGenSig = GenericSignature())
       : Witness(witness), Kind(kind), WitnessType(witnessType),
@@ -296,7 +296,7 @@ struct RequirementMatch {
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind, Requirement requirement,
-                   llvm::Optional<RequirementEnvironment> env = llvm::None,
+                   std::optional<RequirementEnvironment> env = std::nullopt,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {},
                    GenericSignature derivativeGenSig = GenericSignature())
       : Witness(witness), Kind(kind), WitnessType(requirement.getFirstType()),
@@ -318,13 +318,13 @@ struct RequirementMatch {
   Type WitnessType;
 
   /// Requirement not met.
-  llvm::Optional<Requirement> MissingRequirement;
+  std::optional<Requirement> MissingRequirement;
 
   /// Unmet attribute from the requirement.
   const DeclAttribute *UnmetAttribute = nullptr;
 
   /// The requirement environment to use for the witness thunk.
-  llvm::Optional<RequirementEnvironment> ReqEnv;
+  std::optional<RequirementEnvironment> ReqEnv;
 
   /// The set of optional adjustments performed on the witness.
   SmallVector<OptionalAdjustment, 2> OptionalAdjustments;
@@ -455,9 +455,10 @@ struct RequirementMatch {
   }
 
   swift::Witness getWitness(ASTContext &ctx) const {
-    return swift::Witness(
-      this->Witness, WitnessSubstitutions, ReqEnv->getWitnessThunkSignature(),
-      ReqEnv->getRequirementToWitnessThunkSubs(), DerivativeGenSig, llvm::None);
+    return swift::Witness(this->Witness, WitnessSubstitutions,
+                          ReqEnv->getWitnessThunkSignature(),
+                          ReqEnv->getRequirementToWitnessThunkSubs(),
+                          DerivativeGenSig, std::nullopt);
   }
 };
 

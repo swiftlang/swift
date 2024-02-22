@@ -93,7 +93,7 @@ class TBDGenVisitor : public IRSymbolVisitor {
   llvm::StringSet<> DuplicateSymbolChecker;
 #endif
 
-  llvm::Optional<llvm::DataLayout> DataLayout = llvm::None;
+  std::optional<llvm::DataLayout> DataLayout = std::nullopt;
   const StringRef DataLayoutDescription;
 
   UniversalLinkageInfo UniversalLinkInfo;

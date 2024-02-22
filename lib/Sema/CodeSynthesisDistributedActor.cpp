@@ -671,7 +671,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 /// \param DC The declaration context of the newly created function
 static FuncDecl *
 createSameSignatureFunctionDecl(DeclContext *DC, FuncDecl *func,
-                                llvm::Optional<DeclName> nameOverride,
+                                std::optional<DeclName> nameOverride,
                                 bool forceAsync, bool forceThrows) {
   auto &C = func->getASTContext();
 

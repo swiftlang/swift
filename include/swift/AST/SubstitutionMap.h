@@ -24,7 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace llvm {
   class FoldingSetNodeID;
@@ -185,13 +185,13 @@ public:
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(SubstitutionMap subMap,
-                        SubstOptions options = llvm::None) const;
+                        SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances,
-                        SubstOptions options = llvm::None) const;
+                        SubstOptions options = std::nullopt) const;
 
   /// Apply an in-flight substitution to all replacement types in the map.
   /// Does not change keys.

@@ -22,7 +22,7 @@
 
 using namespace swift;
 
-llvm::Optional<ObjCInterfaceAndImplementation>
+std::optional<ObjCInterfaceAndImplementation>
 ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   auto passedDecl = std::get<0>(getStorage());
   if (!passedDecl)
@@ -61,7 +61,7 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   }
 
   // Nothing in the caches, so we must need to compute this.
-  return llvm::None;
+  return std::nullopt;
 }
 
 void ObjCInterfaceAndImplementationRequest::

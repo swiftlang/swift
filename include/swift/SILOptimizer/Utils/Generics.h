@@ -427,13 +427,13 @@ bool isKnownPrespecialization(StringRef SpecName);
 
 class TypeReplacements {
 private:
-  llvm::Optional<SILType> resultType;
+  std::optional<SILType> resultType;
   llvm::MapVector<unsigned, CanType> indirectResultTypes;
   llvm::MapVector<unsigned, CanType> paramTypeReplacements;
   llvm::MapVector<unsigned, CanType> yieldTypeReplacements;
 
 public:
-  llvm::Optional<SILType> getResultType() const { return resultType; }
+  std::optional<SILType> getResultType() const { return resultType; }
 
   void setResultType(SILType type) { resultType = type; }
 

@@ -220,22 +220,22 @@ public:
 /// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
-  llvm::Optional<ZeroArgDiagnostic> DelayedDiag;
+  std::optional<ZeroArgDiagnostic> DelayedDiag;
 
-  ErrorTypeRepr(SourceRange Range, llvm::Optional<ZeroArgDiagnostic> Diag)
+  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
       : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
 
 public:
   static ErrorTypeRepr *
   create(ASTContext &Context, SourceRange Range,
-         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
     assert((!DelayedDiag || Range) && "diagnostic needs a location");
     return new (Context) ErrorTypeRepr(Range, DelayedDiag);
   }
 
   static ErrorTypeRepr *
   create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
-         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
     return create(Context, SourceRange(Loc), DelayedDiag);
   }
 

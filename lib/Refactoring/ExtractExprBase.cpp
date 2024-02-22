@@ -295,7 +295,7 @@ bool RefactoringActionExtractExprBase::performChange() {
                             /*StartColumn=*/StartOffset + 1,
                             /*EndLine=*/1,
                             /*EndColumn=*/EndOffset + 1,
-                            /*ArgIndex*/ llvm::None};
+                            /*ArgIndex*/ std::nullopt};
 
   // Perform code change.
   EditConsumer.accept(SM, InsertLoc, DeclBuffer.str(), {DeclNameRegion});
@@ -308,7 +308,7 @@ bool RefactoringActionExtractExprBase::performChange() {
         {{RefactoringRangeKind::BaseName,
           /*StartLine=*/1, /*StartColumn-*/ 1, /*EndLine=*/1,
           /*EndColumn=*/static_cast<unsigned int>(PreferredName.size() + 1),
-          /*ArgIndex*/ llvm::None}});
+          /*ArgIndex*/ std::nullopt}});
   }
   return false;
 }

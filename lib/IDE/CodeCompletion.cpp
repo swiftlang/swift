@@ -132,15 +132,15 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool HasSpace = false;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
-  llvm::Optional<DeclKind> AttTargetDK;
-  llvm::Optional<StmtKind> ParentStmtKind;
+  std::optional<DeclKind> AttTargetDK;
+  std::optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
   SourceLoc introducerLoc;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
 
-  llvm::Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
+  std::optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
     // Figure out the kind of type-check we'll be performing.
@@ -169,7 +169,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
 
       return std::make_pair(*T, ReferencedDecl);
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// \returns true on success, false on failure.
@@ -236,7 +236,7 @@ public:
       : CodeCompletionCallbacks(P), DoneParsingCallback(),
         CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-  void setAttrTargetDeclKind(llvm::Optional<DeclKind> DK) override {
+  void setAttrTargetDeclKind(std::optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
     else if (DK == DeclKind::Param)
@@ -292,9 +292,9 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
-                         llvm::Optional<unsigned> yieldIndex) override;
+                         std::optional<unsigned> yieldIndex) override;
   void completeAfterPoundExpr(CodeCompletionExpr *E,
-                              llvm::Optional<StmtKind> ParentKind) override;
+                              std::optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
   void completePlatformCondition() override;
   void completeGenericRequirement() override;
@@ -564,7 +564,7 @@ void CodeCompletionCallbacksImpl::completeThenStmt(CodeCompletionExpr *E) {
 }
 
 void CodeCompletionCallbacksImpl::completeYieldStmt(
-    CodeCompletionExpr *E, llvm::Optional<unsigned> index) {
+    CodeCompletionExpr *E, std::optional<unsigned> index) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   // TODO: use a different completion kind when completing without an index
@@ -573,7 +573,7 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(
 }
 
 void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
-    CodeCompletionExpr *E, llvm::Optional<StmtKind> ParentKind) {
+    CodeCompletionExpr *E, std::optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::AfterPoundExpr;
@@ -676,7 +676,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
                             bool IsConcurrencyEnabled) {
   auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
-                                 llvm::Optional<DeclAttrKind> DAK) -> bool {
+                                 std::optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
     case CodeCompletionKeywordKind::kw_protocol:
     case CodeCompletionKeywordKind::kw_class:
@@ -691,7 +691,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
   };
   auto isTopLevelOnlyDeclIntroducer =
       [](CodeCompletionKeywordKind Kind,
-         llvm::Optional<DeclAttrKind> DAK) -> bool {
+         std::optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
     case CodeCompletionKeywordKind::kw_operator:
     case CodeCompletionKeywordKind::kw_precedencegroup:
@@ -705,7 +705,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
   };
 
   auto getFlair = [&](CodeCompletionKeywordKind Kind,
-                      llvm::Optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
+                      std::optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
     if (isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
       // Type decls are common in library file top-level.
       if (isTypeDeclIntroducer(Kind, DAK))
@@ -770,11 +770,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
         }
       }
     }
-    return llvm::None;
+    return std::nullopt;
   };
 
   auto AddDeclKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
-                            llvm::Optional<DeclAttrKind> DAK) {
+                            std::optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
       // Treat keywords that could be the start of a pattern specially.
       return;
@@ -795,16 +795,16 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 
     // Special case for 'actor'. Get the same flair with 'kw_class'.
     if (Kind == CodeCompletionKeywordKind::None && Name == "actor")
-      flair = getFlair(CodeCompletionKeywordKind::kw_class, llvm::None);
+      flair = getFlair(CodeCompletionKeywordKind::kw_class, std::nullopt);
 
     addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"", flair);
   };
 
 #define DECL_KEYWORD(kw)                                                       \
-  AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, llvm::None);
+  AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, std::nullopt);
 #include "swift/AST/TokenKinds.def"
   // Manually add "actor" because it's a contextual keyword.
-  AddDeclKeyword("actor", CodeCompletionKeywordKind::None, llvm::None);
+  AddDeclKeyword("actor", CodeCompletionKeywordKind::None, std::nullopt);
 
   // Context-sensitive keywords.
   auto AddCSKeyword = [&](StringRef Name, DeclAttrKind Kind) {
@@ -1678,7 +1678,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-  llvm::Optional<Type> ExprType;
+  std::optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
   if (ParsedExpr) {
     if (auto *checkedExpr = findParsedExpr(CurDeclContext,

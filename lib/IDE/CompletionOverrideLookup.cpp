@@ -457,7 +457,7 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   {
     llvm::raw_string_ostream out(declStringWithoutFunc);
     printResultBuilderBuildFunction(builder, componentType, function,
-                                    llvm::None, out);
+                                    std::nullopt, out);
   }
   Builder.addTextChunk(declStringWithoutFunc);
   Builder.addBraceStmtWithCursor();

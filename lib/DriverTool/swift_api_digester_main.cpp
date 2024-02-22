@@ -136,8 +136,8 @@ class BestMatchMatcher : public NodeMatcher {
     return MatchedRight.count(R) == 0 && CanMatch(L, R);
   }
 
-  llvm::Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
-    llvm::Optional<NodePtr> Best;
+  std::optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
+    std::optional<NodePtr> Best;
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
         continue;
@@ -221,10 +221,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     N->getUsr().startswith("c:@E@");
   }
 
-  static llvm::Optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
+  static std::optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
     auto LastPartIndex = N->getUsr().find_last_of('@');
     if (LastPartIndex == StringRef::npos)
-      return llvm::None;
+      return std::nullopt;
     return N->getUsr().substr(LastPartIndex + 1);
   }
 
@@ -419,9 +419,9 @@ class SameNameNodeMatcher : public NodeMatcher {
   }
 
   // Given two SDK nodes, figure out the reason for why they have the same name.
-  llvm::Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
+  std::optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
-      return llvm::None;
+      return std::nullopt;
     auto NameEqual = L->getPrintedName() == R->getPrintedName();
     auto UsrEqual = isUSRSame(L, R);
     if (NameEqual && UsrEqual)
@@ -431,7 +431,7 @@ class SameNameNodeMatcher : public NodeMatcher {
     else if (UsrEqual)
       return NameMatchKind::USR;
     else
-      return llvm::None;
+      return std::nullopt;
   }
 
   struct NameMatchCandidate {
@@ -1799,7 +1799,7 @@ public:
   }
 };
 
-static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
+static std::optional<uint8_t> findSelfIndex(SDKNode *Node) {
   if (auto func = dyn_cast<SDKNodeDeclAbstractFunc>(Node)) {
     return func->getSelfIndexOptional();
   } else if (auto vd = dyn_cast<SDKNodeDeclVar>(Node)) {
@@ -1810,7 +1810,7 @@ static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
       }
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Find cases where a diff is due to a change to being a type member
@@ -1834,7 +1834,7 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
             : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(),
         findSelfIndex(right),
-        llvm::None,
+        std::nullopt,
         leftParent->getKind() == SDKNodeKind::Root
             ? StringRef()
             : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),

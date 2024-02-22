@@ -51,9 +51,9 @@ struct InferredAvailability {
   PlatformAgnosticAvailabilityKind PlatformAgnostic
     = PlatformAgnosticAvailabilityKind::None;
 
-  llvm::Optional<llvm::VersionTuple> Introduced;
-  llvm::Optional<llvm::VersionTuple> Deprecated;
-  llvm::Optional<llvm::VersionTuple> Obsoleted;
+  std::optional<llvm::VersionTuple> Introduced;
+  std::optional<llvm::VersionTuple> Deprecated;
+  std::optional<llvm::VersionTuple> Obsoleted;
   bool IsSPI = false;
 };
 
@@ -66,8 +66,8 @@ typedef const llvm::VersionTuple &(*MergeFunction)(
 /// Apply a merge function to two optional versions, returning the result
 /// in Inferred.
 static bool
-mergeIntoInferredVersion(const llvm::Optional<llvm::VersionTuple> &Version,
-                         llvm::Optional<llvm::VersionTuple> &Inferred,
+mergeIntoInferredVersion(const std::optional<llvm::VersionTuple> &Version,
+                         std::optional<llvm::VersionTuple> &Inferred,
                          MergeFunction Merge) {
   if (Version.has_value()) {
     if (Inferred.has_value()) {
@@ -266,7 +266,7 @@ AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
   return bestAvailAttr;
 }
 
-llvm::Optional<AvailableAttrDeclPair>
+std::optional<AvailableAttrDeclPair>
 SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
                                             const Decl *decl) const {
   if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(
@@ -277,21 +277,21 @@ SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
           AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticAvailableRangeAttr();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<AvailableAttrDeclPair>
+std::optional<AvailableAttrDeclPair>
 Decl::getSemanticAvailableRangeAttr() const {
   auto &eval = getASTContext().evaluator;
   return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this},
-                           llvm::None);
+                           std::nullopt);
 }
 
-llvm::Optional<AvailabilityContext>
+std::optional<AvailabilityContext>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   auto bestAvailAttr = attrForAnnotatedAvailableRange(D, Ctx);
   if (!bestAvailAttr)
-    return llvm::None;
+    return std::nullopt;
 
   return availableRange(bestAvailAttr, Ctx);
 }
@@ -301,7 +301,7 @@ bool Decl::isAvailableAsSPI() const {
     .isAvailableAsSPI();
 }
 
-llvm::Optional<AvailableAttrDeclPair>
+std::optional<AvailableAttrDeclPair>
 SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
                                          bool ignoreAppExtensions) const {
   // Directly marked unavailable.
@@ -313,15 +313,15 @@ SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
           AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticUnavailableAttr(ignoreAppExtensions);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<AvailableAttrDeclPair>
+std::optional<AvailableAttrDeclPair>
 Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
   auto &eval = getASTContext().evaluator;
   return evaluateOrDefault(
       eval, SemanticUnavailableAttrRequest{this, ignoreAppExtensions},
-      llvm::None);
+      std::nullopt);
 }
 
 static bool shouldStubOrSkipUnavailableDecl(const Decl *D) {
@@ -407,7 +407,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
 
 AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
                                                           ASTContext &Ctx) {
-  llvm::Optional<AvailabilityContext> AnnotatedRange =
+  std::optional<AvailabilityContext> AnnotatedRange =
       annotatedAvailableRange(D, Ctx);
   if (AnnotatedRange.has_value()) {
     return AnnotatedRange.value();

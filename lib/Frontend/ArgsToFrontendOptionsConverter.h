@@ -29,7 +29,7 @@ private:
   const llvm::opt::ArgList &Args;
   FrontendOptions &Opts;
 
-  llvm::Optional<std::vector<std::string>>
+  std::optional<std::vector<std::string>>
       cachedOutputFilenamesFromCommandLineOrFilelist;
 
   void handleDebugCrashGroupArguments();

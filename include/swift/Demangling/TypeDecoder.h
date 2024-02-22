@@ -32,10 +32,9 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringSwitch.h"
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -133,7 +132,7 @@ public:
   using ConventionType = ImplParameterConvention;
   using OptionsType = ImplParameterInfoOptions;
 
-  static llvm::Optional<ConventionType>
+  static std::optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
@@ -158,10 +157,10 @@ public:
     if (conventionString == "@pack_inout")
       return ConventionType::Pack_Inout;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
-  static llvm::Optional<OptionsType>
+  static std::optional<OptionsType>
   getDifferentiabilityFromString(StringRef string) {
     OptionsType result;
 
@@ -213,7 +212,7 @@ public:
   using ConventionType = ImplResultConvention;
   using OptionsType = ImplResultInfoOptions;
 
-  static llvm::Optional<ConventionType>
+  static std::optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@out")
       return ConventionType::Indirect;
@@ -228,10 +227,10 @@ public:
     if (conventionString == "@pack_out")
       return ConventionType::Pack;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
-  static llvm::Optional<OptionsType>
+  static std::optional<OptionsType>
   getDifferentiabilityFromString(StringRef string) {
     OptionsType result;
 
@@ -397,25 +396,25 @@ public:
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
-static inline llvm::Optional<StringRef>
+static inline std::optional<StringRef>
 getObjCClassOrProtocolName(NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
-    return llvm::None;
+    return std::nullopt;
 
   if (node->getNumChildren() != 2)
-    return llvm::None;
+    return std::nullopt;
 
   // Check whether we have the __ObjC module.
   auto moduleNode = node->getChild(0);
   if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
       moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return llvm::None;
+    return std::nullopt;
 
   // Check whether we have an identifier.
   auto nameNode = node->getChild(1);
   if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return llvm::None;
+    return std::nullopt;
 
   return nameNode->getText();
 }
@@ -470,7 +469,7 @@ void decodeRequirement(NodePointer node,
         return;
 
       auto kind =
-          llvm::StringSwitch<llvm::Optional<LayoutConstraintKind>>(
+          llvm::StringSwitch<std::optional<LayoutConstraintKind>>(
               kindChild->getText())
               .Case("U", LayoutConstraintKind::UnknownLayout)
               .Case("R", LayoutConstraintKind::RefCountedObject)
@@ -482,7 +481,7 @@ void decodeRequirement(NodePointer node,
               .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
               .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
               .Case("S", LayoutConstraintKind::TrivialStride)
-              .Default(llvm::None);
+              .Default(std::nullopt);
 
       if (!kind)
         return;
@@ -689,7 +688,7 @@ protected:
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      llvm::Optional<ImplMetatypeRepresentation> repr;
+      std::optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
@@ -1079,7 +1078,7 @@ protected:
         }
       }
 
-      llvm::Optional<ImplFunctionResult<BuiltType>> errorResult;
+      std::optional<ImplFunctionResult<BuiltType>> errorResult;
       switch (errorResults.size()) {
       case 0:
         break;
@@ -1464,8 +1463,8 @@ protected:
   }
 
 private:
-  template<typename Fn>
-  llvm::Optional<TypeLookupError>
+  template <typename Fn>
+  std::optional<TypeLookupError>
   decodeTypeSequenceElement(Demangle::NodePointer node, unsigned depth,
                             Fn resultCallback) {
     if (node->getKind() == NodeKind::Type)
@@ -1513,7 +1512,7 @@ private:
       resultCallback(elementType.getType());
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   template <typename T>
@@ -1530,7 +1529,7 @@ private:
       return true;
 
     StringRef conventionString = node->getChild(0)->getText();
-    llvm::Optional<typename T::ConventionType> convention =
+    std::optional<typename T::ConventionType> convention =
         T::getConventionFromString(conventionString);
     if (!convention)
       return true;
@@ -1584,7 +1583,7 @@ private:
     return false;
   }
 
-  llvm::Optional<TypeLookupError>
+  std::optional<TypeLookupError>
   decodeGenericArgs(Demangle::NodePointer node, unsigned depth,
                     llvm::SmallVectorImpl<BuiltType> &args) {
     if (node->getKind() != NodeKind::TypeList)
@@ -1597,10 +1596,10 @@ private:
         return *paramType.getError();
       args.push_back(paramType.getType());
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<TypeLookupError>
+  std::optional<TypeLookupError>
   decodeMangledTypeDecl(Demangle::NodePointer node, unsigned depth,
                         BuiltTypeDecl &typeDecl, BuiltType &parent,
                         bool &typeAlias) {
@@ -1657,7 +1656,7 @@ private:
     if (!typeDecl)
       return TypeLookupError("Failed to create type decl");
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   BuiltProtocolDecl decodeMangledProtocolType(Demangle::NodePointer node,
@@ -1681,12 +1680,12 @@ private:
     return Builder.createProtocolDecl(node);
   }
 
-  llvm::Optional<TypeLookupError> decodeMangledFunctionInputType(
+  std::optional<TypeLookupError> decodeMangledFunctionInputType(
       Demangle::NodePointer node, unsigned depth,
       llvm::SmallVectorImpl<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     if (depth > TypeDecoder::MaxDepth)
-      return llvm::None;
+      return std::nullopt;
 
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||
@@ -1697,7 +1696,7 @@ private:
 
     auto decodeParamTypeAndFlags =
         [&](Demangle::NodePointer typeNode,
-            FunctionParam<BuiltType> &param) -> llvm::Optional<TypeLookupError> {
+            FunctionParam<BuiltType> &param) -> std::optional<TypeLookupError> {
       Demangle::NodePointer node = typeNode;
 
       bool recurse = true;
@@ -1760,9 +1759,9 @@ private:
     };
 
     auto decodeParam =
-        [&](NodePointer paramNode) -> llvm::Optional<TypeLookupError> {
+        [&](NodePointer paramNode) -> std::optional<TypeLookupError> {
       if (paramNode->getKind() != NodeKind::TupleElement)
-        return llvm::None;
+        return std::nullopt;
 
       FunctionParam<BuiltType> param;
       for (const auto &child : *paramNode) {
@@ -1789,7 +1788,7 @@ private:
         }
       }
 
-      return llvm::None;
+      return std::nullopt;
     };
 
     // Expand a single level of tuple.
@@ -1801,7 +1800,7 @@ private:
           return *optError;
       }
 
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Otherwise, handle the type as a single argument.
@@ -1810,7 +1809,7 @@ private:
     if (optError)
       return *optError;
 
-    return llvm::None;
+    return std::nullopt;
   }
 };
 

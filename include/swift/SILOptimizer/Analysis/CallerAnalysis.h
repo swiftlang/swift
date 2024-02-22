@@ -210,9 +210,9 @@ struct CallerAnalysis::CallerInfo {
   /// indirectly. That is a separate query that is type system specific.
   bool isDirectCallerSetComplete : 1;
 
-  llvm::Optional<unsigned> getNumPartiallyAppliedArguments() const {
+  std::optional<unsigned> getNumPartiallyAppliedArguments() const {
     if (!hasPartiallyAppliedArguments) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     auto *x = reinterpret_cast<const uint16_t *>(numPartiallyAppliedArguments);

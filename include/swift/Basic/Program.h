@@ -14,11 +14,10 @@
 #define SWIFT_BASIC_PROGRAM_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/Program.h"
+#include <optional>
 
 namespace swift {
 
@@ -61,7 +60,7 @@ struct ChildProcessInfo {
 /// environment.
 llvm::ErrorOr<swift::ChildProcessInfo> ExecuteWithPipe(
     llvm::StringRef program, llvm::ArrayRef<llvm::StringRef> args,
-    llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env = llvm::None);
+    std::optional<llvm::ArrayRef<llvm::StringRef>> env = std::nullopt);
 
 } // end namespace swift
 

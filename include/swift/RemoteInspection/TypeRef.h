@@ -211,7 +211,7 @@ public:
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
 
   /// Build the mangled name from this TypeRef.
-  llvm::Optional<std::string> mangle(Demangle::Demangler &Dem) const;
+  std::optional<std::string> mangle(Demangle::Demangler &Dem) const;
 
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
@@ -223,7 +223,7 @@ public:
                        const GenericArgumentMap &Subs,
                        bool &DidSubstitute) const;
 
-  llvm::Optional<GenericArgumentMap> getSubstMap() const;
+  std::optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
 

@@ -18,7 +18,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
-#include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -375,8 +374,8 @@ void Projection::getFirstLevelProjections(
 //                            Projection Path
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
-                                                                 SILValue End) {
+std::optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
+                                                                SILValue End) {
   ProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
@@ -388,7 +387,7 @@ llvm::Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // and unions. This is currently only associated with structs.
   if (Start->getType().aggregateHasUnreferenceableStorage() ||
       End->getType().aggregateHasUnreferenceableStorage())
-    return llvm::None;
+    return std::nullopt;
 
   auto Iter = End;
   while (Start != Iter) {
@@ -426,7 +425,7 @@ llvm::Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // ProjectionPath never allow paths to be compared as a list of indices.
   // Only the encoded type+index pair will be compared.
   if (P.empty() || Start != Iter)
-    return llvm::None;
+    return std::nullopt;
 
   // Reverse to get a path from base to most-derived.
   std::reverse(P.Path.begin(), P.Path.end());
@@ -556,12 +555,12 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
 }
 
-llvm::Optional<ProjectionPath>
+std::optional<ProjectionPath>
 ProjectionPath::removePrefix(const ProjectionPath &Path,
                              const ProjectionPath &Prefix) {
   // We can only subtract paths that have the same base.
   if (Path.BaseType != Prefix.BaseType)
-    return llvm::None;
+    return std::nullopt;
 
   // If Prefix is greater than or equal to Path in size, Prefix can not be a
   // prefix of Path. Return None.
@@ -569,10 +568,10 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   unsigned PathSize = Path.size();
 
   if (PrefixSize >= PathSize)
-    return llvm::None;
+    return std::nullopt;
 
   // First make sure that the prefix matches.
-  llvm::Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
+  std::optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
   for (unsigned i = 0; i < PrefixSize; ++i) {
     if (Path.Path[i] != Prefix.Path[i]) {
       P.reset();

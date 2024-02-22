@@ -48,7 +48,7 @@ class Term;
 struct SuperclassRequirement {
   /// The most specific superclass constraint (in type difference order) for
   /// this level in the class hierarchy.
-  llvm::Optional<Symbol> SuperclassType;
+  std::optional<Symbol> SuperclassType;
 
   /// Superclass rules that apply to this key.
   llvm::SmallVector<std::pair<Symbol, unsigned>, 1> SuperclassRules;
@@ -72,7 +72,7 @@ class PropertyBag {
   LayoutConstraint Layout;
 
   /// The corresponding layout rule for the above.
-  llvm::Optional<unsigned> LayoutRule;
+  std::optional<unsigned> LayoutRule;
 
   /// The most specific superclass declaration for which this type has a
   /// superclass constraint.
@@ -84,7 +84,7 @@ class PropertyBag {
   llvm::SmallDenseMap<const ClassDecl *, SuperclassRequirement, 2> Superclasses;
 
   /// The most specific concrete type constraint this type satisfies.
-  llvm::Optional<Symbol> ConcreteType;
+  std::optional<Symbol> ConcreteType;
 
   /// Concrete type rules that apply to this key.
   llvm::SmallVector<std::pair<Symbol, unsigned>, 1> ConcreteTypeRules;
@@ -254,7 +254,7 @@ private:
                           Symbol rhsProperty, unsigned rhsRuleID);
 
   void unifyConcreteTypes(
-      Term key, llvm::Optional<Symbol> &bestProperty,
+      Term key, std::optional<Symbol> &bestProperty,
       llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
       Symbol property, unsigned ruleID);
 

@@ -130,8 +130,8 @@ public:
   /// \returns the isolation that needs to be enforced to invoke the witness
   /// from the requirement, used when entering an actor-isolated synchronous
   /// witness from an asynchronous requirement.
-  llvm::Optional<ActorIsolation> checkActorIsolation(ValueDecl *requirement,
-                                                     ValueDecl *witness);
+  std::optional<ActorIsolation> checkActorIsolation(ValueDecl *requirement,
+                                                    ValueDecl *witness);
 
   /// Enforce restrictions on non-final classes witnessing requirements
   /// involving the protocol 'Self' type.
@@ -176,9 +176,9 @@ public:
 RequirementMatch matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
         setup,
-    llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize);
 

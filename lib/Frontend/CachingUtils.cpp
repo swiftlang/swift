@@ -142,7 +142,7 @@ bool replayCachedCompilerOutputs(
     ObjectProxy Proxy;
   };
   SmallVector<OutputEntry> OutputProxies;
-  Optional<OutputEntry> DiagnosticsOutput;
+  std::optional<OutputEntry> DiagnosticsOutput;
 
   auto replayOutputsForInputFile = [&](const std::string &InputPath,
                                        unsigned InputIndex,

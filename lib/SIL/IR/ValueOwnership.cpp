@@ -240,9 +240,9 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     return OwnershipKind::None;
 
   auto mergedValue = ValueOwnershipKind::merge(makeOptionalTransformRange(
-      ops, [&i](const Operand &op) -> llvm::Optional<ValueOwnershipKind> {
+      ops, [&i](const Operand &op) -> std::optional<ValueOwnershipKind> {
         if (i->isTypeDependentOperand(op))
-          return llvm::None;
+          return std::nullopt;
         return op.get()->getOwnershipKind();
       }));
 

@@ -26,7 +26,7 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *FragmentStorageTy,
-                             llvm::Optional<Size::int_type> SizeInBits,
+                             std::optional<Size::int_type> SizeInBits,
                              Alignment Align, bool HasDefaultAlignment,
                              bool IsMetadata, bool SizeIsFragmentSize,
                              bool IsFixedBuffer,
@@ -52,7 +52,7 @@ static bool hasDefaultAlignment(swift::Type Ty) {
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
                                              IRGenModule &IGM,
                                              bool IsFragmentTypeInfo) {
-  llvm::Optional<Size::int_type> SizeInBits;
+  std::optional<Size::int_type> SizeInBits;
   llvm::Type *StorageType = TI.getStorageType();
   std::optional<uint32_t> NumExtraInhabitants;
   if (StorageType->isSized())

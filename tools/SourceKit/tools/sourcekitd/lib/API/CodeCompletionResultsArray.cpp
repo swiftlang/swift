@@ -22,18 +22,11 @@ using namespace SourceKit;
 using namespace sourcekitd;
 
 struct CodeCompletionResultsArrayBuilder::Implementation {
-  CompactArrayBuilder<UIdent,
-                      StringRef,
-                      StringRef,
-                      StringRef,
-                      StringRef,
-                      Optional<StringRef>,
-                      Optional<StringRef>,
-                      Optional<StringRef>,
-                      UIdent,
-                      UIdent,
-                      uint8_t,
-                      uint8_t> Builder;
+  CompactArrayBuilder<UIdent, StringRef, StringRef, StringRef, StringRef,
+                      std::optional<StringRef>, std::optional<StringRef>,
+                      std::optional<StringRef>, UIdent, UIdent, uint8_t,
+                      uint8_t>
+      Builder;
 };
 
 CodeCompletionResultsArrayBuilder::CodeCompletionResultsArrayBuilder()
@@ -46,19 +39,11 @@ CodeCompletionResultsArrayBuilder::~CodeCompletionResultsArrayBuilder() {
 }
 
 void CodeCompletionResultsArrayBuilder::add(
-    UIdent Kind,
-    StringRef Name,
-    StringRef Description,
-    StringRef SourceText,
-    StringRef TypeName,
-    Optional<StringRef> ModuleName,
-    Optional<StringRef> DocBrief,
-    Optional<StringRef> AssocUSRs,
-    UIdent SemanticContext,
-    UIdent TypeRelation,
-    bool NotRecommended,
-    bool IsSystem,
-    unsigned NumBytesToErase) {
+    UIdent Kind, StringRef Name, StringRef Description, StringRef SourceText,
+    StringRef TypeName, std::optional<StringRef> ModuleName,
+    std::optional<StringRef> DocBrief, std::optional<StringRef> AssocUSRs,
+    UIdent SemanticContext, UIdent TypeRelation, bool NotRecommended,
+    bool IsSystem, unsigned NumBytesToErase) {
 
   uint8_t Flags = 0;
   Flags |= NotRecommended << 1;

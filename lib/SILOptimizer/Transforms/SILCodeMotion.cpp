@@ -26,11 +26,11 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <optional>
 
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
@@ -1065,7 +1065,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 /// to the successor instead of the whole instruction.
 /// Return None if no such operand could be found, otherwise return the index
 /// of a suitable operand.
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
   // This will further enable to sink strong_retain_unowned instructions,
@@ -1082,33 +1082,33 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   auto *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
-    return llvm::None;
+    return std::nullopt;
 
   assert(FirstStruct->getNumOperands() == SecondStruct->getNumOperands() &&
          FirstStruct->getType() == SecondStruct->getType() &&
          "Types should be identical");
 
-  llvm::Optional<unsigned> DifferentOperandIndex;
+  std::optional<unsigned> DifferentOperandIndex;
 
   // Check operands.
   for (unsigned i = 0, e = First->getNumOperands(); i != e; ++i) {
     if (FirstStruct->getOperand(i) != SecondStruct->getOperand(i)) {
       // Only track one different operand for now
       if (DifferentOperandIndex)
-        return llvm::None;
+        return std::nullopt;
       DifferentOperandIndex = i;
     }
   }
 
   if (!DifferentOperandIndex)
-    return llvm::None;
+    return std::nullopt;
 
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
   SILType ArgTy = FirstStruct->getOperand(*DifferentOperandIndex)->getType();
   if (!ArgTy.is<BuiltinIntegerType>())
-    return llvm::None;
+    return std::nullopt;
 
   return *DifferentOperandIndex;
 }
@@ -1192,7 +1192,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
 
   // If the instructions are different, but only in terms of a cheap operand
   // then we can still sink it, and create new arguments for this operand.
-  llvm::Optional<unsigned> DifferentOperandIndex;
+  std::optional<unsigned> DifferentOperandIndex;
 
   // Check if the Nth argument in all predecessors is identical.
   for (auto P : BB->getPredecessorBlocks()) {

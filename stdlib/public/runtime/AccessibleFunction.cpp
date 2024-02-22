@@ -251,7 +251,7 @@ _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
 
 static const AccessibleProtocolRequirementFunctionRecord *
 _searchForProtocolRequirementFunctionRecord(
-    AccessibleFunctionsState &S, llvm::Optional<llvm::StringRef> actorTypeName,
+    AccessibleFunctionsState &S, std::optional<llvm::StringRef> actorTypeName,
     llvm::StringRef targetFuncName) {
   auto traceState = runtime::trace::accessible_protocol_requirement_function_scan_begin(
       targetFuncName);

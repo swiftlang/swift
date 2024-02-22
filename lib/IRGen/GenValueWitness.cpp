@@ -1000,12 +1000,12 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
-static void
-addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
-                FixedPacking packing, CanType abstractType,
-                SILType concreteType, const TypeInfo &concreteTI,
-                const llvm::Optional<BoundGenericTypeCharacteristics>
-                    boundGenericCharacteristics = llvm::None) {
+static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
+                            ValueWitness index, FixedPacking packing,
+                            CanType abstractType, SILType concreteType,
+                            const TypeInfo &concreteTI,
+                            const std::optional<BoundGenericTypeCharacteristics>
+                                boundGenericCharacteristics = std::nullopt) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
@@ -1293,8 +1293,8 @@ static void
 addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
                   FixedPacking packing, CanType abstractType,
                   SILType concreteType, const TypeInfo &concreteTI,
-                  const llvm::Optional<BoundGenericTypeCharacteristics>
-                      boundGenericCharacteristics = llvm::None) {
+                  const std::optional<BoundGenericTypeCharacteristics>
+                      boundGenericCharacteristics = std::nullopt) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
                     concreteType, concreteTI, boundGenericCharacteristics);
@@ -1321,7 +1321,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              ConstantStructBuilder &B,
                                              CanType abstractType,
                                              bool &canBeConstant) {
-  llvm::Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
+  std::optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
   if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
     CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 

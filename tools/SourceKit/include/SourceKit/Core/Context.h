@@ -16,12 +16,12 @@
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/Concurrency.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Mutex.h"
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -50,9 +50,8 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings
-  update(llvm::Optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-         llvm::Optional<unsigned> IDEInspectionCheckDependencyInterval);
+  Settings update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+                  std::optional<unsigned> IDEInspectionCheckDependencyInterval);
   Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 

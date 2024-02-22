@@ -418,11 +418,11 @@ static FunctionTest SSAUseLivenessTest("ssa_use_liveness", [](auto &function,
       Ending,
       NonEnding,
     };
-    auto kind = llvm::StringSwitch<llvm::Optional<Kind>>(kindString)
+    auto kind = llvm::StringSwitch<std::optional<Kind>>(kindString)
                     .Case("non-use", Kind::NonUse)
                     .Case("ending", Kind::Ending)
                     .Case("non-ending", Kind::NonEnding)
-                    .Default(llvm::None);
+                    .Default(std::nullopt);
     if (!kind.has_value()) {
       llvm::errs() << "Unknown kind: " << kindString << "\n";
       llvm::report_fatal_error("Bad user kind.  Value must be one of "

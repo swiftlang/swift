@@ -128,17 +128,17 @@ ArrayRef<AnyFunctionType::Param> AsyncHandlerDesc::getSuccessParams() const {
   return params();
 }
 
-llvm::Optional<AnyFunctionType::Param> AsyncHandlerDesc::getErrorParam() const {
+std::optional<AnyFunctionType::Param> AsyncHandlerDesc::getErrorParam() const {
   if (HasError && Type == HandlerType::PARAMS)
     return params().back();
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<swift::Type> AsyncHandlerDesc::getErrorType() const {
+std::optional<swift::Type> AsyncHandlerDesc::getErrorType() const {
   if (HasError) {
     switch (Type) {
     case HandlerType::INVALID:
-      return llvm::None;
+      return std::nullopt;
     case HandlerType::PARAMS:
       // The last parameter of the completion handler is the error param
       return params().back().getPlainType()->lookThroughSingleOptionalType();
@@ -155,7 +155,7 @@ llvm::Optional<swift::Type> AsyncHandlerDesc::getErrorType() const {
       return GenericArgs.back();
     }
   } else {
-    return llvm::None;
+    return std::nullopt;
   }
 }
 

@@ -515,7 +515,7 @@ public:
   }
 
   /// Determine the impact of this fix on the solution score, if any.
-  llvm::Optional<ScoreKind> impact() const;
+  std::optional<ScoreKind> impact() const;
 
   virtual std::string getName() const = 0;
 
@@ -1651,11 +1651,11 @@ class AllowTupleTypeMismatch final : public ContextualMismatch {
   /// If this is an element mismatch, \c Index is the element index where the
   /// type mismatch occurred. If this is an arity or label mismatch, \c Index
   /// will be \c None.
-  llvm::Optional<unsigned> Index;
+  std::optional<unsigned> Index;
 
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                          ConstraintLocator *locator,
-                         llvm::Optional<unsigned> index)
+                         std::optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
                            locator),
         Index(index) {}
@@ -1663,7 +1663,7 @@ class AllowTupleTypeMismatch final : public ContextualMismatch {
 public:
   static AllowTupleTypeMismatch *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator,
-         llvm::Optional<unsigned> index = llvm::None);
+         std::optional<unsigned> index = std::nullopt);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleTypeMismatch;

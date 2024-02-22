@@ -17,10 +17,10 @@
 #ifndef SWIFT_AST_THROWNERRORDESTINATION
 #define SWIFT_AST_THROWNERRORDESTINATION
 
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "llvm/ADT/PointerUnion.h"
+#include <optional>
 
 namespace swift {
 class Expr;
@@ -73,12 +73,12 @@ public:
   /// Retrieve the conversion as a pair of (opaque thrown error value,
   /// conversion expression), when a conversion from the thrown error type
   /// to the context error type is required.
-  llvm::Optional<std::pair<OpaqueValueExpr *, Expr *>> getConversion() const {
+  std::optional<std::pair<OpaqueValueExpr *, Expr *>> getConversion() const {
     if (auto conversion = storage.dyn_cast<Conversion *>()) {
       return std::make_pair(conversion->thrownError, conversion->conversion);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 };
 
