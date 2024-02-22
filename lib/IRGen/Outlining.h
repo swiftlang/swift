@@ -17,10 +17,10 @@
 #ifndef SWIFT_IRGEN_OUTLINING_H
 #define SWIFT_IRGEN_OUTLINING_H
 
+#include "IRGen.h"
 #include "LocalTypeDataKind.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
-#include "LocalTypeDataKind.h"
 
 namespace llvm {
   class Value;
@@ -41,6 +41,16 @@ class IRGenFunction;
 class IRGenModule;
 class TypeInfo;
 
+enum LayoutIsNeeded_t : bool {
+  LayoutIsNotNeeded = false,
+  LayoutIsNeeded = true
+};
+
+enum DeinitIsNeeded_t : bool {
+  DeinitIsNotNeeded = false,
+  DeinitIsNeeded = true
+};
+
 /// A helper class for emitting outlined value operations.
 ///
 /// The use-pattern for this class is:
@@ -51,14 +61,18 @@ class TypeInfo;
 class OutliningMetadataCollector {
 public:
   IRGenFunction &IGF;
+  const unsigned needsLayout : 1;
+  const unsigned needsDeinit : 1;
+
 private:
   llvm::MapVector<LocalTypeDataKey, llvm::Value *> Values;
   friend class IRGenModule;
 
 public:
-  OutliningMetadataCollector(IRGenFunction &IGF) : IGF(IGF) {}
+  OutliningMetadataCollector(IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
+                             DeinitIsNeeded_t needsDeinitTypes)
+      : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
 
-  void collectFormalTypeMetadata(CanType type);
   void collectTypeMetadataForLayout(SILType type);
 
   void emitCallToOutlinedCopy(Address dest, Address src,
@@ -66,8 +80,13 @@ public:
                               IsInitialization_t isInit, IsTake_t isTake) const;
   void emitCallToOutlinedDestroy(Address addr, SILType T,
                                  const TypeInfo &ti) const;
+  void emitCallToOutlinedRelease(Address addr, SILType T, const TypeInfo &ti,
+                                 Atomicity atomicity) const;
 
 private:
+  void collectFormalTypeMetadata(CanType type);
+  void collectRepresentationTypeMetadata(SILType ty);
+
   void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
   void addMetadataParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
   void bindMetadataParameters(IRGenFunction &helperIGF,

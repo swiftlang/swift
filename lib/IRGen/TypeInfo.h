@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -575,7 +576,8 @@ public:
   /// Returns whether there was an appropriate metadata collector (and whether
   /// \p invocation was called.
   bool withMetadataCollector(
-      IRGenFunction &IGF, SILType T,
+      IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+      DeinitIsNeeded_t needsDeinit,
       llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
@@ -583,6 +585,9 @@ public:
                         IsTake_t isTake) const;
 
   void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                           Atomicity atomicity) const;
 };
 
 } // end namespace irgen
