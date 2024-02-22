@@ -3758,8 +3758,26 @@ static bool usesFeatureFullTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureTypedThrows(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->getThrownTypeRepr() != nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    struct Walker : public TypeWalker {
+      bool hasTypedThrows = false;
+
+      Action walkToTypePre(Type ty) override {
+        if (auto funcType = ty->getAs<AnyFunctionType>()) {
+          if (funcType->hasThrownError()) {
+            hasTypedThrows = true;
+            return Action::Stop;
+          }
+        }
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    func->getInterfaceType().walk(walker);
+    return walker.hasTypedThrows;
+  }
 
   return false;
 }
