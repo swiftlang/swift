@@ -210,7 +210,7 @@ void ClangSyntaxPrinter::printInlineForHelperFunction() const {
 }
 
 void ClangSyntaxPrinter::printNullability(
-    llvm::Optional<OptionalTypeKind> kind,
+    std::optional<OptionalTypeKind> kind,
     NullabilityPrintKind printKind) const {
   if (!kind)
     return;

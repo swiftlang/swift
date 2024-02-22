@@ -398,7 +398,7 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   enum class StepKind { Binding, Disjunction, Conjunction };
 
-  auto chooseStep = [&]() -> Optional<StepKind> {
+  auto chooseStep = [&]() -> std::optional<StepKind> {
     // Bindings usually happen first, but sometimes we want to prioritize a
     // disjunction or conjunction.
     if (bestBindings) {
@@ -416,7 +416,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     if (conjunction)
       return StepKind::Conjunction;
 
-    return None;
+    return std::nullopt;
   };
 
   if (auto step = chooseStep()) {

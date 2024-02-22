@@ -140,11 +140,11 @@ public:
   }
 
   void open(const char *DocName, StringRef Text,
-            Optional<ArrayRef<const char *>> CArgs = llvm::None) {
+            std::optional<ArrayRef<const char *>> CArgs = std::nullopt) {
     auto Args = CArgs.has_value() ? makeArgs(DocName, *CArgs)
                                   : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, std::nullopt);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -164,7 +164,7 @@ public:
     getLang().getCursorInfo(
         DocName, DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
-        /*vfsOptions=*/None, CancellationToken,
+        /*vfsOptions=*/std::nullopt, CancellationToken,
         [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
@@ -449,7 +449,7 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   getLang().getCursorInfo(
       SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/nullptr,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         FirstCursorInfoSema.signal();
@@ -492,7 +492,7 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
   getLang().getCursorInfo(
       SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/CancellationToken,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         CursorInfoSema.signal();

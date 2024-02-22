@@ -29,8 +29,8 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/Optional.h"
 #include <algorithm>
+#include <optional>
 
 namespace swift {
 
@@ -179,7 +179,7 @@ private:
   void updateVTableCache(const Entry &entry);
 
   /// Look up the implementation function for the given method.
-  llvm::Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
+  std::optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
 
   /// Removes entries from the vtable.
   /// \p predicate Returns true if the passed entry should be removed.

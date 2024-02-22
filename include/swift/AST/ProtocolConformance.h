@@ -240,13 +240,13 @@ public:
 
   /// Retrieve the type witness for the given associated type.
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options = llvm::None) const;
+                      SubstOptions options = std::nullopt) const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const;
+                        SubstOptions options = std::nullopt) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -403,7 +403,7 @@ public:
 
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied, if it is possible for them to be computed.
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const;
 
   /// Get any additional requirements that are required for this conformance to
@@ -413,13 +413,13 @@ public:
   /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
   ProtocolConformanceRef subst(SubstitutionMap subMap,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
   ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
@@ -545,7 +545,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   /// Conformances that satisfy each of conformance requirements of the
   /// requirement signature of the protocol.
-  MutableArrayRef<llvm::Optional<ProtocolConformanceRef>> AssociatedConformances;
+  MutableArrayRef<std::optional<ProtocolConformanceRef>> AssociatedConformances;
 
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
@@ -592,7 +592,7 @@ public:
   /// to be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const;
 
   /// Retrieve the state of this conformance.
@@ -698,7 +698,7 @@ public:
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const;
+                        SubstOptions options = std::nullopt) const;
 
   TypeWitnessAndDecl
   getTypeWitnessUncached(AssociatedTypeDecl *requirement) const;
@@ -722,7 +722,7 @@ public:
   ///protocol's requirement signature.
   void createAssociatedConformanceArray();
 
-  llvm::Optional<ProtocolConformanceRef>
+  std::optional<ProtocolConformanceRef>
   getAssociatedConformance(unsigned index) const;
 
   void
@@ -828,12 +828,12 @@ public:
 
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const {
+                        SubstOptions options = std::nullopt) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options = llvm::None) const {
+                      SubstOptions options = std::nullopt) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
@@ -851,7 +851,7 @@ public:
   }
   Witness getWitness(ValueDecl *requirement) const;
 
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
     return ArrayRef<Requirement>();
   }
@@ -898,7 +898,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// Any conditional requirements, in substituted form. (E.g. given Foo<T>: Bar
   /// where T: Bar, Foo<Baz<U>> will include Baz<U>: Bar.)
-  mutable llvm::Optional<ArrayRef<Requirement>> ConditionalRequirements;
+  mutable std::optional<ArrayRef<Requirement>> ConditionalRequirements;
 
   friend class ASTContext;
 
@@ -927,13 +927,13 @@ public:
   /// getConditionalRequirementsIfAvailable (these are separate because
   /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
   /// parameter gets in the way of that).
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
     if (computeIfPossible)
       computeConditionalRequirements();
     return ConditionalRequirements;
   }
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
     return getConditionalRequirementsIfAvailableOrCached(
         /*computeIfPossible=*/true);
@@ -975,7 +975,7 @@ public:
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const;
+                        SubstOptions options = std::nullopt) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -1052,7 +1052,7 @@ public:
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
     return InheritedConformance->getConditionalRequirementsIfAvailable();
   }
@@ -1092,7 +1092,7 @@ public:
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const {
+                        SubstOptions options = std::nullopt) const {
     return InheritedConformance->getTypeWitnessAndDecl(assocType, options);
   }
 
@@ -1171,7 +1171,7 @@ public:
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
-  llvm::Optional<ArrayRef<Requirement>>
+  std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const {
     return ArrayRef<Requirement>();
   }
@@ -1212,7 +1212,7 @@ public:
   /// for the given associated type.
   TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = llvm::None) const {
+                        SubstOptions options = std::nullopt) const {
     llvm_unreachable("builtin-conformances never have associated types");
   }
 

@@ -40,8 +40,8 @@ struct SILDebugVariable {
   unsigned Constant : 1;
   unsigned Implicit : 1;
   unsigned isDenseMapSingleton : 2;
-  llvm::Optional<SILType> Type;
-  llvm::Optional<SILLocation> Loc;
+  std::optional<SILType> Type;
+  std::optional<SILLocation> Loc;
   const SILDebugScope *Scope;
   SILDebugInfoExpression DIExpr;
 
@@ -64,9 +64,8 @@ struct SILDebugVariable {
       : ArgNo(ArgNo), Constant(Constant), Implicit(false),
         isDenseMapSingleton(0), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false,
-                   llvm::Optional<SILType> AuxType = {},
-                   llvm::Optional<SILLocation> DeclLoc = {},
+                   bool IsImplicit = false, std::optional<SILType> AuxType = {},
+                   std::optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
@@ -74,7 +73,7 @@ struct SILDebugVariable {
         DIExpr(ExprElements) {}
 
   /// Created from either AllocStack or AllocBox instruction
-  static llvm::Optional<SILDebugVariable>
+  static std::optional<SILDebugVariable>
   createFromAllocation(const AllocationInst *AI);
 
   // We're not comparing DIExpr here because strictly speaking,

@@ -142,7 +142,7 @@ private:
   /// Returns true if any deallocations were inserted.
   bool insertDeallocs(const BitVector &AliveBefore, const BitVector &AliveAfter,
                       SILInstruction *InsertionPoint,
-                      llvm::Optional<SILLocation> Location);
+                      std::optional<SILLocation> Location);
 
   /// Returns the location bit number for a stack allocation instruction.
   int bitNumberForAlloc(SILInstruction *AllocInst) {

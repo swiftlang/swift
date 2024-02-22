@@ -100,8 +100,8 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 } // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
-static llvm::Optional<DIKind> mergeKinds(llvm::Optional<DIKind> OK1,
-                                         llvm::Optional<DIKind> OK2) {
+static std::optional<DIKind> mergeKinds(std::optional<DIKind> OK1,
+                                        std::optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
   if (!OK1.has_value())
     return OK2;
@@ -158,10 +158,10 @@ namespace {
       return getConditional(Elt).value();
     }
 
-    llvm::Optional<DIKind> getConditional(unsigned Elt) const {
+    std::optional<DIKind> getConditional(unsigned Elt) const {
       bool V1 = Data[Elt*2], V2 = Data[Elt*2+1];
       if (V1 == V2)
-        return V1 ? llvm::Optional<DIKind>(llvm::None) : DIKind::No;
+        return V1 ? std::optional<DIKind>(std::nullopt) : DIKind::No;
       return V2 ? DIKind::Yes : DIKind::Partial;
     }
 
@@ -173,7 +173,7 @@ namespace {
       }
     }
 
-    void set(unsigned Elt, llvm::Optional<DIKind> K) {
+    void set(unsigned Elt, std::optional<DIKind> K) {
       if (!K.has_value())
         Data[Elt*2] = true, Data[Elt*2+1] = true;
       else
@@ -229,7 +229,7 @@ namespace {
     void dump(llvm::raw_ostream &OS) const {
       OS << '(';
       for (unsigned i = 0, e = size(); i != e; ++i) {
-        if (llvm::Optional<DIKind> Elt = getConditional(i)) {
+        if (std::optional<DIKind> Elt = getConditional(i)) {
           switch (Elt.value()) {
             case DIKind::No:      OS << 'n'; break;
             case DIKind::Yes:     OS << 'y'; break;
@@ -275,11 +275,11 @@ namespace {
 
     /// Keep track of blocks where the contents of the self box are stored to
     /// as a result of a successful self.init or super.init call.
-    llvm::Optional<DIKind> LocalSelfInitialized;
+    std::optional<DIKind> LocalSelfInitialized;
 
     /// The live out information of the block. This is the LocalSelfInitialized
     /// plus the information merged-in from the predecessor blocks.
-    llvm::Optional<DIKind> OutSelfInitialized;
+    std::optional<DIKind> OutSelfInitialized;
 
     LiveOutBlockState() { init(0); }
 
@@ -288,8 +288,8 @@ namespace {
       isInWorkList = false;
       LocalAvailability.init(NumElements);
       OutAvailability.init(NumElements);
-      LocalSelfInitialized = llvm::None;
-      OutSelfInitialized = llvm::None;
+      LocalSelfInitialized = std::nullopt;
+      OutSelfInitialized = std::nullopt;
     }
 
     /// Sets all unknown elements to not-available.
@@ -310,10 +310,10 @@ namespace {
     /// \param result Out parameter
     ///
     /// \return True if the result was different from the live-out
-    bool transferAvailability(const llvm::Optional<DIKind> pred,
-                              const llvm::Optional<DIKind> out,
-                              const llvm::Optional<DIKind> local,
-                              llvm::Optional<DIKind> &result) {
+    bool transferAvailability(const std::optional<DIKind> pred,
+                              const std::optional<DIKind> out,
+                              const std::optional<DIKind> local,
+                              std::optional<DIKind> &result) {
       if (local.has_value()) {
         // A local availability overrides the incoming value.
         result = local;
@@ -332,7 +332,7 @@ namespace {
     bool mergeFromPred(const LiveOutBlockState &Pred) {
       bool changed = false;
       for (unsigned i = 0, e = OutAvailability.size(); i != e; ++i) {
-        llvm::Optional<DIKind> result;
+        std::optional<DIKind> result;
         if (transferAvailability(Pred.OutAvailability.getConditional(i),
                                  OutAvailability.getConditional(i),
                                  LocalAvailability.getConditional(i),
@@ -342,7 +342,7 @@ namespace {
         }
       }
 
-      llvm::Optional<DIKind> result;
+      std::optional<DIKind> result;
       if (transferAvailability(Pred.OutSelfInitialized,
                                OutSelfInitialized,
                                LocalSelfInitialized,
@@ -527,7 +527,7 @@ namespace {
     void computePredsLiveOut(SILBasicBlock *BB);
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
     void getOutSelfInitialized(SILBasicBlock *BB,
-                               llvm::Optional<DIKind> &Result);
+                               std::optional<DIKind> &Result);
 
     bool shouldEmitError(const SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -3483,7 +3483,7 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
 }
 
 void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
-                                            llvm::Optional<DIKind> &Result) {
+                                            std::optional<DIKind> &Result) {
   computePredsLiveOut(BB);
 
   for (auto *Pred : BB->getPredecessorBlocks())
@@ -3655,7 +3655,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   if (BlockInfo.LocalSelfInitialized.has_value())
     return *BlockInfo.LocalSelfInitialized;
 
-  llvm::Optional<DIKind> Result;
+  std::optional<DIKind> Result;
   getOutSelfInitialized(InstBB, Result);
 
   // If the result wasn't computed, we must be analyzing code within

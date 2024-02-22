@@ -479,7 +479,7 @@ namespace {
     ConstantInitBuilder InitBuilder;
   protected:
     ConstantStructBuilder B;
-    llvm::Optional<GenericSignatureHeaderBuilder> SignatureHeader;
+    std::optional<GenericSignatureHeaderBuilder> SignatureHeader;
 
     ContextDescriptorBuilderBase(IRGenModule &IGM)
       : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {
@@ -787,7 +787,7 @@ namespace {
     ProtocolDecl *Proto;
     SILDefaultWitnessTable *DefaultWitnesses;
 
-    llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+    std::optional<ConstantAggregateBuilderBase::PlaceholderPosition>
         NumRequirementsInSignature, NumRequirements;
 
     bool Resilient;
@@ -1189,7 +1189,7 @@ namespace {
       MetadataInitialization;
 
     StringRef UserFacingName;
-    llvm::Optional<TypeImportInfo<std::string>> ImportInfo;
+    std::optional<TypeImportInfo<std::string>> ImportInfo;
 
     using super::IGM;
     using super::B;
@@ -1695,7 +1695,7 @@ namespace {
     // Non-null unless the type is foreign.
     ClassMetadataLayout *MetadataLayout = nullptr;
 
-    llvm::Optional<TypeEntityReference> ResilientSuperClassRef;
+    std::optional<TypeEntityReference> ResilientSuperClassRef;
 
     SILVTable *VTable;
     bool Resilient;
@@ -2285,7 +2285,7 @@ namespace {
       emit(ArrayRef<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
                substitutionSet) {
         auto getInt32Constant =
-            [&](llvm::Optional<unsigned> value) -> llvm::ConstantInt * {
+            [&](std::optional<unsigned> value) -> llvm::ConstantInt * {
           return llvm::ConstantInt::get(IGM.Int32Ty, value.value_or(0));
         };
 
@@ -3639,12 +3639,13 @@ static void emitClassMetadataBaseOffset(IRGenModule &IGM,
   offsetVar->setConstant(true);
 }
 
-static llvm::Optional<llvm::Function *>
+static std::optional<llvm::Function *>
 getAddrOfDestructorFunction(IRGenModule &IGM, ClassDecl *classDecl) {
   auto dtorRef = SILDeclRef(classDecl->getDestructor(),
                             SILDeclRef::Kind::Deallocator);
   SILFunction *dtorFunc = IGM.getSILModule().lookUpFunction(dtorRef);
-  if (!dtorFunc) return llvm::None;
+  if (!dtorFunc)
+    return std::nullopt;
   return IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition);
 }
 
@@ -4437,7 +4438,7 @@ namespace {
 
     const ClassLayout &FieldLayout;
 
-    llvm::Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
+    std::optional<ConstantAggregateBuilderBase::PlaceholderPosition>
         ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
 
   public:
@@ -5692,11 +5693,11 @@ void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
 
 // Enums
 
-static llvm::Optional<Size>
+static std::optional<Size>
 getConstantPayloadSize(IRGenModule &IGM, EnumDecl *enumDecl, CanType enumTy) {
   auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
   if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   assert((!enumTI.isFixedSize(ResilienceExpansion::Minimal) || enumDecl->isGenericContext()) &&
@@ -5705,8 +5706,8 @@ getConstantPayloadSize(IRGenModule &IGM, EnumDecl *enumDecl, CanType enumTy) {
   return Size(strategy.getPayloadSizeForMetadata());
 }
 
-static llvm::Optional<Size> getConstantPayloadSize(IRGenModule &IGM,
-                                                   EnumDecl *enumDecl) {
+static std::optional<Size> getConstantPayloadSize(IRGenModule &IGM,
+                                                  EnumDecl *enumDecl) {
   auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
   return getConstantPayloadSize(IGM, enumDecl, enumTy);
 }
@@ -5835,7 +5836,7 @@ namespace {
       return flags;
     }
 
-    llvm::Optional<Size> getPayloadSize() {
+    std::optional<Size> getPayloadSize() {
       return getConstantPayloadSize(IGM, Target);
     }
 
@@ -5889,7 +5890,7 @@ namespace {
                                           ConstantStructBuilder &B)
         : super(IGM, type, decl, B), type(type){};
 
-    llvm::Optional<Size> getPayloadSize() {
+    std::optional<Size> getPayloadSize() {
       return getConstantPayloadSize(IGM, Target, type);
     }
   };
@@ -6893,7 +6894,7 @@ void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
 bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                                              const SILVTable *vtable,
                                              SILDeclRef method) {
-  llvm::Optional<SILVTable::Entry> entry =
+  std::optional<SILVTable::Entry> entry =
       vtable->getEntry(IGM.getSILModule(), method);
   LLVM_DEBUG(llvm::dbgs() << "looking at vtable:\n";
              vtable->print(llvm::dbgs()));
@@ -7110,7 +7111,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     auto reqHeader = addSignatureHeader(reqSig);
 
     // GenericContextDescriptorHeader GenSigHeader; // optional
-    llvm::Optional<GenericSignatureHeaderBuilder> genHeader;
+    std::optional<GenericSignatureHeaderBuilder> genHeader;
     if (genSig)
       genHeader.emplace(addSignatureHeader(genSig));
 

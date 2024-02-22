@@ -15,9 +15,9 @@
 
 #include "SourceKit/Support/CancellationToken.h"
 #include "sourcekitd/sourcekitd.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -41,8 +41,6 @@ bool sourcekitd_variant_array_apply_impl(
 
 namespace sourcekitd {
 
-using llvm::None;
-using llvm::Optional;
 using SourceKit::SourceKitCancellationToken;
 
 // The IPC protocol version. This can be queried via a request.
@@ -69,7 +67,7 @@ public:
   class Dictionary {
   public:
     Dictionary() = default;
-    Dictionary(llvm::NoneType) : Dictionary() {}
+    Dictionary(std::nullopt_t) : Dictionary() {}
     explicit Dictionary(void *Impl) : Impl(Impl) { }
 
     bool isNull() const { return Impl == nullptr; }
@@ -96,7 +94,7 @@ public:
   class Array {
   public:
     Array() = default;
-    Array(llvm::NoneType) : Array() {}
+    Array(std::nullopt_t) : Array() {}
     explicit Array(void *Impl) : Impl(Impl) { }
 
     bool isNull() const { return Impl == nullptr; }
@@ -133,8 +131,8 @@ public:
   }
 
   sourcekitd_uid_t getUID(SourceKit::UIdent Key) const;
-  Optional<llvm::StringRef> getString(SourceKit::UIdent Key) const;
-  Optional<RequestDict> getDictionary(SourceKit::UIdent Key) const;
+  std::optional<llvm::StringRef> getString(SourceKit::UIdent Key) const;
+  std::optional<RequestDict> getDictionary(SourceKit::UIdent Key) const;
 
   /// Populate the vector with an array of C strings.
   /// \param isOptional true if the key is optional. If false and the key is
@@ -153,7 +151,7 @@ public:
                        llvm::function_ref<bool(RequestDict)> applier) const;
 
   bool getInt64(SourceKit::UIdent Key, int64_t &Val, bool isOptional) const;
-  Optional<int64_t> getOptionalInt64(SourceKit::UIdent Key) const;
+  std::optional<int64_t> getOptionalInt64(SourceKit::UIdent Key) const;
 };
 
 /// Initialize the sourcekitd client library. Returns true if this is the first

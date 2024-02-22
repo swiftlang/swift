@@ -19,7 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 

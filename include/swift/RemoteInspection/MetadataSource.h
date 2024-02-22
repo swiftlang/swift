@@ -22,8 +22,8 @@
 #ifndef SWIFT_REFLECTION_METADATASOURCE_H
 #define SWIFT_REFLECTION_METADATASOURCE_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Casting.h"
+#include <optional>
 
 using llvm::cast;
 

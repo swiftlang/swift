@@ -56,7 +56,7 @@ class StorageGuaranteesLoadVisitor
   // The current address being visited.
   SILValue currentAddress;
 
-  llvm::Optional<bool> isWritten;
+  std::optional<bool> isWritten;
 
 public:
   StorageGuaranteesLoadVisitor(Context &context, LoadInst *load,

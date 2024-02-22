@@ -59,9 +59,9 @@ struct LoadOperation {
   ///
   /// TODO: Rather than use an optional here, we should include an invalid
   /// representation in LoadOwnershipQualifier.
-  llvm::Optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
+  std::optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
     if (auto *lbi = value.dyn_cast<LoadBorrowInst *>()) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     return value.get<LoadInst *>()->getOwnershipQualifier();

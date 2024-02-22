@@ -627,12 +627,12 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
 
 bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
-    llvm::Optional<ForeignAsyncConvention> &asyncConvention,
-    llvm::Optional<ForeignErrorConvention> &errorConvention) {
+    std::optional<ForeignAsyncConvention> &asyncConvention,
+    std::optional<ForeignErrorConvention> &errorConvention) {
   // Clear out the async and error conventions. They will be added later if
   // needed.
-  asyncConvention = llvm::None;
-  errorConvention = llvm::None;
+  asyncConvention = std::nullopt;
+  errorConvention = std::nullopt;
 
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
@@ -846,7 +846,7 @@ bool swift::isRepresentableInObjC(
     // For a throwing asynchronous function, an Error? parameter is added
     // to the completion handler parameter, and will be non-nil to signal
     // a thrown error.
-    llvm::Optional<unsigned> completionHandlerErrorParamIndex;
+    std::optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
       completionHandlerErrorParamIndex = completionHandlerParams.size();
       auto errorType = ctx.getErrorExistentialType();
@@ -861,7 +861,7 @@ bool swift::isRepresentableInObjC(
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,
         completionHandlerErrorParamIndex,
-        /* no flag argument */ llvm::None, false);
+        /* no flag argument */ std::nullopt, false);
   } else if (AFD->hasThrows()) {
     // Synchronous throwing functions must map to a particular error convention.
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
@@ -1219,8 +1219,8 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
     return false;
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    llvm::Optional<ForeignAsyncConvention> asyncConvention;
-    llvm::Optional<ForeignErrorConvention> errorConvention;
+    std::optional<ForeignAsyncConvention> asyncConvention;
+    std::optional<ForeignErrorConvention> errorConvention;
     return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
                                  asyncConvention, errorConvention);
   }
@@ -1263,7 +1263,7 @@ ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
-static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
+static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   ASTContext &ctx = CD->getASTContext();
   auto ancestry = CD->checkAncestry();
 
@@ -1277,7 +1277,7 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         // just controlling the runtime name. Don't diagnose this case.
         const_cast<ClassDecl *>(CD)->getAttrs().add(
           new (ctx) ObjCRuntimeNameAttr(*attr));
-        return llvm::None;
+        return std::nullopt;
       }
 
       swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_generic_class)
@@ -1293,7 +1293,7 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       if (attr->hasName()) {
         const_cast<ClassDecl *>(CD)->getAttrs().add(
           new (ctx) ObjCRuntimeNameAttr(*attr));
-        return llvm::None;
+        return std::nullopt;
       }
 
 
@@ -1349,26 +1349,26 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
     if (ancestry.contains(AncestryFlags::Generic)) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
         !checkObjCClassStubAvailability(ctx, CD)) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
-                                                   bool allowImplicit) {
+static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                                  bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
     return shouldMarkClassAsObjC(classDecl);
@@ -1435,7 +1435,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       if (accessor->getStorage()->isObjC())
         return ObjCReason(ObjCReason::Accessor);
 
-      return llvm::None;
+      return std::nullopt;
     }
   }
   // @IBOutlet, @IBAction, @IBSegueAction, @NSManaged, and @GKInspectable imply
@@ -1462,7 +1462,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol) {
     if (!VD->isProtocolRequirement())
-      return llvm::None;
+      return std::nullopt;
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
@@ -1480,7 +1480,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       (isa<ExtensionDecl>(VD->getDeclContext()) &&
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
-    return llvm::None;
+    return std::nullopt;
 
   if (isMemberOfObjCClassExtension(VD) && 
       canInferImplicitObjC(/*allowAnyAccess*/true))
@@ -1500,7 +1500,7 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Determine whether the given type is a C integer type.
@@ -1580,8 +1580,8 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
 
 /// Record that a declaration is @objc.
 static void markAsObjC(ValueDecl *D, ObjCReason reason,
-                       llvm::Optional<ForeignAsyncConvention> asyncConvention,
-                       llvm::Optional<ForeignErrorConvention> errorConvention);
+                       std::optional<ForeignAsyncConvention> asyncConvention,
+                       std::optional<ForeignErrorConvention> errorConvention);
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
@@ -1590,7 +1590,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   TypeChecker::applyAccessNote(VD);
 
   auto dc = VD->getDeclContext();
-  llvm::Optional<ObjCReason> isObjC;
+  std::optional<ObjCReason> isObjC;
   if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
@@ -1632,7 +1632,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());
-          isObjC = llvm::None;
+          isObjC = std::nullopt;
         }
       }
     }
@@ -1648,8 +1648,8 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     return false;
 
   // If needed, check whether this declaration is representable in Objective-C.
-  llvm::Optional<ForeignAsyncConvention> asyncConvention;
-  llvm::Optional<ForeignErrorConvention> errorConvention;
+  std::optional<ForeignAsyncConvention> asyncConvention;
+  std::optional<ForeignErrorConvention> errorConvention;
   if (auto var = dyn_cast<VarDecl>(VD)) {
     if (!isRepresentableInObjC(var, *isObjC)) {
       isObjC->setAttrInvalid();
@@ -1790,7 +1790,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
-  llvm::Optional<ObjCSelector> requirementObjCName;
+  std::optional<ObjCSelector> requirementObjCName;
   ValueDecl *firstReq = nullptr;
   for (auto req : findWitnessedObjCRequirements(decl)) {
     // If this is the first requirement, take its name.
@@ -1841,8 +1841,8 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 /// If the declaration has a @nonobjc attribute, diagnose an error
 /// using the given Reason, if present.
 void markAsObjC(ValueDecl *D, ObjCReason reason,
-                llvm::Optional<ForeignAsyncConvention> asyncConvention,
-                llvm::Optional<ForeignErrorConvention> errorConvention) {
+                std::optional<ForeignAsyncConvention> asyncConvention,
+                std::optional<ForeignErrorConvention> errorConvention) {
   ASTContext &ctx = D->getASTContext();
 
   // By now, the caller will have handled the case where an implicit @objc
@@ -1860,9 +1860,9 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     // Determine the foreign async and error conventions.
-    llvm::Optional<ForeignAsyncConvention> inheritedAsyncConvention;
+    std::optional<ForeignAsyncConvention> inheritedAsyncConvention;
     AbstractFunctionDecl *declProvidingInheritedAsyncConvention = nullptr;
-    llvm::Optional<ForeignErrorConvention> inheritedErrorConvention;
+    std::optional<ForeignErrorConvention> inheritedErrorConvention;
     AbstractFunctionDecl *declProvidingInheritedErrorConvention = nullptr;
     if (auto baseMethod = method->getOverriddenDecl()) {
       // If the overridden method has a foreign async or error convention,
@@ -1966,7 +1966,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     // 'alloc', or 'allocWithZone:'. Check for these cases.
     if (!method->isInstanceMember()) {
       auto isForbiddenSelector = [&](ObjCSelector sel)
-          -> llvm::Optional<Diag<unsigned, DeclName, ObjCSelector>> {
+          -> std::optional<Diag<unsigned, DeclName, ObjCSelector>> {
         switch (sel.getNumArgs()) {
         case 0:
           if (sel.getSelectorPieces().front() == ctx.Id_load ||
@@ -1977,13 +1977,13 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // the point you expect. It is disallowed in Swift 4 and later.
           if (sel.getSelectorPieces().front() == ctx.Id_initialize)
             return diag::objc_class_method_not_permitted;
-          return llvm::None;
+          return std::nullopt;
         case 1:
           if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)
             return diag::objc_class_method_not_permitted;
-          return llvm::None;
+          return std::nullopt;
         default:
-          return llvm::None;
+          return std::nullopt;
         }
       };
       if (auto diagID = isForbiddenSelector(selector)) {
@@ -2123,8 +2123,8 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag,
                                    const ValueDecl *decl,
-                                   llvm::Optional<ObjCSelector> nameOpt,
-                                   llvm::Optional<ObjCSelector> targetNameOpt,
+                                   std::optional<ObjCSelector> nameOpt,
+                                   std::optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {
   if (decl->isImplicit())
     return false;
@@ -2697,9 +2697,9 @@ void TypeChecker::checkObjCImplementation(Decl *D) {
                     evaluator::SideEffect());
 }
 
-static llvm::Optional<Located<StaticSpellingKind>>
+static std::optional<Located<StaticSpellingKind>>
 getLocatedStaticSpelling(ValueDecl *VD) {
-  using Ret = llvm::Optional<Located<StaticSpellingKind>>;
+  using Ret = std::optional<Located<StaticSpellingKind>>;
 
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
     return Ret({ FD->getCorrectStaticSpelling(), FD->getStaticLoc() });
@@ -2716,18 +2716,18 @@ getLocatedStaticSpelling(ValueDecl *VD) {
       llvm_unreachable("unknown AbstractStorageDecl");
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-static llvm::Optional<StaticSpellingKind> getStaticSpelling(ValueDecl *VD) {
+static std::optional<StaticSpellingKind> getStaticSpelling(ValueDecl *VD) {
   if (auto locSpelling = getLocatedStaticSpelling(VD))
     return locSpelling->Item;
-  return llvm::None;
+  return std::nullopt;
 }
 
 static void
 fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
-                             llvm::Optional<StaticSpellingKind> newSpelling) {
+                             std::optional<StaticSpellingKind> newSpelling) {
   auto spelling = getLocatedStaticSpelling(VD);
   if (!newSpelling || !spelling)
     return;
@@ -3017,7 +3017,7 @@ private:
     return ObjCSelector();
   }
 
-  static llvm::Optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+  static std::optional<ObjCSelector> getObjCName(ValueDecl *VD) {
     if (!VD->getCDeclName().empty()) {
       auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
       return ObjCSelector(VD->getASTContext(), 0, { ident });

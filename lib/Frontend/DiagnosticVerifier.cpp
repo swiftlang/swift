@@ -162,7 +162,7 @@ struct ExpectedDiagnosticInfo {
   // This is the message string with escapes expanded.
   std::string MessageStr;
   unsigned LineNo = ~0U;
-  llvm::Optional<unsigned> ColumnNo;
+  std::optional<unsigned> ColumnNo;
 
   using AlternativeExpectedFixIts = std::vector<ExpectedFixIt>;
   std::vector<AlternativeExpectedFixIts> Fixits = {};
@@ -179,7 +179,7 @@ struct ExpectedDiagnosticInfo {
                              llvm::SmallVector<StringRef, 1> Names)
         : StartLoc(StartLoc), EndLoc(EndLoc), Names(Names) {}
   };
-  llvm::Optional<ExpectedEducationalNotes> EducationalNotes;
+  std::optional<ExpectedEducationalNotes> EducationalNotes;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          const char *ClassificationStart,
@@ -428,17 +428,17 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
 ///
 /// \param DiagnosticLineNo The line number of the associated expected
 /// diagnostic; used to turn line offsets into line numbers.
-static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
+static std::optional<LineColumnRange> parseExpectedFixItRange(
     StringRef &Str, unsigned DiagnosticLineNo,
     llvm::function_ref<void(const char *, const Twine &)> diagnoseError) {
   assert(!Str.empty());
 
   struct ParsedLineAndColumn {
-    llvm::Optional<unsigned> Line;
+    std::optional<unsigned> Line;
     unsigned Column;
   };
 
-  const auto parseLineAndColumn = [&]() -> llvm::Optional<ParsedLineAndColumn> {
+  const auto parseLineAndColumn = [&]() -> std::optional<ParsedLineAndColumn> {
     enum class OffsetKind : uint8_t { None, Plus, Minus };
 
     OffsetKind LineOffsetKind = OffsetKind::None;
@@ -467,20 +467,20 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
                       "expected line offset after leading '+' or '-' in fix-it "
                       "verification");
       }
-      return llvm::None;
+      return std::nullopt;
     }
 
     // If the first value is not followed by a colon, it is either a column or a
     // line offset that is missing a column.
     if (Str.empty() || Str.front() != ':') {
       if (LineOffsetKind == OffsetKind::None) {
-        return ParsedLineAndColumn{llvm::None, FirstVal};
+        return ParsedLineAndColumn{std::nullopt, FirstVal};
       }
 
       diagnoseError(Str.data(),
                     "expected colon-separated column number after line offset "
                     "in fix-it verification");
-      return llvm::None;
+      return std::nullopt;
     }
 
     unsigned Column = 0;
@@ -488,7 +488,7 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
     if (Str.consumeInteger(10, Column)) {
       diagnoseError(Str.data(),
                     "expected column number after ':' in fix-it verification");
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Apply the offset relative to the line of the expected diagnostic.
@@ -513,7 +513,7 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
     Range.StartLine = LineAndCol->Line.value_or(DiagnosticLineNo);
     Range.StartCol = LineAndCol->Column;
   } else {
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (!Str.empty() && Str.front() == '-') {
@@ -521,7 +521,7 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
   } else {
     diagnoseError(Str.data(),
                   "expected '-' range separator in fix-it verification");
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (const auto LineAndCol = parseLineAndColumn()) {
@@ -529,7 +529,7 @@ static llvm::Optional<LineColumnRange> parseExpectedFixItRange(
     Range.EndLine = LineAndCol->Line.value_or(Range.StartLine);
     Range.EndCol = LineAndCol->Column;
   } else {
-    return llvm::None;
+    return std::nullopt;
   }
 
   return Range;

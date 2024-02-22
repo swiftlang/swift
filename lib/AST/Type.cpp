@@ -478,12 +478,12 @@ bool TypeBase::isDistributedActor() {
   return false;
 }
 
-llvm::Optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
+std::optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
   if (auto protoTy = this->getAs<ProtocolType>())
     if (auto protoDecl = protoTy->getDecl())
       return protoDecl->getKnownProtocolKind();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool TypeBase::isSpecialized() {
@@ -1017,7 +1017,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     auto newInstanceType =
         instanceType->stripConcurrency(recurse, dropGlobalActor);
     if (instanceType.getPointer() != newInstanceType.getPointer()) {
-      llvm::Optional<MetatypeRepresentation> repr;
+      std::optional<MetatypeRepresentation> repr;
       if (existentialMetatype->hasRepresentation())
         repr = existentialMetatype->getRepresentation();
       return ExistentialMetatypeType::get(
@@ -1757,7 +1757,7 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getReducedType(genericSig);
 
-    llvm::Optional<ASTExtInfo> extInfo = llvm::None;
+    std::optional<ASTExtInfo> extInfo = std::nullopt;
     if (funcTy->hasExtInfo())
       extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
@@ -4022,7 +4022,7 @@ bool SILFunctionType::hasNonDerivableClangType() {
   auto results = getResults();
   auto computedClangType = getASTContext().getCanonicalClangFunctionType(
       getParameters(),
-      results.empty() ? llvm::None : llvm::Optional<SILResultInfo>(results[0]),
+      results.empty() ? std::nullopt : std::optional<SILResultInfo>(results[0]),
       getRepresentation());
   assert(computedClangType && "Failed to compute Clang type.");
   return clangTypeInfo != ClangTypeInfo(computedClangType);
@@ -4077,7 +4077,7 @@ Identifier DependentMemberType::getName() const {
 /// \param pos The variance position of the result type.
 static bool transformSILResult(
     TypePosition pos, SILResultInfo &result, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = result.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4092,7 +4092,7 @@ static bool transformSILResult(
 /// \param pos The variance position of the yield type.
 static bool transformSILYield(
     TypePosition pos, SILYieldInfo &yield, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = yield.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4107,7 +4107,7 @@ static bool transformSILYield(
 /// \param pos The variance position of the parameter type.
 static bool transformSILParameter(
     TypePosition pos, SILParameterInfo &param, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = param.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4122,7 +4122,7 @@ static bool transformSILParameter(
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   return transformWithPosition(
       TypePosition::Invariant,
-      [fn](TypeBase *type, auto) -> llvm::Optional<Type> {
+      [fn](TypeBase *type, auto) -> std::optional<Type> {
         Type transformed = fn(Type(type));
         if (!transformed)
           return Type();
@@ -4130,7 +4130,7 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
         // If the function didn't change the type at
         // all, let transformRec() recurse.
         if (transformed.getPointer() == type)
-          return llvm::None;
+          return std::nullopt;
 
         return transformed;
       });
@@ -4154,18 +4154,18 @@ static PackType *getTransformedPack(Type substType) {
 }
 
 Type Type::transformRec(
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *)> fn) const {
+    llvm::function_ref<std::optional<Type>(TypeBase *)> fn) const {
   return transformWithPosition(TypePosition::Invariant,
                                [fn](TypeBase *type, auto) { return fn(type); });
 }
 
 Type Type::transformWithPosition(
     TypePosition pos,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn)
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn)
     const {
   if (!isa<ParenType>(getPointer())) {
     // Transform this type node.
-    if (llvm::Optional<Type> transformed = fn(getPointer(), pos))
+    if (std::optional<Type> transformed = fn(getPointer(), pos))
       return *transformed;
 
     // Recur.
@@ -4332,7 +4332,7 @@ case TypeKind::Id:
       transInterfaceResults.push_back(result);
     }
 
-    llvm::Optional<SILResultInfo> transErrorResult;
+    std::optional<SILResultInfo> transErrorResult;
     if (fnTy->hasErrorResult()) {
       SILResultInfo result = fnTy->getErrorResult();
       if (transformSILResult(pos, result, changed, fn)) return Type();
@@ -4874,7 +4874,7 @@ case TypeKind::Id:
       isUnchanged = false;
 
     // Transform the extended info.
-    llvm::Optional<ASTExtInfo> extInfo;
+    std::optional<ASTExtInfo> extInfo;
     if (function->hasExtInfo()) {
       auto origExtInfo = function->getExtInfo();
       extInfo = origExtInfo;
@@ -5407,10 +5407,10 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
-llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
+std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
-    return llvm::None;
+    return std::nullopt;
 
   // If there is no specified thrown error type, it throws "any Error".
   Type thrownError = getThrownError();
@@ -5419,7 +5419,7 @@ llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
 
   // If the thrown interface type is "Never", this function does not throw.
   if (thrownError->isNever())
-    return llvm::None;
+    return std::nullopt;
 
   // Otherwise, return the typed error.
   return thrownError;
@@ -5432,7 +5432,7 @@ Type AnyFunctionType::getEffectiveThrownErrorTypeOrNever() const {
   return getASTContext().getNeverType();
 }
 
-llvm::Optional<TangentSpace>
+std::optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
   auto &ctx = getASTContext();
@@ -5441,7 +5441,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto lookup = ctx.AutoDiffTangentSpaces.find(cacheKey);
   if (lookup != ctx.AutoDiffTangentSpaces.end())
     return lookup->getSecond();
-  auto cache = [&](llvm::Optional<TangentSpace> tangentSpace) {
+  auto cache = [&](std::optional<TangentSpace> tangentSpace) {
     ctx.AutoDiffTangentSpaces.insert({cacheKey, tangentSpace});
     return tangentSpace;
   };
@@ -5470,7 +5470,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
   if (!differentiableProtocol)
-    return cache(llvm::None);
+    return cache(std::nullopt);
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
@@ -5480,12 +5480,13 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
-  auto assocTy = dependentType->substBaseType(this, lookupConformance, llvm::None);
+  auto assocTy =
+      dependentType->substBaseType(this, lookupConformance, std::nullopt);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 
   // Otherwise, there is no associated tangent space. Return `None`.
-  return cache(llvm::None);
+  return cache(std::nullopt);
 }
 
 bool TypeBase::isForeignReferenceType() {

@@ -508,7 +508,7 @@ struct UseState {
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
 
-  llvm::Optional<unsigned> cachedNumSubelements;
+  std::optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
   ///
@@ -653,11 +653,11 @@ struct UseState {
   /// instruction.
   /// 2. In the case of a ref_element_addr or a global, this will contain the
   /// end_access.
-  llvm::Optional<ScopeRequiringFinalInit>
+  std::optional<ScopeRequiringFinalInit>
   isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
     auto iter = scopeEndsRequiringInit.find(inst);
     if (iter == scopeEndsRequiringInit.end()) {
-      return llvm::None;
+      return std::nullopt;
     }
     return {iter->second};
   }
@@ -689,7 +689,7 @@ struct UseState {
 
   void clear() {
     address = nullptr;
-    cachedNumSubelements = llvm::None;
+    cachedNumSubelements = std::nullopt;
     consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
@@ -1725,7 +1725,7 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
 }
 
 /// Whether an error should be emitted in response to a partial consumption.
-static llvm::Optional<PartialMutationError>
+static std::optional<PartialMutationError>
 shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
                                SILInstruction *user, SILType useType,
                                TypeTreeLeafTypeRange usedBits) {
@@ -2605,7 +2605,7 @@ namespace {
 
 using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
 using InstOptionalLeafTypePair =
-    std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>>;
+    std::pair<SILInstruction *, std::optional<TypeTreeLeafTypeRange>>;
 
 /// Post process the found liveness and emit errors if needed. TODO: Better
 /// name.

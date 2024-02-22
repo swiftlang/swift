@@ -31,9 +31,9 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-                         llvm::Optional<ModuleDecl *> ExtendedModule,
+                         std::optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         llvm::Optional<llvm::VersionTuple> ModuleVersion,
+                         std::optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
     : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
       ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {

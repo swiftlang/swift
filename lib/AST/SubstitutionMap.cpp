@@ -206,7 +206,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
-  InFlightSubstitution IFS(subs, lookupConformance, llvm::None);
+  InFlightSubstitution IFS(subs, lookupConformance, std::nullopt);
   return get(genericSig, IFS);
 }
 
@@ -359,7 +359,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto getSignatureConformance =
       [&](Type type,
-          ProtocolDecl *proto) -> llvm::Optional<ProtocolConformanceRef> {
+          ProtocolDecl *proto) -> std::optional<ProtocolConformanceRef> {
     unsigned index = 0;
     for (auto reqt : genericSig.getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance) {
@@ -371,7 +371,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   };
 
   // Fast path -- check if the generic signature directly states the

@@ -54,14 +54,14 @@ struct ApplySiteKind {
   ApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+  static std::optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
     if (auto innerTyOpt = ApplySiteKind::fromNodeKindHelper(kind))
       return ApplySiteKind(*innerTyOpt);
-    return llvm::None;
+    return std::nullopt;
   }
 
 private:
-  static llvm::Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return ApplySiteKind::ApplyInst;
@@ -72,7 +72,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return ApplySiteKind::BeginApplyInst;
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 };
@@ -611,15 +611,15 @@ struct FullApplySiteKind {
   FullApplySiteKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<FullApplySiteKind>
+  static std::optional<FullApplySiteKind>
   fromNodeKind(SILInstructionKind kind) {
     if (auto innerOpt = FullApplySiteKind::fromNodeKindHelper(kind))
       return FullApplySiteKind(*innerOpt);
-    return llvm::None;
+    return std::nullopt;
   }
 
 private:
-  static llvm::Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+  static std::optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
     case SILInstructionKind::ApplyInst:
       return FullApplySiteKind::ApplyInst;
@@ -628,7 +628,7 @@ private:
     case SILInstructionKind::BeginApplyInst:
       return FullApplySiteKind::BeginApplyInst;
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 };

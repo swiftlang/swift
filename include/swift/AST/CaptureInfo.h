@@ -188,7 +188,7 @@ public:
     // FIXME: Ideally, everywhere that synthesizes a function should include
     // its capture info.
     if (!hasBeenComputed())
-      return llvm::None;
+      return std::nullopt;
     return StorageAndFlags.getPointer()->getCaptures();
   }
 

@@ -178,8 +178,8 @@ public:
 
   template <typename T>
   bool
-  parseSILQualifier(llvm::Optional<T> &result,
-                    llvm::function_ref<llvm::Optional<T>(StringRef)> parseName);
+  parseSILQualifier(std::optional<T> &result,
+                    llvm::function_ref<std::optional<T>(StringRef)> parseName);
 
   bool parseVerbatim(StringRef identifier);
 
@@ -236,15 +236,15 @@ public:
     return false;
   }
 
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   parseOptionalAttribute(ArrayRef<StringRef> expected) {
     // We parse here @ <identifier>.
     if (P.Tok.getKind() != tok::at_sign)
-      return llvm::None;
+      return std::nullopt;
 
     auto name = P.peekToken().getText();
     if (!is_contained(expected, name))
-      return llvm::None;
+      return std::nullopt;
 
     // Ok, we can do this.
     P.consumeToken(tok::at_sign);
@@ -369,12 +369,12 @@ public:
     return parseProtocolConformance(dummy, genericSig, genericParams);
   }
 
-  llvm::Optional<llvm::coverage::Counter>
+  std::optional<llvm::coverage::Counter>
   parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
 
   template <class T>
   struct ParsedEnum {
-    llvm::Optional<T> Value;
+    std::optional<T> Value;
     StringRef Name;
     SourceLoc Loc;
 

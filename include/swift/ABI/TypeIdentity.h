@@ -20,7 +20,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Config.h"
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/StringRef.h>
 
 namespace swift {
@@ -188,7 +187,7 @@ public:
   llvm::StringRef FullIdentity;
 
   /// Any extended information that type might have.
-  llvm::Optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
+  std::optional<TypeImportInfo<llvm::StringRef>> ImportInfo;
 
   /// The ABI name of the type.
   llvm::StringRef getABIName() const {

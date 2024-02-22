@@ -188,8 +188,8 @@ namespace {
     }
 
     /// Return the statically-known offset of the given element.
-    llvm::Optional<Size> getFixedElementOffset(IRGenModule &IGM,
-                                               unsigned fieldNo) const {
+    std::optional<Size> getFixedElementOffset(IRGenModule &IGM,
+                                              unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       switch (field.getKind()) {
       case ElementLayout::Kind::Empty:
@@ -199,16 +199,16 @@ namespace {
       case ElementLayout::Kind::InitialNonFixedSize:
         return Size(0);
       case ElementLayout::Kind::NonFixed:
-        return llvm::None;
+        return std::nullopt;
       }
       llvm_unreachable("bad element layout kind");
     }
 
-    llvm::Optional<unsigned> getElementStructIndex(IRGenModule &IGM,
-                                                   unsigned fieldNo) const {
+    std::optional<unsigned> getElementStructIndex(IRGenModule &IGM,
+                                                  unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
-        return llvm::None;
+        return std::nullopt;
       return field.getStructIndex();
     }
 
@@ -301,11 +301,11 @@ namespace {
           fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
   };
 
@@ -353,11 +353,11 @@ namespace {
           fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
   };
 
@@ -512,7 +512,7 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                           LayoutStrategy::Universal, fieldTypes);
     }
   };
@@ -638,14 +638,14 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
                                           IGF.IGM.getStorageType(elementType));
 }
 
-llvm::Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
-                                                       SILType tupleType,
-                                                       unsigned fieldNo) {
+std::optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
+                                                      SILType tupleType,
+                                                      unsigned fieldNo) {
   // Macro happens to work with IGM, too.
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 irgen::getPhysicalTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
                                           unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGM, tupleType, getElementStructIndex, fieldNo);

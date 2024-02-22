@@ -40,7 +40,7 @@ using namespace Lowering;
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static llvm::Optional<SmallVector<Expr *, 2>>
+static std::optional<SmallVector<Expr *, 2>>
 decomposeArguments(SILGenFunction &SGF, SILLocation loc,
                    PreparedArguments &&args, unsigned expectedCount) {
   SmallVector<Expr*, 2> result;
@@ -55,7 +55,7 @@ decomposeArguments(SILGenFunction &SGF, SILLocation loc,
   SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                    "argument to builtin should be a literal tuple");
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &SGF,
@@ -2010,16 +2010,16 @@ static ManagedValue emitBuiltinDistributedActorAsAnyActor(
       });
 }
 
-llvm::Optional<SpecializedEmitter>
+std::optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
   if (function.kind != SILDeclRef::Kind::Func)
-    return llvm::None;
+    return std::nullopt;
   if (!function.hasDecl())
-    return llvm::None;
+    return std::nullopt;
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
-    return llvm::None;
+    return std::nullopt;
 
   const auto name = decl->getBaseIdentifier();
   const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);

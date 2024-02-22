@@ -86,7 +86,7 @@ public:
                 bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
-                llvm::Optional<SILLocation> DbgLoc = llvm::None);
+                std::optional<SILLocation> DbgLoc = std::nullopt);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);

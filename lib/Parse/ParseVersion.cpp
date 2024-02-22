@@ -53,7 +53,7 @@ static void splitVersionComponents(
   }
 }
 
-llvm::Optional<Version> VersionParser::parseCompilerVersionString(
+std::optional<Version> VersionParser::parseCompilerVersionString(
     StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags) {
 
   Version CV;
@@ -173,10 +173,10 @@ llvm::Optional<Version> VersionParser::parseCompilerVersionString(
     CV.Components[0] = CV.Components[0] / 1000;
   }
 
-  return isValidVersion ? llvm::Optional<Version>(CV) : llvm::None;
+  return isValidVersion ? std::optional<Version>(CV) : std::nullopt;
 }
 
-llvm::Optional<Version>
+std::optional<Version>
 VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
                                   DiagnosticEngine *Diags) {
   Version TheVersion;
@@ -188,7 +188,7 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
   if (VersionString.empty()) {
     if (Diags)
       Diags->diagnose(Loc, diag::empty_version_string);
-    return llvm::None;
+    return std::nullopt;
   }
 
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
@@ -221,5 +221,5 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
     }
   }
 
-  return isValidVersion ? llvm::Optional<Version>(TheVersion) : llvm::None;
+  return isValidVersion ? std::optional<Version>(TheVersion) : std::nullopt;
 }

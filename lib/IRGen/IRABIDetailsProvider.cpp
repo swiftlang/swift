@@ -41,7 +41,7 @@
 using namespace swift;
 using namespace irgen;
 
-static llvm::Optional<Type>
+static std::optional<Type>
 getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
   if (const auto *intType = dyn_cast<llvm::IntegerType>(type)) {
     switch (intType->getBitWidth()) {
@@ -56,7 +56,7 @@ getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
     case 64:
       return ctx.getUInt64Type();
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   } else if (type->isFloatTy()) {
     return ctx.getFloatType();
@@ -66,7 +66,7 @@ getPrimitiveTypeFromLLVMType(ASTContext &ctx, const llvm::Type *type) {
     return ctx.getOpaquePointerType();
   }
   // FIXME: Handle vector type.
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace swift {
@@ -78,12 +78,12 @@ public:
         silMod(SILModule::createEmptyModule(&mod, typeConverter, silOpts)),
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
-  llvm::Optional<IRABIDetailsProvider::SizeAndAlignment>
+  std::optional<IRABIDetailsProvider::SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD) {
     auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
     auto *fixedTI = dyn_cast<FixedTypeInfo>(TI);
     if (!fixedTI)
-      return llvm::None;
+      return std::nullopt;
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
@@ -131,7 +131,7 @@ public:
     return elements;
   }
 
-  llvm::Optional<LoweredFunctionSignature>
+  std::optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
     auto declRef = SILDeclRef(fd);
     auto function = Lowering::SILGenModule(*silMod, declRef.getModuleContext())
@@ -141,9 +141,9 @@ public:
     auto silFuncType = function->getLoweredFunctionType();
     // FIXME: Async function support.
     if (silFuncType->isAsync())
-      return llvm::None;
+      return std::nullopt;
     if (silFuncType->getLanguage() != SILFunctionLanguage::Swift)
-      return llvm::None;
+      return std::nullopt;
 
     // FIXME: Tuple parameter mapping support.
     llvm::SmallVector<const ParamDecl *, 8> silParamMapping;
@@ -151,7 +151,7 @@ public:
       if (auto *tuple =
               param->getInterfaceType()->getAs<TupleType>()) {
         if (tuple->getNumElements() > 0)
-          return llvm::None;
+          return std::nullopt;
       }
     }
 
@@ -200,29 +200,29 @@ public:
     // Return nothing if we were unable to represent the exact signature
     // parameters.
     if (signatureParamCount != abiDetails->numParamIRTypesInSignature)
-      return llvm::None;
+      return std::nullopt;
 
     return result;
   }
 
   using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
 
-  llvm::Optional<MethodDispatchInfo::PointerAuthDiscriminator>
+  std::optional<MethodDispatchInfo::PointerAuthDiscriminator>
   getMethodPointerAuthInfo(const AbstractFunctionDecl *funcDecl,
                            SILDeclRef method) {
     // FIXME: Async support.
     if (funcDecl->hasAsync())
-      return llvm::None;
+      return std::nullopt;
     const auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
     if (!schema)
-      return llvm::None;
+      return std::nullopt;
     auto discriminator =
         PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
     return MethodDispatchInfo::PointerAuthDiscriminator{
         discriminator->getZExtValue()};
   }
 
-  llvm::Optional<MethodDispatchInfo>
+  std::optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
     if (funcDecl->isSemanticallyFinal())
       return MethodDispatchInfo::direct();
@@ -348,10 +348,10 @@ LoweredFunctionSignature::MetadataSourceParameter::MetadataSourceParameter(
     const CanType &type)
     : type(type) {}
 
-llvm::Optional<LoweredFunctionSignature::DirectResultType>
+std::optional<LoweredFunctionSignature::DirectResultType>
 LoweredFunctionSignature::getDirectResultType() const {
   if (!abiDetails.directResult)
-    return llvm::None;
+    return std::nullopt;
   return DirectResultType(owner, abiDetails.directResult->typeInfo);
 }
 
@@ -455,12 +455,12 @@ IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,
 
 IRABIDetailsProvider::~IRABIDetailsProvider() {}
 
-llvm::Optional<IRABIDetailsProvider::SizeAndAlignment>
+std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
 }
 
-llvm::Optional<LoweredFunctionSignature>
+std::optional<LoweredFunctionSignature>
 IRABIDetailsProvider::getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
   return impl->getFunctionLoweredSignature(fd);
 }
@@ -482,7 +482,7 @@ IRABIDetailsProvider::getEnumTagMapping(const EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
 }
 
-llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo>
+std::optional<IRABIDetailsProvider::MethodDispatchInfo>
 IRABIDetailsProvider::getMethodDispatchInfo(
     const AbstractFunctionDecl *funcDecl) {
   return impl->getMethodDispatchInfo(funcDecl);

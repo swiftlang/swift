@@ -15,8 +15,8 @@
 #include "swift/Basic/ClusteredBitVector.h"
 
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include <optional>
 
 namespace swift {
 namespace irgen {
@@ -146,9 +146,9 @@ public:
   /// the option will contain a value that is the combined length of
   /// the elements appended to the builder. The mask represents is an
   /// integer in the target byte order.
-  llvm::Optional<APInt> build() const {
+  std::optional<APInt> build() const {
     if (Size == 0) {
-      return llvm::Optional<APInt>();
+      return std::optional<APInt>();
     }
     auto result = APInt::getZero(Size);
     unsigned offset = 0;

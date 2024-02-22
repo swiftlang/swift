@@ -169,11 +169,11 @@ public:
   }
   
   /// Return the abstraction pattern of the context we're emitting into.
-  llvm::Optional<AbstractionPattern> getAbstractionPattern() const {
+  std::optional<AbstractionPattern> getAbstractionPattern() const {
     if (auto *init = getEmitInto()) {
       return init->getAbstractionPattern();
     }
-    return llvm::None;
+    return std::nullopt;
   }
 };
 

@@ -13,14 +13,14 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include <limits.h>
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -98,12 +98,12 @@ public:
   AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
   /// Returns the TypeAttrKind.
-  llvm::Optional<TypeAttrKind> type() const {
+  std::optional<TypeAttrKind> type() const {
     if (!isType || kind == NumTypeAttrKinds) return {};
     return static_cast<TypeAttrKind>(kind);
   }
   /// Returns the DeclAttrKind.
-  llvm::Optional<DeclAttrKind> decl() const {
+  std::optional<DeclAttrKind> decl() const {
     if (isType || kind == NumDeclAttrKinds)
       return {};
     return static_cast<DeclAttrKind>(kind);
@@ -536,7 +536,7 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// The information for converting archetypes to specialized types.
-  llvm::Optional<TypeTransformContext> TransformContext;
+  std::optional<TypeTransformContext> TransformContext;
 
   /// Whether to display (Clang-)imported module names;
   bool QualifyImportedTypes = false;

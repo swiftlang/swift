@@ -128,11 +128,11 @@ bool Term::containsUnresolvedSymbols() const {
 ///
 /// This is used to implement Term::compare() and MutableTerm::compare()
 /// below.
-static llvm::Optional<int> shortlexCompare(const Symbol *lhsBegin,
-                                           const Symbol *lhsEnd,
-                                           const Symbol *rhsBegin,
-                                           const Symbol *rhsEnd,
-                                           RewriteContext &ctx) {
+static std::optional<int> shortlexCompare(const Symbol *lhsBegin,
+                                          const Symbol *lhsEnd,
+                                          const Symbol *rhsBegin,
+                                          const Symbol *rhsEnd,
+                                          RewriteContext &ctx) {
   // First, compare the number of name symbols.
   unsigned lhsNameCount = 0;
   for (auto *iter = lhsBegin; iter != lhsEnd; ++iter) {
@@ -166,7 +166,7 @@ static llvm::Optional<int> shortlexCompare(const Symbol *lhsBegin,
     ++lhsBegin;
     ++rhsBegin;
 
-    llvm::Optional<int> result = lhs.compare(rhs, ctx);
+    std::optional<int> result = lhs.compare(rhs, ctx);
     if (!result.has_value() || *result != 0) {
       assert(lhs != rhs);
       return result;
@@ -180,14 +180,14 @@ static llvm::Optional<int> shortlexCompare(const Symbol *lhsBegin,
 
 /// Shortlex order on terms. Returns None if the terms are identical except
 /// for an incomparable superclass or concrete type symbol at the end.
-llvm::Optional<int> Term::compare(Term other, RewriteContext &ctx) const {
+std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Shortlex order on mutable terms. Returns None if the terms are identical
 /// except for an incomparable superclass or concrete type symbol at the end.
-llvm::Optional<int> MutableTerm::compare(const MutableTerm &other,
-                                         RewriteContext &ctx) const {
+std::optional<int> MutableTerm::compare(const MutableTerm &other,
+                                        RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 

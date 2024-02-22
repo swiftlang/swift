@@ -18,10 +18,9 @@
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -137,14 +136,14 @@ private:
 
     /// The last buffer we looked in. This acts as a one-element MRU cache for
     /// lookups based on source locations.
-    llvm::Optional<unsigned> lastBufferID;
+    std::optional<unsigned> lastBufferID;
   };
 
   /// The cache that's used to quickly map a source location to a particular
   /// buffer ID.
   mutable BufferLocCache LocCache;
 
-  llvm::Optional<unsigned> findBufferContainingLocInternal(SourceLoc Loc) const;
+  std::optional<unsigned> findBufferContainingLocInternal(SourceLoc Loc) const;
 
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
@@ -210,7 +209,7 @@ public:
   bool hasGeneratedSourceInfo(unsigned bufferID);
 
   /// Retrieve the generated source information for the given buffer.
-  llvm::Optional<GeneratedSourceInfo>
+  std::optional<GeneratedSourceInfo>
   getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Retrieve the list of ancestors of the given source buffer, starting with
@@ -344,7 +343,7 @@ public:
 
   /// Returns a buffer ID for a previously added buffer with the given
   /// buffer identifier, or None if there is no such buffer.
-  llvm::Optional<unsigned>
+  std::optional<unsigned>
   getIDForBufferIdentifier(StringRef BufIdentifier) const;
 
   /// Returns the identifier for the buffer with the given ID.
@@ -436,7 +435,7 @@ public:
   StringRef getEntireTextForBuffer(unsigned BufferID) const;
 
   StringRef extractText(CharSourceRange Range,
-                        llvm::Optional<unsigned> BufferID = llvm::None) const;
+                        std::optional<unsigned> BufferID = std::nullopt) const;
 
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,
@@ -449,15 +448,15 @@ public:
 
   /// Translate line and column pair to the offset.
   /// If the column number is the maximum unsinged int, return the offset of the end of the line.
-  llvm::Optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
-                                              unsigned Col) const;
+  std::optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
+                                             unsigned Col) const;
 
   /// Translate the end position of the given line to the offset.
-  llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
-                                                     unsigned Line) const;
+  std::optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
+                                                    unsigned Line) const;
 
   /// Get the length of the line
-  llvm::Optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;
+  std::optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;
 
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);

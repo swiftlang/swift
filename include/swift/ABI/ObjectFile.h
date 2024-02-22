@@ -7,9 +7,9 @@
 #ifndef SWIFT_ABI_OBJECTFILE_H
 #define SWIFT_ABI_OBJECTFILE_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <optional>
 
 namespace swift {
 
@@ -27,12 +27,10 @@ class SwiftObjectFileFormat {
 public:
   virtual ~SwiftObjectFileFormat() {}
   virtual llvm::StringRef getSectionName(ReflectionSectionKind section) = 0;
-  virtual llvm::Optional<llvm::StringRef> getSegmentName() {
-    return {};
-  }
+  virtual std::optional<llvm::StringRef> getSegmentName() { return {}; }
   /// Get the name of the segment in the symbol rich binary that may contain
   /// Swift metadata.
-  virtual llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() {
+  virtual std::optional<llvm::StringRef> getSymbolRichSegmentName() {
     return {};
   }
   /// Predicate to identify if the named section can contain reflection data.
@@ -53,11 +51,11 @@ public:
     llvm_unreachable("Section type not found.");
   }
 
-  llvm::Optional<llvm::StringRef> getSegmentName() override {
+  std::optional<llvm::StringRef> getSegmentName() override {
     return {"__TEXT"};
   }
 
-  llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() override {
+  std::optional<llvm::StringRef> getSymbolRichSegmentName() override {
     return {"__DWARF"};
   }
 

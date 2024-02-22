@@ -1715,12 +1715,12 @@ void OpenPackElementInst::forEachDefinedLocalArchetype(
 //                         Multiple Value Instruction
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
   // First make sure we actually have one of our instruction results.
   auto *MVIR = dyn_cast<MultipleValueInstructionResult>(Target);
   if (!MVIR || MVIR->getParent() != this)
-    return llvm::None;
+    return std::nullopt;
   return MVIR->getIndex();
 }
 

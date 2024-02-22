@@ -21,13 +21,13 @@
 #define SWIFT_BASIC_JSONSERIALIZATION_H
 
 /* #include "swift/Basic/LLVM.h" */
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <map>
 #include <vector>
@@ -475,8 +475,8 @@ public:
   }
 
   template <typename T>
-  void mapOptional(llvm::StringRef Key, llvm::Optional<T> &Val) {
-    processKeyWithDefault(Key, Val, llvm::Optional<T>(), /*Required=*/false);
+  void mapOptional(llvm::StringRef Key, std::optional<T> &Val) {
+    processKeyWithDefault(Key, Val, std::optional<T>(), /*Required=*/false);
   }
 
   template <typename T>
@@ -492,8 +492,8 @@ public:
 
 private:
   template <typename T>
-  void processKeyWithDefault(llvm::StringRef Key, llvm::Optional<T> &Val,
-                             const llvm::Optional<T> &DefaultValue,
+  void processKeyWithDefault(llvm::StringRef Key, std::optional<T> &Val,
+                             const std::optional<T> &DefaultValue,
                              bool Required) {
     assert(!DefaultValue.has_value() &&
            "Optional<T> shouldn't have a value!");

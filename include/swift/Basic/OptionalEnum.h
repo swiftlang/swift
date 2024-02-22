@@ -35,7 +35,7 @@ namespace swift {
     OptionalEnum() : Storage(0) { }
 
     /// Construct an empty instance.
-    /*implicit*/ OptionalEnum(llvm::NoneType) : OptionalEnum() {}
+    /*implicit*/ OptionalEnum(std::nullopt_t) : OptionalEnum() {}
 
     /// Construct an instance containing a value of type \c T constructed with
     /// the given argument.

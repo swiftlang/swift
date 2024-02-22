@@ -50,7 +50,7 @@ struct RenameRefInfo {
 /// arguments. For example, returns `true` for `Foo.init` but `false` for
 /// `Foo.init()` or `Foo.init(a: 1)`.
 static bool
-isReferenceWithoutArguments(const llvm::Optional<RenameRefInfo> &refInfo) {
+isReferenceWithoutArguments(const std::optional<RenameRefInfo> &refInfo) {
   if (!refInfo) {
     return false;
   }
@@ -67,9 +67,9 @@ isReferenceWithoutArguments(const llvm::Optional<RenameRefInfo> &refInfo) {
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 
-static llvm::Optional<RefactorAvailabilityInfo>
+static std::optional<RefactorAvailabilityInfo>
 renameAvailabilityInfo(const ValueDecl *VD,
-                       llvm::Optional<RenameRefInfo> RefInfo) {
+                       std::optional<RenameRefInfo> RefInfo) {
   RefactorAvailableKind AvailKind = RefactorAvailableKind::Available;
   if (getRelatedSystemDecl(VD)) {
     AvailKind = RefactorAvailableKind::Unavailable_system_symbol;
@@ -85,7 +85,7 @@ renameAvailabilityInfo(const ValueDecl *VD,
     if (!file)
       return false;
 
-    return file->getFulfilledMacroRole() != llvm::None;
+    return file->getFulfilledMacroRole() != std::nullopt;
   };
 
   if (AvailKind == RefactorAvailableKind::Available) {
@@ -100,20 +100,20 @@ renameAvailabilityInfo(const ValueDecl *VD,
   if (isa<AbstractFunctionDecl>(VD)) {
     // Disallow renaming accessors.
     if (isa<AccessorDecl>(VD))
-      return llvm::None;
+      return std::nullopt;
 
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
-      return llvm::None;
+      return std::nullopt;
 
     // Disallow renaming init with no arguments.
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
-        return llvm::None;
+        return std::nullopt;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
       if (isReferenceWithoutArguments(RefInfo)) {
-        return llvm::None;
+        return std::nullopt;
       }
 #endif
     }
@@ -124,11 +124,11 @@ renameAvailabilityInfo(const ValueDecl *VD,
       // whether it's an instance method, so we do the same here for now.
       if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
         if (!FD->getParameters()->size())
-          return llvm::None;
+          return std::nullopt;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
         if (isReferenceWithoutArguments(RefInfo)) {
-          return llvm::None;
+          return std::nullopt;
         }
 #endif
       }
@@ -149,15 +149,15 @@ renameAvailabilityInfo(const ValueDecl *VD,
 /// Given a cursor, return the decl and its rename availability. \c None if
 /// the cursor did not resolve to a decl or it resolved to a decl that we do
 /// not allow renaming on.
-llvm::Optional<RenameInfo>
+std::optional<RenameInfo>
 swift::ide::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
   auto valueCursor = dyn_cast<ResolvedValueRefCursorInfo>(cursorInfo);
   if (!valueCursor)
-    return llvm::None;
+    return std::nullopt;
 
   ValueDecl *VD = valueCursor->typeOrValue();
   if (!VD)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto *V = dyn_cast<VarDecl>(VD)) {
     // Always use the canonical var decl for comparison. This is so we
@@ -176,7 +176,7 @@ swift::ide::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
     }
   }
 
-  llvm::Optional<RenameRefInfo> refInfo;
+  std::optional<RenameRefInfo> refInfo;
   if (!valueCursor->getShorthandShadowedDecls().empty()) {
     // Find the outermost decl for a shorthand if let/closure capture
     VD = valueCursor->getShorthandShadowedDecls().back();
@@ -185,10 +185,10 @@ swift::ide::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
                valueCursor->isKeywordArgument()};
   }
 
-  llvm::Optional<RefactorAvailabilityInfo> info =
+  std::optional<RefactorAvailabilityInfo> info =
       renameAvailabilityInfo(VD, refInfo);
   if (!info)
-    return llvm::None;
+    return std::nullopt;
 
   return RenameInfo{VD, *info};
 }
@@ -255,14 +255,14 @@ private:
     return true;
   }
 
-  llvm::Optional<RenameLoc>
+  std::optional<RenameLoc>
   indexSymbolToRenameLoc(const index::IndexSymbol &symbol);
 };
 
-llvm::Optional<RenameLoc>
+std::optional<RenameLoc>
 RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
   if (symbol.roles & (unsigned)index::SymbolRole::Implicit) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   RenameLocUsage usage = RenameLocUsage::Unknown;
@@ -324,7 +324,7 @@ static ValueDecl *getDeclForLocalRename(SourceFile *sourceFile,
       CursorInfoRequest{CursorInfoOwner(sourceFile, startLoc)},
       new ResolvedCursorInfo());
 
-  llvm::Optional<RenameInfo> info = getRenameInfo(cursorInfo);
+  std::optional<RenameInfo> info = getRenameInfo(cursorInfo);
   if (!info) {
     diags.diagnose(startLoc, diag::unresolved_location);
     return nullptr;

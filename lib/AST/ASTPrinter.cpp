@@ -450,7 +450,7 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
 }
 
 void ASTPrinter::callPrintDeclPre(const Decl *D,
-                                  llvm::Optional<BracketOptions> Bracket) {
+                                  std::optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && isa<ExtensionDecl>(D))
@@ -6405,7 +6405,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  llvm::Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+  std::optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
@@ -7493,7 +7493,7 @@ public:
     // substituted types in terms of a generic signature declared on the decl,
     // which would make this logic more uniform.
     TypePrinter *sub = this;
-    llvm::Optional<TypePrinter> subBuffer;
+    std::optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericSig = nullptr;

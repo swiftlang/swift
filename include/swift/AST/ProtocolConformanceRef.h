@@ -21,9 +21,9 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include <optional>
 
 namespace llvm {
   class raw_ostream;
@@ -153,12 +153,12 @@ public:
   
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType, TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to the conforming type.
   ///

@@ -67,8 +67,8 @@ using InvertibleProtocolSet = FixedBitSet<NumInvertibleProtocols,
 
 /// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
 /// \returns None if the known protocol is not invertible.
-llvm::Optional<InvertibleProtocolKind>
-    getInvertibleProtocolKind(KnownProtocolKind kp);
+std::optional<InvertibleProtocolKind>
+getInvertibleProtocolKind(KnownProtocolKind kp);
 
 /// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
 KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);

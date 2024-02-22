@@ -190,7 +190,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
                                                      StringRef moduleName) const {
   using namespace llvm::sys;
   using namespace file_types;
-  llvm::Optional<std::string> modulePath;
+  std::optional<std::string> modulePath;
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
 

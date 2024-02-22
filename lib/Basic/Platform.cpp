@@ -79,7 +79,7 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
   return false;
 }
 
-const llvm::Optional<llvm::VersionTuple>
+const std::optional<llvm::VersionTuple>
 swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isMacOSX())
     return llvm::VersionTuple(10, 10, 0);
@@ -99,7 +99,7 @@ swift::minimumAvailableOSVersionForTriple(const llvm::Triple &triple) {
   if (triple.isWatchOS())
     return llvm::VersionTuple(2, 0);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
@@ -282,7 +282,7 @@ StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
 //   map to. That is, `.Cases("bar", "baz", "foo")` will return "foo" if it sees
 //   "bar" or "baz".
 //
-// * llvm::Optional is similar to a Swift Optional: it either contains a value
+// * std::optional is similar to a Swift Optional: it either contains a value
 //   or represents the absence of one. `None` is equivalent to `nil`; leading
 //   `*` is equivalent to trailing `!`; conversion to `bool` is a not-`None`
 //   check.
@@ -339,11 +339,11 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
               .Default(tripleOSNameNoVersion);
 }
 
-static llvm::Optional<StringRef>
+static std::optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
-  return llvm::StringSwitch<llvm::Optional<StringRef>>(tripleEnvironment)
-      .Cases("unknown", "", llvm::None)
+  return llvm::StringSwitch<std::optional<StringRef>>(tripleEnvironment)
+      .Cases("unknown", "", std::nullopt)
       // These values are also supported, but are handled by the default case
       // below:
       //          .Case ("simulator", StringRef("simulator"))
@@ -361,7 +361,7 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
     StringRef newOS = getOSForAppleTargetSpecificModuleTriple(triple);
 
-    llvm::Optional<StringRef> newEnvironment =
+    std::optional<StringRef> newEnvironment =
         getEnvironmentForAppleTargetSpecificModuleTriple(triple);
 
     if (!newEnvironment)
@@ -400,7 +400,7 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
                       unversionedOSName);
 }
 
-llvm::Optional<llvm::VersionTuple>
+std::optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -514,7 +514,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
@@ -533,7 +533,7 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
     if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
             clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
       return MacOStoMacCatalystMapping
-          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), llvm::None)
+          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), std::nullopt)
           .value_or(llvm::VersionTuple(0, 0, 0));
     }
     return llvm::VersionTuple(0, 0, 0);
