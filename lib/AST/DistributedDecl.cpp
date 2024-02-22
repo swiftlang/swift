@@ -256,7 +256,7 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     return nullptr;
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  if (!systemTy)
+  if (!systemTy || systemTy->is<GenericTypeParamType>())
     return nullptr;
 
   auto decoderTy =

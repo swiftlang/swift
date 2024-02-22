@@ -869,7 +869,10 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   auto &ctx = actor->getASTContext();
 
   auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
-  assert(decoder);
+  // If distributed actor is generic over actor system, there is not
+  // going to be a concrete decoder.
+  if (!decoder)
+    return nullptr;
 
   auto decoderTy = decoder->getDeclaredInterfaceType();
 
