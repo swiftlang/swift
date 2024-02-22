@@ -620,7 +620,7 @@ namespace {
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
-      Signature signature = IGF.IGM.getSignature(fnType);
+      Signature signature = IGF.IGM.getSignature(fnType, copyConstructor);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
       auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(

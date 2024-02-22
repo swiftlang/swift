@@ -3511,7 +3511,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       emitCXXConstructorCall(subIGF, ctor, ctorFnType, ctorAddress, Args);
   if (isa<llvm::InvokeInst>(call))
     IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
-  subIGF.Builder.CreateRetVoid();
+  if (ctorFnType->getReturnType()->isVoidTy())
+    subIGF.Builder.CreateRetVoid();
+  else
+    subIGF.Builder.CreateRet(call);
 
   return thunk;
 }
@@ -3583,7 +3586,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
 
     if (cxxCtor) {
-      Signature signature = getSignature(f->getLoweredFunctionType());
+      Signature signature = getSignature(f->getLoweredFunctionType(), cxxCtor);
 
       // The thunk has private linkage, so it doesn't need to have a predictable
       // mangled name -- we just need to make sure the name is unique.
