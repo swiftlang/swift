@@ -607,12 +607,13 @@ func singleFieldVarMergeTest() async {
 }
 
 func multipleFieldVarMergeTest1() async {
-  var box = TwoFieldKlassBox()
+  var box = TwoFieldKlassBox() // expected-tns-note {{variable defined here}}
   box = TwoFieldKlassBox()
 
   // This transfers the entire region.
-  await transferToMain(box.k1) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  await transferToMain(box.k1) // expected-tns-warning {{transferring 'box.k1' may cause a race}}
+  // expected-tns-note @-1 {{'box.k1' is transferred from nonisolated caller to main actor-isolated callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   
 
   // So even if we reassign over k1, since we did a merge, this should error.
@@ -647,12 +648,13 @@ func multipleFieldVarMergeTest2() async {
 }
 
 func multipleFieldTupleMergeTest1() async {
-  var box = (NonSendableKlass(), NonSendableKlass())
+  var box = (NonSendableKlass(), NonSendableKlass()) // expected-tns-note {{variable defined here}}
   box = (NonSendableKlass(), NonSendableKlass())
 
   // This transfers the entire region.
-  await transferToMain(box.0) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  await transferToMain(box.0) // expected-tns-warning {{transferring 'box.0' may cause a race}}
+  // expected-tns-note @-1 {{'box.0' is transferred from nonisolated caller to main actor-isolated callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   // So even if we reassign over k1, since we did a merge, this should error.
   box.0 = NonSendableKlass() // expected-tns-note {{access here could race}}
