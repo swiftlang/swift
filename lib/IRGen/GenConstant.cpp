@@ -378,9 +378,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     SILFunction *fn = FRI->getReferencedFunction();
 
     llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
-    assert(!fn->isAsync() && "TODO: support async functions");
-
     CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
+
+    if (irgen::classifyFunctionPointerKind(fn).isAsyncFunctionPointer()) {
+      llvm::Constant *asyncFnPtr = IGM.getAddrOfAsyncFunctionPointer(fn);
+      fnPtr = llvm::ConstantExpr::getBitCast(asyncFnPtr, fnPtr->getType());
+    }
+
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
     if (authInfo.isSigned()) {
       auto constantDiscriminator =
