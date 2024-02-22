@@ -83,14 +83,14 @@ public:
   void emitCallToOutlinedRelease(Address addr, SILType T, const TypeInfo &ti,
                                  Atomicity atomicity) const;
 
-private:
-  void collectFormalTypeMetadata(CanType type);
-  void collectRepresentationTypeMetadata(SILType ty);
-
   void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
   void addMetadataParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
   void bindMetadataParameters(IRGenFunction &helperIGF,
                               Explosion &params) const;
+
+private:
+  void collectFormalTypeMetadata(CanType type);
+  void collectRepresentationTypeMetadata(SILType ty);
 };
 
 std::pair<CanType, CanGenericSignature>
