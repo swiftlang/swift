@@ -2113,8 +2113,9 @@ namespace {
       if (!normal)
         return;
 
-      // FIXME(kavon): probably need to emit the inverse requirements in the
-      //  metadata so the runtime knows not to check for Copyable?
+      // FIXME(kavon): emit the inverse requirements in the
+      //  metadata so the runtime knows not to check for Copyable.
+      //  (rdar://123466649)
       SmallVector<Requirement, 2> condReqs;
       SmallVector<InverseRequirement, 2> inverses;
       normal->getConditionalRequirementsWithInverses(condReqs, inverses);

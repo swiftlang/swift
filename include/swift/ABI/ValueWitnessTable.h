@@ -171,6 +171,11 @@ template <typename Runtime> struct TargetValueWitnessTable {
     return flags.isBitwiseTakable();
   }
 
+  // Is this type copyable?
+  bool isCopyable() const {
+    return flags.isCopyable();
+  }
+
   /// Return the size of this type.  Unlike in C, this has not been
   /// padded up to the alignment; that value is maintained as
   /// 'stride'.

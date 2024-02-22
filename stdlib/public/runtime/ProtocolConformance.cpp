@@ -323,9 +323,41 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
+/// Returns true iff the given type only has Copyable generic arguments.
+static bool hasOnlyCopyableGenericArgs(const Metadata *type) {
+  auto *descriptor = type->getTypeContextDescriptor();
+  if (!descriptor)
+    return true; // nothing to check.
+
+  if (!descriptor->isGeneric())
+    return true; // nothing to check.
+
+  auto &genericContextHeader = descriptor->getGenericContextHeader();
+  const uint32_t numArgs = genericContextHeader.getNumArguments();
+  if (numArgs == 0)
+    return true; // nothing to check;
+
+  auto args = descriptor->getGenericArguments(type);
+  for (uint32_t i = 0; i < numArgs; i++) {
+    auto *vwt = args[i]->getValueWitnesses();
+    if (!vwt)
+      continue;
+
+    if (!vwt->isCopyable())
+      return false;
+  }
+
+  return true;
+}
+
 template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
+  // FIXME(kavon): allow noncopyable args if there are inverse requirements
+  //  for the corresponding generic parameters. (rdar://123466649)
+  if (!hasOnlyCopyableGenericArgs(type))
+    return nullptr;
+
   // If needed, check the conditional requirements.
   llvm::SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
