@@ -255,8 +255,8 @@ ErrorTests.test("willThrow") {
   expectEqual(2, errors.count)
   expectEqual(SillyError.self, type(of: errors.last!))
 
-  // Typed errors introduced in Swift 5.11
-  guard #available(SwiftStdlib 5.11, *) else {
+  // Typed errors introduced in Swift 6.0
+  guard #available(SwiftStdlib 6.0, *) else {
     return
   }
 

@@ -252,6 +252,8 @@
 // RUN:             -e _ZNSt6vectorIjSaIjEE17_M_realloc_insertIJRKjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
 // RUN:             -e _ZNSsC2EPKcRKSaIcE \
 // RUN:             -e _ZSt27__throw_bad_optional_accessv \
+// RUN:             -e _ZNSt8__detail9__variant13__erased_ctorIRSt9monostateOS2_EEvPvS5_ \
+// RUN:             -e _ZNSt8__detail9__variant15__erased_assignIRSt9monostateOS2_EEvPvS5_ \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt

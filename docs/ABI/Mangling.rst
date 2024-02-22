@@ -656,7 +656,7 @@ Types
     function-isolation ::= type 'Yc'          // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
-  #if SWIFT_RUNTIME_VERSION >= 5.11
+  #if SWIFT_RUNTIME_VERSION >= 6.0
     throws ::= type 'YK'                     // 'throws(type)' annotation on function types
     function-isolation ::= type 'YA'         // @isolated(any) on function type
   #endif

@@ -388,7 +388,7 @@ extension MutableCollection {
   /// - Returns: The new bounds of the moved elements.
   ///
   /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @discardableResult
   public mutating func moveSubranges(
     _ subranges: RangeSet<Index>, to insertionPoint: Index

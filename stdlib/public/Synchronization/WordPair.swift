@@ -40,7 +40,7 @@ import Builtin
 ///
 /// - Note: This type only conforms to `AtomicRepresentable` on platforms that
 ///   support double wide atomics.
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 @frozen
 public struct WordPair {
   /// The first element in this word pair.
@@ -53,7 +53,7 @@ public struct WordPair {
   ///
   /// - Parameter first: The first word to use in the pair.
   /// - Parameter second: The second word to use in the pair.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(first: UInt, second: UInt) {
@@ -64,7 +64,7 @@ public struct WordPair {
 
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: AtomicRepresentable {
 #if _pointerBitWidth(_64)
   /// The storage representation type that `Self` encodes to and decodes from
@@ -88,7 +88,7 @@ extension WordPair: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -125,7 +125,7 @@ extension WordPair: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -151,7 +151,7 @@ extension WordPair: AtomicRepresentable {
 
 #endif
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: Equatable {
   /// Compares two values of this type to determine if they are equivalent to
   /// each other.
@@ -159,7 +159,7 @@ extension WordPair: Equatable {
   /// - Parameter lhs: The first value to compare.
   /// - Parameter rhs: The second value to compare.
   /// - Returns: True if both values were equal, or false if they were unequal.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func ==(lhs: WordPair, rhs: WordPair) -> Bool {
@@ -167,14 +167,14 @@ extension WordPair: Equatable {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public func hash(into hasher: inout Hasher) {
@@ -183,24 +183,24 @@ extension WordPair: Hashable {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: CustomStringConvertible {
   /// A string that represents the contents of the word pair.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public var description: String {
     "WordPair(first: \(first), second: \(second))"
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: CustomDebugStringConvertible {
   /// A string that represents the contents of the word pair, suitable for
   /// debugging.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public var debugDescription: String {
     "WordPair(first: \(first), second: \(second))"
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension WordPair: Sendable {}

@@ -12,7 +12,7 @@
 
 /// A collection wrapper that provides access to the elements of a collection,
 /// indexed by a set of indices.
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 public struct DiscontiguousSlice<Base: Collection> {
   internal var _base: Base
   
@@ -31,18 +31,18 @@ public struct DiscontiguousSlice<Base: Collection> {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Sendable
 where Base: Sendable, Base.Index: Sendable {}
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.elementsEqual(rhs)
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // delimeter; do not remove
@@ -52,14 +52,14 @@ extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice {
   /// A position in a `DiscontiguousSlice`.
   public struct Index {
@@ -76,38 +76,38 @@ extension DiscontiguousSlice {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice.Index: Equatable {
   public static func == (left: Self, right: Self) -> Bool {
     left.base == right.base
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice.Index: Hashable where Base.Index: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(base)
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice.Index: Comparable {
   public static func < (left: Self, right: Self) -> Bool {
     left.base < right.base
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice.Index: CustomStringConvertible {
   public var description: String {
     "<base: \(String(reflecting: base)), rangeOffset: \(_rangeOffset)>"
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice.Index: Sendable where Base.Index: Sendable {}
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = IndexingIterator<Self>
@@ -125,7 +125,7 @@ extension DiscontiguousSlice: Sequence {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Collection {
   public typealias SubSequence = Self
   public typealias Indices = DefaultIndices<Self>
@@ -308,7 +308,7 @@ extension DiscontiguousSlice: Collection {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: BidirectionalCollection
   where Base: BidirectionalCollection
 {
@@ -331,7 +331,7 @@ extension DiscontiguousSlice: BidirectionalCollection
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice where Base: MutableCollection {
   /// Accesses the element at the specified position.
   ///
@@ -374,7 +374,7 @@ extension Collection {
   /// - Returns: A collection of the elements at the positions in `subranges`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public subscript(subranges: RangeSet<Index>) -> DiscontiguousSlice<Self> {
     DiscontiguousSlice(_base: self, subranges: subranges)
   }
@@ -402,7 +402,7 @@ extension Collection {
   /// - Returns: A collection of the elements that are not in `subranges`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public func removingSubranges(
     _ subranges: RangeSet<Index>
   ) -> DiscontiguousSlice<Self> {

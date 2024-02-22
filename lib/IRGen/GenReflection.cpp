@@ -176,7 +176,7 @@ public:
 
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
-  // The Swift 5.11 runtime is the first version able to demangle types
+  // The Swift 6.0 runtime is the first version able to demangle types
   // that involve typed throws.
   bool usesTypedThrows = type.findIf([](CanType t) -> bool {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
@@ -187,7 +187,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     return false;
   });
   if (usesTypedThrows) {
-    return llvm::VersionTuple(5, 11);
+    return llvm::VersionTuple(6, 0);
   }
 
   // The Swift 5.5 runtime is the first version able to demangle types

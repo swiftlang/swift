@@ -408,7 +408,7 @@ extension DistributedActor {
   /// as only a local distributed actor can be isolated on and may be automatically
   /// erased to such `any Actor` when calling methods implicitly accepting the
   /// caller's actor isolation, e.g. by using the `#isolation` macro.
-  @backDeployed(before: SwiftStdlib 5.11)
+  @backDeployed(before: SwiftStdlib 6.0)
   public var asLocalActor: any Actor {
     Builtin.distributedActorAsAnyActor(self)
   }
@@ -442,10 +442,10 @@ func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
 
 // ==== Distributed Actor Stubs ------------------------------------------------
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 public protocol _DistributedActorStub where Self: DistributedActor {}
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 public func _distributedStubFatalError(function: String = #function) -> Never {
   fatalError("Unexpected invocation of distributed method '\(function)' stub!")
 }
