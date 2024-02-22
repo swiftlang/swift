@@ -6920,28 +6920,46 @@ ProtocolDecl::getProtocolDependencies() const {
       std::nullopt);
 }
 
-/// If we hit a request cycle, give the protocol a requirement signature where
-/// everything is Copyable and Escapable. Otherwise, we'll get spurious
-/// downstream diagnostics concerning move-only types.
+/// If we hit a request cycle, give the protocol a requirement signature that
+/// still has inherited protocol requirements on Self, and also conformances
+/// to Copyable and Escapable for all associated types. Otherwise, we'll see
+/// invariant violations from the inheritance clause mismatch, as well as
+/// spurious downstream diagnostics concerning move-only types.
 static RequirementSignature getPlaceholderRequirementSignature(
     const ProtocolDecl *proto) {
   auto &ctx = proto->getASTContext();
 
-  SmallVector<Requirement, 2> requirements;
+  SmallVector<ProtocolDecl *, 2> inheritedProtos;
+  for (auto *inheritedProto : proto->getInheritedProtocols()) {
+    inheritedProtos.push_back(inheritedProto);
+  }
 
   if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto add = [&](Type type) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
+      inheritedProtos.push_back(otherProto);
+    }
+  }
+
+  ProtocolType::canonicalizeProtocols(inheritedProtos);
+
+  SmallVector<Requirement, 2> requirements;
+
+  for (auto *inheritedProto : inheritedProtos) {
+    requirements.emplace_back(RequirementKind::Conformance,
+                              proto->getSelfInterfaceType(),
+                              inheritedProto->getDeclaredInterfaceType());
+  }
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
       for (auto ip : InvertibleProtocolSet::full()) {
-        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance, type,
-                                  proto->getDeclaredInterfaceType());
+        auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
+        requirements.emplace_back(RequirementKind::Conformance,
+                                  assocTypeDecl->getDeclaredInterfaceType(),
+                                  otherProto->getDeclaredInterfaceType());
       }
-    };
-
-    add(proto->getSelfInterfaceType());
-
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
-      add(assocTypeDecl->getDeclaredInterfaceType());
+    }
   }
 
   // Maintain invariants.

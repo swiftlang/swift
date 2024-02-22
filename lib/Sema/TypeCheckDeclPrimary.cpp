@@ -2054,6 +2054,11 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   const bool EnabledNoncopyableGenerics =
       ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
+  // Check for circular inheritance; the HasCircularInheritedProtocolsRequest
+  // will diagnose an error in that case, and we skip all remaining checks.
+  if (proto->hasCircularInheritedProtocols())
+    return;
+
   // If we make a ~P marking but our protocol Self type still conforms to P,
   // diagnose an error.
   //
@@ -3480,9 +3485,6 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
-
-    // Check for circular inheritance within the protocol.
-    (void) PD->hasCircularInheritedProtocols();
 
     TypeChecker::checkDeclAttributes(PD);
 

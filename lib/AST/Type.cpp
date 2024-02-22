@@ -1527,6 +1527,11 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
     if (proto == nullptr)
       continue;
 
+    // The below algorithm assumes the inheritance graph is acyclic. Just skip
+    // it if we have invalid code.
+    if (proto->hasCircularInheritedProtocols())
+      continue;
+
     // Add the protocols we inherited.
     proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
       if (inherited == proto)
