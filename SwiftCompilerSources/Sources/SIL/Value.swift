@@ -138,6 +138,14 @@ extension Value {
     }
   }
 
+  public var nextInstruction: Instruction {
+    if self is Argument {
+      return parentBlock.instructions.first!
+    }
+    // Block terminators do not directly produce values.
+    return definingInstruction!.next!
+  }
+
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
   public var bridged: BridgedValue {
