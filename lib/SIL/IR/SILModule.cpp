@@ -126,8 +126,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 
 SILModule::~SILModule() {
 #ifndef NDEBUG
-  checkForLeaks();
-
   NumSlabsAllocated += numAllocatedSlabs;
   assert(numAllocatedSlabs == freeSlabs.size() && "leaking slabs in SILModule");
 #endif
@@ -161,65 +159,6 @@ SILModule::~SILModule() {
     F.eraseAllBlocks();
   }
   flushDeletedInsts();
-}
-
-void SILModule::checkForLeaks() const {
-
-  /// Leak checking is not thread safe, because the instruction counters are
-  /// global non-atomic variables. Leak checking can only be done in case there
-  /// is a single SILModule in a single thread.
-  if (!getOptions().checkSILModuleLeaks)
-    return;
-
-  int instsInModule = scheduledForDeletion.size();
-
-  for (const SILFunction &F : *this) {
-    const SILFunction *sn = &F;
-    do {
-      for (const SILBasicBlock &block : *sn) {
-        instsInModule += std::distance(block.begin(), block.end());
-      }
-    } while ((sn = sn->snapshots) != nullptr);
-  }
-  for (const SILFunction &F : zombieFunctions) {
-    const SILFunction *sn = &F;
-    do {
-      for (const SILBasicBlock &block : F) {
-        instsInModule += std::distance(block.begin(), block.end());
-      }
-    } while ((sn = sn->snapshots) != nullptr);
-  }
-  for (const SILGlobalVariable &global : getSILGlobals()) {
-      instsInModule += std::distance(global.StaticInitializerBlock.begin(),
-                                     global.StaticInitializerBlock.end());
-  }
-  
-  int numAllocated = SILInstruction::getNumCreatedInstructions() -
-                       SILInstruction::getNumDeletedInstructions();
-                       
-  if (numAllocated != instsInModule) {
-    llvm::errs() << "Leaking instructions!\n";
-    llvm::errs() << "Allocated instructions: " << numAllocated << '\n';
-    llvm::errs() << "Instructions in module: " << instsInModule << '\n';
-    llvm_unreachable("leaking instructions");
-  }
-  
-  assert(PlaceholderValue::getNumPlaceholderValuesAlive() == 0 &&
-         "leaking placeholders");
-}
-
-void SILModule::checkForLeaksAfterDestruction() {
-// Disabled in release (non-assert) builds because this check fails in rare
-// cases in lldb, causing crashes. rdar://70826934
-#ifndef NDEBUG
-  int numAllocated = SILInstruction::getNumCreatedInstructions() -
-                     SILInstruction::getNumDeletedInstructions();
-
-  if (numAllocated != 0) {
-    llvm::errs() << "Leaking " << numAllocated << " instructions!\n";
-    llvm_unreachable("leaking instructions");
-  }
-#endif
 }
 
 std::unique_ptr<SILModule> SILModule::createEmptyModule(

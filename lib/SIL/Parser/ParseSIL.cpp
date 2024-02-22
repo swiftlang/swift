@@ -101,9 +101,6 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   auto bufferID = SF->getBufferID();
   assert(bufferID);
 
-  // For leak detection.
-  SILInstruction::resetInstructionCounts();
-
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
   SILParserState parserState(*silMod.get());

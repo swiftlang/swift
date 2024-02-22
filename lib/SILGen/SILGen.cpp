@@ -2115,9 +2115,6 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
     return evaluateOrFatal(evaluator, ParseSILModuleRequest{desc});
   }
 
-  // For leak detection.
-  SILInstruction::resetInstructionCounts();
-
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts, desc.irgenOptions);
 
