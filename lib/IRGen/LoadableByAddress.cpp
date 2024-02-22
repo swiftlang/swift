@@ -3306,7 +3306,7 @@ bool Peepholes::optimizeLoad(SILBasicBlock &BB, SILInstruction *I) {
     if (next2It == BB.end())
       return false;
     auto *store = dyn_cast<StoreInst>(&*next2It);
-    if (!store)
+    if (!store || store->getSrc() != LI)
       return false;
     if (ignore(store))
       return false;
@@ -3459,6 +3459,19 @@ public:
 
   SILValue getAddressForValue(SILValue v) {
     auto it = valueToAddressMap.find(v);
+
+    // This can happen if we deem a container type small but a contained type
+    // big.
+    if (it == valueToAddressMap.end()) {
+      if (auto *sv = dyn_cast<SingleValueInstruction>(v)) {
+        auto addr = createAllocStack(v->getType());
+        auto builder = getBuilder(++sv->getIterator());
+        builder.createStore(sv->getLoc(), v, addr,
+                            StoreOwnershipQualifier::Unqualified);
+        mapValueToAddress(v, addr);
+        return addr;
+      }
+    }
     assert(it != valueToAddressMap.end());
 
     return it->second;
