@@ -450,7 +450,7 @@ void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
 }
 
 void ASTPrinter::callPrintDeclPre(const Decl *D,
-                                  llvm::Optional<BracketOptions> Bracket) {
+                                  std::optional<BracketOptions> Bracket) {
   forceNewlines();
 
   if (SynthesizeTarget && isa<ExtensionDecl>(D))
@@ -3758,8 +3758,26 @@ static bool usesFeatureFullTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureTypedThrows(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->getThrownTypeRepr() != nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    struct Walker : public TypeWalker {
+      bool hasTypedThrows = false;
+
+      Action walkToTypePre(Type ty) override {
+        if (auto funcType = ty->getAs<AnyFunctionType>()) {
+          if (funcType->hasThrownError()) {
+            hasTypedThrows = true;
+            return Action::Stop;
+          }
+        }
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    func->getInterfaceType().walk(walker);
+    return walker.hasTypedThrows;
+  }
 
   return false;
 }
@@ -6405,7 +6423,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  llvm::Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
+  std::optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
   void printGenericArgs(ArrayRef<Type> flatArgs) {
@@ -7493,7 +7511,7 @@ public:
     // substituted types in terms of a generic signature declared on the decl,
     // which would make this logic more uniform.
     TypePrinter *sub = this;
-    llvm::Optional<TypePrinter> subBuffer;
+    std::optional<TypePrinter> subBuffer;
     PrintOptions subOptions = Options;
     if (auto substitutions = T->getPatternSubstitutions()) {
       subOptions.GenericSig = nullptr;

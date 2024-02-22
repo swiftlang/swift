@@ -288,7 +288,7 @@ private:
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
-  llvm::Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+  std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
 public:
   void infer(Constraint *constraint);
@@ -383,7 +383,7 @@ public:
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
-  llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
+  std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
   BindingSet(const PotentialBindings &info)
       : CS(info.CS), TypeVar(info.TypeVar), Info(info) {

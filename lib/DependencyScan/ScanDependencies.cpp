@@ -92,7 +92,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   for (auto It = SN->begin(); It != SN->end(); ++It) {
     auto *MN = cast<MappingNode>(&*It);
     BatchScanInput entry;
-    llvm::Optional<std::set<int8_t>> Platforms;
+    std::optional<std::set<int8_t>> Platforms;
     for (auto &Pair : *MN) {
       auto Key = getScalaNodeText(Pair.getKey());
       auto *Value = Pair.getValue();
@@ -120,7 +120,7 @@ static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
   return false;
 }
 
-static llvm::Optional<std::vector<BatchScanInput>>
+static std::optional<std::vector<BatchScanInput>>
 parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
                         llvm::StringSaver &saver) {
   assert(!batchInputPath.empty());
@@ -133,7 +133,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
   if (!FileBufOrErr) {
     ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
                        batchInputPath);
-    return llvm::None;
+    return std::nullopt;
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
 
@@ -149,7 +149,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
     if (parseBatchInputEntries(ctx, saver, N, result)) {
       ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_corrupted,
                          batchInputPath);
-      return llvm::None;
+      return std::nullopt;
     }
   }
   return result;
@@ -193,7 +193,8 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
 static llvm::Error resolveExplicitModuleInputs(
     ModuleDependencyID moduleID, const ModuleDependencyInfo &resolvingDepInfo,
     const std::set<ModuleDependencyID> &dependencies,
-    ModuleDependenciesCache &cache, CompilerInstance &instance) {
+    ModuleDependenciesCache &cache, CompilerInstance &instance,
+    std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps) {
   // Only need to resolve dependency for following dependencies.
   if (moduleID.Kind == ModuleDependencyKind::SwiftPlaceholder)
     return llvm::Error::success();
@@ -359,13 +360,11 @@ static llvm::Error resolveExplicitModuleInputs(
       dependencyInfoCopy.updateCommandLine(newCommandLine);
     }
 
-    if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
+    if (bridgingHeaderDeps) {
       std::vector<std::string> newCommandLine =
           dependencyInfoCopy.getBridgingHeaderCommandline();
-      for (auto bridgingDep :
-           sourceDep->textualModuleDetails.bridgingModuleDependencies) {
-        auto dep =
-            cache.findDependency(bridgingDep, ModuleDependencyKind::Clang);
+      for (auto bridgingDep : *bridgingHeaderDeps) {
+        auto dep = cache.findDependency(bridgingDep);
         assert(dep && "unknown clang dependency");
         auto *clangDep = (*dep)->getAsClangModule();
         assert(clangDep && "wrong module dependency kind");
@@ -377,8 +376,8 @@ static llvm::Error resolveExplicitModuleInputs(
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back(clangDep->moduleCacheKey);
         }
-        dependencyInfoCopy.updateBridgingHeaderCommandLine(newCommandLine);
       }
+      dependencyInfoCopy.updateBridgingHeaderCommandLine(newCommandLine);
     }
 
     if (resolvingDepInfo.isClangModule() ||
@@ -1336,6 +1335,27 @@ computeTransitiveClosureOfExplicitDependencies(
   return result;
 }
 
+static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
+    const ModuleDependencyInfo *dep,
+    const std::unordered_map<ModuleDependencyID, std::set<ModuleDependencyID>>
+        &transitiveClosures,
+    const ModuleDependenciesCache &cache) {
+  std::set<ModuleDependencyID> result;
+  auto *sourceDep = dep->getAsSwiftSourceModule();
+  if (!sourceDep)
+    return result;
+
+  for (auto &dep : sourceDep->textualModuleDetails.bridgingModuleDependencies) {
+    ModuleDependencyID modID{dep, ModuleDependencyKind::Clang};
+    result.insert(modID);
+    auto succDeps = transitiveClosures.find(modID);
+    assert(succDeps != transitiveClosures.end() && "unknown dependency");
+    llvm::set_union(result, succDeps->second);
+  }
+
+  return result;
+}
+
 static std::vector<ModuleDependencyID>
 findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
                  ModuleDependenciesCache &cache) {
@@ -1763,8 +1783,14 @@ static void resolveDependencyCommandLineArguments(
     auto optionalDeps = cache.findDependency(modID);
     assert(optionalDeps.has_value());
     auto deps = optionalDeps.value();
-    if (auto E = resolveExplicitModuleInputs(modID, *deps, dependencyClosure,
-                                             cache, instance))
+    std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps;
+    if (modID.Kind == ModuleDependencyKind::SwiftSource)
+      bridgingHeaderDeps = computeBridgingHeaderTransitiveDependencies(
+          deps, moduleTransitiveClosures, cache);
+
+    if (auto E =
+            resolveExplicitModuleInputs(modID, *deps, dependencyClosure, cache,
+                                        instance, bridgingHeaderDeps))
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    toString(std::move(E)));
 
@@ -1902,7 +1928,7 @@ swift::dependencies::performBatchModuleScan(
 
         StringRef moduleName = entry.moduleName;
         bool isClang = !entry.isSwift;
-        llvm::Optional<const ModuleDependencyInfo *> rootDeps;
+        std::optional<const ModuleDependencyInfo *> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
           // This action will populate the cache with the main module's

@@ -210,7 +210,7 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
            "this point.");
     SILModule &M = AI->getModule();
     for (VarDecl *VD : SD->getStoredProperties()) {
-      llvm::Optional<SILDebugVariable> NewDebugVarInfo =
+      std::optional<SILDebugVariable> NewDebugVarInfo =
           SILDebugVariable::createFromAllocation(AI);
       if (NewDebugVarInfo)
         NewDebugVarInfo->DIExpr.append(

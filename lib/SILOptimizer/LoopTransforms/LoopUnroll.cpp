@@ -108,29 +108,29 @@ void LoopCloner::cloneLoop() {
 /// Determine the number of iterations the loop is at most executed. The loop
 /// might contain early exits so this is the maximum if no early exits are
 /// taken.
-static llvm::Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
-                                                    SILBasicBlock *Preheader,
-                                                    SILBasicBlock *Header,
-                                                    SILBasicBlock *Latch) {
+static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
+                                                   SILBasicBlock *Preheader,
+                                                   SILBasicBlock *Header,
+                                                   SILBasicBlock *Latch) {
 
   // Skip a split backedge.
   SILBasicBlock *OrigLatch = Latch;
   if (!Loop->isLoopExiting(Latch) &&
       !(Latch = Latch->getSinglePredecessorBlock()))
-    return llvm::None;
+    return std::nullopt;
   if (!Loop->isLoopExiting(Latch))
-    return llvm::None;
+    return std::nullopt;
 
  // Get the loop exit condition.
   auto *CondBr = dyn_cast<CondBranchInst>(Latch->getTerminator());
   if (!CondBr)
-    return llvm::None;
+    return std::nullopt;
 
   // Match an add 1 recurrence.
 
   auto *Cmp = dyn_cast<BuiltinInst>(CondBr->getCondition());
   if (!Cmp)
-    return llvm::None;
+    return std::nullopt;
 
   unsigned Adjust = 0;
   SILBasicBlock *Exit = CondBr->getTrueBB();
@@ -151,15 +151,15 @@ static llvm::Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
       Exit = CondBr->getFalseBB();
       break;
     default:
-      return llvm::None;
+      return std::nullopt;
   }
 
   if (Loop->contains(Exit))
-    return llvm::None;
+    return std::nullopt;
 
   auto *End = dyn_cast<IntegerLiteralInst>(Cmp->getArguments()[1]);
   if (!End)
-    return llvm::None;
+    return std::nullopt;
 
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
@@ -176,31 +176,31 @@ static llvm::Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
                           0)) &&
       !match(RecNext, m_ApplyInst(BuiltinValueKind::Add,
                                       m_SILPhiArgument(RecArg), m_One()))) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (RecArg->getParent() != Header)
-    return llvm::None;
+    return std::nullopt;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
       RecArg->getIncomingPhiValue(Preheader));
   if (!Start)
-    return llvm::None;
+    return std::nullopt;
 
   if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
-    return llvm::None;
+    return std::nullopt;
 
   auto StartVal = Start->getValue();
   auto EndVal = End->getValue();
   if (StartVal.sgt(EndVal))
-    return llvm::None;
+    return std::nullopt;
 
   auto Dist = EndVal - StartVal;
   if (Dist.getBitWidth() > 64)
-    return llvm::None;
+    return std::nullopt;
 
   if (Dist == 0)
-    return llvm::None;
+    return std::nullopt;
 
   return Dist.getZExtValue() + Adjust;
 }
@@ -400,7 +400,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
 
   auto *Header = Loop->getHeader();
 
-  llvm::Optional<uint64_t> MaxTripCount =
+  std::optional<uint64_t> MaxTripCount =
       getMaxLoopTripCount(Loop, Preheader, Header, Latch);
   if (!MaxTripCount) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");

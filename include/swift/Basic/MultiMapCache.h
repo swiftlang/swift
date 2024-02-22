@@ -14,11 +14,10 @@
 #define SWIFT_BASIC_MULTIMAPCACHE_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/None.h"
-#include "swift/Basic/STLExtras.h"
+#include <optional>
 
 namespace swift {
 
@@ -37,7 +36,7 @@ namespace swift {
 template <
     typename KeyTy, typename ValueTy,
     typename MapTy =
-        llvm::DenseMap<KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>>,
+        llvm::DenseMap<KeyTy, std::optional<std::tuple<unsigned, unsigned>>>,
     typename VectorTy = std::vector<ValueTy>, typename VectorTyImpl = VectorTy>
 class MultiMapCache {
   std::function<bool(const KeyTy &, VectorTyImpl &)> function;
@@ -59,8 +58,8 @@ public:
   bool empty() const { return valueToDataOffsetIndexMap.empty(); }
   unsigned size() const { return valueToDataOffsetIndexMap.size(); }
 
-  llvm::Optional<ArrayRef<ValueTy>> get(const KeyTy &key) {
-    auto iter = valueToDataOffsetIndexMap.try_emplace(key, llvm::None);
+  std::optional<ArrayRef<ValueTy>> get(const KeyTy &key) {
+    auto iter = valueToDataOffsetIndexMap.try_emplace(key, std::nullopt);
 
     // If we already have a cached value, just return the cached value.
     if (!iter.second) {
@@ -82,7 +81,7 @@ public:
     // We assume that constructValuesForKey /only/ inserts to the end of data
     // and does not inspect any other values in the data array.
     if (!function(key, data)) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Otherwise, compute our length, compute our initial ArrayRef<ValueTy>,
@@ -98,7 +97,7 @@ template <typename KeyTy, typename ValueTy>
 using SmallMultiMapCache =
     MultiMapCache<KeyTy, ValueTy,
                   llvm::SmallDenseMap<
-                      KeyTy, llvm::Optional<std::tuple<unsigned, unsigned>>, 8>,
+                      KeyTy, std::optional<std::tuple<unsigned, unsigned>>, 8>,
                   SmallVector<ValueTy, 32>, SmallVectorImpl<ValueTy>>;
 
 } // namespace swift

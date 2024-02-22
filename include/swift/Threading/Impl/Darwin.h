@@ -29,7 +29,7 @@
 
 #include "chrono_utils.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "swift/Threading/Errors.h"
 
@@ -68,7 +68,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
+inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
   stack_bounds result;
   pthread_t thread = pthread_self();
 

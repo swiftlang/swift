@@ -283,7 +283,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
-  return substBaseType(substBase, LookUpConformanceInModule(module), llvm::None);
+  return substBaseType(substBase, LookUpConformanceInModule(module),
+                       std::nullopt);
 }
 
 Type DependentMemberType::substBaseType(Type substBase,
@@ -509,7 +510,7 @@ static Type substType(Type derivedType, unsigned level,
   if (IFS.isInvariant(derivedType))
     return derivedType;
 
-  return derivedType.transformRec([&](TypeBase *type) -> llvm::Optional<Type> {
+  return derivedType.transformRec([&](TypeBase *type) -> std::optional<Type> {
     // FIXME: Add SIL versions of mapTypeIntoContext() and
     // mapTypeOutOfContext() and use them appropriately
     assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
@@ -537,7 +538,7 @@ static Type substType(Type derivedType, unsigned level,
 
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
       if (silFnTy->isPolymorphic())
-        return llvm::None;
+        return std::nullopt;
       if (auto subs = silFnTy->getInvocationSubstitutions()) {
         auto newSubs = subs.subst(IFS);
         return silFnTy->withInvocationSubstitutions(newSubs);
@@ -546,7 +547,7 @@ static Type substType(Type derivedType, unsigned level,
         auto newSubs = subs.subst(IFS);
         return silFnTy->withPatternSubstitutions(newSubs);
       }
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Special-case TypeAliasType; we need to substitute conformances.
@@ -584,21 +585,21 @@ static Type substType(Type derivedType, unsigned level,
     
     auto substOrig = dyn_cast<SubstitutableType>(type);
     if (!substOrig)
-      return llvm::None;
+      return std::nullopt;
 
     // Opaque types can't normally be directly substituted unless we
     // specifically were asked to substitute them.
     if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(substOrig))
-      return llvm::None;
+      return std::nullopt;
 
     // If we have a substitution for this type, use it.
     if (auto known = IFS.substType(substOrig, currentLevel)) {
       if (IFS.shouldSubstituteOpaqueArchetypes() &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
-        return llvm::None; // Recursively process the substitutions of the
-                           // opaque type archetype.
+        return std::nullopt; // Recursively process the substitutions of the
+                             // opaque type archetype.
       return known;
     }
 
@@ -950,14 +951,14 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 // Replacing opaque result archetypes with their underlying types
 //===----------------------------------------------------------------------===//
 
-static llvm::Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType *>>
+static std::optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType *>>
 getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
   auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
   if (!archetype)
-    return llvm::None;
+    return std::nullopt;
   auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
   if (!opaqueRoot)
-    return llvm::None;
+    return std::nullopt;
 
   return std::make_pair(archetype, opaqueRoot);
 }

@@ -169,7 +169,7 @@ void RewriteSystem::computeRecursiveRules() {
 /// 3) Finally, redundant conformance rules are deleted, with
 /// \p redundantConformances equal to the set of conformance rules that are
 ///    not minimal conformances.
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
@@ -195,7 +195,7 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
     }
   }
 
-  llvm::Optional<std::pair<unsigned, unsigned>> found;
+  std::optional<std::pair<unsigned, unsigned>> found;
 
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
     llvm::dbgs() << "\n";
@@ -303,7 +303,7 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
 
     {
       // Otherwise, perform a shortlex comparison on (LHS, RHS).
-      llvm::Optional<int> comparison = rule.compare(otherRule, Context);
+      std::optional<int> comparison = rule.compare(otherRule, Context);
 
       if (!comparison.has_value()) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if

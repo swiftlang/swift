@@ -29,6 +29,16 @@ struct Y {
   var y2: X
 }
 
+class C1 {
+}
+
+sil_vtable C1 {
+}
+
+struct Small {
+  var x1 : Int
+}
+
 // CHECK: sil @test1 : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   %0 = alloc_stack $Optional<X>
@@ -226,6 +236,36 @@ sil @test8 : $@convention(c) (SamplesType) -> () {
 bb0(%0 : $SamplesType):
   %1 = function_ref @helper : $@convention(thin) (SamplesType) -> ()
   %2 = apply %1(%0) : $@convention(thin) (SamplesType) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// In this test case Container type is identified as not large but contained
+// type is.
+sil @test9 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $_ContainerType
+  %1 = load %0 : $*_ContainerType
+  %2 = alloc_stack $(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+
+  %3 = struct_extract %1 : $_ContainerType, #_ContainerType.l
+  store %3 to %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %0 : $*_ContainerType
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @test10 : $@convention(thin) (@in_guaranteed C1, @in Small) -> () {
+bb0(%0 : $*C1, %1 : $*Small):
+  %2 = load %1 : $*Small
+  %3 = load %0 : $*C1
+  retain_value %3 : $C1
+  store %2 to %1 : $*Small
+  retain_value %3 : $C1
   %t = tuple ()
   return %t : $()
 }

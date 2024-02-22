@@ -22,7 +22,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 

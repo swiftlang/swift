@@ -29,11 +29,11 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <type_traits>
 
@@ -949,7 +949,7 @@ public:
 
   /// Return a hash of all tokens in the body for dependency analysis, if
   /// available.
-  llvm::Optional<Fingerprint> getBodyFingerprint() const;
+  std::optional<Fingerprint> getBodyFingerprint() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

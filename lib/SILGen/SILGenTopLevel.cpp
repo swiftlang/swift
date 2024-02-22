@@ -33,7 +33,7 @@ static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl) {
       /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
       ctx.getNeverType(), moduleDecl);
   exitFuncDecl->getAttrs().add(new (ctx) ExternAttr(
-      llvm::None, llvm::None, ExternKind::C, /*implicit*/ true));
+      std::nullopt, std::nullopt, ExternKind::C, /*implicit*/ true));
   return exitFuncDecl;
 }
 
@@ -58,9 +58,9 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
   TopLevelSGF.MagicFunctionName = SwiftModule->getName();
   auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 
-  TopLevelSGF.prepareEpilog(
-      SF, llvm::None, getASTContext().getErrorExistentialType(),
-      moduleCleanupLoc);
+  TopLevelSGF.prepareEpilog(SF, std::nullopt,
+                            getASTContext().getErrorExistentialType(),
+                            moduleCleanupLoc);
 
   auto prologueLoc = RegularLocation::getModuleLocation();
   prologueLoc.markAsPrologue();
@@ -306,9 +306,8 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
 
       // Generic errors are passed indirectly.
       if (!error->getType().isAddress()) {
-        auto *tmp = B.createAllocStack(loc,
-                                       error->getType().getObjectType(),
-                                       llvm::None);
+        auto *tmp = B.createAllocStack(loc, error->getType().getObjectType(),
+                                       std::nullopt);
         emitSemanticStore(
             loc, error, tmp,
             getTypeLowering(tmp->getType()), IsInitialization);

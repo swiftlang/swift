@@ -247,7 +247,7 @@ private:
   /// error.
   bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
-  llvm::Optional<YAMLTypeInfoNode>
+  std::optional<YAMLTypeInfoNode>
   getLegacyTypeInfo(NominalTypeDecl *decl) const;
 
   // Debugging aids.

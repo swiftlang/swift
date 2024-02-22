@@ -80,8 +80,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
       InPath = PrivateInPath;
     }
   }
-  auto dependencies =
-      scanInterfaceFile(InPath, IsFramework, isTestableDependencyLookup);
+  auto dependencies = scanInterfaceFile(InPath, IsFramework);
   if (dependencies) {
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
@@ -148,7 +147,7 @@ static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
-                                      bool isFramework, bool isTestableImport) {
+                                      bool isFramework) {
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
@@ -157,7 +156,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   StringRef sdkPath = Ctx.SearchPathOpts.getSDKPath();
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  llvm::Optional<ModuleDependencyInfo> Result;
+  std::optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
@@ -242,64 +241,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                                   &alreadyAddedModules);
         }
 
-        // For a `@testable` direct dependency, read in the dependencies
-        // from an adjacent binary module, for completeness.
-        if (isTestableImport) {
-          auto adjacentBinaryModule = std::find_if(
-              compiledCandidates.begin(), compiledCandidates.end(),
-              [moduleInterfacePath](const std::string &candidate) {
-                return llvm::sys::path::parent_path(candidate) ==
-                       llvm::sys::path::parent_path(moduleInterfacePath.str());
-              });
-          if (adjacentBinaryModule != compiledCandidates.end()) {
-            // Required modules.
-            auto adjacentBinaryModuleRequiredImports = getImportsOfModule(
-                *adjacentBinaryModule, ModuleLoadingBehavior::Required,
-                isFramework, isRequiredOSSAModules(),
-                isRequiredNoncopyableGenerics(),
-                Ctx.LangOpts.SDKName,
-                Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
-                Ctx.SearchPathOpts.DeserializedPathRecoverer);
-            if (!adjacentBinaryModuleRequiredImports)
-              return adjacentBinaryModuleRequiredImports.getError();
-            auto adjacentBinaryModuleRequiredModuleImports =
-                (*adjacentBinaryModuleRequiredImports).moduleImports;
-#ifndef NDEBUG
-            //  Verify that the set of required modules read out from the binary
-            //  module is a super-set of module imports identified in the
-            //  textual interface.
-            for (const auto &requiredImport : Result->getModuleImports()) {
-              assert(
-                  adjacentBinaryModuleRequiredModuleImports.contains(
-                      requiredImport) &&
-                  "Expected adjacent binary module's import set to contain all "
-                  "textual interface imports.");
-            }
-#endif
-
-            for (const auto &requiredImport :
-                 adjacentBinaryModuleRequiredModuleImports)
-              Result->addModuleImport(requiredImport.getKey(),
-                                      &alreadyAddedModules);
-
-            // Optional modules. Will be looked-up on a best-effort basis
-            auto adjacentBinaryModuleOptionalImports = getImportsOfModule(
-                *adjacentBinaryModule, ModuleLoadingBehavior::Optional,
-                isFramework, isRequiredOSSAModules(),
-                isRequiredNoncopyableGenerics(), Ctx.LangOpts.SDKName,
-                Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
-                Ctx.SearchPathOpts.DeserializedPathRecoverer);
-            if (!adjacentBinaryModuleOptionalImports)
-              return adjacentBinaryModuleOptionalImports.getError();
-            auto adjacentBinaryModuleOptionalModuleImports =
-                (*adjacentBinaryModuleOptionalImports).moduleImports;
-            for (const auto &optionalImport :
-                 adjacentBinaryModuleOptionalModuleImports)
-              Result->addOptionalModuleImport(optionalImport.getKey(),
-                                              &alreadyAddedModules);
-          }
-        }
-
         return std::error_code();
       });
 
@@ -320,9 +261,13 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
-  llvm::Optional<SwiftDependencyTracker> tracker = llvm::None;
+  std::optional<SwiftDependencyTracker> tracker = std::nullopt;
   if (CacheFS)
     tracker = SwiftDependencyTracker(*CacheFS, mapper);
+
+  // Do not load interface module if it is testable import.
+  ModuleLoadingMode MLM =
+      isTestableDependencyLookup ? ModuleLoadingMode::OnlySerialized : LoadMode;
 
   // Instantiate dependency scanning "loaders".
   SmallVector<std::unique_ptr<SwiftModuleScanner>, 2> scanners;
@@ -332,11 +277,10 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   // dependency graph of the placeholder dependency module itself.
   // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
-      Ctx, LoadMode, moduleId,
-      Ctx.SearchPathOpts.PlaceholderDependencyModuleMap, delegate,
-      moduleOutputPath, tracker));
+      Ctx, MLM, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
+      delegate, moduleOutputPath, tracker));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
-      Ctx, LoadMode, moduleId, delegate, moduleOutputPath,
+      Ctx, MLM, moduleId, delegate, moduleOutputPath,
       SwiftModuleScanner::MDS_plain, tracker));
 
   // Check whether there is a module with this name that we can import.

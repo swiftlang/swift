@@ -876,7 +876,7 @@ private:
         assert(Range.getByteLength() > 1 &&
                (Range.str().front() == '_' || Range.str().front() == '$'));
         auto AfterDollar = Loc.getAdvancedLoc(1);
-        reportRef(Wrapped, AfterDollar, Info, llvm::None);
+        reportRef(Wrapped, AfterDollar, Info, std::nullopt);
       }
     }
 
@@ -954,7 +954,7 @@ private:
   bool report(ValueDecl *D);
   bool reportExtension(ExtensionDecl *D);
   bool reportRef(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
-                 llvm::Optional<AccessKind> AccKind);
+                 std::optional<AccessKind> AccKind);
   bool reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
                                  Decl *container);
 
@@ -1010,7 +1010,7 @@ private:
   bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info,
-                              llvm::Optional<AccessKind> AccKind);
+                              std::optional<AccessKind> AccKind);
 
   bool indexComment(const Decl *D);
 
@@ -1018,11 +1018,11 @@ private:
   // generated buffer or not. 0:0 if indexing a module and \p loc is invalid.
   // \c None if \p loc is otherwise invalid or its original location isn't
   // contained within the current buffer.
-  llvm::Optional<MappedLoc> getMappedLocation(SourceLoc loc) {
+  std::optional<MappedLoc> getMappedLocation(SourceLoc loc) {
     if (loc.isInvalid()) {
       if (IsModuleFile)
         return {{0, 0, false}};
-      return llvm::None;
+      return std::nullopt;
     }
 
     bool inGeneratedBuffer =
@@ -1033,7 +1033,7 @@ private:
       std::tie(bufferID, loc) = CurrentModule->getOriginalLocation(loc);
       if (BufferID != bufferID) {
         assert(false && "Location is not within file being indexed");
-        return llvm::None;
+        return std::nullopt;
       }
     }
 
@@ -1188,7 +1188,7 @@ bool IndexSwiftASTWalker::visitImports(
     if (Path.empty() || Path == TopMod.getFilename())
       continue; // this is a submodule.
 
-    llvm::Optional<bool> IsClangModuleOpt;
+    std::optional<bool> IsClangModuleOpt;
     for (auto File : Mod->getFiles()) {
       switch (File->getKind()) {
       case FileUnitKind::Source:
@@ -1375,7 +1375,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
   // don't report this ref again when visitDeclReference reports it
   suppressRefAtLoc(Loc);
 
-  if (!reportRef(D, Loc, Info, llvm::None)) {
+  if (!reportRef(D, Loc, Info, std::nullopt)) {
     Cancelled = true;
     return false;
   }
@@ -1411,7 +1411,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
         IndexSymbol Info;
         if (isImplicit)
           Info.roles |= (unsigned)SymbolRole::Implicit;
-        if (!reportRef(TAD, IdLoc, Info, llvm::None))
+        if (!reportRef(TAD, IdLoc, Info, std::nullopt))
           return false;
         if (auto Ty = TAD->getUnderlyingType()) {
           NTD = Ty->getAnyNominal();
@@ -1622,7 +1622,7 @@ static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
 
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
                                     IndexSymbol &Info,
-                                    llvm::Optional<AccessKind> AccKind) {
+                                    std::optional<AccessKind> AccKind) {
   if (!shouldIndex(D, /*IsRef=*/true))
     return true; // keep walking
 
@@ -1842,7 +1842,7 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
 bool IndexSwiftASTWalker::initVarRefIndexSymbols(
     Expr *CurrentE, ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
-    llvm::Optional<AccessKind> AccKind) {
+    std::optional<AccessKind> AccKind) {
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 

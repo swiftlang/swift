@@ -33,10 +33,10 @@ public:
   ImportDepth() = default;
   ImportDepth(ASTContext &context, const FrontendOptions &frontendOptions);
 
-  llvm::Optional<uint8_t> lookup(StringRef module) {
+  std::optional<uint8_t> lookup(StringRef module) {
     auto I = depths.find(module);
     if (I == depths.end())
-      return llvm::None;
+      return std::nullopt;
     return I->getValue();
   }
 };

@@ -190,7 +190,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *options, SourceKit::CodeCompletionConsumer &SKConsumer,
-    ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions,
+    ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::Options CCOpts;
@@ -206,7 +206,7 @@ void SwiftLangSupport::codeComplete(
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
   auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
   if (!fileSystem) {
     return SKConsumer.failed(error);
   }
@@ -1093,7 +1093,7 @@ void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
     GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
-    llvm::Optional<VFSOptions> vfsOptions,
+    std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken) {
   StringRef filterText;
   unsigned resultOffset = 0;
@@ -1108,7 +1108,7 @@ void SwiftLangSupport::codeCompleteOpen(
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
   auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, fileSystemError);
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, fileSystemError);
   if (!fileSystem)
     return consumer.failed(fileSystemError);
 

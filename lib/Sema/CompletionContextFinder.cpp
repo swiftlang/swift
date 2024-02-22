@@ -100,15 +100,15 @@ size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
   return ComponentIndex;
 }
 
-llvm::Optional<Fallback>
+std::optional<Fallback>
 CompletionContextFinder::getFallbackCompletionExpr() const {
   if (!hasCompletionExpr()) {
     // Creating a fallback expression only makes sense if we are completing in
     // an expression, not when we're completing in a key path.
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<Fallback> fallback;
+  std::optional<Fallback> fallback;
   bool separatePrecheck = false;
   DeclContext *fallbackDC = InitialDC;
 
@@ -133,7 +133,7 @@ CompletionContextFinder::getFallbackCompletionExpr() const {
       fallbackDC = cast<AbstractClosureExpr>(context.E);
       LLVM_FALLTHROUGH;
     case ContextKind::ErrorExpression:;
-      fallback = llvm::None;
+      fallback = std::nullopt;
       separatePrecheck = true;
       continue;
     }
@@ -144,7 +144,7 @@ CompletionContextFinder::getFallbackCompletionExpr() const {
 
   if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool swift::containsIDEInspectionTarget(SourceRange range,

@@ -172,7 +172,7 @@ enum class KnownFoundationEntity {
 
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
-llvm::Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+std::optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
 /// Retrieve the Swift name for the given Foundation entity, where
 /// "NS" prefix stripping will apply under omit-needless-words.
@@ -362,7 +362,7 @@ public:
   unsigned NumTypoCorrections = 0;
 
   /// Cached mapping from types to their associated tangent spaces.
-  llvm::DenseMap<Type, llvm::Optional<TangentSpace>> AutoDiffTangentSpaces;
+  llvm::DenseMap<Type, std::optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// A cache of derivative function types per configuration.
   llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
@@ -845,7 +845,7 @@ public:
   /// SIL analog of \c ASTContext::getClangFunctionType .
   const clang::Type *
   getCanonicalClangFunctionType(ArrayRef<SILParameterInfo> params,
-                                llvm::Optional<SILResultInfo> result,
+                                std::optional<SILResultInfo> result,
                                 SILFunctionType::Representation trueRep);
 
   /// Instantiates "Impl.Converter" if needed, then translate Swift generic
@@ -1572,7 +1572,7 @@ public:
 private:
   friend Decl;
 
-  llvm::Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
   void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
 
   friend TypeBase;

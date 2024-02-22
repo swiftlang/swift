@@ -344,7 +344,7 @@ private:
   }
 
   /// Find the tangent space of a given canonical type.
-  llvm::Optional<TangentSpace> getTangentSpace(CanType type) {
+  std::optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
     type = witness->getDerivativeGenericSignature().getReducedType(
         type);
@@ -1688,7 +1688,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   auto *diffGenericEnv = diffGenericSig.getGenericEnvironment();
   auto diffType = SILFunctionType::get(
       diffGenericSig, SILExtInfo::getThin(), origTy->getCoroutineKind(),
-      origTy->getCalleeConvention(), dfParams, {}, dfResults, llvm::None,
+      origTy->getCalleeConvention(), dfParams, {}, dfResults, std::nullopt,
       origTy->getPatternSubstitutions(), origTy->getInvocationSubstitutions(),
       original->getASTContext());
 

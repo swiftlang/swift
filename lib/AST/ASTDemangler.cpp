@@ -570,7 +570,7 @@ Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
-    llvm::Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+    std::optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
   GenericSignature genericSig;
 
@@ -630,7 +630,7 @@ Type ASTBuilder::createImplFunctionType(
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
   llvm::SmallVector<SILResultInfo, 8> funcResults;
-  llvm::Optional<SILResultInfo> funcErrorResult;
+  std::optional<SILResultInfo> funcErrorResult;
 
   for (const auto &param : params) {
     auto type = param.getType()->getCanonicalType();
@@ -657,7 +657,7 @@ Type ASTBuilder::createImplFunctionType(
     assert(funcResults.size() <= 1 && funcYields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
     auto result =
-        funcResults.empty() ? llvm::Optional<SILResultInfo>() : funcResults[0];
+        funcResults.empty() ? std::optional<SILResultInfo>() : funcResults[0];
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
@@ -713,7 +713,7 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
 }
 
 Type ASTBuilder::createExistentialMetatypeType(
-    Type instance, llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
+    Type instance, std::optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (auto existential = instance->getAs<ExistentialType>())
     instance = existential->getConstraintType();
   if (!instance->isAnyExistentialType())
@@ -766,7 +766,7 @@ Type ASTBuilder::createSymbolicExtendedExistentialType(NodePointer shapeNode,
 }
 
 Type ASTBuilder::createMetatypeType(
-    Type instance, llvm::Optional<Demangle::ImplMetatypeRepresentation> repr) {
+    Type instance, std::optional<Demangle::ImplMetatypeRepresentation> repr) {
   if (!repr)
     return MetatypeType::get(instance);
 
@@ -1072,19 +1072,19 @@ ASTBuilder::findModuleNode(NodePointer node) {
   return child;
 }
 
-llvm::Optional<ASTBuilder::ForeignModuleKind>
+std::optional<ASTBuilder::ForeignModuleKind>
 ASTBuilder::getForeignModuleKind(NodePointer node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
     return getForeignModuleKind(node->getFirstChild());
 
   if (node->getKind() != Demangle::Node::Kind::Module)
-    return llvm::None;
+    return std::nullopt;
 
-  return llvm::StringSwitch<llvm::Optional<ForeignModuleKind>>(node->getText())
+  return llvm::StringSwitch<std::optional<ForeignModuleKind>>(node->getText())
       .Case(MANGLING_MODULE_OBJC, ForeignModuleKind::Imported)
       .Case(MANGLING_MODULE_CLANG_IMPORTER,
             ForeignModuleKind::SynthesizedByImporter)
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 LayoutConstraint ASTBuilder::getLayoutConstraint(LayoutConstraintKind kind) {
@@ -1293,7 +1293,7 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
   return result;
 }
 
-static llvm::Optional<ClangTypeKind>
+static std::optional<ClangTypeKind>
 getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
   switch (kind) {
   case Demangle::Node::Kind::Protocol:
@@ -1306,7 +1306,7 @@ getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
   case Demangle::Node::Kind::Enum:
     return ClangTypeKind::Tag;
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -1347,7 +1347,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
     consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
   };
 
-  llvm::Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
+  std::optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
   if (!lookupKind)
     return nullptr;
 

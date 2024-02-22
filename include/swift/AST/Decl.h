@@ -988,12 +988,12 @@ public:
   /// Returns the introduced OS version in the given platform kind specified
   /// by @available attribute.
   /// This function won't consider the parent context to get the information.
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
   getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
   /// `@backDeployed` attribute.
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
   getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns true if the decl has an active `@backDeployed` attribute for the
@@ -1016,13 +1016,13 @@ public:
   /// Returns the source range of the declaration including its attributes.
   SourceRange getSourceRangeIncludingAttrs() const;
 
-  using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
+  using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
   /// Returns the import that may restrict the access to this decl
   /// from \p useDC.
   ///
   /// If this decl and \p useDC are from the same module it returns
-  /// \c llvm::None. If there are many imports, it returns the most
+  /// \c std::nullopt. If there are many imports, it returns the most
   /// permissive one.
   ImportAccessLevel getImportAccessFrom(const DeclContext *useDC) const;
 
@@ -1118,11 +1118,11 @@ public:
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
 
-  llvm::Optional<StringRef> getGroupName() const;
+  std::optional<StringRef> getGroupName() const;
 
-  llvm::Optional<StringRef> getSourceFileName() const;
+  std::optional<StringRef> getSourceFileName() const;
 
-  llvm::Optional<unsigned> getSourceOrder() const;
+  std::optional<unsigned> getSourceOrder() const;
 
   /// \returns The brief comment attached to this declaration, or the brief
   /// comment attached to the comment providing decl.
@@ -1263,7 +1263,7 @@ public:
   /// This is the "raw" global actor attribute as written directly on the
   /// declaration, along with the nominal type declaration to which it refers,
   /// without any inference rules applied.
-  llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
   getGlobalActorAttr() const;
 
   /// If an alternative module name is specified for this decl, e.g. using
@@ -1286,7 +1286,7 @@ public:
   /// This attribute may come from an enclosing decl since availability is
   /// inherited. The second member of the returned pair is the decl that owns
   /// the attribute.
-  llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
+  std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticAvailableRangeAttr() const;
 
   /// Retrieve the @available attribute that makes this declaration unavailable,
@@ -1299,7 +1299,7 @@ public:
   ///
   /// Note that this notion of unavailability is broader than that which is
   /// checked by \c AvailableAttr::isUnavailable.
-  llvm::Optional<std::pair<const AvailableAttr *, const Decl *>>
+  std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Returns true if this declaration should be considered available during
@@ -1363,10 +1363,10 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
 /// during lowering.
 template <typename T>
 struct AvailableDuringLoweringDeclFilter {
-  llvm::Optional<T *> operator()(T *decl) const {
+  std::optional<T *> operator()(T *decl) const {
     if (decl->isAvailableDuringLowering())
       return decl;
-    return llvm::None;
+    return std::nullopt;
   }
 };
 
@@ -1504,7 +1504,7 @@ public:
   ///
   /// If the list is non-homogeneous, or if there is more than one decl that
   /// cannot be overloaded, returns None.
-  static llvm::Optional<ImportKind>
+  static std::optional<ImportKind>
   findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ImportKind getImportKind() const {
@@ -1859,7 +1859,7 @@ public:
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid or
   /// \c isObjCImplementation() is false.
-  llvm::Optional<Identifier> getCategoryNameForObjCImplementation() const;
+  std::optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -2025,7 +2025,7 @@ public:
                       PatternBindingInitializer *InitContext)
       : PatternAndFlags(P, {}),
         InitExpr({E, {E, InitializerStatus::NotChecked}, EqualLoc}),
-        InitContextAndFlags({InitContext, llvm::None}) {}
+        InitContextAndFlags({InitContext, std::nullopt}) {}
 
 private:
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
@@ -2622,18 +2622,18 @@ public:
 
   /// A reference to 'Self'.
   static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, position, llvm::None);
+    return GenericParameterReferenceInfo(false, position, std::nullopt);
   }
 
   /// A reference to the generic parameter in covariant result position.
   static GenericParameterReferenceInfo forCovariantResult() {
     return GenericParameterReferenceInfo(true, TypePosition::Covariant,
-                                         llvm::None);
+                                         std::nullopt);
   }
 
   /// A reference to 'Self' through an associated type.
   static GenericParameterReferenceInfo forAssocTypeRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, llvm::None, position);
+    return GenericParameterReferenceInfo(false, std::nullopt, position);
   }
 
   GenericParameterReferenceInfo &operator|=(const GenericParameterReferenceInfo &other);
@@ -2643,8 +2643,8 @@ public:
   }
 
   GenericParameterReferenceInfo()
-      : hasCovariantSelfResult(false), selfRef(llvm::None),
-        assocTypeRef(llvm::None) {}
+      : hasCovariantSelfResult(false), selfRef(std::nullopt),
+        assocTypeRef(std::nullopt) {}
 
 private:
   GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
@@ -2746,7 +2746,7 @@ protected:
 
 public:
   /// Find the import that makes the given declaration available.
-  llvm::Optional<AttributedImport<ImportedModule>>
+  std::optional<AttributedImport<ImportedModule>>
   findImport(const DeclContext *fromDC);
 
   /// Return true if this protocol member is a protocol requirement.
@@ -2812,7 +2812,7 @@ public:
   /// entities (classes, protocols, properties), this operation will
   /// return a zero-parameter selector with the appropriate name in its
   /// first slot.
-  llvm::Optional<ObjCSelector>
+  std::optional<ObjCSelector>
   getObjCRuntimeName(bool skipIsObjCResolution = false) const;
 
   /// Determine whether the given declaration can infer @objc, or the
@@ -3307,7 +3307,7 @@ private:
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
   /// signature of the original declaration.
-  llvm::Optional<SubstitutionMap> UniqueUnderlyingType;
+  std::optional<SubstitutionMap> UniqueUnderlyingType;
 
   /// A set of substitutions which are used based on the availability
   /// checks performed at runtime. This set of only populated if there
@@ -3315,8 +3315,8 @@ private:
   ///
   /// It always contains one or more conditionally available substitutions
   /// followed by a universally available type used as a fallback.
-  llvm::Optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
-      ConditionallyAvailableTypes = llvm::None;
+  std::optional<MutableArrayRef<ConditionallyAvailableSubstitutions *>>
+      ConditionallyAvailableTypes = std::nullopt;
 
   mutable Identifier OpaqueReturnTypeIdentifier;
 
@@ -3364,7 +3364,7 @@ public:
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
-  llvm::Optional<unsigned> getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const;
+  std::optional<unsigned> getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -3400,7 +3400,7 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
+  std::optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
@@ -3877,7 +3877,7 @@ public:
   /// Retrieve the default definition type if computed, `None` otherwise.
   ///
   /// \Note Should only be used for dumping.
-  llvm::Optional<Type> getCachedDefaultDefinitionType() const;
+  std::optional<Type> getCachedDefaultDefinitionType() const;
 
 private:
   /// Set the computed default definition type.
@@ -4227,7 +4227,7 @@ public:
   bool isOptionalDecl() const;
 
   /// Is this a key path type?
-  llvm::Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+  std::optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
@@ -4738,14 +4738,14 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
-  llvm::Optional<bool> getCachedInheritsSuperclassInitializers() const {
+  std::optional<bool> getCachedInheritsSuperclassInitializers() const {
     if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
       return Bits.ClassDecl.InheritsSuperclassInits;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<bool> getCachedHasMissingDesignatedInitializers() const {
+  std::optional<bool> getCachedHasMissingDesignatedInitializers() const {
     if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
       // Force loading all the members, which will add this attribute if any of
       // members are determined to be missing while loading.
@@ -4757,7 +4757,7 @@ class ClassDecl final : public NominalTypeDecl {
     if (Bits.ClassDecl.ComputedHasMissingDesignatedInitializers)
       return Bits.ClassDecl.HasMissingDesignatedInitializers;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   void setHasMissingDesignatedInitializers(bool value) {
@@ -5092,15 +5092,15 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  llvm::Optional<RequirementSignature> RequirementSig;
+  std::optional<RequirementSignature> RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
-  llvm::Optional<bool> getCachedRequiresClass() const {
+  std::optional<bool> getCachedRequiresClass() const {
     if (Bits.ProtocolDecl.RequiresClassValid)
       return Bits.ProtocolDecl.RequiresClass;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Caches the result of \c requiresClass
@@ -5111,11 +5111,11 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// Returns the cached result of \c existentialConformsToSelf or \c None if it
   /// hasn't yet been computed.
-  llvm::Optional<bool> getCachedExistentialConformsToSelf() const {
+  std::optional<bool> getCachedExistentialConformsToSelf() const {
     if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
       return Bits.ProtocolDecl.ExistentialConformsToSelf;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Caches the result of \c existentialConformsToSelf
@@ -5126,11 +5126,11 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// Returns the cached result of \c hasSelfOrAssociatedTypeRequirements or
   /// \c None if it hasn't yet been computed.
-  llvm::Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
+  std::optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
     if (Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid)
       return static_cast<bool>(Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements);
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Caches the result of \c hasSelfOrAssociatedTypeRequirements
@@ -5290,7 +5290,7 @@ public:
 
   /// Determine if this is an invertible protocol and return its kind,
   /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.
-  llvm::Optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
+  std::optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -5312,17 +5312,17 @@ private:
 public:
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
-  llvm::Optional<KnownProtocolKind> getKnownProtocolKind() const {
+  std::optional<KnownProtocolKind> getKnownProtocolKind() const {
     if (Bits.ProtocolDecl.KnownProtocol == 0)
       computeKnownProtocolKind();
 
     if (Bits.ProtocolDecl.KnownProtocol == 1)
-      return llvm::None;
+      return std::nullopt;
 
     return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
 
-  llvm::Optional<KnownDerivableProtocolKind>
+  std::optional<KnownDerivableProtocolKind>
   getKnownDerivableProtocolKind() const;
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -6339,13 +6339,12 @@ public:
 
   /// Retrieve information about the mutability of the composed
   /// property wrappers.
-  llvm::Optional<PropertyWrapperMutability>
-  getPropertyWrapperMutability() const;
+  std::optional<PropertyWrapperMutability> getPropertyWrapperMutability() const;
 
   /// Returns whether this property is the backing storage property or a storage
   /// wrapper for wrapper instance's projectedValue. If this property is
   /// neither, then it returns `None`.
-  llvm::Optional<PropertyWrapperSynthesizedPropertyKind>
+  std::optional<PropertyWrapperSynthesizedPropertyKind>
   getPropertyWrapperSynthesizedPropertyKind() const;
 
   /// Retrieve the backing storage property for a property that has an
@@ -6397,8 +6396,8 @@ public:
   /// \param kind If not \c None, only returns the original property when
   /// \c this property is the specified synthesized property.
   VarDecl *getOriginalWrappedProperty(
-      llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind =
-          llvm::None) const;
+      std::optional<PropertyWrapperSynthesizedPropertyKind> kind =
+          std::nullopt) const;
 
   /// Set the property that wraps to this property as it's backing
   /// property.
@@ -6498,7 +6497,7 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  llvm::Optional<Initializer *> getCachedDefaultArgumentInitContext() const;
+  std::optional<Initializer *> getCachedDefaultArgumentInitContext() const;
 
   /// NOTE: This is stored using bits from TyReprAndFlags and
   /// DefaultValueAndFlags.
@@ -6830,11 +6829,11 @@ public:
 
   using Specifier = ParamSpecifier;
 
-  llvm::Optional<Specifier> getCachedSpecifier() const {
+  std::optional<Specifier> getCachedSpecifier() const {
     if (Bits.ParamDecl.OwnershipSpecifier != 0)
       return Specifier(Bits.ParamDecl.OwnershipSpecifier - 1);
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Return the raw specifier value for this parameter.
@@ -7104,21 +7103,21 @@ class BodyAndFingerprint {
   Fingerprint Fp;
 
 public:
-  BodyAndFingerprint(BraceStmt *body, llvm::Optional<Fingerprint> fp)
+  BodyAndFingerprint(BraceStmt *body, std::optional<Fingerprint> fp)
       : BodyAndHasFp(body, fp.has_value()),
         Fp(fp.has_value() ? *fp : Fingerprint::ZERO()) {}
-  BodyAndFingerprint() : BodyAndFingerprint(nullptr, llvm::None) {}
+  BodyAndFingerprint() : BodyAndFingerprint(nullptr, std::nullopt) {}
 
   BraceStmt *getBody() const { return BodyAndHasFp.getPointer(); }
 
-  llvm::Optional<Fingerprint> getFingerprint() const {
+  std::optional<Fingerprint> getFingerprint() const {
     if (BodyAndHasFp.getInt())
       return Fp;
     else
-      return llvm::None;
+      return std::nullopt;
   }
 
-  void setFingerprint(llvm::Optional<Fingerprint> fp) {
+  void setFingerprint(std::optional<Fingerprint> fp) {
     if (fp.has_value()) {
       Fp = *fp;
       BodyAndHasFp.setInt(true);
@@ -7387,12 +7386,12 @@ public:
   /// Retrieves the thrown interface type.
   Type getThrownInterfaceType() const;
 
-  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this function cannot throw.
   ///
   /// Functions with untyped throws will produce "any Error", functions that
-  /// cannot throw or are specified to throw "Never" will return llvm::None.
-  llvm::Optional<Type> getEffectiveThrownErrorType() const;
+  /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  std::optional<Type> getEffectiveThrownErrorType() const;
 
   /// Returns if the function throws or is async.
   bool hasEffect(EffectKind kind) const;
@@ -7464,7 +7463,7 @@ public:
 
   /// Provide the parsed body for the function.
   void setBodyParsed(BraceStmt *S,
-                     llvm::Optional<Fingerprint> fp = llvm::None) {
+                     std::optional<Fingerprint> fp = std::nullopt) {
     setBody(S, BodyKind::Parsed);
     BodyAndFP.setFingerprint(fp);
   }
@@ -7628,11 +7627,11 @@ public:
   /// Retrieve the fingerprint of the body. Note that this is not affected by
   /// the body of the local functions or the members of the local types in this
   /// function.
-  llvm::Optional<Fingerprint> getBodyFingerprint() const;
+  std::optional<Fingerprint> getBodyFingerprint() const;
 
   /// Retrieve the fingerprint of the body including the local type members and
   /// the local function bodies.
-  llvm::Optional<Fingerprint>
+  std::optional<Fingerprint>
   getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
@@ -7706,14 +7705,14 @@ public:
 
   /// Get information about the foreign error convention used by this
   /// declaration, given that it is @objc and 'throws'.
-  llvm::Optional<ForeignErrorConvention> getForeignErrorConvention() const;
+  std::optional<ForeignErrorConvention> getForeignErrorConvention() const;
 
   /// If this is a foreign C function imported as a method, get the index of
   /// the foreign parameter imported as `self`. If the function is imported
   /// as a static method, `-1` is returned to represent the `self` parameter
   /// being dropped altogether. `None` is returned for a normal function
   /// or method.
-  llvm::Optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
+  std::optional<int> getForeignFunctionAsMethodSelfParameterIndex() const;
 
   /// Set information about the foreign async convention used by this
   /// declaration.
@@ -7721,7 +7720,7 @@ public:
 
   /// Get information about the foreign async convention used by this
   /// declaration, given that it is @objc and 'async'.
-  llvm::Optional<ForeignAsyncConvention> getForeignAsyncConvention() const;
+  std::optional<ForeignAsyncConvention> getForeignAsyncConvention() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
@@ -7758,7 +7757,7 @@ public:
   /// Returns the last index of the parameter that looks like a completion
   /// handler if \p asyncAlternative is not set (with the same conditions on
   /// its type as above).
-  llvm::Optional<unsigned> findPotentialCompletionHandlerParam(
+  std::optional<unsigned> findPotentialCompletionHandlerParam(
       const AbstractFunctionDecl *asyncAlternative = nullptr) const;
 
   using DeclContext::operator new;
@@ -7824,18 +7823,18 @@ private:
                               DeclContext *Parent,
                               ClangNode ClangN);
 
-  llvm::Optional<SelfAccessKind> getCachedSelfAccessKind() const {
+  std::optional<SelfAccessKind> getCachedSelfAccessKind() const {
     if (Bits.FuncDecl.SelfAccessComputed)
       return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
 
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<bool> getCachedIsStatic() const {
+  std::optional<bool> getCachedIsStatic() const {
     if (Bits.FuncDecl.IsStaticComputed)
       return Bits.FuncDecl.IsStatic;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
 public:
@@ -8029,10 +8028,10 @@ class AccessorDecl final : public FuncDecl {
              bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
              TypeLoc thrownTy, DeclContext *parent, ClangNode clangNode);
 
-  llvm::Optional<bool> getCachedIsTransparent() const {
+  std::optional<bool> getCachedIsTransparent() const {
     if (Bits.AccessorDecl.IsTransparentComputed)
       return Bits.AccessorDecl.IsTransparent;
-    return llvm::None;
+    return std::nullopt;
   }
 
   friend class IsAccessorTransparentRequest;
@@ -9158,7 +9157,7 @@ public:
 
   /// Retrieve the builtin macro kind for this macro, or \c None if it is a
   /// user-defined macro with no special semantics.
-  llvm::Optional<BuiltinMacroKind> getBuiltinKind() const;
+  std::optional<BuiltinMacroKind> getBuiltinKind() const;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
@@ -9214,7 +9213,7 @@ GenericParameterReferenceInfo
 findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
                                GenericTypeParamType *genericParam,
                                bool treatNonResultCovarianceAsInvariant,
-                               llvm::Optional<unsigned> skipParamIndex);
+                               std::optional<unsigned> skipParamIndex);
 
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
                                             const DeclRefExpr *base) const {

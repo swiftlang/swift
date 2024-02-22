@@ -32,18 +32,29 @@
 using namespace swift;
 using namespace irgen;
 
-void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
+void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  if (!type.hasArchetype()) {
+  if (!ty.hasArchetype()) {
     return;
   }
 
   // Substitute opaque types if allowed.
-  type =
-      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type, CanGenericSignature());
+  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
 
-  auto formalType = type.getASTType();
-  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+  auto astType = ty.getASTType();
+  auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
+
+  if (needsDeinit) {
+    auto *nominal = ty.getASTType()->getAnyNominal();
+    if (nominal && nominal->getValueTypeDestructor()) {
+      assert(ty.isMoveOnly());
+      collectFormalTypeMetadata(ty.getASTType());
+    }
+  }
+
+  if (!needsLayout) {
+    return;
+  }
 
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
@@ -55,16 +66,11 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   // If the type is a legal formal type, add it as a formal type.
   // FIXME: does this force us to emit a more expensive metadata than we need
   // to?
-  if (formalType->isLegalFormalType()) {
-    return collectFormalTypeMetadata(formalType);
+  if (astType->isLegalFormalType()) {
+    return collectFormalTypeMetadata(astType);
   }
 
-  auto key = LocalTypeDataKey(type.getASTType(),
-                            LocalTypeDataKind::forRepresentationTypeMetadata());
-  if (Values.count(key)) return;
-
-  auto metadata = IGF.emitTypeMetadataRefForLayout(type);
-  Values.insert({key, metadata});
+  collectRepresentationTypeMetadata(ty);
 }
 
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
@@ -78,6 +84,15 @@ void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
   Values.insert({key, metadata});
 }
 
+void OutliningMetadataCollector::collectRepresentationTypeMetadata(SILType ty) {
+  auto key = LocalTypeDataKey(
+      ty.getASTType(), LocalTypeDataKind::forRepresentationTypeMetadata());
+  if (Values.count(key))
+    return;
+
+  auto metadata = IGF.emitTypeMetadataRefForLayout(ty);
+  Values.insert({key, metadata});
+}
 
 void OutliningMetadataCollector::addMetadataArguments(
                                     SmallVectorImpl<llvm::Value*> &args) const {
@@ -135,24 +150,38 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
           env->getGenericSignature().getCanonicalSignature()};
 }
 
-void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
-                                SILType T, IsInitialization_t isInit,
-                                IsTake_t isTake) const {
+bool TypeInfo::withMetadataCollector(
+    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+    DeinitIsNeeded_t needsDeinit,
+    llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
   if (!T.hasLocalArchetype() &&
       !IGF.outliningCanCallValueWitnesses()) {
-    OutliningMetadataCollector collector(IGF);
+    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
     }
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
-    return;
+    invocation(collector);
+    return true;
   }
 
   if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+    // The implementation will call vwt in this case.
+    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
+    invocation(collector);
+    return true;
+  }
+
+  return false;
+}
+
+void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                                SILType T, IsInitialization_t isInit,
+                                IsTake_t isTake) const {
+  if (withMetadataCollector(IGF, T, LayoutIsNeeded, DeinitIsNotNeeded,
+                            [&](auto collector) {
+                              collector.emitCallToOutlinedCopy(
+                                  dest, src, T, *this, isInit, isTake);
+                            })) {
     return;
   }
 
@@ -172,6 +201,8 @@ void OutliningMetadataCollector::emitCallToOutlinedCopy(
                             Address dest, Address src,
                             SILType T, const TypeInfo &ti, 
                             IsInitialization_t isInit, IsTake_t isTake) const {
+  assert(needsLayout);
+  assert(!needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(src, ti.getStorageType())
                             .getAddress());
@@ -345,21 +376,10 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (!T.hasLocalArchetype() &&
-      !IGF.outliningCanCallValueWitnesses()) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedDestroy(addr, T, *this);
+  if (withMetadataCollector(
+          IGF, T, LayoutIsNeeded, DeinitIsNeeded, [&](auto collector) {
+            collector.emitCallToOutlinedDestroy(addr, T, *this);
+          })) {
     return;
   }
 
@@ -368,6 +388,8 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
 
 void OutliningMetadataCollector::emitCallToOutlinedDestroy(
                       Address addr, SILType T, const TypeInfo &ti) const {
+  assert(needsLayout);
+  assert(needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
                             .getAddress());
@@ -440,24 +462,46 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
       true /*setIsNoInline*/);
 }
 
-llvm::Constant *
-IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
-                                        SILType t,
-                                        llvm::Type *llvmType,
-                                        Atomicity atomicity) {
+void TypeInfo::callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                                   Atomicity atomicity) const {
+  OutliningMetadataCollector collector(IGF, LayoutIsNotNeeded, DeinitIsNeeded);
+  collectMetadataForOutlining(collector, T);
+  collector.emitCallToOutlinedRelease(addr, T, *this, atomicity);
+}
+
+void OutliningMetadataCollector::emitCallToOutlinedRelease(
+    Address addr, SILType T, const TypeInfo &ti, Atomicity atomicity) const {
+  assert(!needsLayout);
+  assert(needsDeinit);
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(addr.getAddress());
+  addMetadataArguments(args);
+  auto *outlinedF = cast<llvm::Function>(IGF.IGM.getOrCreateReleaseFunction(
+      ti, T, addr.getAddress()->getType(), atomicity, *this));
+  llvm::CallInst *call =
+      IGF.Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+}
+
+llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
+    const TypeInfo &ti, SILType t, llvm::Type *ptrTy, Atomicity atomicity,
+    const OutliningMetadataCollector &collector) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,
                                                         manglingBits.second);
-  llvm::Type *argTys[] = {llvmType};
+  llvm::SmallVector<llvm::Type *, 4> argTys;
+  argTys.push_back(ptrTy);
+  collector.addMetadataParameterTypes(argTys);
   return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
+      funcName, ptrTy, argTys,
       [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getStorageType(),
+        Explosion params = IGF.collectParameters();
+        Address addr(params.claimNext(), loadableTI->getStorageType(),
                      loadableTI->getFixedAlignment());
+        collector.bindMetadataParameters(IGF, params);
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         loadableTI->consume(IGF, loaded, atomicity, t);

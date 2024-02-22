@@ -241,7 +241,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               llvm::Optional<SILLocation> VarLoc,
+                               std::optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue,
@@ -257,7 +257,7 @@ public:
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
-                                     llvm::Optional<SILLocation> Loc);
+                                     std::optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
@@ -278,7 +278,7 @@ public:
     }
 
     // If the source buffer is a macro, extract its full text.
-    llvm::Optional<StringRef> Source;
+    std::optional<StringRef> Source;
     bool ForceGeneratedSourceToDisk = Opts.DWARFVersion < 5;
     if (!ForceGeneratedSourceToDisk) {
       auto BufferID = SM.findBufferContainingLoc(SL);
@@ -378,7 +378,7 @@ private:
     return getSwiftFileAndLocation(D, End);
   }
 
-  FileAndLocation getStartLocation(llvm::Optional<SILLocation> OptLoc) {
+  FileAndLocation getStartLocation(std::optional<SILLocation> OptLoc) {
     if (!OptLoc)
       return {};
     if (OptLoc->isFilenameAndLocation())
@@ -485,7 +485,7 @@ private:
 #endif
 
   llvm::DIFile *getOrCreateFile(StringRef Filename,
-                                llvm::Optional<StringRef> Source) {
+                                std::optional<StringRef> Source) {
     if (Filename.empty())
       Filename = SILLocation::getCompilerGeneratedLoc()->filename;
 
@@ -514,14 +514,14 @@ private:
       }
     }
 
-    return createFile(Filename, llvm::None, Source);
+    return createFile(Filename, std::nullopt, Source);
   }
 
   /// This is effectively \p clang::CGDebugInfo::createFile().
   llvm::DIFile *
   createFile(StringRef FileName,
-             llvm::Optional<llvm::DIFile::ChecksumInfo<StringRef>> CSInfo,
-             llvm::Optional<StringRef> Source) {
+             std::optional<llvm::DIFile::ChecksumInfo<StringRef>> CSInfo,
+             std::optional<StringRef> Source) {
     StringRef File, Dir;
     StringRef CurDir = Opts.DebugCompilationDir;
     SmallString<128> NormalizedFile(FileName);
@@ -849,18 +849,18 @@ private:
                              Desc.getASTFile());
   };
 
-  static llvm::Optional<ASTSourceDescriptor>
+  static std::optional<ASTSourceDescriptor>
   getClangModule(const ModuleDecl &M) {
     for (auto *FU : M.getFiles())
       if (auto *CMU = dyn_cast_or_null<ClangModuleUnit>(FU))
         if (auto Desc = CMU->getASTSourceDescriptor())
           return Desc;
-    return llvm::None;
+    return std::nullopt;
   }
 
   llvm::DIModule *getOrCreateModule(ImportedModule IM) {
     ModuleDecl *M = IM.importedModule;
-    if (llvm::Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
+    if (std::optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
     StringRef Path = getFilenameFromDC(M);
     // Use the module 'real' name, which can be different from the name if module
@@ -1217,7 +1217,7 @@ private:
 
     auto RawType = Decl->getRawType();
     auto &TI = IGM.getTypeInfoForUnlowered(RawType);
-    llvm::Optional<CompletedDebugTypeInfo> ElemDbgTy =
+    std::optional<CompletedDebugTypeInfo> ElemDbgTy =
         CompletedDebugTypeInfo::getFromTypeInfo(RawType, TI, IGM);
     if (!ElemDbgTy)
       // Without complete type info we can only create a forward decl.
@@ -1271,7 +1271,7 @@ private:
 
     SmallVector<llvm::Metadata *, 16> Elements;
     for (auto *ElemDecl : Decl->getAllElements()) {
-      llvm::Optional<CompletedDebugTypeInfo> ElemDbgTy;
+      std::optional<CompletedDebugTypeInfo> ElemDbgTy;
       if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A variant case which carries a payload.
         ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
@@ -1723,7 +1723,7 @@ private:
       }
       llvm::DIDerivedType *PTy = DBuilder.createPointerType(
           nullptr, PtrSize, 0,
-          /* DWARFAddressSpace */ llvm::None, MangledName);
+          /* DWARFAddressSpace */ std::nullopt, MangledName);
 
       return DBuilder.createObjectPointerType(PTy);
     }
@@ -2980,7 +2980,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, llvm::Optional<SILLocation> DbgInstLoc,
+    const SILDebugScope *DS, std::optional<SILLocation> DbgInstLoc,
     SILDebugVariable VarInfo, IndirectionKind Indirection,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
   assert(DS && "variable has no scope");
@@ -3359,7 +3359,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, llvm::Optional<SILLocation> Loc) {
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, std::optional<SILLocation> Loc) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -3530,7 +3530,7 @@ void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
 }
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, llvm::Optional<SILLocation> VarLoc,
+    const SILDebugScope *DS, std::optional<SILLocation> VarLoc,
     SILDebugVariable VarInfo, IndirectionKind Indirection,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
@@ -3553,7 +3553,7 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
     DebugTypeInfo DebugType, bool IsLocalToUnit,
-    llvm::Optional<SILLocation> Loc) {
+    std::optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
       Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
 }

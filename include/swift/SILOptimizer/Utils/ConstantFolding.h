@@ -61,7 +61,7 @@ APInt constantFoldCast(APInt val, const BuiltinInfo &BI);
 /// If `ResultsInError` is not none than errors are diagnosed and
 /// `ResultsInError` is set to true in case of an error.
 SILValue constantFoldBuiltin(BuiltinInst *BI,
-                             llvm::Optional<bool> &ResultsInError);
+                             std::optional<bool> &ResultsInError);
 
 /// A utility class to do constant folding.
 class ConstantFolder {

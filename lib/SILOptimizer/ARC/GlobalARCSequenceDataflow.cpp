@@ -415,12 +415,12 @@ ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() = default;
 
 void ARCSequenceDataflowEvaluator::clear() { BBStateInfo->clear(); }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getBottomUpBBState(SILBasicBlock *BB) {
   return BBStateInfo->getBottomUpBBHandle(BB);
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getTopDownBBState(SILBasicBlock *BB) {
   return BBStateInfo->getTopDownBBHandle(BB);
 }

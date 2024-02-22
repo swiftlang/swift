@@ -363,14 +363,14 @@ BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
   }
 }
 
-llvm::Optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
+std::optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
     return DeclAttrKind::CLASS;
 #include "swift/AST/DeclAttr.def"
   case BridgedDeclAttrKindNone:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("unhandled enum value");
 }
@@ -1016,7 +1016,7 @@ static void setParsedMembers(IterableDeclContext *IDC,
 
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
-      FingerprintAndMembers{llvm::None, ctx.AllocateCopy(members)});
+      FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
 }
 
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl bridgedDecl,
@@ -1965,14 +1965,14 @@ BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   }
 }
 
-static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
+static std::optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case BridgedTypeAttrKind##CLASS:                                             \
     return TypeAttrKind::CLASS;
 #include "swift/AST/TypeAttr.def"
   case BridgedTypeAttrKindNone:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("unhandled enum value");
 }

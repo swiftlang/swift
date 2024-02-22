@@ -537,8 +537,8 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-  llvm::Optional<swift::Thread::StackBounds> bounds =
-    swift::Thread::stackBounds();
+  std::optional<swift::Thread::StackBounds> bounds =
+      swift::Thread::stackBounds();
   if (!bounds)
     return false;
   *outBegin = (uintptr_t)bounds->low;

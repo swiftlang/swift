@@ -174,6 +174,7 @@ CONSTANT_OWNERSHIP_INST(None, PackPackIndex)
 CONSTANT_OWNERSHIP_INST(None, ScalarPackIndex)
 CONSTANT_OWNERSHIP_INST(None, PackElementGet)
 CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
+CONSTANT_OWNERSHIP_INST(None, Object)
 CONSTANT_OWNERSHIP_INST(None, Vector)
 
 #undef CONSTANT_OWNERSHIP_INST
@@ -240,9 +241,9 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     return OwnershipKind::None;
 
   auto mergedValue = ValueOwnershipKind::merge(makeOptionalTransformRange(
-      ops, [&i](const Operand &op) -> llvm::Optional<ValueOwnershipKind> {
+      ops, [&i](const Operand &op) -> std::optional<ValueOwnershipKind> {
         if (i->isTypeDependentOperand(op))
-          return llvm::None;
+          return std::nullopt;
         return op.get()->getOwnershipKind();
       }));
 
@@ -270,7 +271,6 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
-FORWARDING_OWNERSHIP_INST(Object)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)

@@ -608,7 +608,7 @@ static swift_layout_kind_t convertAllocationChunkKind(
 }
 
 static const char *returnableCString(SwiftReflectionContextRef ContextRef,
-                                      llvm::Optional<std::string> String) {
+                                     std::optional<std::string> String) {
   if (String) {
     auto *TmpStr = ContextRef->allocateTemporaryObject<std::string>();
     *TmpStr = *String;

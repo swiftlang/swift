@@ -109,16 +109,16 @@ public:
     return rawValue != 0;
   }
 
-  llvm::Optional<DeclID> getAsDeclID() const {
+  std::optional<DeclID> getAsDeclID() const {
     if (rawValue > 0)
       return DeclID(rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+  std::optional<LocalDeclContextID> getAsLocalDeclContextID() const {
     if (rawValue < 0)
       return LocalDeclContextID(-rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
   static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {

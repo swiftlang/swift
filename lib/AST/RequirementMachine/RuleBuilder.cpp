@@ -280,7 +280,7 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 /// will be added in the corresponding term from the substitution array.
 void RuleBuilder::addRequirement(const Requirement &req,
                                  const ProtocolDecl *proto,
-                                 llvm::Optional<ArrayRef<Term>> substitutions) {
+                                 std::optional<ArrayRef<Term>> substitutions) {
   if (Dump) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
@@ -398,7 +398,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,
                                  const ProtocolDecl *proto) {
-  addRequirement(req.req.getCanonical(), proto, /*substitutions=*/llvm::None);
+  addRequirement(req.req.getCanonical(), proto, /*substitutions=*/std::nullopt);
 }
 
 /// Lowers a protocol typealias to a rewrite rule.

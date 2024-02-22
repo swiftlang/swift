@@ -755,7 +755,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     } else {
       contextBuffer =
           B.createAllocBox(loc, contextStorageTy.castTo<SILBoxType>(),
-                           /*debug variable*/ llvm::None,
+                           /*debug variable*/ std::nullopt,
                            /*dynamic lifetime*/ false,
                            /*reflection*/ true);
       contextProj = B.createProjectBox(loc, contextBuffer, 0);

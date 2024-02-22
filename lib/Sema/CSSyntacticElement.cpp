@@ -467,13 +467,13 @@ struct SyntacticElementContext
     return this->dyn_cast<SingleValueStmtExpr *>();
   }
 
-  llvm::Optional<AnyFunctionRef> getAsAnyFunctionRef() const {
+  std::optional<AnyFunctionRef> getAsAnyFunctionRef() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return {fn};
     } else if (auto *closure = this->dyn_cast<AbstractClosureExpr *>()) {
       return {closure};
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
@@ -730,7 +730,7 @@ private:
     }
   }
 
-  llvm::Optional<SyntacticElementTarget>
+  std::optional<SyntacticElementTarget>
   getTargetForPattern(PatternBindingDecl *patternBinding, unsigned index,
                       Type patternType) {
     auto hasPropertyWrapper = [&](Pattern *pattern) -> bool {
@@ -761,7 +761,7 @@ private:
 
       if (ConstraintSystem::preCheckTarget(
               target, /*replaceInvalidRefsWithErrors=*/true))
-        return llvm::None;
+        return std::nullopt;
 
       return target;
     }
@@ -1296,7 +1296,7 @@ private:
       auto contextualFixedTy =
           cs.getFixedTypeRecursive(contextInfo->getType(), /*wantRValue*/ true);
       if (contextualFixedTy->isTypeVariableOrMember())
-        contextInfo = llvm::None;
+        contextInfo = std::nullopt;
     }
 
     // We form a single element conjunction here to ensure the context type var
@@ -1607,7 +1607,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto anchor = locator.getAnchor();
 
-  llvm::Optional<SyntacticElementContext> context;
+  std::optional<SyntacticElementContext> context;
   if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
     context = SyntacticElementContext::forClosure(closure);
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {

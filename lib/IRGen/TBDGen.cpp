@@ -109,11 +109,11 @@ static StringRef getLinkerPlatformName(uint8_t Id) {
   }
 }
 
-static llvm::Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
-  return llvm::StringSwitch<llvm::Optional<uint8_t>>(Platform)
+static std::optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<std::optional<uint8_t>>(Platform)
 #define LD_PLATFORM(Name, Id) .Case(#Name, Id)
 #include "ldPlatformKinds.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
@@ -158,7 +158,7 @@ parseEntry(ASTContext &Ctx,
       auto *MN = cast<MappingNode>(&*It);
       std::string ModuleName;
       std::string InstallName;
-      llvm::Optional<std::set<int8_t>> Platforms;
+      std::optional<std::set<int8_t>> Platforms;
       for (auto &Pair: *MN) {
         auto Key = getScalaNodeText(Pair.getKey());
         auto* Value = Pair.getValue();
@@ -270,13 +270,13 @@ getLinkerPlatformName(OriginallyDefinedInAttr::ActiveVersion Ver) {
 
 /// Find the most relevant introducing version of the decl stack we have visited
 /// so far.
-static llvm::Optional<llvm::VersionTuple>
+static std::optional<llvm::VersionTuple>
 getInnermostIntroVersion(ArrayRef<Decl *> DeclStack, PlatformKind Platform) {
   for (auto It = DeclStack.rbegin(); It != DeclStack.rend(); ++ It) {
     if (auto Result = (*It)->getIntroducedOSVersion(Platform))
       return Result;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Using the introducing version of a symbol as the start version to redirect
@@ -334,7 +334,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     OS << InstallName << "$";
     OS << ComptibleVersion << "$";
     OS << std::to_string((uint8_t)PlatformNumber) << "$";
-    static auto getMinor = [](llvm::Optional<unsigned> Minor) {
+    static auto getMinor = [](std::optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
     };
     auto verStart = calculateLdPreviousVersionStart(Ctx, *IntroVer);
@@ -559,18 +559,18 @@ enum DylibVersionKind_t: unsigned {
 /// If an individual component is greater than the highest number that can be
 /// represented in its alloted space, it will be truncated to the maximum value
 /// that fits in the alloted space, which matches the behavior of the linker.
-static llvm::Optional<llvm::MachO::PackedVersion>
+static std::optional<llvm::MachO::PackedVersion>
 parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
                    ASTContext &ctx) {
   if (versionString.empty())
-    return llvm::None;
+    return std::nullopt;
 
   llvm::MachO::PackedVersion version;
   auto result = version.parse64(versionString);
   if (!result.first) {
     ctx.Diags.diagnose(SourceLoc(), diag::tbd_err_invalid_version,
                        (unsigned)kind, versionString);
-    return llvm::None;
+    return std::nullopt;
   }
   if (result.second) {
     ctx.Diags.diagnose(SourceLoc(), diag::tbd_warn_truncating_version,

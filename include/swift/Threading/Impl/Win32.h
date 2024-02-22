@@ -23,7 +23,7 @@
 
 #include <atomic>
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 namespace threading_impl {
@@ -35,7 +35,7 @@ using thread_id = ::DWORD;
 inline thread_id thread_get_current() { return ::GetCurrentThreadId(); }
 bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) { return a == b; }
-llvm::Optional<stack_bounds> thread_get_current_stack_bounds();
+std::optional<stack_bounds> thread_get_current_stack_bounds();
 
 // .. Mutex support ..........................................................
 

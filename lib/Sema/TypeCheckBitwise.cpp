@@ -51,7 +51,7 @@ bool isImplicit(BitwiseCopyableCheck check) {
 /// The implicit check kind appropriate to \p nominal, if any.
 ///
 /// For public, non-frozen types, this is ::None.
-llvm::Optional<BitwiseCopyableCheck>
+std::optional<BitwiseCopyableCheck>
 getImplicitCheckForNominal(NominalTypeDecl *nominal) {
   assert(nominal);
   if (!nominal
@@ -65,7 +65,7 @@ getImplicitCheckForNominal(NominalTypeDecl *nominal) {
       nominal->getAttrs().hasAttribute<FrozenAttr>())
     return {BitwiseCopyableCheck::Implicit};
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Checks that \p nominal conforms to BitwiseCopyable and emits the relevant

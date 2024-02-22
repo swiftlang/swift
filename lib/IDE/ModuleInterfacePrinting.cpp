@@ -54,9 +54,9 @@ public:
 
 private:
   void printDeclPre(const Decl *D,
-                    llvm::Optional<BracketOptions> Bracket) override;
+                    std::optional<BracketOptions> Bracket) override;
   void printDeclPost(const Decl *D,
-                     llvm::Optional<BracketOptions> Bracket) override;
+                     std::optional<BracketOptions> Bracket) override;
   void avoidPrintDeclPost(const Decl *D) override;
   // Forwarding implementations.
 
@@ -85,15 +85,16 @@ private:
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
   }
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPre(ED, Target, Bracket);
   }
 
   void printSynthesizedExtensionPost(
       const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+      std::optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPost(ED, Target, Bracket);
   }
 
@@ -221,14 +222,14 @@ static bool extensionHasClangNode(ExtensionDecl *ext) {
   return static_cast<bool>(swift::ide::extensionGetClangNode(ext));
 }
 
-llvm::Optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
-                                                          StringRef USR) {
+std::optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
+                                                         StringRef USR) {
   for (auto File : M->getTopLevelModule()->getFiles()) {
     if (auto Name = File->getGroupNameByUSR(USR)) {
       return Name;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Prints a single decl using the \p Printer and \p Options provided. If
@@ -955,7 +956,7 @@ void ClangCommentPrinter::avoidPrintDeclPost(const Decl *D) {
 }
 
 void ClangCommentPrinter::printDeclPre(const Decl *D,
-                                       llvm::Optional<BracketOptions> Bracket) {
+                                       std::optional<BracketOptions> Bracket) {
   // Skip parameters, since we do not gracefully handle nested declarations on a
   // single line.
   // FIXME: we should fix that, since it also affects struct members, etc.
@@ -972,8 +973,8 @@ void ClangCommentPrinter::printDeclPre(const Decl *D,
   return OtherPrinter.printDeclPre(D, Bracket);
 }
 
-void ClangCommentPrinter::printDeclPost(
-    const Decl *D, llvm::Optional<BracketOptions> Bracket) {
+void ClangCommentPrinter::printDeclPost(const Decl *D,
+                                        std::optional<BracketOptions> Bracket) {
   OtherPrinter.printDeclPost(D, Bracket);
 
   // Skip parameters; see printDeclPre().

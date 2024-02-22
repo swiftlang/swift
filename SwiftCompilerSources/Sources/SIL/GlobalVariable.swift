@@ -137,9 +137,6 @@ extension Instruction {
         // initializers.
         return false
       }
-    case let fri as FunctionRefInst:
-      // TODO: support async function pointers in static globals.
-      return !fri.referencedFunction.isAsync
     case is StructInst,
          is TupleInst,
          is EnumInst,
@@ -152,7 +149,8 @@ extension Instruction {
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,
          is AddressToPointerInst,
-         is GlobalAddrInst:
+         is GlobalAddrInst,
+         is FunctionRefInst:
       return true
     default:
       return false

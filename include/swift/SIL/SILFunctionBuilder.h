@@ -102,7 +102,7 @@ class SILFunctionBuilder {
   /// SILFunctionBuilder. Eventually the uses should probably be refactored.
   SILFunction *createFunction(
       SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-      GenericEnvironment *genericEnv, llvm::Optional<SILLocation> loc,
+      GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
       IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
       IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

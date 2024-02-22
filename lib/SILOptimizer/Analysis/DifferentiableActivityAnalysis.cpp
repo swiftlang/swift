@@ -231,13 +231,13 @@ void DifferentiableActivityInfo::propagateVaried(
 
 /// Returns the accessor kind of the given SIL function, if it is a lowered
 /// accessor. Otherwise, return `None`.
-static llvm::Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
+static std::optional<AccessorKind> getAccessorKind(SILFunction *fn) {
   auto *dc = fn->getDeclContext();
   if (!dc)
-    return llvm::None;
+    return std::nullopt;
   auto *accessor = dyn_cast_or_null<AccessorDecl>(dc->getAsDecl());
   if (!accessor)
-    return llvm::None;
+    return std::nullopt;
   return accessor->getAccessorKind();
 }
 

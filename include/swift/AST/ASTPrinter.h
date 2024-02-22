@@ -131,7 +131,7 @@ public:
   ///
   /// Callers should use callPrintDeclPre().
   virtual void printDeclPre(const Decl *D,
-                            llvm::Optional<BracketOptions> Bracket) {}
+                            std::optional<BracketOptions> Bracket) {}
   /// Called before printing at the point which would be considered the location
   /// of the declaration (normally the name of the declaration).
   ///
@@ -146,7 +146,7 @@ public:
   ///
   /// Callers should use callPrintDeclPost().
   virtual void printDeclPost(const Decl *D,
-                             llvm::Optional<BracketOptions> Bracket) {}
+                             std::optional<BracketOptions> Bracket) {}
 
   /// Called before printing the result type of the declaration. Printer can
   /// replace \p TL to customize the input.
@@ -175,13 +175,13 @@ public:
   /// Called before printing a synthesized extension.
   virtual void
   printSynthesizedExtensionPre(const ExtensionDecl *ED, TypeOrExtensionDecl NTD,
-                               llvm::Optional<BracketOptions> Bracket) {}
+                               std::optional<BracketOptions> Bracket) {}
 
   /// Called after printing a synthesized extension.
   virtual void
   printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                 TypeOrExtensionDecl TargetDecl,
-                                llvm::Optional<BracketOptions> Bracket) {}
+                                std::optional<BracketOptions> Bracket) {}
 
   /// Called before printing a structured entity.
   ///
@@ -303,11 +303,10 @@ public:
   // MARK: Callback interface wrappers that perform ASTPrinter bookkeeping.
 
    /// Make a callback to printDeclPre(), performing any necessary bookkeeping.
-  void callPrintDeclPre(const Decl *D, llvm::Optional<BracketOptions> Bracket);
+  void callPrintDeclPre(const Decl *D, std::optional<BracketOptions> Bracket);
 
   /// Make a callback to printDeclPost(), performing any necessary bookkeeping.
-  void callPrintDeclPost(const Decl *D,
-                         llvm::Optional<BracketOptions> Bracket) {
+  void callPrintDeclPost(const Decl *D, std::optional<BracketOptions> Bracket) {
     printDeclPost(D, Bracket);
   }
 

@@ -846,6 +846,12 @@ bool BridgedInstruction::maySuspend() const {
   return unbridged()->maySuspend();
 }
 
+bool BridgedInstruction::shouldBeForwarding() const {
+  return llvm::isa<swift::OwnershipForwardingSingleValueInstruction>(unbridged()) ||
+         llvm::isa<swift::OwnershipForwardingTermInst>(unbridged()) ||
+         llvm::isa<swift::OwnershipForwardingMultipleValueInstruction>(unbridged());
+}
+
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
   return getAs<swift::MultipleValueInstruction>()->getNumResults();
 }
@@ -1448,7 +1454,7 @@ BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftI
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
                                     bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
   return {unbridged().createAllocStack(regularLoc(), type.unbridged(),
-                                       llvm::None, hasDynamicLifetime,
+                                       std::nullopt, hasDynamicLifetime,
                                        isLexical, wasMoved)};
 }
 

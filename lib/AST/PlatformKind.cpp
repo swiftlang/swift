@@ -47,23 +47,23 @@ StringRef swift::prettyPlatformString(PlatformKind platform) {
   llvm_unreachable("bad PlatformKind");
 }
 
-llvm::Optional<PlatformKind> swift::platformFromString(StringRef Name) {
+std::optional<PlatformKind> swift::platformFromString(StringRef Name) {
   if (Name == "*")
     return PlatformKind::none;
-  return llvm::StringSwitch<llvm::Optional<PlatformKind>>(Name)
+  return llvm::StringSwitch<std::optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
       .Case("OSX", PlatformKind::macOS)
       .Case("OSXApplicationExtension", PlatformKind::macOSApplicationExtension)
-      .Default(llvm::Optional<PlatformKind>());
+      .Default(std::optional<PlatformKind>());
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 swift::closestCorrectedPlatformString(StringRef candidate) {
   auto lowerCasedCandidate = candidate.lower();
   auto lowerCasedCandidateRef = StringRef(lowerCasedCandidate);
   auto minDistance = std::numeric_limits<unsigned int>::max();
-  llvm::Optional<StringRef> result = llvm::None;
+  std::optional<StringRef> result = std::nullopt;
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   {                                                                            \
     auto platform = StringRef(#X);                                             \
@@ -80,10 +80,10 @@ swift::closestCorrectedPlatformString(StringRef candidate) {
   // If the most similar platform distance is greater than this threshold,
   // it's not similar enough to be suggested as correction.
   const unsigned int distanceThreshold = 5;
-  return (minDistance < distanceThreshold) ? result : llvm::None;
+  return (minDistance < distanceThreshold) ? result : std::nullopt;
 }
 
-llvm::Optional<PlatformKind>
+std::optional<PlatformKind>
 swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   switch (Platform) {
   case PlatformKind::macOSApplicationExtension:
@@ -104,7 +104,7 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("bad PlatformKind");
 }

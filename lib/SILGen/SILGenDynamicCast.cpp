@@ -111,7 +111,7 @@ namespace {
     void emitConditional(
         ManagedValue operand, CastConsumptionKind consumption, SGFContext ctx,
         llvm::function_ref<void(ManagedValue)> handleTrue,
-        llvm::function_ref<void(llvm::Optional<ManagedValue>)> handleFalse,
+        llvm::function_ref<void(std::optional<ManagedValue>)> handleFalse,
         ProfileCounter TrueCount = ProfileCounter(),
         ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
@@ -190,7 +190,7 @@ namespace {
         // If we have an address only type, do not handle the consumption
         // rules. These are handled for us by the user.
         if (Strategy == CastStrategy::Address) {
-          handleFalse(llvm::None);
+          handleFalse(std::nullopt);
           assert(!SGF.B.hasValidInsertionPoint() &&
                  "handler did not end block");
           return;
@@ -210,7 +210,7 @@ namespace {
             FullExpr argScope(SGF.Cleanups, CleanupLocation(Loc));
             SGF.B.createForwardedTermResult(operandValue.getType());
           }
-          handleFalse(llvm::None);
+          handleFalse(std::nullopt);
           assert(!SGF.B.hasValidInsertionPoint() &&
                  "handler did not end block");
           return;
@@ -220,7 +220,7 @@ namespace {
         switch (consumption) {
         case CastConsumptionKind::BorrowAlways:
         case CastConsumptionKind::CopyOnSuccess:
-          handleFalse(llvm::None);
+          handleFalse(std::nullopt);
           break;
         case CastConsumptionKind::TakeAlways:
         case CastConsumptionKind::TakeOnSuccess:
@@ -299,7 +299,7 @@ namespace {
 void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
     llvm::function_ref<void(ManagedValue)> handleTrue,
-    llvm::function_ref<void(llvm::Optional<ManagedValue>)> handleFalse,
+    llvm::function_ref<void(std::optional<ManagedValue>)> handleFalse,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
@@ -311,7 +311,7 @@ void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
     llvm::function_ref<void(ManagedValue)> handleTrue,
-    llvm::function_ref<void(llvm::Optional<ManagedValue>)> handleFalse,
+    llvm::function_ref<void(std::optional<ManagedValue>)> handleFalse,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
@@ -449,7 +449,7 @@ RValue Lowering::emitConditionalCheckedCast(
   // Set up a result buffer if desirable/required.
   SILValue resultBuffer;
   SILValue resultObjectBuffer;
-  llvm::Optional<TemporaryInitialization> resultObjectTemp;
+  std::optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
   if ((resultTL.isAddressOnly() && SGF.useLoweredAddresses())
       || (C.getEmitInto()
@@ -490,8 +490,8 @@ RValue Lowering::emitConditionalCheckedCast(
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
       },
       // The failure path.
-      [&](llvm::Optional<ManagedValue> Value) {
-        // We always are performing a take here, so Value should be llvm::None
+      [&](std::optional<ManagedValue> Value) {
+        // We always are performing a take here, so Value should be std::nullopt
         // since the object should have been destroyed immediately in the fail
         // block.
         assert(!Value.has_value() && "Expected a take_always consumption kind");
@@ -565,7 +565,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
         SILValue yes = SGF.B.createIntegerLiteral(loc, i1Ty, 1);
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, yes);
       },
-      [&](llvm::Optional<ManagedValue> Value) {
+      [&](std::optional<ManagedValue> Value) {
         assert(!Value.has_value() && "Expected take_always semantics");
         SILValue no = SGF.B.createIntegerLiteral(loc, i1Ty, 0);
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, no);

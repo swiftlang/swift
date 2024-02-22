@@ -23,7 +23,7 @@ namespace {
 /// false otherwise.
 static bool
 forEachDependencyUntilTrue(CompilerInstance &CI,
-                           llvm::Optional<unsigned> excludeBufferID,
+                           std::optional<unsigned> excludeBufferID,
                            llvm::function_ref<bool(StringRef)> callback) {
   // Check files in the current module. If 'excludeBufferID' is None, exclude
   // all source files.
@@ -66,10 +66,9 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
 }
 
 /// Collect hash codes of the dependencies into \c Map.
-static void
-cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                            llvm::Optional<unsigned> excludeBufferID,
-                            llvm::StringMap<llvm::hash_code> &Map) {
+static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
+                                        std::optional<unsigned> excludeBufferID,
+                                        llvm::StringMap<llvm::hash_code> &Map) {
   auto &FS = CI.getFileSystem();
   forEachDependencyUntilTrue(CI, excludeBufferID, [&](StringRef filename) {
     if (Map.count(filename))
@@ -93,7 +92,7 @@ cacheDependencyHashIfNeeded(CompilerInstance &CI,
 /// Check if any dependent files are modified since \p timestamp.
 static bool
 areAnyDependentFilesInvalidated(CompilerInstance &CI, llvm::vfs::FileSystem &FS,
-                                llvm::Optional<unsigned> excludeBufferID,
+                                std::optional<unsigned> excludeBufferID,
                                 llvm::sys::TimePoint<> timestamp,
                                 const llvm::StringMap<llvm::hash_code> &Map) {
 
@@ -139,14 +138,14 @@ areAnyDependentFilesInvalidated(CompilerInstance &CI, llvm::vfs::FileSystem &FS,
 } // namespace
 
 void ide::cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                      llvm::Optional<unsigned> excludeBufferID,
+                                      std::optional<unsigned> excludeBufferID,
                                       llvm::StringMap<llvm::hash_code> &Map) {
   return ::cacheDependencyHashIfNeeded(CI, excludeBufferID, Map);
 }
 
 bool ide::areAnyDependentFilesInvalidated(
     CompilerInstance &CI, llvm::vfs::FileSystem &FS,
-    llvm::Optional<unsigned> excludeBufferID, llvm::sys::TimePoint<> timestamp,
+    std::optional<unsigned> excludeBufferID, llvm::sys::TimePoint<> timestamp,
     const llvm::StringMap<llvm::hash_code> &Map) {
   return ::areAnyDependentFilesInvalidated(CI, FS, excludeBufferID, timestamp,
                                            Map);

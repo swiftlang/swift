@@ -103,7 +103,7 @@ private:
   static StringInfo getStringInfo(SILValue value);
   static StringInfo getStringFromStaticLet(SILValue value);
 
-  static llvm::Optional<int> getIntConstant(SILValue value);
+  static std::optional<int> getIntConstant(SILValue value);
   static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue);
   static SILValue copyValue(SILValue value, SILInstruction *before);
   ApplyInst *createStringInit(StringRef str, SILInstruction *beforeInst);
@@ -304,7 +304,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
-  llvm::Optional<int> isQualifiedOpt =
+  std::optional<int> isQualifiedOpt =
       getIntConstant(typeNameCall->getArgument(1));
   if (!isQualifiedOpt)
     return false;
@@ -547,7 +547,7 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
     // An empty string initializer with initial capacity.
     int reservedCapacity = std::numeric_limits<int>::max();
     if (apply->getNumArguments() > 0) {
-      if (llvm::Optional<int> capacity = getIntConstant(apply->getArgument(0)))
+      if (std::optional<int> capacity = getIntConstant(apply->getArgument(0)))
         reservedCapacity = capacity.value();
     }
     return StringInfo("", reservedCapacity);
@@ -659,14 +659,14 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
 
 /// Returns the constant integer value if \a value is an Int or Bool struct with
 /// an integer_literal as operand.
-llvm::Optional<int> StringOptimization::getIntConstant(SILValue value) {
+std::optional<int> StringOptimization::getIntConstant(SILValue value) {
   auto *boolOrIntStruct = dyn_cast<StructInst>(value);
   if (!boolOrIntStruct || boolOrIntStruct->getNumOperands() != 1)
-    return llvm::None;
+    return std::nullopt;
 
   auto *literal = dyn_cast<IntegerLiteralInst>(boolOrIntStruct->getOperand(0));
   if (!literal || literal->getValue().getActiveBits() > 64)
-    return llvm::None;
+    return std::nullopt;
 
   return literal->getValue().getSExtValue();
 }

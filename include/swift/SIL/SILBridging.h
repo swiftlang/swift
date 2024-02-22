@@ -100,7 +100,7 @@ struct OptionalBridgedResultInfo {
   BridgedResultConvention convention = BridgedResultConvention::Indirect;
 
 #ifdef USED_IN_CPP_SOURCE
-  OptionalBridgedResultInfo(llvm::Optional<swift::SILResultInfo> resultInfo) {
+  OptionalBridgedResultInfo(std::optional<swift::SILResultInfo> resultInfo) {
     if (resultInfo) {
       type = resultInfo->getInterfaceType().getPointer();
       convention =
@@ -725,7 +725,7 @@ struct OptionalBridgedSILDebugVariable {
   uint64_t storage[16];
 
 #ifdef USED_IN_CPP_SOURCE
-  using OptionalSILDebugVariable = llvm::Optional<swift::SILDebugVariable>;
+  using OptionalSILDebugVariable = std::optional<swift::SILDebugVariable>;
 
   OptionalBridgedSILDebugVariable(
     OptionalSILDebugVariable &&debugVariable) {
@@ -770,6 +770,7 @@ struct BridgedInstruction {
   bool mayLoadWeakOrUnowned() const;
   bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
+  BRIDGED_INLINE bool shouldBeForwarding() const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses

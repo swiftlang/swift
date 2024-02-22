@@ -14,13 +14,13 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
+#include "swift/Basic/BlotMapVector.h"
+#include "swift/Basic/ImmutablePointerSet.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
-#include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/ImmutablePointerSet.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 

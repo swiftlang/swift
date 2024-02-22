@@ -301,7 +301,7 @@ private:
   StringRef WasmExportName;
 
   /// Name of a Wasm import module and field if @_extern(wasm) attribute
-  llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
+  std::optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
@@ -484,7 +484,7 @@ private:
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+         std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,

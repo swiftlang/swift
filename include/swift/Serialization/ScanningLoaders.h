@@ -34,24 +34,23 @@ private:
 
   /// Scan the given interface file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework,
-                    bool isTestableImport);
+  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework);
 
   InterfaceSubContextDelegate &astDelegate;
 
   /// Location where pre-built moduels are to be built into.
   std::string moduleOutputPath;
 
-  llvm::Optional<SwiftDependencyTracker> dependencyTracker;
+  std::optional<SwiftDependencyTracker> dependencyTracker;
 
 public:
-  llvm::Optional<ModuleDependencyInfo> dependencies;
+  std::optional<ModuleDependencyInfo> dependencies;
 
   SwiftModuleScanner(
       ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
       InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
       ScannerKind kind = MDS_plain,
-      llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
+      std::optional<SwiftDependencyTracker> tracker = std::nullopt)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         kind(kind), moduleName(moduleName), astDelegate(astDelegate),
@@ -96,7 +95,7 @@ public:
       ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
       StringRef PlaceholderDependencyModuleMap,
       InterfaceSubContextDelegate &astDelegate, StringRef moduleOutputPath,
-      llvm::Optional<SwiftDependencyTracker> tracker = llvm::None)
+      std::optional<SwiftDependencyTracker> tracker = std::nullopt)
       : SwiftModuleScanner(ctx, LoadMode, moduleName, astDelegate,
                            moduleOutputPath, MDS_placeholder, tracker) {
 

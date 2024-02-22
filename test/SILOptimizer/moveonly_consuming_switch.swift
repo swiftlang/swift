@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BorrowingSwitch -enable-experimental-feature MoveOnlyPartialConsumption -verify %s
+
+// TODO: Remove this and just use the real `UnsafeMutablePointer` when
+// noncopyable type support has been upstreamed.
 struct MyPointer<Wrapped: ~Copyable>: Copyable {
     var v: UnsafeMutablePointer<Int>
 
@@ -40,14 +43,6 @@ struct Box<Wrapped: ~Copyable>: ~Copyable {
         return wrapped
     }
 }
-
-
-
-
-
-
-
-
 
 enum List<Element: ~Copyable>: ~Copyable {
     case empty

@@ -227,7 +227,7 @@ private:
     return getPullback().mapTypeIntoContext(remappedSILType);
   }
 
-  llvm::Optional<TangentSpace> getTangentSpace(CanType type) {
+  std::optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
     type =
         getWitness()->getDerivativeGenericSignature().getReducedType(
@@ -725,7 +725,7 @@ private:
   /// Helper for `getAdjointBuffer`.
   AllocStackInst *createFunctionLocalAllocation(
       SILType type, SILLocation loc, bool zeroInitialize = false,
-      llvm::Optional<SILDebugVariable> varInfo = llvm::None) {
+      std::optional<SILDebugVariable> varInfo = std::nullopt) {
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
     // allocations exist yet.
@@ -2842,8 +2842,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Branch to pullback successor blocks.
   assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
   builder.createSwitchEnum(pbLoc, predEnumVal, /*DefaultBB*/ nullptr,
-                           pullbackSuccessorCases, llvm::None, ProfileCounter(),
-                           OwnershipKind::Owned);
+                           pullbackSuccessorCases, std::nullopt,
+                           ProfileCounter(), OwnershipKind::Owned);
 }
 
 //--------------------------------------------------------------------------//

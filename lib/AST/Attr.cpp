@@ -116,12 +116,12 @@ SourceRange TypeAttribute::getSourceRange() const {
 /// Given a name like "autoclosure", return the type attribute ID that
 /// corresponds to it.
 ///
-llvm::Optional<TypeAttrKind>
+std::optional<TypeAttrKind>
 TypeAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(Str)
+  return llvm::StringSwitch<std::optional<TypeAttrKind>>(Str)
 #define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
 #include "swift/AST/TypeAttr.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 /// Return the name (like "autoclosure") for an attribute ID.
@@ -268,14 +268,14 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 /// Also note that this recognizes both attributes like '@inline' (with no @)
 /// and decl modifiers like 'final'.
 ///
-llvm::Optional<DeclAttrKind>
+std::optional<DeclAttrKind>
 DeclAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(Str)
+  return llvm::StringSwitch<std::optional<DeclAttrKind>>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DeclAttrKind::CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DeclAttrKind::CLASS)
 #include "swift/AST/DeclAttr.def"
       .Case(SPI_AVAILABLE_ATTRNAME, DeclAttrKind::Available)
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
@@ -479,7 +479,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -517,7 +517,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
           !AvAttr->isPackageDescriptionVersionSpecific())
         continue;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -1032,22 +1032,22 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
-llvm::Optional<const DeclAttribute *>
+std::optional<const DeclAttribute *>
 ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   if (Attr->isImplicit())
-    return llvm::None;
+    return std::nullopt;
 
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
   auto *declFile = mod->getSourceFileContainingLocation(declLoc);
   auto *attrFile = mod->getSourceFileContainingLocation(Attr->getLocation());
   if (!declFile || !attrFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Only attributes in the same buffer as the declaration they're attached to
   // are part of the original attribute list.
   if (declFile->getBufferID() != attrFile->getBufferID())
-    return llvm::None;
+    return std::nullopt;
 
   return Attr;
 }
@@ -1923,7 +1923,7 @@ StringRef DeclAttribute::getAttrName() const {
 }
 
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
-                   llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+                   std::optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
     : DeclAttribute(DeclAttrKind::ObjC, atLoc, baseRange, /*Implicit=*/false),
       NameData(nullptr) {
@@ -1945,7 +1945,7 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   Bits.ObjCAttr.ImplicitName = false;
 }
 
-ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
+ObjCAttr *ObjCAttr::create(ASTContext &Ctx, std::optional<ObjCSelector> name,
                            bool isNameImplicit) {
   return new (Ctx) ObjCAttr(name, isNameImplicit);
 }
@@ -1953,11 +1953,11 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
   return new (Ctx)
-      ObjCAttr(AtLoc, SourceRange(ObjCLoc), llvm::None, SourceRange(), {});
+      ObjCAttr(AtLoc, SourceRange(ObjCLoc), std::nullopt, SourceRange(), {});
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(llvm::None, false);
+  return new (Ctx) ObjCAttr(std::nullopt, false);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -2186,7 +2186,7 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                IsSPI);
 }
 
-llvm::Optional<OriginallyDefinedInAttr::ActiveVersion>
+std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
@@ -2205,7 +2205,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
     Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
     return Result;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
@@ -2908,7 +2908,7 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
 
 bool swift::hasAttribute(
     const LangOptions &langOpts, llvm::StringRef attributeName) {
-  llvm::Optional<DeclAttrKind> kind =
+  std::optional<DeclAttrKind> kind =
       DeclAttribute::getAttrKindFromString(attributeName);
   if (!kind)
     return false;

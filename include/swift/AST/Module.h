@@ -31,13 +31,13 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include <optional>
 #include <set>
 
 namespace clang {
@@ -533,7 +533,7 @@ private:
 
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
-  llvm::Optional<std::pair<ModuleDecl *, Identifier>>
+  std::optional<std::pair<ModuleDecl *, Identifier>>
       declaringModuleAndBystander;
 
   /// If this module is an underscored cross import overlay, gets the underlying
@@ -1095,7 +1095,7 @@ public:
   ///
   /// \returns true if there was a problem adding this file.
   bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
-                              llvm::Optional<ArtificialMainKind> kind);
+                              std::optional<ArtificialMainKind> kind);
 
   /// \returns true if this module has a main entry point.
   bool hasEntryPoint() const {

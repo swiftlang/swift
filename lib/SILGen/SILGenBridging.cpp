@@ -89,7 +89,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
 /// Bridge the given Swift value to its corresponding Objective-C
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
-static llvm::Optional<ManagedValue>
+static std::optional<ManagedValue>
 emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
                              ManagedValue swiftValue, CanType swiftValueType,
                              CanType bridgedType,
@@ -97,7 +97,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = SGF.SGM.getBridgeToObjectiveCRequirement(loc);
   if (!requirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Retrieve the _bridgeToObjectiveC witness.
   auto witness = conformance->getWitnessDecl(requirement);
@@ -106,7 +106,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq)
-    return llvm::None;
+    return std::nullopt;
 
   Type objcType = conformance->getTypeWitness(objcTypeReq);
 
@@ -177,7 +177,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
 /// Bridge the given Objective-C object to its corresponding Swift
 /// value, using the appropriate witness for the
 /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.
-static llvm::Optional<ManagedValue>
+static std::optional<ManagedValue>
 emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
                              ManagedValue objcValue, CanType bridgedType,
                              ProtocolConformance *conformance) {
@@ -185,12 +185,12 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
   auto requirement =
     SGF.SGM.getUnconditionallyBridgeFromObjectiveCRequirement(loc);
   if (!requirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Find the _ObjectiveCType requirement.
   auto objcTypeRequirement = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeRequirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
   auto witness = conformance->getWitnessDeclRef(requirement);
@@ -247,7 +247,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
       std::move(resultPlan), std::move(argScope), loc,
       ManagedValue::forObjectRValueWithoutOwnership(witnessRef), subs,
       {objcValue, ManagedValue::forObjectRValueWithoutOwnership(metatypeValue)},
-      calleeTypeInfo, ApplyOptions(), context, llvm::None);
+      calleeTypeInfo, ApplyOptions(), context, std::nullopt);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -478,7 +478,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   ManagedValue result =
       SGF.emitMonomorphicApply(loc, fn, args, formalNativeResultType,
                                formalNativeResultType, ApplyOptions(),
-                               llvm::None, llvm::None, C)
+                               std::nullopt, std::nullopt, C)
           .getAsSingleValue(SGF, loc);
 
   // Bridge the result back to ObjC.
@@ -571,7 +571,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto results = blockInterfaceTy->getResults();
   auto representation = SILFunctionType::Representation::CFunctionPointer;
   auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
-      params, results.empty() ? llvm::Optional<SILResultInfo>() : results[0],
+      params, results.empty() ? std::optional<SILResultInfo>() : results[0],
       representation);
 
   auto extInfo = SILFunctionType::ExtInfoBuilder()
@@ -920,7 +920,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
              loc, block, args, formalBlockTy.getResult(), formalResultType,
              ApplyOptions(),
              /*override CC*/ SILFunctionTypeRepresentation::Block,
-             /*foreign error*/ llvm::None, SGFContext(init.get()))
+             /*foreign error*/ std::nullopt, SGFContext(init.get()))
           .getAsSingleValue(SGF, loc);
 
   SILValue r;
@@ -1330,8 +1330,8 @@ static SILFunctionType *
 emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                        SmallVectorImpl<SILValue> &args,
                        SILValue &foreignErrorSlot, SILValue &foreignAsyncSlot,
-                       llvm::Optional<ForeignErrorConvention> &foreignError,
-                       llvm::Optional<ForeignAsyncConvention> &foreignAsync,
+                       std::optional<ForeignErrorConvention> &foreignError,
+                       std::optional<ForeignAsyncConvention> &foreignAsync,
                        CanType &nativeFormalResultTy,
                        CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
@@ -1596,7 +1596,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   bool emitExecutorPrecondition =
       getASTContext().LangOpts.hasFeature(Feature::DynamicActorIsolation);
 
-  llvm::Optional<ActorIsolation> isolation;
+  std::optional<ActorIsolation> isolation;
   if (F.isAsync()) {
     if (thunk.hasDecl())
       isolation = getActorIsolation(thunk.getDecl());
@@ -1644,8 +1644,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   Scope argScope(Cleanups, CleanupLocation(loc));
 
   // Bridge the arguments.
-  llvm::Optional<ForeignErrorConvention> foreignError;
-  llvm::Optional<ForeignAsyncConvention> foreignAsync;
+  std::optional<ForeignErrorConvention> foreignError;
+  std::optional<ForeignAsyncConvention> foreignAsync;
   SILValue foreignErrorSlot;
   SILValue foreignAsyncSlot;
   CanType nativeFormalResultType, bridgedFormalResultType;
@@ -2065,13 +2065,13 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   auto foreignFnTy = foreignCI.SILFnType;
 
   // Find the foreign error/async convention and 'self' parameter index.
-  llvm::Optional<Type> thrownErrorType;
-  llvm::Optional<ForeignAsyncConvention> foreignAsync;
+  std::optional<Type> thrownErrorType;
+  std::optional<ForeignAsyncConvention> foreignAsync;
   if (nativeFnTy->isAsync()) {
     foreignAsync = fd->getForeignAsyncConvention();
     assert(foreignAsync && "couldn't find foreign async convention?!");
   }
-  llvm::Optional<ForeignErrorConvention> foreignError;
+  std::optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {
     thrownErrorType = nativeFnTy->getErrorResult().getInterfaceType();
     foreignError = fd->getForeignErrorConvention();
@@ -2286,7 +2286,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forObjectRValueWithoutOwnership(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions(), context, llvm::None)
+                  calleeTypeInfo, ApplyOptions(), context, std::nullopt)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

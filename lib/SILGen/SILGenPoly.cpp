@@ -806,7 +806,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // If we're emitting to memory, project out this element in the
     // destination buffer, then wrap that in an Initialization to
     // track the cleanup.
-    llvm::Optional<TemporaryInitialization> outputEltTemp;
+    std::optional<TemporaryInitialization> outputEltTemp;
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
@@ -910,14 +910,14 @@ void SILGenFunction::collectThunkParams(
 /// If the inner function we are calling (with type \c fnType) from the thunk
 /// created by \c SGF requires an indirect error argument, returns that
 /// argument.
-static llvm::Optional<SILValue>
+static std::optional<SILValue>
 emitThunkIndirectErrorArgument(SILGenFunction &SGF, SILLocation loc,
                                CanSILFunctionType fnType) {
   // If the function we're calling has an indirect error result, create an
   // argument for it.
   auto innerError = fnType->getOptionalErrorResult();
   if (!innerError || innerError->getConvention() != ResultConvention::Indirect)
-    return llvm::None;
+    return std::nullopt;
 
   // If the type of the indirect error is the same for both the inner
   // function and the thunk, so we can re-use the indirect error slot.
@@ -5106,7 +5106,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
 
     // Set up the context into which to emit the outer result.
     SGFContext outerResultCtxt;
-    llvm::Optional<TemporaryInitialization> outerResultInit;
+    std::optional<TemporaryInitialization> outerResultInit;
     SILType outerResultTy;
     if (outerIsIndirect) {
       outerResultTy = op.OuterResultAddr->getType();
@@ -6727,7 +6727,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   // Collect the arguments to the implementation.
   SmallVector<SILValue, 8> args;
 
-  llvm::Optional<ResultPlanner> resultPlanner;
+  std::optional<ResultPlanner> resultPlanner;
 
   if (coroutineKind == SILCoroutineKind::None) {
     // First, indirect results.
@@ -6976,7 +6976,7 @@ void SILGenFunction::emitProtocolWitness(
     SILDeclRef requirement, SubstitutionMap reqtSubs, SILDeclRef witness,
     SubstitutionMap witnessSubs, IsFreeFunctionWitness_t isFree,
     bool isSelfConformance, bool isPreconcurrency,
-    llvm::Optional<ActorIsolation> enterIsolation) {
+    std::optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -7002,7 +7002,7 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    llvm::Optional<ManagedValue> actorSelf;
+    std::optional<ManagedValue> actorSelf;
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
@@ -7126,7 +7126,7 @@ void SILGenFunction::emitProtocolWitness(
   // Collect the arguments.
   SmallVector<SILValue, 8> args;
 
-  llvm::Optional<ResultPlanner> resultPlanner;
+  std::optional<ResultPlanner> resultPlanner;
   if (coroutineKind == SILCoroutineKind::None) {
     //   - indirect results
     resultPlanner.emplace(*this, loc, thunkIndirectResults, args);

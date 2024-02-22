@@ -354,7 +354,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   }
 
   // Add error results.
-  llvm::Optional<SILResultInfo> InterfaceErrorResult;
+  std::optional<SILResultInfo> InterfaceErrorResult;
   if (FTy->hasErrorResult()) {
     InterfaceErrorResult = FTy->getErrorResult();
   }
