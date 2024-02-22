@@ -29,3 +29,14 @@ struct SamplesType {
     void* Z;
     void* AA;
 };
+
+
+typedef struct _ContainedType {
+  unsigned int f1;
+  float    f2;
+} __attribute__((packed)) ContainedType;
+
+typedef struct _ContainerType {
+  char x1;
+  ContainedType l[10];
+}  __attribute__((packed)) ContainerType;
