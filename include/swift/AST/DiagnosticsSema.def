@@ -4464,7 +4464,7 @@ ERROR(could_not_infer_pack_element,none,
       "could not infer pack element #%0 from context", (unsigned))
 
 NOTE(note_in_opening_pack_element,none,
-      "in infering pack element #%0 of '%1'", (unsigned,StringRef))
+      "in inferring pack element #%0 of '%1'", (unsigned,StringRef))
 
       
 ERROR(type_of_expression_is_ambiguous,none,
