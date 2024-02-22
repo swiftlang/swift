@@ -1475,12 +1475,11 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
 
 ObjectInst *ObjectInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements,
-                               unsigned NumBaseElements, SILModule &M,
-                               ValueOwnershipKind forwardingOwnershipKind) {
+                               unsigned NumBaseElements, SILModule &M) {
   auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
   auto Buffer = M.allocateInst(Size, alignof(ObjectInst));
   return ::new (Buffer)
-      ObjectInst(Loc, Ty, Elements, NumBaseElements, forwardingOwnershipKind);
+      ObjectInst(Loc, Ty, Elements, NumBaseElements);
 }
 
 VectorInst *VectorInst::create(SILDebugLocation Loc,
