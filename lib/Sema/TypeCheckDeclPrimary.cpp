@@ -1034,7 +1034,7 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
       &ctx.Diags, SF->getExportedSourceFile(),
       initExpr->getLoc().getOpaquePointerValue());
 #else
-  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported));
+  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported);
   return false;
 #endif
 }
