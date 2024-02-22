@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module -enable-experimental-feature BitwiseCopyable
+// REQUIRES: asserts
 // REQUIRES: noncopyable_generics
 import Builtin
 
@@ -95,6 +96,10 @@ func invalidSpecifierPosition1(_ x: borrowing _borrow(x) BufferView) -> BufferVi
 func invalidSpecifierPosition2(_ x: borrowing BufferView) -> BufferView { 
   let y: _borrow(x) x // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
   return BufferView(y.ptr)
+}
+
+func invalidTupleLifetimeDependence(_ x: inout BufferView) -> (_mutate(x) BufferView, BufferView) { // expected-error{{lifetime dependence specifiers cannot be applied to tuple elements}}
+  return (BufferView(x.ptr), BufferView(x.ptr))
 }
 
 struct Wrapper : ~Escapable {

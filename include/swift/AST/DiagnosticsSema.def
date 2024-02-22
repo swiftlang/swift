@@ -7849,6 +7849,8 @@ ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
       "cannot infer lifetime dependence on implicit initializer of ~Escapable"
       " type, define an initializer with explicit lifetime dependence"
       " specifiers", ())
+ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
+      "lifetime dependence specifiers cannot be applied to tuple elements", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring
