@@ -14,6 +14,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME(distributed): pending rework of distributed protocol target mangling
+// XFAIL: *
+
 import Distributed
 import FakeDistributedActorSystems
 

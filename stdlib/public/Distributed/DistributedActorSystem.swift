@@ -482,33 +482,13 @@ extension DistributedActorSystem {
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
-    let concreteTargetNameTypeNamePair: _SwiftNamePair?
-    if #available(SwiftStdlib 5.11, *) {
-      let dataAndLength = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        _getConcreteAccessibleWitnessName(on: actor,
-          targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))
-      }
-      // If the length is greater than zero it is a real value, nil otherwise
-      if dataAndLength.1 > 0 {
-        concreteTargetNameTypeNamePair = dataAndLength
-      } else {
-        concreteTargetNameTypeNamePair = nil
-      }
-    } else {
-      // protocol method targets not supported in previous Swift versions,
-      // the targetName can be assumed to be a concrete name
-      concreteTargetNameTypeNamePair = nil
-    }
-    let concreteTargetNameData = concreteTargetNameTypeNamePair?.0
-    let concreteTargetNameLength = (concreteTargetNameTypeNamePair?.1).map(UInt.init)
-
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
-        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-          _getGenericEnvironmentOfDistributedTarget(
-            concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-            concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
-        }
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        _getGenericEnvironmentOfDistributedTarget(
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex))
+      }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
     var witnessTablesBuffer: UnsafeRawPointer? = nil
@@ -535,7 +515,7 @@ extension DistributedActorSystem {
       }
 
       (witnessTablesBuffer, numWitnessTables) = _getWitnessTablesFor(environment: genericEnv,
-                                                                     genericArguments: substitutionsBuffer!)
+        genericArguments: substitutionsBuffer!)
       if numWitnessTables < 0 {
         throw ExecuteDistributedTargetError(
           message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))",
@@ -546,8 +526,8 @@ extension DistributedActorSystem {
     let paramCount =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         __getParameterCount(
-          concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-          concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex))
       }
 
     guard paramCount >= 0 else {
@@ -569,8 +549,8 @@ extension DistributedActorSystem {
     // Demangle and write all parameter types into the prepared buffer
     let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
       __getParameterTypeInfo(
-        concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-        concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
+        targetNameUTF8.baseAddress!,
+        UInt(targetNameUTF8.endIndex),
         genericEnv,
         substitutionsBuffer,
         argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
@@ -604,8 +584,8 @@ extension DistributedActorSystem {
     let maybeReturnTypeFromTypeInfo =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         __getReturnTypeInfo(
-          /*targetName:*/concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-          /*targetLength:*/concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
+          /*targetName:*/targetNameUTF8.baseAddress!,
+          /*targetLength:*/UInt(targetNameUTF8.endIndex),
           /*genericEnv:*/genericEnv,
           /*genericArguments:*/substitutionsBuffer)
       }
@@ -634,34 +614,17 @@ extension DistributedActorSystem {
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
       // Execute the target!
-      // Boilerplate invocation since types don't quite align between
-      // concreteTargetNameData and
-      if let concreteTargetNameData,
-         let concreteTargetNameLength {
-        try await _executeDistributedTarget(
-          on: actor,
-          /*targetNameData:*/concreteTargetNameData,
-          /*targetNameLength:*/concreteTargetNameLength,
-          argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-          resultBuffer: resultBuffer._rawValue,
-          substitutions: UnsafeRawPointer(substitutionsBuffer),
-          witnessTables: witnessTablesBuffer,
-          numWitnessTables: UInt(numWitnessTables)
-        )
-      } else {
-        try await _executeDistributedTarget(
-          on: actor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.count),
-          argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-          resultBuffer: resultBuffer._rawValue,
-          substitutions: UnsafeRawPointer(substitutionsBuffer),
-          witnessTables: witnessTablesBuffer,
-          numWitnessTables: UInt(numWitnessTables)
-        )
-      }
+      try await _executeDistributedTarget(
+        on: actor,
+        /*targetNameData:*/targetName,
+        /*targetNameLength:*/UInt(targetName.count),
+        argumentDecoder: &invocationDecoder,
+        argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+        resultBuffer: resultBuffer._rawValue,
+        substitutions: UnsafeRawPointer(substitutionsBuffer),
+        witnessTables: witnessTablesBuffer,
+        numWitnessTables: UInt(numWitnessTables)
+      )
 
       if returnType == Void.self {
         try await handler.onReturnVoid()
