@@ -569,6 +569,14 @@ public:
   virtual void verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const;
+  /// Perform \p invocation with the appropriate metadata collector if there is
+  /// one.
+  ///
+  /// Returns whether there was an appropriate metadata collector (and whether
+  /// \p invocation was called.
+  bool withMetadataCollector(
+      IRGenFunction &IGF, SILType T,
+      llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,
