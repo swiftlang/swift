@@ -58,7 +58,6 @@ private:
 public:
   OutliningMetadataCollector(IRGenFunction &IGF) : IGF(IGF) {}
 
-  void collectFormalTypeMetadata(CanType type);
   void collectTypeMetadataForLayout(SILType type);
 
   void emitCallToOutlinedCopy(Address dest, Address src,
@@ -68,6 +67,7 @@ public:
                                  const TypeInfo &ti) const;
 
 private:
+  void collectFormalTypeMetadata(CanType type);
   void collectRepresentationTypeMetadata(SILType ty);
 
   void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
