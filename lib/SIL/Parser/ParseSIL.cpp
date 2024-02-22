@@ -3707,6 +3707,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool isLexical = false;
     bool hasPointerEscape = false;
     bool fromVarDecl = false;
+    bool fixed = false;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -3717,6 +3718,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         hasPointerEscape = true;
       else if (AttrName == "var_decl")
         fromVarDecl = true;
+      else if (AttrName == "fixed")
+        fixed = true;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -3730,7 +3733,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical, hasPointerEscape,
-                                    fromVarDecl);
+                                    fromVarDecl, fixed);
     break;
   }
 

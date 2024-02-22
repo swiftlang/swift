@@ -1737,6 +1737,9 @@ public:
     if (BBI->isFromVarDecl()) {
       *this << "[var_decl] ";
     }
+    if (BBI->isFixed()) {
+      *this << "[fixed] ";
+    }
     *this << getIDAndType(BBI->getOperand());
   }
 

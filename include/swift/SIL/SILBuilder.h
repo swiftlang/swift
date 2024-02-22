@@ -817,12 +817,13 @@ public:
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false,
                                      bool hasPointerEscape = false,
-                                     bool fromVarDecl = false) {
+                                     bool fromVarDecl = false,
+                                     bool fixed = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
-                                      hasPointerEscape, fromVarDecl));
+                                      hasPointerEscape, fromVarDecl, fixed));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and

@@ -4520,15 +4520,18 @@ class BeginBorrowInst
   USE_SHARED_UINT8;
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical,
-                  bool hasPointerEscape, bool fromVarDecl)
+                  bool hasPointerEscape, bool fromVarDecl, bool fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
     sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().BeginBorrowInst.fixed = fixed;
   }
 
 public:
+  
+
   // FIXME: this does not return all instructions that end a local borrow
   // scope. Branches can also end it via a reborrow, so APIs using this are
   // incorrect. Instead, either iterate over all uses and return those with
@@ -4554,6 +4557,12 @@ public:
 
   bool isFromVarDecl() const {
     return sharedUInt8().BeginBorrowInst.fromVarDecl;
+  }
+
+  /// Whether the borrow scope is fixed during move checking and should be
+  /// treated as an opaque use of the value.
+  bool isFixed() const {
+    return sharedUInt8().BeginBorrowInst.fixed;
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
