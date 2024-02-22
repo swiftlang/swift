@@ -189,7 +189,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
   /// sequence. By construction, the sequence produced by the `transform`
   /// closure must either produce this type of error or not produce errors
   /// at all.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -275,7 +275,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
     /// from this iterator until it terminates.  At this point,
     /// `next(isolation:)` is ready to receive the next value from the base
     /// sequence.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {

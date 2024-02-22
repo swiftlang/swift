@@ -179,7 +179,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     /// from this iterator until it terminates.  At this point,
     /// `next(isolation:)` is ready to receive the next value from the base
     /// sequence. If `transform` throws an error, the sequence terminates.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {

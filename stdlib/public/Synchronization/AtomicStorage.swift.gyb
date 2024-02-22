@@ -20,13 +20,13 @@ import Builtin
 // ${size} bit Atomic Storage
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 @frozen
 @_alignment(${alignment})
 public struct ${type} {
   public var _storage: ${builtin}
 
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ _builtin: ${builtin}) {
@@ -38,14 +38,14 @@ public struct ${type} {
 // ${size} bit atomic load
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically loads and returns the current value, applying the specified
   /// memory ordering.
   ///
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The current value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -68,14 +68,14 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 // ${size} bit atomic store
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically sets the current value to `desired`, applying the specified
   /// memory ordering.
   ///
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -102,7 +102,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 // ${size} bit atomic exchanges
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically sets the current value to `desired` and returns the original
   /// value, applying the specified memory ordering.
@@ -110,7 +110,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -140,7 +140,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 // ${size} bit atomic compare exchanges
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified memory ordering.
@@ -163,7 +163,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -181,7 +181,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified success/failure memory orderings.
@@ -211,7 +211,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -251,7 +251,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 // ${size} bit weak compare exchanges
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the memory ordering. This compare-exchange variant is
@@ -283,7 +283,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -301,7 +301,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the specified success/failure memory orderings. This
@@ -341,7 +341,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent

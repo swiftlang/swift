@@ -179,7 +179,7 @@ public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 
 /// Called to indicate that a typed error will be thrown.
 @_silgen_name("swift_willThrowTypedImpl")
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 @usableFromInline
 func _willThrowTypedImpl<E: Error>(_ error: E)
 

@@ -1156,7 +1156,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     ///
     /// - Returns: The value returned by the next child task that completes,
     ///   or `nil` if there are no remaining child tasks,
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
       guard !finished else { return nil }
       do {
