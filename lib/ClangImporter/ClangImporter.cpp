@@ -1110,6 +1110,10 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching)
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
+
+    // Forward the index store path. That information is not passed to scanner
+    // and it is cached invariant so we don't want to re-scan if that changed.
+    CI->getFrontendOpts().IndexStorePath = ctx.ClangImporterOpts.IndexStorePath;
   } else {
     // Otherwise, create cc1 arguments from driver args.
     auto driverArgs = getClangDriverArguments(ctx, ignoreClangTarget);
@@ -3978,6 +3982,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   auto &FEOpts = instance.getFrontendOpts();
   FEOpts.IncludeTimestamps = false;
   FEOpts.ModuleMapFiles.clear();
+
+  // IndexStorePath is forwarded from swift.
+  FEOpts.IndexStorePath.clear();
 
   // PreprocessorOptions.
   // Cannot clear macros as the main module clang importer doesn't have clang
