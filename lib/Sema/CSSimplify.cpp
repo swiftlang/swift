@@ -15105,6 +15105,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
+  case FixKind::SpecifyPackElementType:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowNoopCheckedCast:
   case FixKind::AllowNoopExistentialToCFTypeCheckedCast:
