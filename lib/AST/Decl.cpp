@@ -6652,33 +6652,6 @@ findInverseInInheritance(InheritedTypes inherited,
   return inverse;
 }
 
-bool NominalTypeDecl::hasMarking(InvertibleProtocolKind target) const {
-  InverseMarking::Mark mark;
-
-  std::function<bool(Type)> isTarget = [&](Type t) -> bool {
-    if (auto kp = t->getKnownProtocol()) {
-      if (auto ip = getInvertibleProtocolKind(*kp))
-        return *ip == target;
-    } else if (auto pct = t->getAs<ProtocolCompositionType>()) {
-      return llvm::any_of(pct->getMembers(), isTarget);
-    }
-
-    return false;
-  };
-
-  findInheritedType(getInherited(),
-                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
-                      if (!isTarget(inheritedTy))
-                        return false;
-
-                      mark = InverseMarking::Mark(
-                          InverseMarking::Kind::Explicit,
-                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
-                      return true;
-                    });
-  return mark;
-}
-
 InverseMarking::Mark
 AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   auto &ctx = getASTContext();
