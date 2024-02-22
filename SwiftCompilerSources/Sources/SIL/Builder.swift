@@ -420,6 +420,7 @@ public struct Builder {
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
     
+  @discardableResult
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))

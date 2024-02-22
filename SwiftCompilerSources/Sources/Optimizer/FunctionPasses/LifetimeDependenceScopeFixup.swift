@@ -119,7 +119,7 @@ private func extendAccessScope(beginAccess: BeginAccessInst, range: inout Instru
   // Create new end_access at the end of extended uses
   for end in range.ends {
     let endBuilder = Builder(after: end, context)
-    _ = endBuilder.createEndAccess(beginAccess: beginAccess)
+    endBuilder.createEndAccess(beginAccess: beginAccess)
   }
   // Delete original end_access instructions
   for endAccess in endAcceses {
