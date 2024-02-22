@@ -1572,7 +1572,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = unsigned(BBI->isLexical()) |
              (unsigned(BBI->hasPointerEscape() << 1)) |
-             (unsigned(BBI->isFromVarDecl() << 2));
+             (unsigned(BBI->isFromVarDecl() << 2)) |
+             (unsigned(BBI->isFixed() << 3));
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1)) |

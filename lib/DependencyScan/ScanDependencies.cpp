@@ -1410,6 +1410,9 @@ static bool diagnoseCycle(CompilerInstance &instance,
         [&buffer](const ModuleDependencyID &id) {
           buffer.append(id.ModuleName);
           switch (id.Kind) {
+          case swift::ModuleDependencyKind::SwiftSource:
+            buffer.append(" (Source Target)");
+            break;
           case swift::ModuleDependencyKind::SwiftInterface:
             buffer.append(".swiftinterface");
             break;
@@ -1429,11 +1432,12 @@ static bool diagnoseCycle(CompilerInstance &instance,
         [&buffer] { buffer.append(" -> "); });
   };
 
-  auto emitCycleDiagnostic = [&](const ModuleDependencyID &dep) {
-    auto startIt = std::find(openSet.begin(), openSet.end(), dep);
+  auto emitCycleDiagnostic = [&](const ModuleDependencyID &sourceId,
+				 const ModuleDependencyID &sinkId) {
+    auto startIt = std::find(openSet.begin(), openSet.end(), sourceId);
     assert(startIt != openSet.end());
     std::vector<ModuleDependencyID> cycleNodes(startIt, openSet.end());
-    cycleNodes.push_back(*startIt);
+    cycleNodes.push_back(sinkId);
     llvm::SmallString<64> errorBuffer;
     emitModulePath(cycleNodes, errorBuffer);
     instance.getASTContext().Diags.diagnose(
@@ -1472,13 +1476,20 @@ static bool diagnoseCycle(CompilerInstance &instance,
     auto beforeSize = openSet.size();
     assert(cache.findDependency(lastOpen).has_value() &&
            "Missing dependency info during cycle diagnosis.");
-    for (const auto &dep : cache.getAllDependencies(lastOpen)) {
-      if (closeSet.count(dep))
+    for (const auto &depId : cache.getAllDependencies(lastOpen)) {
+      if (closeSet.count(depId))
         continue;
-      if (openSet.insert(dep)) {
+      // Ensure we detect dependency of the Source target
+      // on an existing Swift module with the same name
+      if (kindIsSwiftDependency(depId) &&
+          depId.ModuleName == mainId.ModuleName && openSet.contains(mainId)) {
+        emitCycleDiagnostic(mainId, depId);
+        return true;
+      }
+      if (openSet.insert(depId)) {
         break;
       } else {
-        emitCycleDiagnostic(dep);
+        emitCycleDiagnostic(depId, depId);
         return true;
       }
     }

@@ -3424,26 +3424,29 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         
         case ValueOwnership::Shared:
           emission.setNoncopyableBorrowingOwnership();
-          if (!subjectMV.isPlusZero()) {
-            subjectMV = subjectMV.borrow(*this, S);
-          }
           if (subjectMV.getType().isAddress()) {
+            // Initiate a read access on the memory, to ensure that even
+            // if the underlying memory is mutable or consumable, the pattern
+            // match is not allowed to modify it.
+            auto access = B.createBeginAccess(S, subjectMV.getValue(),
+              SILAccessKind::Read,
+              SILAccessEnforcement::Static,
+              /*no nested conflict*/ true, false);
+            Cleanups.pushCleanup<EndAccessCleanup>(access);
+            subjectMV = ManagedValue::forBorrowedAddressRValue(access);
             if (subjectMV.getType().isLoadable(F)) {
               // Load a borrow if the type is loadable.
               subjectMV = subjectUndergoesFormalAccess
                 ? B.createFormalAccessLoadBorrow(S, subjectMV)
                 : B.createLoadBorrow(S, subjectMV);
-            } else {
-              // Initiate a read access on the memory, to ensure that even
-              // if the underlying memory is mutable or consumable, the pattern
-              // match is not allowed to modify it.
-              auto access = B.createBeginAccess(S, subjectMV.getValue(),
-                SILAccessKind::Read,
-                SILAccessEnforcement::Static,
-                /*no nested conflict*/ true, false);
-              Cleanups.pushCleanup<EndAccessCleanup>(access);
-              subjectMV = ManagedValue::forBorrowedAddressRValue(access);
             }
+          } else {
+            // Initiate a fixed borrow on the subject, so that it's treated as
+            // opaque by the move checker.
+            subjectMV = subjectUndergoesFormalAccess
+              ? B.createFormalAccessBeginBorrow(S, subjectMV,
+                                                false, /*fixed*/true)
+              : B.createBeginBorrow(S, subjectMV, false, /*fixed*/ true);
           }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
           
@@ -3466,8 +3469,19 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
             Cleanups.getCleanupsDepth(),
             subjectMV);
 
-          // Perform the pattern match on a borrow of the subject.
-          subjectMV = subjectMV.borrow(*this, S);
+          // Perform the pattern match on an opaque borrow or read access of the
+          // subject.
+          if (subjectMV.getType().isAddress()) {
+            auto access = B.createBeginAccess(S, subjectMV.getValue(),
+              SILAccessKind::Read,
+              SILAccessEnforcement::Static,
+              /*no nested conflict*/ true, false);
+            Cleanups.pushCleanup<EndAccessCleanup>(access);
+            subjectMV = ManagedValue::forBorrowedAddressRValue(access);
+          } else {
+            subjectMV = B.createBeginBorrow(S, subjectMV,
+                                            false, /*fixed*/ true);
+          }
           return {subjectMV, CastConsumptionKind::BorrowAlways};
         }
         llvm_unreachable("unhandled value ownership");

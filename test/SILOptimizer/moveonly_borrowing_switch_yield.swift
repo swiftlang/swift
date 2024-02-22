@@ -3,9 +3,12 @@
 extension List {
     var peek: Element {
         _read {
-            // TODO: fix move-only checker induced ownership bug when
-            // we try to switch over `self.head` here.
-            yield head.peek
+            switch self.head {
+            case .empty: fatalError()
+            case .more(_borrowing box):
+                yield box.wrapped.element
+            }
+            //yield head.peek
         }
     }
 }

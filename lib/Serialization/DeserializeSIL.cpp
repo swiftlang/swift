@@ -2225,11 +2225,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool isLexical = Attr & 0x1;
     bool hasPointerEscape = (Attr >> 1) & 0x1;
     bool fromVarDecl = (Attr >> 2) & 0x1;
+    bool isFixed = (Attr >> 3) & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        isLexical, hasPointerEscape, fromVarDecl);
+        isLexical, hasPointerEscape, fromVarDecl, isFixed);
     break;
   }
 

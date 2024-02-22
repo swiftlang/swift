@@ -243,7 +243,8 @@ protected:
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
                  pointerEscape : 1,
-                 fromVarDecl : 1);
+                 fromVarDecl : 1,
+                 fixed : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
