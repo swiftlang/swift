@@ -4923,10 +4923,11 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Handle protocols specially, without building a GenericSignature.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))
-    return protoDecl->requiresInvertible(ip)
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+    return protoDecl->inheritsFrom(proto)
          ? TypeDecl::CanBeInvertible::Always
          : TypeDecl::CanBeInvertible::Never;
+  }
 
   Type selfTy = decl->getDeclaredInterfaceType();
   assert(selfTy);
