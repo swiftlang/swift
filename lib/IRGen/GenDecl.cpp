@@ -4417,14 +4417,6 @@ void IRGenModule::addAccessibleFunction(SILFunction *func) {
   AccessibleFunctions.push_back(func);
 }
 
-void IRGenModule::addAccessibleFunctionDistributedAliased(
-    std::string mangledRecordName,
-    std::optional<std::string> mangledActorTypeName,
-    SILFunction *func) {
-  AccessibleProtocolFunctions.push_back(AccessibleProtocolFunctionsData(
-      func, mangledRecordName, mangledActorTypeName));
-}
-
 /// Emit the protocol conformance list and return it (if asContiguousArray is
 /// true, otherwise the records are emitted as individual globals and
 /// nullptr is returned).
@@ -4748,11 +4740,10 @@ void IRGenModule::emitAccessibleFunction(
 }
 
 void IRGenModule::emitAccessibleFunctions() {
-  if (AccessibleFunctions.empty() && AccessibleProtocolFunctions.empty())
+  if (AccessibleFunctions.empty())
     return;
 
   StringRef fnsSectionName;
-  StringRef protocolFnsSectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
@@ -4762,17 +4753,14 @@ void IRGenModule::emitAccessibleFunctions() {
                      "the selected object format.");
   case llvm::Triple::MachO:
     fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
-    protocolFnsSectionName = "__TEXT, __swift5_acpfuns, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
     fnsSectionName = "swift5_accessible_functions";
-    protocolFnsSectionName = "swift5_accessible_protocol_requirement_functions";
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     fnsSectionName = ".sw5acfn$B";
-    protocolFnsSectionName = ".sw5acpfn$B";
     break;
   }
 
@@ -4785,24 +4773,6 @@ void IRGenModule::emitAccessibleFunctions() {
     emitAccessibleFunction(
         fnsSectionName, mangledRecordName,
         /*mangledActorName=*/{}, mangledFunctionName, func);
-  }
-
-  for (auto accessibleInfo : AccessibleProtocolFunctions) {
-    auto func = accessibleInfo.function;
-
-    std::string mangledRecordName =
-        accessibleInfo.mangledRecordName
-            ? (*accessibleInfo.mangledRecordName)
-            : LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-    std::string mangledFunctionName =
-        LinkEntity::forSILFunction(func).mangleAsString();
-    std::string mangledActorName = accessibleInfo.concreteMangledTypeName
-                                       ? *accessibleInfo.concreteMangledTypeName
-                                       : "<none>";
-
-    emitAccessibleFunction(
-        protocolFnsSectionName, mangledRecordName,
-        mangledActorName, mangledFunctionName, func);
   }
 }
 

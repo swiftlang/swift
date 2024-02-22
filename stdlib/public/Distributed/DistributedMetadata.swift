@@ -95,25 +95,6 @@ func __getReturnTypeInfo(
 /// uses to return String data/length pairs.
 typealias _SwiftNamePair = (UnsafePointer<UInt8>, Int)
 
-@available(SwiftStdlib 5.11, *)
-@_silgen_name("swift_distributed_getConcreteAccessibleWitnessName")
-func _getConcreteAccessibleWitnessName(
-  on actor: AnyObject, // : DistributedActor
-  _ targetNameStart: UnsafePointer<UInt8>,
-  _ targetNameLength: UInt
-) -> _SwiftNamePair
-
-/// Retrieve a generic environment descriptor associated with
-/// the given distributed target.
-@available(SwiftStdlib 5.11, *)
-@_silgen_name("swift_distributed_getGenericEnvironmentForConcreteActor")
-// SPI Distributed
-func _getGenericEnvironmentOfDistributedTarget(
-    on actor: AnyObject, // : DistributedActor
-    _ targetNameStart: UnsafePointer<UInt8>,
-    _ targetNameLength: UInt
-) -> UnsafeRawPointer?
-
 /// Deprecated SPI: Instead use the entry point with the actor parameter passed.
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")

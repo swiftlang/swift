@@ -2476,36 +2476,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
 
-    if (auto val = CurSILFn->getLocation().castToASTNode<ValueDecl>()) {
-      if (auto attr =
-              val->getAttrs().getAttribute<DistributedThunkTargetAttr>()) {
-
-        // the original `distributed func`
-        auto func = attr->getTargetFunction();
-
-        auto distributedRequirements = func->getDistributedMethodWitnessedProtocolRequirements();
-        if (distributedRequirements.size() == 1) {
-          auto protocolFunc = distributedRequirements.front();
-          Mangle::ASTMangler mangler;
-          // The mangled name of the requirement is the name of the record
-          auto mangledProtocolFuncName =
-            mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
-
-          std::optional<std::string> mangledActorTypeName;
-          if (isa<ClassDecl>(func->getDeclContext()->getAsDecl())) {
-            // a concrete type, not a "distributed" protocol
-            mangledActorTypeName = mangler.mangleAnyDecl(
-                func->getDeclContext()->getSelfNominalTypeDecl(),
-                /*prefix=*/true);
-          }
-
-          IGM.addAccessibleFunctionDistributedAliased(
-              /*mangledRecordName=*/mangledProtocolFuncName,
-              /*mangledActorTypeName=*/mangledActorTypeName,
-              CurSILFn);
-        }
-      }
-    }
+    // TODO(distributed): for protocols emit a special accessor
   }
 
   // Configure the dominance resolver.

@@ -1152,10 +1152,6 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
   void addAccessibleFunction(SILFunction *func);
-  void addAccessibleFunctionDistributedAliased(
-      std::string mangledRecordName,
-      std::optional<std::string> mangledActorTypeName,
-      SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
@@ -1313,25 +1309,6 @@ private:
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
-
-  struct AccessibleProtocolFunctionsData {
-    SILFunction *function;
-    /// Mangled name of the requirement function.
-    std::optional<std::string> mangledRecordName;
-    std::optional<std::string> concreteMangledTypeName;
-    AccessibleProtocolFunctionsData(
-        SILFunction *function,
-        const std::optional<std::string> &mangledRecordName,
-        const std::optional<std::string> &concreteMangledTypeName);
-  };
-  /// List of all functions which are protocol *requirements* which may be
-  /// looked up by name at runtime. The record can be used to pair
-  /// a concrete implementation type with the protocol (record) name,
-  /// in order to locate the *witness* function name on this specific type.
-  ///
-  /// The witness function name can then be used to look up the witness at
-  /// runtime by inspecting `AccessibleFunctions`.
-  SmallVector<AccessibleProtocolFunctionsData, 4> AccessibleProtocolFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
