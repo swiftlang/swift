@@ -79,3 +79,21 @@ do {
 
   func bar<each T>() -> (repeat each T) {}
 }
+
+
+// apple/swift#69432 - Passing nil to a parameter pack fails to produce diagnostic for expression
+do {
+  func foo<each T>(_ value: repeat each T) {}
+
+  foo(nil) // expected-error {{'nil' requires a contextual type}}
+  foo(1, nil) // expected-error {{'nil' requires a contextual type}}
+  foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
+
+  func bar<each T, U, each W>(_ t: repeat each T, u: U, w: repeat each W) {}
+
+  bar(1, nil, "Hello", nil, u: 3, w: 4, 8, nil) 
+  // expected-error@-1 {{'nil' requires a contextual type}}
+  // expected-error@-2 {{'nil' requires a contextual type}}
+  // expected-error@-3 {{'nil' requires a contextual type}}
+
+}

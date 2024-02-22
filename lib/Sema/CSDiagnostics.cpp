@@ -8187,6 +8187,37 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
   return true;
 }
 
+bool UnableToInferGenericPackElementType::diagnoseAsError() {
+
+  const auto* locator = getLocator();
+  auto path = locator->getPath();
+
+  if (path.size() > 1) {
+    const auto applyArgToParamElt = (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
+
+    if (!applyArgToParamElt)
+      return false;
+
+    unsigned eltIdx = applyArgToParamElt->getArgIdx();
+    auto anchor = getAnchor();
+
+
+    // `nil` appears as an element of generic pack params, let's record a
+    // specify contextual type for nil fix.
+    if (isExpr<NilLiteralExpr>(anchor)) {
+      emitDiagnostic(diag::unresolved_nil_literal);
+      return true;
+    }
+
+    // unable to infer the type of an element of generic pack params
+    emitDiagnostic(diag::could_not_infer_pack_element, eltIdx);
+    return true;
+  }
+
+  return false;
+}
+
+
 static std::pair<StringRef, StringRef>
 getImportModuleAndDefaultType(const ASTContext &ctx,
                               const ObjectLiteralExpr *expr) {
