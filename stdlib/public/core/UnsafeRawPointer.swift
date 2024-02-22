@@ -1332,6 +1332,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ) {
     _debugPrecondition(_isPOD(T.self))
 
+#if $TypedThrows
     withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1341,6 +1342,17 @@ public struct UnsafeMutableRawPointer: _Pointer {
         /*volatile:*/ false._value
       )
     }
+#else
+    try! __abi_withUnsafePointer(to: value) { source in
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue,
+        source._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+    }
+#endif
   }
 
   // This unavailable implementation uses the expected mangled name
