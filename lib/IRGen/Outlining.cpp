@@ -32,18 +32,17 @@
 using namespace swift;
 using namespace irgen;
 
-void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
+void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  if (!type.hasArchetype()) {
+  if (!ty.hasArchetype()) {
     return;
   }
 
   // Substitute opaque types if allowed.
-  type =
-      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type, CanGenericSignature());
+  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
 
-  auto formalType = type.getASTType();
-  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+  auto astType = ty.getASTType();
+  auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
 
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
@@ -55,11 +54,11 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   // If the type is a legal formal type, add it as a formal type.
   // FIXME: does this force us to emit a more expensive metadata than we need
   // to?
-  if (formalType->isLegalFormalType()) {
-    return collectFormalTypeMetadata(formalType);
+  if (astType->isLegalFormalType()) {
+    return collectFormalTypeMetadata(astType);
   }
 
-  collectRepresentationTypeMetadata(type);
+  collectRepresentationTypeMetadata(ty);
 }
 
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
