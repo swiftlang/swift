@@ -613,14 +613,15 @@ swiftscan_compiler_supported_features_query() {
 swiftscan_diagnostic_set_t*
 swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
   DependencyScanningTool *ScanningTool = unwrap(scanner);
-  auto NumDiagnostics = ScanningTool->getDiagnostics().size();
-  
+  auto Diagnostics = ScanningTool->getDiagnostics();
+  auto NumDiagnostics = Diagnostics.size();
+
   swiftscan_diagnostic_set_t *Result = new swiftscan_diagnostic_set_t;
   Result->count = NumDiagnostics;
   Result->diagnostics = new swiftscan_diagnostic_info_t[NumDiagnostics];
   
   for (size_t i = 0; i < NumDiagnostics; ++i) {
-    const auto &Diagnostic = ScanningTool->getDiagnostics()[i];
+    const auto &Diagnostic = Diagnostics[i];
     swiftscan_diagnostic_info_s *DiagnosticInfo = new swiftscan_diagnostic_info_s;
     DiagnosticInfo->message = swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
     switch (Diagnostic.Severity) {

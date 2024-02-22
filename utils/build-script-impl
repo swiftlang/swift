@@ -2754,6 +2754,21 @@ for host in "${ALL_HOSTS[@]}"; do
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
                 fi
+
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "FALSE" ]]; then
+                    echo "--- Rerun LLDB API tests (Config: Redecl completion) ---"
+                     with_pushd ${results_dir} \
+                        call "${llvm_build_dir}/bin/llvm-lit" \
+                             "${lldb_build_dir}/test/API" \
+                             ${LLVM_LIT_ARGS} \
+                             --param dotest-args="--setting plugin.typesystem.clang.experimental-redecl-completion=true" \
+                             --filter="lang" \
+                             --filter="functionalities" \
+                             --filter="types" \
+                             --filter="commands"
+
+                    # FIXME: run shell-tests with new setting. LLDB doesn't support that yet.
+                 fi
                 continue
                 ;;
             llbuild)
