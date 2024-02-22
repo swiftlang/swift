@@ -3777,13 +3777,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
       }
     }
 
-    // Drop any explicitly provided invertible protocols.
-    if (auto ip = proto->getInvertibleProtocolKind()) {
-      // We diagnose '~Copyable & Copyable' before forming the PCT.
-      assert(!Inverses.contains(*ip) && "opposing invertible constraints!");
-      continue;
-    }
-
     CanTypes.push_back(proto->getDeclaredInterfaceType());
   }
 

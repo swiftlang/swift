@@ -409,7 +409,6 @@ func checkExistentialAndClasses(
     _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
     _ b: any Soup & Copyable & ~Escapable & ~Copyable,
     // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
-    // expected-error@-2 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
     _ c: some (~Escapable & Removed) & Soup // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
     ) {}
 

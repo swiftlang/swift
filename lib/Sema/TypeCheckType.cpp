@@ -5485,146 +5485,89 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, ctx);
 }
 
-/// \returns the inverse ~P that is conflicted if a protocol in \c tys
-/// requires P. For example, `Q & ~Copyable` is a conflict, if `Q` requires
-/// or is equal to `Copyable`
-static std::optional<InvertibleProtocolKind>
-hasConflictedInverse(ArrayRef<Type> tys, InvertibleProtocolSet inverses) {
-  // Fast-path: no inverses that could be conflicted!
-  if (inverses.empty())
-    return std::nullopt;
-
-  for (auto ty : tys) {
-    // Handle nested PCT's recursively since we haven't flattened them away yet.
-    if (auto pct = dyn_cast<ProtocolCompositionType>(ty)) {
-      if (auto conflict = hasConflictedInverse(pct->getMembers(), inverses))
-        return conflict;
-      continue;
-    }
-
-    // Dig out a protocol.
-    ProtocolDecl *decl = nullptr;
-    if (auto protoTy = dyn_cast<ProtocolType>(ty))
-      decl = protoTy->getDecl();
-    else if (auto paramProtoTy = dyn_cast<ParameterizedProtocolType>(ty))
-      decl = paramProtoTy->getProtocol();
-
-    if (!decl)
-      continue;
-
-    // If an inverse ~I exists for this protocol member of the PCT that
-    // requires I, then it's a conflict.
-    for (auto inverse : inverses) {
-      if (decl->isSpecificProtocol(getKnownProtocolKind(inverse))
-          || decl->requiresInvertible(inverse)) {
-        return inverse;
-      }
-    }
-  }
-
-  return std::nullopt;
-}
-
 NeverNullType
 TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                      TypeResolutionOptions options) {
+
+  SmallVector<Type, 4> Members;
 
   // Note that the superclass type will appear as part of one of the
   // types in 'Members', so it's not used when constructing the
   // fully-realized type below -- but we just record it to make sure
   // there is only one superclass.
   Type SuperclassType;
-  SmallVector<Type, 4> Members;
-  InvertibleProtocolSet Inverses;
-  bool HasAnyObject = false;
 
-  // Whether we saw at least one protocol. A protocol composition
-  // must either be empty (in which case it is Any or AnyObject),
-  // or if it has a superclass constraint, have at least one protocol.
-  bool HasProtocol = false;
+  // Did we see at least one protocol or inverse?
+  bool HasNonClassMember = false;
 
-  auto checkSuperclass = [&](SourceLoc loc, Type t) -> bool {
-    if (SuperclassType && !SuperclassType->isEqual(t)) {
-      diagnose(loc, diag::protocol_composition_one_class, t,
-               SuperclassType);
-      return true;
+  // If true, we cannot form a composition from these members.
+  bool IsInvalid = false;
+
+  std::function<void (SourceLoc, Type)> checkMember
+      = [&](SourceLoc loc, Type ty) {
+    if (auto pct = ty->getAs<ProtocolCompositionType>()) {
+      if (!pct->getInverses().empty())
+        HasNonClassMember = true;
+
+      for (auto member : pct->getMembers())
+        checkMember(loc, member);
+      return;
     }
 
-    SuperclassType = t;
-    return false;
-  };
+    if (ty->is<ProtocolType>() ||
+        ty->is<ParameterizedProtocolType>()) {
+      HasNonClassMember = true;
+      return;
+    }
 
-  bool IsInvalid = false;
+    assert(isa<ClassDecl>(ty->getAnyNominal()));
+
+    if (SuperclassType && !SuperclassType->isEqual(ty)) {
+      diagnose(loc, diag::protocol_composition_one_class, ty,
+               SuperclassType);
+      IsInvalid = true;
+      return;
+    }
+
+    SuperclassType = ty;
+  };
 
   for (auto tyR : repr->getTypes()) {
     auto ty = resolveType(tyR,
         options.withContext(TypeResolverContext::GenericRequirement));
     if (ty->hasError()) return ty;
 
-    auto nominalDecl = ty->getAnyNominal();
-    if (isa_and_nonnull<ClassDecl>(nominalDecl)) {
-      if (checkSuperclass(tyR->getStartLoc(), ty))
-        continue;
-
+    if (ty->is<ProtocolType>()) {
+      checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
     }
 
     // FIXME: Support compositions involving parameterized protocol types,
     // like 'any Collection<String> & Sendable', etc.
-    if (ty->isConstraintType()) {
-      if (ty->is<ProtocolType>()) {
-        HasProtocol = true;
-        Members.push_back(ty);
-        continue;
-      }
+    if (ty->is<ParameterizedProtocolType>() &&
+        !options.isConstraintImplicitExistential() &&
+        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
+    }
 
-      if (ty->is<ParameterizedProtocolType>() &&
-          !options.isConstraintImplicitExistential() &&
-          options.getContext() != TypeResolverContext::ExistentialConstraint) {
-        HasProtocol = true;
-        Members.push_back(ty);
-        continue;
-      }
+    if (ty->is<ProtocolCompositionType>()) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
+    }
 
-      if (auto pct = ty->getAs<ProtocolCompositionType>()) {
-        auto layout = ty->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass)
-          if (checkSuperclass(tyR->getStartLoc(), superclass))
-            continue;
-        if (!layout.getProtocols().empty())
-          HasProtocol = true;
-        if (layout.hasExplicitAnyObject)
-          HasAnyObject = true;
-
-        Inverses.insertAll(pct->getInverses());
-        Members.push_back(ty);
-        continue;
-      }
+    if (isa_and_nonnull<ClassDecl>(ty->getAnyNominal())) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
     }
 
     diagnose(tyR->getStartLoc(),
              diag::invalid_protocol_composition_member,
              ty);
-
-    IsInvalid = true;
-  }
-
-  // Cannot combine inverses with Superclass or AnyObject in a composition.
-  if ((SuperclassType || HasAnyObject) && !Inverses.empty()) {
-    diagnose(repr->getStartLoc(),
-             diag::inverse_with_class_constraint,
-             HasAnyObject,
-             getProtocolName(getKnownProtocolKind(*Inverses.begin())),
-             SuperclassType);
-    IsInvalid = true;
-  }
-
-  // Cannot provide an inverse in the same composition requiring the protocol.
-  if (auto conflict = hasConflictedInverse(Members, Inverses)) {
-    diagnose(repr->getLoc(),
-       diag::inverse_conflicts_explicit_composition,
-       getProtocolName(getKnownProtocolKind(*conflict)));
     IsInvalid = true;
   }
 
@@ -5636,17 +5579,58 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // Avoid confusing diagnostics ('MyClass' not convertible to 'MyClass',
   // etc) by collapsing a composition consisting of a single class down
   // to the class itself.
-  if (SuperclassType && !HasProtocol)
+  if (SuperclassType && !HasNonClassMember)
     return SuperclassType;
 
-  // In user-written types, AnyObject constraints always refer to the
-  // AnyObject type in the standard library.
   auto composition =
-      ProtocolCompositionType::get(getASTContext(), Members, Inverses,
+      ProtocolCompositionType::get(getASTContext(), Members,
+                                   /*Inverses=*/{},
                                    /*HasExplicitAnyObject=*/false);
+
+  // Flatten the composition.
+  if (auto canComposition = dyn_cast<ProtocolCompositionType>(
+          composition->getCanonicalType())) {
+    auto inverses = canComposition->getInverses();
+    auto layout = composition->getExistentialLayout();
+
+    // Cannot provide an inverse in the same composition requiring the protocol.
+    for (auto ip : inverses) {
+      auto kp = getKnownProtocolKind(ip);
+
+      if (layout.requiresClass()) {
+        bool hasExplicitAnyObject = layout.hasExplicitAnyObject;
+        diagnose(repr->getStartLoc(),
+                 diag::inverse_with_class_constraint,
+                 hasExplicitAnyObject,
+                 getProtocolName(kp),
+                 layout.getSuperclass());
+        IsInvalid = true;
+        break;
+      }
+
+      auto *proto = getASTContext().getProtocol(kp);
+      for (auto *otherProto : layout.getProtocols()) {
+        if (proto == otherProto ||
+            otherProto->inheritsFrom(proto)) {
+          diagnose(repr->getLoc(),
+                   diag::inverse_conflicts_explicit_composition,
+                   getProtocolName(kp));
+          IsInvalid = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (IsInvalid) {
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
+  }
+
   if (options.isConstraintImplicitExistential()) {
     return ExistentialType::get(composition);
   }
+
   return composition;
 }
 
