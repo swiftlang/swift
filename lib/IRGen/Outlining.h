@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_OUTLINING_H
 #define SWIFT_IRGEN_OUTLINING_H
 
+#include "IRGen.h"
 #include "LocalTypeDataKind.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
@@ -79,6 +80,8 @@ public:
                               IsInitialization_t isInit, IsTake_t isTake) const;
   void emitCallToOutlinedDestroy(Address addr, SILType T,
                                  const TypeInfo &ti) const;
+  void emitCallToOutlinedRelease(Address addr, SILType T, const TypeInfo &ti,
+                                 Atomicity atomicity) const;
 
 private:
   void collectFormalTypeMetadata(CanType type);

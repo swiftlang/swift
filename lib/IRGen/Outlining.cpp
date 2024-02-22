@@ -464,33 +464,44 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
 
 void TypeInfo::callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
                                    Atomicity atomicity) const {
-  llvm::Type *llvmType = addr.getAddress()->getType();
-  auto *outlinedF = cast<llvm::Function>(
-      IGF.IGM.getOrCreateReleaseFunction(*this, T, llvmType, atomicity));
-  llvm::Value *args[] = {addr.getAddress()};
+  OutliningMetadataCollector collector(IGF, LayoutIsNotNeeded, DeinitIsNeeded);
+  collectMetadataForOutlining(collector, T);
+  collector.emitCallToOutlinedRelease(addr, T, *this, atomicity);
+}
+
+void OutliningMetadataCollector::emitCallToOutlinedRelease(
+    Address addr, SILType T, const TypeInfo &ti, Atomicity atomicity) const {
+  assert(!needsLayout);
+  assert(needsDeinit);
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(addr.getAddress());
+  addMetadataArguments(args);
+  auto *outlinedF = cast<llvm::Function>(IGF.IGM.getOrCreateReleaseFunction(
+      ti, T, addr.getAddress()->getType(), atomicity, *this));
   llvm::CallInst *call =
       IGF.Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
   call->setCallingConv(IGF.IGM.DefaultCC);
 }
 
-llvm::Constant *
-IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
-                                        SILType t,
-                                        llvm::Type *llvmType,
-                                        Atomicity atomicity) {
+llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
+    const TypeInfo &ti, SILType t, llvm::Type *ptrTy, Atomicity atomicity,
+    const OutliningMetadataCollector &collector) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
   IRGenMangler mangler;
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,
                                                         manglingBits.second);
-  llvm::Type *argTys[] = {llvmType};
+  llvm::SmallVector<llvm::Type *, 4> argTys;
+  argTys.push_back(ptrTy);
+  collector.addMetadataParameterTypes(argTys);
   return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
+      funcName, ptrTy, argTys,
       [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getStorageType(),
+        Explosion params = IGF.collectParameters();
+        Address addr(params.claimNext(), loadableTI->getStorageType(),
                      loadableTI->getFixedAlignment());
+        collector.bindMetadataParameters(IGF, params);
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         loadableTI->consume(IGF, loaded, atomicity, t);

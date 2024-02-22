@@ -87,6 +87,45 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 }
 
 // If the destroyed value has no deinit, is releasable, and contains a
+// noncopyable value with a deinit, call the outlined release function.
+// Destroyed value:
+// - has NO deinit
+// - contains value type with deinit
+// - is releasable
+// On lifetime end:
+// - call outlined release function
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions13takeOuterNC_1yyAA0eF2_1VyxGnlF"(
+// CHECK-SAME:      ptr{{.*}} %0,
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingReleasableNCVMa"(
+//           :        i64 0,
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[INNER_DEINITING_RELEASABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
+// CHECK-SAME:        ptr %0,
+// CHECK-SAME:        ptr [[INNER_DEINITING_RELEASABLE_NC_METADATA]])
+// CHECK:       }
+
+// Verify that the outlined release function takes the metadata for the
+// move-only-with-deinit type InnerDeinitingReleasableNC<T> and passes it along
+// to that deinit.
+// $s24moveonly_value_functions9OuterNC_1VyxGlWOs ---> outlined release of moveonly_value_functions.OuterNC_2<A>
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
+// CHECK-SAME:      ptr %0,
+// CHECK-SAME:      ptr %"InnerDeinitingReleasableNC<T>")
+// CHECK-SAME:  {
+//                ...
+//                ...
+// CHECK:         call swiftcc void @"$s24moveonly_value_functions26InnerDeinitingReleasableNCVfD"(
+// CHECK-SAME:        ptr %"InnerDeinitingReleasableNC<T>",
+//           :        ptr noalias nocapture swiftself dereferenceable(64) %deinit.arg)
+// CHECK:       }
+public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
+  external_symbol()
+}
+
+// If the destroyed value has no deinit, is releasable, and contains a
 // noncopyable value with a deinit, call the outlined destroy function.
 // Destroyed value:
 // - has NO deinit

@@ -1193,8 +1193,10 @@ public:
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
 
-  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
-                              llvm::Type *llvmType, Atomicity atomicity);
+  llvm::Constant *
+  getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
+                             llvm::Type *llvmType, Atomicity atomicity,
+                             const OutliningMetadataCollector &collector);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType objectType, const TypeInfo &objectTI,
