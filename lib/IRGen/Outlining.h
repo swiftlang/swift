@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines interfaces for outlining value witnesses.
+// This file defines interfaces for outlined value witnesses.
 //
 //===----------------------------------------------------------------------===//
 
