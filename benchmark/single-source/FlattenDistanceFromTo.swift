@@ -36,6 +36,30 @@ public let FlattenDistanceFromTo = [
     runFunction: { with(randomAccess32x32, $0) },
     tags: [.validation, .api],
     setUpFunction: { blackHole(randomAccess32x32) }),
+  
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.RepeatString.08x08",
+    runFunction: { with(repeatString08x08, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(repeatString08x08) }),
+
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.RepeatString.08x16",
+    runFunction: { with(repeatString08x16, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(repeatString08x16) }),
+
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.RepeatString.16x08",
+    runFunction: { with(repeatString16x08, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(repeatString16x08) }),
+
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.RepeatString.16x16",
+    runFunction: { with(repeatString16x16, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(repeatString16x16) }),
 ]
 
 // MARK: - Random Access
@@ -58,7 +82,40 @@ public func with(
   _ iterations: Int
 ) {
   var value = 0 as Int
+  
+  for _ in 0 ..< iterations {
+    for a in collection.indices {
+      for b in collection.indices {
+        value &+= collection.distance(from: a, to: b)
+        value &+= collection.distance(from: b, to: a)
+      }
+    }
+  }
 
+  blackHole(value == 0)
+}
+
+// MARK: - Repeat String
+
+func makeRepeatString(
+  _ outer: Int,
+  _ inner: Int
+) -> FlattenSequence<Repeated<String>> {
+  repeatElement(String(repeating: "0", count: inner), count: outer).joined()
+}
+
+let repeatString08x08 = makeRepeatString(08, 08)
+let repeatString08x16 = makeRepeatString(08, 16)
+let repeatString16x08 = makeRepeatString(16, 08)
+let repeatString16x16 = makeRepeatString(16, 16)
+
+@inline(never)
+public func with(
+  _ collection: FlattenSequence<Repeated<String>>,
+  _ iterations: Int
+) {
+  var value = 0 as Int
+  
   for _ in 0 ..< iterations {
     for a in collection.indices {
       for b in collection.indices {
