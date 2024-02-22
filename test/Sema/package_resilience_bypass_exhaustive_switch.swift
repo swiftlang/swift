@@ -35,12 +35,6 @@ public enum FrozenPublicEnum {
   case two(Int)
 }
 
-@usableFromInline
-enum UfiInternalEnum {
-  case one
-  case two(Int)
-}
-
 //--- ClientDefault.swift
 import Utils
 
@@ -53,7 +47,7 @@ package func f(_ arg: PkgEnum) -> Int {
   }
 }
 
-public func g(_ arg: UfiPkgEnum) -> Int {
+package func g(_ arg: UfiPkgEnum) -> Int {
   switch arg { // expected-warning {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
   case .one:
     return 1
@@ -80,14 +74,6 @@ public func k(_ arg: FrozenPublicEnum) -> Int {
   }
 }
 
-public func m(_ arg: UfiInternalEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
 
 //--- ClientOptimized.swift
 import Utils
@@ -104,7 +90,7 @@ package func f(_ arg: PkgEnum) -> Int {
   }
 }
 
-public func g(_ arg: UfiPkgEnum) -> Int {
+package func g(_ arg: UfiPkgEnum) -> Int {
   switch arg { // no-warning
   case .one:
     return 1
@@ -123,15 +109,6 @@ public func h(_ arg: PublicEnum) -> Int {
 }
 
 public func k(_ arg: FrozenPublicEnum) -> Int {
-  switch arg { // no-warning
-  case .one:
-    return 1
-  case .two(let val):
-    return 2 + val
-  }
-}
-
-public func m(_ arg: UfiInternalEnum) -> Int {
   switch arg { // no-warning
   case .one:
     return 1
