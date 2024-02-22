@@ -35,6 +35,7 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
       // final/visibility/etc.
       mayHaveIndirectCallers(
           f->getDynamicallyReplacedFunction() ||
+          f->getReferencedAdHocRequirementWitnessFunction() ||
           canBeCalledIndirectly(f->getRepresentation())),
       mayHaveExternalCallers(f->isPossiblyUsedExternally() ||
                              f->isAvailableExternally()) {}
