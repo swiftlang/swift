@@ -184,7 +184,8 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    OutliningMetadataCollector collector(IGF);
+    OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+                                         DeinitIsNotNeeded);
     // No need to collect anything because we assume loadable types can be
     // loaded without enums.
     collector.emitCallToOutlinedCopy(

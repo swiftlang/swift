@@ -44,6 +44,18 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   auto astType = ty.getASTType();
   auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
 
+  if (needsDeinit) {
+    auto *nominal = ty.getASTType()->getAnyNominal();
+    if (nominal && nominal->getValueTypeDestructor()) {
+      assert(ty.isMoveOnly());
+      collectFormalTypeMetadata(ty.getASTType());
+    }
+  }
+
+  if (!needsLayout) {
+    return;
+  }
+
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
   // non ABI accessible field/element types.
@@ -139,11 +151,12 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
 }
 
 bool TypeInfo::withMetadataCollector(
-    IRGenFunction &IGF, SILType T,
+    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+    DeinitIsNeeded_t needsDeinit,
     llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
   if (!T.hasLocalArchetype() &&
       !IGF.outliningCanCallValueWitnesses()) {
-    OutliningMetadataCollector collector(IGF);
+    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
     }
@@ -153,7 +166,7 @@ bool TypeInfo::withMetadataCollector(
 
   if (!T.hasArchetype()) {
     // The implementation will call vwt in this case.
-    OutliningMetadataCollector collector(IGF);
+    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
     invocation(collector);
     return true;
   }
@@ -164,9 +177,11 @@ bool TypeInfo::withMetadataCollector(
 void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
-  if (withMetadataCollector(IGF, T, [&](auto collector) {
-        collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
-      })) {
+  if (withMetadataCollector(IGF, T, LayoutIsNeeded, DeinitIsNotNeeded,
+                            [&](auto collector) {
+                              collector.emitCallToOutlinedCopy(
+                                  dest, src, T, *this, isInit, isTake);
+                            })) {
     return;
   }
 
@@ -186,6 +201,8 @@ void OutliningMetadataCollector::emitCallToOutlinedCopy(
                             Address dest, Address src,
                             SILType T, const TypeInfo &ti, 
                             IsInitialization_t isInit, IsTake_t isTake) const {
+  assert(needsLayout);
+  assert(!needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(src, ti.getStorageType())
                             .getAddress());
@@ -359,9 +376,10 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (withMetadataCollector(IGF, T, [&](auto collector) {
-        collector.emitCallToOutlinedDestroy(addr, T, *this);
-      })) {
+  if (withMetadataCollector(
+          IGF, T, LayoutIsNeeded, DeinitIsNeeded, [&](auto collector) {
+            collector.emitCallToOutlinedDestroy(addr, T, *this);
+          })) {
     return;
   }
 
@@ -370,6 +388,8 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
 
 void OutliningMetadataCollector::emitCallToOutlinedDestroy(
                       Address addr, SILType T, const TypeInfo &ti) const {
+  assert(needsLayout);
+  assert(needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
                             .getAddress());
