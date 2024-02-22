@@ -479,6 +479,52 @@ SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
   return result;
 }
 
+void GenericSignature::requirementsAndInversesWhenExtending(
+                          GenericSignature otherSig,
+                          SmallVector<Requirement, 2> &result,
+                          SmallVector<InverseRequirement, 2> &inverses) const {
+  assert(!isNull()); // what to do about a null generic signature?
+  return getPointer()->requirementsAndInversesWhenExtending(otherSig,
+                                                            result,
+                                                            inverses);
+}
+
+
+void GenericSignatureImpl::requirementsAndInversesWhenExtending(
+                          GenericSignature otherSig,
+                          SmallVector<Requirement, 2> &result,
+                          SmallVector<InverseRequirement, 2> &inverses) const {
+  SmallVector<Requirement, 2> reqs;
+  getRequirementsWithInverses(reqs, inverses);
+
+  // If the signatures match by pointer, all requirements are satisfied.
+  if (otherSig.getPointer() == this) return;
+
+  // If there is no other signature, no requirements are satisfied.
+  if (!otherSig) {
+    result.append(reqs.begin(), reqs.end());
+    return;
+  }
+
+#ifndef NDEBUG
+  {
+    // Check that otherSig has the same or more inverses than this signature.
+    SmallVector<Requirement, 2> otherReqs;
+    SmallVector<InverseRequirement, 2> otherInverses;
+    otherSig->getRequirementsWithInverses(otherReqs, otherInverses);
+    assert(otherInverses.size() >= inverses.size()
+          && "otherSig's inverses are not a superset of this generic sig!");
+  };
+#endif
+
+  // Find the requirements that aren't satisfied.
+  for (const auto &req : reqs) {
+    if (!otherSig->isRequirementSatisfied(req))
+      result.push_back(req);
+  }
+
+}
+
 bool GenericSignatureImpl::isReducedType(Type type) const {
   // If the type isn't canonical, it's not reduced.
   if (!type->isCanonical())

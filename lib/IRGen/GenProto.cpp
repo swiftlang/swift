@@ -2113,17 +2113,19 @@ namespace {
       if (!normal)
         return;
 
-      std::optional<Requirement> scratchRequirement;
-      auto condReqs = normal->getConditionalRequirements();
+      // FIXME(kavon): probably need to emit the inverse requirements in the
+      //  metadata so the runtime knows not to check for Copyable?
+      SmallVector<Requirement, 2> condReqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      normal->getConditionalRequirementsWithInverses(condReqs, inverses);
       if (condReqs.empty()) {
         // For a protocol P that conforms to another protocol, introduce a
         // conditional requirement for that P's Self: P. This aligns with
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
         if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
           auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
-          scratchRequirement.emplace(RequirementKind::Conformance, selfType,
+          condReqs.emplace_back(RequirementKind::Conformance, selfType,
                                      selfProto->getDeclaredInterfaceType());
-          condReqs = *scratchRequirement;
         }
 
         if (condReqs.empty())

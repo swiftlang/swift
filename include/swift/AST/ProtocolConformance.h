@@ -595,6 +595,13 @@ public:
   std::optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const;
 
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied, and inverses, which indicate generic parameters that do
+  /// *not* require conformance to an invertible protocol.
+  void getConditionalRequirementsWithInverses(
+                            SmallVector<Requirement, 2> &requirements,
+                            SmallVector<InverseRequirement, 2> &inverses) const;
+
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
     return static_cast<ProtocolConformanceState>(

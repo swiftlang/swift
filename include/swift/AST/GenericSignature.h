@@ -213,6 +213,20 @@ public:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// Requirements for invertible protocols are omitted. Instead, their absence
+  /// in this generic signature is noted in the \c inverses output.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature, and
+  /// whose inverses are a superset of the inverses in this generic signature.
+  void requirementsAndInversesWhenExtending(
+                            GenericSignature otherSig,
+                            SmallVector<Requirement, 2> &result,
+                            SmallVector<InverseRequirement, 2> &inverses) const;
+
   /// Return the reduced version of the given type under this generic
   /// signature.
   CanType getReducedType(Type type) const;
@@ -527,6 +541,20 @@ private:
   /// equivalent to or a subset of the generic parameters in this signature.
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// Requirements for invertible protocols are omitted. Instead, their absence
+  /// in this generic signature is noted in the \c inverses output.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature, and
+  /// whose inverses are a superset of the inverses in this generic signature.
+  void requirementsAndInversesWhenExtending(
+                            GenericSignature otherSig,
+                            SmallVector<Requirement, 2> &reqs,
+                            SmallVector<InverseRequirement, 2> &inverses) const;
 
   /// Return the reduced version of the given type under this generic
   /// signature.

@@ -384,6 +384,43 @@ NormalProtocolConformance::getConditionalRequirements() const {
                            {});
 }
 
+void NormalProtocolConformance::getConditionalRequirementsWithInverses(
+                          SmallVector<Requirement, 2> &requirements,
+                          SmallVector<InverseRequirement, 2> &inverses) const {
+  // NOTE: This is mostly the same as `ConditionalRequirementsRequest::evaluate`
+  //       and we should consider combining the two.
+
+  // A non-extension conformance won't have conditional requirements.
+  const auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+  if (!ext) {
+    return;
+  }
+
+  // If the extension is invalid, it won't ever get a signature, so we
+  // "succeed" with an empty result instead.
+  if (ext->isInvalid()) {
+    return;
+  }
+
+  // A non-generic type won't have conditional requirements.
+  const auto typeSig = ext->getExtendedNominal()->getGenericSignature();
+  if (!typeSig) {
+    return;
+  }
+
+  const auto extensionSig = ext->getGenericSignature();
+
+  // The extension signature should be a superset of the type signature.
+  assert(typeSig.getCanonicalSignature().getGenericParams() ==
+      extensionSig.getCanonicalSignature().getGenericParams());
+
+  // Find the requirements in the extension that aren't proved by the original
+  // type, these are the ones that make the conformance conditional.
+  extensionSig.requirementsAndInversesWhenExtending(typeSig,
+                                                    requirements,
+                                                    inverses);
+}
+
 llvm::ArrayRef<Requirement>
 ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
                                          NormalProtocolConformance *NPC) const {
