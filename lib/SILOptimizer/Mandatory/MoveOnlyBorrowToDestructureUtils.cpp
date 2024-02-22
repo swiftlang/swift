@@ -435,8 +435,9 @@ bool Implementation::gatherUses(SILValue value) {
       continue;
     }
     case OperandOwnership::Borrow: {
-      // Look through borrows.
-      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser())) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser());
+          bbi && !bbi->isFixed()) {
+        // Look through non-fixed borrows.
         LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
         for (auto *use : bbi->getUses()) {
           useWorklist.push_back(use);
@@ -452,7 +453,7 @@ bool Implementation::gatherUses(SILValue value) {
       }
 
       // Otherwise, treat it as a normal use.
-      LLVM_DEBUG(llvm::dbgs() << "        Treating non-begin_borrow borrow as "
+      LLVM_DEBUG(llvm::dbgs() << "        Treating borrow as "
                                  "a non lifetime ending use!\n");
       blocksToUses.insert(nextUse->getParentBlock(),
                           {nextUse,
