@@ -73,14 +73,14 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   collectRepresentationTypeMetadata(ty);
 }
 
-void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
+void OutliningMetadataCollector::collectFormalTypeMetadata(CanType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  assert(type->hasArchetype());
+  assert(ty->hasArchetype());
 
-  auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
+  auto key = LocalTypeDataKey(ty, LocalTypeDataKind::forFormalTypeMetadata());
   if (Values.count(key)) return;
 
-  auto metadata = IGF.emitTypeMetadataRef(type);
+  auto metadata = IGF.emitTypeMetadataRef(ty);
   Values.insert({key, metadata});
 }
 
