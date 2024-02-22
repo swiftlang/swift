@@ -6790,42 +6790,6 @@ ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
   return InverseMarking::Mark();
 }
 
-bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
-  // Protocols don't inherit from themselves.
-  if (auto thisIP = getInvertibleProtocolKind()) {
-    if (thisIP == ip)
-      return false;
-  }
-
-  auto kp = ::getKnownProtocolKind(ip);
-
-  // Otherwise, check for inverses on all of the inherited protocols. If there
-  // is one protocol missing an inverse for this `super` protocol, then it is
-  // implicitly inherited.
-  return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {
-    if (proto->isSpecificProtocol(kp))
-      return TypeWalker::Action::Stop; // It is explicitly inherited.
-
-    // There is no implicit inheritance of an invertible protocol requirement
-    // on an invertible protocol itself.
-    if (proto->getInvertibleProtocolKind())
-      return TypeWalker::Action::Continue;
-
-    // HACK: claim that Sendable also doesn't implicitly inherit Copyable, etc.
-    // This shouldn't be needed after Swift 6.0
-    if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return TypeWalker::Action::Continue;
-
-    // Otherwise, check to see if there's an inverse on this protocol.
-
-    // The implicit requirement was suppressed on this protocol, keep looking.
-    if (proto->hasInverseMarking(ip))
-      return TypeWalker::Action::Continue;
-
-    return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
-  });
-}
-
 bool ProtocolDecl::requiresClass() const {
   return evaluateOrDefault(getASTContext().evaluator,
     ProtocolRequiresClassRequest{const_cast<ProtocolDecl *>(this)}, false);

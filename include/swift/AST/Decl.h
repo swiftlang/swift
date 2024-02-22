@@ -5239,10 +5239,6 @@ public:
   /// Determine whether this protocol has ~<target>` stated on
   /// itself, one of its inherited types or `Self` requirements.
   InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
-
-  /// Determine whether this protocol requires conformance to `IP`, without
-  /// querying a generic signature.
-  bool requiresInvertible(InvertibleProtocolKind ip) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
