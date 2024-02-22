@@ -2235,10 +2235,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::setBugReportMsg(nullptr);
   }
   
-  /// Enable leaks checking because this SILModule is the only one in the process
-  /// (leaks checking is not thread safe).
-  Invocation.getSILOptions().checkSILModuleLeaks = true;
-
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files

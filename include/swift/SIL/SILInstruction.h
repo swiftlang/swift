@@ -900,11 +900,6 @@ public:
     return NumDeletedInstructions;
   }
   
-  static void resetInstructionCounts() {
-    NumCreatedInstructions = 0;
-    NumDeletedInstructions = 0;
-  }
-
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;

@@ -939,19 +939,6 @@ public:
   /// Check linear OSSA lifetimes, assuming complete OSSA.
   void verifyOwnership() const;
 
-  /// Check if there are any leaking instructions.
-  ///
-  /// Aborts with an error if more instructions are allocated than contained in
-  /// the module.
-  void checkForLeaks() const;
-
-  /// Check if there are any leaking instructions after the SILModule is
-  /// destructed.
-  ///
-  /// The SILModule destructor already calls checkForLeaks(). This function is
-  /// useful to check if the destructor itself destroys all data structures.
-  static void checkForLeaksAfterDestruction();
-
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
 
