@@ -22,6 +22,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
+#include "TaskPrivate.h"
 #include "swift/Basic/ListMerger.h"
 #include "swift/Concurrency/Actor.h"
 #include "swift/Runtime/AccessibleFunction.h"
@@ -314,39 +315,109 @@ bool _task_serialExecutor_isSameExclusiveExecutionContext(
     const SerialExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
-static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef executor) {
+static bool swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
   auto current = ExecutorTrackingInfo::current();
 
   if (!current) {
-    // TODO(ktoso): checking the "is main thread" is not correct, main executor can be not main thread, relates to rdar://106188692
-    return executor.isMainExecutor() && isExecutingOnMainThread();
-  }
+    // We have no current executor, i.e. we are running "outside" of Swift
+    // Concurrency. We could still be running on a thread/queue owned by
+    // the expected executor however, so we need to try a bit harder before
+    // we fail.
 
-  auto currentExecutor = current->getActiveExecutor();
-  if (currentExecutor == executor) {
+    // Are we expecting the main executor and are using the main thread?
+    if (expectedExecutor.isMainExecutor() && isExecutingOnMainThread()) {
+      // TODO(concurrency): consider removing this special case, as checkIsolated will compare against mainQueue already
+      return true;
+    }
+
+    // Otherwise, as last resort, let the expected executor check using
+    // external means, as it may "know" this thread is managed by it etc.
+    swift_task_checkIsolated(expectedExecutor);
+
+    // checkIsolated did not crash, so we are on the right executor, after all!
     return true;
   }
 
-  if (executor.isComplexEquality()) {
+  SerialExecutorRef currentExecutor = current->getActiveExecutor();
+
+  // Fast-path: the executor is exactly the same memory address;
+  // We assume executors do not come-and-go appearing under the same address,
+  // and treat pointer equality of executors as good enough to assume the executor.
+  if (currentExecutor == expectedExecutor) {
+    return true;
+  }
+
+  // Fast-path, specialize the common case of comparing two main executors.
+  if (currentExecutor.isMainExecutor() && expectedExecutor.isMainExecutor()) {
+    return true;
+  }
+
+  // If the expected executor is "default" then we should have matched
+  // by pointer equality already with the current executor.
+  if (expectedExecutor.isDefaultActor()) {
+    // If the expected executor is a default actor, it makes no sense to try
+    // the 'checkIsolated' call, it must be equal to the other actor, or it is
+    // not the same isolation domain.
+    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
+    return false;
+  }
+
+  if (expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor()) {
+    // TODO: Invoke checkIsolated() on "main" SerialQueue once it implements `checkIsolated`, otherwise messages will be sub-par and hard to address
+    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption; Expected MainActor executor");
+    return false;
+  } else if (!expectedExecutor.isMainExecutor() && currentExecutor.isMainExecutor()) {
+    // TODO: Invoke checkIsolated() on "main" SerialQueue once it implements `checkIsolated`, otherwise messages will be sub-par and hard to address
+    swift_Concurrency_fatalError(0, "Incorrect actor executor assumption; Expected not-MainActor executor");
+    return false;
+  }
+
+  if (expectedExecutor.isComplexEquality()) {
     if (!swift_compareWitnessTables(
         reinterpret_cast<const WitnessTable*>(currentExecutor.getSerialExecutorWitnessTable()),
-        reinterpret_cast<const  WitnessTable*>(executor.getSerialExecutorWitnessTable()))) {
+        reinterpret_cast<const  WitnessTable*>(expectedExecutor.getSerialExecutorWitnessTable()))) {
       // different witness table, we cannot invoke complex equality call
       return false;
     }
+
     // Avoid passing nulls to Swift for the isSame check:
-    if (!currentExecutor.getIdentity() || !executor.getIdentity()) {
+    if (!currentExecutor.getIdentity() || !expectedExecutor.getIdentity()) {
       return false;
     }
 
-    return _task_serialExecutor_isSameExclusiveExecutionContext(
+    auto result = _task_serialExecutor_isSameExclusiveExecutionContext(
         currentExecutor.getIdentity(),
-        executor.getIdentity(),
+        expectedExecutor.getIdentity(),
         swift_getObjectType(currentExecutor.getIdentity()),
-        executor.getSerialExecutorWitnessTable());
+        expectedExecutor.getSerialExecutorWitnessTable());
+
+    return result;
   }
 
-  return false;
+  // This provides a last-resort check by giving the expected SerialExecutor the
+  // chance to perform a check using some external knowledge if perhaps we are,
+  // after all, on this executor, but the Swift concurrency runtime was just not
+  // aware.
+  //
+  // Unless handled in `swift_task_checkIsolated` directly, this should call
+  // through to the executor's `SerialExecutor.checkIsolated`.
+  //
+  // This call is expected to CRASH, unless it has some way of proving that
+  // we're actually indeed running on this executor.
+  //
+  // For example, when running outside of Swift concurrency tasks, but trying to
+  // `MainActor.assumeIsolated` while executing DIRECTLY on the main dispatch
+  // queue, this allows Dispatch to check for this using its own tracking
+  // mechanism, and thus allow the assumeIsolated to work correctly, even though
+  // the code executing is not even running inside a Task.
+  //
+  // Note that this only works because the closure in assumeIsolated is
+  // synchronous, and will not cause suspensions, as that would require the
+  // presence of a Task.
+  swift_task_checkIsolated(expectedExecutor);
+
+  // The checkIsolated call did not crash, so we are on the right executor.
+  return true;
 }
 
 /// Logging level for unexpected executors:
