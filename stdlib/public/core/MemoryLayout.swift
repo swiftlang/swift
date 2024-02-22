@@ -83,21 +83,21 @@ extension MemoryLayout where T: ~Copyable {
 
 extension MemoryLayout {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static var size: Int {
     return Int(Builtin.sizeof(T.self))
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static var stride: Int {
     return Int(Builtin.strideof(T.self))
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static var alignment: Int {
     return Int(Builtin.alignof(T.self))
@@ -191,21 +191,21 @@ extension MemoryLayout where T: ~Copyable {
 
 extension MemoryLayout {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static func size(ofValue value: borrowing T) -> Int {
     return MemoryLayout.size
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static func stride(ofValue value: borrowing T) -> Int {
     return MemoryLayout.stride
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 5.11) // Legacy ABI compatibility
+  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
   @usableFromInline
   internal static func alignment(ofValue value: borrowing T) -> Int {
     return MemoryLayout.alignment
