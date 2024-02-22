@@ -462,3 +462,20 @@ func checkExistentials() {
     let _: any Copyable & ~Copyable = 1 // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
     let _: any Escapable & ~Escapable = 1 // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
 }
+
+// Conformances can be conditional on whether a generic parameter is Copyable
+protocol Arbitrary {}
+protocol AnotherOne {}
+struct UnethicalPointer<Pointee: ~Copyable> {}
+extension UnethicalPointer: Arbitrary {}
+extension UnethicalPointer: AnotherOne where Pointee: Copyable {}
+
+struct StillIllegal1<Pointee: ~Escapable> {}
+extension StillIllegal1: Arbitrary {}
+// expected-error@-1 {{conditional conformance to non-marker protocol 'Arbitrary' cannot depend on conformance of 'Pointee' to marker protocol 'Escapable'}}
+extension StillIllegal1: AnotherOne where Pointee: Escapable {}
+// expected-error@-1 {{conditional conformance to non-marker protocol 'AnotherOne' cannot depend on conformance of 'Pointee' to marker protocol 'Escapable'}}
+
+struct SillIllegal2<Pointee> {}
+extension SillIllegal2: Arbitrary where Pointee: Sendable {}
+// expected-error@-1 {{conditional conformance to non-marker protocol 'Arbitrary' cannot depend on conformance of 'Pointee' to marker protocol 'Sendable'}}
