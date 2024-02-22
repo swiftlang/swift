@@ -3142,16 +3142,6 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index) const {
 
-  // FIXME: this is an awful hack for NoncopyableGenerics.
-  // The correct fix here is to integrate the guts of
-  // `ProtocolDecl::requiresInvertible` into this request, so that it works
-  // automatically, not only for `ProtocolDecl::inheritsFrom` but for other
-  // nominal types too.
-  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
-    if (auto protoDecl = dyn_cast<ProtocolDecl>(typeDecl))
-      if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable))
-        return {};
-
   // Prefer syntactic information when we have it.
   const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
