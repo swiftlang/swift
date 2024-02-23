@@ -36,7 +36,7 @@ static const void *__backtraceRef __attribute__((used))
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
 #if defined(__ELF__)
-# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"a\"\n");
+# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"aR\"\n");
 #elif defined(__wasm__)
 # define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"R\",@\n");
 #endif
