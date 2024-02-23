@@ -1894,6 +1894,11 @@ def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
   MetaVarName<"<path>">,
   HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
 
+def experimental_clang_importer_direct_cc1_scan:
+  Flag<["-"], "experimental-clang-importer-direct-cc1-scan">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Enables swift driver to construct swift-frontend invocations using -direct-clang-cc1-module-build">;
+
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;

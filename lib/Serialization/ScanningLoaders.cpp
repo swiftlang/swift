@@ -160,7 +160,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         // Handle clang arguments. For caching build, all arguments are passed
         // with `-direct-clang-cc1-module-build`.
-        if (Ctx.CASOpts.EnableCaching) {
+        if (Ctx.ClangImporterOpts.ClangImporterDirectCC1Scan) {
           Args.push_back("-direct-clang-cc1-module-build");
           auto *importer =
               static_cast<ClangImporter *>(Ctx.getClangModuleLoader());

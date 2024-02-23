@@ -347,6 +347,8 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
 
   std::string rootID;
   std::vector<std::string> buildArgs;
+  auto clangImporter =
+      static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
   if (tracker) {
     tracker->startTracking();
     for (auto fileUnit : mainModule->getFiles()) {
@@ -359,8 +361,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
         ScanCompilerInvocation.getSearchPathOptions());
     // Fetch some dependency files from clang importer.
     std::vector<std::string> clangDependencyFiles;
-    auto clangImporter =
-        static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
     clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
     llvm::for_each(clangDependencyFiles,
                    [&](std::string &file) { tracker->trackFile(file); });
@@ -372,7 +372,9 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
       return std::make_error_code(std::errc::io_error);
     }
     rootID = root->getID().toString();
+  }
 
+  if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     buildArgs.push_back("-direct-clang-cc1-module-build");
     for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
       buildArgs.push_back("-Xcc");

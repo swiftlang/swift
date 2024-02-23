@@ -1677,6 +1677,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   genericSubInvocation.getClangImporterOptions().DirectClangCC1ModuleBuild =
       clangImporterOpts.DirectClangCC1ModuleBuild;
+  genericSubInvocation.getClangImporterOptions().ClangImporterDirectCC1Scan =
+      clangImporterOpts.ClangImporterDirectCC1Scan;
 
   // Validate Clang modules once per-build session flags must be consistent
   // across all module sub-invocations

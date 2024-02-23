@@ -1709,6 +1709,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  Opts.ClangImporterDirectCC1Scan |=
+      Args.hasArg(OPT_experimental_clang_importer_direct_cc1_scan);
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (CASOpts.EnableCaching) {
@@ -1716,6 +1718,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // useful in non-caching context.
     Opts.UseClangIncludeTree |= !Args.hasArg(OPT_no_clang_include_tree);
     Opts.HasClangIncludeTreeRoot |= Args.hasArg(OPT_clang_include_tree_root);
+    // Caching requires direct clang import cc1 scanning.
+    Opts.ClangImporterDirectCC1Scan = true;
   }
 
   // If in direct clang cc1 module build mode, return early.
