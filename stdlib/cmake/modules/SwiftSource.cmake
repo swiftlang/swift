@@ -13,7 +13,11 @@ endfunction()
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  if(sdk IN_LIST SWIFT_DARWIN_PLATFORMS OR sdk STREQUAL "MACCATALYST")
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
+  else()
+    set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+  endif()
 endfunction()
 
 # Return a swiftc flag (e.g. -O or -Onone) to control optimization level based
