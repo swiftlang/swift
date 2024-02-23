@@ -1038,8 +1038,8 @@ public:
     }
 
     static UseDiagnosticInfo
-    forFunctionArgumentClosure(ApplyIsolationCrossing isolation) {
-      return {UseDiagnosticInfoKind::FunctionArgumentClosure, isolation};
+    forFunctionArgumentClosure(ApplyIsolationCrossing isolation, Type inferredType) {
+      return {UseDiagnosticInfoKind::FunctionArgumentClosure, isolation, inferredType};
     }
 
     static UseDiagnosticInfo forFunctionArgumentApplyStronglyTransferred(Type inferredType) {
@@ -1107,8 +1107,9 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
       loc = std::get<0>(p).getLoc();
+      Type type = std::get<0>(p).getDecl()->getInterfaceType();
       diagnosticInfo =
-          UseDiagnosticInfo::forFunctionArgumentClosure(std::get<2>(p));
+        UseDiagnosticInfo::forFunctionArgumentClosure(std::get<2>(p), type);
       return true;
     }
   }
@@ -1269,7 +1270,7 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
     }
     case UseDiagnosticInfoKind::FunctionArgumentClosure: {
       diagnoseError(astContext, loc, diag::regionbasedisolation_arg_transferred,
-                    op->get()->getType().getASTType(),
+                    diagnosticInfo.getType(),
                     diagnosticInfo.getIsolationCrossing().getCalleeIsolation())
           .highlight(op->getUser()->getLoc().getSourceRange());
       // Only emit the note if our value is different from the function
