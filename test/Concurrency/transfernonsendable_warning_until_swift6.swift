@@ -39,7 +39,8 @@ func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) 
 }
 
 func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendableType, _ y: NonSendableType) async {
-  x = y // expected-error {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  x = y // expected-error {{assigning 'y' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y'}}
 }
 
 func testIsolationCrossingDueToCapture() async {
