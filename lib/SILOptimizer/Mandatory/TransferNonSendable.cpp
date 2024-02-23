@@ -1042,8 +1042,9 @@ public:
       return {UseDiagnosticInfoKind::FunctionArgumentClosure, isolation};
     }
 
-    static UseDiagnosticInfo forFunctionArgumentApplyStronglyTransferred() {
-      return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred};
+    static UseDiagnosticInfo forFunctionArgumentApplyStronglyTransferred(Type inferredType) {
+      return {UseDiagnosticInfoKind::FunctionArgumentApplyStronglyTransferred, {},
+        inferredType};
     }
 
     static UseDiagnosticInfo
@@ -1155,8 +1156,14 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
       if (auto fas = FullApplySite::isa(op->getUser())) {
         if (fas.getArgumentParameterInfo(*op).hasOption(
                 SILParameterInfo::Transferring)) {
+          Type type = op->get()->getType().getASTType();
+          if (auto *inferredArgExpr =
+              inferArgumentExprFromApplyExpr(sourceApply, fas, op)) {
+            type = inferredArgExpr->findOriginalType();
+          }
+
           diagnosticInfo =
-              UseDiagnosticInfo::forFunctionArgumentApplyStronglyTransferred();
+              UseDiagnosticInfo::forFunctionArgumentApplyStronglyTransferred(type);
           return true;
         }
       }
@@ -1283,7 +1290,7 @@ void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
       diagnoseError(
           astContext, loc,
           diag::regionbasedisolation_arg_passed_to_strongly_transferred_param,
-          op->get()->getType().getASTType())
+          diagnosticInfo.getType())
           .highlight(op->getUser()->getLoc().getSourceRange());
       break;
     }
