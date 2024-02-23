@@ -15,29 +15,28 @@ extension StorageView where Element: ~Copyable {
   public struct Iterator: Copyable, ~Escapable {
     var curPointer: UnsafeRawPointer
     let endPointer: UnsafeRawPointer
-  }
-}
 
-extension StorageView.Iterator where Element: ~Copyable {
+    init<Owner: ~Escapable & ~Copyable>(
+      startPointer: UnsafeRawPointer,
+      endPointer: UnsafeRawPointer,
+      owner: borrowing Owner
+    ) -> _borrow(owner) Self {
+      self.curPointer = startPointer
+      self.endPointer = endPointer
+      return self
+    }
 
-  init<Owner: ~Escapable & ~Copyable>(
-    startPointer: UnsafeRawPointer,
-    endPointer: UnsafeRawPointer,
-    owner: borrowing Owner
-  ) /*-> borrow(owner) Self*/ {
-    self.curPointer = startPointer
-    self.endPointer = endPointer
-  }
-
-  init<Owner: ~Escapable & ~Copyable>(
-    from start: StorageView.Index,
-    to end: StorageView.Index,
-    owner: borrowing Owner
-  ) /*-> borrow(owner) Self*/ {
-    assert(start._allocation == end._allocation)
-    self.init(
-      startPointer: start._rawValue, endPointer: end._rawValue, owner: owner
-    )
+    init<Owner: ~Escapable & ~Copyable>(
+      from start: StorageView.Index,
+      to end: StorageView.Index,
+      owner: borrowing Owner
+    ) -> _borrow(owner) Self {
+      assert(start._allocation == end._allocation)
+      self.init(
+        startPointer: start._rawValue, endPointer: end._rawValue, owner: owner
+      )
+      return self
+    }
   }
 }
 
