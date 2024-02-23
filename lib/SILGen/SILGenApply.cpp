@@ -56,6 +56,17 @@ using namespace Lowering;
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
+FunctionTypeInfo SILGenFunction::getFunctionTypeInfo(CanAnyFunctionType fnType) {
+  return { AbstractionPattern(fnType), fnType,
+           cast<SILFunctionType>(getLoweredRValueType(fnType)) };
+}
+
+static bool isTrivialNoEscapeType(SILType type) {
+  if (auto fnTy = type.getAs<SILFunctionType>())
+    return fnTy->isTrivialNoEscape();
+  return false;
+}
+
 SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
                                               AbstractFunctionDecl *original,
                                               AbstractFunctionDecl *overridden,
@@ -1278,9 +1289,8 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
-    // Emit the closure body.
-    SGF.SGM.emitClosure(e);
+    auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+    SGF.SGM.emitClosure(e, SGF.getFunctionTypeInfo(closureType));
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
@@ -3812,6 +3822,7 @@ private:
         llvm_unreachable("bad language");
       }();
       value = emitConvertedArgument(std::move(arg), conversion,
+                                    param.getSILStorageInterfaceType(),
                                     contexts.FinalContext);
       Args.push_back(convertOwnershipConvention(value));
       return;
@@ -4247,7 +4258,15 @@ private:
 
   ManagedValue emitConvertedArgument(ArgumentSource &&arg,
                                      Conversion conversion,
+                                     SILType paramTy,
                                      SGFContext C) {
+    // If the argument has a non-escaping type, we need to make
+    // sure we don't destroy any intermediate values it depends on.
+    if (isTrivialNoEscapeType(paramTy)) {
+      // TODO: honor C here.
+      return std::move(arg).getConverted(SGF, conversion);
+    }
+
     auto loc = arg.getLocation();
     Scope scope(SGF, loc);
 
@@ -5259,8 +5278,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // yet.
   for (auto arg : uncurriedArgs) {
     // Nonescaping closures can't be forwarded so we pass them +0.
-    auto argFnTy = arg.getType().getAs<SILFunctionType>();
-    if (argFnTy && argFnTy->isTrivialNoEscape()) {
+    if (isTrivialNoEscapeType(arg.getType())) {
       rawArgs.push_back(arg.getValue());
     } else {
       // Named builtins are by default assumed to take other arguments at +1,
@@ -7242,12 +7260,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   
   auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
                                      getLoweredType(origParam, substParamType));
-  ConvertingInitialization convertingInit(conversion, SGFContext());
-  auto taskFunction = emitRValue(asyncLetEntryPoint,
-                                 SGFContext(&convertingInit))
-    .getAsSingleValue(*this, loc);
-  taskFunction = emitSubstToOrigValue(loc, taskFunction,
-                                      origParam, substParamType);
+  auto taskFunction = emitConvertedRValue(asyncLetEntryPoint, conversion);
 
   auto apply = B.createBuiltin(
       loc,

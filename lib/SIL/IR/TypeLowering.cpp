@@ -4784,15 +4784,40 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   return boxTy;
 }
 
-std::optional<AbstractionPattern>
-TypeConverter::getConstantAbstractionPattern(SILDeclRef constant) {
+const FunctionTypeInfo *TypeConverter::getClosureTypeInfo(SILDeclRef constant) {
   if (auto closure = constant.getAbstractClosureExpr()) {
-    // Using operator[] here creates an entry in the map if one doesn't exist
-    // yet, marking the fact that the lack of abstraction pattern has been
-    // established and cannot be overridden by `setAbstractionPattern` later.
-    return ClosureAbstractionPatterns[closure];
+    return &getClosureTypeInfo(closure);
   }
-  return std::nullopt;
+  return nullptr;
+}
+
+const FunctionTypeInfo &
+TypeConverter::getClosureTypeInfo(AbstractClosureExpr *closure) {
+  auto it = ClosureInfos.find(closure);
+  assert(it != ClosureInfos.end() &&
+         "looking for closure info for closure without any set");
+  return it->second;
+}
+
+void TypeConverter::withClosureTypeInfo(AbstractClosureExpr *closure,
+                                        const FunctionTypeInfo &info,
+                                        llvm::function_ref<void()> operation) {
+  auto insertResult = ClosureInfos.insert({closure, info});
+  (void) insertResult;
+#ifndef NDEBUG
+  if (!insertResult.second) {
+    auto &existing = insertResult.first->second;
+    assert(existing.FormalType == info.FormalType);
+    assert(existing.ExpectedLoweredType == info.ExpectedLoweredType);
+  }
+#endif
+
+  operation();
+
+  // TODO: figure out a way to clear this out so that emitting a closure
+  // doesn't require permanent memory use.  Right now we have too much
+  // code relying on not emitting this in a scoped pattern.
+  //ClosureInfos.erase(closure);
 }
 
 TypeExpansionContext
@@ -4806,17 +4831,6 @@ TypeConverter::getCaptureTypeExpansionContext(SILDeclRef constant) {
   auto minimal = TypeExpansionContext::minimal();
   CaptureTypeExpansionContexts.insert({constant, minimal});
   return minimal;
-}
-
-void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
-                                          AbstractionPattern pattern) {
-  auto existing = ClosureAbstractionPatterns.find(closure);
-  if (existing != ClosureAbstractionPatterns.end()) {
-    assert(*existing->second == pattern
-     && "closure shouldn't be emitted at different abstraction level contexts");
-  } else {
-    ClosureAbstractionPatterns[closure] = pattern;
-  }
 }
 
 void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,

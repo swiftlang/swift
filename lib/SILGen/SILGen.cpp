@@ -1461,23 +1461,30 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }
 }
 
-SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  SILDeclRef constant(ce);
-  SILFunction *f = getFunction(constant, ForDefinition);
+SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
+                                       const FunctionTypeInfo &closureInfo) {
+  Types.setCaptureTypeExpansionContext(SILDeclRef(e), M);
 
-  // Generate the closure function, if we haven't already.
-  //
-  // We may visit the same closure expr multiple times in some cases,
-  // for instance, when closures appear as in-line initializers of stored
-  // properties. In these cases the closure will be emitted into every
-  // initializer of the containing type.
-  if (!f->isExternalDeclaration())
-    return f;
+  SILFunction *f = nullptr;
+  Types.withClosureTypeInfo(e, closureInfo, [&] {
+    SILDeclRef constant(e);
+    f = getFunction(constant, ForDefinition);
 
-  // Emit property wrapper argument generators.
-  emitArgumentGenerators(ce, ce->getParameters());
+    // Generate the closure function, if we haven't already.
+    //
+    // We may visit the same closure expr multiple times in some cases,
+    // for instance, when closures appear as in-line initializers of stored
+    // properties. In these cases the closure will be emitted into every
+    // initializer of the containing type.
+    if (!f->isExternalDeclaration())
+      return;
 
-  emitFunctionDefinition(constant, f);
+    // Emit property wrapper argument generators.
+    emitArgumentGenerators(e, e->getParameters());
+
+    emitFunctionDefinition(constant, f);
+  });
+
   return f;
 }
 

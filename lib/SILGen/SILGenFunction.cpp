@@ -963,9 +963,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
-                                 CanType expectedType,
-                                 SubstitutionMap subs,
-                                 bool alreadyConverted) {
+                                 const FunctionTypeInfo &typeContext,
+                                 SubstitutionMap subs) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
   SGM.Types.setCaptureTypeExpansionContext(constant, SGM.M);
   
@@ -1006,42 +1005,39 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }
 
+  // TODO: these abstraction patterns seem wrong; we should be using the formal
+  // pattern
+
+  ManagedValue result;
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
-    auto result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
-    if (!alreadyConverted)
-      result = emitOrigToSubstValue(loc, result,
-                                    AbstractionPattern(expectedType),
-                                    expectedType);
-    return result;
+    result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
+  } else {
+    SmallVector<ManagedValue, 4> capturedArgs;
+    emitCaptures(loc, constant, CaptureEmission::PartialApplication,
+                 capturedArgs);
+
+    // The partial application takes ownership of the context parameters.
+    SmallVector<SILValue, 4> forwardedArgs;
+    for (auto capture : capturedArgs)
+      forwardedArgs.push_back(capture.forward(*this));
+
+    auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+
+    auto toClosure =
+      B.createPartialApply(loc, functionRef, subs, forwardedArgs,
+                           calleeConvention);
+    result = emitManagedRValueWithCleanup(toClosure);
   }
 
-  SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, constant, CaptureEmission::PartialApplication,
-               capturedArgs);
-
-  // The partial application takes ownership of the context parameters.
-  SmallVector<SILValue, 4> forwardedArgs;
-  for (auto capture : capturedArgs)
-    forwardedArgs.push_back(capture.forward(*this));
-
-  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-
-  auto toClosure =
-    B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                         calleeConvention);
-  auto result = emitManagedRValueWithCleanup(toClosure);
-
-  // Get the lowered AST types:
-  //  - the original type
-  auto origFormalType = AbstractionPattern(subs, constantInfo.LoweredType);
-
-  // - the substituted type
-  auto substFormalType = expectedType;
-
   // Generalize if necessary.
-  if (!alreadyConverted)
-    result = emitOrigToSubstValue(loc, result, origFormalType,
-                                  substFormalType);
+  if (result.getType().getASTType() != typeContext.ExpectedLoweredType) {
+    result = emitTransformedValue(loc, result,
+                                  AbstractionPattern(subs, constantInfo.LoweredType),
+                                  typeContext.FormalType,
+                                  typeContext.OrigType,
+                                  typeContext.FormalType,
+              SILType::getPrimitiveObjectType(typeContext.ExpectedLoweredType));
+  }
 
   return result;
 }
@@ -1080,7 +1076,12 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
-  OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
+
+  auto closureInfo = SGM.M.Types.getClosureTypeInfo(ace);
+
+  // TODO: remember more information from closureInfo and use it in
+  // prolog/epilog/return-statement emission.
+  OrigFnType = closureInfo.OrigType;
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   std::optional<Type> errorIfaceTy;

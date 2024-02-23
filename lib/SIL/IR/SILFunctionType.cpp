@@ -3980,11 +3980,11 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
       auto proto = constant.getDecl()->getDeclContext()->getSelfProtocolDecl();
       witnessMethodConformance = ProtocolConformanceRef(proto);
     }
-    
+
     // Does this constant have a preferred abstraction pattern set?
     AbstractionPattern origType = [&]{
-      if (auto abstraction = TC.getConstantAbstractionPattern(constant)) {
-        return *abstraction;
+      if (auto closureInfo = TC.getClosureTypeInfo(constant)) {
+        return closureInfo->OrigType;
       } else {
         return AbstractionPattern(origLoweredInterfaceType);
       }
@@ -4036,6 +4036,9 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
 CanSILFunctionType TypeConverter::getUncachedSILFunctionTypeForConstant(
     TypeExpansionContext context, SILDeclRef constant,
     CanAnyFunctionType origInterfaceType) {
+  // This entrypoint is only used for computing a type for dynamic dispatch.
+  assert(!constant.getAbstractClosureExpr());
+
   auto bridgedTypes = getLoweredFormalTypes(constant, origInterfaceType);
   return ::getUncachedSILFunctionTypeForConstant(*this, context, constant,
                                                  bridgedTypes);
@@ -4167,7 +4170,6 @@ getLoweredResultIndices(const SILFunctionType *functionType,
   return IndexSubset::get(functionType->getASTContext(),
                           numResults, resultIndices);
 }
-
 
 const SILConstantInfo &
 TypeConverter::getConstantInfo(TypeExpansionContext expansion,

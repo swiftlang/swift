@@ -705,6 +705,12 @@ public:
     return SGM.Types.getConstantInfo(context, constant);
   }
 
+  /// Return the normal local type-lowering information for the given
+  /// formal function type without any special abstraction pattern applied.
+  /// This matches the type that `emitRValue` etc. are expected to produce
+  /// without any contextual overrides.
+  FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
+
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
 
@@ -1714,9 +1720,8 @@ public:
   /// given. The result is re-abstracted to the given expected type.
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
-                                CanType expectedType,
-                                SubstitutionMap subs,
-                                bool alreadyConverted);
+                                const FunctionTypeInfo &typeContext,
+                                SubstitutionMap subs);
 
   PreparedArguments prepareSubscriptIndices(SILLocation loc,
                                             SubscriptDecl *subscript,

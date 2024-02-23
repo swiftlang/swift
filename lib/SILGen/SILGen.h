@@ -305,7 +305,9 @@ public:
 
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  SILFunction *emitClosure(AbstractClosureExpr *ce);
+  SILFunction *emitClosure(AbstractClosureExpr *ce,
+                           const FunctionTypeInfo &closureInfo);
+
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
