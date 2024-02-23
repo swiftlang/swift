@@ -4400,6 +4400,12 @@ int main(int argc, char *argv[]) {
     if (options::CxxInteropVersion == "upcoming-swift")
       InitInvok.getLangOptions().cxxInteropCompatVersion =
           version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else if (options::CxxInteropVersion == "swift-6")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({6});
+    else if (options::CxxInteropVersion == "swift-5.9")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({5, 9});
     else
       llvm::errs() << "invalid CxxInteropVersion\n";
   }
