@@ -16,7 +16,7 @@
 
 import Distributed
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<any Codable>, ActorSystem.ActorID: Codable {
   distributed func hi(name: String) {
     print("Hi, \(name)!")
@@ -28,7 +28,7 @@ distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<
 }
 
 // ==== Execute ----------------------------------------------------------------
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 @main struct Main {
   static func main() async throws {
     let system = LocalTestingDistributedActorSystem()
