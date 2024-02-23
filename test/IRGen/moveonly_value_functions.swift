@@ -3,7 +3,7 @@
 // RUN:     -disable-type-layout                             \
 // RUN:     %s                                               \
 // RUN: |                                                    \
-// RUN: %FileCheck %s
+// RUN: %IRGenFileCheck %s
 
 @_silgen_name("external_symbol")
 func external_symbol()
@@ -138,7 +138,7 @@ public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"(
-// CHECK-SAME:        i64 0,
+// CHECK-SAME:        [[INT]] 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[INNER_DEINITING_DESTRUCTABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_2VyxGlWOh"(
