@@ -61,6 +61,12 @@ class BlockPartitionState {
   /// Set if this block in the next iteration needs to be visited.
   bool needsUpdate = false;
 
+  /// Set if this block is live.
+  ///
+  /// If the block is not live, then we shouldnt try to emit diagnostics for it
+  /// since we will not have performed dataflow upon it.
+  bool isLive = false;
+
   /// The partition of elements into regions at the top of the block.
   Partition entryPartition;
 
@@ -81,6 +87,8 @@ class BlockPartitionState {
                       TransferringOperandSetFactory &ptrSetFactory);
 
 public:
+  bool getLiveness() const { return isLive; }
+
   ArrayRef<PartitionOp> getPartitionOps() const { return blockPartitionOps; }
 
   const Partition &getEntryPartition() const { return entryPartition; }

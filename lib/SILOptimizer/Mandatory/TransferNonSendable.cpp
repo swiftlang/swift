@@ -1324,6 +1324,12 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
   LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
   for (auto [block, blockState] : regionInfo->getRange()) {
     LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
+
+    if (!blockState.getLiveness()) {
+      LLVM_DEBUG(llvm::dbgs() << "Dead block... skipping!\n");
+      continue;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Entry Partition: ";
                blockState.getEntryPartition().print(llvm::dbgs()));
 
