@@ -34,12 +34,13 @@ func foo() {
 // CHECK: sil hidden [ossa] @$s6Client3fooyyF : $@convention(thin) () -> () {
 // CHECK-DEFAULT: [[F_REF:%.*]] = function_ref @$s5Utils9PkgStructV6pkgVarSivg : $@convention(method) (@in_guaranteed PkgStruct) -> Int
 // CHECK-DEFAULT: sil package_external @$s5Utils9PkgStructV6pkgVarSivg : $@convention(method) (@in_guaranteed PkgStruct) -> Int
-// CHECK-BYPASS:  [[ADDR:%.*]] = struct_element_addr %7 : $*PkgStruct, #PkgStruct.pkgVar
+// CHECK-BYPASS:  [[ADDR:%.*]] = struct_element_addr {{.*}} : $*PkgStruct, #PkgStruct.pkgVar
 
 func bar() {
   print(PubStruct().pubVar)
 }
 
 // CHECK: sil hidden [ossa] @$s6Client3baryyF : $@convention(thin) () -> () {
-// CHECK: [[F_REF:%.*]] = function_ref @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
-// CHECK: sil @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
+// CHECK-DEFAULT: [[F_REF:%.*]] = function_ref @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
+// CHECK-DEFAULT: sil @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
+// CHECK-BYPASS:  [[ADDR:%.*]] = struct_element_addr {{.*}} : $*PubStruct, #PubStruct.pubVar
