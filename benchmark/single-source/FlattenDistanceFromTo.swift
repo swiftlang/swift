@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let FlattenDistanceFromTo = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "FlattenDistanceFromTo.Array.Array.16.16",
     runFunction: { with(arrayArray16x16, $0) },
