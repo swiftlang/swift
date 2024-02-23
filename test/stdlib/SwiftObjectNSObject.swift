@@ -124,8 +124,7 @@ func TestEquatableHash(_ e: AnyObject)
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   // Legacy behavior: Equatable in Swift => ObjC hashes with identity
   TestSwiftObjectNSObjectDefaultHashValue(e)
-  let msg = "Obj-C `-hash` ... type `SwiftObjectNSObject.\(type(of: e))` ... Equatable but not Hashable\n"
-  fputs(msg, stderr)
+  fakeEquatableWarning(e)
 #else
   // New behavior: These should have a constant hash value
   TestSwiftObjectNSObjectHashValue(e, 1)
@@ -143,10 +142,18 @@ func TestNonEquatableHash(_ e: AnyObject)
 // CHECK-NEXT: d ##SwiftObjectNSObject.D##
 // CHECK-NEXT: S ##{{.*}}SwiftObject##
 
-// Full message is longer, but this is the essential part...
+// Verify that the runtime emits the warning that we expected...
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E` {{.*}} Equatable but not Hashable
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E1` {{.*}} Equatable but not Hashable
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E2` {{.*}} Equatable but not Hashable
+
+// If we're checking legacy behavior or unsupported platform, then
+// the warning above won't be emitted.  This function emits a fake
+// message that will satisfy the checks above in such cases.
+func fakeEquatableWarning(e: AnyObject) {
+  let msg = "Obj-C `-hash` ... type `SwiftObjectNSObject.\(type(of: e))` ... Equatable but not Hashable\n"
+  fputs(msg, stderr)
+}
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
@@ -213,7 +220,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("c ##SwiftObjectNSObject.C##\n", stderr)
   fputs("d ##SwiftObjectNSObject.D##\n", stderr)
   fputs("S ##Swift._SwiftObject##\n", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E1` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E2` ... Equatable but not Hashable", stderr)
+  fakeEquatableWarning(E(i:1))
+  fakeEquatableWarning(E1(i:1))
+  fakeEquatableWarning(E2(i:1))
 }
