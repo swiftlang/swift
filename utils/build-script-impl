@@ -2764,10 +2764,7 @@ for host in "${ALL_HOSTS[@]}"; do
                              "${lldb_build_dir}/test/API" \
                              ${LLVM_LIT_ARGS} \
                              --param dotest-args="--setting plugin.typesystem.clang.experimental-redecl-completion=true" \
-                             --filter="lang" \
-                             --filter="functionalities" \
-                             --filter="types" \
-                             --filter="commands"
+                             --filter="lang|functionalities|types|commands"
 
                     # FIXME: run shell-tests with new setting. LLDB doesn't support that yet.
                  fi
