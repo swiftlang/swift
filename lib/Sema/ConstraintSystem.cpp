@@ -4219,7 +4219,7 @@ struct TypeSimplifier {
 
         auto result = conformance.getAssociatedType(
             lookupBaseType, assocType->getDeclaredInterfaceType());
-        if (!result->hasError())
+        if (result && !result->hasError())
           return result;
       }
 
