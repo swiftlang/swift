@@ -1463,9 +1463,9 @@ private:
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
         Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
     return DBuilder.createStructType(
-        Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
-        llvm::dwarf::DW_LANG_Swift, nullptr, "", SpecificationOf, 0);
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf, 0);
   }
 
   llvm::DIType *
