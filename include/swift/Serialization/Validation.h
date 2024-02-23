@@ -140,6 +140,7 @@ class ExtendedValidationInfo {
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
+    unsigned OnlyHasExportableDecls: 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -203,6 +204,10 @@ public:
   bool isBuiltFromInterface() const { return Bits.IsBuiltFromInterface; }
   void setIsBuiltFromInterface(bool val) {
     Bits.IsBuiltFromInterface = val;
+  }
+  bool onlyHasExportableDecls() const { return Bits.OnlyHasExportableDecls; }
+  void setOnlyHasExportableDecls(bool val) {
+    Bits.OnlyHasExportableDecls = val;
   }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;

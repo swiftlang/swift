@@ -711,6 +711,15 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
+  /// Returns true if the module was built with -experimental-skip-non-exportable-decls
+  /// or -experimental-skip-non-inlinable-function-bodies.
+  bool onlyHasExportableDecls() const {
+    return Bits.ModuleDecl.OnlyHasExportableDecls;
+  }
+  void setOnlyHasExportableDecls(bool flag = true) {
+    Bits.ModuleDecl.OnlyHasExportableDecls = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///

@@ -197,6 +197,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::HAS_CXX_INTEROPERABILITY_ENABLED:
       extendedInfo.setHasCxxInteroperability(true);
       break;
+    case options_block::ONLY_HAS_EXPORTABLE_DECLS:
+      extendedInfo.setOnlyHasExportableDecls(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -679,6 +682,8 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << "', built from "
      << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
      << ", " << (resilient? "resilient": "non-resilient");
+  if (Bits.OnlyHasExportableDecls)
+    os << ", built with -experimental-skip-non-exportable-decls or  experimental-skip-non-inlinable-function-bodies";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
@@ -1441,6 +1446,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
+      Bits.OnlyHasExportableDecls = extInfo.onlyHasExportableDecls();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();

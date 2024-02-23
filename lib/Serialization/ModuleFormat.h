@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 855; // ref_adhoc_requirement_witness attributes are back
+const uint16_t SWIFTMODULE_VERSION_MINOR = 856; // Add OnlyHasExportableDecls bit to Module
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -938,6 +938,7 @@ namespace options_block {
     MODULE_EXPORT_AS_NAME,
     PLUGIN_SEARCH_OPTION,
     HAS_CXX_INTEROPERABILITY_ENABLED,
+    ONLY_HAS_EXPORTABLE_DECLS,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1019,6 +1020,10 @@ namespace options_block {
 
   using HasCxxInteroperabilityEnabledLayout = BCRecordLayout<
     HAS_CXX_INTEROPERABILITY_ENABLED
+  >;
+
+  using OnlyHasExportableDecls = BCRecordLayout<
+    ONLY_HAS_EXPORTABLE_DECLS
   >;
 }
 

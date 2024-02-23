@@ -652,6 +652,10 @@ public:
     return Core->Bits.IsBuiltFromInterface;
   }
 
+  bool onlyHasExportableDecls() const {
+    return Core->Bits.OnlyHasExportableDecls;
+  }
+
   /// Whether this module is compiled with implicit dynamic.
   bool isImplicitDynamicEnabled() const {
     return Core->Bits.IsImplicitDynamicEnabled;
