@@ -304,6 +304,12 @@ def default_stdlib_deployment_targets(args):
            args.build_xros and args.build_xros_device:
             targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
+    elif host_target.platform.name == 'linux':
+        targets = [host_target]
+        if args.build_linux_static:
+            targets.append(getattr(StdlibDeploymentTarget.Musl,
+                                   host_target.arch))
+        return targets
     else:
         # All other machines only configure their host stdlib by default.
         return [host_target]

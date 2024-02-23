@@ -518,6 +518,18 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--extra-dsymutil-args=%s" % ' '.join(
                     shlex.quote(opt) for opt in args.extra_dsymutil_args)
+
+        if args.musl_path:
+            impl_args += [
+                "--musl-path=%s" % (args.musl_path, )
+            ]
+        if args.linux_static_arch:
+            impl_args += [
+                "--linux-static-arch=%s" % ';'.join(args.linux_static_arch)
+            ]
+        if args.linux_arch:
+            impl_args += [
+                "--linux-arch=%s" % ';'.join(args.linux_arch)
             ]
 
         # Compute the set of host-specific variables, which we pass through to
