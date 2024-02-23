@@ -655,6 +655,10 @@ public:
     return Core->Bits.IsBuiltFromInterface;
   }
 
+  bool allowNonResilientAccess() const {
+    return Core->Bits.AllowNonResilientAccess;
+  }
+
   /// Whether this module is compiled with implicit dynamic.
   bool isImplicitDynamicEnabled() const {
     return Core->Bits.IsImplicitDynamicEnabled;

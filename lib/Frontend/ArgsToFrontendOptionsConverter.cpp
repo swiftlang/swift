@@ -314,6 +314,26 @@ bool ArgsToFrontendOptionsConverter::convert(
                      "-enable-library-evolution");
   }
 
+  Opts.AllowNonResilientAccess = Args.hasArg(OPT_experimental_allow_non_resilient_access);
+  if (Opts.AllowNonResilientAccess) {
+    // Override the option to skip non-exportable decls.
+    if (Opts.SkipNonExportableDecls) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-skip-non-exportable-decls",
+                     "-experimental-allow-non-resilient-access");
+      Opts.SkipNonExportableDecls = false;
+    }
+    // If built from interface, non-resilient access should not be allowed.
+    if (Opts.AllowNonResilientAccess &&
+        (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
+         Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                     "-experimental-allow-non-resilient-access",
+                     "-compile-module-from-interface or -typecheck-module-from-interface");
+      Opts.AllowNonResilientAccess = false;
+    }
+  }
+
   // HACK: The driver currently erroneously passes all flags to module interface
   // verification jobs. -experimental-skip-non-exportable-decls is not
   // appropriate for verification tasks and should be ignored, though.

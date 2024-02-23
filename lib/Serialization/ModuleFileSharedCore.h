@@ -391,6 +391,9 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
+    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    unsigned AllowNonResilientAccess : 1;
+
     // Explicitly pad out to the next word boundary.
     unsigned : 3;
   } Bits = {};

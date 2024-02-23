@@ -168,6 +168,8 @@ WARNING(emit_reference_dependencies_without_primary_file,none,
 
 WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
+WARNING(warn_ignore_option_overriden_by,none,
+        "ignoring %0 (overriden by %1)", (StringRef, StringRef))
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())

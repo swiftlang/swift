@@ -854,6 +854,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, MODULE_PACKAGE_NAME);
   BLOCK_RECORD(options_block, MODULE_EXPORT_AS_NAME);
   BLOCK_RECORD(options_block, PLUGIN_SEARCH_OPTION);
+  BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1088,6 +1089,11 @@ void Serializer::writeHeader() {
       if (M->isBuiltFromInterface()) {
         options_block::IsBuiltFromInterfaceLayout BuiltFromInterface(Out);
         BuiltFromInterface.emit(ScratchRecord);
+      }
+
+      if (M->allowNonResilientAccess()) {
+        options_block::AllowNonResilientAccess AllowNonResAcess(Out);
+        AllowNonResAcess.emit(ScratchRecord);
       }
 
       if (allowCompilerErrors()) {

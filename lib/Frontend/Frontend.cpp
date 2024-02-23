@@ -1402,6 +1402,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
+    if (Invocation.getFrontendOptions().AllowNonResilientAccess)
+      MainModule->setAllowNonResilientAccess();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
