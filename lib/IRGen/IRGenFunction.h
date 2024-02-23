@@ -76,7 +76,7 @@ public:
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
 
-  llvm::Function *CurFn;
+  llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
