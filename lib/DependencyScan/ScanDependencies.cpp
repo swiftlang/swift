@@ -29,6 +29,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
@@ -1070,8 +1071,42 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
   }
 }
 
+static swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    const DependencyScanDiagnosticCollector *diagnosticCollector) {
+  auto collectedDiagnostics = diagnosticCollector->getDiagnostics();
+  auto numDiagnostics = collectedDiagnostics.size();
+  swiftscan_diagnostic_set_t *diagnosticOutput = new swiftscan_diagnostic_set_t;
+  diagnosticOutput->count = numDiagnostics;
+  diagnosticOutput->diagnostics =
+      new swiftscan_diagnostic_info_t[numDiagnostics];
+  for (size_t i = 0; i < numDiagnostics; ++i) {
+    const auto &Diagnostic = collectedDiagnostics[i];
+    swiftscan_diagnostic_info_s *diagnosticInfo =
+        new swiftscan_diagnostic_info_s;
+    diagnosticInfo->message =
+        swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
+    switch (Diagnostic.Severity) {
+    case llvm::SourceMgr::DK_Error:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR;
+      break;
+    case llvm::SourceMgr::DK_Warning:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING;
+      break;
+    case llvm::SourceMgr::DK_Note:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE;
+      break;
+    case llvm::SourceMgr::DK_Remark:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
+      break;
+    }
+    diagnosticOutput->diagnostics[i] = diagnosticInfo;
+  }
+  return diagnosticOutput;
+}
+
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(const CompilerInstance &instance,
+                            const DependencyScanDiagnosticCollector *diagnosticCollector,
                             const ModuleDependenciesCache &cache,
                             const ArrayRef<ModuleDependencyID> allModules) {
   if (allModules.empty()) {
@@ -1253,6 +1288,10 @@ generateFullDependencyGraph(const CompilerInstance &instance,
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
   result->main_module_name = create_clone(mainModuleName.c_str());
   result->dependencies = dependencySet;
+  result->diagnostics =
+      diagnosticCollector
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
+          : nullptr;
   return result;
 }
 
@@ -1668,7 +1707,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
-      performModuleScan(instance, cache);
+      performModuleScan(instance, nullptr, cache);
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
@@ -1704,7 +1743,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
       instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream
-  auto importSetOrErr = performModulePrescan(instance, cache);
+  auto importSetOrErr = performModulePrescan(instance, nullptr, cache);
   if (importSetOrErr.getError())
     return true;
   auto importSet = std::move(*importSetOrErr);
@@ -1744,7 +1783,8 @@ bool swift::dependencies::batchScanDependencies(
     return true;
 
   auto batchScanResults = performBatchModuleScan(
-      instance, cache, /*versionedPCMInstanceCache*/ nullptr, saver,
+      instance, /*DependencyScanDiagnosticCollector*/ nullptr, 
+      cache, /*versionedPCMInstanceCache*/ nullptr, saver,
       *batchInput);
 
   // Write the result JSON to the specified output path, for each entry
@@ -1848,6 +1888,7 @@ updateDependencyTracker(CompilerInstance &instance,
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(CompilerInstance &instance,
+                                       DependencyScanDiagnosticCollector *diagnosticCollector,
                                        ModuleDependenciesCache &cache) {
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
@@ -1893,12 +1934,13 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
                                         topologicallySortedModuleList);
 
   updateDependencyTracker(instance, cache, allModules);
-  return generateFullDependencyGraph(instance, cache,
+  return generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                      topologicallySortedModuleList);
 }
 
 llvm::ErrorOr<swiftscan_import_set_t>
 swift::dependencies::performModulePrescan(CompilerInstance &instance,
+                                          DependencyScanDiagnosticCollector *diagnosticCollector,
                                           ModuleDependenciesCache &cache) {
   // Setup the scanner
   auto scanner = ModuleDependencyScanner(
@@ -1913,12 +1955,17 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
     return mainDependencies.getError();
   auto *importSet = new swiftscan_import_set_s;
   importSet->imports = create_set(mainDependencies->getModuleImports());
+  importSet->diagnostics =
+      diagnosticCollector
+          ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
+          : nullptr;
   return importSet;
 }
 
 std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
 swift::dependencies::performBatchModuleScan(
     CompilerInstance &invocationInstance,
+    DependencyScanDiagnosticCollector *diagnosticCollector,
     ModuleDependenciesCache &invocationCache,
     CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
     llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
@@ -1929,7 +1976,8 @@ swift::dependencies::performBatchModuleScan(
   forEachBatchEntry(
       invocationInstance, invocationCache, versionedPCMInstanceCache, saver,
       batchInput,
-      [&batchScanResult](BatchScanInput entry, CompilerInstance &instance,
+      [&batchScanResult, &diagnosticCollector](BatchScanInput entry,
+                         CompilerInstance &instance,
                          ModuleDependenciesCache &cache) {
         auto scanner = ModuleDependencyScanner(
             cache.getScanService(), instance.getInvocation(),
@@ -1961,7 +2009,10 @@ swift::dependencies::performBatchModuleScan(
                                       : ModuleDependencyKind::SwiftInterface};
         auto allDependencies = scanner.getModuleDependencies(moduleID, cache);
         batchScanResult.push_back(
-            generateFullDependencyGraph(instance, cache, allDependencies));
+            generateFullDependencyGraph(instance, diagnosticCollector,
+                                        cache, allDependencies));
+        if (diagnosticCollector)
+          diagnosticCollector->reset();
       });
 
   return batchScanResult;
