@@ -64,13 +64,13 @@
 // CHECK-NEXT:   (requirement "A" conforms_to "Copyable"))
 
 // CHECK-LABEL: ExtensionDecl line=0 base=Freestanding<T>
-// CHECK-NEXT: (normal_conformance type="Freestanding<T>" protocol="Copyable"
-// CHECK-NEXT:   (requirement "T" conforms_to "Copyable"))
-  
-// CHECK-LABEL: ExtensionDecl line=0 base=Freestanding<T>
 // CHECK-NEXT: (normal_conformance type="Freestanding<T>" protocol="Escapable"
 // CHECK-NEXT:   (requirement "T" conforms_to "Escapable"))
 
+// CHECK-LABEL: ExtensionDecl line=0 base=Freestanding<T>
+// CHECK-NEXT: (normal_conformance type="Freestanding<T>" protocol="Copyable"
+// CHECK-NEXT:   (requirement "T" conforms_to "Copyable"))
+  
 public struct Outer<A: ~Copyable> {
   public func innerFn<B: ~Copyable>(_ b: borrowing B) {}
   public struct InnerStruct<C: ~Copyable> {
