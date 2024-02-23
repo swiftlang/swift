@@ -500,60 +500,6 @@ CanType GenericSignature::getReducedType(Type type) const {
   return getPointer()->getReducedType(type);
 }
 
-GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
-  bool changedSignature = false;
-  llvm::SmallVector<Requirement, 2> requirementsErased;
-  auto &C = Ptr->getASTContext();
-
-  for (auto req : getRequirements()) {
-    bool found = std::any_of(typeErasedParams.begin(),
-                             typeErasedParams.end(),
-                             [&](Type t) {
-      auto other = req.getFirstType();
-      return t->isEqual(other);
-    });
-    if (found && req.getKind() == RequirementKind::Layout) {
-      auto layout = req.getLayoutConstraint();
-      if (layout->isClass()) {
-        requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                                 req.getFirstType(),
-                                                 C.getAnyObjectType()));
-      } else if (layout->isBridgeObject()) {
-        requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                                 req.getFirstType(),
-                                                 C.TheBridgeObjectType));
-      } else if (layout->isFixedSizeTrivial()) {
-        unsigned bitWidth = layout->getTrivialSizeInBits();
-        requirementsErased.push_back(
-            Requirement(RequirementKind::SameType, req.getFirstType(),
-                        CanType(BuiltinIntegerType::get(bitWidth, C))));
-      } else if (layout->isTrivialStride()) {
-        requirementsErased.push_back(
-            Requirement(RequirementKind::SameType, req.getFirstType(),
-                        CanType(BuiltinVectorType::get(
-                            Ptr->getASTContext(),
-                            BuiltinIntegerType::get(8, Ptr->getASTContext()),
-                            layout->getTrivialStride()))));
-      } else {
-        requirementsErased.push_back(req);
-      }
-    } else {
-      requirementsErased.push_back(req);
-    }
-    changedSignature |= found;
-  }
-
-  if (changedSignature) {
-    return buildGenericSignature(
-        Ptr->getASTContext(), GenericSignature(),
-        SmallVector<GenericTypeParamType *>(getGenericParams()),
-        requirementsErased,
-        /*allowInverses=*/false);
-  }
-
-  return *this;
-}
-
 CanType GenericSignatureImpl::getReducedType(Type type) const {
   type = type->getCanonicalType();
 

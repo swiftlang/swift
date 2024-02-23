@@ -465,7 +465,8 @@ public:
 
       auto specializedSignature = attr->getSpecializedSignature(AFD);
       auto erasedSignature =
-          specializedSignature.typeErased(attr->getTypeErasedParams());
+          SILSpecializeAttr::buildTypeErasedSignature(specializedSignature,
+                                                      attr->getTypeErasedParams());
 
       if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
         addFunction(SILDeclRef(targetFun, erasedSignature),

@@ -99,6 +99,9 @@ public:
     Partial
   };
 
+  static GenericSignature buildTypeErasedSignature(
+      GenericSignature sig, ArrayRef<Type> typeErasedParams);
+
   static SILSpecializeAttr *create(SILModule &M,
                                    GenericSignature specializedSignature,
                                    ArrayRef<Type> typeErasedParams,

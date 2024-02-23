@@ -39,6 +39,61 @@
 using namespace swift;
 using namespace Lowering;
 
+GenericSignature SILSpecializeAttr::buildTypeErasedSignature(
+    GenericSignature sig, ArrayRef<Type> typeErasedParams) {
+  bool changedSignature = false;
+  llvm::SmallVector<Requirement, 2> requirementsErased;
+  auto &C = sig->getASTContext();
+
+  for (auto req : sig.getRequirements()) {
+    bool found = std::any_of(typeErasedParams.begin(),
+                             typeErasedParams.end(),
+                             [&](Type t) {
+      auto other = req.getFirstType();
+      return t->isEqual(other);
+    });
+    if (found && req.getKind() == RequirementKind::Layout) {
+      auto layout = req.getLayoutConstraint();
+      if (layout->isClass()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.getAnyObjectType()));
+      } else if (layout->isBridgeObject()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.TheBridgeObjectType));
+      } else if (layout->isFixedSizeTrivial()) {
+        unsigned bitWidth = layout->getTrivialSizeInBits();
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinIntegerType::get(bitWidth, C))));
+      } else if (layout->isTrivialStride()) {
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinVectorType::get(
+                            C,
+                            BuiltinIntegerType::get(8, C),
+                            layout->getTrivialStride()))));
+      } else {
+        requirementsErased.push_back(req);
+      }
+    } else {
+      requirementsErased.push_back(req);
+    }
+    changedSignature |= found;
+  }
+
+  if (changedSignature) {
+    return buildGenericSignature(
+        C, GenericSignature(),
+        SmallVector<GenericTypeParamType *>(sig.getGenericParams()),
+        requirementsErased,
+        /*allowInverses=*/false);
+  }
+
+  return sig;
+}
+
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
                                      GenericSignature unerasedSpecializedSig,
@@ -62,7 +117,9 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
                           AvailabilityContext availability) {
-  auto erasedSpecializedSig = specializedSig.typeErased(typeErasedParams);
+  auto erasedSpecializedSig =
+      SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
+                                                  typeErasedParams);
 
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
 
