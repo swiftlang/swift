@@ -7845,6 +7845,10 @@ ERROR(lifetime_dependence_cannot_use_infer, none,
        (StringRef))
 ERROR(lifetime_dependence_on_bitwise_copyable, none,
       "invalid lifetime dependence on bitwise copyable type", ())
+ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
+      "cannot infer lifetime dependence on implicit initializer of ~Escapable"
+      " type, define an initializer with explicit lifetime dependence"
+      " specifiers", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring

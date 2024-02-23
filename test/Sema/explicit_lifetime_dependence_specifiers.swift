@@ -8,6 +8,7 @@ struct Container {
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
@@ -19,6 +20,7 @@ struct BufferView : ~Escapable {
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeMutableRawBufferPointer) {
     self.ptr = ptr
   }
@@ -97,6 +99,9 @@ func invalidSpecifierPosition2(_ x: borrowing BufferView) -> BufferView {
 
 struct Wrapper : ~Escapable {
   let view: BufferView
+  init(_ view: consuming BufferView) {
+    self.view = view
+  }
   borrowing func getView1() -> _borrow(self) BufferView {
     return view
   }

@@ -28,6 +28,12 @@ struct BV {
 struct NCNE : ~Copyable {
   let p: UnsafeRawPointer
   let c: Int
+  
+  @_unsafeNonescapableResult
+  init(_ p: UnsafeRawPointer, _ c: Int) {
+    self.p = p
+    self.c = c
+  }
 
   // Requires a borrow.
   borrowing func getBV() -> _borrow(self) BV {
