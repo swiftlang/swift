@@ -44,7 +44,6 @@ To learn more about the programming language, visit [swift.org](https://swift.or
 
 - [Contributing to Swift](#contributing-to-swift)
 - [Getting Started](#getting-started)
-  - [Swift Toolchains](#swift-toolchains)
   - [Build Failures](#build-failures)
 - [Learning More](#learning-more)
 
@@ -71,8 +70,7 @@ If you are interested in:
   [How to Submit Your First Pull Request guide](/docs/HowToGuides/FirstPullRequest.md).
 - Building the compiler as a one-off: See our [Getting Started guide][].
 - Building a toolchain as a one-off: Follow the [Getting Started guide][]
-  up until the "Building the project" section. After that, follow the
-  instructions in the [Swift Toolchains](#swift-toolchains) section below.
+  up until the "Building the project" section.
 
 We also have an [FAQ](/docs/HowToGuides/FAQ.md) that answers common questions.
 
