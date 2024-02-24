@@ -160,3 +160,9 @@ struct GenericBufferView<Element> : ~Escapable {
     }
   }
 }
+
+// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYlsF : $@convention(thin) (@guaranteed BufferView) -> _scope(1) (@owned BufferView, @owned BufferView) {
+func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferView) {
+  return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
+}
+

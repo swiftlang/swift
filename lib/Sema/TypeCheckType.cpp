@@ -5048,6 +5048,11 @@ TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
 
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
     LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+  if (options.is(TypeResolverContext::TupleElement)) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::lifetime_dependence_cannot_be_applied_to_tuple_elt);
+    return ErrorType::get(getASTContext());
+  }
   if (!options.is(TypeResolverContext::FunctionResult)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(),
