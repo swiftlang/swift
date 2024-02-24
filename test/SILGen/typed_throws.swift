@@ -290,7 +290,9 @@ func formerReabstractionCrash() {
   // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_ : $@convention(thin) () -> @owned MyResult<String, any Error> {
   // CHECK: function_ref @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_SSyXEfU_ : $@convention(thin) () -> @owned String
   // CHECK-NEXT: thin_to_thick_function
-  // CHECK-NEXT: convert_function {{%.*}} : $@noescape @callee_guaranteed () -> @owned String to $@noescape @callee_guaranteed () -> (@owned String, @error any Error)
+  // CHECK-NEXT: // function_ref thunk
+  // CHECK-NEXT: function_ref @$sSSIgo_SSs5Error_pIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> (@out String, @error_indirect any Error)
+  // CHECK-NEXT: partial_apply
   let _: MyResult<String, Error>? = {
     return MyResult{"hello"}
   }()
