@@ -50,9 +50,9 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   auto &fs = *Ctx.SourceMgr.getFileSystem();
 
   auto ModPath = BaseName.getName(file_types::TY_SwiftModuleFile);
-  auto InPath = BaseName.getName(file_types::TY_SwiftModuleInterfaceFile);
+  auto InPath = BaseName.findInterfacePath(fs, Ctx);
 
-  if (LoadMode == ModuleLoadingMode::OnlySerialized || !fs.exists(InPath)) {
+  if (LoadMode == ModuleLoadingMode::OnlySerialized || !InPath) {
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies = scanModuleFile(ModPath, IsFramework);
@@ -61,26 +61,12 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
         return std::error_code();
       }
       return dependencies.getError();
-    } else {
-      return std::make_error_code(std::errc::no_such_file_or_directory);
     }
+    return std::make_error_code(std::errc::no_such_file_or_directory);
   }
-  assert(fs.exists(InPath));
+  assert(InPath);
 
-  // Use package.swiftinterface if it exists and its package-name applies to
-  // the importer module.
-  auto PkgInPath = BaseName.getPackageInterfacePathIfInSamePackage(fs, Ctx).value_or("");
-  if (!PkgInPath.empty() && fs.exists(PkgInPath)) {
-    InPath = PkgInPath;
-  } else {
-    // If not in package, use the private interface file if exits.
-    auto PrivateInPath =
-    BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
-    if (fs.exists(PrivateInPath)) {
-      InPath = PrivateInPath;
-    }
-  }
-  auto dependencies = scanInterfaceFile(InPath, IsFramework);
+  auto dependencies = scanInterfaceFile(*InPath, IsFramework);
   if (dependencies) {
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
