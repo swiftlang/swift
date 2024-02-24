@@ -1,6 +1,3 @@
-// rdar://118461385 (Swift CI: failing on the ASAN bot with `Abort trap: 6`)
-// REQUIRES: rdar118461385
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -20,64 +17,6 @@
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV %s < %t/Bar.private.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV,CHECK-PKG %s < %t/Bar.package.swiftinterface
 
-/// Client should load a package interface module if enabled with -experimental-package-interface-load
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name barpkg \
-// RUN:   -experimental-package-interface-load \
-// RUN:   -Rmodule-loading 2> %t/load-pkg-flag.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-ENABLED %s < %t/load-pkg-flag.output
-
-/// Client should load a package interface module if enabled with env var `SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD`
-// RUN: env SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD=true \
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name barpkg \
-// RUN:   -Rmodule-loading 2> %t/load-pkg-env-var.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-ENABLED %s < %t/load-pkg-env-var.output
-
-// CHECK-LOAD-PKG-ENABLED: loaded module 'Bar'; source: '{{.*}}Bar.package.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
-
-/// Client should not load a package interface module without the flag or the env var
-// RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name barpkg \
-// RUN:   -Rmodule-loading 2> %t/load-pkg-off.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-OFF %s < %t/load-pkg-off.output
-// CHECK-LOAD-PKG-OFF: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PKG-OFF: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.private.swiftinterface
-
-/// Client loads a private interface since the package-name is different from the loaded module's.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name foopkg \
-// RUN:   -experimental-package-interface-load \
-// RUN:   -Rmodule-loading 2> %t/load-diff-pkg.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-DIFF-PKG %s < %t/load-diff-pkg.output
-// CHECK-LOAD-DIFF-PKG: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
-
-// RUN: rm -rf %t/*.swiftmodule
-// RUN: rm -rf %t/Bar.package.swiftinterface
-
-/// Client loads a private interface since package interface doesn't exist. It should error since the loaded module is not built from a package interface.
-// RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name barpkg \
-// RUN:   -experimental-package-interface-load \
-// RUN:   -Rmodule-loading 2> %t/load-priv.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PRIV %s < %t/load-priv.output
-// CHECK-LOAD-PRIV: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PRIV: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.private.swiftinterface
-
-// RUN: rm -rf %t/*.swiftmodule
-// RUN: rm -rf %t/Bar.private.swiftinterface
-
-/// Client loads a public interface since package or private interface doesn't exist.
-/// It should error since the loaded module is not built from a package interface.
-// RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name barpkg \
-// RUN:   -experimental-package-interface-load \
-// RUN:   -Rmodule-loading 2> %t/load-pub.output
-
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PUB %s < %t/load-pub.output
-// CHECK-LOAD-PUB: loaded module 'Bar'; source: '{{.*}}Bar.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PUB: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.swiftinterface
-
 
 //--- Bar.swift
 public enum PubEnum {
@@ -94,6 +33,29 @@ public enum PubEnum {
 // CHECK:   }
 // CHECK: }
 
+@_transparent
+public func pubFunc(arg: PubEnum) {
+  switch arg {
+  case .red:
+    print("r")
+  case .green:
+    print("g")
+  @unknown default:
+    print("def")
+  }
+}
+
+// CHECK: @_transparent public func pubFunc(arg: Bar.PubEnum) {
+// CHECK:   switch arg {
+// CHECK:   case .red:
+// CHECK:     print("r")
+// CHECK:   case .green:
+// CHECK:     print("g")
+// CHECK:   @unknown default:
+// CHECK:     print("def")
+// CHECK:   }
+// CHECK: }
+
 package enum PkgEnum {
   case blue, yellow
 }
@@ -106,6 +68,48 @@ package enum PkgEnum {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG: }
+
+
+@usableFromInline
+package enum UfiPkgEnum {
+  case one, two
+}
+
+// CHECK: @usableFromInline
+// CHECK: package enum UfiPkgEnum {
+// CHECK:   case one, two
+// CHECK:   @usableFromInline
+// CHECK:   package static func == (a: Bar.UfiPkgEnum, b: Bar.UfiPkgEnum) -> Swift.Bool
+// CHECK:   @usableFromInline
+// CHECK:   package func hash(into hasher: inout Swift.Hasher)
+// CHECK:   @usableFromInline
+// CHECK:   package var hashValue: Swift.Int {
+// CHECK:     @usableFromInline
+// CHECK:     get
+// CHECK:   }
+// CHECK: }
+
+@inlinable
+package func pkgFunc(arg: UfiPkgEnum) {
+  switch arg {
+  case .one:
+    print("1")
+  case .two:
+    print("2")
+  @unknown default:
+    print("def")
+  }
+}
+// CHECK: @inlinable package func pkgFunc(arg: Bar.UfiPkgEnum) {
+// CHECK:   switch arg {
+// CHECK:   case .one:
+// CHECK:     print("1")
+// CHECK:   case .two:
+// CHECK:     print("2")
+// CHECK:   @unknown default:
+// CHECK:     print("def")
+// CHECK:   }
+// CHECK: }
 
 @frozen public struct FrozenPub {
   public var one: String
@@ -135,9 +139,7 @@ package struct PkgStruct {
 
 // CHECK-PKG: package struct PkgStruct {
 // CHECK-PKG:   package var one: Swift.String
-// CHECK-PKG:   internal var two: Swift.String
-// CHECK-PKG:   private var three: Swift.String
-// CHECK-PKG:   @_hasStorage package var four: Swift.String {
+// CHECK-PKG:   package var four: Swift.String {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG: }
@@ -160,6 +162,7 @@ public class PubKlass {
 
 // CHECK: public class PubKlass {
 // CHECK:   public var pubVarInPub: Swift.String
+// CHECK-PKG:   package var pkgVarInPub: Swift.String
 // CHECK:   public var pubVarPrivSetInPub: Swift.Int {
 // CHECK:     get
 // CHECK:   }
@@ -189,8 +192,7 @@ package class PkgKlass {
 
 // CHECK-PKG: package class PkgKlass {
 // CHECK-PKG:   package var pkgVarInPkg: Swift.String
-// CHECK-PKG:   internal var intrnVarInPkg: Swift.String
-// CHECK-PKG:   @_hasStorage package var pkgVarPrivSetInPkg: Swift.Int {
+// CHECK-PKG:   package var pkgVarPrivSetInPkg: Swift.Int {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG:   package init()
@@ -234,6 +236,9 @@ extension PubProto {
 // CHECK:   public var p3: Swift.Int {
 // CHECK:     get
 // CHECK:   }
+// CHECK-PKG:   package var p4: Swift.Int {
+// CHECK-PKG:     get
+// CHECK-PKG:   }
 // CHECK:   public func f3()
 // CHECK: }
 
@@ -274,13 +279,18 @@ extension PkgProto {
 
 public func pub(x: Int, y: String) { print("pub func") }
 // CHECK: public func pub(x: Swift.Int, y: Swift.String)
+
 @_spi(LibBar) public func spi(x: Int, y: String) { print("spi func") }
 // CHECK-PRIV: @_spi(LibBar) public func spi(x: Swift.Int, y: Swift.String)
-@usableFromInline package func ufipkg(x: Int, y: String) { print("ufi pkg func") }
+
+@usableFromInline
+package func ufipkg(x: Int, y: String) { print("ufi pkg func") }
 // CHECK: @usableFromInline
 // CHECK: package func ufipkg(x: Swift.Int, y: Swift.String)
 
 package func pkg(x: Int, y: String) { print("pkg func") }
+// CHECK-PKG: package func pkg(x: Swift.Int, y: Swift.String)
+
 func int(x: Int, y: String) { print("int func") }
 private func priv(x: Int, y: String) { print("priv func") }
 
@@ -288,6 +298,3 @@ private func priv(x: Int, y: String) { print("priv func") }
 // CHECK: extension Bar.PubEnum : Swift.Hashable {}
 // CHECK: extension Bar.FrozenPub : Swift.Sendable {}
 
-
-//--- Client.swift
-import Bar
