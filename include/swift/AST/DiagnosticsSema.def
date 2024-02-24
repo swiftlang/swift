@@ -5640,6 +5640,9 @@ ERROR(sendable_raw_storage,none,
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
+WARNING(restate_unchecked_sendable,none,
+        "class %0 must restate inherited '@unchecked Sendable' conformance",
+        (DeclName))
 ERROR(unchecked_not_inheritance_clause,none,
       "'unchecked' attribute only applies in inheritance clauses", ())
 ERROR(unchecked_not_existential,none,

@@ -5596,6 +5596,55 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  bool isUnchecked = false;
+  if (auto *normal = conformance->getRootNormalConformance())
+    isUnchecked = normal->isUnchecked();
+
+  if (isUnchecked) {
+    // Warn if inferred or inherited '@unchecked Sendable' is not restated.
+    // Beyond that, '@unchecked Sendable' requires no further checking.
+
+    if (!isa<InheritedProtocolConformance>(conformance))
+      return false;
+
+    auto statesUnchecked =
+      [](InheritedTypes inheritedTypes, DeclContext *dc) -> bool {
+        for (auto i : inheritedTypes.getIndices()) {
+          auto inheritedType =
+              TypeResolution::forInterface(
+                  dc,
+                  TypeResolverContext::Inherited,
+                  /*unboundTyOpener*/ nullptr,
+                  /*placeholderHandler*/ nullptr,
+                  /*packElementOpener*/ nullptr)
+              .resolveType(inheritedTypes.getTypeRepr(i));
+
+          if (!inheritedType || inheritedType->hasError())
+            continue;
+
+          if (inheritedType->getKnownProtocol() != KnownProtocolKind::Sendable)
+            continue;
+
+          if (inheritedTypes.getEntry(i).isUnchecked())
+            return true;
+        }
+
+        return false;
+      };
+
+    if (statesUnchecked(nominal->getInherited(), nominal))
+      return false;
+
+    for (auto *extension : nominal->getExtensions()) {
+      if (statesUnchecked(extension->getInherited(), extension))
+        return false;
+    }
+
+    nominal->diagnose(diag::restate_unchecked_sendable,
+                      nominal->getName());
+    return false;
+  }
+
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
     // Actors implicitly conform to Sendable and protect their state.

@@ -6017,7 +6017,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
-  bool sendableConformanceIsUnchecked = false;
+  bool hasDeprecatedUnsafeSendable = false;
   bool sendableConformancePreconcurrency = false;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
@@ -6049,12 +6049,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       SendableConformance = conformance;
 
       if (auto normal = conformance->getRootNormalConformance()) {
-        if (normal->isUnchecked())
-          sendableConformanceIsUnchecked = true;
-        else if (isImpliedByConformancePredatingConcurrency(normal))
+        if (isImpliedByConformancePredatingConcurrency(normal))
           sendableConformancePreconcurrency = true;
-        else if (isa<InheritedProtocolConformance>(conformance))
-          sendableConformanceIsUnchecked = true;
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
@@ -6098,7 +6094,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
-      sendableConformanceIsUnchecked = true;
+      hasDeprecatedUnsafeSendable = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
       tryDiagnoseExecutorConformance(Context, nominal, proto);
     } else if (NoncopyableGenerics
@@ -6116,7 +6112,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   }
 
   // Check constraints of Sendable.
-  if (SendableConformance && !sendableConformanceIsUnchecked) {
+  if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
       check = SendableCheck::ImpliedByStandardProtocol;
