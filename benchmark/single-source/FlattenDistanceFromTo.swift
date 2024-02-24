@@ -14,52 +14,52 @@ import TestsUtils
 
 public let benchmarks = [
   BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.Array.16.16",
-    runFunction: { with(arrayArray16x16, $0) },
+    name: "FlattenDistanceFromTo.Array.Array.04.04",
+    runFunction: { with(arrayArray04x04, $0) },
     tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayArray16x16) }),
+    setUpFunction: { blackHole(arrayArray04x04) }),
 
   BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.Array.16.32",
-    runFunction: { with(arrayArray16x32, $0) },
+    name: "FlattenDistanceFromTo.Array.Array.04x08",
+    runFunction: { with(arrayArray04x08, $0) },
     tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayArray16x32) }),
+    setUpFunction: { blackHole(arrayArray04x08) }),
 
   BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.Array.32.16",
-    runFunction: { with(arrayArray32x16, $0) },
+    name: "FlattenDistanceFromTo.Array.Array.08.04",
+    runFunction: { with(arrayArray08x04, $0) },
     tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayArray32x16) }),
+    setUpFunction: { blackHole(arrayArray08x04) }),
 
   BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.Array.32.32",
-    runFunction: { with(arrayArray32x32, $0) },
+    name: "FlattenDistanceFromTo.Array.Array.08.08",
+    runFunction: { with(arrayArray08x08, $0) },
     tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayArray32x32) }),
+    setUpFunction: { blackHole(arrayArray08x08) }),
   
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.Array.String.04.04",
+    runFunction: { with(arrayString04x04, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(arrayString04x04) }),
+
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.Array.String.04.08",
+    runFunction: { with(arrayString04x08, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(arrayString04x08) }),
+
+  BenchmarkInfo(
+    name: "FlattenDistanceFromTo.Array.String.08.04",
+    runFunction: { with(arrayString08x04, $0) },
+    tags: [.validation, .api],
+    setUpFunction: { blackHole(arrayString08x04) }),
+
   BenchmarkInfo(
     name: "FlattenDistanceFromTo.Array.String.08.08",
     runFunction: { with(arrayString08x08, $0) },
     tags: [.validation, .api],
     setUpFunction: { blackHole(arrayString08x08) }),
-
-  BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.String.08.16",
-    runFunction: { with(arrayString08x16, $0) },
-    tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayString08x16) }),
-
-  BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.String.16.08",
-    runFunction: { with(arrayString16x08, $0) },
-    tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayString16x08) }),
-
-  BenchmarkInfo(
-    name: "FlattenDistanceFromTo.Array.String.16.16",
-    runFunction: { with(arrayString16x16, $0) },
-    tags: [.validation, .api],
-    setUpFunction: { blackHole(arrayString16x16) }),
 ]
 
 // MARK: - Array Array
@@ -68,10 +68,10 @@ func makeArrayArray(_ outer: Int, _ inner: Int) -> FlattenSequence<[[UInt8]]> {
   Array(repeating: Array(repeating: 123, count: inner), count: outer).joined()
 }
 
-let arrayArray16x16 = makeArrayArray(16, 16)
-let arrayArray16x32 = makeArrayArray(16, 32)
-let arrayArray32x16 = makeArrayArray(32, 16)
-let arrayArray32x32 = makeArrayArray(32, 32)
+let arrayArray04x04 = makeArrayArray(04, 04)
+let arrayArray04x08 = makeArrayArray(04, 08)
+let arrayArray08x04 = makeArrayArray(08, 04)
+let arrayArray08x08 = makeArrayArray(08, 08)
 
 @inline(never)
 public func with(_ collection: FlattenSequence<[[UInt8]]>, _ iterations: Int) {
@@ -95,10 +95,10 @@ func makeArrayString(_ outer: Int, _ inner: Int) -> FlattenSequence<[String]> {
   Array(repeating: String(repeating: "0", count: inner), count: outer).joined()
 }
 
+let arrayString04x04 = makeArrayString(04, 04)
+let arrayString04x08 = makeArrayString(04, 08)
+let arrayString08x04 = makeArrayString(08, 04)
 let arrayString08x08 = makeArrayString(08, 08)
-let arrayString08x16 = makeArrayString(08, 16)
-let arrayString16x08 = makeArrayString(16, 08)
-let arrayString16x16 = makeArrayString(16, 16)
 
 @inline(never)
 public func with(_ collection: FlattenSequence<[String]>, _ iterations: Int) {
