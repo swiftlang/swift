@@ -1959,16 +1959,14 @@ void swift::ide::api::
 SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
                                               NominalTypeDecl *NTD) {
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-    PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-      if (PD != inherited && !Ctx.shouldIgnore(inherited)) {
+    for (auto *inherited : PD->getAllInheritedProtocols()) {
+      if (!Ctx.shouldIgnore(inherited)) {
         ProtocolConformanceRef Conf(inherited);
         auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
             .createSDKNode(SDKNodeKind::Conformance);
         Root->addConformance(ConfNode);
       }
-
-      return TypeWalker::Action::Continue;
-    });
+    }
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;

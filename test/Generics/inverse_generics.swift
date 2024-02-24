@@ -29,9 +29,11 @@ func checkAliases<C, NC: ~Copyable>(_ a: AlwaysCopyable<C>, _ b: AlwaysCopyable<
   checkCopyable(b)
 }
 
+protocol NeedsCopyable {}
+// expected-note@-1 {{type 'TryInferCopyable' does not conform to inherited protocol 'Copyable'}}
+
 struct TryInferCopyable: ~Copyable, NeedsCopyable {}
-// expected-error@-1 {{type 'TryInferCopyable' does not conform to protocol 'NeedsCopyable'}}
-// expected-error@-2 {{type 'TryInferCopyable' does not conform to protocol 'Copyable'}}
+// expected-error@-1 {{type 'TryInferCopyable' does not conform to protocol 'Copyable'}}
 
 protocol Removed: ~Copyable {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
@@ -165,8 +167,6 @@ func chk(_ t: CornerCase<NC>) {}
 
 /// MARK: tests that we diagnose ~Copyable that became invalid because it's required to be copyable
 
-protocol NeedsCopyable {}
-
 struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required to be 'Copyable' but is marked with '~Copyable'}}
 enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
 
@@ -175,10 +175,6 @@ class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Co
 
 @_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
                                        // expected-error@-1 {{class 'NiceTry2' required to be 'Copyable' but is marked with '~Copyable'}}
-
-struct OopsConformance1: ~Copyable, NeedsCopyable {}
-// expected-error@-1 {{type 'OopsConformance1' does not conform to protocol 'NeedsCopyable'}}
-// expected-error@-2 {{type 'OopsConformance1' does not conform to protocol 'Copyable'}}
 
 
 struct Extendo: ~Copyable {}
@@ -344,8 +340,8 @@ func conflict10<T>(_ t: T, _ u: some ~Copyable & Copyable)
         T: ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
-// FIXME: this is bogus (rdar://119345796)
 protocol Conflict11: ~Copyable, Copyable {}
+// expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 struct Conflict12: ~Copyable, Copyable {}
 // expected-error@-1 {{struct 'Conflict12' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -413,7 +409,6 @@ func checkExistentialAndClasses(
     _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
     _ b: any Soup & Copyable & ~Escapable & ~Copyable,
     // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
-    // expected-error@-2 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
     _ c: some (~Escapable & Removed) & Soup // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
     ) {}
 
@@ -446,17 +441,19 @@ public struct Record<Output> {
 protocol P {}
 extension Record : Decodable where Output : P {}
 
-// Expect that if Copyable is an inherited protocol, then conditional
-// conformances carry that through, making the Blahaj conditionally Copyable.
 struct Blahaj<Value>: ~Copyable {
-  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'Blahaj' that conforms to 'Copyable'}}
+  deinit {} // this is OK
 }
 extension Blahaj: Q where Value: Q {}
+// expected-error@-1 {{type 'Blahaj<Value>' does not conform to protocol 'Copyable'}}
 protocol Q: Copyable {}
+// expected-note@-1 {{type 'Blahaj<Value>' does not conform to inherited protocol 'Copyable'}}
 
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'Blahaj<T>' must specify ownership}}
 func testBlahaj<T, U: Q>(_ x: Blahaj<T>,
+// expected-note@+2 3{{add}}
+// expected-error@+1 {{parameter of noncopyable type 'Blahaj<U>' must specify ownership}}
                          _ y: Blahaj<U>) {}
 
 extension Int: NeedsCopyable {}

@@ -5781,8 +5781,9 @@ namespace {
   template<typename D>
   bool inheritanceListContainsProtocol(D decl, const ProtocolDecl *proto) {
     bool anyObject = false;
+    InvertibleProtocolSet inverses;
     for (const auto &found :
-            getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+            getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject)) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(found.Item))
         if (protoDecl == proto || protoDecl->inheritsFrom(proto))
           return true;
@@ -5912,6 +5913,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (!proto)
       return false;
 
+    if (auto *computedProto = dyn_cast<ProtocolDecl>(computedNominal)) {
+      return (computedProto == proto || computedProto->inheritsFrom(proto));
+    }
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
     if (conformsToProtocolInOriginalModule(computedNominal, proto)) {

@@ -225,9 +225,6 @@ public:
   /// requirement signature against the protocol generic signature
   /// <Self where Self : P>.
   void verify(ArrayRef<Requirement> reqts) const;
-
-  /// Returns a new signature with the given parameters erased
-  GenericSignature typeErased(ArrayRef<Type> typeErasedParams) const;
 };
 
 /// A reference to a canonical generic signature.
