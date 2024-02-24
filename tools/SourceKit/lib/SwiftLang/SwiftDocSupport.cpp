@@ -455,7 +455,7 @@ static bool initDocEntityInfo(const Decl *D,
   }
 
   if (!IsRef) {
-    llvm::raw_svector_ostream OS(Info.DocComment);
+    llvm::raw_svector_ostream OS(Info.DocCommentAsXML);
 
     {
       llvm::SmallString<128> DocBuffer;
