@@ -205,16 +205,6 @@ public:
                      "uninitialized");
   }
 
-  /// The preferred abstraction pattern to initialize with.
-  ///
-  /// Returning something other than None here gives expression emission the
-  /// opportunity to generate the initial value directly at the proper
-  /// abstraction level, avoiding the need for a conversion in some
-  /// circumstances.
-  virtual std::optional<AbstractionPattern> getAbstractionPattern() const {
-    return std::nullopt;
-  }
-
 protected:
   bool EmitDebugValueOnInit = true;
 
