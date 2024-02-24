@@ -190,12 +190,19 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     assert(superclassDecl);
 
     // Fish a class declaration out of the type witness.
-    auto classDecl = type->getClassOrBoundGenericClass();
-    if (!classDecl) {
-      if (auto archetype = type->getAs<ArchetypeType>()) {
-        if (auto superclassType = archetype->getSuperclass())
+    ClassDecl *classDecl = nullptr;
+
+    if (auto archetype = type->getAs<ArchetypeType>()) {
+      if (auto superclassType = archetype->getSuperclass())
           classDecl = superclassType->getClassOrBoundGenericClass();
-      }
+    } else if (type->isObjCExistentialType()) {
+      // For self-conforming Objective-C existentials, the exact check is
+      // implemented in TypeBase::isExactSuperclassOf(). Here, we just always
+      // look through into a superclass of a composition.
+      if (auto superclassType = type->getSuperclass())
+        classDecl = superclassType->getClassOrBoundGenericClass();
+    } else {
+      classDecl = type->getClassOrBoundGenericClass();
     }
 
     if (!classDecl || !superclassDecl->isSuperclassOf(classDecl))
