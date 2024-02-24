@@ -328,7 +328,7 @@ ArrayRef<NodeAnnotation> SDKNode::
 getAnnotations(std::vector<NodeAnnotation> &Scratch) const {
   for (auto Ann : Annotations)
     Scratch.push_back(Ann);
-  return llvm::makeArrayRef(Scratch);
+  return llvm::ArrayRef(Scratch);
 }
 
 bool SDKNode::isAnnotatedAs(NodeAnnotation Anno) const {
@@ -380,7 +380,7 @@ KnownTypeKind SDKNodeType::getTypeKind() const {
 }
 
 ArrayRef<TypeAttrKind> SDKNodeType::getTypeAttributes() const {
-  return llvm::makeArrayRef(TypeAttributes.data(), TypeAttributes.size());
+  return llvm::ArrayRef(TypeAttributes.data(), TypeAttributes.size());
 }
 
 void SDKNodeType::addTypeAttribute(TypeAttrKind AttrKind) {
@@ -508,7 +508,7 @@ bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
 }
 
 ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
-  return llvm::makeArrayRef(DeclAttributes.data(), DeclAttributes.size());
+  return llvm::ArrayRef(DeclAttributes.data(), DeclAttributes.size());
 }
 
 bool SDKNodeDecl::hasAttributeChange(const SDKNodeDecl &Another) const {

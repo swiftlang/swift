@@ -145,8 +145,7 @@ class CaptureInfo {
       : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
 
     ArrayRef<CapturedValue> getCaptures() const {
-      return llvm::makeArrayRef(this->getTrailingObjects<CapturedValue>(),
-                                Count);
+      return llvm::ArrayRef(this->getTrailingObjects<CapturedValue>(), Count);
     }
 
     DynamicSelfType *getDynamicSelfType() const {

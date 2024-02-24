@@ -1947,8 +1947,7 @@ public:
     // There are multiple trailing closures.
     SmallVector<ClosureInfo, 4> trailingClosures;
     trailingClosures.reserve(params.size() - firstTrailingIndex);
-    for (const auto &param :
-         llvm::makeArrayRef(params).slice(firstTrailingIndex)) {
+    for (const auto &param : llvm::ArrayRef(params).slice(firstTrailingIndex)) {
       trailingClosures.push_back(*param.placeholderClosure);
     }
     MultiClosureCallback(Args, firstTrailingIndex, trailingClosures);

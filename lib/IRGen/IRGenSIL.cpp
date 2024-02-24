@@ -7687,7 +7687,7 @@ void IRGenSILFunction::visitIncrementProfilerCounterInst(
   llvm::SmallVector<llvm::Value *, 2> indices;
   indices.append(2, llvm::ConstantInt::get(IGM.SizeTy, 0));
   auto *nameGEP = llvm::ConstantExpr::getGetElementPtr(
-      nameVar->getValueType(), nameVar, makeArrayRef(indices));
+      nameVar->getValueType(), nameVar, llvm::ArrayRef(indices));
 
   // Emit the call to the 'llvm.instrprof.increment' LLVM intrinsic.
   llvm::Value *args[] = {

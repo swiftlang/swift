@@ -2824,7 +2824,7 @@ SourceFile::getIfConfigsWithin(SourceRange outer) const {
   }
 
   // First let's find the first #if that is after the outer start loc.
-  auto ranges = llvm::makeArrayRef(IfConfigRanges.Ranges);
+  auto ranges = llvm::ArrayRef(IfConfigRanges.Ranges);
   auto lower = llvm::lower_bound(
       ranges, outer.Start, [&](IfConfigRangeInfo range, SourceLoc loc) {
         return SM.isBeforeInBuffer(range.getStartLoc(), loc);
@@ -2838,7 +2838,7 @@ SourceFile::getIfConfigsWithin(SourceRange outer) const {
       ranges, outer.End, [&](SourceLoc loc, IfConfigRangeInfo range) {
         return SM.isBeforeInBuffer(loc, range.getStartLoc());
       });
-  return llvm::makeArrayRef(lower, upper - lower);
+  return llvm::ArrayRef(lower, upper - lower);
 }
 
 void ModuleDecl::setPackageName(Identifier name) {

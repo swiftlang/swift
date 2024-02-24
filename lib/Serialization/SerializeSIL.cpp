@@ -2045,7 +2045,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
@@ -2063,7 +2063,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
@@ -2081,7 +2081,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
         (unsigned)CI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
 
@@ -2561,7 +2561,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), ownershipField,
         S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
         (unsigned)CBI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
@@ -2582,7 +2582,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(),
         S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
         (unsigned)CBI->getTargetLoweredType().getCategory(),
-        llvm::makeArrayRef(listOfValues));
+        llvm::ArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::InitBlockStorageHeaderInst: {

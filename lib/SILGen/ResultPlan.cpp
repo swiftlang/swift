@@ -673,8 +673,8 @@ public:
         eltPlans.push_back(builder.build(eltInit, origEltType,
                                          substEltTypes[0]));
       } else {
-        auto componentInits = llvm::makeArrayRef(eltInits)
-               .slice(elt.getSubstIndex(), substEltTypes.size());
+        auto componentInits = llvm::ArrayRef(eltInits).slice(
+            elt.getSubstIndex(), substEltTypes.size());
         eltPlans.push_back(builder.buildForPackExpansion(componentInits,
                                                          origEltType,
                                                          substEltTypes));

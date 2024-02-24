@@ -5191,7 +5191,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
 
     case Operation::TupleDirect: {
       auto firstEltIndex = outerDirectResults.size() - op.NumElements;
-      auto elts = makeArrayRef(outerDirectResults).slice(firstEltIndex);
+      auto elts = llvm::ArrayRef(outerDirectResults).slice(firstEltIndex);
       auto tupleType = SGF.F.mapTypeIntoContext(
                           SGF.getSILType(op.OuterResult, CanSILFunctionType()));
       auto tuple = SGF.B.createTuple(Loc, tupleType, elts);

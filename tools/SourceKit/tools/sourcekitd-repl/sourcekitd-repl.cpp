@@ -268,8 +268,7 @@ public:
         CurrentLines.append(indent, ' ');
       }
 
-      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
-                    CurrentLines);
+      convertToUTF8(llvm::ArrayRef(WLine, WLine + wcslen(WLine)), CurrentLines);
 
       // Special-case backslash for line continuations in the REPL.
       if (CurrentLines.size() > 2 &&
@@ -411,8 +410,8 @@ private:
   }
 
   bool isAtStartOfLine(const LineInfoW *line) {
-    for (wchar_t c : llvm::makeArrayRef(line->buffer,
-                                        line->cursor - line->buffer)) {
+    for (wchar_t c :
+         llvm::ArrayRef(line->buffer, line->cursor - line->buffer)) {
       if (!iswspace(c))
         return false;
     }

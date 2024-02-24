@@ -614,7 +614,7 @@ public:
       // formal self parameter, but they do not pass an origFnType down,
       // so we can ignore that possibility.
       FormalParamTypes.emplace(SGF.getASTContext(), loweredParams, *origFnType,
-                               llvm::makeArrayRef(substFormalParams),
+                               llvm::ArrayRef(substFormalParams),
                                /*ignore final*/ false);
     }
 

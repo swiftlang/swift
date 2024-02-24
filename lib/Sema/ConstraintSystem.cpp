@@ -1572,7 +1572,7 @@ void ConstraintSystem::recordOpenedTypes(
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
   OpenedTypes.insert(
-      {locatorPtr, llvm::makeArrayRef(openedTypes, replacements.size())});
+      {locatorPtr, llvm::ArrayRef(openedTypes, replacements.size())});
 }
 
 /// Determine how many levels of argument labels should be removed from the

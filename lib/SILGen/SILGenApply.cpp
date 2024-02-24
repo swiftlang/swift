@@ -4990,7 +4990,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
                rawResults, ExecutorBreadcrumb());
 
   auto token = rawResults.pop_back_val();
-  auto yieldValues = llvm::makeArrayRef(rawResults);
+  auto yieldValues = llvm::ArrayRef(rawResults);
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
@@ -5783,7 +5783,7 @@ RValue SILGenFunction::emitApply(
     assert(unmanagedCopies.empty());
   }
 
-  auto directResultsArray = makeArrayRef(directResults);
+  auto directResultsArray = llvm::ArrayRef(directResults);
   RValue result = resultPlan->finish(*this, loc, directResultsArray,
                                      bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");

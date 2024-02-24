@@ -302,7 +302,7 @@ public:
   std::optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
     if (!Items)
       return std::nullopt;
-    return llvm::makeArrayRef(*Items);
+    return llvm::ArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.

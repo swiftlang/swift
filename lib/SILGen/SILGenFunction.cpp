@@ -1154,11 +1154,9 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     
     ImportPath::Element UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
-    
-    ModuleDecl *UIKit = ctx
-      .getClangModuleLoader()
-      ->loadModule(SourceLoc(),
-                   ImportPath::Module(llvm::makeArrayRef(UIKitName)));
+
+    ModuleDecl *UIKit = ctx.getClangModuleLoader()->loadModule(
+        SourceLoc(), ImportPath::Module(llvm::ArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,

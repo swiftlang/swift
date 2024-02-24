@@ -60,7 +60,7 @@ toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
   }
 
   StringRef paths[] = {swiftBinDir, path};
-  auto pathsRef = llvm::makeArrayRef(paths);
+  auto pathsRef = llvm::ArrayRef(paths);
   if (!hasToolchain)
     pathsRef = pathsRef.drop_back();
 

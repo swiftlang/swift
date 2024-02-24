@@ -23,7 +23,6 @@
 namespace swift {
 
 using llvm::ArrayRef;
-using llvm::makeArrayRef;
 
 namespace constraints {
 

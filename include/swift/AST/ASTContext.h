@@ -523,7 +523,7 @@ public:
   StringRef AllocateCopy(StringRef Str,
                     AllocationArena arena = AllocationArena::Permanent) const {
     ArrayRef<char> Result =
-        AllocateCopy(llvm::makeArrayRef(Str.data(), Str.size()), arena);
+        AllocateCopy(llvm::ArrayRef(Str.data(), Str.size()), arena);
     return StringRef(Result.data(), Result.size());
   }
 

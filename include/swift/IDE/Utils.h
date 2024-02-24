@@ -428,7 +428,7 @@ public:
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
   operator bool() const { return !BaseName.empty(); }
   StringRef base() const { return BaseName; }
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef(Labels); }
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;

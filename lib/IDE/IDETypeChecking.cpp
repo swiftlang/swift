@@ -589,7 +589,7 @@ forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
       GroupContent.push_back(
           {Member->Ext, Member->EnablingExt, Member->IsSynthesized});
     }
-    Fn(llvm::makeArrayRef(GroupContent));
+    Fn(llvm::ArrayRef(GroupContent));
   }
 }
 
