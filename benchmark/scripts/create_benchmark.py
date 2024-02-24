@@ -56,7 +56,7 @@ def create_benchmark_file(name):
     # fill in missing template details
     file_text = file_text.format(
         name = name,
-        padding = "-" * (55 - len(name)),
+        padding = "-" * (56 - len(name)),
         year = datetime.date.today().year
     )
     
