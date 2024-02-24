@@ -2773,9 +2773,8 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
       return makeParserError();
     }
 
-    auto messageOpt =
-        getStringLiteralIfNotInterpolated(Tok.getLoc(), "'#assert' message",
-                                          /*AllowMultiline=*/true);
+    auto messageOpt = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                        "'#assert' message");
     consumeToken();
     if (!messageOpt)
       return makeParserError();

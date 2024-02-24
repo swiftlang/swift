@@ -116,6 +116,10 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
   return cContext.unbridged().LangOpts.hasFeature((Feature)feature);
 }
 
+unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext) {
+  return cContext.unbridged().LangOpts.EffectiveLanguageVersion[0];
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
