@@ -1346,7 +1346,7 @@ private:
 
     SmallVector<llvm::Metadata *, 16> Elements;
     for (auto *ElemDecl : Decl->getAllElements()) {
-      llvm::Optional<DebugTypeInfo> ElemDbgTy;
+      std::optional<DebugTypeInfo> ElemDbgTy;
       if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A variant case which carries a payload.
         ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
