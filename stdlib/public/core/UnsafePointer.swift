@@ -222,7 +222,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
 extension UnsafePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -247,7 +247,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 
 extension UnsafePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
@@ -273,7 +273,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 
 extension UnsafePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal var pointee: Pointee {
     unsafeAddress {
@@ -301,7 +301,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 
 extension UnsafePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
     @_transparent
@@ -405,7 +405,7 @@ extension UnsafePointer {
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
-  @available(swift, obsoleted: 6.0)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
@@ -701,21 +701,21 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: _Pointer, Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -723,14 +723,14 @@ extension UnsafeMutablePointer {
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
    self._rawValue = other._rawValue
   }
 
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }
@@ -789,7 +789,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal static func allocate(
     capacity count: Int
@@ -833,7 +833,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer  {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func deallocate() {
     // Passing zero alignment to the runtime forces "aligned
@@ -868,7 +868,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal var pointee: Pointee {
     @_transparent unsafeAddress {
@@ -923,7 +923,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func initialize(to value: Pointee) { // Note: `value` was __shared!
     Builtin.initialize(value, self._rawValue)
@@ -955,7 +955,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func move() -> Pointee {
     return Builtin.take(_rawValue)
@@ -1096,7 +1096,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func moveInitialize(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
@@ -1199,7 +1199,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF") // To maintain ABI with moveAssign below
   internal func moveUpdate(
@@ -1253,7 +1253,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal func deinitialize(count: Int) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
@@ -1354,7 +1354,7 @@ extension UnsafeMutablePointer {
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
   // for Swift 5.6 and older.
-  @available(swift, obsoleted: 6.0)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
   @usableFromInline
   internal func _legacy_se0333_withMemoryRebound<T, Result>(
@@ -1397,7 +1397,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer {
   // TODO: Merge this back into the noncopyable variant once we have @_preInverseGenerics
-  @available(swift, obsoleted: 6.0) // Legacy ABI compatibility
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 2)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
     @_transparent
