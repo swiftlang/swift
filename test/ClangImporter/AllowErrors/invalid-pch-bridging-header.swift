@@ -46,7 +46,8 @@ struct InnerTy {
 //--- use.swift
 func use(s: SomeTy, s2: InnerTy) {}
 
-
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
 
 
 // MISSING_HMAP-NOT: cannot find type 'SomeTy' in scope

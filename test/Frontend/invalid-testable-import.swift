@@ -6,6 +6,8 @@
 
 x = 8
 
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
 
 
 // CHECK-NOT: cannot find 'x' in scope

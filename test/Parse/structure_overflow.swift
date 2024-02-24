@@ -7,6 +7,8 @@
 
 ;blah blah blah
 
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
 
 
 

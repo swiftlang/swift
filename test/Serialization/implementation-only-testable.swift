@@ -52,6 +52,8 @@ internal func dependsOnHiddenType() -> HiddenType { fatalError() }
 /// needs to enable testing. We may want to improve upon this in the future.
 import TestedLib
 
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
 
 
 // CHECK-NOT-LOADED-NOT: remark: loaded module 'HiddenDep'
