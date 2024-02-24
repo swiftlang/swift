@@ -1848,9 +1848,18 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     auto layout = existential->getExistentialLayout();
 
     auto protocols = layout.getProtocols();
-    if (!(protocols.size() == 1 &&
-          protocols[0] == ctx.getProtocol(KnownProtocolKind::Sendable)))
+    if (!llvm::all_of(protocols,
+                      [&](ProtocolDecl *proto) {
+                        if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+                          return true;
+
+                        if (proto->getInvertibleProtocolKind())
+                          return true;
+
+                        return false;
+                      })) {
       return false;
+    }
 
     paramTy = layout.getSuperclass();
     if (!paramTy)

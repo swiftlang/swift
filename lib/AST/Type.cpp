@@ -278,7 +278,20 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
+static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
+                           InvertibleProtocolSet inverses,
+                           ASTContext &ctx) {
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      if (!inverses.contains(ip)) {
+        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        protocols.push_back(proto);
+      }
+    }
+  }
 
+  ProtocolType::canonicalizeProtocols(protocols);
+}
 
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
@@ -291,9 +304,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   representsAnyObject = false;
 
   protocols.push_back(protoDecl);
-
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(), {}, protocols);
+  expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
@@ -326,13 +337,26 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  representsAnyObject =
-      hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
+  auto inverses = type->getInverses();
+  expandDefaults(protocols, inverses, type->getASTContext());
 
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(),
-                                     type->getInverses(),
-                                     protocols);
+  representsAnyObject = [&]() {
+    if (!hasExplicitAnyObject)
+      return false;
+
+    if (explicitSuperclass)
+      return false;
+
+    if (!inverses.empty())
+      return false;
+
+    for (auto *proto : protocols) {
+      if (!proto->getInvertibleProtocolKind())
+        return false;
+    }
+
+    return true;
+  }();
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -1501,39 +1525,12 @@ static void addProtocols(Type T,
   Superclass = T;
 }
 
-bool ProtocolType::visitAllProtocols(
-                                 ArrayRef<ProtocolDecl *> protocols,
-                                 llvm::function_ref<bool(ProtocolDecl *)> fn) {
-  SmallVector<ProtocolDecl *, 4> stack;
-  SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-
-  // Prepopulate the stack.
-  for (auto proto : protocols) {
-    if (knownProtocols.insert(proto).second)
-      stack.push_back(proto);
-  }
-  std::reverse(stack.begin(), stack.end());
-
-  while (!stack.empty()) {
-    auto proto = stack.back();
-    stack.pop_back();
-
-    // Visit this protocol.
-    if (fn(proto))
-      return true;
-
-    // Add inherited protocols that we haven't seen already.
-    for (auto inherited : proto->getInheritedProtocols()) {
-      if (knownProtocols.insert(inherited).second)
-        stack.push_back(inherited);
-    }
-  }
-
-  return false;
-}
-
 static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
                                   ParameterizedProtocolMap *parameterized) {
+  // Skip a bunch of useless work.
+  if (protocols.size() <= 1)
+    return;
+
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
   bool zappedAny = false;
 
@@ -1558,23 +1555,24 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
     if (proto == nullptr)
       continue;
 
-    // Add the protocols we inherited.
-    proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-      if (inherited == proto)
-        return TypeWalker::Action::Continue;
+    // The below algorithm assumes the inheritance graph is acyclic. Just skip
+    // it if we have invalid code.
+    if (proto->hasCircularInheritedProtocols())
+      continue;
 
+    // Add the protocols we inherited.
+    auto allInherited = proto->getAllInheritedProtocols();
+    for (auto *inherited : allInherited) {
       auto found = known.find(inherited);
       if (found != known.end()) {
         // Don't zap protocols associated with parameterized types.
         if (parameterized && parameterized->count(inherited))
-          return TypeWalker::Action::Continue;
+          return;
 
         protocols[found->second] = nullptr;
         zappedAny = true;
       }
-
-      return TypeWalker::Action::Continue;
-    });
+    }
   }
   
   if (zappedAny) {
@@ -3777,13 +3775,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
         CanTypes.push_back(it->second->getCanonicalType());
         continue;
       }
-    }
-
-    // Drop any explicitly provided invertible protocols.
-    if (auto ip = proto->getInvertibleProtocolKind()) {
-      // We diagnose '~Copyable & Copyable' before forming the PCT.
-      assert(!Inverses.contains(*ip) && "opposing invertible constraints!");
-      continue;
     }
 
     CanTypes.push_back(proto->getDeclaredInterfaceType());

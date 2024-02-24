@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete
 
-// XFAIL: noncopyable_generics
-
 // REQUIRES: concurrency
 // REQUIRES: asserts
 

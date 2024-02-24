@@ -603,7 +603,7 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases
@@ -612,7 +612,7 @@ void getDirectlyInheritedNominalTypeDecls(
 /// If we come across the AnyObject type, set \c anyObject true.
 SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
