@@ -89,6 +89,7 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
+import FlattenDistanceFromTo
 import FlattenList
 import FloatingPointConversion
 import FloatingPointParsing
@@ -282,6 +283,7 @@ register(Exclusivity.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)
+register(FlattenDistanceFromTo.benchmarks)
 register(FlattenList.benchmarks)
 register(FloatingPointConversion.benchmarks)
 register(FloatingPointParsing.benchmarks)
