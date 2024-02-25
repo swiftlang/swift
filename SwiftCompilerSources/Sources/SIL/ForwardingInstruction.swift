@@ -397,3 +397,33 @@ extension LinearFunctionExtractInst: ForwardingInstruction {
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
+
+// -----------------------------------------------------------------------------
+// ownership transition instructions
+
+/// An instruction that transfers lifetime dependence from a single operand to a single result. The operand and result
+/// have the same identity, but they are not part of the same forwarded lifetime:
+/// copy_value, move_value, begin_borrow.
+public protocol OwnershipTransitionInstruction: UnaryInstruction {
+  var ownershipResult: Value { get }
+}
+
+extension OwnershipTransitionInstruction where Self: SingleValueInstruction {
+  public var ownershipResult: Value { self }
+}
+
+// CopyingInstruction implies OwnershipTransitionInstruction
+
+extension MoveValueInst: OwnershipTransitionInstruction {}
+
+extension BeginBorrowInst: OwnershipTransitionInstruction {}
+
+extension BeginCOWMutationInst: OwnershipTransitionInstruction {
+  public var ownershipResult: Value { instanceResult }
+}
+
+extension EndCOWMutationInst: OwnershipTransitionInstruction {}
+
+extension EndInitLetRefInst: OwnershipTransitionInstruction {}
+
+extension BeginDeallocRefInst: OwnershipTransitionInstruction {}

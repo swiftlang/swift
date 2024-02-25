@@ -1041,7 +1041,7 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
 
-public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
+public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction, OwnershipTransitionInstruction {}
 
 final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
