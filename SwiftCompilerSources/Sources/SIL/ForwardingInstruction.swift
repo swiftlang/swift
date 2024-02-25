@@ -265,6 +265,12 @@ extension MoveOnlyWrapperToCopyableValueInst : ConversionInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension MoveOnlyWrapperToCopyableBoxInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
 extension UpcastInst : ConversionInstruction {
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }
@@ -381,12 +387,6 @@ extension SwitchEnumInst : ForwardingInstruction {
 }
 
 extension MarkUnresolvedReferenceBindingInst : ForwardingInstruction {
-  public var preservesRepresentation: Bool { true }
-  public var canForwardGuaranteedValues: Bool { true }
-  public var canForwardOwnedValues: Bool { true }
-}
-
-extension MoveOnlyWrapperToCopyableBoxInst : ForwardingInstruction {
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
