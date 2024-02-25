@@ -452,7 +452,7 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
 final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
-final public class BeginDeallocRefInst : SingleValueInstruction {
+final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
   public var reference: Value { operands[0].value }
   public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
 }
@@ -1043,16 +1043,16 @@ final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInst
 
 public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
 
-final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class ExplicitCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class UnownedCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
-final public class WeakCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
+final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
+final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
 final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
 
@@ -1245,8 +1245,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction,
-                                          UnaryInstruction {
+final public class BeginCOWMutationInst : MultipleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
   public var uniquenessResult: Value { return getResult(index: 0) }
   public var instanceResult: Value { return getResult(index: 1) }
