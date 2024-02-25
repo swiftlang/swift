@@ -987,8 +987,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.ContainerTypeUSR = copyAndClearString(Allocator, Buffer);
 
-  ide::getDocumentationCommentAsXML(DInfo.OriginalProperty, OS);
+  ide::getRawDocumentationComment(DInfo.OriginalProperty, OS);
   Symbol.DocComment = copyAndClearString(Allocator, Buffer);
+
+  ide::getDocumentationCommentAsXML(DInfo.OriginalProperty, OS);
+  Symbol.DocCommentAsXML = copyAndClearString(Allocator, Buffer);
 
   {
     auto *Group = DInfo.InSynthesizedExtension ? DInfo.BaseType->getAnyNominal()

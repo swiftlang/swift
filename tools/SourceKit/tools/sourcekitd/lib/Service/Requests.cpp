@@ -2451,8 +2451,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyIsOptional, Info.IsOptional);
   if (Info.IsAsync)
     Elem.set(KeyIsAsync, Info.IsAsync);
-  if (!Info.DocComment.empty())
-    Elem.set(KeyDocFullAsXML, Info.DocComment);
+  if (!Info.DocCommentAsXML.empty())
+    Elem.set(KeyDocFullAsXML, Info.DocCommentAsXML);
   if (!Info.FullyAnnotatedDecl.empty())
     Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
   if (!Info.FullyAnnotatedGenericSig.empty())
@@ -2604,7 +2604,9 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
   if (!Symbol.ContainerTypeUSR.empty())
     Elem.set(KeyContainerTypeUsr, Symbol.ContainerTypeUSR);
   if (!Symbol.DocComment.empty())
-    Elem.set(KeyDocFullAsXML, Symbol.DocComment);
+    Elem.set(KeyDocComment, Symbol.DocComment);
+  if (!Symbol.DocCommentAsXML.empty())
+    Elem.set(KeyDocFullAsXML, Symbol.DocCommentAsXML);
   if (!Symbol.GroupName.empty())
     Elem.set(KeyGroupName, Symbol.GroupName);
   if (!Symbol.LocalizationKey.empty())

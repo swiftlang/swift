@@ -24,18 +24,19 @@ std::string LineList::str() const {
   if (Lines.empty())
     return "";
 
-  auto FirstLine = Lines.begin();
-  while (FirstLine != Lines.end() && FirstLine->Text.empty())
-    ++FirstLine;
+  Line *FirstNonEmptyLine = Lines.begin();
+  while (FirstNonEmptyLine != Lines.end() && FirstNonEmptyLine->Text.empty())
+    ++FirstNonEmptyLine;
 
-  if (FirstLine == Lines.end())
+  if (FirstNonEmptyLine == Lines.end())
     return "";
 
-  auto InitialIndentation = measureIndentation(FirstLine->Text);
+  auto InitialIndentation = measureIndentation(FirstNonEmptyLine->Text);
 
-  for (auto Line = FirstLine; Line != Lines.end(); ++Line) {
+  Stream << FirstNonEmptyLine->Text.drop_front(InitialIndentation);
+  for (auto Line = FirstNonEmptyLine + 1; Line != Lines.end(); ++Line) {
     auto Drop = std::min(InitialIndentation, Line->FirstNonspaceOffset);
-    Stream << Line->Text.drop_front(Drop) << "\n";
+    Stream << '\n' << Line->Text.drop_front(Drop);
   }
 
   Stream.flush();
