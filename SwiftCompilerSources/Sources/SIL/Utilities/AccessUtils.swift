@@ -546,20 +546,16 @@ extension Value {
   public var referenceRoot: Value {
     var value: Value = self
     while true {
-      switch value {
-      case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-           is EndInitLetRefInst,
-           is BeginDeallocRefInst,
-           is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst:
-        value = (value as! Instruction).operands[0].value
-      case let mvr as MultipleValueInstructionResult:
-        guard  let bcm = mvr.parentInstruction as? BeginCOWMutationInst else {
-          return value
-        }
-        value = bcm.instance
-      default:
-        return value
+      if let forward = value.forwardingInstruction, forward.preservesIdentity,
+         let operand = forward.singleForwardedOperand {
+        value = operand.value
+        continue
       }
+      if let transition = value.definingInstruction as? OwnershipTransitionInstruction {
+        value = transition.operand.value
+        continue
+      }
+      return value
     }
   }
 }
