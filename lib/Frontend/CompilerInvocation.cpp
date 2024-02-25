@@ -1978,7 +1978,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   // If no style options are specified, default to LLVM style.
-  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
     if (contents == "llvm") {

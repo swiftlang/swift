@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -c %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -c %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 let x = 0 // We need this because of the #sourceLocation-ends-with-a-newline requirement.
 
