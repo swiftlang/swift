@@ -49,9 +49,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-xc++")
 endif()
 
-# Use the new diagnostic formatter.
-list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-diagnostic-style" "swift")
-
 # We should avoid non-literals in format strings, or appropriately mark
 # functions.
 check_cxx_compiler_flag("-Wformat-nonliteral -Werror=format-nonliteral" CXX_SUPPORTS_FORMAT_NONLITERAL_WARNING)

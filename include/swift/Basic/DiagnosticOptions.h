@@ -70,8 +70,8 @@ public:
   bool PrintEducationalNotes = false;
 
   /// Whether to emit diagnostics in the terse LLVM style or in a more
-  /// descriptive style that's specific to Swift (currently experimental).
-  FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
+  /// descriptive style that's specific to Swift.
+  FormattingStyle PrintedFormattingStyle = FormattingStyle::Swift;
 
   /// Whether to emit macro expansion buffers into separate, temporary files.
   bool EmitMacroExpansionFiles = true;
