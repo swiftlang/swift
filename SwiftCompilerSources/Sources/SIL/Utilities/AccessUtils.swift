@@ -546,6 +546,10 @@ extension Value {
   public var referenceRoot: Value {
     var value: Value = self
     while true {
+      if let operand = value.forwardingInstruction?.singleForwardedOperand {
+        value = operand.value
+        continue
+      }
       switch value {
       case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
            is EndInitLetRefInst,
