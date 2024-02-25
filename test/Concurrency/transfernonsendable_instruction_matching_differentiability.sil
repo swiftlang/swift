@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: differentiable_programming
 
 sil_stage raw
 
