@@ -58,21 +58,6 @@ extension ForwardingInstruction {
   }
 }
 
-// An instruction that forwards a single value to a single result.
-//
-// For legacy reasons, some ForwardingInstructions that fit the
-// SingleValueInstruction and UnaryInstruction requirements are not
-// considered ConversionInstructions because certain routines do not
-// want to see through them (InitExistentialValueInst,
-// DeinitExistentialValueInst, OpenExistentialValueInst,
-// OpenExistentialValueInst). This most likely has to do with
-// type-dependent operands, although any ConversionInstruction should
-// support type-dependent operands.
-public protocol ConversionInstruction : SingleValueInstruction,
-                                        UnaryInstruction,
-                                        ForwardingInstruction
-{}
-
 extension Value {
   // If this value is produced by a ForwardingInstruction, return that instruction. This is convenient for following the forwarded value chain.
   // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point. 
@@ -231,6 +216,18 @@ extension TuplePackExtractInst : ForwardingInstruction {
 
 // -----------------------------------------------------------------------------
 // conversion instructions
+
+/// An instruction that forwards a single value to a single result.
+///
+/// For legacy reasons, some ForwardingInstructions that fit the
+/// SingleValueInstruction and UnaryInstruction requirements are not
+/// considered ConversionInstructions because certain routines do not
+/// want to see through them (InitExistentialValueInst,
+/// DeinitExistentialValueInst, OpenExistentialValueInst,
+/// OpenExistentialValueInst). This most likely has to do with
+/// type-dependent operands, although any ConversionInstruction should
+/// support type-dependent operands.
+public protocol ConversionInstruction : SingleValueInstruction, UnaryInstruction, ForwardingInstruction {}
 
 extension MarkUnresolvedNonCopyableValueInst : ConversionInstruction {
   public var preservesRepresentation: Bool { true }

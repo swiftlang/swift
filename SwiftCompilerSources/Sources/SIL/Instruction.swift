@@ -1115,8 +1115,7 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class MarkUnresolvedNonCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
@@ -1125,13 +1124,11 @@ final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstr
   public var isInitializationOfDest: Bool { true }
 }
 
-final public class CopyableToMoveOnlyWrapperValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MoveOnlyWrapperToCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableBoxInst : SingleValueInstruction {}
+final public class MoveOnlyWrapperToCopyableBoxInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class CopyableToMoveOnlyWrapperAddrInst
   : SingleValueInstruction, UnaryInstruction {}
