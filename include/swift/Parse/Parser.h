@@ -1979,7 +1979,7 @@ public:
   parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
                             Diag<> DefaultID, StmtKind ParentKind,
                             StringRef &BindingKindStr);
-  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
+  ParserStatus parseStmtCondition(BraceStmt **BodyAfterTrailingComma, StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
   ParserResult<PoundHasSymbolInfo> parseStmtConditionPoundHasSymbol();

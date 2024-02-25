@@ -1846,7 +1846,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 /// The use of expr-basic here disallows trailing closures, which are
 /// problematic given the curly braces around the if/while body.
 ///
-ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
+ParserStatus Parser::parseStmtCondition(BraceStmt **BodyAfterTrailingComma, StmtCondition &Condition,
                                         Diag<> DefaultID, StmtKind ParentKind) {
   ParserStatus Status;
   Condition = StmtCondition();
@@ -1861,10 +1861,30 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   // a variety of common errors situations (including migrating from Swift 2
   // syntax).
   while (true) {
+
+    if (Tok.getText() == "else") {
+      break;
+    }
+
     Status |= parseStmtConditionElement(result, DefaultID, ParentKind,
                                         BindingKindStr);
     if (Status.isErrorOrHasCompletion())
       break;
+
+    StmtConditionElement last = result.back();
+
+    if (last.getKind() == StmtConditionElement::CK_Boolean) {
+      Expr* expr = last.getExprOrNull();
+      ClosureExpr* closure = dyn_cast<ClosureExpr>(expr);
+      if (closure != NULL) {
+        BraceStmt* body = closure->getBody();
+        if (body != NULL) {
+          *BodyAfterTrailingComma = body;
+          result.pop_back_val();
+          break;
+        }
+      }
+    }
 
     // If a comma exists consume it and succeed.
     if (consumeIf(tok::comma))
@@ -1915,6 +1935,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
 
   ParserStatus Status;
   StmtCondition Condition;
+  BraceStmt *BodyAfterTrailingComma = NULL;
   ParserResult<BraceStmt> NormalBody;
   
   // A scope encloses the condition and true branch for any variables bound
@@ -1944,13 +1965,12 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
       Condition = Context.AllocateCopy(ConditionElems);
     } else {
-      Status |= parseStmtCondition(Condition, diag::expected_condition_if,
-                                   StmtKind::If);
+      Status |= parseStmtCondition(&BodyAfterTrailingComma, Condition, diag::expected_condition_if, StmtKind::If);
       if (Status.isErrorOrHasCompletion())
         return recoverWithCond(Status, Condition);
     }
 
-    if (Tok.is(tok::kw_else)) {
+    if (BodyAfterTrailingComma == NULL && Tok.is(tok::kw_else)) {
       SourceLoc ElseLoc = Tok.getLoc();
       diagnose(ElseLoc, diag::unexpected_else_after_if);
       diagnose(ElseLoc, diag::suggest_removing_else)
@@ -1958,11 +1978,15 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       consumeToken(tok::kw_else);
     }
 
-    NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
-    Status |= NormalBody;
-    if (NormalBody.isNull())
-      return recoverWithCond(Status, Condition);
-  }
+    if (BodyAfterTrailingComma != NULL) {
+      NormalBody = makeParserResult(BodyAfterTrailingComma);
+    } else {
+      NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
+      Status |= NormalBody;
+      if (NormalBody.isNull())
+        return recoverWithCond(Status, Condition);
+      }
+    }
 
   // The else branch, if any, is outside of the scope of the condition.
   SourceLoc ElseLoc;
@@ -2012,6 +2036,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   
   ParserStatus Status;
   StmtCondition Condition;
+  BraceStmt *BodyAfterTrailingComma = NULL;
   ParserResult<BraceStmt> Body;
 
   auto recoverWithCond = [&](ParserStatus Status,
@@ -2037,8 +2062,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_guard,
-                                 StmtKind::Guard);
+    Status |= parseStmtCondition(&BodyAfterTrailingComma, Condition, diag::expected_condition_guard, StmtKind::Guard);
     if (Status.isErrorOrHasCompletion()) {
       // FIXME: better recovery
       return recoverWithCond(Status, Condition);
@@ -2056,9 +2080,15 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
       return recoverWithCond(Status, Condition);
   }
 
-  Body = parseBraceItemList(diag::expected_lbrace_after_guard);
-  if (Body.isNull())
-    return recoverWithCond(Status, Condition);
+  if (BodyAfterTrailingComma != NULL) {
+    Body = makeParserResult(BodyAfterTrailingComma);
+  } else {
+    Body = parseBraceItemList(diag::expected_lbrace_after_guard);
+    Status |= Body;
+    if (Body.isNull()) {
+      return recoverWithCond(Status, Condition);
+    }
+  }
 
   Status |= Body;
   
@@ -2074,6 +2104,8 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 
   ParserStatus Status;
   StmtCondition Condition;
+  BraceStmt *BodyAfterTrailingComma = NULL;
+  ParserResult<BraceStmt> Body;
 
   auto recoverWithCond = [&](ParserStatus Status,
                              StmtCondition Condition) -> ParserResult<Stmt> {
@@ -2098,21 +2130,23 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_while,
-                                 StmtKind::While);
+    Status |= parseStmtCondition(&BodyAfterTrailingComma, Condition, diag::expected_condition_while, StmtKind::While);
     if (Status.isErrorOrHasCompletion())
       return recoverWithCond(Status, Condition);
   }
 
-  ParserResult<BraceStmt> Body =
-      parseBraceItemList(diag::expected_lbrace_after_while);
-  Status |= Body;
-  if (Body.isNull())
-    return recoverWithCond(Status, Condition);
-
+  if (BodyAfterTrailingComma != NULL) {
+    Body = makeParserResult(BodyAfterTrailingComma);
+  } else {
+    Body = parseBraceItemList(diag::expected_lbrace_after_while);
+    Status |= Body;
+    if (Body.isNull()) {
+      return recoverWithCond(Status, Condition);
+    }
+  }
+    
   return makeParserResult(
-      Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition,
-                                      Body.get()));
+      Status, new (Context) WhileStmt(LabelInfo, WhileLoc, Condition, Body.get()));
 }
 
 ///
