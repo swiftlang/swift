@@ -35,6 +35,7 @@ UID_KEYS = [
     KEY('GenericParams', 'key.generic_params'),
     KEY('GenericRequirements', 'key.generic_requirements'),
     KEY('DocFullAsXML', 'key.doc.full_as_xml'),
+    KEY('DocComment', 'key.doc_comment'),
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
