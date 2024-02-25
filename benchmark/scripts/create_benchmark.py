@@ -47,19 +47,18 @@ def create_benchmark_file(name):
     and places it in the `single-source` directory.
     """
 
-    template_path = create_relative_path("Template.swift")
     file_text = ""
-    
+    template_path = create_relative_path("Template.swift")
     with open(template_path, "r") as f:
         file_text = "".join(f.readlines())
 
     # fill in missing template details
     file_text = file_text.format(
-        name = name,
-        padding = "-" * (56 - len(name)),
-        year = datetime.date.today().year
+        name=name,
+        padding="-" * (56 - len(name)),
+        year=datetime.date.today().year
     )
-    
+
     file_path_prefix = create_relative_path("../single-source/")
     file_path = os.path.join(file_path_prefix, name + ".swift")
     with open(file_path, "w") as f:
