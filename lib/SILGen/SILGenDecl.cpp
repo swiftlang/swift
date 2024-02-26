@@ -1726,8 +1726,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // Begin a new binding scope, which is popped when the next innermost debug
           // scope ends. The cleanup location loc isn't the perfect source location
           // but it's close enough.
-          B.getSILGenFunction().enterDebugScope(loc,
-                                                      /*isBindingScope=*/true);
+          B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
         InitializationPtr initialization =
           emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 

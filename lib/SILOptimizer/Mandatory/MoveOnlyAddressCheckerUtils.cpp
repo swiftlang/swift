@@ -1573,6 +1573,19 @@ struct CopiedLoadBorrowEliminationState {
   }
 };
 
+static bool shouldVisitAsEndPointUse(Operand *op) {
+  // If an access is static and marked as "no nested conflict", we use that
+  // in switch codegen to mark an opaque sub-access that move-only checking
+  // should not look through.
+  if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
+    if (ba->getEnforcement() == SILAccessEnforcement::Static
+        && ba->hasNoNestedConflict()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// An early transform that we run to convert any load_borrow that are copied
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
@@ -1582,6 +1595,10 @@ struct CopiedLoadBorrowEliminationVisitor
 
   CopiedLoadBorrowEliminationVisitor(CopiedLoadBorrowEliminationState &state)
       : state(state) {}
+
+  bool visitTransitiveUseAsEndPointUse(Operand *op) {
+    return shouldVisitAsEndPointUse(op);
+  }
 
   bool visitUse(Operand *op) {
     LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim visiting ";
@@ -1978,16 +1995,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
 } // end anonymous namespace
 
 bool GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
-  // If an access is static and marked as "no nested conflict", we use that
-  // in switch codegen to mark an opaque sub-access that move-only checking
-  // should not look through.
-  if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
-    if (ba->getEnforcement() == SILAccessEnforcement::Static
-        && ba->hasNoNestedConflict()) {
-      return true;
-    }
-  }
-  return false;
+  return shouldVisitAsEndPointUse(op);
 }
 
 // Filter out recognized uses that do not write to memory.
