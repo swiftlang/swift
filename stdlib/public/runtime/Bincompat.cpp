@@ -247,6 +247,8 @@ bool useLegacySwiftValueUnboxingInCasting() {
 bool useLegacySwiftObjCHashing() {
 #if BINARY_COMPATIBILITY_APPLE
   return true; // For now, legacy behavior on Apple OSes
+#elif SWIFT_TARGET_OS_DARWIN
+  return true; // For now, legacy behavior on open-source builds for Apple OSes
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif
