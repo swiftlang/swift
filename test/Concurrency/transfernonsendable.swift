@@ -1465,3 +1465,9 @@ final actor FinalActorWithSetter {
     // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 }
+
+func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
+  let _ = { @MainActor in
+    let _ = x // expected-tns-warning {{task isolated value of type '() -> ()' transferred to main actor-isolated context}}
+  }
+}
