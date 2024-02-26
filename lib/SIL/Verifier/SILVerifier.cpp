@@ -6902,6 +6902,11 @@ public:
               "generic function definition must have a generic environment");
     }
 
+    // Before verifying the body of the function, validate the SILUndef map to
+    // make sure that all SILUndef in the function's map point at the function
+    // as the SILUndef's parent.
+    F->verifySILUndefMap();
+
     // Otherwise, verify the body of the function.
     verifyEntryBlock(F->getEntryBlock());
     verifyEpilogBlocks(F);
@@ -6972,6 +6977,15 @@ void SILFunction::verifyCriticalEdges() const {
   SILVerifier(*this, /*calleeCache=*/nullptr,
                      /*SingleFunction=*/true,
                      /*checkLinearLifetime=*/ false).verifyBranches(this);
+}
+
+/// Validate that all SILUndef in \p f have f as a parent.
+void SILFunction::verifySILUndefMap() const {
+  for (auto &pair : undefValues) {
+    assert(
+        pair.second->getParent() == this &&
+        "undef in f->undefValue map with different parent function than f?!");
+  }
 }
 
 /// Verify that a property descriptor follows invariants.
