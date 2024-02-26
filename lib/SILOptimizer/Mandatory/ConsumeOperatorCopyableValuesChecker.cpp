@@ -436,7 +436,6 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
              << "Found at least one value to check, performing checking.\n");
   auto valuesToProcess =
       llvm::ArrayRef(valuesToCheck.begin(), valuesToCheck.end());
-  auto &mod = fn->getModule();
 
   // If we do not emit any diagnostics, we need to put in a break after each dbg
   // info carrying inst for a lexical value that we find a move on. This ensures

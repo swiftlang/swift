@@ -392,7 +392,6 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
-  SILModule &M = Preheader->getParent()->getModule();
 
   auto *Latch = Loop->getLoopLatch();
   if (!Latch)
