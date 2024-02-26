@@ -27,4 +27,4 @@ struct ContentView: View {
   }
 }
 
-// COMPLETE: Pattern/Local/Flair[ArgLabels]:     {#foo: Int#}[#Int#];
+// COMPLETE: Decl[InstanceMethod]/Super/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#foo: Int#}[')'][#Never#]; name=foo:
