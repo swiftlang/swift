@@ -196,6 +196,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(LinearFunction)
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
+  FORWARDING_INST(FunctionExtractIsolation)
 #undef FORWARDING_INST
 
   bool processWorklist();

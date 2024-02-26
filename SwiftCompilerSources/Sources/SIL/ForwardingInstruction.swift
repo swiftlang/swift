@@ -347,6 +347,13 @@ extension DestructureStructInst : ForwardingInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension FunctionExtractIsolationInst : ForwardingInstruction {
+  public var preservesIdentity: Bool { false }
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
+}
+
 extension InitExistentialRefInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
   public var preservesRepresentation: Bool { true }
