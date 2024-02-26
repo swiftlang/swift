@@ -611,7 +611,7 @@ SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(
 
   if (fs.exists(packagePath)) {
     // Read the interface file and extract its package-name argument value
-    StringRef result;
+    std::string result;
     if (auto packageFile = llvm::MemoryBuffer::getFile(packagePath)) {
       llvm::BumpPtrAllocator alloc;
       llvm::StringSaver argSaver(alloc);
