@@ -289,31 +289,41 @@ extension FlattenCollection: Collection {
 
   @inlinable // lazy-performance
   public func distance(from start: Index, to end: Index) -> Int {
-    // The following check makes sure that distance(from:to:) is invoked on the
-    // _base at least once, to trigger a _precondition in forward only
+    // The following check ensures that distance(from:to:) is invoked on
+    // the _base at least once, to trigger a _precondition in forward only
     // collections.
-    if end < start {
+    if start > end {
       _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
     }
-    var _start: Index
-    let _end: Index
-    let step: Int
-    if start > end {
-      _start = end
-      _end = start
-      step = -1
+    
+    // This handles indices belonging to the same collection.
+    if start._outer == end._outer {
+      guard let i = start._inner, let j = end._inner else { return 0 }
+      return _base[start._outer].distance(from: i, to: j)
     }
-    else {
-      _start = start
-      _end = end
-      step = 1
+    
+    // The following combines the distance of three sections.
+    let range = start <= end ? start ..< end : end ..< start
+    var outer = range.lowerBound._outer
+    var count = 0 as Int // 0...Int.max
+    
+    if let inner = range.lowerBound._inner {
+      let collection = _base[outer]
+      count += collection.distance(from: inner, to: collection.endIndex)
+      _base.formIndex(after: &outer)
     }
-    var count = 0
-    while _start != _end {
-      count += step
-      formIndex(after: &_start)
+    
+    while outer < range.upperBound._outer {
+      count += _base[outer].count
+      _base.formIndex(after: &outer)
     }
-    return count
+    
+    if let inner = range.upperBound._inner {
+      let collection = _base[outer]
+      count += collection.distance(from: collection.startIndex, to: inner)
+    }
+    
+    return start <= end ? count : -count
   }
 
   @inline(__always)
