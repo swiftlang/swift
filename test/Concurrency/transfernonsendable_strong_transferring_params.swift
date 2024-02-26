@@ -346,3 +346,9 @@ func testTransferOtherParamClassStructTuple(_ x: transferring Klass, y: KlassWit
   x = y.ns2.1.second // expected-warning {{assigning 'y.ns2.1.second' to transferring parameter 'x' may cause a race}}
   // expected-note @-1 {{'y.ns2.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.ns2.1.second'}}
 }
+
+func useSugaredTypeNameWhenEmittingTaskIsolationError(_ x: @escaping @MainActor () async -> ()) {
+  func fakeInit(operation: transferring @escaping () async -> ()) {}
+
+  fakeInit(operation: x) // expected-warning {{task isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
+}
