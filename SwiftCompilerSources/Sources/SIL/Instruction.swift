@@ -452,7 +452,7 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
 final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
-final public class BeginDeallocRefInst : SingleValueInstruction {
+final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
   public var reference: Value { operands[0].value }
   public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
 }
@@ -983,12 +983,18 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-public typealias AccessKind = BridgedInstruction.AccessKind
-
-
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
+  // The raw values must match SILAccessKind.
+  public enum AccessKind: Int {
+    case `init` = 0
+    case read = 1
+    case modify = 2
+    case `deinit` = 3
+  }
+  public var accessKind: AccessKind {
+    AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
+  }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
 
@@ -1035,18 +1041,18 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
 
-public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
+public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction, OwnershipTransitionInstruction {}
 
-final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class CopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class ExplicitCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
-final public class UnownedCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
-final public class WeakCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {}
+final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
+final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
 final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
 
@@ -1109,8 +1115,7 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class MarkUnresolvedNonCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
@@ -1119,13 +1124,11 @@ final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstr
   public var isInitializationOfDest: Bool { true }
 }
 
-final public class CopyableToMoveOnlyWrapperValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableValueInst
-  : SingleValueInstruction, UnaryInstruction {}
+final public class MoveOnlyWrapperToCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
-final public class MoveOnlyWrapperToCopyableBoxInst : SingleValueInstruction {}
+final public class MoveOnlyWrapperToCopyableBoxInst: SingleValueInstruction, UnaryInstruction {}
 
 final public class CopyableToMoveOnlyWrapperAddrInst
   : SingleValueInstruction, UnaryInstruction {}
@@ -1242,8 +1245,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction,
-                                          UnaryInstruction {
+final public class BeginCOWMutationInst : MultipleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
   public var uniquenessResult: Value { return getResult(index: 0) }
   public var instanceResult: Value { return getResult(index: 1) }

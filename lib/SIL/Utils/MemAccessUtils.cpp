@@ -795,7 +795,6 @@ bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
   return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi) ||
          isa<EndInitLetRefInst>(svi) || isa<BeginDeallocRefInst>(svi) ||
          isa<EndCOWMutationInst>(svi) ||
-         isa<MarkUnresolvedReferenceBindingInst>(svi) ||
          isIdentityAndOwnershipPreservingRefCast(svi);
 }
 
@@ -824,6 +823,7 @@ bool swift::isIdentityAndOwnershipPreservingRefCast(
   // Ignore markers
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
     return true;
   }
 }
