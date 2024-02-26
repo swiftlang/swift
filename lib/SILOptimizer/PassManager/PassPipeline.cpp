@@ -61,18 +61,18 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
-llvm::cl::opt<bool> EnableDeinitDevirtualizer(
-    "enable-deinit-devirtualizer", llvm::cl::init(false),
-    llvm::cl::desc("Enable the DeinitDevirtualizer pass."));
+static llvm::cl::opt<bool>
+    EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
 
 // Temporary flag until the stdlib builds with ~Escapable
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
 EnableLifetimeDependenceInsertion(
   "enable-lifetime-dependence-insertion", llvm::cl::init(false),
   llvm::cl::desc("Enable lifetime dependence insertion."));
 
 // Temporary flag until the stdlib builds with ~Escapable
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
 EnableLifetimeDependenceDiagnostics(
   "enable-lifetime-dependence-diagnostics", llvm::cl::init(false),
   llvm::cl::desc("Enable lifetime dependence diagnostics."));

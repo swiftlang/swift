@@ -706,12 +706,8 @@ extension LifetimeDependenceUseDefWalker {
   mutating func walkUpDefault(dependent value: Value, owner: Value?)
     -> WalkResult {
     switch value.definingInstruction {
-    case let copyInst as CopyValueInst:
-      return walkUp(newLifetime: copyInst.fromValue)
-    case let moveInst as MoveValueInst:
-      return walkUp(value: moveInst.fromValue, owner)
-    case let borrow as BeginBorrowInst:
-      return walkUp(newLifetime: borrow.borrowedValue)
+    case let transition as OwnershipTransitionInstruction:
+      return walkUp(newLifetime: transition.operand.value)
     case let load as LoadInstruction:
       return walkUp(address: load.address)
     case let markDep as MarkDependenceInst:
@@ -862,11 +858,8 @@ extension LifetimeDependenceDefUseWalker {
       return leafUse(of: operand)
     }
     switch operand.instruction {
-    case let copy as CopyingInstruction:
-      return walkDownUses(of: copy, using: operand)
-
-    case let move as MoveValueInst:
-      return walkDownUses(of: move, using: operand)
+    case let transition as OwnershipTransitionInstruction:
+      return walkDownUses(of: transition.ownershipResult, using: operand)
 
     case let mdi as MarkDependenceInst where mdi.isUnresolved:
       // Override mark_dependence [unresolved] to handle them just

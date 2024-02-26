@@ -402,11 +402,6 @@ static_assert((int)BridgedMemoryBehavior::MayWrite == (int)swift::MemoryBehavior
 static_assert((int)BridgedMemoryBehavior::MayReadWrite == (int)swift::MemoryBehavior::MayReadWrite);
 static_assert((int)BridgedMemoryBehavior::MayHaveSideEffects == (int)swift::MemoryBehavior::MayHaveSideEffects);
 
-static_assert((int)BridgedInstruction::AccessKind::Init == (int)swift::SILAccessKind::Init);
-static_assert((int)BridgedInstruction::AccessKind::Read == (int)swift::SILAccessKind::Read);
-static_assert((int)BridgedInstruction::AccessKind::Modify == (int)swift::SILAccessKind::Modify);
-static_assert((int)BridgedInstruction::AccessKind::Deinit == (int)swift::SILAccessKind::Deinit);
-
 BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);

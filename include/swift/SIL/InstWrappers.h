@@ -111,6 +111,8 @@ struct ConversionOperation {
 
   static bool isa(SILInstruction *inst) {
     switch (inst->getKind()) {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+    case SILInstructionKind::MarkUninitializedInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::UpcastInst:
     case SILInstructionKind::AddressToPointerInst:
@@ -135,6 +137,9 @@ struct ConversionOperation {
     case SILInstructionKind::RefToUnownedInst:
     case SILInstructionKind::UnmanagedToRefInst:
     case SILInstructionKind::UnownedToRefInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
       return true;
     default:
       return false;

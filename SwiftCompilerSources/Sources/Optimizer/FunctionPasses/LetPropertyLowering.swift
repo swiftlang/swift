@@ -156,17 +156,17 @@ private func constructLetInitRegion(
       initRegion.insert(inst)
 
     case let beginAccess as BeginAccessInst
-         where beginAccess.accessKind == .Deinit &&
+         where beginAccess.accessKind == .deinit &&
                beginAccess.address.isLetFieldAddress(of: markUninitialized):
       // Include let-field partial de-initializations in the region.
       initRegion.insert(inst)
 
     case let beginBorrow as BeginBorrowInst
-         where beginBorrow.borrowedValue.referenceRoot == markUninitialized:
+           where beginBorrow.borrowedValue.isReferenceDerived(from: markUninitialized):
       borrows.append(beginBorrow)
 
     case let storeBorrow as StoreBorrowInst
-         where storeBorrow.source.referenceRoot == markUninitialized:
+           where storeBorrow.source.isReferenceDerived(from: markUninitialized):
       borrows.append(storeBorrow)
 
     default:
@@ -202,10 +202,28 @@ private extension RefElementAddrInst {
 }
 
 private extension Value {
+  func isReferenceDerived(from root: Value) -> Bool {
+    var parent: Value = self
+    while true {
+      if parent == root {
+        return true
+      }
+      if let operand = parent.forwardingInstruction?.singleForwardedOperand {
+        parent = operand.value
+        continue
+      }
+      if let transition = parent.definingInstruction as? OwnershipTransitionInstruction {
+        parent = transition.operand.value
+        continue
+      }
+      return false
+    }
+  }
+
   func isLetFieldAddress(of markUninitialized: MarkUninitializedInst) -> Bool {
     if case .class(let rea) = self.accessBase,
        rea.fieldIsLet,
-       rea.instance.referenceRoot == markUninitialized
+       rea.instance.isReferenceDerived(from: markUninitialized)
     {
       return true
     }
