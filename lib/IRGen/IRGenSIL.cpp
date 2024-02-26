@@ -2809,7 +2809,7 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
         i->getModule().Types,
         LookUpConformanceInModule(i->getModule().getSwiftModule()));
     auto *undef = SILUndef::get(
-        SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
+        i->getFunction(), SILType::getPrimitiveObjectType(derivativeFnType));
     return getLoweredExplosion(undef);
   };
   auto jvpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::JVP);

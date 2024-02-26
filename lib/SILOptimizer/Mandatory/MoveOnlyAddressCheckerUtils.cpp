@@ -2979,9 +2979,8 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // referring to the same debug variable as the original definition, we have to
   // use the same debug scope and location as the original debug var.
   auto insertUndefDebugValue = [&debugVar](SILInstruction *insertPt) {
-    insertDebugValueBefore(insertPt, debugVar, [&]{
-      return SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
-                           insertPt->getModule());
+    insertDebugValueBefore(insertPt, debugVar, [&] {
+      return SILUndef::get(debugVar.getOperandForDebugValueClone());
     });
   };
 

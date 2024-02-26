@@ -40,6 +40,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILUndef;
 
 namespace Lowering {
 class TypeLowering;
@@ -211,6 +212,7 @@ private:
   friend class BasicBlockBitfield;
   friend class NodeBitfield;
   friend class OperandBitfield;
+  friend SILUndef;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -328,6 +330,9 @@ private:
   Purpose specialPurpose = Purpose::None;
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
+
+  /// This is the set of undef values we've created, for uniquing purposes.
+  llvm::DenseMap<SILType, SILUndef *> undefValues;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.

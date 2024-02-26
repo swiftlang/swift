@@ -2207,7 +2207,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         }
 
         return ConsumableManagedValue::forUnmanaged(
-            SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
+            SILUndef::get(SGF.F, SGF.SGM.Types.getEmptyTupleType()));
       }();
 
       // Okay, specialize on the argument.
@@ -2392,7 +2392,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       if (hasNonAny) {
         result = SGF.emitEmptyTuple(loc);
       } else {
-        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
+        result = SILUndef::get(&SGF.F, SGF.SGM.Types.getEmptyTupleType());
       }
       origCMV = ConsumableManagedValue::forUnmanaged(result);
       eltCMV = origCMV;
@@ -2611,8 +2611,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     // We're in conditionally-executed code; enter a scope.
     Scope scope(SGF.Cleanups, CleanupLocation(loc));
 
-    SILValue result
-      = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F);
+    SILValue result = SILUndef::get(&SGF.F, SGF.SGM.Types.getEmptyTupleType());
     ConsumableManagedValue CMV =
       ConsumableManagedValue::forUnmanaged(result);
 

@@ -667,7 +667,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
 
   for (auto *Use : Uses)
     if (Use->getUser()->getParent() != BB)
-      Use->set(SILUndef::get(Use->get()->getType(), *F));
+      Use->set(SILUndef::get(Use->get()));
 }
 
 static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {

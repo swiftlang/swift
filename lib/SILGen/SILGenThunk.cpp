@@ -196,7 +196,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
     SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
                  "delayed application of builtin");
-    return SILUndef::get(constantInfo.getSILType(), F);
+    return SILUndef::get(&F, constantInfo.getSILType());
   }
   
   // If the constant is a thunk we haven't emitted yet, emit it.
@@ -224,7 +224,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                    existingType, constantFnTypeInContext);
       SGM.diagnose(f->getLocation().getSourceLoc(),
                    diag::function_declared_here);
-      return SILUndef::get(constantInfo.getSILType(), F);
+      return SILUndef::get(&F, constantInfo.getSILType());
     };
 
     // If we have a distributed thunk, see if we only differ by isolation.
@@ -604,8 +604,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       }
     }
 
-    SGF.B.createReturn(loc,
-                       SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.F));
+    SGF.B.createReturn(
+        loc, SILUndef::get(&SGF.F, SGF.SGM.Types.getEmptyTupleType()));
   }
   
   return F;

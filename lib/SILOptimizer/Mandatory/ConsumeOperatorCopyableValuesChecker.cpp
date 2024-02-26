@@ -493,10 +493,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             // scope as our original so that the backend treats them as
             // referring to the same "debug entity".
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
-            builder.createDebugValue(
-                dbgVarInst->getLoc(),
-                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
-                false /*poison*/, true /*moved*/);
+            builder.createDebugValue(dbgVarInst->getLoc(),
+                                     SILUndef::get(mvi->getOperand()), *varInfo,
+                                     false /*poison*/, true /*moved*/);
           }
         }
         foundMove = true;

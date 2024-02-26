@@ -185,7 +185,7 @@ emitBridgeErrorForForeignError(SILLocation loc,
   case ForeignErrorConvention::NilResult:
     return B.createOptionalNone(loc, bridgedResultType);
   case ForeignErrorConvention::NonNilError:
-    return SILUndef::get(bridgedResultType, F);
+    return SILUndef::get(F, bridgedResultType);
   }
   llvm_unreachable("bad foreign error convention kind");
 }

@@ -1876,7 +1876,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     setterFRef = emitApplyOfSetterToBase(loc, SILDeclRef(setter), selfValue,
                                          substitutions);
   } else {
-    setterFRef = SILUndef::get(initFRef->getType(), F);
+    setterFRef = SILUndef::get(F, initFRef->getType());
   }
 
   auto isValueSelf = !selfValue.getType().getASTType()->mayHaveSuperclass();
