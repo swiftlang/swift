@@ -68,8 +68,7 @@ internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
   let cu0 = utf8[_unchecked: i]
-  let leadingOneCount = (~cu0).leadingZeroBitCount
-  switch leadingOneCount {
+  switch (~cu0).leadingZeroBitCount {
   case 0: return (_decodeUTF8(cu0), 1)
   case 2: return (_decodeUTF8(cu0, utf8[_unchecked: i &+ 1]), 2)
   case 3: return (_decodeUTF8(
