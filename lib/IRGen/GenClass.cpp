@@ -1407,7 +1407,7 @@ namespace {
         dataPtr
       };
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            makeArrayRef(fields));
+                                            llvm::ArrayRef(fields));
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =

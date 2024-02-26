@@ -514,8 +514,7 @@ public:
                                     bool isUnavailability);
   
   ArrayRef<AvailabilitySpec *> getQueries() const {
-    return llvm::makeArrayRef(getTrailingObjects<AvailabilitySpec *>(),
-                              NumQueries);
+    return llvm::ArrayRef(getTrailingObjects<AvailabilitySpec *>(), NumQueries);
   }
   
   SourceLoc getLParenLoc() const { return LParenLoc; }

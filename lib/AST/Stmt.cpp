@@ -785,7 +785,7 @@ getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
   SmallVector<VarDecl *, 4> tmp;
   labelItems.front().getPattern()->collectVariables(tmp);
   return ctx.AllocateTransform<VarDecl *>(
-      llvm::makeArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
+      llvm::ArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
         auto *vNew = new (ctx) VarDecl(
             /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
             vOld->getName(), vOld->getDeclContext());

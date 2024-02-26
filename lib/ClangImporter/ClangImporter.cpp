@@ -2195,7 +2195,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
     if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path.getRaw()[1])) {
-      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2),
+      submodule = loadModule(llvm::ArrayRef(clangPath).slice(0, 2),
                              clang::Module::Hidden);
     }
 
@@ -4241,7 +4241,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
   }
 
   // Cache our results for use next time.
-  auto importsToCache = llvm::makeArrayRef(imports).slice(firstImport);
+  auto importsToCache = llvm::ArrayRef(imports).slice(firstImport);
   importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
 }
 

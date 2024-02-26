@@ -260,7 +260,7 @@ static void skt_main(skt_args *args) {
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
-  auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   bool firstInvocation = true;
   while (1) {
     unsigned i = 0;

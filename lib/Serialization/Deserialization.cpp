@@ -8064,8 +8064,8 @@ public:
 
   ArrayRef<ProtocolConformanceID> claim() {
     // TODO: free the memory here (if it's not used in multiple places?)
-    return llvm::makeArrayRef(getTrailingObjects<ProtocolConformanceID>(),
-                              NumConformances);
+    return llvm::ArrayRef(getTrailingObjects<ProtocolConformanceID>(),
+                          NumConformances);
   }
 };
 } // end anonymous namespace

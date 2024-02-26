@@ -2232,7 +2232,7 @@ namespace {
       // TODO: build a scalar tuple if possible.
       auto temporary = SGF.emitFormalAccessTemporary(
           loc, SGF.getTypeLowering(getTypeOfRValue()));
-      auto yieldsAsArray = llvm::makeArrayRef(yields);
+      auto yieldsAsArray = llvm::ArrayRef(yields);
       copyBorrowedYieldsIntoTemporary(SGF, loc, yieldsAsArray,
                                       getOrigFormalType(), getSubstFormalType(),
                                       temporary.get());

@@ -7740,7 +7740,7 @@ static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
 
   SmallString<128> name;
   name += path[0].str();
-  for (auto elt : makeArrayRef(path).slice(1)) {
+  for (auto elt : llvm::ArrayRef(path).slice(1)) {
     name += '.';
     name += elt.str();
   }

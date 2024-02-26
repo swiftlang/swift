@@ -2724,7 +2724,7 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
     addCursorSymbolInfo(Info.Symbols[0], Elem);
     if (Info.Symbols.size() > 1) {
       auto SecondarySymbols = Elem.setArray(KeySecondarySymbols);
-      for (auto Secondary : makeArrayRef(Info.Symbols).drop_front()) {
+      for (auto Secondary : llvm::ArrayRef(Info.Symbols).drop_front()) {
         auto SecondaryElem = SecondarySymbols.appendDictionary();
         addCursorSymbolInfo(Secondary, SecondaryElem);
       }

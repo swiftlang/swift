@@ -343,8 +343,8 @@ swift::extractCommentParts(swift::markup::MarkupContext &MC,
   }
 
   // Copy BodyNodes and ParamFields into the MarkupContext.
-  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
-  Parts.ParamFields = MC.allocateCopy(llvm::makeArrayRef(ParamFields));
+  Parts.BodyNodes = MC.allocateCopy(llvm::ArrayRef(BodyNodes));
+  Parts.ParamFields = MC.allocateCopy(llvm::ArrayRef(ParamFields));
 
   for (auto Param : Parts.ParamFields) {
     auto ParamParts = extractCommentParts(MC, Param);
@@ -378,7 +378,7 @@ void DocComment::addInheritanceNote(swift::markup::MarkupContext &MC,
   SmallVector<const markup::MarkupASTNode *, 8> BodyNodes{
     Parts.BodyNodes.begin(), Parts.BodyNodes.end()};
   BodyNodes.push_back(note);
-  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
+  Parts.BodyNodes = MC.allocateCopy(llvm::ArrayRef(BodyNodes));
 }
 
 DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,

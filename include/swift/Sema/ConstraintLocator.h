@@ -216,8 +216,8 @@ public:
   /// subcomponent.
   ArrayRef<PathElement> getPath() const {
     // FIXME: Alignment.
-    return llvm::makeArrayRef(reinterpret_cast<const PathElement *>(this + 1),
-                              numPathElements);
+    return llvm::ArrayRef(reinterpret_cast<const PathElement *>(this + 1),
+                          numPathElements);
   }
 
   unsigned getSummaryFlags() const { return summaryFlags; }

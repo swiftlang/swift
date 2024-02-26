@@ -264,7 +264,7 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
     if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
       Nodes = BS->getElements();
     } else {
-      Nodes = llvm::makeArrayRef(ElseNode);
+      Nodes = llvm::ArrayRef(ElseNode);
     }
     if (hasForceUnwrappedErrorParam(Nodes)) {
       // If we also found an unwrap in the success block, we don't know what's

@@ -1612,8 +1612,8 @@ static ArrayRef<llvm::Type *> expandScalarOrStructTypeToArray(llvm::Type *&ty) {
   ArrayRef<llvm::Type*> expandedTys;
   if (auto expansionTy = dyn_cast<llvm::StructType>(ty)) {
     // Is there any good reason this isn't public API of llvm::StructType?
-    expandedTys = makeArrayRef(expansionTy->element_begin(),
-                               expansionTy->getNumElements());
+    expandedTys = llvm::ArrayRef(expansionTy->element_begin(),
+                                 expansionTy->getNumElements());
   } else {
     expandedTys = ty;
   }
@@ -2935,8 +2935,8 @@ public:
     auto &Builder = IGF.Builder;
 
     auto resultTys =
-        makeArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
-                     suspendResultTy->element_end());
+        llvm::ArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
+                       suspendResultTy->element_end());
 
     auto substCalleeType = getCallee().getSubstFunctionType();
     SILFunctionConventions substConv(substCalleeType, IGF.getSILModule());
@@ -4195,7 +4195,7 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
   if (AI.isDirect() && AI.getCanBeFlattened() &&
       isa<llvm::StructType>(coercionTy)) {
     const auto *ST = cast<llvm::StructType>(coercionTy);
-    expandedTys = makeArrayRef(ST->element_begin(), ST->getNumElements());
+    expandedTys = llvm::ArrayRef(ST->element_begin(), ST->getNumElements());
   } else if (coercionTy == paramTI.getStorageType()) {
     // Fast-path a really common case.  This check assumes that either
     // the storage type of a type is an llvm::StructType or it has a
@@ -5937,8 +5937,8 @@ void irgen::forwardAsyncCallResult(IRGenFunction &IGF,
   } else {
     auto &Builder = IGF.Builder;
     auto resultTys =
-        makeArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
-                     suspendResultTy->element_end());
+        llvm::ArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
+                       suspendResultTy->element_end());
 
     for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
       llvm::Value *elt =

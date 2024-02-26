@@ -741,7 +741,7 @@ public:
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
-    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+    auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
         /*isRetroactive=*/false,
         /*isPreconcurrency=*/false)));

@@ -623,7 +623,7 @@ void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
 template <typename T>
 void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
                     unsigned indentLevel) {
-  writeJSONValue(out, llvm::makeArrayRef(values), indentLevel);
+  writeJSONValue(out, llvm::ArrayRef(values), indentLevel);
 }
 
 /// Write a single JSON field.

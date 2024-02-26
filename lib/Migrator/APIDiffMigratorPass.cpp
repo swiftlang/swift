@@ -128,13 +128,12 @@ public:
                            TypeRepr *SecondChild, bool Optional = false,
                            bool Suffixable = true) {
     TypeRepr *Children[] = {FirstChild, SecondChild};
-    return handleParent(Parent, llvm::makeArrayRef(Children), Optional,
-                        Suffixable);
+    return handleParent(Parent, llvm::ArrayRef(Children), Optional, Suffixable);
   }
 
   FoundResult handleParent(TypeRepr *Parent, TypeRepr *Base,
                            bool Optional = false, bool Suffixable = true) {
-    return handleParent(Parent, llvm::makeArrayRef(Base), Optional, Suffixable);
+    return handleParent(Parent, llvm::ArrayRef(Base), Optional, Suffixable);
   }
 
   FoundResult visitTypeRepr(TypeRepr *T) {

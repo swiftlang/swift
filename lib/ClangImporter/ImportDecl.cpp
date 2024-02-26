@@ -7666,7 +7666,7 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
         asyncImports[objcMethod] = imported;
       } else {
         syncImports[objcMethod] = llvm::TinyPtrVector<Decl *>(
-            llvm::makeArrayRef(members).drop_front(start + 1));
+            llvm::ArrayRef(members).drop_front(start + 1));
       }
     }
   }
@@ -9438,9 +9438,8 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
     return true;
   });
 
-  addCompletionHandlerAttribute(asyncImport,
-                                llvm::makeArrayRef(members).drop_front(start),
-                                SwiftContext);
+  addCompletionHandlerAttribute(
+      asyncImport, llvm::ArrayRef(members).drop_front(start), SwiftContext);
 }
 
 void ClangImporter::Implementation::importInheritedConstructors(

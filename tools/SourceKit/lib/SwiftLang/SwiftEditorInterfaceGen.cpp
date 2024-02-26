@@ -367,9 +367,9 @@ static bool getModuleInterfaceInfo(
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.value());
   }
-  printModuleInterface(Mod, Group.has_value()
-                         ? llvm::makeArrayRef(Group.value())
-                         : ArrayRef<StringRef>(),
+  printModuleInterface(Mod,
+                       Group.has_value() ? llvm::ArrayRef(Group.value())
+                                         : ArrayRef<StringRef>(),
                        TraversalOptions, Printer, Options,
                        Group.has_value() && SynthesizedExtensions);
 

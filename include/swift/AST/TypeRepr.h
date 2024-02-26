@@ -281,8 +281,8 @@ public:
                                     TypeRepr *ty);
 
   ArrayRef<TypeOrCustomAttr> getAttrs() const {
-    return llvm::makeArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
-                              Bits.AttributedTypeRepr.NumAttributes);
+    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
+                          Bits.AttributedTypeRepr.NumAttributes);
   }
 
   TypeAttribute *get(TypeAttrKind kind) const;
@@ -871,12 +871,12 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::makeMutableArrayRef(getTrailingObjects<TypeRepr*>(),
-                                     Bits.PackTypeRepr.NumElements);
+    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
+                                 Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::makeArrayRef(getTrailingObjects<TypeRepr*>(),
-                              Bits.PackTypeRepr.NumElements);
+    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
+                          Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {

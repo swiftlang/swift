@@ -456,10 +456,9 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   Identifier zeroInitID = ctx.getIdentifier("zeroInitializer");
   auto zeroInitializerFunc =
       cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
-  SubstitutionMap subMap =
-      SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
-                           llvm::makeArrayRef(selfType),
-                           LookUpConformanceInModule(module));
+  SubstitutionMap subMap = SubstitutionMap::get(
+      zeroInitializerFunc->getGenericSignature(), llvm::ArrayRef(selfType),
+      LookUpConformanceInModule(module));
   ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
       new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);

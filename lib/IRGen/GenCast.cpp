@@ -160,7 +160,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return argsBuf;
       
   case CheckedCastMode::Conditional:
-    return llvm::makeArrayRef(argsBuf, n-3);
+    return llvm::ArrayRef(argsBuf, n - 3);
     break;
   }
   llvm_unreachable("covered switch");

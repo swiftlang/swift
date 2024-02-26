@@ -5654,7 +5654,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   SmallVector<SILValue, 4> bbArgs;
   if (!isByAddress)
     bbArgs.push_back(results[0].getValue());
-  for (const auto &result : llvm::makeArrayRef(results).slice(1))
+  for (const auto &result : llvm::ArrayRef(results).slice(1))
     bbArgs.push_back(result.getValue());
 
   // Branch to the continuation block.
@@ -5671,7 +5671,7 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   } else {
     bbArgs.push_back(getOptionalNoneValue(loc, optTL));
   }
-  for (const auto &result : llvm::makeArrayRef(results).slice(1)) {
+  for (const auto &result : llvm::ArrayRef(results).slice(1)) {
     auto resultTy = result.getType();
     bbArgs.push_back(getOptionalNoneValue(loc, getTypeLowering(resultTy)));
   }

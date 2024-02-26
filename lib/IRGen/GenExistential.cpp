@@ -1610,7 +1610,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     fields[1] = reprTy;
 
     // Replace the type metadata pointer with the class instance.
-    auto classFields = llvm::makeArrayRef(fields).slice(1);
+    auto classFields = llvm::ArrayRef(fields).slice(1);
     type->setBody(classFields);
 
     Alignment align = IGM.getPointerAlignment();
