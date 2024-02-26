@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature IsolatedAny -enable-upcoming-feature InferSendableFromCaptures %s
 
+// REQUIRES: asserts
+
 func globalNonisolatedFunction() {}
 @MainActor func globalMainActorFunction() {}
 

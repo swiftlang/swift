@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature IsolatedAny %s -module-name test -swift-version 5 -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test8callSync2fnyyyYAXE_tYaF
 // CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
