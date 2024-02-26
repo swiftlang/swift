@@ -147,7 +147,7 @@ bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
 
   if (result.fullApplySites.size()) {
     iter.first->second.hasFullApply = true;
-    processApplySites(llvm::makeArrayRef(result.fullApplySites));
+    processApplySites(llvm::ArrayRef(result.fullApplySites));
   }
 
   if (result.partialApplySites.size()) {

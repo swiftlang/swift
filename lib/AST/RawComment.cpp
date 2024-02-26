@@ -158,7 +158,7 @@ RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
       }
 
       if (!SRCs.empty())
-        return RawComment(ctx.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
     }
 
     // Otherwise check to see if we have a comment available in the swiftdoc.

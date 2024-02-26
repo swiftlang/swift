@@ -70,7 +70,7 @@ ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {
 
   // For a single file, we can form an ArrayRef that points at its storage in
   // the union.
-  return llvm::makeArrayRef(*context.getAddrOfPtr1());
+  return llvm::ArrayRef(*context.getAddrOfPtr1());
 }
 
 SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {

@@ -83,8 +83,7 @@ public:
   /// Note that the types may be null, for cases where the generic parameter
   /// is concrete but hasn't been queried yet.
   ArrayRef<Type> getReplacementTypes() const {
-    return llvm::makeArrayRef(getTrailingObjects<Type>(),
-                              getNumReplacementTypes());
+    return llvm::ArrayRef(getTrailingObjects<Type>(), getNumReplacementTypes());
   }
 
   MutableArrayRef<Type> getReplacementTypes() {
@@ -95,8 +94,8 @@ public:
   /// Retrieve the array of protocol conformances, which line up with the
   /// requirements of the generic signature.
   ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return llvm::makeArrayRef(getTrailingObjects<ProtocolConformanceRef>(),
-                              numConformanceRequirements);
+    return llvm::ArrayRef(getTrailingObjects<ProtocolConformanceRef>(),
+                          numConformanceRequirements);
   }
   MutableArrayRef<ProtocolConformanceRef> getConformances() {
     return MutableArrayRef<ProtocolConformanceRef>(

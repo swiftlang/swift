@@ -5827,7 +5827,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
     if (attrMakingUnavailable) {
       // Conformance availability is currently tied to the declaring extension.
       // FIXME: This is a hack--we should give conformances real availability.
-      auto inherits = ctx.AllocateCopy(makeArrayRef(
+      auto inherits = ctx.AllocateCopy(llvm::ArrayRef(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                          /*isUnchecked*/ true, /*isRetroactive=*/false,
                          /*isPreconcurrency=*/false)));

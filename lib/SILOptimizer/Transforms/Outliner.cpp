@@ -190,7 +190,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   auto Conformance = ConformanceRef.getConcrete();
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
-                llvm::makeArrayRef(Identifier()));
+                llvm::ArrayRef(Identifier()));
   auto *Requirement = dyn_cast_or_null<FuncDecl>(
       Proto->getSingleRequirement(Name));
   if (!Requirement)

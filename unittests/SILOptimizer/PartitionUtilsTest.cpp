@@ -180,7 +180,7 @@ TEST(PartitionUtilsTest, Join1) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::makeArrayRef(data1));
+  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
     PartitionOpEvaluatorBasic eval(p1, factory);
@@ -192,7 +192,7 @@ TEST(PartitionUtilsTest, Join1) {
                 PartitionOp::Assign(Element(5), Element(2))});
   }
 
-  Partition p2 = Partition::separateRegions(llvm::makeArrayRef(data1));
+  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data1));
   {
     PartitionOpEvaluatorBasic eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(0)),
@@ -219,7 +219,7 @@ TEST(PartitionUtilsTest, Join2) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::makeArrayRef(data1));
+  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
     PartitionOpEvaluatorBasic eval(p1, factory);
@@ -233,7 +233,7 @@ TEST(PartitionUtilsTest, Join2) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 = Partition::separateRegions(llvm::makeArrayRef(data2));
+  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
     PartitionOpEvaluatorBasic eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
@@ -264,7 +264,7 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   Element data1[] = {Element(0), Element(1), Element(2),
                      Element(3), Element(4), Element(5)};
-  Partition p1 = Partition::separateRegions(llvm::makeArrayRef(data1));
+  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
 
   {
     PartitionOpEvaluatorBasic eval(p1, factory);
@@ -278,7 +278,7 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 
   Element data2[] = {Element(4), Element(5), Element(6),
                      Element(7), Element(8), Element(9)};
-  Partition p2 = Partition::separateRegions(llvm::makeArrayRef(data2));
+  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
     PartitionOpEvaluatorBasic eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(4), Element(4)),
@@ -314,7 +314,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(15), Element(16), Element(17), Element(18), Element(19),
       Element(20), Element(21), Element(22), Element(23), Element(24),
       Element(25), Element(26), Element(27), Element(28), Element(29)};
-  Partition p1 = Partition::separateRegions(llvm::makeArrayRef(data1));
+  Partition p1 = Partition::separateRegions(llvm::ArrayRef(data1));
   {
     PartitionOpEvaluatorBasic eval(p1, factory);
     eval.apply({PartitionOp::Assign(Element(0), Element(29)),
@@ -356,7 +356,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
       Element(30), Element(31), Element(32), Element(33), Element(34),
       Element(35), Element(36), Element(37), Element(38), Element(39),
       Element(40), Element(41), Element(42), Element(43), Element(44)};
-  Partition p2 = Partition::separateRegions(llvm::makeArrayRef(data2));
+  Partition p2 = Partition::separateRegions(llvm::ArrayRef(data2));
   {
     PartitionOpEvaluatorBasic eval(p2, factory);
     eval.apply({PartitionOp::Assign(Element(15), Element(31)),

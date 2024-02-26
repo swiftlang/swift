@@ -268,7 +268,7 @@ public:
   }
 
   UnwrappedArrayView<const Action> getActions() const {
-    return llvm::makeArrayRef(Actions);
+    return llvm::ArrayRef(Actions);
   }
 
   template <typename SpecificAction, typename... Args>
@@ -278,9 +278,7 @@ public:
     return newAction;
   }
 
-  UnwrappedArrayView<const Job> getJobs() const {
-    return llvm::makeArrayRef(Jobs);
-  }
+  UnwrappedArrayView<const Job> getJobs() const { return llvm::ArrayRef(Jobs); }
 
   /// To send job list to places that don't truck in fancy array views.
   std::vector<const Job *> getJobsSimply() const {

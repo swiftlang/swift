@@ -1357,11 +1357,9 @@ void IRGenModule::finishEmitAfterTopLevel() {
           { Context.StdlibModuleName, swift::SourceLoc() }
         };
 
-        auto Imp = ImportDecl::create(Context,
-                                      getSwiftModule(),
-                                      SourceLoc(),
+        auto Imp = ImportDecl::create(Context, getSwiftModule(), SourceLoc(),
                                       ImportKind::Module, SourceLoc(),
-                                      llvm::makeArrayRef(moduleName));
+                                      llvm::ArrayRef(moduleName));
         Imp->setModule(TheStdlib);
         DebugInfo->emitImport(Imp);
       }
@@ -4990,7 +4988,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     numParams += numGenericArgs;
   }
 
-  auto paramTypes = llvm::makeArrayRef(paramTypesArray, numParams);
+  auto paramTypes = llvm::ArrayRef(paramTypesArray, numParams);
   auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
                                         paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
@@ -5022,7 +5020,7 @@ IRGenModule::getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
   llvm::Type *paramTypesArray[1];
   paramTypesArray[0] = SizeTy; // MetadataRequest
 
-  auto paramTypes = llvm::makeArrayRef(paramTypesArray, 1);
+  auto paramTypes = llvm::ArrayRef(paramTypesArray, 1);
   auto functionType =
       llvm::FunctionType::get(TypeMetadataResponseTy, paramTypes, false);
   Signature signature(functionType, llvm::AttributeList(), SwiftCC);

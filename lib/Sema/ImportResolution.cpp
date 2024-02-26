@@ -1396,8 +1396,7 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
     // declares a cross-import with any previous one.
     auto oldImports =
         // Slice from the start of crossImportableModules up to newImport.
-        llvm::makeArrayRef(crossImportableModules.getArrayRef().data(),
-                           &newImport);
+        llvm::ArrayRef(crossImportableModules.getArrayRef().data(), &newImport);
     findCrossImportsInLists(I, {newImport}, oldImports,
                             /*shouldDiagnoseRedundantCrossImports=*/true);
 

@@ -163,16 +163,16 @@ public:
   bool empty() const { return innerResults().empty(); }
 
   ArrayRef<LookupResultEntry> innerResults() const {
-    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).take_front(IndexOfFirstOuterResult);
   }
 
   ArrayRef<LookupResultEntry> outerResults() const {
-    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+    return llvm::ArrayRef(Results).drop_front(IndexOfFirstOuterResult);
   }
 
   /// \returns An array of both the inner and outer results.
   ArrayRef<LookupResultEntry> allResults() const {
-    return llvm::makeArrayRef(Results);
+    return llvm::ArrayRef(Results);
   }
 
   const LookupResultEntry& operator[](unsigned index) const {

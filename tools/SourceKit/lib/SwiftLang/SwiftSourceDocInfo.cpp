@@ -695,7 +695,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   Symbol.IsSystem = Mod.isNonUserModule();
   if (auto MD = Mod.getAsSwiftModule()) {
     ide::collectModuleGroups(const_cast<ModuleDecl *>(MD), ModuleGroups);
-    Symbol.ModuleGroupArray = llvm::makeArrayRef(ModuleGroups);
+    Symbol.ModuleGroupArray = llvm::ArrayRef(ModuleGroups);
   }
 
   CursorInfoData Data;
@@ -829,7 +829,7 @@ static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
 template <typename T>
 static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
                                      SmallVectorImpl<T> &Array) {
-  auto Ref = copyArray(Allocator, llvm::makeArrayRef(Array));
+  auto Ref = copyArray(Allocator, llvm::ArrayRef(Array));
   Array.clear();
   return Ref;
 }
@@ -1034,7 +1034,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                            Component.Kind,
                            copyAndClearString(Allocator, Buffer));
     };
-    Symbol.ParentContexts = copyArray(Allocator, llvm::makeArrayRef(Parents));
+    Symbol.ParentContexts = copyArray(Allocator, llvm::ArrayRef(Parents));
 
     SmallVector<ReferencedDeclInfo, 8> ReferencedDecls;
     for (auto &FI: FragmentInfos) {
@@ -1066,10 +1066,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           swift::getAccessLevelSpelling(FI.VD->getFormalAccess()), Filename,
           getModuleName(FI.VD, Allocator),
           FI.VD->getModuleContext()->isNonUserModule(), FI.VD->isSPI(),
-          copyArray(Allocator, llvm::makeArrayRef(FIParents)));
+          copyArray(Allocator, llvm::ArrayRef(FIParents)));
     }
-    Symbol.ReferencedSymbols = copyArray(Allocator,
-                                         llvm::makeArrayRef(ReferencedDecls));
+    Symbol.ReferencedSymbols =
+        copyArray(Allocator, llvm::ArrayRef(ReferencedDecls));
   }
 
   Symbol.ModuleName = getModuleName(DInfo.VD, Allocator);
@@ -1329,7 +1329,7 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
     if (Info.ArgNames.size() > NumPieces)
       return clang::DeclarationName();
 
-    ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
+    ArrayRef<StringRef> Args = llvm::ArrayRef(Info.ArgNames);
     std::vector<clang::IdentifierInfo *> Pieces;
     for (unsigned i = 0; i < NumPieces; ++i) {
       if (i >= Info.ArgNames.size() || Info.ArgNames[i].empty()) {
@@ -1365,7 +1365,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
       Args[i] = Ctx.getIdentifier(Arg == "_" ? StringRef() : Arg);
     }
   }
-  return DeclName(Ctx, BaseName, llvm::makeArrayRef(Args));
+  return DeclName(Ctx, BaseName, llvm::ArrayRef(Args));
 }
 
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
@@ -1470,7 +1470,7 @@ protected:
   bool CancelOnSubsequentRequest;
 protected:
   ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
-    return llvm::makeArrayRef(PreviousASTSnaps);
+    return llvm::ArrayRef(PreviousASTSnaps);
   }
 
 public:

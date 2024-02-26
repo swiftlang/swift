@@ -1266,7 +1266,7 @@ void AsyncConverter::addHoistedClosureCallback(
     InlinePatternsToPrint ErrInlinePatterns;
 
     // Always use the ErrParam name if none is bound.
-    prepareNames(Blocks.ErrorBlock, llvm::makeArrayRef(ErrOrResultParam),
+    prepareNames(Blocks.ErrorBlock, llvm::ArrayRef(ErrOrResultParam),
                  ErrInlinePatterns,
                  /*AddIfMissing=*/HandlerDesc.Type != HandlerType::RESULT);
     preparePlaceholdersAndUnwraps(HandlerDesc, CallbackParams,
@@ -1275,7 +1275,7 @@ void AsyncConverter::addHoistedClosureCallback(
     addCatch(ErrOrResultParam);
     convertNodes(Blocks.ErrorBlock.nodesToPrint());
     OS << "\n" << tok::r_brace;
-    clearNames(llvm::makeArrayRef(ErrOrResultParam));
+    clearNames(llvm::ArrayRef(ErrOrResultParam));
   }
 }
 

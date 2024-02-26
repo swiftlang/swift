@@ -2455,7 +2455,7 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);
     ASTContext &context = cContext.unbridged();
-    decl->setInherited(context.AllocateCopy(llvm::makeArrayRef(entry)));
+    decl->setInherited(context.AllocateCopy(llvm::ArrayRef(entry)));
   }
 
   return decl;

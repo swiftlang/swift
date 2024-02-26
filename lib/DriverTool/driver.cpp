@@ -253,14 +253,14 @@ static int run_driver(StringRef ExecName,
     StringRef FirstArg(argv[1]);
 
     if (FirstArg == "-frontend") {
-      return performFrontend(llvm::makeArrayRef(argv.data()+2,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(
+          llvm::ArrayRef(argv.data() + 2, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-modulewrap") {
-      return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return modulewrap_main(
+          llvm::ArrayRef(argv.data() + 2, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-sil-opt") {
       return sil_opt_main(eraseFirstArg(argv),
@@ -295,9 +295,9 @@ static int run_driver(StringRef ExecName,
     // without a leading "-frontend".
     if (!FirstArg.startswith("--driver-mode=")
         && ExecName == "swift-frontend") {
-      return performFrontend(llvm::makeArrayRef(argv.data()+1,
-                                                argv.data()+argv.size()),
-                             argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(
+          llvm::ArrayRef(argv.data() + 1, argv.data() + argv.size()), argv[0],
+          (void *)(intptr_t)getExecutablePath);
     }
 
     if (FirstArg == "repl") {

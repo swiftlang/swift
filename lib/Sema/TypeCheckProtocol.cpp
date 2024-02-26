@@ -1951,7 +1951,7 @@ public:
 
   /// Peek the unsatisfied requirements collected during conformance checking.
   ArrayRef<ValueDecl*> getUnsatisfiedRequirements() {
-    return llvm::makeArrayRef(UnsatisfiedReqs);
+    return llvm::ArrayRef(UnsatisfiedReqs);
   }
 
   /// Whether this member is "covered" by one of the conformances.
