@@ -760,6 +760,12 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
+  for (auto &op : inst->getAllOperands()) {
+    if (auto *undef = dyn_cast<SILUndef>(op.get())) {
+      op.set(SILUndef::get(inst->getFunction(), undef->getType()));
+    }
+  }
+
   inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
                                          SILValue dependency) {
     LocalArchetypeKey key = {archeTy, fromFunction};
