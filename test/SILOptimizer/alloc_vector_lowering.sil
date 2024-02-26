@@ -70,7 +70,7 @@ bb3:
 // CHECK:         [[P:%.*]] = address_to_pointer [[G]]
 // CHECK:         [[UMP:%.*]] = struct $UnsafeMutablePointer<Int64> ([[P]] : $Builtin.RawPointer)
 // CHECK:         [[BA:%.*]] = struct_element_addr {{%.*}} : $*FixedArray<Int64>, #FixedArray.buffer
-// CHECK          store [[UMP]] to [trivial] [[BA]]
+// CHECK:         store [[UMP]] to [trivial] [[BA]]
 // CHECK:       } // end sil function 'global_init_with_array_initialization'
 sil [global_init_once_fn] [ossa] @global_init_with_array_initialization : $@convention(thin) () -> () {
 bb0:
@@ -133,7 +133,7 @@ bb0:
 // CHECK:         [[G:%.*]] = global_addr @global_init_uninitializedTv_
 // CHECK:         [[P:%.*]] = address_to_pointer [[G]]
 // CHECK:         [[UMP:%.*]] = struct $UnsafeMutablePointer<Int64> ([[P]] : $Builtin.RawPointer)
-// CHECK          store [[UMP]] to [trivial] [[A]]
+// CHECK:         store [[UMP]] to [trivial] [[A]]
 // CHECK:       } // end sil function 'global_init_uninitialized'
 sil [global_init_once_fn] [ossa] @global_init_uninitialized : $@convention(thin) () -> () {
 bb0:

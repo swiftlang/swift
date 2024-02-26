@@ -358,8 +358,8 @@ struct Int {
 // AppliesToSpecialize should have the order: bar bas common.
 // Only then, the functions get specialized correctly, and we won't see an assert in checkNoPromotedBoxInApply.
 // CHECK-LABEL: sil [noinline] [ossa] @$testdfs1 :
-// CHECK-NOT : alloc_box ${ var Int64 }, var, name "x"
-// CHECK-NOT : alloc_box ${ var Int64 }, var, name "y"
+// CHECK-NOT: alloc_box ${ var Int64 }, var, name "x"
+// CHECK-NOT: alloc_box ${ var Int64 }, var, name "y"
 // CHECK-LABEL:} // end sil function '$testdfs1'
 sil [noinline] [ossa] @$testdfs1 : $@convention(thin) () -> Int64 {
 bb0:
