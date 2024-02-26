@@ -1,3 +1,4 @@
+// UNSUPPORTED: OS=windows-msvc
 // When adding a private protocol method, the interface hash should stay the same
 // The per-type fingerprint should change
 
