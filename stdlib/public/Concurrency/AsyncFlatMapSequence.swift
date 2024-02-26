@@ -40,6 +40,7 @@ extension AsyncSequence {
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
   @usableFromInline
+  @preconcurrency
   __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult> {
