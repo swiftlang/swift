@@ -1813,7 +1813,10 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
         clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
-  } else if (LoaderOpts.strictImplicitModuleContext) {
+  } else if (LoaderOpts.strictImplicitModuleContext ||
+             // Explicit module Interface verification jobs still spawn a sub-instance
+             // and we must ensure this sub-instance gets all of the Xcc flags.
+             LoaderOpts.disableImplicitSwiftModule) {
     // If the compiler has been asked to be strict with ensuring downstream
     // dependencies get the parent invocation's context, inherit the extra Clang
     // arguments also. Inherit any clang-specific state of the compilation
