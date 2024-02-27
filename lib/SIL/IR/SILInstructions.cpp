@@ -208,10 +208,6 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   if (!VarInfo)
     return {};
 
-  // TODO: Support variables with expressions.
-  if (VarInfo->DIExpr)
-    return {};
-
   // Coalesce the debug loc attached on AI into VarInfo
   SILType Type = AI->getType();
   SILLocation InstLoc = AI->getLoc();
@@ -493,6 +489,12 @@ bool DebugValueInst::exprStartsWithDeref() const {
 
 VarDecl *DebugValueInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
+}
+
+VarDecl *SILDebugVariable::getDecl() const {
+  if (!Loc)
+    return nullptr;
+  return Loc->getAsASTNode<VarDecl>();
 }
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
