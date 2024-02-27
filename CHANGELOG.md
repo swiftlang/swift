@@ -148,11 +148,11 @@ concurrency checking.
 
   Member macros can specify a list of protocols via the `conformances` argument to the macro role. The macro implementation will be provided with those protocols that are listed but have not already been implemented by the type to which the member macro is attached, in the same manner as extension macros.
 
-   ```swift
-   @attached(member, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
-@attached(extension, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
-macro Codable() = #externalMacro(module: "MyMacros", type: "CodableMacro")
-   ```
+  ```swift
+  @attached(member, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
+  @attached(extension, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
+  macro Codable() = #externalMacro(module: "MyMacros", type: "CodableMacro")
+  ```
 
 ## Swift 5.9
 
