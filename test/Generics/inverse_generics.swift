@@ -466,6 +466,14 @@ func checkExistentials() {
     let _: any Escapable & ~Escapable = 1 // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
 }
 
+typealias NotCopyable = ~Copyable
+typealias EmptyComposition = ~Copyable & ~Escapable
+func test(_ t: borrowing NotCopyable) {} // expected-error {{use of 'NotCopyable' (aka '~Copyable') as a type must be written 'any NotCopyable'}}
+func test(_ t: borrowing EmptyComposition) {} // expected-error {{use of 'EmptyComposition' (aka '~Copyable & ~Escapable') as a type must be written 'any EmptyComposition' (aka 'any ~Copyable & ~Escapable')}}
+
+typealias Copy = Copyable
+func test(_ z1: Copy, _ z2: Copyable) {}
+
 // Conformances can be conditional on whether a generic parameter is Copyable
 protocol Arbitrary {}
 protocol AnotherOne {}
