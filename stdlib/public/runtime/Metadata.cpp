@@ -3514,9 +3514,14 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
   //
   // The rodata may be in read-only memory if the compiler knows that the size
   // it generates is already definitely correct. Don't write to this value
-  // unless it's necessary.
-  if (rodata->InstanceStart != size)
+  // unless it's necessary. We'll grow the space for the superclass if needed,
+  // but not shrink it, as the compiler may write an unaligned size that's less
+  // than our aligned InstanceStart.
+  if (rodata->InstanceStart < size)
     rodata->InstanceStart = size;
+  else
+    size = rodata->InstanceStart;
+
 #endif
 
   // Okay, now do layout.
