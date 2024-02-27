@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
-// RUN: %abi-symbol-checker %s %t/symbols --base %S/stdlib.swift
-// RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline-asserts %t/symbols
+// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftObservation.dylib > %t/symbols
+// RUN: %abi-symbol-checker %s %t/symbols
+// RUN: diff -u %S/../../Inputs/macOS/arm64/observation/baseline %t/symbols
 
-// REQUIRES: swift_stdlib_asserts
+// REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
@@ -34,10 +34,10 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
-// *** NOTE: ***
-// You will normally add new entries in 'abi/macOS/arm64/stdlib.swift' instead
-// of this file. This file is dedicated for assert only symbols.
+// Observation Symbols
 
-// Standard Library Symbols
+// Observation.ObservationTracking.changed.getter : Swift.AnyKeyPath?
+Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvg
 
-// Runtime Symbols
+// property descriptor for Observation.ObservationTracking.changed : Swift.AnyKeyPath?
+Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvpMV

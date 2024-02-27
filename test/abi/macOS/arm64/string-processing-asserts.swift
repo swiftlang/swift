@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
-// RUN: %abi-symbol-checker %s %t/symbols --base %S/stdlib.swift
-// RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline-asserts %t/symbols
+// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswift_StringProcessing.dylib > %t/symbols
+// RUN: %abi-symbol-checker %s %t/symbols --base %S/string-processing.swift
+// RUN: diff -u %S/../../Inputs/macOS/arm64/string-processing/baseline-asserts %t/symbols
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
@@ -35,9 +35,7 @@
 //                                            -- Your friendly stdlib engineers
 
 // *** NOTE: ***
-// You will normally add new entries in 'abi/macOS/arm64/stdlib.swift' instead
+// You will normally add new entries in 'abi/macOS/arm64/string-processing.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
-// Standard Library Symbols
-
-// Runtime Symbols
+// _StringProcessing Symbols
