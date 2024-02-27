@@ -25,7 +25,7 @@ struct BufferView : ~Escapable {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSWYls_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(2) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
     self.ptr = ptr
     self.c = a.count
@@ -126,7 +126,7 @@ struct GenericBufferView<Element> : ~Escapable {
   let baseAddress: Pointer
   let count: Int
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(1) @owned GenericBufferView<Element> {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSV_Siqd__hYlstclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(3) @owned GenericBufferView<Element> {
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
