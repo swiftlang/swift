@@ -173,9 +173,30 @@ bool BindingSet::involvesTypeVariables() const {
 }
 
 bool BindingSet::isPotentiallyIncomplete() const {
-  // Generic parameters are always potentially incomplete.
+  // Always marking generic parameter type variables as incomplete
+  // is too aggressive. That was the way to make sure that they
+  // are never attempted to eagerly, but really there are only a
+  // couple of situations where that can cause issues:
+  //
+  // 1. Int <: $T_param
+  //    $T1 <: $T_param
+  //
+  // 2. $T2 conv Generic<$T_param>
+  //    $T2 conv Generic<Int?>
+  //    Int <: $T_param
+  //
+  // Attempting $T_param before $T1 in 1. could result in a missed
+  // optional type binding for example.
+  //
+  // Attempting $T_param too early in this case (before $T2) could
+  // miss some transitive bindings inferred through conversion
+  // of `Generic` type.
+  //
+  // If a type variable that represents a generic parameter is no longer
+  // associated with any type variables (directly or indirectly) it's safe
+  // to assume that its binding set is complete.
   if (Info.isGenericParameter())
-    return true;
+    return involvesTypeVariables();
 
   // Key path literal type is incomplete until there is a
   // contextual type or key path is resolved enough to infer
