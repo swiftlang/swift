@@ -289,41 +289,55 @@ extension FlattenCollection: Collection {
 
   @inlinable // lazy-performance
   public func distance(from start: Index, to end: Index) -> Int {
+    let minus = start > end
+    
     // The following check ensures that distance(from:to:) is invoked on
     // the _base at least once, to trigger a _precondition in forward only
     // collections.
-    if start > end {
+    if minus {
       _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
     }
     
-    // This handles indices belonging to the same collection.
+    // This path handles indices belonging to the same collection.
     if start._outer == end._outer {
       guard let i = start._inner, let j = end._inner else { return 0 }
       return _base[start._outer].distance(from: i, to: j)
     }
     
-    // The following combines the distance of three sections.
-    let range = start <= end ? start ..< end : end ..< start
+    // The following path combines the distances of three regions.
+    let range = minus ? end ..< start : start ..< end
     var outer = range.lowerBound._outer
-    var count = 0 as Int // 0...Int.max
     
+    var distance: Int = 0
+    let step: Int = minus ? -1 : 1
+    
+    // This unwrap always succeeds.
     if let inner = range.lowerBound._inner {
       let collection = _base[outer]
-      count += collection.distance(from: inner, to: collection.endIndex)
       _base.formIndex(after: &outer)
+      distance += minus
+      ? collection.distance(from: collection.endIndex, to: inner)
+      : collection.distance(from: inner, to: collection.endIndex)
     }
     
+    // Using count is fine because the distance is nonzero here.
+    // In other words, the most negative nontrapping value is -Int.max.
+    _internalInvariant(distance != 0, "distance should not be zero")
     while outer < range.upperBound._outer {
-      count += _base[outer].count
+      // 0...Int.max can always be negated.
+      let collection = _base[outer]
       _base.formIndex(after: &outer)
+      distance += collection.count &* step
     }
     
     if let inner = range.upperBound._inner {
       let collection = _base[outer]
-      count += collection.distance(from: collection.startIndex, to: inner)
+      distance += minus
+      ? collection.distance(from: inner, to: collection.startIndex)
+      : collection.distance(from: collection.startIndex, to: inner)
     }
     
-    return start <= end ? count : -count
+    return distance
   }
 
   @inline(__always)
