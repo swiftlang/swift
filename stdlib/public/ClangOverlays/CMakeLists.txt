@@ -2,8 +2,6 @@ add_swift_target_library(swift_Builtin_float
     ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
     IS_SDK_OVERLAY
 
-    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
-
     GYB_SOURCES
       float.swift.gyb
 
