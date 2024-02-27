@@ -49,6 +49,8 @@ func transferAsyncResultWithTransferringArg(_ x: transferring NonSendableKlass) 
 func transferAsyncResultWithTransferringArg2(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) async -> transferring NonSendableKlass { NonSendableKlass() }
 func transferAsyncResultWithTransferringArg2Throwing(_ x: transferring NonSendableKlass, _ y: NonSendableKlass) async throws -> transferring NonSendableKlass { NonSendableKlass() }
 
+@MainActor func transferAsyncResultMainActor() async -> transferring NonSendableKlass { NonSendableKlass() }
+
 @MainActor var globalNonSendableKlass = NonSendableKlass()
 
 /////////////////
@@ -105,4 +107,12 @@ func transferReturnArg(_ x: NonSendableKlass) -> transferring NonSendableKlass {
 // safe if we ever support that.
 func transferReturnArgTuple(_ x: transferring NonSendableKlass) -> transferring (NonSendableKlass, NonSendableKlass) {
   return (x, x)
+}
+
+func useTransferredResultMainActor() async {
+  let _ = await transferAsyncResultMainActor()
+}
+
+func useTransferredResult() async {
+  let _ = await transferAsyncResult()
 }
