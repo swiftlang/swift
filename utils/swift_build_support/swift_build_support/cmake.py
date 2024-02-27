@@ -147,7 +147,7 @@ class CMake(object):
             define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", args.cmake_cxx_launcher)
 
         if self.prefer_just_built_toolchain and product:
-            toolchain_path = product.install_toolchain_path(args.host_target)
+            toolchain_path = product.native_toolchain_path(args.host_target)
             cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER',
                                           os.path.join(toolchain_path, 'bin', 'swiftc'))
             define("CMAKE_C_COMPILER:PATH", os.path.join(toolchain_path,
