@@ -342,3 +342,10 @@ extension ChonkyList {
         }
     }
 }
+
+// https://github.com/apple/swift/issues/71598
+struct RangeHolder:~Copyable
+{
+    var r:Range<Int> { fatalError() }
+    var y:Int { self.r.upperBound }
+}
