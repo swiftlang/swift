@@ -284,6 +284,83 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   }
 }
 
+bool AbstractionPattern::isNoncopyable(CanType substTy) const {
+  auto copyable
+    = substTy->getASTContext().getProtocol(KnownProtocolKind::Copyable);
+    
+  auto isDefinitelyCopyable = [&](CanType t) -> bool {
+    auto result = copyable->getParentModule()
+      ->checkConformanceWithoutContext(substTy, copyable,
+                                       /*allowMissing=*/false);
+    return result.has_value() && !result.value().isInvalid();
+  };
+    
+  // If the substituted type definitely conforms, that's authoritative.
+  if (isDefinitelyCopyable(substTy)) {
+    return false;
+  }
+
+  // If the substituted type is fully concrete, that's it. If there are unbound
+  // type variables in the type, then we may have to account for the upper
+  // abstraction bound from the abstraction pattern.
+  if (!substTy->hasTypeParameter()) {
+    return true;
+  }
+  
+  switch (getKind()) {
+  case Kind::Opaque: {
+    // The abstraction pattern doesn't provide any more specific bounds.
+    return true;
+  }
+  case Kind::Type:
+  case Kind::Discard:
+  case Kind::ClangType: {
+    // See whether the abstraction pattern's context gives us an upper bound
+    // that ensures the type is copyable.
+    auto type = getType();
+    if (hasGenericSignature() && getType()->hasTypeParameter()) {
+      type = GenericEnvironment::mapTypeIntoContext(
+        getGenericSignature().getGenericEnvironment(), getType())
+        ->getReducedType(getGenericSignature());
+    }
+    
+    return !isDefinitelyCopyable(type);
+  }
+  case Kind::Tuple: {
+    // A tuple is noncopyable if any element is.
+    if (doesTupleVanish()) {
+      return getVanishingTupleElementPatternType().value()
+        .isNoncopyable(substTy);
+    }
+    auto substTupleTy = cast<TupleType>(substTy);
+  
+    for (unsigned i = 0, e = getNumTupleElements(); i < e; ++i) {
+      if (getTupleElementType(i).isNoncopyable(substTupleTy.getElementType(i))){
+        return true;
+      }
+    }
+    return false;
+  }
+  // Functions are, at least for now, always copyable.
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return false;
+  
+  case Kind::Invalid:
+    llvm_unreachable("asking invalid abstraction pattern");
+  }
+}
+
 bool AbstractionPattern::matchesTuple(CanType substType) const {
   switch (getKind()) {
   case Kind::Invalid:

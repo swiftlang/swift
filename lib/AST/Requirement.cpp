@@ -246,7 +246,9 @@ int Requirement::compare(const Requirement &other) const {
   return compareProtos;
 }
 
-CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requirements) {
+static std::optional<CheckRequirementsResult>
+checkRequirementsImpl(ArrayRef<Requirement> requirements,
+                      bool allowTypeParameters) {
   SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
 
   bool hadSubstFailure = false;
@@ -258,12 +260,20 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
 #ifndef NDEBUG
   {
     auto firstType = req.getFirstType();
-    assert(!firstType->hasTypeParameter());
+    assert((allowTypeParameters || !firstType->hasTypeParameter())
+           && "must take a contextual type. if you really are ok with an "
+            "indefinite answer (and usually YOU ARE NOT), then consider whether "
+            "you really, definitely are ok with an indefinite answer, and "
+            "use `checkRequirementsWithoutContext` instead");
     assert(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert(!secondType->hasTypeParameter());
+      assert((allowTypeParameters || !secondType->hasTypeParameter())
+             && "must take a contextual type. if you really are ok with an "
+              "indefinite answer (and usually YOU ARE NOT), then consider whether "
+              "you really, definitely are ok with an indefinite answer, and "
+              "use `checkRequirementsWithoutContext` instead");
       assert(!secondType->hasTypeVariable());
     }
   }
@@ -276,6 +286,12 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
       break;
 
     case CheckRequirementResult::RequirementFailure:
+      // If a requirement failure was caused by a context-free type parameter,
+      // then we can't definitely know whether it would have satisfied the
+      // requirement without context.
+      if (req.getFirstType()->isTypeParameter()) {
+        return std::nullopt;
+      }
       return CheckRequirementsResult::RequirementFailure;
 
     case CheckRequirementResult::SubstitutionFailure:
@@ -288,6 +304,19 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
     return CheckRequirementsResult::SubstitutionFailure;
 
   return CheckRequirementsResult::Success;
+}
+
+CheckRequirementsResult
+swift::checkRequirements(ArrayRef<Requirement> requirements) {
+  // This entry point requires that there are no type parameters in any of the
+  // requirements, so the underlying check should always produce a result.
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ false)
+    .value();
+}
+
+std::optional<CheckRequirementsResult>
+swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
+  return checkRequirementsImpl(requirements, /*allow type parameters*/ true);
 }
 
 CheckRequirementsResult swift::checkRequirements(
