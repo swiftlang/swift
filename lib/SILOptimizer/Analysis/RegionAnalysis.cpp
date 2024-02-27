@@ -2965,6 +2965,11 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
   if (!fn->getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation))
     return false;
 
+  assert(fn->getASTContext().LangOpts.StrictConcurrencyLevel ==
+             StrictConcurrency::Complete &&
+         "Need strict concurrency to be enabled for RegionBasedIsolation to be "
+         "enabled as well");
+
   // If this function does not correspond to a syntactic declContext and it
   // doesn't have a parent module, don't check it since we cannot check if a
   // type is sendable.
