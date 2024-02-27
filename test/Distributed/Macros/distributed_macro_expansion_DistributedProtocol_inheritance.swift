@@ -45,7 +45,7 @@ protocol G3<ActorSystem>: DistributedActor, EmptyBase where ActorSystem: Distrib
 // CHECK: }
 
 // CHECK: extension G3 where Self: Distributed._DistributedActorStub {
-// CHECK:   func get() -> String {
+// CHECK:   distributed func get() -> String {
 // CHECK:     if #available (SwiftStdlib 6.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {

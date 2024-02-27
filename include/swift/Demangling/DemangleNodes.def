@@ -361,9 +361,6 @@ NODE(AsyncSuspendResumePartialFunction)
 NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
-// Added in Swift 6.0
-NODE(AccessibleProtocolRequirementFunctionRecord)
-
 // Added in Swift 5.7
 NODE(BackDeploymentThunk)
 NODE(BackDeploymentFallback)

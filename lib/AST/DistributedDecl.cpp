@@ -139,7 +139,7 @@ Type swift::getSerializationRequirementTypesForMember(
     return signature->getConcreteType(SerReqAssocType);
   }
 
-  llvm_unreachable("Unable to fetch ActorSystem type!");
+  llvm_unreachable("Unable to fetch SerializationRequirement type!");
 }
 
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
@@ -324,12 +324,9 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 /******************************************************************************/
 
 FuncDecl*
-ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
-  if (!actor->isDistributedActor())
-    return nullptr;
-
+ASTContext::getDistributedActorArgumentDecodingMethod(DeclContext *actor) {
   return evaluateOrDefault(
-      evaluator, GetDistributedActorArgumentDecodingMethodRequest{actor}, nullptr);
+      evaluator, GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
 }
 
 NominalTypeDecl*

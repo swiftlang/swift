@@ -4649,16 +4649,14 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
 }
 
 void IRGenModule::emitAccessibleFunction(
-    StringRef sectionName, std::string mangledRecordName,
-    std::optional<std::string> mangledActorName,
-    std::string mangledFunctionName, SILFunction* func) {
-
-  auto recordTy = mangledActorName.has_value()
-                      ? AccessibleProtocolRequirementFunctionRecordTy
-                      : AccessibleFunctionRecordTy;
+    StringRef sectionName, SILFunction* func) {
+  std::string mangledRecordName =
+      LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
+  std::string mangledFunctionName =
+      LinkEntity::forSILFunction(func).mangleAsString();
 
   auto var = new llvm::GlobalVariable(
-      Module, recordTy, /*isConstant=*/true,
+      Module, AccessibleFunctionRecordTy, /*isConstant=*/true,
       llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
       mangledRecordName);
 
@@ -4666,22 +4664,14 @@ void IRGenModule::emitAccessibleFunction(
 
   // ==== Store fields of 'TargetAccessibleFunctionRecord'
   ConstantStructBuilder fields =
-      builder.beginStruct(recordTy);
+      builder.beginStruct(AccessibleFunctionRecordTy);
 
   // -- Field: Name (record name)
   {
-    llvm::Constant *recordName = nullptr;
-    if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
-      recordName = getAddrOfGlobalString(mangledRecordName,
-                                         /*willBeRelativelyAddressed=*/true);
-    } else if (recordTy == AccessibleFunctionRecordTy) {
-      recordName = getAddrOfGlobalString(mangledFunctionName,
-                                         /*willBeRelativelyAddressed=*/true);
-    } else {
-      assert(false && "Unknown recordTy");
-    }
-    assert(recordName && "record name must be initialized");
-    fields.addRelativeAddress(recordName);
+    llvm::Constant *name =
+        getAddrOfGlobalString(mangledFunctionName,
+                              /*willBeRelativelyAddressed=*/true);
+    fields.addRelativeAddress(name);
   }
 
   // -- Field: GenericEnvironment
@@ -4689,7 +4679,7 @@ void IRGenModule::emitAccessibleFunction(
 
   GenericSignature signature;
   if (auto *env = func->getGenericEnvironment()) {
-    // Drop all of the marker protocols because they are effect-less
+    // Drop all the marker protocols because they are effect-less
     // at runtime.
     signature = env->getGenericSignature().withoutMarkerProtocols();
 
@@ -4724,24 +4714,6 @@ void IRGenModule::emitAccessibleFunction(
 
   // ---- End of 'TargetAccessibleFunctionRecord' fields
 
-  // -- Field: ConcreteActorName
-  if (func->isDistributed()) {
-    if (mangledActorName) {
-      assert(recordTy == AccessibleProtocolRequirementFunctionRecordTy &&
-             "Only store additional actor type when record type is the "
-             "extended one.");
-      llvm::Constant *mangledActorNameAddr = getAddrOfGlobalString(
-          *mangledActorName, /*willBeRelativelyAddressed=*/true);
-      fields.addRelativeAddress(mangledActorNameAddr);
-    }
-  }
-  // -- Field: ConcreteWitnessMethodName
-  if (recordTy == AccessibleProtocolRequirementFunctionRecordTy) {
-    llvm::Constant *witnessMethodName = getAddrOfGlobalString(
-        mangledFunctionName, /*willBeRelativelyAddressed=*/true);
-    fields.addRelativeAddress(witnessMethodName);
-  }
-
   fields.finishAndSetAsInitializer(var);
   var->setSection(sectionName);
   var->setAlignment(llvm::MaybeAlign(4));
@@ -4775,14 +4747,7 @@ void IRGenModule::emitAccessibleFunctions() {
   }
 
   for (auto *func : AccessibleFunctions) {
-    auto mangledRecordName =
-        LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-    std::string mangledFunctionName =
-        LinkEntity::forSILFunction(func).mangleAsString();
-
-    emitAccessibleFunction(
-        fnsSectionName, mangledRecordName,
-        /*mangledActorName=*/{}, mangledFunctionName, func);
+    emitAccessibleFunction(fnsSectionName, func);
   }
 }
 

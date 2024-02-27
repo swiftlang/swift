@@ -197,12 +197,12 @@ private:
 
 } // end namespace
 
-static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
-  assert(thunk->isDistributed() && thunk->isThunk());
-  return thunk->getDeclContext()
-      ->getInnermostTypeContext()
-      ->getSelfNominalTypeDecl();
-}
+//static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
+//  assert(thunk->isDistributed() && thunk->isThunk());
+//  return thunk->getDeclContext()
+//      ->getInnermostTypeContext()
+//      ->getSelfNominalTypeDecl();
+//}
 
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
@@ -620,8 +620,6 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 }
 
 void DistributedAccessor::emit() {
-  assert(getDistributedActorOf(Target) &&
-         "target of distributed accessor must be a distributed actor");
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
@@ -797,10 +795,11 @@ DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
 ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
   auto &C = IGM.Context;
-  auto *actor = getDistributedActorOf(Target);
+  // auto *actor = getDistributedActorOf(Target);
+  DeclContext *targetContext = Target->getDeclContext();
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
-  auto *decodeFn = C.getDistributedActorArgumentDecodingMethod(actor);
+  auto *decodeFn = C.getDistributedActorArgumentDecodingMethod(targetContext);
 
   // If distributed actor is generic over actor system, we have to
   // use witness to reference `decodeNextArgument`.

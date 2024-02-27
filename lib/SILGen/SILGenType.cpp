@@ -710,10 +710,11 @@ SILFunction *SILGenModule::emitProtocolWitness(
        witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
        witnessRef.getFuncDecl()->isDistributed());
   if (shouldUseDistributedThunkWitness) {
-    auto thunkDeclRef = SILDeclRef(
-        witnessRef.getFuncDecl()->getDistributedThunk(),
-        SILDeclRef::Kind::Func);
-    witnessRef = thunkDeclRef.asDistributed();
+    // we may not have a thunk if we're in a protocol?
+    if (auto thunk = witnessRef.getFuncDecl()->getDistributedThunk()) {
+      auto thunkDeclRef = SILDeclRef(thunk, SILDeclRef::Kind::Func);
+      witnessRef = thunkDeclRef.asDistributed();
+    }
   }
 
   // Work out the lowered function type of the SIL witness thunk.

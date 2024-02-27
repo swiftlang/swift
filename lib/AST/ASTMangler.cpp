@@ -922,8 +922,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DistributedThunk: return appendOperator("TE");
     case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
-    case SymbolKind::AccessibleProtocolRequirementFunctionRecord:
-    return appendOperator("HpF");
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
     case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
@@ -1039,7 +1037,14 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
     // so append the Objective-C runtime name.
     appendIdentifier(*objCName);
   } else if (!name.empty()) {
-    appendIdentifier(name.getIdentifier().str());
+    if (DistributedAppendingContext) {
+      std::string syntheticName = "$";
+      syntheticName.append(name.getIdentifier().str());
+      appendIdentifier(syntheticName);
+      DistributedAppendingContext = false;
+    } else {
+      appendIdentifier(name.getIdentifier().str());
+    }
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -2262,6 +2267,10 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
+  // We're appending context, make sure we only add `$` to the single outer type.
+  llvm::SaveAndRestore<bool> savedDistributedAppendingContext(
+      DistributedAppendingContext, DistributedMangleProtocolTargetAsStubTarget);
+
   // Check for a special mangling context.
   if (auto context = getSpecialManglingContext(decl, UseObjCRuntimeNames)) {
     switch (*context) {
@@ -3904,11 +3913,26 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk) {
+void ASTMangler::appendDistributedThunk(
+    const AbstractFunctionDecl *thunk, bool asReference) {
   // Marker protocols cannot be checked at runtime, so there is no point
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
                                                        false);
+  // TODO: add a flag to skip class/struct information from parameter types
+
+  bool shouldEnableThunkDeclMangling = false;
+  if (asReference) {
+    if (auto extension = dyn_cast<ExtensionDecl>(thunk->getDeclContext())) {
+      if (auto extended = extension->getExtendedNominal()) {
+        shouldEnableThunkDeclMangling = isa<ProtocolDecl>(extended);
+      }
+    }
+  }
+  // Marker protocols cannot be checked at runtime, so there is no point
+  // in recording them for distributed thunks.
+  llvm::SaveAndRestore<bool> savedDistributedMangleProtocolTargetAsStubTarget(
+      DistributedMangleProtocolTargetAsStubTarget, shouldEnableThunkDeclMangling);
 
   // Since computed property SILDeclRef's refer to the "originator"
   // of the thunk, we need to mangle distributed thunks of accessors
@@ -3932,7 +3956,30 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
     assert(thunk);
   }
 
-  return mangleEntity(thunk, SymbolKind::DistributedThunk);
+  // We mangle similar to:
+  //    mangleEntity(thunk, SymbolKind::DistributedThunk);
+  // ...however we prefix with `$` if we're emitting for an extension
+  // in distributed protocol extension.
+  beginMangling();
+  appendEntity(thunk);
+  appendSymbolKind(SymbolKind::DistributedThunk);
+}
+
+std::string ASTMangler::mangleDistributedThunkRef(const AbstractFunctionDecl *thunk) {
+  beginMangling();
+  appendDistributedThunk(thunk, /*asReference=*/true);
+  return finalize();
+}
+std::string ASTMangler::mangleDistributedThunkRecord(const AbstractFunctionDecl *thunk) {
+  beginMangling();
+  appendDistributedThunk(thunk, /*asReference=*/true);
+  appendSymbolKind(SymbolKind::AccessibleFunctionRecord);
+  return finalize();
+}
+std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk) {
+  beginMangling();
+  appendDistributedThunk(thunk, /*asReference=*/false);
+  return finalize();
 }
 
 void ASTMangler::appendMacroExpansionContext(
