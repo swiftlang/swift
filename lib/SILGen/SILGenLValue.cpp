@@ -3734,12 +3734,6 @@ static bool shouldEmitSelfAsRValue(AccessorDecl *fn, CanType selfType,
     return false;
   case SelfAccessKind::Borrowing:
   case SelfAccessKind::NonMutating:
-    // If the accessor is a coroutine, we may want to access the projected
-    // value through a borrow of the base. But if it's a regular get/set then
-    // there isn't any real benefit to doing so.
-    if (!fn->isCoroutine()) {
-      return true;
-    }
     // Normally we'll copy the base to minimize accesses. But if the base
     // is noncopyable, or we're accessing it in a `borrow` expression, then
     // we want to keep the access nested on the original base.
