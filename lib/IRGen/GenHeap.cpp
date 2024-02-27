@@ -1845,6 +1845,9 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
                             cast<llvm::Instruction>(SelfValue)))
                       : CurFn->getEntryBlock().begin();
   Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+  // Do not inherit the debug location of this insertion point, it could be
+  // anything (e.g. the location of a dbg.declare).
+  Builder.SetCurrentDebugLocation(llvm::DebugLoc());
 
   switch (SelfKind) {
   case SwiftMetatype:
