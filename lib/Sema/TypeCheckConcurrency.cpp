@@ -3186,6 +3186,20 @@ namespace {
               /*setThrows*/ !explicitlyThrowing,
               /*isDistributedThunk=*/true);
         }
+
+        // In compiler versions <=5.10, the compiler did not diagnose cases
+        // where a non-isolated distributed actor value was passed to a VarDecl
+        // with a function type type that has an isolated distributed actor
+        // parameter, e.g. `(isolated DA) -> Void`. Stage in the error as a
+        // warning until Swift 6.
+        if (var->getTypeInContext()->getAs<FunctionType>()) {
+          ctx.Diags.diagnose(declLoc,
+                             diag::distributed_actor_isolated_non_self_reference,
+                             decl)
+            .warnUntilSwiftVersion(6);
+          noteIsolatedActorMember(decl, context);
+          return std::nullopt;
+        }
       }
 
       // FIXME: Subscript?
