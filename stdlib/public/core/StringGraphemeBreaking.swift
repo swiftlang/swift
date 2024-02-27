@@ -201,6 +201,7 @@ extension _StringGuts {
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
     if _fastPath(isFastUTF8) {
       let ascii = withFastUTF8 { utf8 in
+        if i == utf8.count { return false }
         let scalar = utf8[_unchecked: i]
         return UTF8.isASCII(scalar) && scalar != 0xD /* CR */
       }
