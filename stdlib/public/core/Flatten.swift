@@ -305,33 +305,42 @@ extension FlattenCollection: Collection {
     }
     
     // The following path combines the distances of three regions.
-    let range = minus ? end ..< start : start ..< end
-    var outer = range.lowerBound._outer
-    
     var distance: Int = 0
-    let step: Int = minus ? -1 : 1
+    let step: Int
+    let lowerBound: Index
+    let upperBound: Index
     
-    // This unwrap always succeeds.
-    if let inner = range.lowerBound._inner {
-      let collection = _base[outer]
-      _base.formIndex(after: &outer)
+    if minus {
+      lowerBound = end
+      upperBound = start
+      step = -1
+    } else {
+      lowerBound = start
+      upperBound = end
+      step = 01
+    }
+        
+    // This always unwraps because start._outer != end._outer.
+    if let inner = lowerBound._inner {
+      let collection = _base[lowerBound._outer]
       distance += minus
       ? collection.distance(from: collection.endIndex, to: inner)
       : collection.distance(from: inner, to: collection.endIndex)
     }
     
-    // Using count is fine because the distance is nonzero here.
-    // In other words, the most negative nontrapping value is -Int.max.
-    _internalInvariant(distance != 0, "distance should not be zero")
-    while outer < range.upperBound._outer {
-      // 0...Int.max can always be negated.
-      let collection = _base[outer]
+    // We can use each collection's count in the middle region since the
+    // fast path ensures that the other regions cover a nonzero distance,
+    // which means that an extra Int.min distance should trap regardless.
+    var outer = _base.index(after: lowerBound._outer)
+    while outer < upperBound._outer {
+      // 0 ... Int.max can always be negated.
+      distance += _base[outer].count &* step
       _base.formIndex(after: &outer)
-      distance += collection.count &* step
     }
     
-    if let inner = range.upperBound._inner {
-      let collection = _base[outer]
+    /// This unwraps if start != endIndex and end != endIndex.
+    if let inner = upperBound._inner {
+      let collection = _base[upperBound._outer]
       distance += minus
       ? collection.distance(from: inner, to: collection.startIndex)
       : collection.distance(from: collection.startIndex, to: inner)
