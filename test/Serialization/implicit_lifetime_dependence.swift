@@ -9,8 +9,7 @@
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-silgen -I %t %s \
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
+// RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 
 
 

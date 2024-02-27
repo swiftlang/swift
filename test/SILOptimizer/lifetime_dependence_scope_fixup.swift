@@ -3,7 +3,6 @@
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -disable-experimental-parser-round-trip \
 // RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN: -enable-experimental-lifetime-dependence-inference \
 // RUN:  -Xllvm -enable-lifetime-dependence-diagnostics=true
 
 // REQUIRES: asserts
