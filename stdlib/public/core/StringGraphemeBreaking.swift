@@ -196,9 +196,24 @@ extension _StringGuts {
   /// inconsistent with `_opaqueCharacterStride(endingAt:)`. On the other hand,
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
-  @usableFromInline @inline(never)
+  @usableFromInline
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
+    if _fastPath(isFastUTF8) {
+      let ascii = withFastUTF8 { utf8 in
+        let scalar = utf8[_unchecked: i]
+        return UTF8.isASCII(scalar) && scalar != 0xD /* CR */
+      }
+      if ascii {
+        return 1
+      }
+    }
+    
+    return _opaqueComplexCharacterStride(startingAt: i)
+  }
+  
+  @_effects(releasenone)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
@@ -214,6 +229,8 @@ extension _StringGuts {
 
     return nextIdx &- i
   }
+  
+  
 
   /// Return the length of the extended grapheme cluster ending at offset `i`,
   /// or if `i` happens to be in the middle of a grapheme cluster, find and
