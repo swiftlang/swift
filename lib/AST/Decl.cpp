@@ -5634,7 +5634,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
-      ctx.evaluator, EnumRawTypeRequest{const_cast<EnumDecl *>(this)}, Type());
+      ctx.evaluator, EnumRawTypeRequest{const_cast<EnumDecl *>(this)},
+      ErrorType::get(ctx));
 }
 
 void EnumDecl::setRawType(Type rawType) {
