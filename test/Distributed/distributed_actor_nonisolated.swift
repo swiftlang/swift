@@ -50,3 +50,16 @@ distributed actor DA {
   }
 
 }
+
+func invalidIsolatedCall<DA: DistributedActor> (
+  to actor: DA,
+  queue: AsyncStream<@Sendable (isolated DA) async -> Void>
+) {
+  Task {
+    // expected-note@+1 {{let declared here}}
+    for await closure in queue {
+      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a non-isolated context; this is an error in Swift 6}}
+      await closure(actor)
+    }
+  }
+}
