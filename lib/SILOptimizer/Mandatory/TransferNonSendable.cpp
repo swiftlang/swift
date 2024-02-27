@@ -72,7 +72,7 @@ static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
     unsigned argNum = [&]() -> unsigned {
       if (fai.isCalleeOperand(*op))
         return op->getOperandNumber();
-      return fai.getAppliedArgIndexWithoutIndirectResult(*op);
+      return fai.getAppliedArgIndexWithoutIndirectResults(*op);
     }();
 
     // Something happened that we do not understand.

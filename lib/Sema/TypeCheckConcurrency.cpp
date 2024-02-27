@@ -2498,8 +2498,10 @@ namespace {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             // Defer diagnosing checking of non-Sendable types that are passed
-            // into async let to SIL level region based isolation.
-            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
+            // into async let to SIL level region based isolation if we have
+            // transferring and region based isolation enabled.
+            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) ||
+                !ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
               diagnoseNonSendableTypes(
                   type, getDeclContext(),
                   /*inDerivedConformance*/Type(), capture.getLoc(),
