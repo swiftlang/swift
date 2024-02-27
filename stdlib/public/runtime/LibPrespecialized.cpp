@@ -35,7 +35,10 @@ static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
 #if USE_DLOPEN
   auto path = runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH();
   if (path && path[0]) {
-    void *handle = dlopen(path, RTLD_LAZY);
+    // Use RTLD_NOLOAD to avoid actually loading the library. We just want to
+    // find it if it has already been loaded by other means, such as
+    // DYLD_INSERT_LIBRARIES.
+    void *handle = dlopen(path, RTLD_LAZY | RTLD_NOLOAD);
     if (!handle) {
       swift::warning(0, "Failed to load prespecializations library: %s\n",
                      dlerror());
