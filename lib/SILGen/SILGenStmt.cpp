@@ -704,8 +704,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
 
   auto retTy = ret->getType()->getCanonicalType();
   
-  AbstractionPattern origRetTy = OrigFnType
-    ? OrigFnType->getFunctionResultType()
+  AbstractionPattern origRetTy = TypeContext
+    ? TypeContext->OrigType.getFunctionResultType()
     : AbstractionPattern(retTy);
 
   if (F.getConventions().hasIndirectSILResults()) {

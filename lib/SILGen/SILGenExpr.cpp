@@ -516,6 +516,9 @@ namespace {
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitCaptureListExpr(CaptureListExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
+    ManagedValue tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                         CanAnyFunctionType closureType,
+                                         const Conversion &conv);
     ManagedValue emitClosureReference(AbstractClosureExpr *e,
                                       const FunctionTypeInfo &contextInfo);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
@@ -2825,6 +2828,9 @@ wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
 static std::optional<FunctionTypeInfo>
 tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
                                         const Conversion &conv) {
+  // NOTE: if you support new kinds of conversion here, make sure you can
+  // rewrite them in narrowClosureConvention below
+
   if (conv.getKind() == Conversion::SubstToOrig) {
     auto destType = cast<AnyFunctionType>(conv.getReabstractionSubstResultType());
     auto origType = conv.getReabstractionOrigType();
@@ -2844,6 +2850,29 @@ tryGetSpecializedClosureTypeFromContext(CanAnyFunctionType closureType,
 
   // No other kinds of conversion.
   return std::nullopt;
+}
+
+/// Given that tryGetSpecializedClosureTypeFromContext was able to return
+/// specialized closure type information from the given contextual conversion,
+/// construct a new conversion that starts from the given type, which is a
+/// supertype of the previous closure type but a subtype of the final type.
+/// The conversion should end with the same type.
+static Conversion narrowClosureConversion(CanAnyFunctionType newClosureType,
+                                          const Conversion &conv) {
+  if (conv.getKind() == Conversion::SubstToOrig) {
+    return Conversion::getSubstToOrig(newClosureType,
+                                      conv.getReabstractionOrigType(),
+                                      conv.getReabstractionSubstResultType(),
+                                      conv.getReabstractionLoweredResultType());
+  }
+
+  if (conv.getKind() == Conversion::Subtype) {
+    return Conversion::getSubtype(newClosureType,
+                                  conv.getBridgingResultType(),
+                                  conv.getBridgingLoweredResultType());
+  }
+
+  llvm_unreachable("mismatch with tryGetSpecializedClosureTypeFromContext");
 }
 
 /// Whether the given abstraction pattern as an opaque thrown error.
@@ -2874,17 +2903,24 @@ static bool canEmitClosureFunctionUnderConversion(
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
     .withConcurrent(false)
-    .withThrows(false, Type())
-    .build();
+    .withThrows(false, Type());
 
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
     .withNoEscape(false)
     .withConcurrent(false)
-    .withThrows(false, Type())
-    .build();
+    .withThrows(false, Type());
 
-  if (literalFnType->withExtInfo(literalWithoutEffects)
-        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects))) {
+  // If the converted type has erased isolation, remove the isolation from
+  // both types.
+  if (convertedWithoutEffects.getIsolationKind() ==
+        FunctionTypeIsolation::Kind::Erased) {
+    auto nonIsolation = FunctionTypeIsolation::forNonIsolated();
+    literalWithoutEffects = literalWithoutEffects.withIsolation(nonIsolation);
+    convertedWithoutEffects = convertedWithoutEffects.withIsolation(nonIsolation);
+  }
+
+  if (literalFnType->withExtInfo(literalWithoutEffects.build())
+        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects.build()))) {
     return true;
   }
 
@@ -2915,6 +2951,52 @@ static bool canEmitSpecializedClosureFunction(CanAnyFunctionType closureType,
   return true;
 }
 
+/// Try to emit the given closure under the given conversion.
+/// Returns an invalid ManagedValue if this fails.
+ManagedValue
+RValueEmitter::tryEmitConvertedClosure(AbstractClosureExpr *e,
+                                       CanAnyFunctionType closureType,
+                                       const Conversion &conv) {
+  // Bail out if we don't have specialized type information from context.
+  auto info = tryGetSpecializedClosureTypeFromContext(closureType, conv);
+  if (!info) return ManagedValue();
+
+  // If we can emit the closure with all of the specialized type information,
+  // that's great.
+  if (canEmitSpecializedClosureFunction(closureType, *info)) {
+    return emitClosureReference(e, *info);
+  }
+
+  // If we're converting to an `@isolated(any)` type, at least force the
+  // closure to be emitted using the erased-isolation pattern so that
+  // we don't lose that information.
+  if (info->ExpectedLoweredType->hasErasedIsolation()) {
+    // This assertion is why this isn't an infinite recursion.
+    assert(!closureType->getIsolation().isErased() &&
+           "closure cannot directly have erased isolation");
+
+    // Construct a conversion that just erases isolation and doesn't make
+    // any other changes to the closure type.
+    auto erasedExtInfo = closureType->getExtInfo()
+      .withIsolation(FunctionTypeIsolation::forErased());
+    auto erasedClosureType = closureType.withExtInfo(erasedExtInfo);
+    auto erasureInfo = SGF.getFunctionTypeInfo(erasedClosureType);
+
+    // Emit the closure under that conversion.  This should always succeed.
+    assert(canEmitSpecializedClosureFunction(closureType, erasureInfo));
+    auto erasedResult = emitClosureReference(e, erasureInfo);
+
+    // Narrow the original conversion to start from the erased closure type.
+    auto convAfterErasure = narrowClosureConversion(erasedClosureType, conv);
+
+    // Apply the narrowed conversion.
+    return convAfterErasure.emit(SGF, e, erasedResult, SGFContext());
+  }
+
+  // Otherwise, give up.
+  return ManagedValue();
+}
+
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
   // Look through autoclosures that are just calls to a placeholder
@@ -2928,10 +3010,9 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // If we're emitting into a converting context, try to combine the
   // conversion into the emission of the closure function.
   if (auto *convertingInit = C.getAsConversion()) {
-    if (auto info = tryGetSpecializedClosureTypeFromContext(
-                                closureType, convertingInit->getConversion());
-        info && canEmitSpecializedClosureFunction(closureType, *info)) {
-      auto closure = emitClosureReference(e, *info);
+    ManagedValue closure = tryEmitConvertedClosure(e, closureType,
+                                              convertingInit->getConversion());
+    if (closure.isValid()) {
       convertingInit->initWithConvertedValue(SGF, e, closure);
       convertingInit->finishInitialization(SGF);
       return RValue::forInContext();
