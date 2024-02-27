@@ -124,8 +124,8 @@ public func testrecur() -> Int {
 // AppliesToSpecialize should have the order: bar bas common.
 // Only then, the functions get specialized correctly, and we won't see an assert in checkNoPromotedBoxInApply.
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply8testdfs1SiyF :
-// CHECK-NOT : alloc_box ${ var Int }, var, name "x"
-// CHECK-NOT : alloc_box ${ var Int }, var, name "y"
+// CHECK-NOT: alloc_box ${ var Int }, var, name "x"
+// CHECK-NOT: alloc_box ${ var Int }, var, name "y"
 // CHECK-LABEL:} // end sil function '$s26allocboxtostack_localapply8testdfs1SiyF'
 @inline(never)
 public func testdfs1() -> Int {
