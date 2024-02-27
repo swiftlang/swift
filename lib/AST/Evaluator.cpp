@@ -88,7 +88,7 @@ void Evaluator::finishedRequest(const ActiveRequest &request) {
 }
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
-  if (debugDumpCycles) {
+  if (true /* FIXME(NCG): Temporary hack, remove before flight */ || debugDumpCycles) {
     const auto printIndent = [](llvm::raw_ostream &OS, unsigned indent) {
       OS.indent(indent);
       OS << "`--";
@@ -121,6 +121,7 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
 
     OS << "\n";
   }
+  assert(false); // FIXME(NCG): Temporary hack, remove before flight
 
   request.diagnoseCycle(diags);
   for (const auto &step : llvm::reverse(activeRequests)) {
