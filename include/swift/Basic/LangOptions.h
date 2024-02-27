@@ -188,6 +188,9 @@ namespace swift {
     /// Enable optimization to bypass resilience checks in a package
     bool EnableBypassResilienceInPackage = false;
 
+    /// Enable serializing package decls for optimizations such as CMO
+    bool EnableSerializePackageDecls = false;
+
     /// Optimization mode for unavailable declarations.
     std::optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 

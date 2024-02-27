@@ -523,6 +523,9 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
   Flags<[FrontendOption]>,
   HelpText<"Enable optimization to bypass resilience within a package">;
+def experimental_serialize_package_decls : Flag<["-"], "experimental-serialize-package-decls">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Enable optimization to serialize package decls">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,

@@ -10,12 +10,12 @@
 
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
 
-/// Check serialization in SILGEN with resilience enabled.
-// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-Res.sil
+/// Check silgen with resilience enabled.
+// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t -o %t/Utils-Res.sil
 // RUN: %FileCheck %s --check-prefixes=UTILS-RES,UTILS-COMMON < %t/Utils-Res.sil
 
-/// Check for indirect access with a resiliently built module dependency.
-// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-Res.sil
+/// Check for indirect access to decls in a resiliently built module.
+// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -module-name Client -package-name mypkg -I %t -o %t/Client-Res.sil
 // RUN: %FileCheck %s --check-prefixes=CLIENT-RES,CLIENT-COMMON < %t/Client-Res.sil
 
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -28,12 +28,16 @@
 
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
 
-/// Check serialization in SILGEN with resilience not enabled.
-// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil
+/// Check silgen with resilience not enabled.
+// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t -o %t/Utils-NonRes.sil
 // RUN: %FileCheck %s --check-prefixes=UTILS-NONRES,UTILS-COMMON < %t/Utils-NonRes.sil
 
-/// Check for indirect access with a non-resiliently built module dependency.
-// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-NonRes.sil
+/// Check serialization of package decls in silgen with resilience not enabled.
+// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -experimental-serialize-package-decls -I %t -o %t/Utils-Serial.sil
+// RUN: %FileCheck %s --check-prefixes=UTILS-SERIAL < %t/Utils-Serial.sil
+
+/// Check for indirect access to decls in a non-resiliently built module.
+// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -module-name Client -package-name mypkg -I %t -o %t/Client-NonRes.sil
 // RUN: %FileCheck %s --check-prefixes=CLIENT-NONRES,CLIENT-COMMON < %t/Client-NonRes.sil
 
 
@@ -123,46 +127,59 @@ package class PkgKlass: PkgProto {
 
   // protocol witness for PkgProto.data.getter in conformance PkgKlass
   // UTILS-COMMON-DAG: sil private [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP4dataSivgTW : $@convention(witness_method: PkgProto) (@in_guaranteed PkgKlass) -> Int {
+  // UTILS-SERIAL-DAG: sil [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP4dataSivgTW : $@convention(witness_method: PkgProto) (@in_guaranteed PkgKlass) -> Int {
 
   // protocol witness for PkgProto.data.setter in conformance PkgKlass
   // UTILS-COMMON-DAG: sil private [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP4dataSivsTW : $@convention(witness_method: PkgProto) (Int, @inout PkgKlass) -> () {
+  // UTILS-SERIAL-DAG: sil [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP4dataSivsTW : $@convention(witness_method: PkgProto) (Int, @inout PkgKlass) -> () {
 
   // PkgKlass.data.getter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils8PkgKlassC4dataSivg : $@convention(method) (@guaranteed PkgKlass) -> Int {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils8PkgKlassC4dataSivg : $@convention(method) (@guaranteed PkgKlass) -> Int {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils8PkgKlassC4dataSivg : $@convention(method) (@guaranteed PkgKlass) -> Int {
 
   // PkgKlass.data.setter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils8PkgKlassC4dataSivs : $@convention(method) (Int, @guaranteed PkgKlass) -> () {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils8PkgKlassC4dataSivs : $@convention(method) (Int, @guaranteed PkgKlass) -> () {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils8PkgKlassC4dataSivs : $@convention(method) (Int, @guaranteed PkgKlass) -> () {
 
   // PkgKlass.data.modify
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils8PkgKlassC4dataSivM : $@yield_once @convention(method) (@guaranteed PkgKlass) -> @yields @inout Int {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils8PkgKlassC4dataSivM : $@yield_once @convention(method) (@guaranteed PkgKlass) -> @yields @inout Int {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils8PkgKlassC4dataSivM : $@yield_once @convention(method) (@guaranteed PkgKlass) -> @yields @inout Int {
 
   // protocol witness for PkgProto.pkgfunc(_:) in conformance PkgKlass
   // UTILS-COMMON-DAG: sil private [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP7pkgfuncyS2iFTW : $@convention(witness_method: PkgProto) (Int, @in_guaranteed PkgKlass) -> Int {
+  // UTILS-SERIAL-DAG: sil [transparent] [thunk] [ossa] @$s5Utils8PkgKlassCAA0B5ProtoA2aDP7pkgfuncyS2iFTW : $@convention(witness_method: PkgProto) (Int, @in_guaranteed PkgKlass) -> Int {
+
   package var data: Int
 
   // default argument 0 of PkgKlass.init(data:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfcfA_ : $@convention(thin) () -> Int {
+  // UTILS-SERIAL-DAG: sil package_non_abi [serialized] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfcfA_ : $@convention(thin) () -> Int {
 
   // PkgKlass.__allocating_init(data:)
   // UTILS-COMMON-DAG: sil package [exact_self_class] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
+  // UTILS-SERIAL-DAG: sil package [serialized] [exact_self_class] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
 
   // PkgKlass.init(data:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfc : $@convention(method) (Int, @owned PkgKlass) -> @owned PkgKlass {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfc : $@convention(method) (Int, @owned PkgKlass) -> @owned PkgKlass {
 
   // PkgKlass.deinit
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils8PkgKlassCfd : $@convention(method) (@guaranteed PkgKlass) -> @owned Builtin.NativeObject {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils8PkgKlassCfd : $@convention(method) (@guaranteed PkgKlass) -> @owned Builtin.NativeObject {
 
   // PkgKlass.__deallocating_deinit
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils8PkgKlassCfD : $@convention(method) (@owned PkgKlass) -> () {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils8PkgKlassCfD : $@convention(method) (@owned PkgKlass) -> () {
   package init(data: Int = 1) {
     self.data = data
   }
 
   // PkgKlass.pkgfunc(_:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils8PkgKlassC7pkgfuncyS2iF : $@convention(method) (Int, @guaranteed PkgKlass) -> Int {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils8PkgKlassC7pkgfuncyS2iF : $@convention(method) (Int, @guaranteed PkgKlass) -> Int {
   package func pkgfunc(_ arg: Int) -> Int {
     return data + arg
   }
@@ -220,21 +237,26 @@ package class UfiPkgClass {
   // UfiPkgClass.data.getter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils11UfiPkgClassC4dataSivg : $@convention(method) (@guaranteed UfiPkgClass) -> Int {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils11UfiPkgClassC4dataSivg : $@convention(method) (@guaranteed UfiPkgClass) -> Int {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils11UfiPkgClassC4dataSivg : $@convention(method) (@guaranteed UfiPkgClass) -> Int {
 
   // UfiPkgClass.data.setter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils11UfiPkgClassC4dataSivs : $@convention(method) (Int, @guaranteed UfiPkgClass) -> () {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils11UfiPkgClassC4dataSivs : $@convention(method) (Int, @guaranteed UfiPkgClass) -> () {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils11UfiPkgClassC4dataSivs : $@convention(method) (Int, @guaranteed UfiPkgClass) -> () {
 
   // UfiPkgClass.data.modify
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils11UfiPkgClassC4dataSivM : $@yield_once @convention(method) (@guaranteed UfiPkgClass) -> @yields @inout Int {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils11UfiPkgClassC4dataSivM : $@yield_once @convention(method) (@guaranteed UfiPkgClass) -> @yields @inout Int {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils11UfiPkgClassC4dataSivM : $@yield_once @convention(method) (@guaranteed UfiPkgClass) -> @yields @inout Int {
   package var data: Int = 0
 
   // UfiPkgClass.__allocating_init()
   // UTILS-COMMON-DAG: sil package [exact_self_class] [ossa] @$s5Utils11UfiPkgClassCACycfC : $@convention(method) (@thick UfiPkgClass.Type) -> @owned UfiPkgClass {
+  // UTILS-SERIAL-DAG: sil package [serialized] [exact_self_class] [ossa] @$s5Utils11UfiPkgClassCACycfC : $@convention(method) (@thick UfiPkgClass.Type) -> @owned UfiPkgClass {
 
   // UfiPkgClass.init()
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils11UfiPkgClassCACycfc : $@convention(method) (@owned UfiPkgClass) -> @owned UfiPkgClass {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils11UfiPkgClassCACycfc : $@convention(method) (@owned UfiPkgClass) -> @owned UfiPkgClass {
 
   // UfiPkgClass.deinit
   // UTILS-COMMON-DAG: sil [ossa] @$s5Utils11UfiPkgClassCfd : $@convention(method) (@guaranteed UfiPkgClass) -> @owned Builtin.NativeObject {
@@ -326,6 +348,7 @@ package struct PkgStruct {
   // PkgStruct.init()
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils9PkgStructVACycfC : $@convention(method) (@thin PkgStruct.Type) -> @out PkgStruct {
   // UTILS-NONRES-DAG: sil package [ossa] @$s5Utils9PkgStructVACycfC : $@convention(method) (@thin PkgStruct.Type) -> PkgStruct {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils9PkgStructVACycfC : $@convention(method) (@thin PkgStruct.Type) -> PkgStruct {
   package init() {}
 }
 
@@ -347,6 +370,7 @@ package struct UfiPkgStruct {
   // UfiPkgStruct.init()
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils12UfiPkgStructVACycfC : $@convention(method) (@thin UfiPkgStruct.Type) -> @out UfiPkgStruct {
   // UTILS-NONRES-DAG: sil package [ossa] @$s5Utils12UfiPkgStructVACycfC : $@convention(method) (@thin UfiPkgStruct.Type) -> UfiPkgStruct {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils12UfiPkgStructVACycfC : $@convention(method) (@thin UfiPkgStruct.Type) -> UfiPkgStruct {
   package init() {}
 }
 
@@ -368,6 +392,7 @@ package struct PkgStructGeneric<T> {
   package init(_ arg: T) { data = arg }
   // PkgStructGeneric.init(_:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils16PkgStructGenericVyACyxGxcfC : $@convention(method) <T> (@in T, @thin PkgStructGeneric<T>.Type) -> @out PkgStructGeneric<T> {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils16PkgStructGenericVyACyxGxcfC : $@convention(method) <T> (@in T, @thin PkgStructGeneric<T>.Type) -> @out PkgStructGeneric<T> {
 }
 
 package class PkgClassGeneric<T> {
@@ -382,24 +407,33 @@ package class PkgClassGeneric<T> {
   // PkgClassGeneric.data.getter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils15PkgClassGenericC4dataxvg : $@convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @out T {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils15PkgClassGenericC4dataxvg : $@convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @out T {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils15PkgClassGenericC4dataxvg : $@convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @out T {
 
   // PkgClassGeneric.data.setter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils15PkgClassGenericC4dataxvs : $@convention(method) <T> (@in T, @guaranteed PkgClassGeneric<T>) -> () {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils15PkgClassGenericC4dataxvs : $@convention(method) <T> (@in T, @guaranteed PkgClassGeneric<T>) -> () {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils15PkgClassGenericC4dataxvs : $@convention(method) <T> (@in T, @guaranteed PkgClassGeneric<T>) -> () {
 
   // PkgClassGeneric.data.modify
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils15PkgClassGenericC4dataxvM : $@yield_once @convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @yields @inout T {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils15PkgClassGenericC4dataxvM : $@yield_once @convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @yields @inout T {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils15PkgClassGenericC4dataxvM : $@yield_once @convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @yields @inout T {
 
   // PkgClassGeneric.__allocating_init(_:)
   // UTILS-COMMON-DAG: sil package [exact_self_class] [ossa] @$s5Utils15PkgClassGenericCyACyxGxcfC : $@convention(method) <T> (@in T, @thick PkgClassGeneric<T>.Type) -> @owned PkgClassGeneric<T> {
+  // UTILS-SERIAL-DAG: sil package [serialized] [exact_self_class] [ossa] @$s5Utils15PkgClassGenericCyACyxGxcfC : $@convention(method) <T> (@in T, @thick PkgClassGeneric<T>.Type) -> @owned PkgClassGeneric<T> {
 
   // PkgClassGeneric.init(_:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils15PkgClassGenericCyACyxGxcfc : $@convention(method) <T> (@in T, @owned PkgClassGeneric<T>) -> @owned PkgClassGeneric<T> {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils15PkgClassGenericCyACyxGxcfc : $@convention(method) <T> (@in T, @owned PkgClassGeneric<T>) -> @owned PkgClassGeneric<T> {
+
   // PkgClassGeneric.deinit
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils15PkgClassGenericCfd : $@convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @owned Builtin.NativeObject {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils15PkgClassGenericCfd : $@convention(method) <T> (@guaranteed PkgClassGeneric<T>) -> @owned Builtin.NativeObject {
+
   // PkgClassGeneric.__deallocating_deinit
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils15PkgClassGenericCfD : $@convention(method) <T> (@owned PkgClassGeneric<T>) -> () {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils15PkgClassGenericCfD : $@convention(method) <T> (@owned PkgClassGeneric<T>) -> () {
 }
 
 package struct PkgStructWithPublicMember {
@@ -429,18 +463,22 @@ package struct PkgStructWithPublicExistential {
   // PkgStructWithPublicExistential.member.getter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvg : $@convention(method) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvg : $@convention(method) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvg : $@convention(method) (@in_guaranteed PkgStructWithPublicExistential) -> @out any PublicProto {
 
   // PkgStructWithPublicExistential.member.setter
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvs : $@convention(method) (@in any PublicProto, @inout PkgStructWithPublicExistential) -> () {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvs : $@convention(method) (@in any PublicProto, @inout PkgStructWithPublicExistential) -> () {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvs : $@convention(method) (@in any PublicProto, @inout PkgStructWithPublicExistential) -> () {
 
   // PkgStructWithPublicExistential.member.modify
   // UTILS-RES-DAG: sil package [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvM : $@yield_once @convention(method) (@inout PkgStructWithPublicExistential) -> @yields @inout any PublicProto {
   // UTILS-NONRES-DAG: sil package [transparent] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvM : $@yield_once @convention(method) (@inout PkgStructWithPublicExistential) -> @yields @inout any PublicProto {
+  // UTILS-SERIAL-DAG: sil package [transparent] [serialized] [ossa] @$s5Utils30PkgStructWithPublicExistentialV6memberAA0E5Proto_pvM : $@yield_once @convention(method) (@inout PkgStructWithPublicExistential) -> @yields @inout any PublicProto {
   package var member: any PublicProto
 
   // PkgStructWithPublicExistential.init(_:)
   // UTILS-COMMON-DAG: sil package [ossa] @$s5Utils30PkgStructWithPublicExistentialVyAcA0E5Proto_pcfC : $@convention(method) (@in any PublicProto, @thin PkgStructWithPublicExistential.Type) -> @out PkgStructWithPublicExistential {
+  // UTILS-SERIAL-DAG: sil package [serialized] [ossa] @$s5Utils30PkgStructWithPublicExistentialVyAcA0E5Proto_pcfC : $@convention(method) (@in any PublicProto, @thin PkgStructWithPublicExistential.Type) -> @out PkgStructWithPublicExistential {
   package init(_ arg: any PublicProto) { member = arg }
 }
 

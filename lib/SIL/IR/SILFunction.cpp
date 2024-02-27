@@ -898,6 +898,12 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
       isAvailableExternally())
     return false;
 
+  if (getASTContext().LangOpts.EnableSerializePackageDecls &&
+      (getLinkage() == SILLinkage::Package ||
+       getLinkage() == SILLinkage::PackageExternal ||
+       getLinkage() == SILLinkage::PackageNonABI))
+    return true;
+
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(getLinkage());
 }

@@ -305,9 +305,12 @@ public:
     }
 
     IsSerialized_t serialized = IsNotSerialized;
-    auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
+    auto visibleAccess = SGM.getASTContext().LangOpts.EnableSerializePackageDecls ? AccessLevel::Package : AccessLevel::Public;
+    auto classIsVisible = theClass->getEffectiveAccess() >= visibleAccess;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !isResilient)
+    // Also the case if the decl's defining module was built non-resiliently
+    // and if the decl has a public or package access level.
+    if (classIsVisible && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -1091,9 +1094,10 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   SILDeclRef constant(dd, SILDeclRef::Kind::Deallocator);
   SILFunction *f = getFunction(constant, NotForDefinition);
   auto serialized = IsSerialized_t::IsNotSerialized;
-  bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
-  // We only serialize the deinit if the type is public and not resilient.
-  if (nomIsPublic && !nom->isResilient())
+  auto visibleAccess = nom->getASTContext().LangOpts.EnableSerializePackageDecls ? AccessLevel::Package : AccessLevel::Public;
+  bool nomIsVisible = nom->getEffectiveAccess() >= visibleAccess;
+  // We only serialize the deinit if the type is public/package and not resilient.
+  if (nomIsVisible && !nom->isResilient())
     serialized = IsSerialized;
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }

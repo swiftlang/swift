@@ -3315,7 +3315,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
                "Should have emitted function body earlier");
         writeSILFunction(F, true);
       }
-    } else if (F.getLinkage() == SILLinkage::Public &&
+    } else if (((SILMod->getSwiftModule()->getASTContext().LangOpts.EnableSerializePackageDecls &&
+               F.getLinkage() == SILLinkage::Package) ||
+               F.getLinkage() == SILLinkage::Public) &&
                resilience != ResilienceStrategy::Resilient &&
                F.hasArgumentEffects()) {
       writeSILFunction(F, true);

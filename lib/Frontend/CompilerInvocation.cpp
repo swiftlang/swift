@@ -675,6 +675,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
   Opts.EnableBypassResilienceInPackage = Args.hasArg(OPT_experimental_package_bypass_resilience);
+  Opts.EnableSerializePackageDecls = Args.hasArg(OPT_experimental_serialize_package_decls);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);

@@ -801,6 +801,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   auto *d = getDecl();
 
+  auto visibleAccess = d->getASTContext().LangOpts.EnableSerializePackageDecls ? AccessLevel::Package : AccessLevel::Public;
+
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
   if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
@@ -822,6 +824,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       d->getFormalAccessScope(/*useDC=*/nullptr,
                               /*treatUsableFromInlineAsPublic=*/true);
 
+    if (visibleAccess == AccessLevel::Package && scope.isPublicOrPackage())
+      return IsSerialized;
     if (scope.isPublic())
       return IsSerialized;
     return IsNotSerialized;
@@ -855,8 +859,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     return IsNotSerialized;
   }
 
-  // Anything else that is not public is not serializable.
-  if (d->getEffectiveAccess() < AccessLevel::Public)
+  // Anything else that is not public or package is not serializable.
+  if (d->getEffectiveAccess() < visibleAccess)
     return IsNotSerialized;
 
   // Enum element constructors are serializable if the enum is
@@ -918,6 +922,10 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+    return IsSerialized;
+
+  if (visibleAccess == AccessLevel::Package &&
+      d->getEffectiveAccess() == AccessLevel::Package)
     return IsSerialized;
 
   return IsNotSerialized;
