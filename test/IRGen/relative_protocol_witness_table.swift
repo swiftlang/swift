@@ -137,7 +137,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME:                      i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedAAWP" to i64)) to i32),
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA8FuncOnlyAAWP" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 1) to i64)) to i32),
-// CHECK-SAME   i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedA2aDP1cyyFTW" to i64),
+// CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s1A7BStructVAA9InheritedA2aDP1cyyFTW" to i64),
 // CHECK-SAME:                      i64 ptrtoint (ptr getelementptr inbounds ([3 x i32], ptr @"$s1A7BStructVAA9InheritedAAWP", i32 0, i32 2) to i64)) to i32)
 // CHECK-SAME: ], align 8
 

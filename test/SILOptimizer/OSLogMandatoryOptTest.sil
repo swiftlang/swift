@@ -173,12 +173,12 @@ bb0:
   destroy_value %9 : $String
   %12 = tuple ()
   return %12 : $()
-    // CHECK-DAG [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
-    // CHECK-DAG {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
-    // CHECK-DAG [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
-    // CHECK-DAG [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG [[LIT]] = string_literal oslog "test message: %lld"
-    // CHECK-DAG destroy_value [[STRINGCONST]] : $String
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
 // Test that the OSLogOptimization pass does not fold instructions that define

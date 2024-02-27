@@ -1472,8 +1472,8 @@ bb0:
 
 // This test needs the guard malloc to crash without the fix in #35037
 // Tests there is no use-after-free in ClosureCleanup::recordDeadFunction when deleting debug instructions
-// CHECK-LABEL : sil [ossa] @$test_no_use_after_free :
-// CHECK-LABEL : } // end sil function '$test_no_use_after_free'
+// CHECK-LABEL: sil [ossa] @$test_no_use_after_free :
+// CHECK-LABEL: } // end sil function '$test_no_use_after_free'
 sil [ossa] @$test_no_use_after_free : $@convention(thin) () -> () {
 bb0:
   %12 = function_ref @callee : $@convention(thin) () -> ()
