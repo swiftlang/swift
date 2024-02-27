@@ -1900,6 +1900,16 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                               TypeExpansionContext expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
 
+  // If the function is a closure being converted to an @isolated(any) type,
+  // add the implicit isolation parameter.
+  if (auto closureInfo = TC.getClosureTypeInfo(function)) {
+    if (closureInfo->ExpectedLoweredType->hasErasedIsolation()) {
+      auto isolationTy = SILType::getOpaqueIsolationType(TC.Context);
+      inputs.push_back({isolationTy.getASTType(),
+                        ParameterConvention::Direct_Guaranteed});
+    }
+  }
+
   // NB: The generic signature may be elided from the lowered function type
   // if the function is in a fully-specialized context, but we still need to
   // canonicalize references to the generic parameters that may appear in

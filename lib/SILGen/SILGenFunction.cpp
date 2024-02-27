@@ -1005,27 +1005,40 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     emitMarkFunctionEscapeForTopLevelCodeGlobals(loc, captureInfo);
   }
 
-  // TODO: these abstraction patterns seem wrong; we should be using the formal
-  // pattern
+  bool hasErasedIsolation =
+    typeContext.ExpectedLoweredType->hasErasedIsolation();
 
   ManagedValue result;
-  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
+  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized &&
+      !hasErasedIsolation) {
     result = ManagedValue::forObjectRValueWithoutOwnership(functionRef);
   } else {
     SmallVector<ManagedValue, 4> capturedArgs;
     emitCaptures(loc, constant, CaptureEmission::PartialApplication,
                  capturedArgs);
 
+    // Compute the erased isolation
+    ManagedValue isolation;
+    if (hasErasedIsolation) {
+      isolation = emitClosureIsolation(loc, constant, capturedArgs);
+    }
+
     // The partial application takes ownership of the context parameters.
     SmallVector<SILValue, 4> forwardedArgs;
+    if (hasErasedIsolation)
+      forwardedArgs.push_back(isolation.forward(*this));
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
+    auto resultIsolation = (hasErasedIsolation
+                              ? SILFunctionTypeIsolation::Erased
+                              : SILFunctionTypeIsolation::Unknown);
+
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention);
+                           calleeConvention, resultIsolation);
     result = emitManagedRValueWithCleanup(toClosure);
   }
 
@@ -1077,11 +1090,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
-  auto closureInfo = SGM.M.Types.getClosureTypeInfo(ace);
-
-  // TODO: remember more information from closureInfo and use it in
-  // prolog/epilog/return-statement emission.
-  OrigFnType = closureInfo.OrigType;
+  auto &closureInfo = SGM.M.Types.getClosureTypeInfo(ace);
+  TypeContext = closureInfo;
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   std::optional<Type> errorIfaceTy;
@@ -1090,9 +1100,9 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProlog(ace, captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
-             resultIfaceTy, errorIfaceTy, ace->getLoc(), OrigFnType);
+             resultIfaceTy, errorIfaceTy, ace->getLoc());
   prepareEpilog(ace, resultIfaceTy, errorIfaceTy,
-                CleanupLocation(ace), OrigFnType);
+                CleanupLocation(ace));
 
   emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -1608,8 +1618,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 }
 
 void SILGenFunction::emitGeneratorFunction(
-    SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
-    std::optional<AbstractionPattern> pattern) {
+    SILDeclRef function, Type resultInterfaceType, BraceStmt *body) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation loc(function.getDecl());
@@ -1619,7 +1628,7 @@ void SILGenFunction::emitGeneratorFunction(
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   emitProlog(dc, captureInfo, ParameterList::createEmpty(getASTContext()),
              /*selfParam=*/nullptr, resultInterfaceType,
-             /*errorType=*/std::nullopt, SourceLoc(), pattern);
+             /*errorType=*/std::nullopt, SourceLoc());
 
   prepareEpilog(dc, resultInterfaceType, std::nullopt, CleanupLocation(loc));
 
