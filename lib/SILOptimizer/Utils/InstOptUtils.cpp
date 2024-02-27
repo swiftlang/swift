@@ -1933,10 +1933,7 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
     if (!debugVal)
       continue;
 
-    // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
-      continue;
 
     SILType baseType = oldValue->getType();
 
