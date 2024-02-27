@@ -290,7 +290,7 @@ EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)
 
 // Enable isolated(any) attribute on function types.
-EXPERIMENTAL_FEATURE(IsolatedAny, false)
+EXPERIMENTAL_FEATURE(IsolatedAny, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

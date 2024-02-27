@@ -219,6 +219,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(LinearFunctionExtract)
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
+  HANDLE_FORWARDING_INST(FunctionExtractIsolation)
 #undef HANDLE_FORWARDING_INST
 };
 

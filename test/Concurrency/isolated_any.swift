@@ -7,6 +7,9 @@ func globalNonisolatedFunction() {}
 
 actor A {
   func actorFunction() {}
+  func asyncActorFunction() async {}
+  func asyncThrowsActorFunction() async throws {}
+  func actorFunctionWithArgs(value: Int) async -> String { "" }
 }
 
 func testBasic_sync() {
@@ -70,4 +73,13 @@ func requireSendableGlobalActor(_ fn: @Sendable @MainActor () -> ()) {}
 func testConvertIsolatedAnyToMainActor(fn: @Sendable @isolated(any) () -> ()) {
   // expected-error @+1 {{cannot convert value of type '@isolated(any) @Sendable () -> ()' to expected argument type '@MainActor @Sendable () -> ()'}}
   requireSendableGlobalActor(fn)
+}
+
+func extractFunctionIsolation(_ fn: @isolated(any) @escaping () async -> Void) {
+  let _: (any Actor)? = extractIsolation(fn)
+
+  let myActor = A()
+  let _: (any Actor)? = extractIsolation(myActor.asyncActorFunction)
+  let _: (any Actor)? = extractIsolation(myActor.asyncThrowsActorFunction)
+  let _: (any Actor)? = extractIsolation(myActor.actorFunctionWithArgs(value:))
 }
