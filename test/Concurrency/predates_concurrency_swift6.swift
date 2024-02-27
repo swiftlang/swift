@@ -29,8 +29,8 @@ func testInAsync(x: X) async {
   let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
   let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> (@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
@@ -44,8 +44,8 @@ func testElsewhere(x: X) {
   let _: Int = unsafelyMainActorClosure // expected-error{{type '@Sendable (@MainActor () -> Void) -> ()'}}
   let _: Int = unsafelyDoEverythingClosure // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> (@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()'}}
+  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '@Sendable (@MainActor @Sendable () -> Void) -> ()'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
