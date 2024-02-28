@@ -145,7 +145,9 @@ void FormalEvaluationScope::popImpl() {
     access.setFinished();
 
     // Deactivate the cleanup.
-    SGF.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
+    if (SGF.B.hasValidInsertionPoint()) {
+      SGF.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
+    }
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code. We do a simple N^2 comparison here to detect this because it is
@@ -168,8 +170,10 @@ void FormalEvaluationScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the context.
-    DiverseValueBuffer<FormalAccess> copiedAccess(access);
-    copiedAccess.getCopy().finish(SGF);
+    if (SGF.B.hasValidInsertionPoint()) {
+      DiverseValueBuffer<FormalAccess> copiedAccess(access);
+      copiedAccess.getCopy().finish(SGF);
+    }
 
   } while (i != endDepth);
 
