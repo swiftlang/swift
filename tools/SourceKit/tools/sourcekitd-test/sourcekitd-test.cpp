@@ -260,7 +260,7 @@ static void skt_main(skt_args *args) {
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
-  auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
@@ -1808,6 +1808,7 @@ struct ResponseSymbolInfo {
   const char *TypeUSR = nullptr;
   const char *ContainerTypeUSR = nullptr;
   const char *DocComment = nullptr;
+  const char *DocCommentAsXML = nullptr;
   const char *GroupName = nullptr;
   const char *LocalizationKey = nullptr;
   const char *AnnotatedDeclaration = nullptr;
@@ -1856,6 +1857,8 @@ struct ResponseSymbolInfo {
         sourcekitd_variant_dictionary_get_string(Info, KeyContainerTypeUsr);
 
     Symbol.DocComment =
+        sourcekitd_variant_dictionary_get_string(Info, KeyDocComment);
+    Symbol.DocCommentAsXML =
         sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
     Symbol.GroupName =
         sourcekitd_variant_dictionary_get_string(Info, KeyGroupName);
@@ -1981,8 +1984,12 @@ struct ResponseSymbolInfo {
       OS << AnnotatedDeclaration << '\n';
     if (FullyAnnotatedDeclaration)
       OS << FullyAnnotatedDeclaration << '\n';
+    OS << "DOC COMMENT\n";
     if (DocComment)
       OS << DocComment << '\n';
+    OS << "DOC COMMENT XML\n";
+    if (DocCommentAsXML)
+      OS << DocCommentAsXML << '\n';
     if (LocalizationKey) {
       OS << "<LocalizationKey>" << LocalizationKey;
       OS << "</LocalizationKey>" << '\n';

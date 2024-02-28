@@ -151,6 +151,9 @@ public:
 
   void endTransformFunction();
 
+  void beginVerifyFunction(SILFunction *function);
+  void endVerifyFunction();
+
   void notifyNewCloner() { numClonersAllocated++; }
   void notifyClonerDestroyed() { numClonersAllocated--; }
 
@@ -416,6 +419,12 @@ public:
   static bool isPassDisabled(StringRef passName);
   static bool isInstructionPassDisabled(StringRef instName);
   static bool disablePassesForFunction(SILFunction *function);
+
+  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
+  void runSwiftFunctionVerification(SILFunction *f);
+
+  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
+  void runSwiftModuleVerification();
 
 private:
   void parsePassCount(StringRef countsStr);

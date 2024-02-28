@@ -869,7 +869,9 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   SmallVector<InverseRequirement> inverses;
 
   SmallVector<Type, 4> needsDefaultRequirements;
-  InverseRequirement::enumerateDefaultedParams(proto, needsDefaultRequirements);
+  needsDefaultRequirements.push_back(proto->getSelfInterfaceType());
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
+    needsDefaultRequirements.push_back(assocTypeDecl->getDeclaredInterfaceType());
 
   auto &ctx = proto->getASTContext();
   auto selfTy = proto->getSelfInterfaceType();

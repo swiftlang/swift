@@ -12,7 +12,7 @@
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
-// RUN:     %S/Inputs/Swiftskell.swift
+// RUN:     %S/../Inputs/Swiftskell.swift
 
 // Check the interfaces
 
@@ -123,7 +123,13 @@ import NoncopyableGenerics_Misc
 // Synthesized conditional conformances are next
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Hello : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
 
 // FIXME: (rdar://123293620) inner struct extensions are not feature-guarded correctly
 // CHECK-MISC: extension {{.*}}.Outer.InnerStruct : Swift.Copyable {
@@ -132,10 +138,10 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: extension {{.*}}.Outer : Swift.Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Escapable where T : ~Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Escapable where T : ~Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Copyable where T : ~Escapable {
 
 ////////////////////////////////////////////////////////////////////////
 //    At the end, ensure there are no synthesized Copyable extensions

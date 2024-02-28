@@ -1737,6 +1737,9 @@ public:
     if (BBI->isFromVarDecl()) {
       *this << "[var_decl] ";
     }
+    if (BBI->isFixed()) {
+      *this << "[fixed] ";
+    }
     *this << getIDAndType(BBI->getOperand());
   }
 
@@ -3408,6 +3411,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 

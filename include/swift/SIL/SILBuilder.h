@@ -817,12 +817,13 @@ public:
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false,
                                      bool hasPointerEscape = false,
-                                     bool fromVarDecl = false) {
+                                     bool fromVarDecl = false,
+                                     bool fixed = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
-                                      hasPointerEscape, fromVarDecl));
+                                      hasPointerEscape, fromVarDecl, fixed));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -1615,19 +1616,8 @@ public:
   ObjectInst *createObject(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements,
                            unsigned NumBaseElements) {
-    return createObject(Loc, Ty, Elements, NumBaseElements,
-                        hasOwnership()
-                            ? mergeSILValueOwnership(Elements)
-                            : ValueOwnershipKind(OwnershipKind::None));
-  }
-
-  ObjectInst *createObject(SILLocation Loc, SILType Ty,
-                           ArrayRef<SILValue> Elements,
-                           unsigned NumBaseElements,
-                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(ObjectInst::create(getSILDebugLocation(Loc), Ty, Elements,
-                                     NumBaseElements, getModule(),
-                                     forwardingOwnershipKind));
+                                     NumBaseElements, getModule()));
   }
 
   VectorInst *createVector(SILLocation Loc, ArrayRef<SILValue> Elements) {

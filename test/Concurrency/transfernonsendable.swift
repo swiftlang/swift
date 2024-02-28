@@ -74,14 +74,16 @@ class TwoFieldKlassClassBox {
 
 extension Actor {
   func warningIfCallingGetter() async {
-    await self.klass.asyncCall() // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'self.klass' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
     // Since we are calling finalKlass directly, we emit a warning here.
-    await self.finalKlass.asyncCall() // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    await self.finalKlass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'self.finalKlass' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'self.finalKlass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
   }
 
   // We do not warn on this since we warn in the caller of our getter instead.
@@ -93,8 +95,9 @@ extension Actor {
 extension FinalActor {
   func warningIfCallingAsyncOnFinalField() async {
     // Since our whole class is final, we emit the error directly here.
-    await self.klass.asyncCall() // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    await self.klass.asyncCall() // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'self.klass' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'self.klass' to nonisolated callee could cause races between nonisolated and actor-isolated uses}}
   }
 }
 
@@ -123,7 +126,7 @@ func closureInOut(_ a: Actor) async {
 
   await a.useKlass(ns0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
-  // expected-tns-warning @-2 {{transferring non-Sendable value 'ns0' could yield races with later accesses}}
+  // expected-tns-warning @-2 {{transferring 'ns0' may cause a race}}
   // expected-tns-note @-3 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // We only emit a warning on the first use we see, so make sure we do both
@@ -146,13 +149,13 @@ func closureInOut2(_ a: Actor) async {
 
   var closure = {}
 
-  await a.useKlass(ns0) // expected-tns-warning {{transferring non-Sendable value 'ns0' could yield races with later accesses}}
+  await a.useKlass(ns0) // expected-tns-warning {{transferring 'ns0' may cause a race}}
   // expected-tns-note @-1 {{'ns0' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure = { useInOut(&contents) } // expected-tns-note {{access here could race}}
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable value 'ns1' could yield races with later accesses}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring 'ns1' may cause a race}}
   // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
@@ -174,25 +177,32 @@ func closureNonInOut(_ a: Actor) async {
 
   closure = { useValue(contents) }
 
-  await a.useKlass(ns1) // expected-tns-warning {{transferring non-Sendable value 'ns1' could yield races with later accesses}}
+  await a.useKlass(ns1) // expected-tns-warning {{transferring 'ns1' may cause a race}}
   // expected-tns-note @-1 {{'ns1' is transferred from nonisolated caller to actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure() // expected-tns-note {{access here could race}}
 }
 
+// TODO: Rework the nonisolated closure so we only treat nonisolated closures
+// that capture self as being nonisolated. When we capture from outside of a
+// method, we cannot access the inside of the actor without using an await, so
+// this is safe.
 func transferNonIsolatedNonAsyncClosureTwice() async {
   let a = Actor()
 
   // This is non-isolated and non-async... we can transfer it safely.
   var actorCaptureClosure = { print(a) }
-  await transferToMain(actorCaptureClosure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  await transferToMain(actorCaptureClosure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-tns-warning @-2 {{transferring 'actorCaptureClosure' may cause a race}}
+  // expected-tns-note @-3 {{transferring nonisolated 'actorCaptureClosure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
+
   actorCaptureClosure = { print(a) }
-  await transferToMain(actorCaptureClosure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  await transferToMain(actorCaptureClosure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-tns-warning @-2 {{transferring 'actorCaptureClosure' may cause a race}}
+  // expected-tns-note @-3 {{transferring nonisolated 'actorCaptureClosure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 extension Actor {
@@ -201,28 +211,31 @@ extension Actor {
     let closure: () -> () = {
       print(self.klass)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
+  // TODO: Why is this task isolated?
   func simpleClosureCaptureSelfAndTransferThroughTuple() async {
     let closure: () -> () = {
       print(self.klass)
     }
     let x = (1, closure)
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, () -> ())' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type '(Int, () -> ())' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{task isolated value of type '(Int, () -> ())' transferred to main actor-isolated context}}
   }
 
+  // TODO: Why is this task isolated?
   func simpleClosureCaptureSelfAndTransferThroughTupleBackwards() async {
     let closure: () -> () = {
       print(self.klass)
     }
 
     let x = (closure, 1)
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await transferToMain(x) // expected-tns-warning {{task isolated value of type '(() -> (), Int)' transferred to main actor-isolated context}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '(() -> (), Int)' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
@@ -232,8 +245,9 @@ extension Actor {
       print(self.klass)
     }
     let x: Any? = (1, closure)
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any?' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'Any?' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'x' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfAndTransferThroughOptionalBackwards() async {
@@ -244,8 +258,9 @@ extension Actor {
     // we are forming is an Any?  so we actually form the tuple as an object and
     // store it all as once.
     let x: Any? = (closure, 1)
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any?' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'Any?' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{transferring 'x' may cause a race}}
+    // expected-tns-note @-2 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfWithReinit() async {
@@ -254,9 +269,10 @@ extension Actor {
     }
 
     // Error here.
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
 
     closure = {}
 
@@ -279,18 +295,20 @@ extension Actor {
     }
 
     // Error here.
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfWithReinit3() async {
-    var closure: () -> () = {}
+    var closure: () -> () = {} // expected-tns-note {{variable defined here}}
 
     // We get a transfer after use error.
-    await transferToMain(closure) // expected-tns-warning {{transferring value of non-Sendable type '() -> ()' from actor-isolated context to main actor-isolated context; later accesses could race}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{'closure' is transferred from actor-isolated caller to main actor-isolated callee}}
 
     if await booleanFlag {
       closure = {
@@ -298,10 +316,11 @@ extension Actor {
       }
     }
 
-    await transferToMain(closure) // expected-tns-note {{access here could race}}
-    // expected-tns-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-note @-2 {{access here could race}}
+    // expected-tns-warning @-3 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-4 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   // In this case, we reinit along both paths, but only one has an actor derived
@@ -321,9 +340,10 @@ extension Actor {
       closure = {}
     }
 
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   #if TYPECHECKER_ONLY
@@ -349,9 +369,10 @@ extension Actor {
     let closure: () -> () = {
       print(x.1)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfThroughTuple2() async {
@@ -359,9 +380,10 @@ extension Actor {
     let closure: () -> () = {
       print(x.1)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   func simpleClosureCaptureSelfThroughOptional() async {
@@ -369,18 +391,20 @@ extension Actor {
     let closure: () -> () = {
       print(x as Any)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 }
 
 func testSimpleLetClosureCaptureActor() async {
   let a = Actor()
   let closure = { print(a) }
-  await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+  // expected-tns-note @-3 {{transferring nonisolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 #if TYPECHECKER_ONLY
@@ -415,9 +439,10 @@ func testSimpleVarClosureCaptureActor() async {
   let a = Actor()
   var closure = {}
   closure = { print(a) }
-  await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+  // expected-tns-note @-3 {{transferring nonisolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
 
 #if TYPECHECKER_ONLY
@@ -459,9 +484,10 @@ extension Actor {
     let closure: () -> () = {
       print(f)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 
   // Make sure that we properly propagate actor derived from klass into field's
@@ -471,22 +497,24 @@ extension Actor {
     let closure: () -> () = {
       print(f.field!)
     }
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 }
 
 extension Actor {
   func testVarReassignStopActorDerived() async {
-    var closure: () -> () = {
+    var closure: () -> () = { // expected-tns-note {{variable defined here}}
       print(self)
     }
 
     // This should error.
-    await transferToMain(closure) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{transferring actor-isolated 'closure' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
 
     // This doesnt since we re-assign
     closure = {}
@@ -496,9 +524,11 @@ extension Actor {
 
     // This re-assignment shouldn't error.
     closure = {}
-    await transferToMain(closure) // expected-tns-warning {{transferring value of non-Sendable type '() -> ()' from actor-isolated context to main actor-isolated context; later accesses could race}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // But this transfer should.
+    await transferToMain(closure) // expected-complete-warning {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-tns-warning @-2 {{transferring 'closure' may cause a race}}
+    // expected-tns-note @-3 {{'closure' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
     // But this will error since we race.
     closure() // expected-tns-note {{access here could race}}
@@ -519,9 +549,10 @@ func testConversionsAndSendable(a: Actor, f: @Sendable () -> Void, f2: () -> Voi
   await a.useNonSendableFunction(f)
 
   // Show that we error if we are not sendable.
-  await a.useNonSendableFunction(f2) // expected-tns-warning {{task isolated value of type '@noescape @callee_guaranteed () -> ()' transferred to actor-isolated context; later accesses to value could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
-  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  await a.useNonSendableFunction(f2) // expected-complete-warning {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
+  // expected-complete-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-tns-warning @-2 {{transferring 'f2' may cause a race}}
+  // expected-tns-note @-3 {{transferring nonisolated 'f2' to actor-isolated callee could cause races between actor-isolated and nonisolated uses}}
 }
 
 func testSendableClosureCapturesNonSendable(a: Actor) {
@@ -565,7 +596,7 @@ func singleFieldVarMergeTest() async {
   useValue(box)
   useValue(box.k)
 
-  await transferToMain(box) // expected-tns-warning {{transferring non-Sendable value 'box' could yield races with later accesses}}
+  await transferToMain(box) // expected-tns-warning {{transferring 'box' may cause a race}}
   // expected-tns-note @-1 {{'box' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'SingleFieldKlassBox' into main actor-isolated context may introduce data races}}
   
@@ -576,12 +607,13 @@ func singleFieldVarMergeTest() async {
 }
 
 func multipleFieldVarMergeTest1() async {
-  var box = TwoFieldKlassBox()
+  var box = TwoFieldKlassBox() // expected-tns-note {{variable defined here}}
   box = TwoFieldKlassBox()
 
   // This transfers the entire region.
-  await transferToMain(box.k1) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  await transferToMain(box.k1) // expected-tns-warning {{transferring 'box.k1' may cause a race}}
+  // expected-tns-note @-1 {{'box.k1' is transferred from nonisolated caller to main actor-isolated callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   
 
   // So even if we reassign over k1, since we did a merge, this should error.
@@ -616,12 +648,13 @@ func multipleFieldVarMergeTest2() async {
 }
 
 func multipleFieldTupleMergeTest1() async {
-  var box = (NonSendableKlass(), NonSendableKlass())
+  var box = (NonSendableKlass(), NonSendableKlass()) // expected-tns-note {{variable defined here}}
   box = (NonSendableKlass(), NonSendableKlass())
 
   // This transfers the entire region.
-  await transferToMain(box.0) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context; later accesses could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  await transferToMain(box.0) // expected-tns-warning {{transferring 'box.0' may cause a race}}
+  // expected-tns-note @-1 {{'box.0' is transferred from nonisolated caller to main actor-isolated callee}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   // So even if we reassign over k1, since we did a merge, this should error.
   box.0 = NonSendableKlass() // expected-tns-note {{access here could race}}
@@ -821,7 +854,7 @@ func letNonSendableNonTrivialLetStructFieldTest() async {
 func letSendableTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   _ = test.letSendableTrivial
@@ -831,7 +864,7 @@ func letSendableTrivialVarStructFieldTest() async {
 func letSendableNonTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   _ = test.letSendableNonTrivial
@@ -841,7 +874,7 @@ func letSendableNonTrivialVarStructFieldTest() async {
 func letNonSendableNonTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.letNonSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -898,7 +931,7 @@ func varNonSendableNonTrivialLetStructFieldTest() async {
 func varSendableTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   _ = test.varSendableTrivial
@@ -908,7 +941,7 @@ func varSendableTrivialVarStructFieldTest() async {
 func varSendableNonTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   _ = test.varSendableNonTrivial
@@ -918,7 +951,7 @@ func varSendableNonTrivialVarStructFieldTest() async {
 func varNonSendableNonTrivialVarStructFieldTest() async {
   var test = StructFieldTests() // expected-tns-note {{variable defined here}}
   test = StructFieldTests()
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.varNonSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -934,7 +967,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest1() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.letSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -949,7 +982,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest2() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.varSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -964,7 +997,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest3() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
@@ -980,7 +1013,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest4() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.letSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -996,7 +1029,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest5() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   let z = test.varSendableNonTrivial // expected-tns-note {{access here could race}}
@@ -1012,7 +1045,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest6() async {
     test = StructFieldTests()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
@@ -1027,7 +1060,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest7() async {
     test.varSendableNonTrivial = SendableKlass()
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
@@ -1042,7 +1075,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest8() async {
     useInOut(&test)
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
@@ -1057,7 +1090,7 @@ func varNonSendableNonTrivialLetStructFieldClosureTest9() async {
     useInOut(&test.varSendableNonTrivial)
   }
   _ = cls
-  await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+  await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
@@ -1075,7 +1108,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive1() async {
     }
     _ = cls
   } else {
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
     // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
 
@@ -1096,7 +1129,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive2() async {
     }
     _ = cls
 
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
     // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   }
@@ -1118,7 +1151,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive3() async {
     }
     _ = cls
   } else {
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
     // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   }
@@ -1138,7 +1171,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
     // loop carry use and an error due to multiple params. Then we could emit
     // the error on test below. This is still correct though, just not as
     // good... that is QoI though.
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
     // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-tns-note @-2 {{access here could race}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
@@ -1165,7 +1198,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
   // this. This is a case where we are going to need to be able to have the
   // compiler explain the regions well.
   for _ in 0..<1024 {
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-tns-note @-2 {{access here could race}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
@@ -1189,11 +1222,11 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
       useInOut(&test.varSendableNonTrivial)
     }
     _ = cls
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   } else {
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   }
@@ -1210,7 +1243,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
   var cls = {}
 
   if await booleanFlag {
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   } else {
@@ -1218,7 +1251,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
       useInOut(&test.varSendableNonTrivial)
     }
     _ = cls
-    await transferToMain(test) // expected-tns-warning {{transferring non-Sendable value 'test' could yield races with later accesses}}
+    await transferToMain(test) // expected-tns-warning {{transferring 'test' may cause a race}}
   // expected-tns-note @-1 {{'test' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   }
@@ -1319,7 +1352,7 @@ func controlFlowTest2() async {
   var x = NonSendableKlass() // expected-tns-note {{variable defined here}}
 
   for _ in 0..<1024 {
-    await transferToMain(x) // expected-tns-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+    await transferToMain(x) // expected-tns-warning {{transferring 'x' may cause a race}}
     // expected-tns-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     // expected-tns-note @-2 {{access here could race}}
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
@@ -1341,25 +1374,26 @@ actor ActorWithSetter {
   var recursive: ActorWithSetter? = nil
   var classBox = TwoFieldKlassClassBox()
 
+  // TODO: Why is this task isolated? This should be actor isolated?
   func test1() async {
     let x = NonSendableKlass()
     self.field = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test2() async {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test3() async {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   // This triggers a crash in SILGen with tns enabled.
@@ -1378,8 +1412,8 @@ actor ActorWithSetter {
   func classBox() async {
     let x = NonSendableKlass()
     self.classBox.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 }
 
@@ -1393,22 +1427,22 @@ final actor FinalActorWithSetter {
   func test1() async {
     let x = NonSendableKlass()
     self.field = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test2() async {
     let x = NonSendableKlass()
     self.twoFieldBox.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   func test3() async {
     let x = NonSendableKlass()
     self.twoFieldBoxInTuple.1.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
   }
 
   // This triggers a crash in SILGen with tns enabled.
@@ -1427,7 +1461,13 @@ final actor FinalActorWithSetter {
   func classBox() async {
     let x = NonSendableKlass()
     self.classBox.k1 = x
-    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    await transferToMain(x) // expected-complete-warning {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+    // expected-tns-warning @-1 {{task isolated value of type 'NonSendableKlass' transferred to main actor-isolated context}}
+  }
+}
+
+func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
+  let _ = { @MainActor in
+    let _ = x // expected-tns-warning {{task isolated value of type '() -> ()' transferred to main actor-isolated context}}
   }
 }

@@ -58,7 +58,8 @@ void simple_display(
 
 /// Describes a set of type declarations that are "direct" referenced by
 /// a particular type in the AST.
-using DirectlyReferencedTypeDecls = llvm::TinyPtrVector<TypeDecl *>;
+using DirectlyReferencedTypeDecls = std::pair<llvm::TinyPtrVector<TypeDecl *>,
+                                              InvertibleProtocolSet>;
 
 /// Request the set of declarations directly referenced by the an "inherited"
 /// type of a type or extension declaration.
@@ -198,6 +199,25 @@ public:
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
+class AllInheritedProtocolsRequest
+    : public SimpleRequest<
+          AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 class ProtocolRequirementsRequest
     : public SimpleRequest<ProtocolRequirementsRequest,
                            ArrayRef<ValueDecl *>(ProtocolDecl *),
@@ -270,6 +290,7 @@ public:
 
 struct SelfBounds {
   llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
 };
 

@@ -12,3 +12,5 @@
 // RUN: %clang -E -P -x c %S/Outputs/stability-stdlib-source-%target-cpu.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-source.swift.expected
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-source.swift.expected %t.tmp/changes.txt.tmp
+
+// XFAIL: noncopyable_generics

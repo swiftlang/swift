@@ -85,7 +85,7 @@ extension AsyncCompactMapSequence: AsyncSequence {
   ///
   /// The compact map sequence produces whatever type of error its
   /// base sequence does.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -138,7 +138,7 @@ extension AsyncCompactMapSequence: AsyncSequence {
     /// transform returns a non-`nil` value. If the transform returns `nil`,
     /// this method continues to wait for further elements until it gets one
     /// that transforms to a non-`nil` value.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> ElementOfResult? {
       while true {

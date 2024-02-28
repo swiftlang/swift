@@ -3472,7 +3472,7 @@ public:
   /// path element.
   ConstraintLocator *
   getConstraintLocator(ASTNode anchor, ConstraintLocator::PathElement pathElt) {
-    return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt),
+    return getConstraintLocator(anchor, llvm::ArrayRef(pathElt),
                                 pathElt.getNewSummaryFlags());
   }
 

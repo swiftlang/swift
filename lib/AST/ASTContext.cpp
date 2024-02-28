@@ -3914,15 +3914,6 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
                                bool HasExplicitAnyObject) {
   assert(Members.size() != 1 || HasExplicitAnyObject || !Inverses.empty());
 
-#ifndef NDEBUG
-  for (auto member : Members) {
-    if (auto *proto = member->getAs<ProtocolType>()) {
-      assert(!proto->getDecl()->getInvertibleProtocolKind() &&
-             "Should have been folded away");
-    }
-  }
-#endif
-
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;

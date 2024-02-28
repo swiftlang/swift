@@ -238,6 +238,10 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
+option(SWIFT_BUILD_CLANG_OVERLAYS
+  "Build Swift overlays for the clang builtin modules"
+  TRUE)
+
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
     TRUE)
@@ -1381,14 +1385,6 @@ endif()
 add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
-  # TODO Remove this once release/5.9 is done and we can finish migrating Swift
-  #      off of `llvm::None`/`llvm::Optional`, and `llvm::makeArrayRef`.
-  # This is to silence the avalanche of deprecation warnings from LLVM headers
-  # until we can actually do something about them. This is nasty, but it's
-  # better than losing context due to the sheer number in-actionable deprecation
-  # warnings or the massive number of merge-conflicts we would get otherwise.
-  add_definitions(-DSWIFT_TARGET)
-
   add_subdirectory(lib)
 
   add_subdirectory(SwiftCompilerSources)

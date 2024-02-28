@@ -718,11 +718,8 @@ public:
   ///
   /// \param Loc where to diagnose.
   /// \param DiagText name for the string literal in the diagnostic.
-  /// \param AllowMultiline Whether the string literal can be a multiline string
-  ///        literal.
   std::optional<StringRef>
-  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
-                                    bool AllowMultiline);
+  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
 
   /// Returns true to indicate that experimental concurrency syntax should be
   /// parsed if the parser is generating only a syntax tree or if the user has

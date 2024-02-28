@@ -60,8 +60,16 @@ static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
   diag.flush();
 
   // Have no advice for situations where the KP conformance is explicit.
-  if (nominal->hasMarking(ip))
-    return;
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  auto inheritedNominals = getDirectlyInheritedNominalTypeDecls(
+      nominal, inverses, anyObject);
+  for (auto entry : inheritedNominals) {
+    if (auto *otherProto = dyn_cast<ProtocolDecl>(entry.Item)) {
+      if (otherProto->isSpecificProtocol(kp))
+        return;
+    }
+  }
 
   auto &ctx = nominal->getASTContext();
 

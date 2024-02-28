@@ -171,7 +171,7 @@ namespace swift {
     ///
 
     /// User-overridable language version to compile for.
-    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
+    version::Version EffectiveLanguageVersion = version::Version{5, 10};
 
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
@@ -563,7 +563,7 @@ namespace swift {
     bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = false;
+    bool EnableExperimentalLifetimeDependenceInference = true;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;

@@ -462,8 +462,8 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("pattern is not a tuple");
   case Kind::Tuple: {
-    for (auto &elt : llvm::makeArrayRef(OrigTupleElements,
-                                        getNumTupleElements_Stored())) {
+    for (auto &elt :
+         llvm::ArrayRef(OrigTupleElements, getNumTupleElements_Stored())) {
       if (elt.isPackExpansion())
         return true;
     }

@@ -1195,6 +1195,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
       }
 
       Caller->verify();
+      pm->runSwiftFunctionVerification(Caller);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -1212,6 +1213,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // the inliner without running the entire inliner.
   if (EnableVerifyAfterInlining) {
     Caller->verify();
+    pm->runSwiftFunctionVerification(Caller);
   }
 
   return true;

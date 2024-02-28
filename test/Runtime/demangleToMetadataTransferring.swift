@@ -21,7 +21,7 @@ class Klass {}
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
   DemangleToMetadataTests.test("transferring parameter") {
     typealias Fn = (transferring Klass) -> Void
     expectEqual("y4main5KlassCnYuc", _mangledTypeName(Fn.self)!)

@@ -558,8 +558,11 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, options.Passes),
       isMandatory, IRGenMod);
 
-  if (Module->getOptions().VerifyAll)
+  if (Module->getOptions().VerifyAll) {
     Module->verify();
+    SILPassManager pm(Module, isMandatory, IRGenMod);
+    pm.runSwiftModuleVerification();
+  }
 }
 
 namespace {
@@ -705,7 +708,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.VerifySILOwnership = !options.DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = options.RemarksFilename;
   SILOpts.OptRecordPasses = options.RemarksPasses;
-  SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnableStackProtection = true;
   SILOpts.EnableMoveInoutStackProtection = options.EnableMoveInoutStackProtection;
 

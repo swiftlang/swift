@@ -4080,20 +4080,36 @@ public:
   
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  /// Should this declaration behave as if it must be accessed
-  /// resiliently, even when we're building a non-resilient module?
+  /// Returns whether this declaration is resilient at the definition site, i.e.
+  /// must be accessed resiliently even when its defining module is built
+  /// non-resiliently.
   ///
   /// This is used for diagnostics, because we do not want a behavior
   /// change between builds with resilience enabled and disabled.
   bool isFormallyResilient() const;
 
-  /// Do we need to use resilient access patterns outside of this type's
-  /// resilience domain?
+  /// Returns whether this decl is resilient at the definition site
+  /// \c isFormallyResilient or whether its defining module
+  /// is built resiliently.
   bool isResilient() const;
 
-  /// Do we need to use resilient access patterns when accessing this
-  /// type from the given module?
-  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
+  /// Returns whether this decl is accessed non/resiliently at the _use_ site
+  /// in \p accessingModule, depending on \p expansion.
+  ///
+  /// If \p expansion is maximal, the decl could be treated as non-resilient
+  /// even though the decl is resilient by definition or its defining module is built
+  /// resiliently. For example, if accessing a decl defined in the same module or
+  /// another module in the same package as the \p accessingModule, the
+  /// decl could be treated as non-resilient (with package optimization enabled in
+  /// case of different modules); this enables bypassing resilience checks at the
+  /// use site so the decl can be accessed directly.
+  ///
+  /// \p accessingModule The module from which this decl is accessed. Might
+  ///                    be the same module as its defining module.
+  /// \p expansion Used to determine whether non-resilience / direct access
+  ///              to this decl is possible.
+  bool isResilient(ModuleDecl *accessingModule,
+                   ResilienceExpansion expansion) const;
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.
@@ -4372,10 +4388,6 @@ public:
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
-
-  /// Determine whether this type has `: <target>` stated explicitly in
-  /// its inheritance clause.
-  bool hasMarking(InvertibleProtocolKind target) const;
 
   /// Determine whether this type has ~<target>` stated on
   /// itself, one of its inherited types or `Self` requirements.
@@ -5172,6 +5184,10 @@ public:
   /// Retrieve the set of protocols inherited from this protocol.
   ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
+  /// Retrieve the transitive closure of the inherited protocols, not including
+  /// this protocol itself.
+  ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
@@ -5239,10 +5255,6 @@ public:
   /// Determine whether this protocol has ~<target>` stated on
   /// itself, one of its inherited types or `Self` requirements.
   InverseMarking::Mark hasInverseMarking(InvertibleProtocolKind target) const;
-
-  /// Determine whether this protocol requires conformance to `IP`, without
-  /// querying a generic signature.
-  bool requiresInvertible(InvertibleProtocolKind ip) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {

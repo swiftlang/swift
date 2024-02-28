@@ -1079,8 +1079,7 @@ void ModuleFile::allocateBuffer(MutableArrayRef<T> &buffer,
     return;
 
   void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
-  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
-                                     rawData.size());
+  buffer = llvm::MutableArrayRef(static_cast<T *>(rawBuffer), rawData.size());
   std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
 }
 

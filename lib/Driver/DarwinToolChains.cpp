@@ -60,7 +60,7 @@ toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
   }
 
   StringRef paths[] = {swiftBinDir, path};
-  auto pathsRef = llvm::makeArrayRef(paths);
+  auto pathsRef = llvm::ArrayRef(paths);
   if (!hasToolchain)
     pathsRef = pathsRef.drop_back();
 
@@ -384,8 +384,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
     } else if (value.equals("5.8")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-    } else if (value.equals("5.11")) {
-      runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
+    } else if (value.equals("6.0")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = std::nullopt;
     } else {

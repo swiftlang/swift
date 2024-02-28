@@ -7255,8 +7255,6 @@ void SILModule::verify(CalleeCache *calleeCache,
   if (!verificationEnabled(*this))
     return;
 
-  checkForLeaks();
-
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 

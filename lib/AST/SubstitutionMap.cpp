@@ -527,9 +527,8 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-  return get(protocol->getGenericSignature(),
-             llvm::makeArrayRef<Type>(selfType),
-             llvm::makeArrayRef<ProtocolConformanceRef>(conformance));
+  return get(protocol->getGenericSignature(), llvm::ArrayRef<Type>(selfType),
+             llvm::ArrayRef<ProtocolConformanceRef>(conformance));
 }
 
 SubstitutionMap

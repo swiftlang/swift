@@ -98,10 +98,25 @@ public distributed actor MyOtherActor {
 
 /// Read the current offset and cast an element to `Int`
 
+// CHECK: [[DECODER:%.*]] = load ptr, ptr %1
+// CHECK-NEXT: [[DECODE_NEXT_ARG_REF:%.*]] = getelementptr inbounds ptr, ptr %2, i64
+
 // CHECK: [[ARG_0_SIZE_ADJ:%.*]] = add i64 %size, 15
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i64 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_0_SIZE]])
-// CHECK-NEXT: call swiftcc void @"$s11Distributed0A23TargetInvocationDecoderP18decodeNextArgumentqd__yKlFTj"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[DECODER_TYPE]], ptr [[DECODER_PROTOCOL_WITNESS]])
+// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSeMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[ENCODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness, label [[CONT:%.*]]
+// CHECK: missing-witness:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: [[DECODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSEMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[DECODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness1, label [[CONT:%.*]]
+// CHECK: missing-witness1:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
 
 // CHECK: store ptr null, ptr %swifterror
 // CHECK-NEXT: %._value = getelementptr inbounds %TSi, ptr [[ARG_0_VALUE_BUF]], i32 0, i32 0

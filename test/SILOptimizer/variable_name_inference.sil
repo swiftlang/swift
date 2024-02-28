@@ -1,11 +1,39 @@
-// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -module-name infer -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
 
-class Klass {}
+//===----------------------------------------------------------------------===//
+//                             MARK: Declarations
+//===----------------------------------------------------------------------===//
+
+class Klass {
+}
+
+class ContainsKlass {
+  var computedKlass: Klass { get }
+  final var klass: Klass
+
+  init()
+}
+
+struct KlassPair {
+  var lhs: Klass
+  var rhs: Klass
+}
+
+class KlassWithKlassPair {
+  var ns1: KlassPair { get }
+  var ns2: (KlassPair, KlassPair) { get }
+}
 
 sil @getKlass : $@convention(thin) () -> @owned Klass
+sil @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
 sil @useIndirect : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @sideEffect : $@convention(thin) () -> ()
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: begin running test {{[0-9]+}} of {{[0-9]+}} on simple_test_case: variable-name-inference with: @trace[0]
 // CHECK: Input Value:   %1 = apply %0() : $@convention(thin) () -> @owned Klass
@@ -73,4 +101,292 @@ bb0:
   dealloc_stack %temp : $*Klass
   %9999 = tuple ()
   return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on look_through_accessors_get: variable-name-inference with: @trace[0]
+// CHECK: Name: 'myName.computedKlass'
+// CHECK: Root: %2 = move_value [lexical] [var_decl]
+// CHECK: end running test {{.*}} of {{.*}} on look_through_accessors_get: variable-name-inference with: @trace[0]
+sil [ossa] @look_through_accessors_get : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %0 = function_ref @getContainsKlass : $@convention(thin) () -> @owned ContainsKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned ContainsKlass
+  %3 = move_value [lexical] [var_decl] %1 : $ContainsKlass
+  debug_value %3 : $ContainsKlass, let, name "myName"
+  %5 = begin_borrow %3 : $ContainsKlass
+  %6 = class_method %5 : $ContainsKlass, #ContainsKlass.computedKlass!getter : (ContainsKlass) -> () -> Klass, $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed ContainsKlass) -> @owned Klass
+  debug_value [trace] %7 : $Klass
+  end_borrow %5 : $ContainsKlass
+  destroy_value %7 : $Klass
+  destroy_value %3 : $ContainsKlass
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil [thunk] @test_reabstraction_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on handle_function_conversion_reabstraction_thunks: variable-name-inference with: @trace[0]
+// CHECK: Name: 'namedClosure'
+// CHECK: Root: %0 = alloc_stack [lexical] $@callee_guaranteed () -> (), var, name "namedClosure"
+// CHECK: end running test {{.*}} of {{.*}} on handle_function_conversion_reabstraction_thunks: variable-name-inference with: @trace[0]
+sil [ossa] @handle_function_conversion_reabstraction_thunks : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %namedStack = alloc_stack [lexical] $@callee_guaranteed () -> (), var, name "namedClosure"
+  %f = function_ref @sideEffect : $@convention(thin) () -> ()
+  %pa = partial_apply [callee_guaranteed] %f() : $@convention(thin) () -> ()
+  store %pa to [init] %namedStack : $*@callee_guaranteed () -> ()
+
+  %temp = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %access = begin_access [read] [static] %namedStack : $*@callee_guaranteed () -> ()
+  %load = load [copy] %access : $*@callee_guaranteed () -> ()
+  end_access %access : $*@callee_guaranteed () -> ()
+
+  %reabstract = function_ref @test_reabstraction_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+  %reabstract_partially_applied = partial_apply [callee_guaranteed] %reabstract(%load) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out ()
+  %cvt = convert_function %reabstract_partially_applied : $@callee_guaranteed () -> @out () to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  store %cvt to [init] %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  debug_value [trace] %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+
+  destroy_addr %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  dealloc_stack %temp : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  destroy_addr %namedStack : $*@callee_guaranteed () -> ()
+  dealloc_stack %namedStack : $*@callee_guaranteed () -> ()
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on mark_uninitialized_test: variable-name-inference with: @trace[0]
+// CHECK: Name: 'self'
+// CHECK: Root: %0 = alloc_stack $Klass, var, name "self"
+// CHECK: end running test {{.*}} of {{.*}} on mark_uninitialized_test: variable-name-inference with: @trace[0]
+sil [ossa] @mark_uninitialized_test : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %1 = alloc_stack $Klass, var, name "self"
+  %2 = mark_uninitialized [rootself] %1 : $*Klass
+  debug_value [trace] %2 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} of {{.*}} on copyable_to_moveonlywrapper_addr_test: variable-name-inference with: @trace[0]
+// CHECK: Name: 'self'
+// CHECK: Root: %0 = alloc_stack $Klass, var, name "self"
+// CHECK: end running test {{.*}} of {{.*}} on copyable_to_moveonlywrapper_addr_test: variable-name-inference with: @trace[0]
+sil [ossa] @copyable_to_moveonlywrapper_addr_test : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable-name-inference @trace[0]"
+  %0 = alloc_stack $Klass, var, name "self"
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Klass
+  %2 = moveonlywrapper_to_copyable_addr %1 : $*@moveOnly Klass
+  debug_value [trace] %2 : $*Klass
+  dealloc_stack %0 : $*Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_tuple_destructure: variable-name-inference with: @trace[0]
+// CHECK: Input Value: (**%8**, %9) = destructure_tuple %7 : $(Klass, Klass)
+// CHECK: Name: 'y.0'
+// CHECK: Root:   %5 = tuple (%1 : $Klass, %2 : $Klass)
+// CHECK: end running test 1 of 1 on test_tuple_destructure: variable-name-inference with: @trace[0]
+sil [ossa] @test_tuple_destructure : $@convention(thin) (@owned Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %3 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %3 : $*Klass
+  %5 = tuple (%1 : $Klass, %2 : $Klass)
+  debug_value %5 : $(Klass, Klass), let, name "y", argno 2
+  %9 = copy_value %5 : $(Klass, Klass)
+  (%10, %11) = destructure_tuple %9 : $(Klass, Klass)
+  %12 = begin_access [modify] [static] %3 : $*Klass
+  debug_value [trace] %10 : $Klass
+  store %10 to [assign] %12 : $*Klass
+  end_access %12 : $*Klass
+  destroy_value %11 : $Klass
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_tuple_extract: variable-name-inference with: @trace[0]
+// CHECK: Input Value: %9 = tuple_extract %8 : $(Klass, Klass), 0
+// CHECK: Name: 'y.0'
+// CHECK: Root:   %5 = tuple (%1 : $Klass, %2 : $Klass)
+// CHECK: end running test 1 of 1 on test_tuple_extract: variable-name-inference with: @trace[0]
+sil [ossa] @test_tuple_extract : $@convention(thin) (@owned Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %3 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %3 : $*Klass
+  %5 = tuple (%1 : $Klass, %2 : $Klass)
+  debug_value %5 : $(Klass, Klass), let, name "y", argno 2
+  %9 = copy_value %5 : $(Klass, Klass)
+  %9a = begin_borrow %9 : $(Klass, Klass)
+  %10 = tuple_extract %9a : $(Klass, Klass), 0
+  debug_value [trace] %10 : $Klass
+  end_borrow %9a : $(Klass, Klass)
+  destroy_value %9 : $(Klass, Klass)
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_struct_destructure: variable-name-inference with: @trace[0]
+// CHECK: Input Value: (%8, **%9**) = destructure_struct %7 : $KlassPair
+// CHECK: Name: 'y.rhs'
+// CHECK: Root:   %5 = struct $KlassPair (%1 : $Klass, %2 : $Klass)
+// CHECK: end running test 1 of 1 on test_struct_destructure: variable-name-inference with: @trace[0]
+sil [ossa] @test_struct_destructure : $@convention(thin) (@owned Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %3 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %3 : $*Klass
+  %5 = struct $KlassPair (%1 : $Klass, %2 : $Klass)
+  debug_value %5 : $KlassPair, let, name "y", argno 2
+  %9 = copy_value %5 : $KlassPair
+  (%10, %11) = destructure_struct %9 : $KlassPair
+  %12 = begin_access [modify] [static] %3 : $*Klass
+  debug_value [trace] %11 : $Klass
+  store %10 to [assign] %12 : $*Klass
+  end_access %12 : $*Klass
+  destroy_value %11 : $Klass
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_struct_extract: variable-name-inference with: @trace[0]
+// CHECK: Input Value: %9 = struct_extract %8 : $KlassPair, #KlassPair.rhs
+// CHECK: Name: 'y.rhs'
+// CHECK: Root: %5 = struct $KlassPair (%1 : $Klass, %2 : $Klass)
+// CHECK: end running test 1 of 1 on test_struct_extract: variable-name-inference with: @trace[0]
+sil [ossa] @test_struct_extract : $@convention(thin) (@owned Klass, @guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
+  specify_test "variable-name-inference @trace[0]"
+  %3 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %3 : $*Klass
+  %5 = struct $KlassPair (%1 : $Klass, %2 : $Klass)
+  debug_value %5 : $KlassPair, let, name "y", argno 2
+  %9 = copy_value %5 : $KlassPair
+  %9a = begin_borrow %9 : $KlassPair
+  %10 = struct_extract %9a : $KlassPair, #KlassPair.rhs
+  debug_value [trace] %10 : $Klass
+  end_borrow %9a : $KlassPair
+  destroy_value %9 : $KlassPair
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_klass_tuple_struct_lookthrough: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %28 = load [copy] %27 : $*Klass
+// CHECK: Name: 'arg2.ns2.1.rhs'
+// CHECK: Root: %1 = argument of bb0 : $KlassWithKlassPair
+// CHECK: end running test 1 of 1 on test_klass_tuple_struct_lookthrough: variable-name-inference with: @trace[0]
+sil [ossa] @test_klass_tuple_struct_lookthrough : $@convention(thin) @async (@owned Klass, @guaranteed KlassWithKlassPair) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $KlassWithKlassPair):
+  debug_value %0 : $Klass, let, name "arg1", argno 1
+  debug_value %1 : $KlassWithKlassPair, let, name "arg2", argno 2
+
+  specify_test "variable-name-inference @trace[0]"
+  %2 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %2 : $*Klass
+  %7 = alloc_stack $KlassPair
+  %8 = class_method %1 : $KlassWithKlassPair, #KlassWithKlassPair.ns1!getter : (KlassWithKlassPair) -> () -> KlassPair, $@convention(method) (@guaranteed KlassWithKlassPair) -> @owned KlassPair
+  %9 = apply %8(%1) : $@convention(method) (@guaranteed KlassWithKlassPair) -> @owned KlassPair
+  store %9 to [init] %7 : $*KlassPair
+  %11 = struct_element_addr %7 : $*KlassPair, #KlassPair.rhs
+  %12 = load [copy] %11 : $*Klass
+  destroy_addr %7 : $*KlassPair
+  %14 = begin_access [modify] [static] %2 : $*Klass
+  store %12 to [assign] %14 : $*Klass
+  end_access %14 : $*Klass
+  dealloc_stack %7 : $*KlassPair
+  %18 = alloc_stack $(KlassPair, KlassPair)
+  %19 = tuple_element_addr %18 : $*(KlassPair, KlassPair), 0
+  %20 = tuple_element_addr %18 : $*(KlassPair, KlassPair), 1
+  %21 = class_method %1 : $KlassWithKlassPair, #KlassWithKlassPair.ns2!getter : (KlassWithKlassPair) -> () -> (KlassPair, KlassPair), $@convention(method) (@guaranteed KlassWithKlassPair) -> (@owned KlassPair, @owned KlassPair)
+  %22 = apply %21(%1) : $@convention(method) (@guaranteed KlassWithKlassPair) -> (@owned KlassPair, @owned KlassPair)
+  (%23, %24) = destructure_tuple %22 : $(KlassPair, KlassPair)
+  store %23 to [init] %19 : $*KlassPair
+  store %24 to [init] %20 : $*KlassPair
+  %27 = tuple_element_addr %18 : $*(KlassPair, KlassPair), 1
+  %28 = struct_element_addr %27 : $*KlassPair, #KlassPair.rhs
+  %29 = load [copy] %28 : $*Klass
+  destroy_addr %18 : $*(KlassPair, KlassPair)
+  %31 = begin_access [modify] [static] %2 : $*Klass
+  debug_value [trace] %29 : $Klass
+  store %29 to [assign] %31 : $*Klass
+  end_access %31 : $*Klass
+  dealloc_stack %18 : $*(KlassPair, KlassPair)
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %37 = tuple ()
+  return %37 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_klass_tuple_struct_lookthrough_with_copyaddr: variable-name-inference with: @trace[0]
+// CHECK: Input Value:   %33 = load [copy] %32 : $*Klass
+// CHECK: Name: 'arg2.ns2.1.rhs'
+// CHECK: Root: %1 = argument of bb0 : $KlassWithKlassPair
+// CHECK: end running test 1 of 1 on test_klass_tuple_struct_lookthrough_with_copyaddr: variable-name-inference with: @trace[0]
+sil [ossa] @test_klass_tuple_struct_lookthrough_with_copyaddr : $@convention(thin) @async (@owned Klass, @guaranteed KlassWithKlassPair) -> () {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $KlassWithKlassPair):
+  debug_value %0 : $Klass, let, name "arg1", argno 1
+  debug_value %1 : $KlassWithKlassPair, let, name "arg2", argno 2
+
+  specify_test "variable-name-inference @trace[0]"
+  %2 = alloc_stack [lexical] $Klass, var, name "x"
+  store %0 to [init] %2 : $*Klass
+  %7 = alloc_stack $KlassPair
+  %8 = class_method %1 : $KlassWithKlassPair, #KlassWithKlassPair.ns1!getter : (KlassWithKlassPair) -> () -> KlassPair, $@convention(method) (@guaranteed KlassWithKlassPair) -> @owned KlassPair
+  %9 = apply %8(%1) : $@convention(method) (@guaranteed KlassWithKlassPair) -> @owned KlassPair
+  store %9 to [init] %7 : $*KlassPair
+  %11 = struct_element_addr %7 : $*KlassPair, #KlassPair.rhs
+  %12 = load [copy] %11 : $*Klass
+  destroy_addr %7 : $*KlassPair
+  %14 = begin_access [modify] [static] %2 : $*Klass
+  store %12 to [assign] %14 : $*Klass
+  end_access %14 : $*Klass
+  dealloc_stack %7 : $*KlassPair
+  %18 = alloc_stack $(KlassPair, KlassPair)
+  %19 = tuple_element_addr %18 : $*(KlassPair, KlassPair), 0
+  %20 = tuple_element_addr %18 : $*(KlassPair, KlassPair), 1
+  %21 = class_method %1 : $KlassWithKlassPair, #KlassWithKlassPair.ns2!getter : (KlassWithKlassPair) -> () -> (KlassPair, KlassPair), $@convention(method) (@guaranteed KlassWithKlassPair) -> (@owned KlassPair, @owned KlassPair)
+  %22 = apply %21(%1) : $@convention(method) (@guaranteed KlassWithKlassPair) -> (@owned KlassPair, @owned KlassPair)
+  (%23, %24) = destructure_tuple %22 : $(KlassPair, KlassPair)
+  store %23 to [init] %19 : $*KlassPair
+  store %24 to [init] %20 : $*KlassPair
+
+  %18a = alloc_stack $(KlassPair, KlassPair)
+  %19a = tuple_element_addr %18a : $*(KlassPair, KlassPair), 0
+  copy_addr [take] %19 to [init] %19a : $*KlassPair
+  %20a = tuple_element_addr %18a : $*(KlassPair, KlassPair), 1
+  copy_addr [take] %20 to [init] %20a : $*KlassPair
+
+  %27 = tuple_element_addr %18a : $*(KlassPair, KlassPair), 1
+  %28 = struct_element_addr %27 : $*KlassPair, #KlassPair.rhs
+  %29 = load [copy] %28 : $*Klass
+
+  destroy_addr %18a : $*(KlassPair, KlassPair)
+  %31 = begin_access [modify] [static] %2 : $*Klass
+  debug_value [trace] %29 : $Klass
+  store %29 to [assign] %31 : $*Klass
+  end_access %31 : $*Klass
+  dealloc_stack %18a : $*(KlassPair, KlassPair)
+  dealloc_stack %18 : $*(KlassPair, KlassPair)
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  %37 = tuple ()
+  return %37 : $()
 }

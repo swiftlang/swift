@@ -696,19 +696,12 @@ func testCovariantAssocMethod6Constrained(p2: any P2) {
 // CHECK-LABEL: sil hidden [ossa] @$s42existential_member_accesses_self_assoctype36testCovariantAssocMethod7Constrained2p2yAA2P2_p_tF
 // CHECK: [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %0 : $*any P2 to $*@opened([[OPENED_ID:"[0-9A-F-]+"]], any P2) Self
 // CHECK: function_ref thunk for @callee_guaranteed (@guaranteed Class & P) -> ()
-// CHECK-NEXT: [[THUNK1:%[0-9]+]] = function_ref @$s42existential_member_accesses_self_assoctype1P_AA5ClassCXcIgg_1AAaBPQzIegg_AA2P2RzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P2> (@guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@guaranteed any Class & P) -> ()) -> ()
-// CHECK: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK1]]<@opened([[OPENED_ID]], any P2) Self>
-// CHECK: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] : $@callee_guaranteed (@guaranteed @opened([[OPENED_ID]], any P2) Self.A) -> () to $@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : _NativeClass> (@guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P2) Self.A>
-// CHECK: [[STEP3:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[STEP2]]
-// CHECK: [[STEP4:%[0-9]+]] = convert_function [[STEP3]] : $@noescape @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : _NativeClass> (@guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P2) Self.A> to $@noescape @callee_guaranteed (@guaranteed @opened([[OPENED_ID]], any P2) Self.A) -> ()
-// FIXME: 'A.P.A' is a rather weird way to print (@opened P2).A
-// CHECK: function_ref thunk for @callee_guaranteed (@guaranteed A.P.A) -> ()
-// CHECK: [[THUNK2:%[0-9]+]] = function_ref @$s1A42existential_member_accesses_self_assoctype1PPQzIgg_AEIegn_AB2P2RzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@guaranteed τ_0_0.A) -> ()) -> ()
-// CHECK: [[STEP5:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK2]]<@opened([[OPENED_ID]], any P2) Self>([[STEP4]])
-// CHECK: [[STEP6:%[0-9]+]] = convert_function [[STEP5]] : $@callee_guaranteed (@in_guaranteed @opened([[OPENED_ID]], any P2) Self.A) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P2) Self.A>
-// CHECK: [[STEP7:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[STEP6]]
-// CHECK: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod7 : <Self where Self : P> (Self) -> ((Self.A) -> ()) -> ()
-// CHECK: apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[STEP7]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0.A>, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: [[THUNK1:%[0-9]+]] = function_ref @$s42existential_member_accesses_self_assoctype1P_AA5ClassCXcIgg_1AAaBPQzIegn_AA2P2RzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0.A, @guaranteed @noescape @callee_guaranteed (@guaranteed any Class & P) -> ()) -> ()
+// CHECK-NEXT: [[STEP1:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK1]]<@opened([[OPENED_ID]], any P2) Self>
+// CHECK-NEXT: [[STEP2:%[0-9]+]] = convert_function [[STEP1]] :  $@callee_guaranteed (@in_guaranteed @opened([[OPENED_ID]], any P2) Self.A) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <@opened([[OPENED_ID]], any P2) Self.A>
+// CHECK-NEXT: [[STEP3:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[STEP2]]
+// CHECK-NEXT: [[WITNESS:%[0-9]+]] = witness_method $@opened([[OPENED_ID]], any P2) Self, #P.covariantAssocMethod7 : <Self where Self : P> (Self) -> ((Self.A) -> ()) -> ()
+// CHECK-NEXT: apply [[WITNESS]]<@opened([[OPENED_ID]], any P2) Self>([[STEP3]], [[OPENED]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0.A>, @in_guaranteed τ_0_0) -> ()
 func testCovariantAssocMethod7Constrained(p2: any P2) {
   p2.covariantAssocMethod7 { _ in }
 }

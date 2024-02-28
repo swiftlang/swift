@@ -305,7 +305,9 @@ public:
 
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  SILFunction *emitClosure(AbstractClosureExpr *ce);
+  SILFunction *emitClosure(AbstractClosureExpr *ce,
+                           const FunctionTypeInfo &closureInfo);
+
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
@@ -417,12 +419,6 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-
-  /// Should the self argument of the given method always be emitted as
-  /// an r-value (meaning that it can be borrowed only if that is not
-  /// semantically detectable), or it acceptable to emit it as a borrowed
-  /// storage reference?
-  bool shouldEmitSelfAsRValue(FuncDecl *method, CanType selfType);
 
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);

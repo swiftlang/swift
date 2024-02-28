@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -disable-availability-checking -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -disable-availability-checking -verify %s -o /dev/null -parse-as-library
 
 // Tests specific to global actors.
 
@@ -39,16 +39,17 @@ struct CustomActor {
 /////////////////
 
 @MainActor func testTransferGlobalActorGuardedValue() async {
-  await transferToCustom(globalKlass) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // TODO: Global actor error needed.
+  await transferToCustom(globalKlass) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 @MainActor func testTransferGlobalActorGuardedValueWithlet() async {
   let x = globalKlass
-  await transferToCustom(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(x) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 @MainActor func testTransferGlobalActorGuardedValueWithlet(_ k: Klass) async {
   // expected-note @-1 {{value is task isolated since it is in the same region as 'k'}}
   globalKlass = k
-  await transferToCustom(k) // expected-tns-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context; later accesses to value could race}}
+  await transferToCustom(k) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context; later accesses to value could race}}
 }

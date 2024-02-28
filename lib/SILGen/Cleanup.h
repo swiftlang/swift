@@ -176,7 +176,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// we can only reap the cleanup stack up to the innermost depth
   /// that we've handed out as a Scope.
   Scope *innermostScope = nullptr;
-  FormalEvaluationScope *innermostFormalScope = nullptr;
 
   void popTopDeadCleanups();
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,

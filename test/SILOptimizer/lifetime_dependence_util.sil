@@ -39,11 +39,15 @@ sil_vtable D {
 @_nonescapable
 struct NE {
   var d: D
+  @_unsafeNonescapableResult
+  init() { }
 }
 
 @_nonescapable
 struct NEWrap {
   var ne: NE
+  @_unsafeNonescapableResult
+  init() { }
 }
 
 sil @coroutine : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE

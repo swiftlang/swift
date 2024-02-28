@@ -8,6 +8,7 @@
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -enable-experimental-cxx-interop -Xcc -DINCMOD | %FileCheck %s
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -cxx-interoperability-mode=swift-6 -Xcc -DINCMOD | %FileCheck --check-prefixes=CHECK,CHECKLATEST %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -cxx-interoperability-mode=upcoming-swift -Xcc -DINCMOD | %FileCheck --check-prefixes=CHECK,CHECKLATEST %s
 
 // Test through the use of the bridging header

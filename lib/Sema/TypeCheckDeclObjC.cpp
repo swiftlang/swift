@@ -2551,6 +2551,12 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      conflict.selector);
       diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
 
+      // Temporarily soften selector conflicts in objcImpl extensions; we're
+      // seeing some that are caused by ObjCImplementationChecker improvements.
+      if (conflictingDecl->getDeclContext()->getImplementedObjCContext()
+            != conflictingDecl->getDeclContext())
+        diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
+
       auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
       swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
       if (objcAttr)

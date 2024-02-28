@@ -614,7 +614,7 @@ public:
       // formal self parameter, but they do not pass an origFnType down,
       // so we can ignore that possibility.
       FormalParamTypes.emplace(SGF.getASTContext(), loweredParams, *origFnType,
-                               llvm::makeArrayRef(substFormalParams),
+                               llvm::ArrayRef(substFormalParams),
                                /*ignore final*/ false);
     }
 
@@ -1211,17 +1211,28 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 void SILGenFunction::emitProlog(
     DeclContext *DC, CaptureInfo captureInfo, ParameterList *paramList,
     ParamDecl *selfParam, Type resultType, std::optional<Type> errorType,
-    SourceLoc throwsLoc, std::optional<AbstractionPattern> origClosureType) {
+    SourceLoc throwsLoc) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
 
+  bool hasErasedIsolation =
+    (TypeContext && TypeContext->ExpectedLoweredType->hasErasedIsolation());
+
   uint16_t ArgNo = emitBasicProlog(DC, paramList, selfParam, resultType,
                                    errorType, throwsLoc,
                                    /*ignored parameters*/
-                                     captureInfo.getCaptures().size(),
-                                   origClosureType);
+                                     (hasErasedIsolation ? 1 : 0) +
+                                     captureInfo.getCaptures().size());
+
+  // If we're emitting into a type context that expects erased isolation,
+  // add (and ignore) the isolation parameter.
+  if (hasErasedIsolation) {
+    SILType ty = SILType::getOpaqueIsolationType(getASTContext());
+    SILValue val = F.begin()->createFunctionArgument(ty);
+    (void) val;
+  }
 
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
@@ -1421,11 +1432,13 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
 uint16_t SILGenFunction::emitBasicProlog(
     DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
     Type resultType, std::optional<Type> errorType, SourceLoc throwsLoc,
-    unsigned numIgnoredTrailingParameters,
-    std::optional<AbstractionPattern> origClosureType) {
+    unsigned numIgnoredTrailingParameters) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getReducedType(genericSig);
+
+  std::optional<AbstractionPattern> origClosureType;
+  if (TypeContext) origClosureType = TypeContext->OrigType;
 
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()

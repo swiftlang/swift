@@ -33,7 +33,7 @@
 // CHECK-MOVED: <unknown>:0: note: declarations in the underlying clang module 'A' may be hidden by clang preprocessor macros
 // CHECK-MOVED: <unknown>:0: note: the distributed module 'LibWithXRef' refers to the local module 'A'; this may be caused by header maps or search paths
 // CHECK-MOVED: <unknown>:0: note: the type 'MyType' moved between related modules; clang preprocessor macros may affect headers shared between these modules
-// CHECK-MOVED: LibWithXRef.swiftmodule:1:1: note: could not deserialize type for 'foo()'
+// CHECK-MOVED: note: could not deserialize type for 'foo()'
 // CHECK-MOVED: error: cannot find 'foo' in scope
 
 /// Move A to the SDK, triggering a different note about layering.

@@ -669,11 +669,9 @@ public:
 
     // First record all protocols that have already been handled.
     for (ProtocolDecl *proto : IncludedProtocols) {
-      proto->walkInheritedProtocols(
-          [&handledProtocols](ProtocolDecl *inherited) -> TypeWalker::Action {
-        handledProtocols.insert(inherited);
-        return TypeWalker::Action::Continue;
-      });
+      handledProtocols.insert(proto);
+      auto allInherited = proto->getAllInheritedProtocols();
+      handledProtocols.insert(allInherited.begin(), allInherited.end());
     }
 
     // Preserve the behavior of previous implementations which formatted of
@@ -743,7 +741,7 @@ public:
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
-    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+    auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
         /*isRetroactive=*/false,
         /*isPreconcurrency=*/false)));

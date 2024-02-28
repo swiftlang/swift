@@ -11,7 +11,7 @@
 
 // RUN: not %target-swift-frontend -color-diagnostics -diagnostic-style=llvm -print-educational-notes -diagnostic-documentation-path %S/../diagnostics/test-docs/ \
 // RUN:   -emit-module -emit-module-path %t/test.module @%t/MyApp.cmd %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
-// RUN: not %target-swift-frontend -no-color-diagnostics -print-educational-notes -diagnostic-documentation-path %S/../diagnostics/test-docs/ \
+// RUN: not %target-swift-frontend -no-color-diagnostics  -diagnostic-style=llvm -print-educational-notes -diagnostic-documentation-path %S/../diagnostics/test-docs/ \
 // RUN:   -emit-module -emit-module-path %t/test.module @%t/MyApp.cmd %s 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --check-prefix=NO-COLOR
 
 // A diagnostic with no educational notes

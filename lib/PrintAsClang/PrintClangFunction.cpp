@@ -701,13 +701,19 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   if (FD->isGeneric()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
 
-    // FIXME: Support generic requirements.
+    // FIXME: This should use getRequirements() and actually
+    // support arbitrary requirements. We don't really want
+    // to use getRequirementsWithInverses() here.
+    //
+    // For now, we use the inverse transform as a quick way to
+    // check for the "default" generic signature where each
+    // generic parameter is Copyable and Escapable, but not
+    // subject to any other requirements; that's exactly the
+    // generic signature that C++ interop supports today.
     SmallVector<Requirement, 2> reqs;
     SmallVector<InverseRequirement, 2> inverseReqs;
     Signature->getRequirementsWithInverses(reqs, inverseReqs);
-    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-
-    if (!reqs.empty())
+    if (!reqs.empty() || !inverseReqs.empty())
       return ClangRepresentation::unsupported;
     // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)

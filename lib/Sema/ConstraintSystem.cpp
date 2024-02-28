@@ -1572,7 +1572,7 @@ void ConstraintSystem::recordOpenedTypes(
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
   OpenedTypes.insert(
-      {locatorPtr, llvm::makeArrayRef(openedTypes, replacements.size())});
+      {locatorPtr, llvm::ArrayRef(openedTypes, replacements.size())});
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -2806,7 +2806,9 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      if (isPartialApplication(locator) && baseOpenedTy->isSendableType()) {
+      if (isPartialApplication(locator) &&
+          (resolvedBaseTy->is<AnyMetatypeType>() ||
+           baseOpenedTy->isSendableType())) {
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType
@@ -4219,7 +4221,7 @@ struct TypeSimplifier {
 
         auto result = conformance.getAssociatedType(
             lookupBaseType, assocType->getDeclaredInterfaceType());
-        if (!result->hasError())
+        if (result && !result->hasError())
           return result;
       }
 

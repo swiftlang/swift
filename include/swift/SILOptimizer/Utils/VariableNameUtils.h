@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_VARIABLENAMEUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_VARIABLENAMEUTILS_H
 
+#include "swift/Basic/OptionSet.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -26,6 +27,19 @@
 namespace swift {
 
 class VariableNameInferrer {
+public:
+  enum class Flag {
+    /// If set then we should look through get and set accessors and infer their
+    /// name from self.
+    ///
+    /// DISCUSSION: This may not be the correct semantics for all name inference
+    /// since we may want to consider computed properties to be tied to self.
+    InferSelfThroughAllAccessors = 0x1,
+  };
+
+  using Options = OptionSet<Flag>;
+
+private:
   /// The stacklist that we use to process from use->
   StackList<PointerUnion<SILInstruction *, SILValue>> variableNamePath;
 
@@ -37,9 +51,20 @@ class VariableNameInferrer {
   /// The final string we computed.
   SmallString<64> &resultingString;
 
+  /// Options that control how we do our walk.
+  ///
+  /// Example: In certain cases we may want to impute self as a name for
+  /// computed getters/setters and in other cases we may not want to.
+  Options options;
+
 public:
   VariableNameInferrer(SILFunction *fn, SmallString<64> &resultingString)
       : variableNamePath(fn), resultingString(resultingString) {}
+
+  VariableNameInferrer(SILFunction *fn, Options options,
+                       SmallString<64> &resultingString)
+      : variableNamePath(fn), resultingString(resultingString),
+        options(options) {}
 
   /// Attempts to infer a name from just uses of \p searchValue.
   ///
@@ -100,10 +125,15 @@ public:
 
 private:
   void drainVariableNamePath();
+  void popSingleVariableName();
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.
   SILValue findDebugInfoProvidingValue(SILValue searchValue);
+
+  /// Do not call this directly. Used just to improve logging for
+  /// findDebugInfoProvidingValue.
+  SILValue findDebugInfoProvidingValueHelper(SILValue searchValue);
 
   /// Given an initialized once allocation inst without a ValueDecl or a
   /// DebugVariable provided name, attempt to find a root value from its

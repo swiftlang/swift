@@ -232,7 +232,7 @@ extension Collection {
   ///   returns `true`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @inlinable
   public func indices(
     where predicate: (Element) throws -> Bool
@@ -269,7 +269,7 @@ extension Collection where Element: Equatable {
   ///   `element`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @inlinable
   public func indices(of element: Element) -> RangeSet<Index> {
     indices(where: { $0 == element })

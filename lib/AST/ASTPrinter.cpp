@@ -3758,8 +3758,26 @@ static bool usesFeatureFullTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureTypedThrows(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->getThrownTypeRepr() != nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    struct Walker : public TypeWalker {
+      bool hasTypedThrows = false;
+
+      Action walkToTypePre(Type ty) override {
+        if (auto funcType = ty->getAs<AnyFunctionType>()) {
+          if (funcType->hasThrownError()) {
+            hasTypedThrows = true;
+            return Action::Stop;
+          }
+        }
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    func->getInterfaceType().walk(walker);
+    return walker.hasTypedThrows;
+  }
 
   return false;
 }
@@ -4902,7 +4920,15 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-
+      {
+        if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(
+                decl->getResultTypeRepr())) {
+          for (auto &dep : typeRepr->getLifetimeDependencies()) {
+            Printer << " " << dep.getLifetimeDependenceKindString() << "(";
+            Printer << dep.getParamString() << ") ";
+          }
+        }
+      }
       {
         auto fnTy = decl->getInterfaceType();
         bool hasTransferring = false;
@@ -5134,6 +5160,17 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
+      if (decl->hasLifetimeDependentReturn()) {
+        Printer << " -> ";
+        auto *typeRepr =
+            cast<LifetimeDependentReturnTypeRepr>(decl->getResultTypeRepr());
+        for (auto &dep : typeRepr->getLifetimeDependencies()) {
+          Printer << dep.getLifetimeDependenceKindString() << "(";
+          Printer << dep.getParamString() << ") ";
+        }
+        // TODO: Handle failable initializers with lifetime dependent returns
+        Printer << "Self";
+      }
     });
 
   printDeclGenericRequirements(decl);
@@ -7423,6 +7460,13 @@ public:
    }
 
     Printer << " -> ";
+
+    if (T->hasLifetimeDependenceInfo()) {
+      auto lifetimeDependenceInfo = T->getExtInfo().getLifetimeDependenceInfo();
+      assert(!lifetimeDependenceInfo.empty());
+      Printer << lifetimeDependenceInfo.getString() << " ";
+    }
+
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);

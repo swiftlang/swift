@@ -900,11 +900,6 @@ public:
     return NumDeletedInstructions;
   }
   
-  static void resetInstructionCounts() {
-    NumCreatedInstructions = 0;
-    NumDeletedInstructions = 0;
-  }
-
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -4525,15 +4520,18 @@ class BeginBorrowInst
   USE_SHARED_UINT8;
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical,
-                  bool hasPointerEscape, bool fromVarDecl)
+                  bool hasPointerEscape, bool fromVarDecl, bool fixed)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
     sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
+    sharedUInt8().BeginBorrowInst.fixed = fixed;
   }
 
 public:
+  
+
   // FIXME: this does not return all instructions that end a local borrow
   // scope. Branches can also end it via a reborrow, so APIs using this are
   // incorrect. Instead, either iterate over all uses and return those with
@@ -4559,6 +4557,12 @@ public:
 
   bool isFromVarDecl() const {
     return sharedUInt8().BeginBorrowInst.fromVarDecl;
+  }
+
+  /// Whether the borrow scope is fixed during move checking and should be
+  /// treated as an opaque use of the value.
+  bool isFixed() const {
+    return sharedUInt8().BeginBorrowInst.fixed;
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
@@ -6375,7 +6379,7 @@ class EndInitLetRefInst
 /// static initializer list.
 class ObjectInst final : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
-                             OwnershipForwardingSingleValueInstruction> {
+                             SingleValueInstruction> {
   friend SILBuilder;
 
   unsigned numBaseElements;
@@ -6383,17 +6387,14 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
   ObjectInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
-             unsigned NumBaseElements,
-             ValueOwnershipKind forwardingOwnershipKind)
-      : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty,
-                                            forwardingOwnershipKind),
+             unsigned NumBaseElements)
+      : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty),
         numBaseElements(NumBaseElements) {}
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements,
-                            unsigned NumBaseElements, SILModule &M,
-                            ValueOwnershipKind forwardingOwnershipKind);
+                            unsigned NumBaseElements, SILModule &M);
 
 public:
   unsigned getNumBaseElements() const { return numBaseElements; }
@@ -11016,7 +11017,6 @@ public:
 inline bool
 OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   switch (kind) {
-  case SILInstructionKind::ObjectInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:

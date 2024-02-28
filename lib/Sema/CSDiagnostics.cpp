@@ -5984,6 +5984,18 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
     return true;
   }
 
+  if (auto *pattern = getAsPattern<EnumElementPattern>(anchor)) {
+    if (isa<TuplePattern>(pattern->getSubPattern())) {
+      auto paramTuple = FunctionType::composeTuple(
+          getASTContext(), ContextualType->getParams(),
+          ParameterFlagHandling::IgnoreNonEmpty);
+
+      emitDiagnostic(diag::tuple_pattern_length_mismatch,
+                     paramTuple);
+      return true;
+    }
+  }
+
   if (isContextualMismatch()) {
     auto *locator = getLocator();
     emitDiagnostic(locator->isLastElement<LocatorPathElt::ContextualType>()

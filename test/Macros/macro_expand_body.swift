@@ -78,7 +78,7 @@ func g(a: Int, b: String) async throws -> String {
   doesNotTypeCheck()
 }
 
-#if compiler(>=5.11) && TEST_DIAGNOSTICS
+#if compiler(>=6.0) && TEST_DIAGNOSTICS
 @available(SwiftStdlib 5.1, *)
 @Remote
 func h(a: Int, b: String) async throws -> String {

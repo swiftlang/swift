@@ -45,6 +45,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -190,12 +191,19 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     assert(superclassDecl);
 
     // Fish a class declaration out of the type witness.
-    auto classDecl = type->getClassOrBoundGenericClass();
-    if (!classDecl) {
-      if (auto archetype = type->getAs<ArchetypeType>()) {
-        if (auto superclassType = archetype->getSuperclass())
+    ClassDecl *classDecl = nullptr;
+
+    if (auto archetype = type->getAs<ArchetypeType>()) {
+      if (auto superclassType = archetype->getSuperclass())
           classDecl = superclassType->getClassOrBoundGenericClass();
-      }
+    } else if (type->isObjCExistentialType()) {
+      // For self-conforming Objective-C existentials, the exact check is
+      // implemented in TypeBase::isExactSuperclassOf(). Here, we just always
+      // look through into a superclass of a composition.
+      if (auto superclassType = type->getSuperclass())
+        classDecl = superclassType->getClassOrBoundGenericClass();
+    } else {
+      classDecl = type->getClassOrBoundGenericClass();
     }
 
     if (!classDecl || !superclassDecl->isSuperclassOf(classDecl))
@@ -577,6 +585,24 @@ struct InferredAssociatedTypesByWitness {
               2> NonViable;
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
+
+  bool operator==(const InferredAssociatedTypesByWitness &other) const {
+    if (Inferred.size() != other.Inferred.size())
+      return false;
+
+    for (unsigned i = 0, e = Inferred.size(); i < e; ++i) {
+      if (Inferred[i].first != other.Inferred[i].first)
+        return false;
+      if (!Inferred[i].second->isEqual(other.Inferred[i].second))
+        return false;
+    }
+
+    return true;
+  }
+
+  bool operator!=(const InferredAssociatedTypesByWitness &other) const {
+    return !(*this == other);
+  }
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1533,6 +1559,39 @@ static InferenceCandidateKind checkInferenceCandidate(
   return InferenceCandidateKind::Good;
 }
 
+/// If all terms introduce identical bindings and none come from a protocol
+/// extension, no choice between them can change the chosen solution, so
+/// collapse down to one.
+///
+/// WARNING: This does not readily generalize to disjunctions that have
+/// multiple duplicated terms, eg A \/ A \/ B \/ B, because the relative
+/// order of the value witnesses binding each A and each B might be weird.
+static void tryOptimizeDisjunction(InferredAssociatedTypesByWitnesses &result) {
+  // We assume there is at least one term.
+  if (result.empty())
+    return;
+
+  for (unsigned i = 0, e = result.size(); i < e; ++i) {
+    // Skip the optimization if we have non-viable bindings anywhere.
+    if (!result[i].NonViable.empty())
+      return;
+
+    // Skip the optimization if anything came from a default type alias
+    // or protocol extension; the ranking is hairier in that case.
+    if (!result[i].Witness ||
+        result[i].Witness->getDeclContext()->getExtendedProtocolDecl())
+      return;
+
+    // Skip the optimization if any two consecutive terms contain distinct
+    // bindings.
+    if (i > 0 && result[i - 1] != result[i])
+      return;
+  }
+
+  // This disjunction is trivial.
+  result.resize(1);
+}
+
 /// Create an initial constraint system for the associated type inference solver.
 ///
 /// Each protocol requirement defines a disjunction, where each disjunction
@@ -1743,7 +1802,9 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
 
     result.push_back(std::move(witnessResult));
 next_witness:;
-}
+  }
+
+  tryOptimizeDisjunction(result);
 
   if (hadTautologicalWitness && !result.empty()) {
     // Create a dummy entry, but only if there was at least one other witness;
@@ -3380,6 +3441,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 void AssociatedTypeInference::findSolutions(
                    ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
                    SmallVectorImpl<InferredTypeWitnessesSolution> &solutions) {
+  FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                  "associated-type-inference", conformance);
+
   SmallVector<InferredTypeWitnessesSolution, 4> nonViableSolutions;
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 4> valueWitnesses;
   findSolutionsRec(unresolvedAssocTypes, solutions, nonViableSolutions,

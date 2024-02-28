@@ -5926,16 +5926,6 @@ public:
   /// in the protocol list, then sorting them in some stable order.
   static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
-  /// Visit all of the protocols in the given list of protocols, along with their
-  ///
-  /// \param fn Visitor function called for each protocol (just once). If it
-  /// returns \c true, the visit operation will abort and return \c true.
-  ///
-  /// \returns \c true if any invocation of \c fn returns \c true, and \c false
-  /// otherwise.
-  static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
-                                llvm::function_ref<bool(ProtocolDecl *)> fn);
-
 private:
   friend class NominalTypeDecl;
   ProtocolType(ProtocolDecl *TheDecl, Type Parent, const ASTContext &Ctx,

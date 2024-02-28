@@ -361,7 +361,7 @@ NODE(AsyncSuspendResumePartialFunction)
 NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
-// Added in Swift 5.11
+// Added in Swift 6.0
 NODE(AccessibleProtocolRequirementFunctionRecord)
 
 // Added in Swift 5.7
@@ -379,7 +379,7 @@ NODE(HasSymbolQuery)
 NODE(OpaqueReturnTypeIndex)
 NODE(OpaqueReturnTypeParent)
 
-// Addedn in Swift 5.11
+// Addedn in Swift 6.0
 NODE(OutlinedEnumTagStore)
 NODE(OutlinedEnumProjectDataForLoad)
 NODE(OutlinedEnumGetTag)

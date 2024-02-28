@@ -109,13 +109,13 @@ public:
   ArrayRef<llvm::Value*> getRange(unsigned from, unsigned to) const {
     assert(from <= to);
     assert(to <= Values.size());
-    return llvm::makeArrayRef(begin() + from, to - from);
+    return llvm::ArrayRef(begin() + from, to - from);
   }
 
   /// Return an array containing all of the remaining values.  The values
   /// are not claimed.
   ArrayRef<llvm::Value *> getAll() {
-    return llvm::makeArrayRef(begin(), Values.size() - NextValue);
+    return llvm::ArrayRef(begin(), Values.size() - NextValue);
   }
 
   /// Transfer ownership of the next N values to the given explosion.
@@ -144,7 +144,7 @@ public:
   /// Claim and return the next N values in this explosion.
   ArrayRef<llvm::Value*> claim(unsigned n) {
     assert(NextValue + n <= Values.size());
-    auto array = llvm::makeArrayRef(begin(), n);
+    auto array = llvm::ArrayRef(begin(), n);
     NextValue += n;
     return array;
   }

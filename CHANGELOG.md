@@ -3,7 +3,7 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
-## Swift 5.11
+## Swift 6.0
 * [SE-0422][]:
   Non-built-in expression macros can now be used as default arguments that
   expand at each call site. For example, a custom `#CurrentFile` macro used as

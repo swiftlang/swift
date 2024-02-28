@@ -16,11 +16,11 @@ import Builtin
 // Bool AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Bool: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias AtomicRepresentation = UInt8.AtomicRepresentation
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
@@ -33,7 +33,7 @@ extension Bool: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -54,7 +54,7 @@ extension Bool: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -70,7 +70,7 @@ extension Bool: AtomicRepresentable {
 // Bool atomic operations
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Atomic where Value == Bool {
   /// Perform an atomic logical AND operation and return the old and new value,
   /// applying the specified memory ordering.
@@ -79,7 +79,7 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
@@ -137,7 +137,7 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
@@ -195,7 +195,7 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient

@@ -48,8 +48,10 @@ bool swiftModulesInitialized() {
 // Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
-  assert((!nodeMetatypesInitialized || metatype) &&
-        "no metatype for bridged SIL node");
+  if (nodeMetatypesInitialized && !metatype) {
+    llvm::errs() << "Instruction " << getSILInstructionName((SILInstructionKind)kind) << " not registered\n";
+    abort();
+  }
   return metatype;
 }
 
@@ -58,19 +60,6 @@ SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
 //===----------------------------------------------------------------------===//
 
 static llvm::StringMap<SILNodeKind> valueNamesToKind;
-static llvm::SmallPtrSet<SwiftMetatype, 4> unimplementedTypes;
-
-// Utility to fill in a metatype of an "unimplemented" class for a whole range
-// of class types.
-static void setUnimplementedRange(SwiftMetatype metatype,
-                                  SILNodeKind from, SILNodeKind to) {
-  unimplementedTypes.insert(metatype);
-  for (unsigned kind = (unsigned)from; kind <= (unsigned)to; ++kind) {
-    assert((!nodeMetatypes[kind] || unimplementedTypes.count(metatype)) &&
-           "unimplemented nodes must be registered first");
-    nodeMetatypes[kind] = metatype;
-  }
-}
 
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
@@ -91,20 +80,6 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
     nodeMetatypes[(unsigned)SILNodeKind::SILFunctionArgument] = metatype;
     return;
   }
-
-  // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specific class is not implemented in Swift yet, it bridges to an
-  // "unimplemented" class. This ensures that optimizations handle _all_ kind of
-  // instructions gracefully, without the need to define the not-yet-used
-  // classes in Swift.
-#define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
-  if (className == "UnimplementedRefCountingInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
-  if (className == "UnimplementedSingleValueInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SingleValueInstruction));
-  if (className == "UnimplementedInstruction")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SILInstruction));
-#undef VALUE_RANGE
 
   if (valueNamesToKind.empty()) {
 #define VALUE(ID, PARENT) \
@@ -134,7 +109,7 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
-  if (existingTy && !unimplementedTypes.count(existingTy)) {
+  if (existingTy) {
     llvm::errs() << "Double registration of class " << className << '\n';
     abort();
   }
@@ -426,11 +401,6 @@ static_assert((int)BridgedMemoryBehavior::MayRead == (int)swift::MemoryBehavior:
 static_assert((int)BridgedMemoryBehavior::MayWrite == (int)swift::MemoryBehavior::MayWrite);
 static_assert((int)BridgedMemoryBehavior::MayReadWrite == (int)swift::MemoryBehavior::MayReadWrite);
 static_assert((int)BridgedMemoryBehavior::MayHaveSideEffects == (int)swift::MemoryBehavior::MayHaveSideEffects);
-
-static_assert((int)BridgedInstruction::AccessKind::Init == (int)swift::SILAccessKind::Init);
-static_assert((int)BridgedInstruction::AccessKind::Read == (int)swift::SILAccessKind::Read);
-static_assert((int)BridgedInstruction::AccessKind::Modify == (int)swift::SILAccessKind::Modify);
-static_assert((int)BridgedInstruction::AccessKind::Deinit == (int)swift::SILAccessKind::Deinit);
 
 BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   std::string str;

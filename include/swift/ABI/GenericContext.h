@@ -318,11 +318,11 @@ public:
       PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
-    return llvm::makeArrayRef(Params, Header.NumParams);
+    return llvm::ArrayRef(Params, Header.NumParams);
   }
 
   llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>> getRequirements() const {
-    return llvm::makeArrayRef(Requirements, Header.NumRequirements);
+    return llvm::ArrayRef(Requirements, Header.NumRequirements);
   }
 
   const GenericPackShapeHeader &getGenericPackShapeHeader() const {
@@ -330,7 +330,7 @@ public:
   }
 
   llvm::ArrayRef<GenericPackShapeDescriptor> getGenericPackShapeDescriptors() const {
-    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
+    return llvm::ArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -379,20 +379,20 @@ class TargetGenericEnvironment
 public:
   /// Retrieve the cumulative generic parameter counts at each level of genericity.
   llvm::ArrayRef<uint16_t> getGenericParameterCounts() const {
-    return llvm::makeArrayRef(this->template getTrailingObjects<uint16_t>(),
-                              Flags.getNumGenericParameterLevels());
+    return llvm::ArrayRef(this->template getTrailingObjects<uint16_t>(),
+                          Flags.getNumGenericParameterLevels());
   }
 
   /// Retrieve the generic parameters descriptors.
   llvm::ArrayRef<GenericParamDescriptor> getGenericParameters() const {
-    return llvm::makeArrayRef(
+    return llvm::ArrayRef(
         this->template getTrailingObjects<GenericParamDescriptor>(),
         getGenericParameterCounts().back());
   }
 
   /// Retrieve the generic requirements.
   llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
-    return llvm::makeArrayRef(
+    return llvm::ArrayRef(
         this->template getTrailingObjects<GenericRequirementDescriptor>(),
         Flags.getNumGenericRequirements());
   }

@@ -195,6 +195,17 @@ static void forwardParameters(AbstractFunctionDecl *afd,
   }
 }
 
+static llvm::StringRef
+mangleDistributedThunkForAccessorRecordName(
+    ASTContext &C, AbstractFunctionDecl *thunk) {
+  Mangle::ASTMangler mangler;
+
+  // default mangling
+  auto mangled =
+      C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+  return mangled;
+}
+
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   auto implicit = true;
@@ -519,34 +530,12 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   {
     // --- Mangle the thunk name
-    Mangle::ASTMangler mangler;
+    auto mangledAccessorRecordName =
+        mangleDistributedThunkForAccessorRecordName(C, thunk);
 
-    // FIXME: cleanup
-    StringLiteralExpr *mangledTargetStringLiteral = nullptr;
-    auto witnessedDistributedRequirements =
-        func->getDistributedMethodWitnessedProtocolRequirements();
-
-    if (witnessedDistributedRequirements.size() == 1) {
-      auto protocolFunc = witnessedDistributedRequirements.front();
-
-      // we expect to witness exactly one distributed requirement,
-      // otherwise we should have diagnosed errors about more than 1 already.
-      std::string mangledString =
-          mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
-      // FIXME: make it THUNK so the mangling is right
-      // MUST BE LIKE: s4main28GreeterP_ConcreteSystem_StubC5greetSSyYaKFTE
-
-      StringRef mangled = C.AllocateCopy(mangledString);
-      mangledTargetStringLiteral =
-          new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
-    } else {
-      // default mangling
-      auto mangled =
-          C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
-      mangledTargetStringLiteral =
-          new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
-    }
-    assert(mangledTargetStringLiteral && "must be initialized");
+    StringLiteralExpr *mangledTargetStringLiteral =
+        new (C) StringLiteralExpr(mangledAccessorRecordName,
+                                  SourceRange(), implicit);
 
     // --- let target = RemoteCallTarget(<mangled name>)
     targetVar->setInterfaceType(remoteCallTargetTy);

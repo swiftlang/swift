@@ -2232,8 +2232,3 @@ bool swift::writeEmptyOutputFilesFor(
   }
   return false;
 }
-IRGenModule::AccessibleProtocolFunctionsData::AccessibleProtocolFunctionsData(
-    SILFunction *function, const std::optional<std::string> &mangledRecordName,
-    const std::optional<std::string> &concreteMangledTypeName)
-    : function(function), mangledRecordName(mangledRecordName),
-      concreteMangledTypeName(concreteMangledTypeName) {}

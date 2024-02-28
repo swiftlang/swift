@@ -606,6 +606,7 @@ struct CursorSymbolInfo {
   StringRef TypeUSR;
   StringRef ContainerTypeUSR;
   StringRef DocComment;
+  StringRef DocCommentAsXML;
   StringRef GroupName;
   /// A key for documentation comment localization, if it exists in the doc
   /// comment for the declaration.
@@ -656,6 +657,7 @@ struct CursorSymbolInfo {
     OS << Indentation << "  TypeUSR: " << TypeUSR << '\n';
     OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
     OS << Indentation << "  DocComment: " << DocComment << '\n';
+    OS << Indentation << "  DocCommentAsXML: " << DocCommentAsXML << '\n';
     OS << Indentation << "  GroupName: " << GroupName << '\n';
     OS << Indentation << "  LocalizationKey: " << LocalizationKey << '\n';
     OS << Indentation << "  AnnotatedDeclaration: " << AnnotatedDeclaration
@@ -839,7 +841,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> USR;
   llvm::SmallString<64> OriginalUSR;
   llvm::SmallString<64> ProvideImplementationOfUSR;
-  llvm::SmallString<64> DocComment;
+  llvm::SmallString<64> DocCommentAsXML;
   llvm::SmallString<64> FullyAnnotatedDecl;
   llvm::SmallString<64> FullyAnnotatedGenericSig;
   llvm::SmallString<64> LocalizationKey;

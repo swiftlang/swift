@@ -358,7 +358,7 @@ static int skt_main(int argc, const char **argv) {
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeySubStructure = sourcekitd_uid_get_from_cstr("key.substructure");
 
-  auto Args = llvm::makeArrayRef(argv + 1, argc - 1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   TestOptions options;
   std::string error;
   if (!parseOptions(Args, options, error)) {

@@ -48,12 +48,13 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
 @GlobalActor func useGlobalActor1() async {
   let x = firstList
 
-  await transferToMainActor(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // TODO: This should say global actor isolated isolated.
+  await transferToMainActor(x) // expected-tns-warning {{task isolated value of type 'NonSendableLinkedList<Int>' transferred to main actor-isolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedList<Int>' into main actor-isolated context may introduce data races}}
 
   let y = secondList.listHead!.next!
 
-  await transferToMainActor(y) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToMainActor(y) // expected-tns-warning {{task isolated value of type 'NonSendableLinkedListNode<Int>' transferred to main actor-isolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
@@ -64,8 +65,9 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
     x = secondList.listHead!.next!
   }
 
-  await transferToMainActor(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
+  await transferToMainActor(x) // expected-tns-warning {{transferring 'x' may cause a race}}
+  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and global actor 'GlobalActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' into main actor-isolated context may introduce data races}}
 }
 
 @GlobalActor func useGlobalActor3() async {
@@ -104,7 +106,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue() // expected-tns-note {{variable defined here}}
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
   // expected-tns-note @-1 {{'x' is transferred from global actor 'GlobalActor'-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
@@ -115,8 +117,9 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x.x = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring 'x' may cause a race}}
+  // expected-tns-note @-1 {{transferring global actor 'GlobalActor'-isolated 'x' to nonisolated callee could cause races between nonisolated and global actor 'GlobalActor'-isolated uses}}
+  // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x)
 }
@@ -137,7 +140,8 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   x.1 = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // TODO: This should be a global actor isolated error, not a task isolated error.
+  await transferToNonIsolated(x) // expected-tns-warning {{task isolated value of type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' transferred to nonisolated context}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 

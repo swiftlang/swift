@@ -1357,11 +1357,9 @@ void IRGenModule::finishEmitAfterTopLevel() {
           { Context.StdlibModuleName, swift::SourceLoc() }
         };
 
-        auto Imp = ImportDecl::create(Context,
-                                      getSwiftModule(),
-                                      SourceLoc(),
+        auto Imp = ImportDecl::create(Context, getSwiftModule(), SourceLoc(),
                                       ImportKind::Module, SourceLoc(),
-                                      llvm::makeArrayRef(moduleName));
+                                      llvm::ArrayRef(moduleName));
         Imp->setModule(TheStdlib);
         DebugInfo->emitImport(Imp);
       }
@@ -3467,6 +3465,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     return ctorAddress;
   }
 
+  // Check whether we've created the thunk already.
+  if (auto *thunkFn = IGM.Module.getFunction(name))
+    return thunkFn;
+
   llvm::Function *thunk = llvm::Function::Create(
       assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
 
@@ -3507,7 +3509,10 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       emitCXXConstructorCall(subIGF, ctor, ctorFnType, ctorAddress, Args);
   if (isa<llvm::InvokeInst>(call))
     IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
-  subIGF.Builder.CreateRetVoid();
+  if (ctorFnType->getReturnType()->isVoidTy())
+    subIGF.Builder.CreateRetVoid();
+  else
+    subIGF.Builder.CreateRet(call);
 
   return thunk;
 }
@@ -3547,10 +3552,15 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   LinkEntity entity =
       LinkEntity::forSILFunction(f, shouldCallPreviousImplementation);
 
-  // Check whether we've created the function already.
+  auto clangDecl = f->getClangDecl();
+  auto cxxCtor = dyn_cast_or_null<clang::CXXConstructorDecl>(clangDecl);
+
+  // Check whether we've created the function already. If the function is a C++
+  // constructor, don't return the constructor here as a thunk might be needed
+  // to call the constructor.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   llvm::Function *fn = Module.getFunction(entity.mangleAsString());
-  if (fn) {
+  if (fn && !cxxCtor) {
     if (forDefinition) {
       updateLinkageForDefinition(*this, fn, entity);
     }
@@ -3562,7 +3572,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // the insert-before point.
   llvm::Constant *clangAddr = nullptr;
   bool isObjCDirect = false;
-  if (auto clangDecl = f->getClangDecl()) {
+  if (clangDecl) {
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
     if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
@@ -3573,8 +3583,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
     }
 
-    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
-      Signature signature = getSignature(f->getLoweredFunctionType());
+    if (cxxCtor) {
+      Signature signature = getSignature(f->getLoweredFunctionType(), cxxCtor);
 
       // The thunk has private linkage, so it doesn't need to have a predictable
       // mangled name -- we just need to make sure the name is unique.
@@ -3583,7 +3593,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       stream << "__swift_cxx_ctor";
       entity.mangle(stream);
 
-      clangAddr = emitCXXConstructorThunkIfNeeded(*this, signature, ctor, name,
+      clangAddr = emitCXXConstructorThunkIfNeeded(*this, signature, cxxCtor, name,
                                                   clangAddr);
     }
   }
@@ -4417,14 +4427,6 @@ void IRGenModule::addAccessibleFunction(SILFunction *func) {
   AccessibleFunctions.push_back(func);
 }
 
-void IRGenModule::addAccessibleFunctionDistributedAliased(
-    std::string mangledRecordName,
-    std::optional<std::string> mangledActorTypeName,
-    SILFunction *func) {
-  AccessibleProtocolFunctions.push_back(AccessibleProtocolFunctionsData(
-      func, mangledRecordName, mangledActorTypeName));
-}
-
 /// Emit the protocol conformance list and return it (if asContiguousArray is
 /// true, otherwise the records are emitted as individual globals and
 /// nullptr is returned).
@@ -4748,11 +4750,10 @@ void IRGenModule::emitAccessibleFunction(
 }
 
 void IRGenModule::emitAccessibleFunctions() {
-  if (AccessibleFunctions.empty() && AccessibleProtocolFunctions.empty())
+  if (AccessibleFunctions.empty())
     return;
 
   StringRef fnsSectionName;
-  StringRef protocolFnsSectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
@@ -4762,17 +4763,14 @@ void IRGenModule::emitAccessibleFunctions() {
                      "the selected object format.");
   case llvm::Triple::MachO:
     fnsSectionName = "__TEXT, __swift5_acfuncs, regular";
-    protocolFnsSectionName = "__TEXT, __swift5_acpfuns, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
     fnsSectionName = "swift5_accessible_functions";
-    protocolFnsSectionName = "swift5_accessible_protocol_requirement_functions";
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     fnsSectionName = ".sw5acfn$B";
-    protocolFnsSectionName = ".sw5acpfn$B";
     break;
   }
 
@@ -4785,24 +4783,6 @@ void IRGenModule::emitAccessibleFunctions() {
     emitAccessibleFunction(
         fnsSectionName, mangledRecordName,
         /*mangledActorName=*/{}, mangledFunctionName, func);
-  }
-
-  for (auto accessibleInfo : AccessibleProtocolFunctions) {
-    auto func = accessibleInfo.function;
-
-    std::string mangledRecordName =
-        accessibleInfo.mangledRecordName
-            ? (*accessibleInfo.mangledRecordName)
-            : LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-    std::string mangledFunctionName =
-        LinkEntity::forSILFunction(func).mangleAsString();
-    std::string mangledActorName = accessibleInfo.concreteMangledTypeName
-                                       ? *accessibleInfo.concreteMangledTypeName
-                                       : "<none>";
-
-    emitAccessibleFunction(
-        protocolFnsSectionName, mangledRecordName,
-        mangledActorName, mangledFunctionName, func);
   }
 }
 
@@ -5008,7 +4988,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
     numParams += numGenericArgs;
   }
 
-  auto paramTypes = llvm::makeArrayRef(paramTypesArray, numParams);
+  auto paramTypes = llvm::ArrayRef(paramTypesArray, numParams);
   auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
                                         paramTypes, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
@@ -5040,7 +5020,7 @@ IRGenModule::getAddrOfCanonicalSpecializedGenericTypeMetadataAccessFunction(
   llvm::Type *paramTypesArray[1];
   paramTypesArray[0] = SizeTy; // MetadataRequest
 
-  auto paramTypes = llvm::makeArrayRef(paramTypesArray, 1);
+  auto paramTypes = llvm::ArrayRef(paramTypesArray, 1);
   auto functionType =
       llvm::FunctionType::get(TypeMetadataResponseTy, paramTypes, false);
   Signature signature(functionType, llvm::AttributeList(), SwiftCC);

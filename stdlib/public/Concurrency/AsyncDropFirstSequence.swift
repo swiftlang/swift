@@ -74,7 +74,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   ///
   /// The drop-first sequence produces whatever type of error its base
   /// sequence produces.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -123,7 +123,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
     /// iterator returns `nil`. After reaching the number of elements to drop,
     /// this iterator passes along the result of calling `next(isolation:)` on
     /// the base iterator.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       var remainingToDrop = count

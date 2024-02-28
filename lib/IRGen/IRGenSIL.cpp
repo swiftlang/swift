@@ -2476,36 +2476,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
 
-    if (auto val = CurSILFn->getLocation().castToASTNode<ValueDecl>()) {
-      if (auto attr =
-              val->getAttrs().getAttribute<DistributedThunkTargetAttr>()) {
-
-        // the original `distributed func`
-        auto func = attr->getTargetFunction();
-
-        auto distributedRequirements = func->getDistributedMethodWitnessedProtocolRequirements();
-        if (distributedRequirements.size() == 1) {
-          auto protocolFunc = distributedRequirements.front();
-          Mangle::ASTMangler mangler;
-          // The mangled name of the requirement is the name of the record
-          auto mangledProtocolFuncName =
-            mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
-
-          std::optional<std::string> mangledActorTypeName;
-          if (isa<ClassDecl>(func->getDeclContext()->getAsDecl())) {
-            // a concrete type, not a "distributed" protocol
-            mangledActorTypeName = mangler.mangleAnyDecl(
-                func->getDeclContext()->getSelfNominalTypeDecl(),
-                /*prefix=*/true);
-          }
-
-          IGM.addAccessibleFunctionDistributedAliased(
-              /*mangledRecordName=*/mangledProtocolFuncName,
-              /*mangledActorTypeName=*/mangledActorTypeName,
-              CurSILFn);
-        }
-      }
-    }
+    // TODO(distributed): for protocols emit a special accessor
   }
 
   // Configure the dominance resolver.
@@ -2998,8 +2969,13 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fnType = fn->getLoweredFunctionType();
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
+  const clang::CXXConstructorDecl *cxxCtorDecl = nullptr;
 
-  auto sig = IGM.getSignature(fnType, fpKind, true /*forStaticCall*/);
+  if (auto *clangFnDecl = fn->getClangDecl())
+    cxxCtorDecl = dyn_cast<clang::CXXConstructorDecl>(clangFnDecl);
+
+  auto sig =
+      IGM.getSignature(fnType, fpKind, true /*forStaticCall*/, cxxCtorDecl);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -5098,15 +5074,9 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   if (tryEmitDestroyUsingDeinit(*this, addr, addrTy)) {
     return;
   }
-  llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  auto *outlinedF = cast<llvm::Function>(
-      IGM.getOrCreateReleaseFunction(addrTI, objectT, llvmType, atomicity));
-  llvm::Value *args[] = {addr.getAddress()};
-  llvm::CallInst *call =
-      Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
-  call->setCallingConv(IGM.DefaultCC);
+  addrTI.callOutlinedRelease(*this, addr, objectT, atomicity);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
@@ -7717,7 +7687,7 @@ void IRGenSILFunction::visitIncrementProfilerCounterInst(
   llvm::SmallVector<llvm::Value *, 2> indices;
   indices.append(2, llvm::ConstantInt::get(IGM.SizeTy, 0));
   auto *nameGEP = llvm::ConstantExpr::getGetElementPtr(
-      nameVar->getValueType(), nameVar, makeArrayRef(indices));
+      nameVar->getValueType(), nameVar, llvm::ArrayRef(indices));
 
   // Emit the call to the 'llvm.instrprof.increment' LLVM intrinsic.
   llvm::Value *args[] = {

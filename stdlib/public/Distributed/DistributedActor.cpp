@@ -32,94 +32,6 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
-/// Find an accessible function record given a concrete actor type we're
-/// attempting to make the call on, and the remote call method identifier.
-static const AccessibleFunctionRecord *findDistributedProtocolMethodAccessor(
-    bool findConcreteWitness, const char *targetActorTypeNameStart,
-    size_t targetActorTypeNameLength, const char *targetNameStart,
-    size_t targetNameLength) {
-  // Find using just the method identifier;
-  // This will work if the call is a concrete method identifier
-  if (auto *func = runtime::swift_findAccessibleFunctionForConcreteType(
-          findConcreteWitness, targetActorTypeNameStart,
-          targetActorTypeNameLength, targetNameStart, targetNameLength)) {
-    assert(func->Flags.isDistributed());
-    return func;
-  }
-
-  return nullptr;
-}
-
-/// Given the presence of protocol witness distributed invocation targets,
-/// obtain a concrete target name.
-///
-/// A distributed target can be identified by a protocol method name:
-/// ```
-/// protocol WorkerProtocol {
-///   associatedtype Ret
-///   distributed func func test() -> Ret
-/// }
-/// ```
-///
-/// So the remote call identifier may be "WorkerProtocol.test", however in order
-/// to perform the invocation on a concrete target actor, we need to obtain
-/// the concrete function we are about to invoke -- not least because of
-/// its generic context details.
-///
-/// A concrete type on the server may be:
-///
-/// ```
-/// distributed actor WorkerImpl: WorkerProtocol {
-///   distributed func func test() -> String { "Hello" }
-/// }
-/// ```
-///
-/// Thus this method allows mapping the "protocol method identifier" and
-/// concrete actor name, into the target witness name.
-///
-/// This way the generic context and other concrete information may be obtained
-/// in order to perform the call on the concrete `WorkerImpl` type.
-SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swiftDistributed)
-TypeNamePair swift_distributed_getConcreteAccessibleWitnessName(
-    DefaultActor *actor, const char *targetNameStart, size_t targetNameLength) {
-
-  // TODO(distributed): Avoid mangling twice; we do it here and in `execute_`
-  auto actorTy = swift_getObjectType(actor);
-  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
-  std::string actorTyName = actorTyNamePair.data;
-
-  auto accessor = findDistributedProtocolMethodAccessor(
-      /*findConcreteWitness=*/true, actorTyNamePair.data,
-      actorTyNamePair.length, targetNameStart, targetNameLength);
-
-  if (!accessor) {
-    return {"", 0};
-  }
-
-  auto concreteNameData = accessor->Name.get();
-  auto concreteNameLength = strlen(accessor->Name.get());
-  return {concreteNameData, concreteNameLength};
-}
-
-SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swiftDistributed)
-void *swift_distributed_getGenericEnvironmentForConcreteActor(
-    DefaultActor *actor, const char *targetNameStart, size_t targetNameLength) {
-
-  // TODO(distributed): Avoid mangling  twice; we do it here and in `execute_`
-  auto actorTy = swift_getObjectType(actor);
-  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
-
-  auto *accessor = findDistributedProtocolMethodAccessor(
-      /*findConcreteWitness=*/true, actorTyNamePair.data,
-      actorTyNamePair.length, targetNameStart, targetNameLength);
-  if (!accessor) {
-    return nullptr;
-  }
-
-  return accessor->GenericEnvironment.get();
-}
 
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)
@@ -141,9 +53,7 @@ void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
 ///    numWitnessTables: UInt
 /// ) async throws
 using TargetExecutorSignature =
-    AsyncSignature<void(/*on=*/DefaultActor *, // FIXME(distributed): Make this
-                                               // accept AnyObject and not
-                                               // witness tables
+    AsyncSignature<void(/*on=*/DefaultActor *,
                         /*targetName=*/const char *, /*targetNameSize=*/size_t,
                         /*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,

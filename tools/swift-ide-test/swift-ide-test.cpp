@@ -4264,7 +4264,7 @@ int main(int argc, char *argv[]) {
   ArrayRef<const char *> CCArgs;
   for (int i = 1; i < argc; ++i) {
     if (StringRef(argv[i]) == "--cc-args") {
-      CCArgs = llvm::makeArrayRef(argv+i+1, argc-i-1);
+      CCArgs = llvm::ArrayRef(argv + i + 1, argc - i - 1);
       argc = i;
     }
   }
@@ -4400,6 +4400,12 @@ int main(int argc, char *argv[]) {
     if (options::CxxInteropVersion == "upcoming-swift")
       InitInvok.getLangOptions().cxxInteropCompatVersion =
           version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else if (options::CxxInteropVersion == "swift-6")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({6});
+    else if (options::CxxInteropVersion == "swift-5.9")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({5, 9});
     else
       llvm::errs() << "invalid CxxInteropVersion\n";
   }

@@ -4,7 +4,7 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension RangeSet: ExpressibleByArrayLiteral {
   public init(arrayLiteral elements: Range<Bound>...) {
     self.init(elements)
@@ -21,7 +21,7 @@ extension Collection {
 
 let RangeSetTests = TestSuite("RangeSet")
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
   let parent = -200..<200
   let source: RangeSet = [1..<5, 8..<10, 20..<22, 27..<29]
 

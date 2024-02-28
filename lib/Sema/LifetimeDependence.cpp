@@ -317,6 +317,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
                                                     ownership);
   }
 
+  auto *cd = dyn_cast<ConstructorDecl>(afd);
+  if (cd && cd->isImplicit() && cd->getParameters()->size() == 0) {
+    return std::nullopt;
+  }
+
   LifetimeDependenceInfo lifetimeDependenceInfo;
   ParamDecl *candidateParam = nullptr;
   unsigned paramIndex = 0;
@@ -349,7 +354,21 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 
     paramIndex++;
   }
+  if (cd && cd->isImplicit()) {
+    diags.diagnose(cd->getLoc(),
+                   diag::lifetime_dependence_cannot_infer_implicit_init);
+    return std::nullopt;
+  }
   if (!candidateParam && !hasParamError) {
+    // Explicitly turn off error messages for builtins, since some of are
+    // ~Escapable currently.
+    // TODO: rdar://123555720: Remove this check after another round of
+    // surveying builtins
+    if (auto *fd = dyn_cast<FuncDecl>(afd)) {
+      if (fd->isImplicit()) {
+        return std::nullopt;
+      }
+    }
     diags.diagnose(returnLoc,
                    diag::lifetime_dependence_cannot_infer_no_candidates);
     return std::nullopt;

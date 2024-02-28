@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature IsolatedAny %s -module-name test -swift-version 5 -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test8callSync2fnyyyYAXE_tYaF
 // CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
@@ -132,4 +133,288 @@ func convertToNonIsolatedWithOtherChanges(fn: @escaping @isolated(any) () async 
   return fn
 }
 
-// TODO: the same with closures
+/*-- Sync closures --*/
+
+func syncAction() {}
+
+func takeSyncIsolatedAny(fn: @escaping @isolated(any) () -> ()) {}
+func takeInheritingSyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) () -> ()) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A27EraseSyncNonIsolatedClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A27EraseSyncNonIsolatedClosureyyFyycfU_ :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test19takeSyncIsolatedAny2fnyyyYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseSyncNonIsolatedClosure() {
+  takeSyncIsolatedAny {
+    syncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A25EraseSyncMainActorClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A25EraseSyncMainActorClosureyyFyyScMYccfU_ :
+// CHECK-NEXT:    [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAIN_ACTOR_SHARED_FN:%.]] = function_ref @$sScM6sharedScMvgZ :
+// CHECK-NEXT:    [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_SHARED_FN]]([[MAIN_ACTOR_METATYPE]])
+// CHECK-NEXT:    [[ERASED_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]] :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_MAIN_ACTOR]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test19takeSyncIsolatedAny2fnyyyYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseSyncMainActorClosure() {
+  takeSyncIsolatedAny { @MainActor in
+    syncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A37EraseInheritingSyncNonIsolatedClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A37EraseInheritingSyncNonIsolatedClosureyyFyycfU_ :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test29takeInheritingSyncIsolatedAny2fnyyyYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseInheritingSyncNonIsolatedClosure() {
+  takeInheritingSyncIsolatedAny {
+    syncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A35EraseInheritingSyncMainActorClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A35EraseInheritingSyncMainActorClosureyyFyyScMYccfU_ :
+// CHECK-NEXT:    [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAIN_ACTOR_SHARED_FN:%.]] = function_ref @$sScM6sharedScMvgZ :
+// CHECK-NEXT:    [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_SHARED_FN]]([[MAIN_ACTOR_METATYPE]])
+// CHECK-NEXT:    [[ERASED_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]] :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_MAIN_ACTOR]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test29takeInheritingSyncIsolatedAny2fnyyyYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+@MainActor
+func testEraseInheritingSyncMainActorClosure() {
+  takeInheritingSyncIsolatedAny { @MainActor in
+    syncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a19EraseInheritingSyncC7ClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a19EraseInheritingSyncC7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> ()
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test29takeInheritingSyncIsolatedAny2fnyyyYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+actor MyActor {
+  func testEraseInheritingSyncActorClosure() {
+    takeInheritingSyncIsolatedAny {
+      // Note that the closure has to actually *reference* `self` to be
+      // formally isolated to it; it can't just include it in the captures
+      // list.  That's the rule, for better or worse.
+      self.syncAction()
+    }
+  }
+
+  func syncAction() {}
+}
+
+/*-- Async closures --*/
+
+func asyncAction() async {}
+
+func takeAsyncIsolatedAny(fn: @escaping @isolated(any) () async -> ()) {}
+func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) () async -> ()) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A28EraseAsyncNonIsolatedClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A28EraseAsyncNonIsolatedClosureyyFyyYacfU_ :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test20takeAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseAsyncNonIsolatedClosure() {
+  takeAsyncIsolatedAny {
+    await asyncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A26EraseAsyncMainActorClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A26EraseAsyncMainActorClosureyyFyyYacfU_ :
+// CHECK-NEXT:    [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAIN_ACTOR_SHARED_FN:%.]] = function_ref @$sScM6sharedScMvgZ :
+// CHECK-NEXT:    [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_SHARED_FN]]([[MAIN_ACTOR_METATYPE]])
+// CHECK-NEXT:    [[ERASED_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]] :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_MAIN_ACTOR]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test20takeAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseAsyncMainActorClosure() {
+  takeAsyncIsolatedAny { @MainActor in
+    await asyncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A38EraseInheritingAsyncNonIsolatedClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A38EraseInheritingAsyncNonIsolatedClosureyyFyyYacfU_ :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+func testEraseInheritingAsyncNonIsolatedClosure() {
+  takeInheritingAsyncIsolatedAny {
+    await asyncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A36EraseInheritingAsyncMainActorClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A36EraseInheritingAsyncMainActorClosureyyFyyYacfU_ :
+// CHECK-NEXT:    [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAIN_ACTOR_SHARED_FN:%.]] = function_ref @$sScM6sharedScMvgZ :
+// CHECK-NEXT:    [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_SHARED_FN]]([[MAIN_ACTOR_METATYPE]])
+// CHECK-NEXT:    [[ERASED_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]] :
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_MAIN_ACTOR]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+@MainActor
+func testEraseInheritingAsyncMainActorClosure() {
+  takeInheritingAsyncIsolatedAny { @MainActor in
+    await asyncAction()
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC7ClosureyyF
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC7ClosureyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> ()
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test30takeInheritingAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+extension MyActor {
+  func testEraseInheritingAsyncActorClosure() {
+    takeInheritingAsyncIsolatedAny {
+      // Note that the closure has to actually *reference* `self` to be
+      // formally isolated to it; it can't just include it in the captures
+      // list.  That's the rule, for better or worse.
+      await self.asyncAction()
+    }
+  }
+
+  func asyncAction() async {}
+}
+
+func takeInheritingAsyncIsolatedAny_optionalResult(@_inheritActorContext fn: @escaping @isolated(any) () async -> Int?) {}
+
+// Test that we correctly handle isolation erasure from closures even when
+// we can't completely apply the conversion as a peephole.
+// CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0a20EraseInheritingAsyncC18Closure_noPeepholeyyF
+//   We emit the closure itself with just the erasure conversion.
+// CHECK:         // function_ref closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test7MyActorC0a20EraseInheritingAsyncC18Closure_noPeepholeyyFSiyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>, @guaranteed MyActor) -> Int
+// CHECK-NEXT:    [[CAPTURE:%.*]] = copy_value %0 : $MyActor
+// CHECK-NEXT:    [[CAPTURE_FOR_ISOLATION:%.*]] = copy_value [[CAPTURE]] : $MyActor
+// CHECK-NEXT:    [[ISOLATION_OBJECT:%.*]] = init_existential_ref [[CAPTURE_FOR_ISOLATION]] : $MyActor : $MyActor, $any Actor
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_OBJECT]] : $any Actor
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_FN]]([[ISOLATION]], [[CAPTURE]])
+//   This is the general function-conversion path, so it doesn't realize
+//   we already know the isolation locally.  This is not worth peepholing in
+//   SILGen, but it should be optimizable in the SIL pipeline.
+// CHECK-NEXT:    [[CLOSURE_BORROW:%.*]] = begin_borrow [[CLOSURE]]
+// CHECK-NEXT:    [[CLOSURE_ISOLATION_BORROW:%.*]] = function_extract_isolation [[CLOSURE_BORROW]]
+// CHECK-NEXT:    [[CLOSURE_ISOLATION:%.*]] = copy_value [[CLOSURE_ISOLATION_BORROW]]
+// CHECK-NEXT:    end_borrow [[CLOSURE_BORROW]]
+//   Apply the converison thunk.
+// CHECK-NEXT:    // function_ref thunk
+// CHECK-NEXT:    [[THUNK_FN:%.*]] = function_ref
+// CHECK-NEXT:    [[CONVERTED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK_FN]]([[CLOSURE_ISOLATION]], [[CLOSURE]])
+//   Call the final function.
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test45takeInheritingAsyncIsolatedAny_optionalResult2fnySiSgyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CONVERTED_CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CONVERTED_CLOSURE]]
+extension MyActor {
+  func testEraseInheritingAsyncActorClosure_noPeephole() {
+    // The conversion from an Int-returning closure to an Int?-returning
+    // closure currently can't be peepholed.  If you change that, please
+    // make this test do some other conversion that can't be peepholed,
+    // unless you literally make everything peepholable.
+    takeInheritingAsyncIsolatedAny_optionalResult {
+      () -> Int in
+
+      await self.asyncAction()
+
+      return 0
+    }
+  }
+}
+
+/*-- Partial applications --*/
+
+//   FIXME: this is wrong; we need to capture the actor value
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A41EraseAsyncActorIsolatedPartialApplication1ayAA02MyD0C_tF
+// CHECK:         // function_ref implicit closure #1
+// CHECK-NEXT:    [[CLOSURE_FN:%.*]] = function_ref @$s4test0A41EraseAsyncActorIsolatedPartialApplication1ayAA02MyD0C_tFyyYacAEYicfu_ : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned @async @callee_guaranteed () -> ()
+// CHECK-NEXT:    [[FN:%.*]] = apply [[CLOSURE_FN]](%0)
+// CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK-NEXT:    // function_ref thunk
+// CHECK-NEXT:    [[THUNK_FN:%.*]] = function_ref @$sIegH_IeAgH_TR :
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK_FN]]([[ISOLATION]], [[FN]])
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[TAKE_FN:%.*]] = function_ref @$s4test20takeAsyncIsolatedAny2fnyyyYaYAc_tF
+// CHECK-NEXT:    apply [[TAKE_FN]]([[CLOSURE]])
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
+  takeAsyncIsolatedAny(fn: a.asyncAction)
+}
