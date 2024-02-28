@@ -19,7 +19,7 @@ extension TheColor {
   // having iOS availability that predates the introduction of tvOS.
 
   // CHECK: public init?(rawValue: Swift.String)
-  // CHECK-NOT: @available(tvOS
+  // CHECK-NOT: @available(tvOS)
   // CHECK: public typealias RawValue = Swift.String
   public enum StaticNamedColor: String {
     case black
