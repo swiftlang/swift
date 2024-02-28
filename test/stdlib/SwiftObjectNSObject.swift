@@ -150,7 +150,7 @@ func TestNonEquatableHash(_ e: AnyObject)
 // If we're checking legacy behavior or unsupported platform, then
 // the warning above won't be emitted.  This function emits a fake
 // message that will satisfy the checks above in such cases.
-func fakeEquatableWarning(e: AnyObject) {
+func fakeEquatableWarning(_ e: AnyObject) {
   let msg = "Obj-C `-hash` ... type `SwiftObjectNSObject.\(type(of: e))` ... Equatable but not Hashable\n"
   fputs(msg, stderr)
 }
