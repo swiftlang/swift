@@ -6858,63 +6858,12 @@ ProtocolDecl::getProtocolDependencies() const {
       std::nullopt);
 }
 
-/// If we hit a request cycle, give the protocol a requirement signature that
-/// still has inherited protocol requirements on Self, and also conformances
-/// to Copyable and Escapable for all associated types. Otherwise, we'll see
-/// invariant violations from the inheritance clause mismatch, as well as
-/// spurious downstream diagnostics concerning move-only types.
-static RequirementSignature getPlaceholderRequirementSignature(
-    const ProtocolDecl *proto) {
-  auto &ctx = proto->getASTContext();
-
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inheritedProto);
-  }
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-      inheritedProtos.push_back(otherProto);
-    }
-  }
-
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  SmallVector<Requirement, 2> requirements;
-
-  for (auto *inheritedProto : inheritedProtos) {
-    requirements.emplace_back(RequirementKind::Conformance,
-                              proto->getSelfInterfaceType(),
-                              inheritedProto->getDeclaredInterfaceType());
-  }
-
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-      for (auto ip : InvertibleProtocolSet::full()) {
-        auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance,
-                                  assocTypeDecl->getDeclaredInterfaceType(),
-                                  otherProto->getDeclaredInterfaceType());
-      }
-    }
-  }
-
-  // Maintain invariants.
-  llvm::array_pod_sort(requirements.begin(), requirements.end(),
-                       [](const Requirement *lhs, const Requirement *rhs) -> int {
-                         return lhs->compare(*rhs);
-                       });
-
-  return RequirementSignature(ctx.AllocateCopy(requirements),
-                              ArrayRef<ProtocolTypeAlias>());
-}
-
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
   return getASTContext().evaluator(
-               RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
+               RequirementSignatureRequest{const_cast<ProtocolDecl *>(this)},
                [this]() {
-                 return getPlaceholderRequirementSignature(this);
+                 return RequirementSignature::getPlaceholderRequirementSignature(
+                     this, GenericSignatureErrors());
                });
 }
 
