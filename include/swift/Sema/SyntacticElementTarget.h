@@ -887,6 +887,10 @@ public:
     llvm_unreachable("invalid target type");
   }
 
+  /// Marks the target as invalid, filling in ErrorTypes for the AST it
+  /// represents.
+  void markInvalid() const;
+
   /// Walk the contents of the application target.
   std::optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
 };

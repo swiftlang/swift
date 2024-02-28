@@ -301,6 +301,30 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   llvm_unreachable("invalid contextual type");
 }
 
+void SyntacticElementTarget::markInvalid() const {
+  class InvalidationWalker : public ASTWalker {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // TODO: We ought to fill in ErrorTypes for expressions here; ultimately
+      // type-checking should always produce typed AST.
+      return Action::Continue(E);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // Mark any VarDecls and PatternBindingDecls as invalid.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        // Only set invalid if we don't already have an interface type computed.
+        if (!VD->hasInterfaceType())
+          D->setInvalid();
+      } else if (isa<PatternBindingDecl>(D)) {
+        D->setInvalid();
+      }
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+    }
+  };
+  InvalidationWalker walker;
+  walk(walker);
+}
+
 std::optional<SyntacticElementTarget>
 SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
