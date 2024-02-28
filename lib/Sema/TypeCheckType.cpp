@@ -2532,7 +2532,6 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
   auto options = resolution.getOptions();
 
   assert(!ty->hasError());
-  assert(!options.contains(TypeResolutionFlags::SILType));
 
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
     return false; // no need for ownership in enum cases.
@@ -2879,8 +2878,8 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // The constraint type is written with respect to the surrounding
     // generic environment.
     constraintType = GenericEnvironment::mapTypeIntoContext(
-               resolution.getGenericSignature().getGenericEnvironment(),
-               constraintType);
+        resolution.getGenericSignature().getGenericEnvironment(),
+        constraintType);
 
     // The opened existential type is formed by mapping the interface type
     // into a new opened generic environment.
@@ -3781,8 +3780,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     // Validate the presence of ownership for a noncopyable parameter.
     if (inStage(TypeResolutionStage::Interface)
-        && !ty->hasUnboundGenericType()
-        && !options.contains(TypeResolutionFlags::SILMode)) {
+        && !ty->hasUnboundGenericType()) {
       diagnoseMissingOwnership(ownership, eltTypeRepr, ty, resolution);
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
@@ -5243,14 +5241,14 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
-  if (!element->hasError()
-      && inStage(TypeResolutionStage::Interface)
-      && !options.contains(TypeResolutionFlags::SILMode)
-      && isInterfaceTypeNoncopyable(
-          element, getDeclContext()->getGenericEnvironmentOfContext())) {
-    diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
-                    element);
-    return ErrorType::get(getASTContext());
+  if (inStage(TypeResolutionStage::Interface)) {
+    auto contextTy = GenericEnvironment::mapTypeIntoContext(
+        resolution.getGenericSignature().getGenericEnvironment(), element);
+    if (!contextTy->hasError() && contextTy->isNoncopyable()) {
+      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
+                      element);
+      return ErrorType::get(getASTContext());
+    }
   }
 
   return element;
@@ -5401,7 +5399,6 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                              TypeResolutionOptions options) {
   auto &ctx = getASTContext();
-  auto *dc = getDeclContext();
 
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
@@ -5429,13 +5426,16 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (inStage(TypeResolutionStage::Interface)
-        && !options.contains(TypeResolutionFlags::SILMode)
-        && !ty->hasUnboundGenericType()
-        && isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext())
-        && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)
-        && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {
-      moveOnlyElementIndex = i;
+    if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
+        !options.contains(TypeResolutionFlags::SILMode) &&
+        inStage(TypeResolutionStage::Interface) &&
+        !moveOnlyElementIndex.has_value() &&
+        !ty->hasUnboundGenericType() &&
+        !isa<TupleTypeRepr>(tyR)) {
+      auto contextTy = GenericEnvironment::mapTypeIntoContext(
+          resolution.getGenericSignature().getGenericEnvironment(), ty);
+      if (contextTy->isNoncopyable())
+        moveOnlyElementIndex = i;
     }
 
     auto eltName = repr->getElementName(i);
