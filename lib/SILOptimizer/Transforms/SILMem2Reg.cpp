@@ -269,7 +269,7 @@ static void
 prepareForDeletion(SILInstruction *inst,
                    SmallVectorImpl<SILInstruction *> &instructionsToDelete) {
   for (auto &operand : inst->getAllOperands()) {
-    operand.set(SILUndef::get(operand.get()->getType(), *inst->getFunction()));
+    operand.set(SILUndef::get(operand.get()));
   }
   instructionsToDelete.push_back(inst);
 }
@@ -713,7 +713,7 @@ static SILValue createEmptyAndUndefValue(SILType ty,
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createStruct(insertionPoint->getLoc(), ty, elements);
   } else {
-    return SILUndef::get(ty, *insertionPoint->getFunction());
+    return SILUndef::get(insertionPoint->getFunction(), ty);
   }
 }
 
@@ -1310,7 +1310,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
   if (auto values = getLiveOutValues(phiBlocks, startBlock)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   return LiveValues::forOwned(undef, undef);
 }
 
@@ -1345,7 +1345,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveInValues(
   if (auto values = getLiveInValues(phiBlocks, block)) {
     return *values;
   }
-  auto *undef = SILUndef::get(asi->getElementType(), *asi->getFunction());
+  auto *undef = SILUndef::get(asi->getFunction(), asi->getElementType());
   // TODO: Add another kind of LiveValues for undef.
   return LiveValues::forOwned(undef, undef);
 }

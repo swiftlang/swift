@@ -409,12 +409,13 @@ public:
   /// otherwise return null.
   SILBasicBlock *getParentBlock() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent function,
-  /// otherwise return null.
+  /// Returns the parent function of this value.
+  ///
+  /// Only returns nullptr if the given value's parent is a sil global variable
+  /// initializer.
   SILFunction *getFunction() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent module,
-  /// otherwise return null.
+  /// Return the parent module of this value.
   SILModule *getModule() const;
   
   /// Pretty-print the node.  If the node is an instruction, the output
