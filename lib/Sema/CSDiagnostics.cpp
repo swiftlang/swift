@@ -8230,7 +8230,7 @@ bool UnableToInferGenericPackElementType::diagnoseAsError() {
                   getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
             emitDiagnosticAt(
                 paramDecl->getLoc(), diag::note_in_opening_pack_element,
-                packElementElt->getIndex() + 1, paramDecl->getNameStr());
+                packElementElt->getIndex(), paramDecl->getNameStr());
           }
         }
       }
