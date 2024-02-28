@@ -366,7 +366,11 @@ class ClangModuleDependencyStorage : public ModuleDependencyInfoStorageBase {
 public:
   /// Destination output path
   const std::string pcmOutputPath;
-  
+
+  /// Same as \c pcmOutputPath, but possibly prefix-mapped using clang's prefix
+  /// mapper.
+  const std::string mappedPCMPath;
+
   /// The module map file used to generate the Clang module.
   const std::string moduleMapFile;
 
@@ -390,6 +394,7 @@ public:
   std::string CASClangIncludeTreeRootID;
 
   ClangModuleDependencyStorage(const std::string &pcmOutputPath,
+                               const std::string &mappedPCMPath,
                                const std::string &moduleMapFile,
                                const std::string &contextHash,
                                const std::vector<std::string> &buildCommandLine,
@@ -400,9 +405,10 @@ public:
                                const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang,
                                         moduleCacheKey),
-        pcmOutputPath(pcmOutputPath), moduleMapFile(moduleMapFile),
-        contextHash(contextHash), buildCommandLine(buildCommandLine),
-        fileDependencies(fileDependencies), capturedPCMArgs(capturedPCMArgs),
+        pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
+        moduleMapFile(moduleMapFile), contextHash(contextHash),
+        buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
+        capturedPCMArgs(capturedPCMArgs),
         CASFileSystemRootID(CASFileSystemRootID),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot) {}
 
@@ -526,20 +532,18 @@ public:
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencyInfo forClangModule(
-      const std::string &pcmOutputPath,
-      const std::string &moduleMapFile,
-      const std::string &contextHash,
+      const std::string &pcmOutputPath, const std::string &mappedPCMPath,
+      const std::string &moduleMapFile, const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs,
       const std::string &CASFileSystemRootID,
       const std::string &clangIncludeTreeRoot,
       const std::string &moduleCacheKey) {
-    return ModuleDependencyInfo(
-        std::make_unique<ClangModuleDependencyStorage>(
-          pcmOutputPath, moduleMapFile, contextHash,
-          nonPathCommandLine, fileDependencies, capturedPCMArgs,
-          CASFileSystemRootID, clangIncludeTreeRoot,  moduleCacheKey));
+    return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
+        pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
+        nonPathCommandLine, fileDependencies, capturedPCMArgs,
+        CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey));
   }
 
   /// Describe a placeholder dependency swift module.
