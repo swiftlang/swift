@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Defer.h"
 
 namespace swift {
 std::string LifetimeDependenceInfo::getString() const {
@@ -327,6 +328,9 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
   unsigned paramIndex = 0;
   bool hasParamError = false;
   for (auto *param : *afd->getParameters()) {
+    SWIFT_DEFER {
+      paramIndex++;
+    };
     Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
 
@@ -351,8 +355,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     candidateParam = param;
     lifetimeDependenceInfo = LifetimeDependenceInfo::getForParamIndex(
         afd, paramIndex + 1, param->getValueOwnership());
-
-    paramIndex++;
   }
   if (cd && cd->isImplicit()) {
     diags.diagnose(cd->getLoc(),
