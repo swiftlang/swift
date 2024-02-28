@@ -59,6 +59,12 @@ Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
 Func _swift_retainCount(_:) is a new API without @available attribute
 Func _swift_unownedRetainCount(_:) is a new API without @available attribute
 Func _swift_weakRetainCount(_:) is a new API without @available attribute
+// And these were temporarily added as ABI in https://github.com/apple/swift/pull/69352,
+// but then https://github.com/apple/swift/pull/71694 made them @_aeic before
+// they shipped anywhere, but not before they got into the ABI baseline. Fun!
+Func _getRetainCount(_:) has been removed
+Func _getUnownedRetainCount(_:) has been removed
+Func _getWeakRetainCount(_:) has been removed
 
 Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
 Class AnyKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
