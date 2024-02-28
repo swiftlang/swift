@@ -40,6 +40,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILUndef;
 
 namespace Lowering {
 class TypeLowering;
@@ -211,6 +212,7 @@ private:
   friend class BasicBlockBitfield;
   friend class NodeBitfield;
   friend class OperandBitfield;
+  friend SILUndef;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -328,6 +330,13 @@ private:
   Purpose specialPurpose = Purpose::None;
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
+
+  /// This is the set of undef values we've created, for uniquing purposes.
+  ///
+  /// We use a SmallDenseMap since in most functions, we will have only one type
+  /// of undef if we have any at all. In that case, by staying small we avoid
+  /// needing a heap allocation.
+  llvm::SmallDenseMap<SILType, SILUndef *, 1> undefValues;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -1557,6 +1566,12 @@ public:
   ///
   /// This is a fast subset of the checks performed in the SILVerifier.
   void verifyCriticalEdges() const;
+
+  /// Validate that all SILUndefs stored in the function's type -> SILUndef map
+  /// have this function as their parent function.
+  ///
+  /// Please only call this from the SILVerifier.
+  void verifySILUndefMap() const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

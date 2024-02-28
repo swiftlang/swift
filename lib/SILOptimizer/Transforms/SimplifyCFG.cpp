@@ -3740,7 +3740,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
+  A->replaceAllUsesWith(SILUndef::get(A));
   auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
                                         BB->getArgument(i)->getOwnershipKind());
   proj->replaceAllUsesWith(NewArg);

@@ -1221,7 +1221,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
       parameterIndices, context.getTypeConverter(),
       LookUpConformanceInModule(builder.getModule().getSwiftModule()));
   auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
-  auto transposeFn = SILUndef::get(transposeType, builder.getFunction());
+  auto transposeFn = SILUndef::get(builder.getFunction(), transposeType);
   auto *newLinearFn = context.createLinearFunction(
       builder, loc, parameterIndices, origFnOperand, SILValue(transposeFn));
   context.getLinearFunctionInstWorklist().push_back(lfi);

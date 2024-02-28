@@ -62,7 +62,7 @@ void ValueBase::replaceAllUsesWithUndef() {
   }
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), *F));
+    Op->set(SILUndef::get(F, Op->get()->getType()));
   }
 }
 
@@ -213,16 +213,24 @@ SILBasicBlock *SILNode::getParentBlock() const {
 }
 
 SILFunction *SILNode::getFunction() const {
-  if (auto *parentBlock = getParentBlock())
-    return parentBlock->getParent();
+  if (auto *parentBlock = getParentBlock()) {
+    // This can return nullptr if the block's parent is a global variable
+    // initializer.
+    if (auto *parentFunction = parentBlock->getParent()) {
+      return parentFunction;
+    }
+  }
+
+  if (auto *undef = dyn_cast<SILUndef>(this))
+    return undef->getParent();
+
+  if (auto *placeHolder = dyn_cast<PlaceholderValue>(this))
+    return placeHolder->getParent();
+
   return nullptr;
 }
 
-SILModule *SILNode::getModule() const {
-  if (SILFunction *func = getFunction())
-    return &func->getModule();
-  return nullptr;
-}
+SILModule *SILNode::getModule() const { return &getFunction()->getModule(); }
 
 /// Get a location for this value.
 SILLocation SILValue::getLoc() const {
@@ -535,8 +543,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 int PlaceholderValue::numPlaceholderValuesAlive = 0;
 
-PlaceholderValue::PlaceholderValue(SILType type)
-      : ValueBase(ValueKind::PlaceholderValue, type) {
+PlaceholderValue::PlaceholderValue(SILFunction *fn, SILType type)
+    : ValueBase(ValueKind::PlaceholderValue, type), parentFunction(fn) {
   numPlaceholderValuesAlive++;
 }
 

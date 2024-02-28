@@ -200,7 +200,11 @@ public:
     assert(F && "cannot create this instruction without a function context");
     return *F;
   }
-  
+
+  /// If this SILBuilder is inserting into a function, return that function. If
+  /// we are inserting into a global, this returns nullptr.
+  SILFunction *maybeGetFunction() const { return F; }
+
   bool isInsertingIntoGlobal() const { return F == nullptr; }
 
   TypeExpansionContext getTypeExpansionContext() const {

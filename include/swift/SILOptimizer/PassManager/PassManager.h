@@ -160,10 +160,11 @@ public:
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
 
-  void initializeSSAUpdater(SILType type, ValueOwnershipKind ownership) {
+  void initializeSSAUpdater(SILFunction *fn, SILType type,
+                            ValueOwnershipKind ownership) {
     if (!ssaUpdater)
       ssaUpdater = new SILSSAUpdater;
-    ssaUpdater->initialize(type, ownership);
+    ssaUpdater->initialize(fn, type, ownership);
   }
 
   SILSSAUpdater *getSSAUpdater() const {

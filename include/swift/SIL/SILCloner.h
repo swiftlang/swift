@@ -593,7 +593,7 @@ SILCloner<ImplClass>::getMappedValue(SILValue Value) {
   if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
     ValueBase *undef =
-      (type == U->getType() ? U : SILUndef::get(type, Builder.getFunction()));
+        (type == U->getType() ? U : SILUndef::get(Builder.getFunction(), type));
     return SILValue(undef);
   }
 
