@@ -223,6 +223,12 @@ enum class CheckRequirementsResult : uint8_t {
 /// not contain any type parameters.
 CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
 
+/// Check if each substituted requirement is satisfied. If the requirement
+/// contains type parameters, and the answer would depend on the context of
+/// those type parameters, then `nullopt` is returned.
+std::optional<CheckRequirementsResult>
+checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
+
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
