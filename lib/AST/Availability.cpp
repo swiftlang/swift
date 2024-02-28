@@ -109,6 +109,12 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
                                           StringRef Rename,
                                           ValueDecl *RenameDecl,
                                           ASTContext &Context) {
+  // If there is no information that would go into the availability attribute,
+  // don't create one.
+  if (!Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
+      Message.empty() && Rename.empty() && !RenameDecl)
+    return nullptr;
+
   llvm::VersionTuple Introduced =
       Inferred.Introduced.value_or(llvm::VersionTuple());
   llvm::VersionTuple Deprecated =
@@ -189,7 +195,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
                                      Rename, RenameDecl, Context);
 
-    Attrs.add(Attr);
+    if (Attr)
+      Attrs.add(Attr);
   }
 }
 
