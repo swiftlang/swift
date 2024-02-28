@@ -2797,7 +2797,6 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
   return getContext().getLoadedModule(name);
 }
 
-
 /// Translate from the Serialization associativity enum values to the AST
 /// strongly-typed enum.
 ///
@@ -5370,6 +5369,11 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
       isPackageDescriptionVersionSpecific, isSPI, LIST_VER_TUPLE_PIECES(Introduced),
       LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
       platform, renameDeclID, messageSize, renameSize);
+  
+  // Hack: Filter the un-supported platforms from swiftmodule
+  if (platform >= /*PlatformKind::visionOS*/13) {
+    return nullptr;
+  }
 
   ValueDecl *renameDecl = nullptr;
   if (renameDeclID) {
@@ -5644,6 +5648,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Available_DECL_ATTR: {
         Attr = readAvailable_DECL_ATTR(scratch, blobData);
+        if (!Attr) skipAttr = true;
         break;
       }
 
@@ -5753,9 +5758,19 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           }
 
           auto attr = readAvailable_DECL_ATTR(scratch, blobData);
-          availabilityAttrs.push_back(attr);
+          if (attr) {
+            availabilityAttrs.push_back(attr);
+          }
           restoreOffset2.cancel();
           --numAvailabilityAttrs;
+        }
+        
+        // Hack: When deserialized from some un-supported @available attr decl, we should remove it
+        // @available (iOS, macOS, visionOS) -> @available (iOS, macOS)
+        if (availabilityAttrs.empty()) {
+          // If attr list is empty, then remove this attr
+          skipAttr = true;
+          break;
         }
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
