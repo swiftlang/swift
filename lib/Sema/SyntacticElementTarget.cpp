@@ -372,7 +372,64 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     break;
   }
   case Kind::forEachStmt: {
-    if (auto *newStmt = getAsForEachStmt()->walk(walker)) {
+    // We need to skip the where clause if requested, and we currently do not
+    // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
+    // so we need to skip it here.
+    // TODO: We ought to be able to fold BraceStmt checking into the constraint
+    // system eventually.
+    class ForEachWalker : public ASTWalker {
+      ASTWalker &Walker;
+      SyntacticElementTarget Target;
+      ForEachStmt *ForStmt;
+
+    public:
+      ForEachWalker(ASTWalker &walker, SyntacticElementTarget target)
+        : Walker(walker), Target(target), ForStmt(target.getAsForEachStmt()) {}
+
+      PreWalkAction walkToDeclPre(Decl *D) override {
+        if (D->walk(Walker))
+          return Action::Stop();
+        return Action::SkipNode();
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        // Ignore where clause if needed.
+        if (Target.ignoreForEachWhereClause() && E == ForStmt->getWhere())
+          return Action::SkipNode(E);
+
+        E = E->walk(Walker);
+
+        if (!E)
+          return Action::Stop();
+        return Action::SkipNode(E);
+      }
+
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+        // We only want to visit the children of the ForEachStmt.
+        if (S == ForStmt)
+          return Action::Continue(S);
+
+        // But not its body.
+        if (S != ForStmt->getBody())
+          S = S->walk(Walker);
+
+        if (!S)
+          return Action::Stop();
+
+        return Action::SkipNode(S);
+      }
+
+      PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+        P = P->walk(Walker);
+        if (!P)
+          return Action::Stop();
+        return Action::SkipNode(P);
+      }
+    };
+
+    ForEachWalker forEachWalker(walker, *this);
+
+    if (auto *newStmt = getAsForEachStmt()->walk(forEachWalker)) {
       result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
     } else {
       return std::nullopt;
