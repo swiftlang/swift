@@ -221,6 +221,11 @@ swiftscan_dependency_set_t *swiftscan_dependency_graph_get_dependencies(
   return result->dependencies;
 }
 
+swiftscan_diagnostic_set_t *swiftscan_dependency_graph_get_diagnostics(
+    swiftscan_dependency_graph_t result) {
+  return result->diagnostics;
+}
+
 //=== Module Dependency Info query APIs -----------------------------------===//
 
 swiftscan_string_ref_t
@@ -472,6 +477,11 @@ swiftscan_import_set_get_imports(swiftscan_import_set_t result) {
   return result->imports;
 }
 
+swiftscan_diagnostic_set_t *
+swiftscan_import_set_get_diagnostics(swiftscan_import_set_t result) {
+  return result->diagnostics;
+}
+
 //=== Scanner Invocation Functions ----------------------------------------===//
 
 swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
@@ -521,11 +531,13 @@ void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
 void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);
   swiftscan_dependency_set_dispose(result->dependencies);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 
 void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
   swiftscan_string_set_dispose(result->imports);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 
