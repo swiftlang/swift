@@ -846,6 +846,7 @@ public:
                                            bool allowMissing = false);
 
   /// Global conformance lookup, checks conditional requirements.
+  /// Requires a contextualized type.
   ///
   /// \param type The type for which we are computing conformance. Must not
   /// contain type parameters.
@@ -859,8 +860,32 @@ public:
   /// \returns An invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
   ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                                          // Note: different default than above
-                                          bool allowMissing = true);
+                              // Note: different default from lookupConformance
+                              bool allowMissing = true);
+
+  /// Global conformance lookup, checks conditional requirements.
+  /// Accepts interface types without context. If the conformance cannot be
+  /// definitively established without the missing context, returns \c nullopt.
+  ///
+  /// \param type The type for which we are computing conformance. Must not
+  /// contain type parameters.
+  ///
+  /// \param protocol The protocol to which we are computing conformance.
+  ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
+  /// \returns An invalid conformance if the search definitively failed. An
+  /// abstract, concrete or pack conformance, depending on the lookup type,
+  /// if the search succeeded. `std::nullopt` if the type could have
+  /// conditionally conformed depending on the context of the interface types.
+  std::optional<ProtocolConformanceRef>
+  checkConformanceWithoutContext(Type type,
+                                 ProtocolDecl *protocol,
+                                 // Note: different default from lookupConformance
+                                 bool allowMissing = true);
+
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
