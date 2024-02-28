@@ -2357,9 +2357,12 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   bool EnableCXXInterop =
       IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
+  bool EnableEmbeddedSwift =
+      IGM.getSILModule().getASTContext().LangOpts.hasFeature(Feature::Embedded);
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile, Producer, Opts.shouldOptimize(),
-      Opts.getDebugFlags(PD, EnableCXXInterop), MajorRuntimeVersion, SplitName,
+      Opts.getDebugFlags(PD, EnableCXXInterop, EnableEmbeddedSwift),
+      MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,

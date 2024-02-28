@@ -602,7 +602,8 @@ public:
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator,
-                            bool EnableCXXInterop) const {
+                            bool EnableCXXInterop,
+                            bool EnableEmbeddedSwift) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
@@ -614,6 +615,12 @@ public:
         Flags += " ";
       Flags += "-enable-experimental-cxx-interop";
     }
+    if (EnableEmbeddedSwift) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-embedded-swift";
+    }
+
     return Flags;
   }
 
