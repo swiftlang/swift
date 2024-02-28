@@ -8188,48 +8188,45 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
 }
 
 bool UnableToInferGenericPackElementType::diagnoseAsError() {
-
-  const auto* locator = getLocator();
+  auto *locator = getLocator();
   auto path = locator->getPath();
 
-  if (path.size() > 1) {
-  
-    const auto applyArgToParamElt = (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
-    const auto packElementElt = (path.end() - 1)->getAs<LocatorPathElt::PackElement>();
-
-    if (!applyArgToParamElt)
-      return false;
-
-    auto anchor = getAnchor();
-
-    // `nil` appears as an element of generic pack params, let's record a
-    // specify contextual type for nil fix.
-    if (isExpr<NilLiteralExpr>(anchor)) {
-      emitDiagnostic(diag::unresolved_nil_literal);
-    }
-    else {
-      // unable to infer the type of an element of generic pack params
-      emitDiagnostic(diag::could_not_infer_pack_element, packElementElt->getIndex());
-    }
-
-    // emit callee side diagnostics
-    auto applyExpr = castToExpr<ApplyExpr>(locator->getAnchor());
-    if (auto* Fn = applyExpr->getFn()) {
-      if (const auto DeclRef = Fn->getReferencedDecl()) {
-        auto paramDecl = getParameterAt(DeclRef, applyArgToParamElt->getParamIdx());
-        emitDiagnosticAt(
-          paramDecl->getLoc(), diag::note_in_opening_pack_element,
-          packElementElt->getIndex() + 1, paramDecl->getNameStr());
-      }
-    }
-
-    return true;
+  const auto applyArgToParamElt =
+      (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
+  const auto packElementElt =
+      (path.end() - 1)->getAs<LocatorPathElt::PackElement>();
+  if (!applyArgToParamElt || !packElementElt) {
+    return false;
   }
 
-  return false;
+  if (isExpr<NilLiteralExpr>(getAnchor())) {
+    // `nil` appears as an element of generic pack params, let's record a
+    // specify contextual type for nil fix.
+    emitDiagnostic(diag::unresolved_nil_literal);
+  } else {
+    // unable to infer the type of an element of generic pack params
+    emitDiagnostic(diag::could_not_infer_pack_element,
+                   packElementElt->getIndex());
+  }
+
+  if (isExpr<ApplyExpr>(locator->getAnchor())) {
+    // emit callee side diagnostics
+    if (auto *calleeLocator = getSolution().getCalleeLocator(locator)) {
+      if (const auto choice = getOverloadChoiceIfAvailable(calleeLocator)) {
+        if (auto *decl = choice->choice.getDeclOrNull()) {
+          if (auto paramDecl =
+                  getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
+            emitDiagnosticAt(
+                paramDecl->getLoc(), diag::note_in_opening_pack_element,
+                packElementElt->getIndex() + 1, paramDecl->getNameStr());
+          }
+        }
+      }
+    }
+  }
+
+  return true;
 }
-
-
 
 static std::pair<StringRef, StringRef>
 getImportModuleAndDefaultType(const ASTContext &ctx,

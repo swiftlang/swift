@@ -97,4 +97,11 @@ do {
   bar(1, 2, 3, nil, "Hello", u: 3, w: 4, 8, nil) // expected-error {{'nil' requires a contextual type}}
   // expected-error@-1 {{'nil' requires a contextual type}}
 
+
+  func fooWithOverload(_ value: Int) {}
+  func fooWithOverload<each T>(_ value: repeat each T) {}
+  // expected-note@-1 {{in inferring pack element #5 of 'value'}}
+
+  fooWithOverload(0, 1, 2, 3, nil) // expected-error {{'nil' requires a contextual type}}
+
 }

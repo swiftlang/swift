@@ -2550,13 +2550,11 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   }
 
   if (dstLocator->isLastElement<LocatorPathElt::PackElement>()) {
-
     // A hole appears as an element of generic pack params
     ConstraintFix *Fix = SpecifyPackElementType::create(cs, dstLocator);
     return std::make_pair(Fix, defaultImpact);
   }
 
-  return std::nullopt;
   return std::nullopt;
 }
 
