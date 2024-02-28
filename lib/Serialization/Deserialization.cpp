@@ -163,6 +163,8 @@ const char UnsafeDeserializationError::ID = '\0';
 void UnsafeDeserializationError::anchor() {}
 const char ModularizationError::ID = '\0';
 void ModularizationError::anchor() {}
+const char InvalidEnumValueError::ID = '\0';
+void InvalidEnumValueError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -5295,8 +5297,9 @@ public:
     return macro;
   }
 
-  AvailableAttr *readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
-                                         StringRef blobData);
+  Expected<AvailableAttr *>
+  readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
+                          StringRef blobData);
 };
 }
 
@@ -5349,7 +5352,7 @@ ModuleFile::getDeclChecked(
   return declOrOffset;
 }
 
-AvailableAttr *
+Expected<AvailableAttr *>
 DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
                                           StringRef blobData) {
   bool isImplicit;
@@ -5362,14 +5365,21 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
   DeclID renameDeclID;
-  unsigned platform, messageSize, renameSize;
+  unsigned rawPlatform, messageSize, renameSize;
 
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
-      isPackageDescriptionVersionSpecific, isSPI, LIST_VER_TUPLE_PIECES(Introduced),
-      LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
-      platform, renameDeclID, messageSize, renameSize);
+      isPackageDescriptionVersionSpecific, isSPI,
+      LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
+      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, renameDeclID, messageSize,
+      renameSize);
+
+  auto maybePlatform = platformFromUnsigned(rawPlatform);
+  if (!maybePlatform.has_value())
+    return llvm::make_error<InvalidEnumValueError>(rawPlatform, "PlatformKind");
+
+  PlatformKind platform = maybePlatform.value();
 
   ValueDecl *renameDecl = nullptr;
   if (renameDeclID) {
@@ -5391,7 +5401,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
   else if (isNoAsync)
     platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
-  else if (((PlatformKind)platform) == PlatformKind::none &&
+  else if (platform == PlatformKind::none &&
            (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
     platformAgnostic =
         isPackageDescriptionVersionSpecific
@@ -5402,9 +5412,9 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
   auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), (PlatformKind)platform, message, rename,
-      renameDecl, Introduced, SourceRange(), Deprecated, SourceRange(),
-      Obsoleted, SourceRange(), platformAgnostic, isImplicit, isSPI);
+      SourceLoc(), SourceRange(), platform, message, rename, renameDecl,
+      Introduced, SourceRange(), Deprecated, SourceRange(), Obsoleted,
+      SourceRange(), platformAgnostic, isImplicit, isSPI);
   return attr;
 }
 
@@ -5643,7 +5653,11 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Available_DECL_ATTR: {
-        Attr = readAvailable_DECL_ATTR(scratch, blobData);
+        auto attrOrError = readAvailable_DECL_ATTR(scratch, blobData);
+        if (!attrOrError)
+          return MF.diagnoseFatal(attrOrError.takeError());
+
+        Attr = attrOrError.get();
         break;
       }
 
@@ -5753,7 +5767,10 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           }
 
           auto attr = readAvailable_DECL_ATTR(scratch, blobData);
-          availabilityAttrs.push_back(attr);
+          if (!attr)
+            return MF.diagnoseFatal(attr.takeError());
+
+          availabilityAttrs.push_back(attr.get());
           restoreOffset2.cancel();
           --numAvailabilityAttrs;
         }
