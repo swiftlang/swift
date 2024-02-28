@@ -2020,8 +2020,11 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
                                     ModuleVersionInfo *versionInfo,
                                     bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
+  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
-  clang::Module *clangModule = Impl.lookupModule(topModule.Item.str());
+  clang::Module *clangModule = clangHeaderSearch.lookupModule(
+      topModule.Item.str(), /*ImportLoc=*/clang::SourceLocation(),
+      /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
   }
@@ -2046,8 +2049,11 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
       // this.
       if (!clangModule && component.Item.str() == "Private" &&
           (&component) == (&modulePath.getRaw()[1])) {
-        clangModule =
-            Impl.lookupModule((topModule.Item.str() + "_Private").str());
+        clangModule = clangHeaderSearch.lookupModule(
+            (topModule.Item.str() + "_Private").str(),
+            /*ImportLoc=*/clang::SourceLocation(),
+            /*AllowSearch=*/true,
+            /*AllowExtraModuleMapSearch=*/true);
       }
       if (!clangModule || !clangModule->isAvailable(lo, ti, r, mh, m)) {
         return false;
@@ -2069,39 +2075,6 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
   versionInfo->setVersion(currentVersion,
                           ModuleVersionSourceKind::ClangModuleTBD);
   return true;
-}
-
-clang::Module *
-ClangImporter::Implementation::lookupModule(StringRef moduleName) {
-  auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
-  if (getClangASTContext().getLangOpts().ImplicitModules)
-    return clangHeaderSearch.lookupModule(
-        moduleName, /*ImportLoc=*/clang::SourceLocation(),
-        /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
-
-  // Explicit module. Try load from modulemap.
-  auto &PP = Instance->getPreprocessor();
-  auto &MM = PP.getHeaderSearchInfo().getModuleMap();
-  auto loadFromMM = [&]() -> clang::Module * {
-    auto *II = PP.getIdentifierInfo(moduleName);
-    if (auto clangModule = MM.getCachedModuleLoad(*II))
-      return *clangModule;
-    return nullptr;
-  };
-  // Check if it is already loaded.
-  if (auto *clangModule = loadFromMM())
-    return clangModule;
-
-  // If not, try load it.
-  auto &PrebuiltModules = Instance->getHeaderSearchOpts().PrebuiltModuleFiles;
-  auto moduleFile = PrebuiltModules.find(moduleName);
-  if (moduleFile == PrebuiltModules.end())
-    return nullptr;
-
-  if (!Instance->loadModuleFile(moduleFile->second))
-    return nullptr; // error loading, return not found.
-  // Lookup again.
-  return loadFromMM();
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(

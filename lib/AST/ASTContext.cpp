@@ -2460,10 +2460,6 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     return false;
 
   if (version.empty()) {
-    // If this module has already been checked successfully, it is importable.
-    if (SucceededModuleImportNames.count(ModuleNameStr))
-      return true;
-
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
@@ -2521,21 +2517,12 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
 bool ASTContext::canImportModule(ImportPath::Module ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
-    return false;
-
-  // If checked successfully, add the top level name to success list as
-  // dependency to handle clang submodule correctly. Swift does not have
-  // submodule so the name should be the same.
-  SmallString<64> TopModuleName;
-  ModuleName.getTopLevelPath().getString(TopModuleName);
-  SucceededModuleImportNames.insert(TopModuleName.str());
-  return true;
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
 }
 
-bool ASTContext::testImportModule(ImportPath::Module ModuleName,
-                                  llvm::VersionTuple version,
-                                  bool underlyingVersion) const {
+bool ASTContext::canImportModule(ImportPath::Module ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) const {
   return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
 }
 

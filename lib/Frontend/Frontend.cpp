@@ -1130,14 +1130,14 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
   auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
+  return getASTContext().canImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportSwiftConcurrencyShims() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_SHIMS_NAME));
   auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
+  return getASTContext().canImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -1152,7 +1152,7 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
+  return getASTContext().canImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitBacktracingImport() {
@@ -1167,7 +1167,7 @@ bool CompilerInstance::canImportSwiftBacktracing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
+  return getASTContext().canImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportCxxShim() const {
@@ -1177,7 +1177,7 @@ bool CompilerInstance::canImportCxxShim() const {
   // Currently, Swift interfaces are not to expose their
   // C++ dependencies. Which means that when scanning them we should not
   // bring in such dependencies, including CxxShims.
-  return getASTContext().testImportModule(modulePath) &&
+  return getASTContext().canImportModule(modulePath) &&
          !Invocation.getFrontendOptions()
               .InputsAndOutputs.hasModuleInterfaceOutputPath() &&
          !Invocation.getFrontendOptions()
