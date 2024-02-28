@@ -12,8 +12,6 @@
 //
 // RUN: %target-run-simple-swift(-parse-as-library)
 // REQUIRES: executable_test
-// REQUIRES: reflection
-// UNSUPPORTED: use_os_stdlib
 // END.
 //
 //===----------------------------------------------------------------------===//
@@ -27,6 +25,7 @@ final class FlattenDistanceFromToTests {
     let tests = FlattenDistanceFromToTests()
     let suite = TestSuite("FlattenDistanceFromToTests")
     suite.test("EachIndexPair", tests.testEachIndexPair)
+    suite.test("MinMaxOutputs", tests.testMinMaxOutputs)
     runAllTests()
   }
 }
@@ -140,5 +139,36 @@ extension FlattenDistanceFromToTests {
     }
     
     expectEqual(invocations, 2502, "unexpected workload")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Min Max Outputs
+//===----------------------------------------------------------------------===//
+
+extension FlattenDistanceFromToTests {
+  
+  /// Checks some `Int.min` and `Int.max` distances.
+  ///
+  /// - Note: A distance of `Int.min` requires more than `Int.max` elements.
+  ///
+  func testMinMaxOutputs() {
+    for s: FlattenSequence in [
+      
+      [-1..<Int.max/1],
+      [00..<Int.max/1, 00..<000000001],
+      [00..<000000001, 01..<Int.max/1, 00..<000000001],
+      [00..<000000001, 00..<Int.max/2, 00..<Int.max/2, 00..<000000001]
+      
+    ].map({ $0.joined() }) {
+      
+      let a = s.startIndex, b = s.endIndex
+      
+      expectEqual(Int.min, s.distance(from: b, to: s.index(a, offsetBy: 00)))
+      expectEqual(Int.max, s.distance(from: s.index(a, offsetBy: 01), to: b))
+      
+      expectEqual(Int.min, s.distance(from: s.index(b, offsetBy: 00), to: a))
+      expectEqual(Int.max, s.distance(from: a, to: s.index(b, offsetBy: -1)))
+    }
   }
 }
