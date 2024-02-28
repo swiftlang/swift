@@ -950,9 +950,6 @@ ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
 ERROR(regionbasedisolation_isolated_capture_yields_race, none,
       "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
       (Type, ActorIsolation, ActorIsolation))
-ERROR(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
-      "transferring value of non-Sendable type %0 into transferring parameter; later accesses could race",
-      (Type))
 ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
       "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
       (Type))
