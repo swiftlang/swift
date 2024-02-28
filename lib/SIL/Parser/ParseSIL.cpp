@@ -376,7 +376,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
   // it until we see a real definition.
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
-  Entry = ::new PlaceholderValue(Type);
+  Entry = ::new PlaceholderValue(&B.getFunction(), Type);
   return Entry;
 }
 

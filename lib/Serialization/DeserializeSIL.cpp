@@ -319,7 +319,7 @@ SILValue SILDeserializer::getLocalValue(SILFunction *inContext, ValueID Id,
   if (!Entry) {
     // Otherwise, this is a forward reference.  Create a dummy node to represent
     // it until we see a real definition.
-    Entry = ::new PlaceholderValue(Type);
+    Entry = ::new PlaceholderValue(inContext, Type);
   }
   // If this value was already defined, check it to make sure types match.
   assert(Entry->getType() == Type && "Value Type mismatch?");

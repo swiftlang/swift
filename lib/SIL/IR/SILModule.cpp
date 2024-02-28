@@ -680,7 +680,8 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
   SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
-    def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
+    def = ::new PlaceholderValue(inFunction,
+                                 SILType::getPrimitiveAddressType(archetype));
   }
 
   return def;

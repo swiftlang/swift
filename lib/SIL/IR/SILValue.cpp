@@ -224,6 +224,9 @@ SILFunction *SILNode::getFunction() const {
   if (auto *undef = dyn_cast<SILUndef>(this))
     return undef->getParent();
 
+  if (auto *placeHolder = dyn_cast<PlaceholderValue>(this))
+    return placeHolder->getParent();
+
   return nullptr;
 }
 
@@ -540,8 +543,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 int PlaceholderValue::numPlaceholderValuesAlive = 0;
 
-PlaceholderValue::PlaceholderValue(SILType type)
-      : ValueBase(ValueKind::PlaceholderValue, type) {
+PlaceholderValue::PlaceholderValue(SILFunction *fn, SILType type)
+    : ValueBase(ValueKind::PlaceholderValue, type), parentFunction(fn) {
   numPlaceholderValuesAlive++;
 }
 
