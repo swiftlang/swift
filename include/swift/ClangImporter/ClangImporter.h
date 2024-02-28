@@ -446,7 +446,9 @@ public:
   void verifyAllModules() override;
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  bridgeClangModuleDependencies(
+      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 

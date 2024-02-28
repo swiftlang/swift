@@ -127,9 +127,29 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
   return commandLineArgs;
 }
 
+static std::unique_ptr<llvm::PrefixMapper>
+getClangPrefixMapper(DependencyScanningTool &clangScanningTool,
+                     ModuleDeps &clangModuleDep,
+                     clang::CompilerInvocation &depsInvocation) {
+  std::unique_ptr<llvm::PrefixMapper> Mapper;
+  if (clangModuleDep.IncludeTreeID) {
+    Mapper = std::make_unique<llvm::PrefixMapper>();
+  } else if (clangModuleDep.CASFileSystemRootID) {
+    assert(clangScanningTool.getCachingFileSystem());
+    Mapper = std::make_unique<llvm::TreePathPrefixMapper>(
+        clangScanningTool.getCachingFileSystem());
+  }
+
+  if (Mapper)
+    DepscanPrefixMapping::configurePrefixMapper(depsInvocation, *Mapper);
+
+  return Mapper;
+}
+
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
-     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-     StringRef moduleOutputPath, RemapPathCallback callback) {
+    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+    clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+    StringRef moduleOutputPath, RemapPathCallback callback) {
   const auto &ctx = Impl.SwiftContext;
   ModuleDependencyVector result;
 
@@ -206,6 +226,10 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     (void)success;
     assert(success && "clang option from dep scanner round trip failed");
 
+    // Create a prefix mapper that matches clang's configuration.
+    auto Mapper =
+        getClangPrefixMapper(clangScanningTool, clangModuleDep, depsInvocation);
+
     // Clear the cache key for module. The module key is computed from clang
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
@@ -251,10 +275,14 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
       swiftArgs.push_back(IncludeTree);
     }
 
+    std::string mappedPCMPath = pcmPath;
+    if (Mapper)
+      Mapper->mapInPlace(mappedPCMPath);
+
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencyInfo::forClangModule(
-        pcmPath, clangModuleDep.ClangModuleMapFile,
+        pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
         RootID, IncludeTree, /*module-cache-key*/ "");
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
@@ -414,7 +442,8 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
     return {};
   }
 
-  return bridgeClangModuleDependencies(*clangModuleDependencies,
+  return bridgeClangModuleDependencies(clangScanningTool,
+                                       *clangModuleDependencies,
                                        moduleOutputPath, [&](StringRef path) {
                                          if (mapper)
                                            return mapper->mapToString(path);
@@ -479,8 +508,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // Record module dependencies for each new module we found.
   auto bridgedDeps = bridgeClangModuleDependencies(
-      clangModuleDependencies->ModuleGraph, cache.getModuleOutputPath(),
-      [&cache](StringRef path) {
+      clangScanningTool, clangModuleDependencies->ModuleGraph,
+      cache.getModuleOutputPath(), [&cache](StringRef path) {
         return cache.getScanService().remapPath(path);
       });
   cache.recordDependencies(bridgedDeps);

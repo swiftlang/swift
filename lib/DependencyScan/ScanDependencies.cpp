@@ -285,7 +285,7 @@ static llvm::Error resolveExplicitModuleInputs(
       if (!resolvingDepInfo.isClangModule()) {
         commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              remapPath(clangDepDetails->pcmOutputPath));
+                              clangDepDetails->mappedPCMPath);
         if (!instance.getInvocation()
                  .getClangImporterOptions()
                  .UseClangIncludeTree) {
@@ -306,7 +306,7 @@ static llvm::Error resolveExplicitModuleInputs(
         appendXclang();
         commandLine.push_back("-fmodule-file-cache-key");
         appendXclang();
-        commandLine.push_back(remapPath(clangDepDetails->pcmOutputPath));
+        commandLine.push_back(clangDepDetails->mappedPCMPath);
         appendXclang();
         commandLine.push_back(clangDepDetails->moduleCacheKey);
       }
@@ -372,7 +372,7 @@ static llvm::Error resolveExplicitModuleInputs(
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back("-fmodule-file-cache-key");
           newCommandLine.push_back("-Xcc");
-          newCommandLine.push_back(remapPath(clangDep->pcmOutputPath));
+          newCommandLine.push_back(clangDep->mappedPCMPath);
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back(clangDep->moduleCacheKey);
         }
