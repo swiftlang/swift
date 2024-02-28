@@ -104,6 +104,18 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
   // our default value, so we can just return.
 }
 
+TypeSubElementCount::TypeSubElementCount(SILValue value) : number(1) {
+  auto whole = TypeSubElementCount(value->getType(), *value->getModule(),
+                                   TypeExpansionContext(*value->getFunction()));
+  // The value produced by a drop_deinit has one fewer subelement than that of
+  // its type--the deinit bit is not included.
+  if (isa<DropDeinitInst>(value)) {
+    assert(value->getType().isValueTypeWithDeinit());
+    whole = whole - 1;
+  }
+  number = whole;
+}
+
 //===----------------------------------------------------------------------===//
 //                           MARK: SubElementNumber
 //===----------------------------------------------------------------------===//
@@ -201,7 +213,14 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       projectionDerivedFromRoot = initData->getOperand();
       continue;
     }
-    
+
+    // A drop_deinit consumes the "self" bit at the end of its type.  The offset
+    // is still to the beginning.
+    if (auto dd = dyn_cast<DropDeinitInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = dd->getOperand();
+      continue;
+    }
+
     // Look through wrappers.
     if (auto c2m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = c2m->getOperand();

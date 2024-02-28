@@ -311,8 +311,7 @@ bool Implementation::gatherUses(SILValue value) {
         // normal use, so we fall through.
       }
 
-      auto leafRange =
-          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
@@ -337,8 +336,7 @@ bool Implementation::gatherUses(SILValue value) {
         continue;
       }
 
-      auto leafRange =
-          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
@@ -407,8 +405,7 @@ bool Implementation::gatherUses(SILValue value) {
       });
 
       if (forwardedValues.empty()) {
-        auto leafRange =
-          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+        auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
         if (!leafRange) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
@@ -445,8 +442,7 @@ bool Implementation::gatherUses(SILValue value) {
         continue;
       }
 
-      auto leafRange =
-          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+      auto leafRange = TypeTreeLeafTypeRange::get(nextUse, getRootValue());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
@@ -505,7 +501,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
         continue;
 
       auto destructureUseSpan =
-          *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
+          *TypeTreeLeafTypeRange::get(use, getRootValue());
       for (unsigned index : destructureUseSpan.getRange()) {
         if (usedBits[index]) {
           // If we get that we used the same bit twice, we have an error. We set
@@ -533,7 +529,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
           continue;
 
         auto destructureUseSpan =
-            *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
+            *TypeTreeLeafTypeRange::get(use, getRootValue());
         for (unsigned index : destructureUseSpan.getRange()) {
           if (!usedBits[index])
             continue;
@@ -574,7 +570,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
         continue;
 
       auto destructureUseSpan =
-          *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
+          *TypeTreeLeafTypeRange::get(use, getRootValue());
       bool emittedError = false;
       for (unsigned index : destructureUseSpan.getRange()) {
         if (!usedBits[index])
@@ -607,8 +603,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
 
-    auto destructureUseSpan =
-        *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
+    auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use, getRootValue());
     if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
@@ -1168,7 +1163,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
         if (!seenOperands.count(&operand))
           continue;
 
-        auto span = *TypeTreeLeafTypeRange::get(operand.get(), getRootValue());
+        auto span = *TypeTreeLeafTypeRange::get(&operand, getRootValue());
 
         // All available values in our span should have the same value
         // associated with it.

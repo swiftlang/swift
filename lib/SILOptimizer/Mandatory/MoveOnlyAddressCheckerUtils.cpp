@@ -505,6 +505,16 @@ namespace {
 struct UseState {
   MarkUnresolvedNonCopyableValueInst *address;
 
+  // FIXME: [partial_consume_of_deiniting_aggregate_with_drop_deinit] Keep track
+  //        of the projections out of which a use emerges and use that to tell
+  //        whether a particular partial consume is allowed.
+  //
+  //        For example, give the TransitiveAddressWalker's worklist a
+  //        client-dependent context and look in that to determine whether a
+  //        relevant drop_deinit has been seen when erroring on partial
+  //        destructuring.
+  bool sawDropDeinit = false;
+
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
 
@@ -1135,7 +1145,15 @@ void UseState::initializeLiveness(
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
-  
+
+  // Assume a value whose deinit has been dropped has been initialized.
+  if (auto *ddi = dyn_cast<DropDeinitInst>(address->getOperand())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding copyable_to_move_only_wrapper as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+
   // Assume a value wrapped in a MoveOnlyWrapper is initialized.
   if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
     LLVM_DEBUG(llvm::dbgs()
@@ -1573,17 +1591,22 @@ struct CopiedLoadBorrowEliminationState {
   }
 };
 
-static bool shouldVisitAsEndPointUse(Operand *op) {
+static TransitiveAddressWalkerTransitiveUseVisitation
+shouldVisitAsEndPointUse(Operand *op) {
   // If an access is static and marked as "no nested conflict", we use that
   // in switch codegen to mark an opaque sub-access that move-only checking
   // should not look through.
   if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
     if (ba->getEnforcement() == SILAccessEnforcement::Static
         && ba->hasNoNestedConflict()) {
-      return true;
+      return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
     }
   }
-  return false;
+  // A drop_deinit consumes the deinit bit.
+  if (auto dd = dyn_cast<DropDeinitInst>(op->getUser())) {
+    return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
+  }
+  return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUses;
 }
 
 /// An early transform that we run to convert any load_borrow that are copied
@@ -1596,7 +1619,8 @@ struct CopiedLoadBorrowEliminationVisitor
   CopiedLoadBorrowEliminationVisitor(CopiedLoadBorrowEliminationState &state)
       : state(state) {}
 
-  bool visitTransitiveUseAsEndPointUse(Operand *op) {
+  CopiedLoadBorrowEliminationVisitor::TransitiveUseVisitation
+  visitTransitiveUseAsEndPointUse(Operand *op) {
     return shouldVisitAsEndPointUse(op);
   }
 
@@ -1761,14 +1785,15 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
                           << "    Target Type: " << targetType << '\n');
 
-  if (iterType == targetType) {
+  if (iterType == targetType && !isa<DropDeinitInst>(user)) {
     LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
                                "without emitting error!\n");
     return {};
   }
 
   auto feature = partialMutationFeature(kind);
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(feature)) {
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(feature) &&
+      !isa<DropDeinitInst>(user)) {
     LLVM_DEBUG(llvm::dbgs()
                << "    " << getFeatureName(feature) << " disabled!\n");
     // If the types equal, just bail early.
@@ -1789,7 +1814,15 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
               iterType, nom, user->getFunction())) {
         return error;
       }
-      if (nom->getValueTypeDestructor()) {
+      // FIXME: [partial_consume_of_deiniting_aggregate_with_drop_deinit] The
+      //        second half of this condition should consider whether this
+      //        user's projection path and whether this value had its deinit
+      //        dropped.
+      auto isAllowedPartialConsume =
+          (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
+          (nom ==
+           useState.address->getType().getNominalOrBoundGenericNominal());
+      if (nom->getValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
@@ -1931,7 +1964,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
         diagnosticEmitter(diagnosticEmitter) {}
 
   bool visitUse(Operand *op);
-  bool visitTransitiveUseAsEndPointUse(Operand *op);
+  TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *op);
   void reset(MarkUnresolvedNonCopyableValueInst *address) {
     useState.address = address;
   }
@@ -1994,7 +2027,8 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
 
 } // end anonymous namespace
 
-bool GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
+GatherUsesVisitor::TransitiveUseVisitation
+GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
   return shouldVisitAsEndPointUse(op);
 }
 
@@ -2012,6 +2046,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  if (isa<DropDeinitInst>(op->getUser())) {
+    // FIXME: [partial_consume_of_deiniting_aggregate_with_drop_deinit] Once
+    //        drop_deinits are handled properly, this should be deleted.
+    useState.sawDropDeinit = true;
+  }
+
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
@@ -2023,7 +2063,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     // TODO: What about copy_addr of itself. We really should just pre-process
     // those maybe.
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
@@ -2035,7 +2075,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   if (noncopyable::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
@@ -2047,17 +2087,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Then handle destroy_addr specially. We want to as part of our dataflow to
   // ignore destroy_addr, so we need to track it separately from other uses.
   if (auto *dvi = dyn_cast<DestroyAddrInst>(user)) {
-    // If we see a destroy_addr not on our base address, bail! Just error and
-    // say that we do not understand the code.
-    if (dvi->getOperand() != useState.address) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "!!! Error! Found destroy_addr no on base address: "
-                 << *useState.address << "destroy: " << *dvi);
-      return false;
-    }
-
     LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
@@ -2082,7 +2113,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (auto *ebi = dyn_cast<EndBorrowInst>(user)) {
     if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
       LLVM_DEBUG(llvm::dbgs() << "Found store_borrow: " << *sbi);
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2113,7 +2144,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
@@ -2178,7 +2209,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // use.
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
         isCopyableValue(li)) {
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2215,7 +2246,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     // Now, validate that what we will transform into a take isn't a take that
     // would invalidate a field that has a deinit.
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to compute leaf range for: " << *op->get());
@@ -2282,7 +2313,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
       // If set, this will tell the checker that we can change this load into
       // a load_borrow.
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2399,7 +2430,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
       return false;
@@ -2428,7 +2459,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
       LLVM_DEBUG(llvm::dbgs() << "in_guaranteed argument to function application\n");
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2456,7 +2487,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   if (auto *yi = dyn_cast<YieldInst>(user)) {
     if (yi->getYieldInfoForOperand(*op).isGuaranteed()) {
       LLVM_DEBUG(llvm::dbgs() << "coroutine yield\n");
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2501,7 +2532,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
       // On-stack partial applications and their final consumes are always a
       // liveness use of their captures.
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
         return false;
@@ -2528,7 +2559,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(!explicitCopy->isTakeOfSrc() &&
            "If we had a take of src, this should have already been identified "
            "as a must consume");
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
       return false;
@@ -2540,7 +2571,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
     LLVM_DEBUG(llvm::dbgs() << "fix_lifetime use\n");
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
     if (!leafRange) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
       return false;
@@ -2556,8 +2587,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // of the access.
     case SILAccessKind::Read: {
       LLVM_DEBUG(llvm::dbgs() << "begin_access [read]\n");
-      
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+
+      auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
         return false;
@@ -2580,7 +2611,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // to be careful.
   LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *user);
 
-  auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+  auto leafRange = TypeTreeLeafTypeRange::get(op, getRootAddress());
   if (!leafRange) {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
     return false;
