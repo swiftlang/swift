@@ -142,6 +142,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   }
   Invocation.setClangModuleCachePath(ModuleCachePath);
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.setDefaultPrebuiltCacheIfNecessary();
 
   if (auto *A = ParsedArgs.getLastArg(OPT_swift_version)) {
