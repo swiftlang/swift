@@ -1132,10 +1132,10 @@ extension Unsafe${Mutable}BufferPointer {
 % else:
   @_silgen_name("_swift_se0333_UnsafeBufferPointer_withMemoryRebound")
 % end
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Failure, Result>(
     to type: T.Type,
-    _ body: (_ buffer: ${Self}<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ buffer: ${Self}<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     guard let base = _position?._rawValue else {
       return try body(.init(start: nil, count: 0))
     }

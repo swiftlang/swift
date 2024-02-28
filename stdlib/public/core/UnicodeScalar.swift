@@ -527,17 +527,17 @@ extension Unicode.Scalar {
 
   // Access the scalar as encoded in UTF-8
   @inlinable
-  internal func withUTF8CodeUnits<Result>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withUTF8CodeUnits<Failure, Result>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     let encodedScalar = UTF8.encode(self)!
     var (codeUnits, utf8Count) = encodedScalar._bytes
 
     // The first code unit is in the least significant byte of codeUnits.
     codeUnits = codeUnits.littleEndian
-    return try Swift._withUnprotectedUnsafePointer(to: &codeUnits) {
-      return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
-        return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
+    return try Swift._withUnprotectedUnsafePointer(to: &codeUnits) { (ptr) throws(Failure) in
+      return try ptr.withMemoryRebound(to: UInt8.self, capacity: 4) { (boundPtr) throws(Failure) in
+        return try body(UnsafeBufferPointer(start: boundPtr, count: utf8Count))
       }
     }
   }

@@ -648,12 +648,12 @@ extension String {
   ///     that memory, and returns the number of initialized elements.
   @inline(__always)
   @available(SwiftStdlib 5.3, *)
-  public init(
+  public init<Failure>(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows {
+    ) throws(Failure) -> Int
+  ) throws(Failure) {
     self = try String(
       _uninitializedCapacity: capacity,
       initializingUTF8With: initializer
@@ -661,15 +661,15 @@ extension String {
   }
 
   @inline(__always)
-  internal init(
+  internal init<Failure>(
     _uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows {
+    ) throws(Failure) -> Int
+  ) throws(Failure) {
     if _fastPath(capacity <= _SmallString.capacity) {
-      let smol = try _SmallString(initializingUTF8With: {
-        try initializer(.init(start: $0.baseAddress, count: capacity))
+      let smol = try _SmallString(initializingUTF8With: { (bytes) throws(Failure) in
+        try initializer(.init(start: bytes.baseAddress, count: capacity))
       })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
@@ -719,7 +719,7 @@ extension String {
     }
     return try _slowWithCString(encodedAs: targetEncoding, body)
   }
-
+  
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding>(
@@ -1092,7 +1092,17 @@ extension String {
   }
 
   public // @testable
-  func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+  func _withNFCCodeUnits<Failure>(
+    _ f: (UInt8) throws(Failure) -> Void
+  ) throws(Failure) {
+    try _gutsSlice._withNFCCodeUnits(f)
+  }
+  
+  /// ABI: Historical withNFCCodeUnits rethrows, expressed as "throws",
+  /// which is ABI-compatible with "rethrows".
+  @_silgen_name("$sSS17_withNFCCodeUnitsyyys5UInt8VKXEKF")
+  public
+  func __abi_withNFCCodeUnits(_ f: (UInt8) throws -> Void) throws {
     try _gutsSlice._withNFCCodeUnits(f)
   }
 }
@@ -1116,7 +1126,9 @@ extension _StringGutsSlice {
     return true
   }
 
-  internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+  internal func _withNFCCodeUnits<Failure>(
+    _ f: (UInt8) throws(Failure) -> Void
+  ) throws(Failure) {
     let substring = String(_guts)[range]
     // Fast path: If we're already NFC (or ASCII), then we don't need to do
     // anything at all.
@@ -1134,8 +1146,8 @@ extension _StringGutsSlice {
       // Because we have access to the fastUTF8, we can go through that instead
       // of accessing the UTF8 view on String.
       if isNFCQC {
-        try withFastUTF8 {
-          for byte in $0 {
+        try withFastUTF8 { (bytes) throws(Failure) in
+          for byte in bytes {
             try f(byte)
           }
         }
@@ -1160,8 +1172,8 @@ extension _StringGutsSlice {
     }
 
     for scalar in substring._internalNFC {
-      try scalar.withUTF8CodeUnits {
-        for byte in $0 {
+      try scalar.withUTF8CodeUnits { (bytes) throws(Failure) in
+        for byte in bytes {
           try f(byte)
         }
       }

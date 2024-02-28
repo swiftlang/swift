@@ -347,12 +347,12 @@ extension __StringStorage {
 
   // The caller is expected to check UTF8 validity and ASCII-ness and update
   // the resulting StringStorage accordingly
-  internal static func create(
+  internal static func create<Failure>(
     uninitializedCodeUnitCapacity capacity: Int,
     initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows -> __StringStorage {
+    ) throws(Failure) -> Int
+  ) throws(Failure) -> __StringStorage {
     let storage = __StringStorage.create(
       codeUnitCapacity: capacity,
       countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false)

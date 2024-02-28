@@ -1074,10 +1074,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Failure, Result>(
     to type: T.Type,
-    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     guard let s = _position else {
       return try body(.init(start: nil, count: 0))
     }
@@ -1207,14 +1207,14 @@ extension ${Self} {
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
-public func withUnsafeMutableBytes<T, Result>(
+public func withUnsafeMutableBytes<T, Failure, Result>(
   of value: inout T,
-  _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-) rethrows -> Result
+  _ body: (UnsafeMutableRawBufferPointer) throws(Failure) -> Result
+) throws(Failure) -> Result
 {
-  return try withUnsafeMutablePointer(to: &value) {
+  return try withUnsafeMutablePointer(to: &value) { (ptr) throws(Failure) -> Result in
     return try body(UnsafeMutableRawBufferPointer(
-        start: $0, count: MemoryLayout<T>.size))
+        start: ptr, count: MemoryLayout<T>.size))
   }
 }
 
@@ -1258,13 +1258,13 @@ public func withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
-public func _withUnprotectedUnsafeBytes<T, Result>(
+public func _withUnprotectedUnsafeBytes<T, Failure, Result>(
   of value: inout T,
-  _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result
+  _ body: (UnsafeRawBufferPointer) throws(Failure) -> Result
+) throws(Failure) -> Result
 {
-  return try _withUnprotectedUnsafePointer(to: &value) {
-    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
+  return try _withUnprotectedUnsafePointer(to: &value) { (pointer) throws(Failure) in
+    try body(UnsafeRawBufferPointer(start: pointer, count: MemoryLayout<T>.size))
   }
 }
 
@@ -1288,10 +1288,10 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
-public func withUnsafeBytes<T, Result>(
+public func withUnsafeBytes<T, Result, Failure>(
   of value: T,
-  _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result {
+  _ body: (UnsafeRawBufferPointer) throws(Failure) -> Result
+) throws(Failure) -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)

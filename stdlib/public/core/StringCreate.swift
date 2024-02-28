@@ -102,12 +102,12 @@ extension String {
     }
   }
 
-  internal static func _fromLargeUTF8Repairing(
+  internal static func _fromLargeUTF8Repairing<Failure>(
     uninitializedCapacity capacity: Int,
     initializingWith initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows -> String {
+    ) throws(Failure) -> Int
+  ) throws(Failure) -> String {
     let result = try __StringStorage.create(
       uninitializedCodeUnitCapacity: capacity,
       initializingUncheckedUTF8With: initializer)

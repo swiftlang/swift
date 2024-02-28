@@ -279,9 +279,10 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+  public func withMemoryRebound<T, Failure, Result>(
+    to type: T.Type, 
+    _ body: (UnsafeMutableBufferPointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     let buffer = Base(rebasing: self)
     return try buffer.withMemoryRebound(to: T.self, body)
   }
@@ -518,9 +519,9 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws -> Result
-  ) rethrows -> Result {
+  public func withMemoryRebound<T, Failure, Result>(
+    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     let buffer = Base(rebasing: self)
     return try buffer.withMemoryRebound(to: T.self, body)
   }
@@ -697,9 +698,9 @@ extension Slice {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result, Element>(
-    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws -> Result
-  ) rethrows -> Result where Base == UnsafeBufferPointer<Element> {
+  public func withMemoryRebound<T, Failure, Result, Element>(
+    to type: T.Type, _ body: (UnsafeBufferPointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result where Base == UnsafeBufferPointer<Element> {
     let rebased = UnsafeBufferPointer<Element>(rebasing: self)
     return try rebased.withMemoryRebound(to: T.self, body)
   }
@@ -1140,9 +1141,10 @@ extension Slice {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result, Element>(
-    to type: T.Type, _ body: (UnsafeMutableBufferPointer<T>) throws -> Result
-  ) rethrows -> Result where Base == UnsafeMutableBufferPointer<Element> {
+  public func withMemoryRebound<T, Failure, Result, Element>(
+    to type: T.Type, 
+    _ body: (UnsafeMutableBufferPointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result where Base == UnsafeMutableBufferPointer<Element> {
     try Base(rebasing: self).withMemoryRebound(to: T.self, body)
   }
 
