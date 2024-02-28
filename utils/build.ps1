@@ -570,12 +570,18 @@ function Test-CMakeAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
   return [int]$Matches.3 -ge $Patch
 }
 
+enum Platform {
+  Windows
+  Android
+}
+
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
   param(
     [string] $Src,
     [string] $Bin,
     [string] $InstallTo = "",
+    [Platform] $Platform = "Windows",
     [hashtable] $Arch,
     [string] $Generator = "Ninja",
     [string] $CacheScript = "",
@@ -600,7 +606,9 @@ function Build-CMakeProject {
   # Enter the developer command shell early so we can resolve cmake.exe
   # for version checks.
   Isolate-EnvVars {
-    Invoke-VsDevShell $Arch
+    if ($Platform -eq "Windows") {
+      Invoke-VsDevShell $Arch
+    }
 
     $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
     $DriverBinaryCache = Get-HostProjectBinaryCache Driver
@@ -624,7 +632,16 @@ function Build-CMakeProject {
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
-    $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+    $CFlags = @()
+    if ($Platform -eq "Windows") {
+      $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+    }
+
+    $CXXFlags = @()
+    if ($Platform -eq "Windows") {
+      $CXXFlags += $CFlags.Clone() + @("/Zc:__cplusplus")
+    }
+
     if ($UseMSVCCompilers.Contains("C") -Or $UseMSVCCompilers.Contains("CXX") -Or
         $UseBuiltCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("CXX") -Or
         $UsePinnedCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("CXX")) {
@@ -636,7 +653,6 @@ function Build-CMakeProject {
         Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
       }
     }
-    $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
 
     if ($UseMSVCCompilers.Contains("C")) {
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
@@ -809,8 +825,8 @@ function Build-CMakeProject {
   if ($Summary) {
     $TimingData.Add([PSCustomObject]@{
       Arch = $Arch.LLVMName
+      Platform = $Platform
       Checkout = $Src.Replace($SourceCache, '')
-      BuildID = Split-Path -Path $Bin -Leaf
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -875,7 +891,7 @@ function Build-SPMProject {
     $TimingData.Add([PSCustomObject]@{
       Arch = $Arch.LLVMName
       Checkout = $Src.Replace($SourceCache, '')
-      BuildID = Split-Path -Path $Bin -Leaf
+      Platform = "Windows"
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -1060,16 +1076,14 @@ function Build-Compilers() {
   }
 }
 
-enum Platform {
-  Windows
-}
-
 function Build-LLVM([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-TargetProjectBinaryCache $Arch LLVM) `
     -Arch $Arch `
+    -Platform $Platform `
     -Defines @{
+      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
     }
 }
@@ -1079,14 +1093,16 @@ function Build-ZLib([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin "$($Arch.BinaryCache)\zlib-1.3" `
+    -Bin "$($Arch.BinaryCache)\$Platform\zlib-1.3" `
     -InstallTo $LibraryRoot\zlib-1.3\usr `
     -Arch $Arch `
+    -Platform $Platform `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3\usr\bin\$ArchName";
-      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3\usr\lib\$ArchName";
+      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
+      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3\usr\bin\$Platform\$ArchName";
+      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ArchName";
     }
 }
 
@@ -1095,14 +1111,16 @@ function Build-XML2([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
-    -Bin "$($Arch.BinaryCache)\libxml2-2.11.5" `
+    -Bin "$($Arch.BinaryCache)\$Platform\libxml2-2.11.5" `
     -InstallTo "$LibraryRoot\libxml2-2.11.5\usr" `
     -Arch $Arch `
+    -Platform $Platform `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      CMAKE_INSTALL_BINDIR = "bin/$ArchName";
-      CMAKE_INSTALL_LIBDIR = "lib/$ArchName";
+      CMAKE_INSTALL_BINDIR = "bin/$Platform/$ArchName";
+      CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
+      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
       LIBXML2_WITH_ICONV = "NO";
       LIBXML2_WITH_ICU = "NO";
       LIBXML2_WITH_LZMA = "NO";
@@ -1116,16 +1134,25 @@ function Build-XML2([Platform]$Platform, $Arch) {
 function Build-CURL([Platform]$Platform, $Arch) {
   $ArchName = $Arch.LLVMName
 
+  $PlatformDefines = @{}
+  if ($Platform -eq "Android") {
+    $PlatformDefines += @{
+      HAVE_FSEEKO = "0";
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin "$($Arch.BinaryCache)\curl-8.4.0" `
+    -Bin "$($Arch.BinaryCache)\$Platform\curl-8.4.0" `
     -InstallTo "$LibraryRoot\curl-8.4.0\usr" `
     -Arch $Arch `
+    -Platform $Platform `
     -BuildTargets default `
-    -Defines @{
+    -Defines ($PlatformDefines + @{
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
-      CMAKE_INSTALL_LIBDIR = "lib/$ArchName";
+      CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
+      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
       BUILD_CURL_EXE = "NO";
       CURL_CA_BUNDLE = "none";
       CURL_CA_FALLBACK = "NO";
@@ -1178,9 +1205,9 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CURL_USE_LIBSSH2 = "NO";
       CURL_USE_MBEDTLS = "NO";
       CURL_USE_OPENSSL = "NO";
-      CURL_USE_SCHANNEL = "YES";
+      CURL_USE_SCHANNEL = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       CURL_USE_WOLFSSL = "NO";
-      CURL_WINDOWS_SSPI = "YES";
+      CURL_WINDOWS_SSPI = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       CURL_ZLIB = "YES";
       CURL_ZSTD = "NO";
       ENABLE_ARES = "NO";
@@ -1198,12 +1225,12 @@ function Build-CURL([Platform]$Platform, $Arch) {
       USE_NGHTTP2 = "NO";
       USE_NGTCP2 = "NO";
       USE_QUICHE = "NO";
-      USE_WIN32_IDN = "YES";
-      USE_WIN32_LARGE_FILES = "YES";
+      USE_WIN32_IDN = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+      USE_WIN32_LARGE_FILES = if ($Platform -eq "Windows") { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$LibraryRoot\zlib-1.3\usr";
-      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$ArchName\zlibstatic.lib";
-    }
+      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ArchName\zlibstatic.lib";
+    })
 }
 
 function Build-ICU([Platform]$Platform, $Arch) {
@@ -1216,11 +1243,11 @@ function Build-ICU([Platform]$Platform, $Arch) {
     }
   }
 
-  if ($Arch -eq $ArchARM64 -and $HostArch -ne $ArchARM64) {
+  if ($Platform -ne "Windows" -or ($Arch -eq $ArchARM64 -and $HostArch -ne $ArchARM64)) {
     # Use previously built x64 tools
     $BuildToolsDefines = @{
       BUILD_TOOLS = "NO";
-      ICU_TOOLS_DIR = "$($ArchX64.BinaryCache)\icu-69.1"
+      ICU_TOOLS_DIR = "$($ArchX64.BinaryCache)\windows\icu-69.1"
     }
   } else {
     $BuildToolsDefines = @{BUILD_TOOLS = "YES"}
@@ -1228,14 +1255,16 @@ function Build-ICU([Platform]$Platform, $Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\icu\icu4c `
-    -Bin "$($Arch.BinaryCache)\icu-69.1" `
+    -Bin "$($Arch.BinaryCache)\$Platform\icu-69.1" `
     -InstallTo "$LibraryRoot\icu-69.1\usr" `
     -Arch $Arch `
+    -Platform $Platform `
     -BuildTargets default `
     -Defines ($BuildToolsDefines + @{
       BUILD_SHARED_LIBS = "NO";
-      CMAKE_INSTALL_BINDIR = "bin/$ArchName";
-      CMAKE_INSTALL_LIBDIR = "lib/$ArchName";
+      CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
+      CMAKE_INSTALL_BINDIR = "bin/$Platform/$ArchName";
+      CMAKE_INSTALL_LIBDIR = "lib/$Platform/$ArchName";
     })
 }
 
@@ -1248,12 +1277,14 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
       -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
+      -Platform $Platform `
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-Windows-$($Arch.LLVMName).cmake `
       -UseBuiltCompilers C,CXX,Swift `
       -BuildTargets default `
       -Defines @{
         CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget;
         CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_SYSTEM_NAME = if ($Platform -eq "Windows") { "Windows" } else { "Android" };
         LLVM_DIR = "$(Get-TargetProjectBinaryCache $Arch LLVM)\lib\cmake\llvm";
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
@@ -1281,6 +1312,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
     -InstallTo "$($Arch.SDKInstallRoot)\usr" `
     -Arch $Arch `
+    -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
     -BuildTargets $Targets `
     -Defines @{
@@ -1315,6 +1347,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -Bin $FoundationBinaryCache `
       -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
+      -Platform $Platform `
       -UseBuiltCompilers ASM,C,Swift `
       -BuildTargets $Targets `
       -Defines (@{
@@ -1324,15 +1357,15 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         # and fails with an ICU data object file icudt69l_dat.obj. This
         # matters to X86 only.
         CMAKE_Swift_FLAGS = if ($Arch -eq $ArchX86) { @("-Xlinker", "/SAFESEH:NO") } else { "" };
-        CURL_DIR = "$LibraryRoot\curl-8.4.0\usr\lib\$ShortArch\cmake\CURL";
-        ICU_DATA_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicudt69.lib";
-        ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicuin69.lib";
+        CURL_DIR = "$LibraryRoot\curl-8.4.0\usr\lib\$Platform\$ShortArch\cmake\CURL";
+        ICU_DATA_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicudt69.lib";
+        ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicuin69.lib";
         ICU_ROOT = "$LibraryRoot\icu-69.1\usr";
-        ICU_UC_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicuuc69.lib";
-        LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.11.5\usr\lib\$ShortArch\libxml2s.lib";
+        ICU_UC_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$Platform\$ShortArch\sicuuc69.lib";
+        LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
         LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
         LIBXML2_DEFINITIONS = "/DLIBXML_STATIC";
-        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$ShortArch\zlibstatic.lib";
+        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$Platform\$ShortArch\zlibstatic.lib";
         ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3\usr\include";
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
       } + $TestingDefines)
@@ -1365,6 +1398,7 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -Bin $XCTestBinaryCache `
       -InstallTo "$($Arch.XCTestInstallRoot)\usr" `
       -Arch $Arch `
+      -Platform $Platform `
       -UseBuiltCompilers Swift `
       -BuildTargets $Targets `
       -Defines (@{
@@ -1902,7 +1936,7 @@ if (-not $SkipBuild) {
 if ($Clean) {
   2..16 | % { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
   foreach ($Arch in $WindowsSDKArchs) {
-    0..3 | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildiD + $_)" -ErrorAction Ignore }
+    0..3 | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
   }
 }
 
@@ -2021,6 +2055,6 @@ if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select Arch,Checkout,BuildID,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    $TimingData | Select Platform,Arch,Checkout,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
 }
