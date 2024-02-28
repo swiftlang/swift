@@ -414,6 +414,8 @@ struct BridgedValue {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand getFirstUse() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getType() const;
   BRIDGED_INLINE Ownership getOwnership() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction SILUndef_getParentFunction() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction PlaceholderValue_getParentFunction() const;
 
   bool findPointerEscape() const;
 };

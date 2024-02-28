@@ -47,9 +47,6 @@ extension Value {
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
   /// It can also handle non-trivial enums with trivial cases.
   func isTrivial(_ context: some Context) -> Bool {
-    if self is Undef {
-      return true
-    }
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -64,12 +61,12 @@ extension Value {
       switch v {
       case is ValueToBridgeObjectInst:
         break
-      case is StructInst, is TupleInst:
-        let inst = (v as! SingleValueInstruction)
-        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let si as StructInst:
+        worklist.pushIfNotVisited(contentsOf: si.operands.values)
+      case let ti as TupleInst:
+        worklist.pushIfNotVisited(contentsOf: ti.operands.values)
       case let en as EnumInst:
-        if let payload = en.payload,
-           !(payload is Undef) {
+        if let payload = en.payload {
           worklist.pushIfNotVisited(payload)
         }
       default:
