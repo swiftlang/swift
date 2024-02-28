@@ -30,6 +30,12 @@
 
 namespace swift {
 
+enum class TransitiveAddressWalkerTransitiveUseVisitation : uint8_t {
+  OnlyUses,
+  OnlyUser,
+  BothUserAndUses,
+};
+
 /// A state structure for findTransitiveUsesForAddress. Intended to be only used
 /// a single time. Please always use a new one for every call to
 /// findTransitiveUsesForAddress.
@@ -61,11 +67,16 @@ protected:
   /// understand. These cause us to return AddressUseKind::Unknown.
   void onError(Operand *use) {}
 
+  using TransitiveUseVisitation =
+      TransitiveAddressWalkerTransitiveUseVisitation;
+
   /// Customization point that causes the walker to treat a specific transitive
   /// use as an end point use.
   ///
   /// Example: Visiting a mutable or immutable open_existential_addr.
-  bool visitTransitiveUseAsEndPointUse(Operand *use) { return false; }
+  TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+    return TransitiveUseVisitation::OnlyUses;
+  }
 
   void meet(AddressUseKind other) {
     assert(!didInvalidate);
@@ -112,8 +123,12 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
       return callVisitUse(use);
     }
 
-    if (asImpl().visitTransitiveUseAsEndPointUse(use))
-      return callVisitUse(use);
+    auto visitation = asImpl().visitTransitiveUseAsEndPointUse(use);
+    if (visitation != TransitiveUseVisitation::OnlyUses)
+      callVisitUse(use);
+
+    if (visitation == TransitiveUseVisitation::OnlyUser)
+      return;
 
     for (auto *use : svi->getUses())
       addToWorklist(use);

@@ -711,6 +711,10 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
   if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(address))
     return getSourceAccess(m->getOperand());
 
+  // Recurse through drop_deinit.
+  if (auto *ddi = dyn_cast<DropDeinitInst>(address))
+    return getSourceAccess(ddi->getOperand());
+
   // Recurse through moveonlywrapper_to_copyable_box.
   if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableBoxInst>(address))
     return getAccessKindForBox(m->getOperand());
