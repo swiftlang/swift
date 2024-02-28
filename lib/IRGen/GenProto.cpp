@@ -2561,8 +2561,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
-    assert(!IRGen.Opts.UseRelativeProtocolWitnessTables &&
-           "resilient relative protocol witness tables are not supported");
+    if (IRGen.Opts.UseRelativeProtocolWitnessTables)
+      llvm::report_fatal_error("resilient relative protocol witness tables are not supported");
+
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);
 
