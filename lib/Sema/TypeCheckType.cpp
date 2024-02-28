@@ -6079,12 +6079,23 @@ private:
       // If this is a type alias to a constraint type, the type
       // alias name must be prefixed with 'any' to be used as an
       // existential type.
-      if (type->isConstraintType()) {
+      if (type->isConstraintType() && !type->isAny() && !type->isAnyObject()) {
+        bool diagnose = false;
+
+        // Look for protocol members that require 'any'.
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!protoDecl->existentialRequiresAny())
-            continue;
+          if (protoDecl->existentialRequiresAny()) {
+            diagnose = true;
+            break;
+          }
+        }
 
+        // If inverses are present, require 'any' too.
+        if (auto *PCT = type->getAs<ProtocolCompositionType>())
+          diagnose |= !PCT->getInverses().empty();
+
+        if (diagnose) {
           auto diag = Ctx.Diags.diagnose(
               T->getNameLoc(), diag::existential_requires_any,
               alias->getDeclaredInterfaceType(),
