@@ -1410,11 +1410,14 @@ static std::string getFixItStringForDecodable(ClassDecl *CD,
 }
 
 /// Diagnose a class that does not have any initializers.
-static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+static void diagnoseClassWithoutInitializers(
+    ClassDecl *classDecl, bool downgradeToWarning
+) {
   ASTContext &C = classDecl->getASTContext();
   C.Diags.diagnose(classDecl, diag::class_without_init,
                    classDecl->isExplicitActor(),
-                   classDecl->getDeclaredType());
+                   classDecl->getDeclaredType())
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6);
 
   // HACK: We've got a special case to look out for and diagnose specifically to
   // improve the experience of seeing this, and mitigate some confusion.
@@ -1585,11 +1588,23 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       classDecl->inheritsSuperclassInitializers())
     return;
 
+  bool downgradeToWarning = false;
   auto *superclassDecl = classDecl->getSuperclassDecl();
   if (superclassDecl &&
       superclassDecl->getModuleContext() != classDecl->getModuleContext() &&
-      superclassDecl->hasMissingDesignatedInitializers())
-    return;
+      superclassDecl->hasMissingDesignatedInitializers()) {
+    // Objective-C classes might have missing designated initializers because
+    // they couldn't be imported. For historical reasons, we allow the
+    // Swift-defined subclasses to have no
+    if (superclassDecl->hasClangNode() && superclassDecl->isObjC())
+      return;
+
+    // Historically, Swift-defined classes with missing designated
+    // initializers could be subclassed from other modules without defining
+    // any initializers. Downgrade the error to a warning prior to Swift 6
+    // to smooth the transition.
+    downgradeToWarning = true;
+  }
 
   for (auto member : classDecl->lookupDirect(DeclBaseName::createConstructor())) {
     auto ctor = dyn_cast<ConstructorDecl>(member);
@@ -1597,7 +1612,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
   }
 
-  diagnoseClassWithoutInitializers(classDecl);
+  diagnoseClassWithoutInitializers(classDecl, downgradeToWarning);
 }
 
 /// Determines if a given TypeLoc is module qualified by checking if it's
