@@ -25,3 +25,30 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: @available(
   // CHECK-NEXT: public typealias Failure = Base.Failure
 }
+
+// CHECK: @available(
+// CHECK-NEXT: public struct OtherSequenceAdapte
+@available(SwiftStdlib 5.1, *)
+public struct OtherSequenceAdapter<Base: AsyncSequence>: AsyncSequence {
+  // CHECK: public typealias Element = Base.Element
+  // CHECK-NOT: public typealias Failure
+  // CHECK: public struct Failure
+
+  // CHECK-LABEL: public struct AsyncIterator
+  // CHECK: @available{{.*}}macOS 10.15
+  // CHECK: @available(
+  // CHECK-NEXT: public typealias Failure = Base.Failure
+  public typealias Element = Base.Element
+
+  public struct Failure: Error { }
+
+  // CHECK-NOT: public typealias Failure
+  public struct AsyncIterator: AsyncIteratorProtocol {
+    public mutating func next() async rethrows -> Base.Element? { nil }
+  }
+
+  // CHECK: public func makeAsyncIterator
+  public func makeAsyncIterator() -> AsyncIterator { AsyncIterator() }
+
+  // CHECK-NOT: public typealias Failure
+}
