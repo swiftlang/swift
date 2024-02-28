@@ -32,7 +32,7 @@ entry(%actor: $Optional<any Actor>, %int: $Int):
 // CHECK-NEXT: store [[INT]] %1, ptr [[ISO_WT_ADDR]], align
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, %TScA_pSg, [{{4|8}} x i8], %TSi }>, ptr [[BOX]], i32 0, i32 2
 // CHECK-NEXT: store ptr %T, ptr [[T_ADDR]], align
-// CHECK:      [[RESULT:%.*]] = insertvalue { ptr, ptr } { ptr @"$s7closureTA", ptr undef }, ptr [[BOX]], 1
+// CHECK:      [[RESULT:%.*]] = insertvalue { ptr, ptr } { ptr @"$s7closureTA{{(\.ptrauth.*)?}}", ptr undef }, ptr [[BOX]], 1
 // CHECK-NEXT: ret { ptr, ptr } [[RESULT]]
 
 sil @extract_closure_isolation : $(@guaranteed @callee_guaranteed @isolated(any) () -> ()) -> Optional<any Actor> {
