@@ -1037,14 +1037,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
     // so append the Objective-C runtime name.
     appendIdentifier(*objCName);
   } else if (!name.empty()) {
-    if (DistributedAppendingContext) {
-      std::string syntheticName = "$";
-      syntheticName.append(name.getIdentifier().str());
-      appendIdentifier(syntheticName);
-      DistributedAppendingContext = false;
-    } else {
-      appendIdentifier(name.getIdentifier().str());
-    }
+    appendIdentifier(name.getIdentifier().str());
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -2267,10 +2260,6 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  // We're appending context, make sure we only add `$` to the single outer type.
-  llvm::SaveAndRestore<bool> savedDistributedAppendingContext(
-      DistributedAppendingContext, DistributedMangleProtocolTargetAsStubTarget);
-
   // Check for a special mangling context.
   if (auto context = getSpecialManglingContext(decl, UseObjCRuntimeNames)) {
     switch (*context) {
@@ -3921,19 +3910,6 @@ void ASTMangler::appendDistributedThunk(
                                                        false);
   // TODO: add a flag to skip class/struct information from parameter types
 
-  bool shouldEnableThunkDeclMangling = false;
-  if (asReference) {
-    if (auto extension = dyn_cast<ExtensionDecl>(thunk->getDeclContext())) {
-      if (auto extended = extension->getExtendedNominal()) {
-        shouldEnableThunkDeclMangling = isa<ProtocolDecl>(extended);
-      }
-    }
-  }
-  // Marker protocols cannot be checked at runtime, so there is no point
-  // in recording them for distributed thunks.
-  llvm::SaveAndRestore<bool> savedDistributedMangleProtocolTargetAsStubTarget(
-      DistributedMangleProtocolTargetAsStubTarget, shouldEnableThunkDeclMangling);
-
   // Since computed property SILDeclRef's refer to the "originator"
   // of the thunk, we need to mangle distributed thunks of accessors
   // specially.
@@ -3955,13 +3931,38 @@ void ASTMangler::appendDistributedThunk(
     thunk = storage->getDistributedThunk();
     assert(thunk);
   }
+  assert(isa<AbstractFunctionDecl>(thunk) &&
+         "distributed thunk to mangle must be function decl");
+  assert(thunk->getContextKind() == DeclContextKind::AbstractFunctionDecl);
 
-  // We mangle similar to:
-  //    mangleEntity(thunk, SymbolKind::DistributedThunk);
-  // ...however we prefix with `$` if we're emitting for an extension
-  // in distributed protocol extension.
-  beginMangling();
-  appendEntity(thunk);
+  auto inProtocolExtensionMangleAsReference =
+      [&thunk, asReference]() -> ProtocolDecl * {
+    if (!asReference) {
+      return nullptr;
+    }
+
+    if (auto extension = dyn_cast<ExtensionDecl>(thunk->getDeclContext())) {
+      if (auto extended = extension->getExtendedNominal()) {
+        return dyn_cast<ProtocolDecl>(extended);
+      }
+    }
+    return nullptr;
+  };
+
+  if (auto type = inProtocolExtensionMangleAsReference()) {
+    appendContext(type->getDeclContext(), thunk->getAlternateModuleName());
+    auto baseName = type->getBaseName();
+    std::string syntheticName = "$";
+    syntheticName.append(baseName.getIdentifier().str());
+    appendIdentifier(syntheticName);
+    appendOperator("C"); // necessary for roundtrip, though we don't use it
+  } else {
+    appendContextOf(thunk);
+  }
+
+  appendIdentifier(thunk->getBaseName().getIdentifier().str());
+  appendDeclType(thunk, FunctionMangling);
+  appendOperator("F");
   appendSymbolKind(SymbolKind::DistributedThunk);
 }
 

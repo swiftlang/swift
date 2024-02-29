@@ -26,6 +26,10 @@ distributed actor DAFR: GreeterProtocol {
   typealias ActorSystem = FakeRoundtripActorSystem
   distributed func greet() -> String { "\(Self.self)" }
 }
+distributed actor DAFL: GreeterProtocol {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  distributed func greet() -> String { "\(Self.self)" }
+}
 
 @main struct Main {
   static func main() async throws {
@@ -38,7 +42,7 @@ distributed actor DAFR: GreeterProtocol {
     print("resolved on \(fakeRoundtripSystem): \(type(of: gfr))")
     // CHECK: resolved on main.FakeRoundtripActorSystem: $GreeterProtocol<FakeRoundtripActorSystem>
 
-    // CHECK: > execute distributed target: greet(), identifier: $s4main16$GreeterProtocolPAA11Distributed01_D9ActorStubRzrlE5greetSSyYaKFTE
+    // CHECK: > execute distributed target: main.$GreeterProtocol.greet(), identifier: $s4main16$GreeterProtocolC5greetSSyYaKFTE
     // Notes:
     // - The call is made on the stub: $GreeterProtocol
     // - the record is name is 'HF' for the accessible function

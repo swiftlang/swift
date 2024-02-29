@@ -83,13 +83,6 @@ protected:
   /// defined in.
   bool RespectOriginallyDefinedIn = true;
 
-  /// When mangling a distributed thunk, we replace the target with a mangling
-  /// of the macro generated stub: e.g. $Greeter. We must not do this for other
-  /// nominal types except the base of the type. This setting is used to prevent
-  /// accidentally mangling more types with a prefixed `$`.
-  bool DistributedMangleProtocolTargetAsStubTarget = false;
-  bool DistributedAppendingContext = false;
-
 public:
   class SymbolicReferent {
   public:
