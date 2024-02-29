@@ -1854,12 +1854,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      if (VarInfo->DIExpr.hasFragment())
-        // Since we can't merge two different op_fragment
-        // now, we're simply bailing out if there is an
-        // existing op_fragment in DIExpression.
-        // TODO: Try to merge two op_fragment expressions here.
-        continue;
       for (VarDecl *FD : FieldDecls) {
         SILDebugVariable NewVarInfo = *VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
@@ -1933,10 +1927,7 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
     if (!debugVal)
       continue;
 
-    // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
-      continue;
 
     SILType baseType = oldValue->getType();
 

@@ -5463,9 +5463,16 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
       assert(isa<SILBoxType>(RealTy));
     }
 
+  VarDecl *VD = i->getDecl();
+  if (!VD) {
+    // The source location of a DebugValueInst inserted by the SIL optimizer is
+    // not necessarily the VarDecl, as it can be the source location of the
+    // update point this DebugValueInst represents.
+    VD = VarInfo->getDecl();
+  }
   // Figure out the debug variable type
-  if (VarDecl *Decl = i->getDecl()) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealTy, getTypeInfo(SILTy),
+  if (VD) {
+    DbgTy = DebugTypeInfo::getLocalVariable(VD, RealTy, getTypeInfo(SILTy),
                                             IGM, IsFragmentType);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
