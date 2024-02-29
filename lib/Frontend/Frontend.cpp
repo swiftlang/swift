@@ -230,7 +230,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
   if (LangOpts.ClangTarget) {
-    serializationOpts.ExtraClangOptions.push_back("-target=" +
+    serializationOpts.ExtraClangOptions.push_back("--target=" +
                                                   LangOpts.ClangTarget->str());
   }
 
