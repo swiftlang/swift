@@ -35,6 +35,9 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
+// rdar://123810657
+// UNSUPPORTED: back_deployment_runtime
+
 //--- Interface.swift
 public protocol P {
   init()
