@@ -24,6 +24,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx && CPU=arm64
+// REQUIRES: rdar123810110
 
 import ExternalGenericMetadataBuilder
 import Foundation
