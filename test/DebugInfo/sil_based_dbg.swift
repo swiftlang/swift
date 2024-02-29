@@ -29,13 +29,12 @@ struct TheStruct {
 }
 // CHECK_DBG_SCOPE-LABEL: sil {{.*}}test_debug_scope
 public func test_debug_scope(val : Int) -> Int {
-    // TODO: Repeated SROA of the same variable is currently disabled.
-    // CHECK_DBG_SCOPE: alloc_stack $Builtin.Int{{[0-9]+}}, 
-    // CHECK_DBG_SCOPE-NOT:                          var,
-    // DISABLED_DBG_SCOPE-SAME:                      var, (name "the_struct",
-    // DISABLED_DBG_SCOPE-SAME:                      loc
+    // CHECK_DBG_SCOPE: alloc_stack $Builtin.Int{{[0-9]+}},
+    // CHECK_DBG_SCOPE-SAME:  var, (name "the_struct",
+    // CHECK_DBG_SCOPE-SAME:  loc
+    // CHECK_DBG_SCOPE-SAME:  expr op_fragment:#TheStruct.the_member:op_fragment:#Int._value
     // The auxiliary debug scope should be removed
-    // DISABLED_DBG_SCOPE-NOT:                       scope {{[0-9]+}})
+    // CHECK_DBG_SCOPE-NOT:   scope {{[0-9]+}})
     var the_struct = TheStruct(the_member: 0)
     the_struct.the_member = val + 13
     return the_struct.the_member

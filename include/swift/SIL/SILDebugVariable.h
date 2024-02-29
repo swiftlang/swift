@@ -76,6 +76,10 @@ struct SILDebugVariable {
   static std::optional<SILDebugVariable>
   createFromAllocation(const AllocationInst *AI);
 
+  /// Return the underlying variable declaration that this denotes,
+  /// or nullptr if we don't have one.
+  VarDecl *getDecl() const;
+
   // We're not comparing DIExpr here because strictly speaking,
   // DIExpr is not part of the debug variable. We simply piggyback
   // it in this class so that's it's easier to carry DIExpr around.
