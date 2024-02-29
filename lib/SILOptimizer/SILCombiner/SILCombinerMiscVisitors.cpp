@@ -2025,7 +2025,8 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
       return nullptr;
 
     std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, DFEI->getLoc(),
+      castValueToABICompatibleType(&Builder, parentTransform->getPassManager(),
+                                   DFEI->getLoc(),
                                    newValue,
                                    newValue->getType(), DFEI->getType(), {});
   }
