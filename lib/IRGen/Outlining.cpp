@@ -94,8 +94,8 @@ void OutliningMetadataCollector::collectRepresentationTypeMetadata(SILType ty) {
   Values.insert({key, metadata});
 }
 
-void OutliningMetadataCollector::addMetadataArguments(
-                                    SmallVectorImpl<llvm::Value*> &args) const {
+void OutliningMetadataCollector::addPolymorphicArguments(
+    SmallVectorImpl<llvm::Value *> &args) const {
   for (auto &pair : Values) {
     auto metadata = pair.second;
     assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
@@ -103,16 +103,16 @@ void OutliningMetadataCollector::addMetadataArguments(
   }
 }
 
-void OutliningMetadataCollector::addMetadataParameterTypes(
-                                 SmallVectorImpl<llvm::Type*> &paramTys) const {
+void OutliningMetadataCollector::addPolymorphicParameterTypes(
+    SmallVectorImpl<llvm::Type *> &paramTys) const {
   for (auto &pair : Values) {
     auto *metadata = pair.second;
     paramTys.push_back(metadata->getType());
   }
 }
 
-void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
-                                                      Explosion &params) const {
+void OutliningMetadataCollector::bindPolymorphicParameters(
+    IRGenFunction &IGF, Explosion &params) const {
   // Note that our parameter IGF intentionally shadows the IGF that this
   // collector was built with.
   for (auto &pair : Values) {
@@ -208,7 +208,7 @@ void OutliningMetadataCollector::emitCallToOutlinedCopy(
                             .getAddress());
   args.push_back(IGF.Builder.CreateElementBitCast(dest, ti.getStorageType())
                             .getAddress());
-  addMetadataArguments(args);
+  addPolymorphicArguments(args);
 
   llvm::Constant *outlinedFn;
   if (isInit && isTake) {
@@ -354,14 +354,14 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
   llvm::SmallVector<llvm::Type *, 4> paramTys;
   paramTys.push_back(ptrTy);
   paramTys.push_back(ptrTy);
-  collector.addMetadataParameterTypes(paramTys);
+  collector.addPolymorphicParameterTypes(paramTys);
 
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         auto params = IGF.collectParameters();
         Address src = ti.getAddressForPointer(params.claimNext());
         Address dest = ti.getAddressForPointer(params.claimNext());
-        collector.bindMetadataParameters(IGF, params);
+        collector.bindPolymorphicParameters(IGF, params);
         generator(IGF, dest, src, T, ti);
         IGF.Builder.CreateRet(dest.getAddress());
       },
@@ -393,7 +393,7 @@ void OutliningMetadataCollector::emitCallToOutlinedDestroy(
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
                             .getAddress());
-  addMetadataArguments(args);
+  addPolymorphicArguments(args);
 
   auto outlinedFn =
     IGF.IGM.getOrCreateOutlinedDestroyFunction(T, ti, *this);
@@ -414,13 +414,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
   auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
   paramTys.push_back(ptrTy);
-  collector.addMetadataParameterTypes(paramTys);
+  collector.addPolymorphicParameterTypes(paramTys);
 
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         Explosion params = IGF.collectParameters();
         Address addr = ti.getAddressForPointer(params.claimNext());
-        collector.bindMetadataParameters(IGF, params);
+        collector.bindPolymorphicParameters(IGF, params);
         if (!IGF.outliningCanCallValueWitnesses() ||
             T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
           ti.destroy(IGF, addr, T, true);
@@ -475,7 +475,7 @@ void OutliningMetadataCollector::emitCallToOutlinedRelease(
   assert(needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(addr.getAddress());
-  addMetadataArguments(args);
+  addPolymorphicArguments(args);
   auto *outlinedF = cast<llvm::Function>(IGF.IGM.getOrCreateReleaseFunction(
       ti, T, addr.getAddress()->getType(), atomicity, *this));
   llvm::CallInst *call =
@@ -494,14 +494,14 @@ llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
                                                         manglingBits.second);
   llvm::SmallVector<llvm::Type *, 4> argTys;
   argTys.push_back(ptrTy);
-  collector.addMetadataParameterTypes(argTys);
+  collector.addPolymorphicParameterTypes(argTys);
   return getOrCreateHelperFunction(
       funcName, ptrTy, argTys,
       [&](IRGenFunction &IGF) {
         Explosion params = IGF.collectParameters();
         Address addr(params.claimNext(), loadableTI->getStorageType(),
                      loadableTI->getFixedAlignment());
-        collector.bindMetadataParameters(IGF, params);
+        collector.bindPolymorphicParameters(IGF, params);
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         loadableTI->consume(IGF, loaded, atomicity, t);

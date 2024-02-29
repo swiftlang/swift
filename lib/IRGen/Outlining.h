@@ -83,10 +83,11 @@ public:
   void emitCallToOutlinedRelease(Address addr, SILType T, const TypeInfo &ti,
                                  Atomicity atomicity) const;
 
-  void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
-  void addMetadataParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
-  void bindMetadataParameters(IRGenFunction &helperIGF,
-                              Explosion &params) const;
+  void addPolymorphicArguments(SmallVectorImpl<llvm::Value *> &args) const;
+  void
+  addPolymorphicParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
+  void bindPolymorphicParameters(IRGenFunction &helperIGF,
+                                 Explosion &params) const;
 
 private:
   void collectFormalTypeMetadata(CanType type);
