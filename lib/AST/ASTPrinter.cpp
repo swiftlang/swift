@@ -1205,6 +1205,11 @@ static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
   return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
 }
 
+static bool isImplicitRethrowsProtocol(const ProtocolDecl *proto) {
+  return proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
+      proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -1214,6 +1219,17 @@ void PrintAST::printAttributes(const Decl *D) {
     (void)D->getSemanticAttrs();
 
   auto attrs = D->getAttrs();
+
+  // When printing a Swift interface, make sure that older compilers see
+  // @rethrows on the AsyncSequence and AsyncIteratorProtocol.
+  if (Options.AsyncSequenceRethrows && Options.IsForSwiftInterface) {
+    if (auto proto = dyn_cast<ProtocolDecl>(D)) {
+      if (isImplicitRethrowsProtocol(proto)) {
+        Printer << "@rethrows";
+        Printer.printNewline();
+      }
+    }
+  }
 
   // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
@@ -3317,6 +3333,21 @@ suppressingFeatureAssociatedTypeAvailability(
   options.ExcludeAttrList.push_back(DeclAttrKind::Available);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static bool usesFeatureAsyncSequenceFailure(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    return isImplicitRethrowsProtocol(proto);
+  }
+
+  return false;
+}
+
+static void
+suppressingFeatureAsyncSequenceFailure(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> saved(options.AsyncSequenceRethrows, true);
+  action();
 }
 
 static bool usesFeatureBuiltinIntLiteralAccessors(Decl *decl) {
