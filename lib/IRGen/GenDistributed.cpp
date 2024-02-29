@@ -197,13 +197,6 @@ private:
 
 } // end namespace
 
-//static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
-//  assert(thunk->isDistributed() && thunk->isThunk());
-//  return thunk->getDeclContext()
-//      ->getInnermostTypeContext()
-//      ->getSelfNominalTypeDecl();
-//}
-
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
 static CanSILFunctionType getAccessorType(IRGenModule &IGM,
@@ -795,7 +788,6 @@ DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
 ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
   auto &C = IGM.Context;
-  // auto *actor = getDistributedActorOf(Target);
   DeclContext *targetContext = Target->getDeclContext();
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 

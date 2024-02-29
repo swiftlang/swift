@@ -3942,9 +3942,7 @@ void ASTMangler::appendDistributedThunk(
     }
 
     if (auto extension = dyn_cast<ExtensionDecl>(thunk->getDeclContext())) {
-      if (auto extended = extension->getExtendedNominal()) {
-        return dyn_cast<ProtocolDecl>(extended);
-      }
+      return dyn_cast_or_null<ProtocolDecl>(extension->getExtendedNominal());
     }
     return nullptr;
   };
