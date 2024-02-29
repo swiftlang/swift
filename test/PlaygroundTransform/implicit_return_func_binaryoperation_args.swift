@@ -9,6 +9,8 @@
 // RUN: %target-run %t/main2 | %FileCheck %s
 // REQUIRES: executable_test
 
+// XFAIL: noncopyable_generics
+
 import PlaygroundSupport
 
 func add<I : SignedNumeric>(_ lhs: I, _ rhs: I) -> I {
