@@ -5062,16 +5062,6 @@ static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
   return newMethod;
 }
 
-// Synthesize a C++ virtual method
-clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
-    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
-    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method) {
-  return synthesizeCxxBaseMethod(
-      Impl, derivedClass, baseClass, method,
-      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
-      false /* forceConstQualifier */, true /* isVirtualCall */);
-}
-
 // Find the base C++ method called by the base function we want to synthesize
 // the derived thunk for.
 // The base C++ method is either the original C++ method that corresponds
@@ -6881,7 +6871,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
 // are not used in the function signature. We supply the type params as explicit
 // metatype arguments to aid in typechecking, but they shouldn't be forwarded to
 // the corresponding C++ function.
-std::pair<BraceStmt *, bool>
+static std::pair<BraceStmt *, bool>
 synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 

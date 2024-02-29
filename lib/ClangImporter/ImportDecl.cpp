@@ -3754,38 +3754,9 @@ namespace {
       }
 
       if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (auto dc = method->getDeclContext();
-              !decl->isPure() &&
-              isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
-
-            // generates the __synthesizedVirtualCall_ C++ thunk
-            clang::CXXMethodDecl *cxxThunk = synthesizeCxxVirtualMethod(
-                *static_cast<ClangImporter *>(
-                    dc->getASTContext().getClangModuleLoader()),
-                decl->getParent(), decl->getParent(), decl);
-
-            // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
-            if (Decl *swiftThunk =
-                    cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
-                isa_and_nonnull<FuncDecl>(swiftThunk)) {
-              // synthesize the body of the Swift method to call the swiftThunk
-              synthesizeForwardingThunkBody(cast<FuncDecl>(method),
-                                            cast<FuncDecl>(swiftThunk));
-              return method;
-            }
-          }
-
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              decl->isPure() ? "virtual function is not available in Swift "
-                               "because it is pure"
-                             : "virtual function is not available in Swift");
-        } else {
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              "virtual functions are not yet available in Swift");
-        }
+        Impl.markUnavailable(
+            cast<ValueDecl>(method),
+            "virtual functions are not yet available in Swift");
       }
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
