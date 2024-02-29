@@ -791,7 +791,15 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   DeclContext *targetContext = Target->getDeclContext();
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
-  auto *decodeFn = C.getDistributedActorArgumentDecodingMethod(targetContext);
+  /// If the context was a function, unwrap it and look for the decode method
+  /// based off a concrete class; If we're not in a concrete class, we'll be
+  /// using a witness for the decoder so returning null is okey.
+  FuncDecl *decodeFn = nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(targetContext)) {
+    decodeFn = C.getDistributedActorArgumentDecodingMethod(
+        func->getDeclContext()->getSelfNominalTypeDecl());;
+  }
+
 
   // If distributed actor is generic over actor system, we have to
   // use witness to reference `decodeNextArgument`.

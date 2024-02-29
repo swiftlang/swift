@@ -864,16 +864,9 @@ GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
 }
 
 FuncDecl *
-GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
-                                                           DeclContext *decl) const {
+GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
-
-  /// If the context was a function, unwrap it and look for the decode method
-  /// based off a concrete class; If we're not in a concrete class, we'll be
-  /// using a witness for the decoder so returning null is okey.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    decl = func->getDeclContext();
-  }
 
   if (auto actor = dyn_cast<ClassDecl>(decl)) {
     auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);

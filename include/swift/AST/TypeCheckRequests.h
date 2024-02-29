@@ -1335,7 +1335,7 @@ public:
 /// to a particular actor invocation type.
 class GetDistributedActorConcreteArgumentDecodingMethodRequest :
   public SimpleRequest<GetDistributedActorConcreteArgumentDecodingMethodRequest,
-                       FuncDecl *(DeclContext *),
+                       FuncDecl *(NominalTypeDecl *),
                        RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1343,7 +1343,7 @@ public:
 private:
   friend SimpleRequest;
 
-  FuncDecl *evaluate(Evaluator &evaluator, DeclContext *actor) const;
+  FuncDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
 
 public:
   // Caching

@@ -324,7 +324,7 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 /******************************************************************************/
 
 FuncDecl*
-ASTContext::getDistributedActorArgumentDecodingMethod(DeclContext *actor) {
+ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
   return evaluateOrDefault(
       evaluator, GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
 }

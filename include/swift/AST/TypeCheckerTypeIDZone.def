@@ -160,7 +160,7 @@ SWIFT_REQUEST(TypeChecker, GetDistributedActorInvocationDecoderRequest,
               NominalTypeDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorConcreteArgumentDecodingMethodRequest,
-              FuncDecl *(DeclContext *),
+              FuncDecl *(NominalTypeDecl *),
               Cache, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GlobalActorInstanceRequest,
               VarDecl *(NominalTypeDecl *),

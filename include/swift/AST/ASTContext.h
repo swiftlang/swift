@@ -1536,7 +1536,7 @@ public:
 
   /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
   /// invocation decoder of the given distributed actor.
-  FuncDecl *getDistributedActorArgumentDecodingMethod(DeclContext *);
+  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
 
   /// The special Builtin.TheTupleType, which parents tuple extensions and
   /// conformances.
