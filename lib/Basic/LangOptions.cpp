@@ -111,6 +111,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationPointerBit
 static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
+  "_multithreaded",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvironments[] = {
@@ -400,6 +401,16 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
   }
 }
 
+static bool isMultiThreadedRuntime(llvm::Triple triple) {
+  if (triple.getOS() == llvm::Triple::WASI) {
+    return triple.getEnvironmentName() == "threads";
+  }
+  if (triple.getOSName() == "none") {
+    return false;
+  }
+  return true;
+}
+
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
   clearAtomicBitWidths();
@@ -571,6 +582,11 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   if (tripleIsMacCatalystEnvironment(Target))
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "macabi");
+
+  if (isMultiThreadedRuntime(Target)) {
+    addPlatformConditionValue(PlatformConditionKind::Runtime,
+                              "_multithreaded");
+  }
 
   // Set the "_hasHasAtomicBitWidth" platform condition.
   setHasAtomicBitWidth(triple);
