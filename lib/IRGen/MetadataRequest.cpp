@@ -1416,9 +1416,14 @@ getFunctionTypeFlags(CanFunctionType type) {
     break;
   }
 
+  auto isolation = type->getIsolation();
+
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
                       .withTransferringResult(type->hasTransferringResult());
+
+  if (isolation.isErased())
+    extFlags = extFlags.withIsolatedAny();
 
   auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
@@ -1428,7 +1433,7 @@ getFunctionTypeFlags(CanFunctionType type) {
       .withParameterFlags(hasParameterFlags)
       .withEscaping(isEscaping)
       .withDifferentiable(type->isDifferentiable())
-      .withGlobalActor(!type->getGlobalActor().isNull())
+      .withGlobalActor(isolation.isGlobalActor())
       .withExtendedFlags(extFlags.getIntValue() != 0);
 
   return std::make_pair(flags, extFlags);
@@ -1632,7 +1637,8 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
 
   default:
     assert((!params.empty() || type->isDifferentiable() ||
-            type->getGlobalActor() || type->getThrownError()) &&
+            !type->getIsolation().isNonIsolated() ||
+            type->getThrownError()) &&
            "0 parameter case should be specialized unless it is a "
            "differentiable function or has a global actor");
 
