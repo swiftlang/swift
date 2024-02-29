@@ -9,8 +9,6 @@
 // RUN: %target-run %t/main2 | %FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: noncopyable_generics
-
 import PlaygroundSupport
 
 func iss<T>(_ instance: Any, anInstanceOf type: T.Type) -> Bool {
