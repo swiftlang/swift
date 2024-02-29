@@ -99,3 +99,23 @@ func forTryAwaitReturningExistentialType() async throws {
   for try await _ in S().seq() { // Ok
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+public struct ReaderSeq: AsyncSequence, Sendable {
+  public enum Failure: Error {
+    case x
+  }
+
+  public typealias Element = Int
+
+  public func makeAsyncIterator() -> Reader {}
+
+  public actor Reader: AsyncIteratorProtocol {
+    public func next() async throws -> Element? {}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test1() -> Error {
+  return ReaderSeq.Failure.x
+}

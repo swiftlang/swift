@@ -389,12 +389,48 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
   }
 }
 
+/// Determine whether this is the AsyncIteratorProtocol.Failure associated type.
+static bool isAsyncIteratorProtocolFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol))
+    return false;
+
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
+}
+
+/// Determine whether this is the AsyncSequence.Failure associated type.
+static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+    return false;
+
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
+}
+
+/// Determine whether this is the AsyncIteratorProtocol.Failure or
+/// AsyncSequence.Failure associated type.
+static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
+      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+    return false;
+
+  return assocType->getName() == assocType->getASTContext().Id_Failure;
+}
+
 /// Attempt to resolve a type witness via member name lookup.
 static ResolveWitnessResult resolveTypeWitnessViaLookup(
                        NormalProtocolConformance *conformance,
                        AssociatedTypeDecl *assocType) {
   auto *dc = conformance->getDeclContext();
   auto &ctx = dc->getASTContext();
+
+  // Prior to Swift 6, don't look for a named type witness for
+  // AsyncSequence.Failure. We'll always infer it from
+  // AsyncIteratorProtocol.Failure.
+  if (isAsyncSequenceFailure(assocType) &&
+      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+    return ResolveWitnessResult::Missing;
 
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
@@ -1816,17 +1852,6 @@ next_witness:;
   return result;
 }
 
-/// Determine whether this is AsyncIteratorProtocol.Failure or
-/// AsyncSequenceProtoco.Failure associated type.
-static bool isAsyncIteratorProtocolFailure(AssociatedTypeDecl *assocType) {
-  auto proto = assocType->getProtocol();
-  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) &&
-      !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
-    return false;
-
-  return assocType->getName() == assocType->getASTContext().Id_Failure;
-}
-
 /// Determine whether this is AsyncIteratorProtocol.next() function.
 static bool isAsyncIteratorProtocolNext(ValueDecl *req) {
   auto proto = dyn_cast<ProtocolDecl>(req->getDeclContext());
@@ -1834,7 +1859,8 @@ static bool isAsyncIteratorProtocolNext(ValueDecl *req) {
       !proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol))
     return false;
 
-  return req->getName().getBaseName() == req->getASTContext().Id_next;
+  return req->getName().getBaseName() == req->getASTContext().Id_next &&
+         req->getName().getArgumentNames().empty();
 }
 
 InferredAssociatedTypes
@@ -2537,8 +2563,7 @@ std::optional<AbstractTypeWitness>
 AssociatedTypeInference::computeFailureTypeWitness(
     AssociatedTypeDecl *assocType,
     ArrayRef<std::pair<ValueDecl *, ValueDecl *>> valueWitnesses) const {
-  // Inference only applies to AsyncIteratorProtocol.Failure and
-  // AsyncSequence.Failure.
+  // Inference only applies to AsyncIteratorProtocol.Failure.
   if (!isAsyncIteratorProtocolFailure(assocType))
     return std::nullopt;
 
@@ -2582,7 +2607,7 @@ AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
   // Ignore the default for AsyncIteratorProtocol.Failure and
   // AsyncSequence.Failure.
-  if (isAsyncIteratorProtocolFailure(assocType))
+  if (isAsyncIteratorOrSequenceFailure(assocType))
     return std::nullopt;
 
   // Go find a default definition.
@@ -2683,8 +2708,8 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 
   // Don't consider the generic parameter names for AsyncSequence.Failure or
   // AsyncIteratorProtocol.Failure; we always rely on inference from next() or
-  // next(_:).
-  if (isAsyncIteratorProtocolFailure(assocType)) {
+  // next(isolation:).
+  if (isAsyncIteratorOrSequenceFailure(assocType)) {
     // If this is specifically AsyncSequence.Failure with the older associated
     // type inference implementation, our abstract witness is
     // "AsyncIterator.Failure". The new implementation is smart enough to do
@@ -2727,7 +2752,7 @@ Type AssociatedTypeInference::computeGenericParamWitness(
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
     // Ignore the generic parameters for AsyncIteratorProtocol.Failure and
     // AsyncSequence.Failure.
-    if (!isAsyncIteratorProtocolFailure(assocType)) {
+    if (!isAsyncIteratorOrSequenceFailure(assocType)) {
       for (auto *gp : genericSig.getInnermostGenericParams()) {
         // Packs cannot witness associated type requirements.
         if (gp->isParameterPack())
