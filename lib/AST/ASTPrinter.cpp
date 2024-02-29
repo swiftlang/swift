@@ -3305,6 +3305,20 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
    return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
 }
 
+static bool usesFeatureAssociatedTypeAvailability(Decl *decl) {
+  return isa<AssociatedTypeDecl>(decl) &&
+      decl->getAttrs().hasAttribute<AvailableAttr>();
+}
+
+static void
+suppressingFeatureAssociatedTypeAvailability(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::Available);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 static bool usesFeatureBuiltinIntLiteralAccessors(Decl *decl) {
   return false;
 }
