@@ -151,22 +151,29 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
 }
 
 bool TypeInfo::withWitnessableMetadataCollector(
-    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+    IRGenFunction &IGF, SILType T, LayoutIsNeeded_t mayNeedLayout,
     DeinitIsNeeded_t needsDeinit,
     llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const {
+  bool needsCollector = false;
+  LayoutIsNeeded_t needsLayout = LayoutIsNotNeeded;
   if (!T.hasLocalArchetype() &&
       !IGF.outliningCanCallValueWitnesses()) {
-    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
+    needsCollector = true;
     if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
+      needsLayout = LayoutIsNeeded;
     }
-    invocation(collector);
-    return true;
+  } else if (!T.hasArchetype()) {
+    needsCollector = true;
+    // The implementation will call vwt in this case.
+    needsLayout = LayoutIsNotNeeded;
   }
 
-  if (!T.hasArchetype()) {
-    // The implementation will call vwt in this case.
+  if (needsCollector) {
     OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
+    if (needsDeinit || needsLayout) {
+      // Only collect if anything would be collected.
+      collectMetadataForOutlining(collector, T);
+    }
     invocation(collector);
     return true;
   }
@@ -198,10 +205,8 @@ void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedCopy(
-                            Address dest, Address src,
-                            SILType T, const TypeInfo &ti, 
-                            IsInitialization_t isInit, IsTake_t isTake) const {
-  assert(needsLayout);
+    Address dest, Address src, SILType T, const TypeInfo &ti,
+    IsInitialization_t isInit, IsTake_t isTake) const {
   assert(!needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(src, ti.getStorageType())
@@ -387,8 +392,7 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedDestroy(
-                      Address addr, SILType T, const TypeInfo &ti) const {
-  assert(needsLayout);
+    Address addr, SILType T, const TypeInfo &ti) const {
   assert(needsDeinit);
   llvm::SmallVector<llvm::Value *, 4> args;
   args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
