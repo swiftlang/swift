@@ -3809,7 +3809,20 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
     if (pd->isTransferring())
       return true;
 
-  // TODO: Results.
+  if (auto *fDecl = dyn_cast<FuncDecl>(decl)) {
+    auto fnTy = fDecl->getInterfaceType();
+    bool hasTransferring = false;
+    if (auto *ft = llvm::dyn_cast_if_present<FunctionType>(fnTy)) {
+      if (ft->hasExtInfo())
+        hasTransferring = ft->hasTransferringResult();
+    } else if (auto *ft =
+               llvm::dyn_cast_if_present<GenericFunctionType>(fnTy)) {
+      if (ft->hasExtInfo())
+        hasTransferring = ft->hasTransferringResult();
+    }
+    if (hasTransferring)
+      return true;
+  }
 
   return false;
 }
@@ -7432,7 +7445,7 @@ public:
     Printer << " -> ";
 
     if (T->hasExtInfo() && T->hasTransferringResult()) {
-      Printer.printKeyword("transferring", Options);
+      Printer.printKeyword("transferring ", Options);
     }
 
     if (T->hasLifetimeDependenceInfo()) {

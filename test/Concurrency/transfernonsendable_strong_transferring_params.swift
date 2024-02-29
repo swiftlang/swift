@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify -enable-experimental-feature RegionBasedIsolation %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature TransferringArgsAndResults -verify -enable-experimental-feature RegionBasedIsolation %s -o /dev/null
 
 // REQUIRES: asserts
 
@@ -174,8 +174,7 @@ actor MyActor {
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{transferring 'globalKlass' may cause a race}}
-  // expected-note @-1 {{transferring main actor-isolated 'globalKlass' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+  await transferToCustom(globalKlass) // expected-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context}}
 }
 
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {

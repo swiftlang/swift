@@ -417,13 +417,19 @@ static bool isProjectedFromAggregate(SILValue value) {
   return visitor.isMerge;
 }
 
-static PartialApplyInst *findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+namespace {
+using AsyncLetSourceValue =
+    llvm::PointerUnion<PartialApplyInst *, ThinToThickFunctionInst *>;
+} // namespace
+
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
   // If our operand is Sendable then we want to return nullptr. We only want to
   // return a value if we are not
   SILValue value = bi->getOperand(1);
   auto fType = value->getType().castTo<SILFunctionType>();
   if (fType->isSendable())
-    return nullptr;
+    return {};
 
   SILValue temp = value;
   while (true) {
@@ -436,10 +442,15 @@ static PartialApplyInst *findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
     value = temp;
   }
 
-  return cast<PartialApplyInst>(value);
+  // We can also get a thin_to_thick_function here if we do not capture
+  // anything. In such a case, we just do not process the partial apply get
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return {{pai}};
+  return {{cast<ThinToThickFunctionInst>(value)}};
 }
 
-static PartialApplyInst *findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
   auto *bi = cast<BuiltinInst>(FullApplySite(ai).getArgument(0));
   assert(*bi->getBuiltinKind() ==
          BuiltinValueKind::StartAsyncLetWithLocalBuffer);
@@ -1552,11 +1563,18 @@ public:
   }
 
   void translateAsyncLetGet(ApplyInst *ai) {
-    auto *pai = findAsyncLetPartialApplyFromGet(ai);
+    auto source = findAsyncLetPartialApplyFromGet(ai);
+    assert(source.has_value());
+
+    // If we didn't find a partial_apply, then we must have had a
+    // thin_to_thick_function meaning we did not capture anything.
+    if (source->is<ThinToThickFunctionInst *>())
+      return;
 
     // We should always be able to derive a partial_apply since we pattern
     // matched against the actual function call to swift_asyncLet_get in our
     // caller.
+    auto *pai = source->get<PartialApplyInst *>();
     assert(pai && "AsyncLet Get should always have a derivable partial_apply");
 
     ApplySite applySite(pai);
@@ -2964,6 +2982,11 @@ void BlockPartitionState::print(llvm::raw_ostream &os) const {
 static bool canComputeRegionsForFunction(SILFunction *fn) {
   if (!fn->getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation))
     return false;
+
+  assert(fn->getASTContext().LangOpts.StrictConcurrencyLevel ==
+             StrictConcurrency::Complete &&
+         "Need strict concurrency to be enabled for RegionBasedIsolation to be "
+         "enabled as well");
 
   // If this function does not correspond to a syntactic declContext and it
   // doesn't have a parent module, don't check it since we cannot check if a

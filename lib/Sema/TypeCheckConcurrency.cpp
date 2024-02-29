@@ -3522,8 +3522,11 @@ namespace {
         diagnoseApplyArgSendability(apply, getDeclContext());
       }
 
-      // Check for sendability of the result type.
-      if (diagnoseNonSendableTypes(
+      // Check for sendability of the result type if we do not have a
+      // transferring result.
+      if ((!ctx.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
+           !fnType->hasTransferringResult()) &&
+          diagnoseNonSendableTypes(
              fnType->getResult(), getDeclContext(),
              /*inDerivedConformance*/Type(),
              apply->getLoc(),
