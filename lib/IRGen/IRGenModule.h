@@ -771,9 +771,6 @@ public:
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
-  llvm::StructType
-      *AccessibleProtocolRequirementFunctionRecordTy; // { i32*, i32*, i32*,
-                                                      // i32, i32*, i32*}
 
   // clang-format off
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
@@ -1159,9 +1156,6 @@ public:
 
   void emitAccessibleFunctions();
   void emitAccessibleFunction(StringRef sectionName,
-                              std::string mangledRecordName,
-                              std::optional<std::string> mangledActorName,
-                              std::string mangledFunctionName,
                               SILFunction *func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,

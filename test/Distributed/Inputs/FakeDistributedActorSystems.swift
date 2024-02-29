@@ -223,6 +223,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   public typealias ResultHandler = FakeRoundtripResultHandler
 
   var activeActors: [ActorID: any DistributedActor] = [:]
+  var forcedNextRemoteCallReply: Any? = nil
 
   public init() {}
 
@@ -261,6 +262,10 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   private var remoteCallResult: Any? = nil
   private var remoteCallError: Error? = nil
 
+  public func forceNextRemoteCallReply(_ reply: Any) {
+    self.forcedNextRemoteCallReply = reply
+  }
+
   public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -273,8 +278,14 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
           Err: Error,
           Res: SerializationRequirement {
     print("  >> remoteCall: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType)), returning:\(String(reflecting: returnType))")
+    print(" > execute distributed target: \(target), identifier: \(target.identifier)")
     guard let targetActor = activeActors[actor.id] else {
       fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor: \(target.identifier)")
+    }
+
+    if let forcedNextRemoteCallReply {
+      defer { self.forcedNextRemoteCallReply = nil }
+      return forcedNextRemoteCallReply as! Res
     }
 
     func doIt<A: DistributedActor>(active: A) async throws -> Res {
@@ -292,7 +303,6 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
       var decoder = invocation.makeDecoder()
 
-      print(" > execute distributed target: \(target), identifier: \(target.identifier)")
       try await executeDistributedTarget(
         on: active,
         target: target,
@@ -479,6 +489,329 @@ public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
 @available(SwiftStdlib 5.7, *)
 public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
+
+  let storeReturn: (any Any) -> Void
+  let storeError: (any Error) -> Void
+  init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
+    self.storeReturn = storeReturn
+    self.storeError = storeError
+  }
+
+  public func onReturn<Success: SerializationRequirement>(value: Success) async throws {
+    print(" << onReturn: \(value)")
+    storeReturn(value)
+  }
+
+  public func onReturnVoid() async throws {
+    print(" << onReturnVoid: ()")
+    storeReturn(())
+  }
+
+  public func onThrow<Err: Error>(error: Err) async throws {
+    print(" << onThrow: \(error)")
+    storeError(error)
+  }
+}
+
+// ==== CustomSerializationProtocol Transport ----------------------------------
+
+public protocol CustomSerializationProtocol {
+  func toBytes() throws -> [UInt8]
+  static func fromBytes(_ bytes: [UInt8]) throws -> Self
+}
+
+extension ActorAddress {
+  func toBytes() throws -> [UInt8] {
+    var bytes: [UInt8] = []
+    bytes.reserveCapacity(address.count)
+    address.utf8CString.withUnsafeBytes { bs in
+      for b in bs {
+        bytes.append(b)
+      }
+    }
+    return bytes
+  }
+  func fromBytes(_ bytes: [UInt8]) throws -> ActorAddress {
+    let address = String(cString: bytes)
+    return Self.init(parse: address)
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+public final class FakeCustomSerializationRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
+  public typealias ActorID = ActorAddress
+  public typealias InvocationEncoder = FakeCustomSerializationInvocationEncoder
+  public typealias InvocationDecoder = FakeCustomSerializationInvocationDecoder
+  public typealias SerializationRequirement = CustomSerializationProtocol
+  public typealias ResultHandler = FakeCustomSerializationRoundtripResultHandler
+
+  var activeActors: [ActorID: any DistributedActor] = [:]
+  var forcedNextRemoteCallReply: Any? = nil
+
+  public init() {}
+
+  public func shutdown() {
+    self.activeActors = [:]
+  }
+
+  public func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    print("| resolve \(id) as remote // this system always resolves as remote")
+    return nil
+  }
+
+  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    let id = ActorAddress(parse: "<unique-id>")
+    print("| assign id: \(id) for \(actorType)")
+    return id
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {
+    print("| actor ready: \(actor)")
+    self.activeActors[actor.id] = actor
+  }
+
+  public func resignID(_ id: ActorID) {
+    print("X resign id: \(id)")
+  }
+
+  public func makeInvocationEncoder() -> InvocationEncoder {
+    .init()
+  }
+
+  private var remoteCallResult: Any? = nil
+  private var remoteCallError: Error? = nil
+
+  public func forceNextRemoteCallReply(_ reply: Any) {
+    self.forcedNextRemoteCallReply = reply
+  }
+
+  public func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder,
+    throwing errorType: Err.Type,
+    returning returnType: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error,
+    Res: SerializationRequirement {
+    print("  >> remoteCall: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType)), returning:\(String(reflecting: returnType))")
+    print(" > execute distributed target: \(target), identifier: \(target.identifier)")
+    guard let targetActor = activeActors[actor.id] else {
+      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor: \(target.identifier)")
+    }
+
+    if let forcedNextRemoteCallReply {
+      defer { self.forcedNextRemoteCallReply = nil }
+      return forcedNextRemoteCallReply as! Res
+    }
+
+    func doIt<A: DistributedActor>(active: A) async throws -> Res {
+      guard (actor.id) == active.id as! ActorID else {
+        fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
+      }
+
+      let resultHandler = FakeCustomSerializationRoundtripResultHandler { value in
+        self.remoteCallResult = value
+        self.remoteCallError = nil
+      } onError: { error in
+        self.remoteCallResult = nil
+        self.remoteCallError = error
+      }
+
+      var decoder = invocation.makeDecoder()
+
+      try await executeDistributedTarget(
+        on: active,
+        target: target,
+        invocationDecoder: &decoder,
+        handler: resultHandler
+      )
+
+      switch (remoteCallResult, remoteCallError) {
+      case (.some(let value), nil):
+        print("  << remoteCall return: \(value)")
+        return remoteCallResult! as! Res
+      case (nil, .some(let error)):
+        print("  << remoteCall throw: \(error)")
+        throw error
+      default:
+        fatalError("No reply!")
+      }
+    }
+    return try await _openExistential(targetActor, do: doIt)
+  }
+
+  public func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder,
+    throwing errorType: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    print("  >> remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
+    guard let targetActor = activeActors[actor.id] else {
+      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
+    }
+
+    func doIt<A: DistributedActor>(active: A) async throws {
+      guard (actor.id) == active.id as! ActorID else {
+        fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
+      }
+
+      let resultHandler = FakeCustomSerializationRoundtripResultHandler { value in
+        self.remoteCallResult = value
+        self.remoteCallError = nil
+      } onError: { error in
+        self.remoteCallResult = nil
+        self.remoteCallError = error
+      }
+
+      var decoder = invocation.makeDecoder()
+
+      print(" > execute distributed target: \(target)")
+      try await executeDistributedTarget(
+        on: active,
+        target: target,
+        invocationDecoder: &decoder,
+        handler: resultHandler
+      )
+
+      switch (remoteCallResult, remoteCallError) {
+      case (.some, nil):
+        return
+      case (nil, .some(let error)):
+        print("  << remoteCall throw: \(error)")
+        throw error
+      default:
+        fatalError("No reply!")
+      }
+    }
+    try await _openExistential(targetActor, do: doIt)
+  }
+
+}
+
+@available(SwiftStdlib 5.7, *)
+public struct FakeCustomSerializationInvocationEncoder : DistributedTargetInvocationEncoder {
+  public typealias SerializationRequirement = CustomSerializationProtocol
+
+  var genericSubs: [Any.Type] = []
+  var arguments: [Any] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
+
+  public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
+    print(" > encode generic sub: \(String(reflecting: type))")
+    genericSubs.append(type)
+  }
+
+  public mutating func recordArgument<Value: SerializationRequirement>(
+    _ argument: RemoteCallArgument<Value>) throws {
+    print(" > encode argument name:\(argument.label ?? "_"), value: \(argument.value)")
+    arguments.append(argument.value)
+  }
+
+  public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
+    print(" > encode error type: \(String(reflecting: type))")
+    self.errorType = type
+  }
+
+  public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
+    print(" > encode return type: \(String(reflecting: type))")
+    self.returnType = type
+  }
+
+  public mutating func doneRecording() throws {
+    print(" > done recording")
+  }
+
+  public mutating func makeDecoder() -> FakeCustomSerializationInvocationDecoder {
+    defer {
+      // reset the decoder; we don't want to keep these values retained by accident here
+      genericSubs = []
+      arguments = []
+      returnType = nil
+      errorType = nil
+    }
+    return .init(
+      args: arguments,
+      substitutions: genericSubs,
+      returnType: returnType,
+      errorType: errorType
+    )
+  }
+}
+
+// === decoding --------------------------------------------------------------
+
+// !!! WARNING !!!
+// This is a 'final class' on purpose, to see that we retain the ad-hoc witness
+// for 'decodeNextArgument'; Do not change it to just a class!
+@available(SwiftStdlib 5.7, *)
+public final class FakeCustomSerializationInvocationDecoder: DistributedTargetInvocationDecoder {
+  public typealias SerializationRequirement = CustomSerializationProtocol
+
+  var genericSubs: [Any.Type] = []
+  var arguments: [Any] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
+
+  var argumentIndex: Int = 0
+
+  fileprivate init(
+    args: [Any],
+    substitutions: [Any.Type] = [],
+    returnType: Any.Type? = nil,
+    errorType: Any.Type? = nil
+  ) {
+    self.arguments = args
+    self.genericSubs = substitutions
+    self.returnType = returnType
+    self.errorType = errorType
+  }
+
+  public func decodeGenericSubstitutions() throws -> [Any.Type] {
+    print("  > decode generic subs: \(genericSubs)")
+    return genericSubs
+  }
+
+  public func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
+    guard argumentIndex < arguments.count else {
+      fatalError("Attempted to decode more arguments than stored! Index: \(argumentIndex), args: \(arguments)")
+    }
+
+    let anyArgument = arguments[argumentIndex]
+    guard let argument = anyArgument as? Argument else {
+      fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
+    }
+
+    print("  > decode argument: \(argument)")
+    argumentIndex += 1
+    return argument
+  }
+
+  public func decodeErrorType() throws -> Any.Type? {
+    print("  > decode return type: \(errorType.map { String(reflecting: $0) }  ?? "nil")")
+    return self.errorType
+  }
+
+  public func decodeReturnType() throws -> Any.Type? {
+    print("  > decode return type: \(returnType.map { String(reflecting: $0) }  ?? "nil")")
+    return self.returnType
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+public struct FakeCustomSerializationRoundtripResultHandler: DistributedTargetInvocationResultHandler {
+  public typealias SerializationRequirement = CustomSerializationProtocol
 
   let storeReturn: (any Any) -> Void
   let storeError: (any Error) -> Void

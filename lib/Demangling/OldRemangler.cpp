@@ -3013,13 +3013,6 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError
-Remangler::mangleAccessibleProtocolRequirementFunctionRecord(Node *node,
-                                                             unsigned depth) {
-  Buffer << "HpF";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleBackDeploymentThunk(Node *node, unsigned depth) {
   Buffer << "Twb";
   return ManglingError::Success;

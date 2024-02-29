@@ -15,81 +15,43 @@
 import Distributed
 import FakeDistributedActorSystems
 
-// FIXME(distributed): enable via @_DistributedProtocol
-protocol GreeterProtocol: DistributedActor {
+@_DistributedProtocol
+protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greet() -> String
-}
-
-// TODO: remove manual stubs code
-extension GreeterProtocol where Self == GreeterProtocol_FakeRoundtripActorSystem_Stub {
-  static func resolve(
-    id: ID, using system: ActorSystem
-  ) throws -> any GreeterProtocol {
-    print("\(Self.self).\(#function) -> return \(GreeterProtocol_FakeRoundtripActorSystem_Stub.self)")
-
-    return try GreeterProtocol_FakeRoundtripActorSystem_Stub(actorSystem: system)
-  }
-}
-
-// TODO: remove manual stubs code
-distributed actor GreeterProtocol_FakeRoundtripActorSystem_Stub: GreeterProtocol {
-  typealias ActorSystem = FakeRoundtripActorSystem
-
-  distributed func greet() -> String {
-    let message = "STUB:\(Self.self).\(#function)"
-    print(message)
-    return message
-  }
-}
-
-// TODO: remove manual stubs code
-extension GreeterProtocol where Self == GreeterProtocol_LocalTestingDistributedActorSystem_Stub {
-  static func resolve(
-    id: Self.ID, using system: Self.ActorSystem
-  ) throws -> any GreeterProtocol {
-    print("\(Self.self).\(#function) -> return \(GreeterProtocol_LocalTestingDistributedActorSystem_Stub.self)")
-
-    return try GreeterProtocol_LocalTestingDistributedActorSystem_Stub(actorSystem: system)
-  }
-}
-
-// TODO: remove manual stubs code
-distributed actor GreeterProtocol_LocalTestingDistributedActorSystem_Stub: GreeterProtocol {
-  typealias ActorSystem = LocalTestingDistributedActorSystem
-
-  distributed func greet() -> String {
-    let message = "STUB:\(Self.self).\(#function)"
-    print(message)
-    return message
-  }
 }
 
 // ==== ------------------------------------------------------------------------
 
-distributed actor DAF {
+distributed actor DAFR: GreeterProtocol {
   typealias ActorSystem = FakeRoundtripActorSystem
+  distributed func greet() -> String { "\(Self.self)" }
 }
-distributed actor DAL {
+distributed actor DAFL: GreeterProtocol {
   typealias ActorSystem = LocalTestingDistributedActorSystem
+  distributed func greet() -> String { "\(Self.self)" }
 }
-
 
 @main struct Main {
   static func main() async throws {
     let fakeRoundtripSystem = FakeRoundtripActorSystem()
-    let fid = fakeRoundtripSystem.assignID(DAF.self)
+    let fr = DAFR(actorSystem: fakeRoundtripSystem)
+    let frid = fr.id
 
-    let localTestingSystem = LocalTestingDistributedActorSystem()
-    let gid = localTestingSystem.assignID(DAL.self)
+    let gfr: any GreeterProtocol = try $GreeterProtocol.resolve(id: frid, using: fakeRoundtripSystem)
 
-    let gf: any GreeterProtocol = try .resolve(id: fid, using: fakeRoundtripSystem)
-    print("resolved on \(fakeRoundtripSystem): \(type(of: gf))")
-    // CHECK: resolved on main.FakeRoundtripActorSystem: GreeterProtocol_FakeRoundtripActorSystem_Stub
-    print()
+    print("resolved on \(fakeRoundtripSystem): \(type(of: gfr))")
+    // CHECK: resolved on main.FakeRoundtripActorSystem: $GreeterProtocol<FakeRoundtripActorSystem>
 
-    let gl: any GreeterProtocol = try .resolve(id: gid, using: localTestingSystem)
-    print("resolved on \(localTestingSystem): \(type(of: gl))")
-    // CHECK: resolved on Distributed.LocalTestingDistributedActorSystem: GreeterProtocol_LocalTestingDistributedActorSystem_Stub
+    // CHECK: > execute distributed target: main.$GreeterProtocol.greet(), identifier: $s4main16$GreeterProtocolC5greetSSyYaKFTE
+    // Notes:
+    // - The call is made on the stub: $GreeterProtocol
+    // - the record is name is 'HF' for the accessible function
+
+    // FIXME: remove this when we can properly roundtrip through new accessor
+    fakeRoundtripSystem.forceNextRemoteCallReply("FAKE")
+
+    let got = try await gfr.greet()
+    print("got: \(got)")
 
     print("ok") // CHECK: ok
   }

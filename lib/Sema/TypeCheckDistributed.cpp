@@ -864,69 +864,74 @@ GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
 }
 
 FuncDecl *
-GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
-                                                           NominalTypeDecl *actor) const {
-  auto &ctx = actor->getASTContext();
+GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  auto &ctx = decl->getASTContext();
 
-  auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
-  // If distributed actor is generic over actor system, there is not
-  // going to be a concrete decoder.
-  if (!decoder)
-    return nullptr;
+  if (auto actor = dyn_cast<ClassDecl>(decl)) {
+    auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
+    // If distributed actor is generic over actor system, there is not
+    // going to be a concrete decoder.
+    if (!decoder)
+      return nullptr;
 
-  auto decoderTy = decoder->getDeclaredInterfaceType();
+    auto decoderTy = decoder->getDeclaredInterfaceType();
 
-  auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
-                                           DeclNameRef(ctx.Id_decodeNextArgument));
+    auto members =
+        TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
+                                  DeclNameRef(ctx.Id_decodeNextArgument));
 
-  // typealias SerializationRequirement = any ...
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs =
-      getDistributedSerializationRequirementProtocols(
-          actor, ctx.getProtocol(KnownProtocolKind::DistributedActor));
+    // typealias SerializationRequirement = any ...
+    llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs =
+        getDistributedSerializationRequirementProtocols(
+            actor, ctx.getProtocol(KnownProtocolKind::DistributedActor));
 
-  SmallVector<FuncDecl *, 2> candidates;
-  // Looking for `decodeNextArgument<Arg: <SerializationReq>>() throws -> Arg`
-  for (auto &member : members) {
-    auto *FD = dyn_cast<FuncDecl>(member.getValueDecl());
-    if (!FD || FD->hasAsync() || !FD->hasThrows())
-      continue;
+    SmallVector<FuncDecl *, 2> candidates;
+    // Looking for `decodeNextArgument<Arg: <SerializationReq>>() throws -> Arg`
+    for (auto &member : members) {
+      auto *FD = dyn_cast<FuncDecl>(member.getValueDecl());
+      if (!FD || FD->hasAsync() || !FD->hasThrows())
+        continue;
 
-    auto *params = FD->getParameters();
-    // No arguments.
-    if (params->size() != 0)
-      continue;
+      auto *params = FD->getParameters();
+      // No arguments.
+      if (params->size() != 0)
+        continue;
 
-    auto genericParamList = FD->getGenericParams();
-    // A single generic parameter.
-    if (genericParamList->size() != 1)
-      continue;
+      auto genericParamList = FD->getGenericParams();
+      // A single generic parameter.
+      if (genericParamList->size() != 1)
+        continue;
 
-    auto paramTy = genericParamList->getParams()[0]
-                       ->getDeclaredInterfaceType();
+      auto paramTy =
+          genericParamList->getParams()[0]->getDeclaredInterfaceType();
 
-    // `decodeNextArgument` should return its generic parameter value
-    if (!FD->getResultInterfaceType()->isEqual(paramTy))
-      continue;
+      // `decodeNextArgument` should return its generic parameter value
+      if (!FD->getResultInterfaceType()->isEqual(paramTy))
+        continue;
 
-    // Let's find out how many serialization requirements does this method cover
-    // e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
-    bool okay = llvm::all_of(serializationReqs,
-                            [&](ProtocolDecl *p) -> bool {
-                              return FD->getGenericSignature()->requiresProtocol(paramTy, p);
-                            });
+      // Let's find out how many serialization requirements does this method cover e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
+      bool okay = llvm::all_of(serializationReqs, [&](ProtocolDecl *p) -> bool {
+        return FD->getGenericSignature()->requiresProtocol(paramTy, p);
+      });
 
-    // If the current method covers all of the serialization requirements,
-    // it's a match. Note that it might also have other requirements, but
-    // we let that go as long as there are no two candidates that differ
-    // only in generic requirements.
-    if (okay)
-      candidates.push_back(FD);
+      // If the current method covers all of the serialization requirements,
+      // it's a match. Note that it might also have other requirements, but
+      // we let that go as long as there are no two candidates that differ
+      // only in generic requirements.
+      if (okay)
+        candidates.push_back(FD);
+    }
+
+    // Type-checker should reject any definition of invocation decoder
+    // that doesn't have a correct version of `decodeNextArgument` declared.
+    assert(candidates.size() == 1);
+    return candidates.front();
   }
 
-  // Type-checker should reject any definition of invocation decoder
-  // that doesn't have a correct version of `decodeNextArgument` declared.
-  assert(candidates.size() == 1);
-  return candidates.front();
+  /// No concrete candidate found, return null and perform the call via a
+  /// witness
+  return nullptr;
 }
 
 llvm::ArrayRef<ValueDecl *>
