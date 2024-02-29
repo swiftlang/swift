@@ -149,34 +149,33 @@ extension _ArrayBufferProtocol {
     elementsOf newValues: __owned C
   ) where C: Collection, C.Element == Element {
     _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
-    let oldCount = self.count
-    let eraseCount = subrange.count
-
-    let growth = newCount - eraseCount
-    // This check will prevent storing a 0 count to the empty array singleton.
-    if growth != 0 {
-      self.count = oldCount + growth
-    }
-
     let elements = self.firstElementAddress
 
     // erase all the elements we're replacing to create a hole
     let holeStart = elements + subrange.lowerBound
     let holeEnd = holeStart + newCount
-
-    // directly forwards to Builtin.destroyArray
-    // TODO: should we branch here or does the compiler branch implicitly?
+    let eraseCount = subrange.count
     holeStart.deinitialize(count: eraseCount)
 
-    // resize the hole to make it the correct size
-    // safe to always call, moveInitialize to the same location is a no-op
-    let tailStart = elements + subrange.upperBound
-    let tailCount = oldCount - subrange.upperBound
-    holeEnd.moveInitialize(from: tailStart, count: tailCount)
+    let growth = newCount - eraseCount
 
-    // place the values into the hole we created
+    if growth != 0 {
+      let tailStart = elements + subrange.upperBound
+      let tailCount = self.count - subrange.upperBound
+      holeEnd.moveInitialize(from: tailStart, count: tailCount)
+      self.count += growth
+    }
+
+    // don't use UnsafeMutableBufferPointer.initialize(fromContentsOf:)
+    // since it behaves differently on collections that misreport count,
+    // and breaks validation tests for those usecases / potentially
+    // breaks ABI guarantees.
     if newCount > 0 {
       let done: Void? = newValues.withContiguousStorageIfAvailable {
+        _precondition(
+          $0.count == newCount,
+          "invalid Collection: count differed in successive traversals"
+        )
         holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
       if done == nil {
