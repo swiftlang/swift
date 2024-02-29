@@ -1,5 +1,6 @@
 // REQUIRES: executable_test
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-enable-experimental-feature TrailingComma)
+// RUN:
 
 import StdlibUnittest
 
@@ -33,13 +34,15 @@ suite.test("argument list") {
 
 suite.test("if conditions") { 
 
+    func f(_ block: (Bool) -> Bool) -> Bool { block(true) }
+
     var value = 0
 
     if true, { value = 1 }
 
     expectEqual(value, 1)
 
-    if true, true, { value = 2 }
+    if true, f { $0 }, { true }(), { value = 2 } else { value = 0 }
     
     expectEqual(value, 2)
 
