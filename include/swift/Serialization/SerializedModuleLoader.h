@@ -68,6 +68,11 @@ struct SerializedModuleBaseName {
   std::optional<std::string> findInterfacePath(llvm::vfs::FileSystem &fs,
                                                ASTContext &ctx) const;
 
+  /// Returns the package-name of the interface file.
+  std::optional<std::string>
+  getPackageNameFromInterface(StringRef interfacePath,
+                              llvm::vfs::FileSystem &fs) const;
+
   /// Returns the .package.swiftinterface path if its package-name also applies to
   /// the the importing module. Returns an empty optional otherwise.
   std::optional<std::string>

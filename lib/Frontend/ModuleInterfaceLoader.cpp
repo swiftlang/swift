@@ -1244,8 +1244,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
-  std::string InPath = BaseName.findInterfacePath(fs, Ctx).value_or("");
-  if (InPath.empty()) {
+  auto InPath = BaseName.findInterfacePath(fs, Ctx);
+  if (!InPath) {
     if (fs.exists(ModPath)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "No .swiftinterface file found adjacent to module file "
@@ -1256,7 +1256,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   }
 
   if (ModuleInterfaceSourcePath)
-    ModuleInterfaceSourcePath->assign(InPath.begin(), InPath.end());
+    ModuleInterfaceSourcePath->assign(InPath->begin(), InPath->end());
 
   // If we've been told to skip building interfaces, we are done here and do
   // not need to have the module actually built. For example, if we are
@@ -1264,14 +1264,14 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // the interface.
   if (skipBuildingInterface) {
     if (ModuleInterfacePath)
-      ModuleInterfacePath->assign(InPath.begin(), InPath.end());
+      ModuleInterfacePath->assign(InPath->begin(), InPath->end());
     return std::error_code();
   }
 
   // Create an instance of the Impl to do the heavy lifting.
   auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
-      Ctx, ModPath, InPath, ModuleName, InterfaceChecker.CacheDir,
+      Ctx, ModPath, *InPath, ModuleName, InterfaceChecker.CacheDir,
       InterfaceChecker.PrebuiltCacheDir, InterfaceChecker.BackupInterfaceDir,
       ModuleID.Loc, InterfaceChecker.Opts,
       InterfaceChecker.RequiresOSSAModules,
@@ -1290,7 +1290,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   if (ModuleBuffer) {
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
     if (ModuleInterfacePath)
-      ModuleInterfacePath->assign(InPath.begin(), InPath.end());
+      ModuleInterfacePath->assign(InPath->begin(), InPath->end());
   }
 
   // Open .swiftsourceinfo file if it's present.

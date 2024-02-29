@@ -203,6 +203,16 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
   return InputType == file_types::TY_SwiftModuleInterfaceFile;
 }
 
+bool FrontendInputsAndOutputs::shouldTreatAsNonPackageModuleInterface() const {
+  if (!hasSingleInput())
+    return false;
+
+  file_types::ID InputType =
+      file_types::lookupTypeFromFilename(getFilenameOfFirstInput());
+  return InputType == file_types::TY_SwiftModuleInterfaceFile ||
+         InputType == file_types::TY_PrivateSwiftModuleInterfaceFile;
+}
+
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",

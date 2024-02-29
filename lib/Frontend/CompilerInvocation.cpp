@@ -974,8 +974,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto pkgName = A->getValue();
     if (StringRef(pkgName).empty())
       Diags.diagnose(SourceLoc(), diag::error_empty_package_name);
-    else
+    else {
       Opts.PackageName = pkgName;
+      // Unless the input type is public or private swift interface, do not
+      // allow non package interface imports for dependencies in the same
+      // package.
+      Opts.AllowNonPackageInterfaceImportFromSamePackage =
+          FrontendOpts.InputsAndOutputs
+              .shouldTreatAsNonPackageModuleInterface();
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {

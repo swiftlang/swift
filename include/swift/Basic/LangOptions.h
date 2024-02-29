@@ -440,6 +440,9 @@ namespace swift {
     /// The name of the package this module belongs to.
     std::string PackageName;
 
+    /// Allow importing a non-package interface from the same package.
+    bool AllowNonPackageInterfaceImportFromSamePackage = false;
+
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
 
