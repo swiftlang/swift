@@ -88,7 +88,7 @@ void Evaluator::finishedRequest(const ActiveRequest &request) {
 }
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
-  if (true /* FIXME(NCG): Temporary hack, remove before flight */ || debugDumpCycles) {
+  if (debugDumpCycles) {
     const auto printIndent = [](llvm::raw_ostream &OS, unsigned indent) {
       OS.indent(indent);
       OS << "`--";
