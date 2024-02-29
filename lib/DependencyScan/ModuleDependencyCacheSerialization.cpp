@@ -557,19 +557,20 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       cache.configureForContextHash(getContextHash());
-      unsigned pcmOutputPathID, moduleMapPathID, contextHashID, commandLineArrayID,
-               fileDependenciesArrayID, capturedPCMArgsArrayID, CASFileSystemRootID,
-               clangIncludeTreeRootID, moduleCacheKeyID;
-      ClangModuleDetailsLayout::readRecord(Scratch, pcmOutputPathID, moduleMapPathID,
-                                           contextHashID, commandLineArrayID,
-                                           fileDependenciesArrayID,
-                                           capturedPCMArgsArrayID,
-                                           CASFileSystemRootID,
-                                           clangIncludeTreeRootID,
-                                           moduleCacheKeyID);
+      unsigned pcmOutputPathID, mappedPCMPathID, moduleMapPathID, contextHashID,
+          commandLineArrayID, fileDependenciesArrayID, capturedPCMArgsArrayID,
+          CASFileSystemRootID, clangIncludeTreeRootID, moduleCacheKeyID;
+      ClangModuleDetailsLayout::readRecord(
+          Scratch, pcmOutputPathID, mappedPCMPathID, moduleMapPathID,
+          contextHashID, commandLineArrayID, fileDependenciesArrayID,
+          capturedPCMArgsArrayID, CASFileSystemRootID, clangIncludeTreeRootID,
+          moduleCacheKeyID);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
         llvm::report_fatal_error("Bad pcm output path");
+      auto mappedPCMPath = getIdentifier(mappedPCMPathID);
+      if (!mappedPCMPath)
+        llvm::report_fatal_error("Bad mapped pcm path");
       auto moduleMapPath = getIdentifier(moduleMapPathID);
       if (!moduleMapPath)
         llvm::report_fatal_error("Bad module map path");
@@ -597,9 +598,9 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forClangModule(
-          *pcmOutputPath, *moduleMapPath, *contextHash, *commandLineArgs,
-          *fileDependencies, *capturedPCMArgs, *rootFileSystemID,
-          *clangIncludeTreeRoot, *moduleCacheKey);
+          *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
+          *commandLineArgs, *fileDependencies, *capturedPCMArgs,
+          *rootFileSystemID, *clangIncludeTreeRoot, *moduleCacheKey);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleImports)
@@ -1036,6 +1037,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
     ClangModuleDetailsLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[ClangModuleDetailsLayout::Code],
         getIdentifier(clangDeps->pcmOutputPath),
+        getIdentifier(clangDeps->mappedPCMPath),
         getIdentifier(clangDeps->moduleMapFile),
         getIdentifier(clangDeps->contextHash),
         getArrayID(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine),
@@ -1240,6 +1242,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         auto clangDeps = dependencyInfo->getAsClangModule();
         assert(clangDeps);
         addIdentifier(clangDeps->pcmOutputPath);
+        addIdentifier(clangDeps->mappedPCMPath);
         addIdentifier(clangDeps->moduleMapFile);
         addIdentifier(clangDeps->contextHash);
         addStringArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine,
