@@ -604,35 +604,43 @@ std::optional<std::string>
 SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(
     llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
   if (!ctx.LangOpts.EnablePackageInterfaceLoad)
-    return {};
+    return std::nullopt;
 
   std::string packagePath{
-    getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
+      getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
 
   if (fs.exists(packagePath)) {
     // Read the interface file and extract its package-name argument value
-    std::string result;
-    if (auto packageFile = llvm::MemoryBuffer::getFile(packagePath)) {
-      llvm::BumpPtrAllocator alloc;
-      llvm::StringSaver argSaver(alloc);
-      SmallVector<const char*, 8> args;
-      (void)extractCompilerFlagsFromInterface(packagePath,
-                                              (*packageFile)->getBuffer(), argSaver, args);
-      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
-        StringRef current(args[I]), next(args[I + 1]);
-        if (current == "-package-name") {
-          // Instead of `break` here, continue to get the last value in case of dupes,
-          // to be consistent with the default parsing logic.
-          result = next;
-        }
+    if (auto packageName = getPackageNameFromInterface(packagePath, fs)) {
+      // Return the .package.swiftinterface path if the package name applies to
+      // the importer module.
+      if (*packageName == ctx.LangOpts.PackageName)
+        return packagePath;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string>
+SerializedModuleBaseName::getPackageNameFromInterface(
+    StringRef interfacePath, llvm::vfs::FileSystem &fs) const {
+  std::optional<std::string> result;
+  if (auto interfaceFile = fs.getBufferForFile(interfacePath)) {
+    llvm::BumpPtrAllocator alloc;
+    llvm::StringSaver argSaver(alloc);
+    SmallVector<const char *, 8> args;
+    (void)extractCompilerFlagsFromInterface(
+        interfacePath, (*interfaceFile)->getBuffer(), argSaver, args);
+    for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+      StringRef current(args[I]), next(args[I + 1]);
+      if (current == "-package-name") {
+        // Instead of `break` here, continue to get the last value in case of
+        // dupes, to be consistent with the default parsing logic.
+        result = next;
       }
     }
-    // Return the .package.swiftinterface path if the package name applies to
-    // the importer module.
-    if (!result.empty() && result == ctx.LangOpts.PackageName)
-      return packagePath;
   }
-  return {};
+  return result;
 }
 
 std::optional<std::string>
@@ -642,16 +650,18 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
   // Ensure the public swiftinterface already exists, otherwise bail early
   // as it's considered the module doesn't exist.
   if (!fs.exists(interfacePath))
-    return {};
+    return std::nullopt;
 
-  // Check if a package interface exists and if the package name applies to
-  // the importer module.
-  auto pkgPath = getPackageInterfacePathIfInSamePackage(fs, ctx).value_or("");
-  if (!pkgPath.empty() && fs.exists(pkgPath))
-    return pkgPath;
+  // If in the same package, try return the package interface path if not
+  // preferring the interface file.
+  if (!ctx.LangOpts.AllowNonPackageInterfaceImportFromSamePackage) {
+    if (auto packageName = getPackageNameFromInterface(interfacePath, fs)) {
+      if (*packageName == ctx.LangOpts.PackageName)
+        return getPackageInterfacePathIfInSamePackage(fs, ctx);
+    }
+  }
 
-  // If above fails, use the existing logic as fallback.
-  // If present, use the private interface instead of the public one.
+  // Otherwise, use the private interface instead of the public one.
   std::string privatePath{
       getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
   if (fs.exists(privatePath))
@@ -704,8 +714,8 @@ bool SerializedModuleLoaderBase::findModule(
     std::optional<SerializedModuleBaseName> firstAbsoluteBaseName;
 
     for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
-      SerializedModuleBaseName
-      absoluteBaseName{currPath, targetSpecificBaseName};
+      SerializedModuleBaseName absoluteBaseName{currPath,
+                                                targetSpecificBaseName};
 
       if (!firstAbsoluteBaseName.has_value())
         firstAbsoluteBaseName.emplace(absoluteBaseName);
@@ -713,26 +723,24 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface,
-          IsFramework, isTestableDependencyLookup);
-      if (!result) {
+          moduleSourceInfoBuffer, skipBuildingInterface, IsFramework,
+          isTestableDependencyLookup);
+      if (!result)
         return SearchResult::Found;
-      } else if (result == std::errc::not_supported) {
+      if (result == std::errc::not_supported)
         return SearchResult::Error;
-      } else if (result != std::errc::no_such_file_or_directory) {
+      if (result != std::errc::no_such_file_or_directory)
         return SearchResult::NotFound;
-      }
     }
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    if (firstAbsoluteBaseName
-        && maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
-                                       *firstAbsoluteBaseName)) {
+    if (firstAbsoluteBaseName &&
+        maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
+                                    *firstAbsoluteBaseName))
       return SearchResult::Error;
-    } else {
-      return SearchResult::NotFound;
-    }
+
+    return SearchResult::NotFound;
   };
 
   SmallVector<std::string, 4> InterestingFilenames = {
@@ -788,13 +796,11 @@ bool SerializedModuleLoaderBase::findModule(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
           moduleSourceInfoBuffer, skipBuildingInterface, isFramework);
-      if (!result) {
+      if (!result)
         return true;
-      } else if (result == std::errc::not_supported) {
+      if (result == std::errc::not_supported)
         return false;
-      } else {
-        continue;
-      }
+      continue;
     }
     case ModuleSearchPathKind::Framework:
     case ModuleSearchPathKind::DarwinImplicitFramework: {
