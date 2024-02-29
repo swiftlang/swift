@@ -120,8 +120,8 @@ void swift::addImageAccessibleFunctionsBlockCallback(
 }
 
 // TODO(distributed): expose dumping records via a flag
-static void
-_dumpAccessibleFunctionRecords() {
+LLVM_ATTRIBUTE_UNUSED
+static void _dumpAccessibleFunctionRecords() {
   auto &S = Functions.get();
 
   fprintf(stderr, "==== Accessible Function Records ====\n");
