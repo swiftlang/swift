@@ -1507,11 +1507,10 @@ bool DataflowState::cleanupAllDestroyAddr(
           SILBuilderWithScope dbgValueInsertBuilder(dvi);
           dbgValueInsertBuilder.setCurrentDebugScope(
               addressDebugInst->getDebugScope());
-          dbgValueInsertBuilder.createDebugValue(
-              (*addressDebugInst)->getLoc(),
-              SILUndef::get(address->getType(), dvi->getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+          dbgValueInsertBuilder.createDebugValue((*addressDebugInst)->getLoc(),
+                                                 SILUndef::get(address),
+                                                 *varInfo, false,
+                                                 /*was moved*/ true);
         }
       }
       useState.destroys.insert(dvi);
@@ -1793,10 +1792,9 @@ bool DataflowState::process(
         if (auto varInfo = addressDebugInst.getVarInfo()) {
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false /*poison*/, true /*was moved*/);
+          undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                        SILUndef::get(address), *varInfo,
+                                        false /*poison*/, true /*was moved*/);
         }
       }
 
@@ -2090,11 +2088,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
       if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+        undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                      SILUndef::get(address), *varInfo, false,
+                                      /*was moved*/ true);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2201,11 +2197,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         {
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+          undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                        SILUndef::get(address), *varInfo, false,
+                                        /*was moved*/ true);
         }
         {
           // Make sure at the reinit point to create a new debug value after the
@@ -2253,11 +2247,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
       if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+        undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                      SILUndef::get(address), *varInfo, false,
+                                      /*was moved*/ true);
       }
       addressDebugInst.markAsMoved();
     }

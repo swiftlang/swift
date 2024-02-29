@@ -2465,7 +2465,7 @@ ERROR(spi_only_imports_not_enabled, none,
 ERROR(access_level_on_import_unsupported, none,
       "The access level %0 is unsupported on imports: "
       "only 'public', 'package', 'internal', 'fileprivate' and 'private' "
-      "are unsupported",
+      "are accepted",
       (DeclAttribute))
 ERROR(access_level_conflict_with_exported,none,
       "'%0' is incompatible with %1; it can only be applied to public imports",

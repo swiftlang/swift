@@ -264,9 +264,6 @@ Added: _$ss32AsyncThrowingPrefixWhileSequenceV8IteratorV4next9isolation7ElementQ
 // async function pointer to Swift.AsyncThrowingPrefixWhileSequence.Iterator.next(isolation: isolated Swift.Actor?) async throws -> A.Element?
 Added: _$ss32AsyncThrowingPrefixWhileSequenceV8IteratorV4next9isolation7ElementQzSgScA_pSgYi_tYaKFTu
 
-// Swift.extractIsolation<each A, B>(@isolated(any) (repeat A) async throws -> B) -> Swift.Actor?
-Added: _$ss16extractIsolationyScA_pSgq_xxQpYaKYAcRvzr0_lF
-
 Added: _swift_job_run_on_serial_and_task_executor
 Added: _swift_job_run_on_task_executor
 Added: _swift_task_getPreferredTaskExecutor

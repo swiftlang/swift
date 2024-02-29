@@ -93,8 +93,7 @@ static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(
-      original.getOperandForDebugValueClone()->getType(), block->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
                                   true /*was moved*/);
@@ -105,9 +104,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                          SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef =
-      SILUndef::get(original.getOperandForDebugValueClone()->getType(),
-                    insertPt->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
                                   true /*was moved*/);

@@ -860,7 +860,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
       OriginalArgUses.push_back(ArgUse);
     }
     // Then replace all uses by an undef.
-    Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), *BB->getParent()));
+    Arg->replaceAllUsesWith(SILUndef::get(Arg));
     // Replace the type of the BB argument.
     auto *NewArg = BB->replacePhiArgument(Arg->getIndex(), NewArgType,
                                           Arg->getOwnershipKind(),

@@ -551,7 +551,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
     auto E = Block->args_end();
     for (auto A = Block->args_begin(); A != E; ++A) {
       assert(!LiveArguments.contains(*A) && "Unexpected live block argument!");
-      Args.push_back(SILUndef::get((*A)->getType(), *(*A)->getFunction()));
+      Args.push_back(SILUndef::get(*A));
     }
     Branch =
         SILBuilderWithScope(Inst).createBranch(Inst->getLoc(), Block, Args);

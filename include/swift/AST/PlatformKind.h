@@ -42,6 +42,10 @@ StringRef platformString(PlatformKind platform);
 /// or None if such a platform kind does not exist.
 std::optional<PlatformKind> platformFromString(StringRef Name);
 
+/// Safely converts the given unsigned value to a valid \c PlatformKind value or
+/// \c nullopt otherwise.
+std::optional<PlatformKind> platformFromUnsigned(unsigned value);
+
 /// Returns a valid platform string that is closest to the candidate string
 /// based on edit distance. Returns \c None if the closest valid platform
 /// distance is not within a minimum threshold.

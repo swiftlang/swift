@@ -236,7 +236,8 @@ private extension LoadInst {
 }
 
 private func replace(load: LoadInst, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
-  var ssaUpdater = SSAUpdater(type: load.type, ownership: load.ownership, context)
+  var ssaUpdater = SSAUpdater(function: load.parentFunction,
+                              type: load.type, ownership: load.ownership, context)
 
   for availableValue in availableValues {
     let block = availableValue.instruction.parentBlock

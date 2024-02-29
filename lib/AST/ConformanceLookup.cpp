@@ -796,8 +796,20 @@ LookupConformanceInModuleRequest::evaluate(
 ProtocolConformanceRef
 ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
                              bool allowMissing) {
-  assert(!type->hasTypeParameter());
+  assert(!type->hasTypeParameter()
+         && "must take a contextual type. if you really are ok with an "
+            "indefinite answer (and usually YOU ARE NOT), then consider whether "
+            "you really, definitely are ok with an indefinite answer, and "
+            "use `checkConformanceWithoutContext` instead");
 
+  // With no type parameter in the type, we should always get a definite answer
+  // from the underlying test.
+  return checkConformanceWithoutContext(type, proto, allowMissing).value();
+}
+
+std::optional<ProtocolConformanceRef>
+ModuleDecl::checkConformanceWithoutContext(Type type, ProtocolDecl *proto,
+                                           bool allowMissing) {
   auto lookupResult = lookupConformance(type, proto, allowMissing);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
@@ -807,7 +819,11 @@ ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
 
   // If we have a conditional requirements that we need to check, do so now.
   if (!condReqs.empty()) {
-    switch (checkRequirements(condReqs)) {
+    auto reqResult = checkRequirementsWithoutContext(condReqs);
+    if (!reqResult.has_value()) {
+      return std::nullopt;
+    }
+    switch (*reqResult) {
     case CheckRequirementsResult::Success:
       break;
 

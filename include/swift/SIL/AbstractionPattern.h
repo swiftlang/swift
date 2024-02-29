@@ -1014,6 +1014,7 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool isNoncopyable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.

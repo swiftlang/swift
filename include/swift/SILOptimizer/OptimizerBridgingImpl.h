@@ -229,7 +229,7 @@ void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedI
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
-  return {swift::SILUndef::get(type.unbridged(), *invocation->getFunction())};
+  return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
 bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
@@ -410,8 +410,10 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
       inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
-void BridgedPassContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  invocation->initializeSSAUpdater(type.unbridged(),
+void BridgedPassContext::SSAUpdater_initialize(
+    BridgedFunction function, BridgedType type,
+    BridgedValue::Ownership ownership) const {
+  invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
                                    BridgedValue::castToOwnership(ownership));
 }
 

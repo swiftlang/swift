@@ -1552,8 +1552,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   scope.pop();
   
   // Return void to the immediate caller.
-  B.createReturn(loc, SILUndef::get(SGM.Types.getEmptyTupleType(), F));
-  
+  B.createReturn(loc, SILUndef::get(&F, SGM.Types.getEmptyTupleType()));
+
   return closure;
 }
 
@@ -1855,7 +1855,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
     
     // The immediate function result is an empty tuple.
-    return SILUndef::get(SGM.Types.getEmptyTupleType(), F);
+    return SILUndef::get(&F, SGM.Types.getEmptyTupleType());
   };
     
   if (!substTy->hasErrorResult()) {
@@ -1966,7 +1966,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           auto paramTy = param.getSILStorageInterfaceType();
           if (paramTy.isTrivial(F)) {
             // If it's trivial, the value passed doesn't matter.
-            completionHandlerArgs.push_back(SILUndef::get(paramTy, F.getModule()));
+            completionHandlerArgs.push_back(SILUndef::get(&F, paramTy));
           } else {
             // If it's not trivial, it must be a nullable class type. Pass
             // nil.
@@ -2002,7 +2002,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       // After invoking the completion handler, our immediate return value is
       // void.
-      result = SILUndef::get(SGM.Types.getEmptyTupleType(), F);
+      result = SILUndef::get(&F, SGM.Types.getEmptyTupleType());
     } else {
       result = contBB->createPhiArgument(objcResultTy, OwnershipKind::Owned);
     }

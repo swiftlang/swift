@@ -680,7 +680,8 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
   SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
-    def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
+    def = ::new PlaceholderValue(inFunction,
+                                 SILType::getPrimitiveAddressType(archetype));
   }
 
   return def;
@@ -760,6 +761,12 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
+  for (auto &op : inst->getAllOperands()) {
+    if (auto *undef = dyn_cast<SILUndef>(op.get())) {
+      op.set(SILUndef::get(inst->getFunction(), undef->getType()));
+    }
+  }
+
   inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
                                          SILValue dependency) {
     LocalArchetypeKey key = {archeTy, fromFunction};

@@ -2353,7 +2353,7 @@ namespace {
 
       return handleReference(classType, properties);
     }
-
+    
     // WARNING: when the specification of trivial types changes, also update
     // the isValueTrivial() API used by SILCombine.
     TypeLowering *visitAnyStructType(CanType structType,
@@ -2433,7 +2433,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2530,7 +2530,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
+      if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())

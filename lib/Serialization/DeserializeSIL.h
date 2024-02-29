@@ -132,8 +132,12 @@ namespace swift {
     /// When an instruction or block argument is defined, this method is used to
     /// register it and update our symbol table.
     void setLocalValue(ValueBase *Value, serialization::ValueID Id);
+
     /// Get a reference to a local value with the specified ID and type.
-    SILValue getLocalValue(serialization::ValueID Id,
+    ///
+    /// NOTE: \p inContext is expected to be nullptr if we are inserting into a
+    /// global variable initializer.
+    SILValue getLocalValue(SILFunction *inContext, serialization::ValueID Id,
                            SILType Type);
 
     SILType getSILType(Type ty, SILValueCategory category,

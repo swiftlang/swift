@@ -295,7 +295,8 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
 
   auto fixupSILForLifetimeExtension = [&](SILValue value, SILValue entryValue) {
     // Use SSAUpdater to find insertion points for lifetime ends.
-    updater.initialize(optionalEscapingClosureTy, value->getOwnershipKind());
+    updater.initialize(value->getFunction(), optionalEscapingClosureTy,
+                       value->getOwnershipKind());
     SmallVector<SILPhiArgument *, 8> insertedPhis;
     updater.setInsertedPhis(&insertedPhis);
 
@@ -1303,9 +1304,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(optionalEscapingClosureTy, fn.hasOwnership()
-                                                    ? OwnershipKind::Owned
-                                                    : OwnershipKind::None);
+  updater.initialize(&fn, optionalEscapingClosureTy,
+                     fn.hasOwnership() ? OwnershipKind::Owned
+                                       : OwnershipKind::None);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;

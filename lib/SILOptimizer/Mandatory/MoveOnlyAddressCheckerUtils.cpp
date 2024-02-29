@@ -2194,25 +2194,23 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     unsigned numDiagnostics =
       moveChecker.diagnosticEmitter.getDiagnosticCount();
 
-    // Before we do anything, run the borrow to destructure transform in case
-    // we have a switch_enum user.
-    if (!getASTContext().LangOpts.hasFeature(Feature::BorrowingSwitch)) {
-      BorrowToDestructureTransform borrowToDestructure(
-          moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
-          moveChecker.poa);
-      if (!borrowToDestructure.transform()) {
-        assert(moveChecker.diagnosticEmitter
-                   .didEmitCheckerDoesntUnderstandDiagnostic());
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Failed to perform borrow to destructure transform!\n");
-        return false;
-      }
-      // If we emitted an error diagnostic, do not transform further and instead
-      // mark that we emitted an early diagnostic and return true.
-      if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-        LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
-        return true;
-      }
+    // Before we do anything, run the borrow to destructure transform to reduce
+    // copies through borrows.
+    BorrowToDestructureTransform borrowToDestructure(
+        moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
+        moveChecker.poa);
+    if (!borrowToDestructure.transform()) {
+      assert(moveChecker.diagnosticEmitter
+                 .didEmitCheckerDoesntUnderstandDiagnostic());
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed to perform borrow to destructure transform!\n");
+      return false;
+    }
+    // If we emitted an error diagnostic, do not transform further and instead
+    // mark that we emitted an early diagnostic and return true.
+    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
+      return true;
     }
 
     // Now, validate that what we will transform into a take isn't a take that
@@ -2979,9 +2977,8 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // referring to the same debug variable as the original definition, we have to
   // use the same debug scope and location as the original debug var.
   auto insertUndefDebugValue = [&debugVar](SILInstruction *insertPt) {
-    insertDebugValueBefore(insertPt, debugVar, [&]{
-      return SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
-                           insertPt->getModule());
+    insertDebugValueBefore(insertPt, debugVar, [&] {
+      return SILUndef::get(debugVar.getOperandForDebugValueClone());
     });
   };
 

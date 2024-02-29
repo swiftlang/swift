@@ -1592,15 +1592,19 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 
 /// Used internally in e.g. the SIL parser and deserializer to handle forward-
 /// referenced values.
+///
 /// A PlaceholderValue must not appear in valid SIL.
 class PlaceholderValue : public ValueBase {
+  SILFunction *parentFunction;
   static int numPlaceholderValuesAlive;
 
 public:
-  PlaceholderValue(SILType type);
+  PlaceholderValue(SILFunction *parentFunction, SILType type);
   ~PlaceholderValue();
 
   static int getNumPlaceholderValuesAlive() { return numPlaceholderValuesAlive; }
+
+  SILFunction *getParent() const { return parentFunction; }
 
   static bool classof(const SILArgument *) = delete;
   static bool classof(const SILInstruction *) = delete;

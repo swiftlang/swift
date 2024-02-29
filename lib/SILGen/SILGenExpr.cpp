@@ -6939,6 +6939,6 @@ ManagedValue SILGenFunction::emitUndef(Type type) {
 }
 
 ManagedValue SILGenFunction::emitUndef(SILType type) {
-  SILValue undef = SILUndef::get(type, F);
+  SILValue undef = SILUndef::get(F, type);
   return ManagedValue::forRValueWithoutOwnership(undef);
 }

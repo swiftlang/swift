@@ -108,7 +108,6 @@ class FuncDecl;
 class IRGenOptions;
 class KeyPathPattern;
 class ModuleDecl;
-class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
@@ -192,7 +191,6 @@ private:
   friend SILType;
   friend SILVTable;
   friend SILProperty;
-  friend SILUndef;
   friend SILWitnessTable;
   friend SILMoveOnlyDeinit;
   friend Lowering::SILGenModule;
@@ -314,9 +312,6 @@ private:
 
   /// This is a cache of builtin Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
-
-  /// This is the set of undef values we've created, for uniquing purposes.
-  llvm::DenseMap<SILType, SILUndef *> UndefValues;
 
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;

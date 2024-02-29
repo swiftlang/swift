@@ -646,6 +646,32 @@ public:
   }
 };
 
+class InvalidEnumValueError
+    : public llvm::ErrorInfo<InvalidEnumValueError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  unsigned enumValue;
+  const char *enumDescription;
+
+public:
+  explicit InvalidEnumValueError(unsigned enumValue,
+                                 const char *enumDescription) {
+    this->enumValue = enumValue;
+    this->enumDescription = enumDescription;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "invalid value " << enumValue << " for enumeration "
+       << enumDescription;
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;

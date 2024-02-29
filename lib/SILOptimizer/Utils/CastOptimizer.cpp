@@ -1065,7 +1065,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
       } else {
-        CastedValue = SILUndef::get(TargetLoweredType, *F);
+        CastedValue = SILUndef::get(F, TargetLoweredType);
       }
       if (!CastedValue)
         CastedValue =

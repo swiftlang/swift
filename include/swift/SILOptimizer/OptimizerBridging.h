@@ -307,7 +307,9 @@ struct BridgedPassContext {
 
   // SSAUpdater
 
-  BRIDGED_INLINE void SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE void
+  SSAUpdater_initialize(BridgedFunction function, BridgedType type,
+                        BridgedValue::Ownership ownership) const;
   BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;

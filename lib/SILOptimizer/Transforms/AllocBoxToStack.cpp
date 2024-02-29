@@ -588,7 +588,7 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
     loc = RegularLocation::getDiagnosticsOnlyLocation(loc, next->getModule());
   SILBuilderWithScope builder(next);
 
-  auto *undef = SILUndef::get(stackBox->getType(), *stackBox->getModule());
+  auto *undef = SILUndef::get(stackBox);
 
   auto *mmci =
       builder.createMarkUnresolvedNonCopyableValueInst(loc, undef, checkKind);

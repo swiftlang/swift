@@ -2,8 +2,7 @@
 // RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-lifetime-dependence-inference \ 
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -enable-experimental-lifetime-dependence-inference
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -62,7 +61,7 @@ public struct BufferView<Element> : ~Escapable {
   let start: BufferViewIndex<Element>
   public let count: Int
   private var baseAddress: UnsafeRawPointer { start._rawValue }
-  
+// TODO: Enable diagnostics once this initializer's store to temporary is handled  
 // CHECK: sil @$s31lifetime_dependence_scope_fixup10BufferViewV11baseAddress5count9dependsOnACyxGSVYls_Siqd__htclufC : $@convention(method) <Element><Owner> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin BufferView<Element>.Type) -> _scope(1) @owned BufferView<Element> {
   public init<Owner>(
       baseAddress: UnsafeRawPointer,

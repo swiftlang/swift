@@ -652,7 +652,7 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
   InstructionDeleter deleter(std::move(tempCallbacks));
 
   // Generate and map the phis with undef operands first, in case of recursion.
-  auto undef = SILUndef::get(ownedValue->getType(), *ownedValue->getFunction());
+  auto undef = SILUndef::get(ownedValue);
   for (PhiValue reborrowedPhi : reborrowedPhis) {
     auto *phiBlock = reborrowedPhi.phiBlock;
     auto *ownedPhi = phiBlock->createPhiArgument(ownedValue->getType(),

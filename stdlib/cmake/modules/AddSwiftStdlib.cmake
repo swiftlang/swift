@@ -530,7 +530,11 @@ function(_add_target_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
+      else()
+        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      endif()
       list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
@@ -1237,6 +1241,9 @@ function(add_swift_target_library_single target name)
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
     endif()
+
+    set_target_properties(${target} PROPERTIES
+      POSITION_INDEPENDENT_CODE YES)
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "OPENBSD")
     set_target_properties("${target}"
       PROPERTIES
