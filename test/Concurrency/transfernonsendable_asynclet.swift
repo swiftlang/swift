@@ -9,7 +9,8 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 92{{}}
+class NonSendableKlass { // expected-complete-note 94{{}}
+  // expected-tns-note @-1 {{}}
   var field: NonSendableKlass? = nil
   var field2: NonSendableKlass? = nil
 
@@ -38,6 +39,7 @@ func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) -> T { x }
 func useValueWrapInOptional<T>(_ x: T) -> T? { x }
 
+@MainActor func returnValueFromMain<T>() async -> T { fatalError() }
 @MainActor func transferToMain<T>(_ t: T) async {}
 @MainActor func transferToMainInt<T>(_ t: T) async -> Int { 5 }
 @MainActor func transferToMainIntOpt<T>(_ t: T) async -> Int? { 5 }
@@ -734,4 +736,16 @@ func asyncLet_Let_NormalUse_Simple2() async {
   // expected-complete-warning @-1 {{capture of 'x' with non-sendable type 'NonSendableKlass' in 'async let' binding}}
   let _ = await y
   useValue(x)
+}
+
+func asyncLetWithoutCapture() async {
+  // Make sure that we setup y correctly as fresh.
+  //
+  // NOTE: Error below will go away in next commit.
+  async let x: NonSendableKlass = await returnValueFromMain()
+  // expected-warning @-1 {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to main actor-isolated function cannot cross actor boundary}}
+  let y = await x
+  await transferToMain(y) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  useValue(y) // expected-tns-note {{access here could race}}
 }

@@ -74,6 +74,9 @@ case none
 case some(T)
 }
 
+sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -144,4 +147,31 @@ bb0:
 
   %9999 = tuple ()
   return %9999 : $()
+}
+
+sil @implicitClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+
+sil [ossa] @asyncLetWithThinToThickFunction : $@convention(thin) @async () -> () {
+bb0:
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %2 = alloc_stack $NonSendableKlass
+  %3 = address_to_pointer %2 : $*NonSendableKlass to $Builtin.RawPointer
+  %4 = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %5 = function_ref @implicitClosure : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %6 = convert_function %5 : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass> to $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %7 = thin_to_thick_function %6 : $@convention(thin) @async @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>
+  %8 = builtin "startAsyncLetWithLocalBuffer"<NonSendableKlass>(%4 : $Optional<Builtin.RawPointer>, %7 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <NonSendableKlass>, %3 : $Builtin.RawPointer) : $Builtin.RawPointer
+  %9 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %10 = apply %9(%8, %3) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %12 = load [copy] %2 : $*NonSendableKlass
+  destroy_value %12 : $NonSendableKlass
+  %14 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %15 = apply %14(%8, %3) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  hop_to_executor %0 : $Optional<Builtin.Executor>
+  %17 = builtin "endAsyncLetLifetime"(%8 : $Builtin.RawPointer) : $()
+  dealloc_stack %2 : $*NonSendableKlass
+  %19 = tuple ()
+  return %19 : $()
 }
