@@ -230,8 +230,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
   if (LangOpts.ClangTarget) {
-    serializationOpts.ExtraClangOptions.push_back("-triple");
-    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTarget->str());
+    serializationOpts.ExtraClangOptions.push_back("--target=" +
+                                                  LangOpts.ClangTarget->str());
   }
 
   serializationOpts.PluginSearchOptions =
