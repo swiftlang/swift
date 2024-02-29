@@ -437,12 +437,26 @@ public:
 };
 
 enum class RegionType {
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol was originally a text match result (has `RenameLocUsage::Unknown`).
   Unmatched,
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol came from the index (does not have `RenameLocUsage::Unknown`).
   Mismatch,
+  /// We were able to match the result to a location in source code that's
+  /// active with respect to the current compiler arguments.
   ActiveCode,
+  /// We were able to match the result to a location in source code that's
+  /// inactive with respect to the current compiler arguments.
+  ///
+  /// Currently, we don't evaluate #if so all occurrences inside #if blocks
+  /// are considered inactive.
   InactiveCode,
+  /// The location is inside a string literal.
   String,
+  /// The location is inside a `#selector`.
   Selector,
+  /// The location is inside a comment.
   Comment,
 };
 
