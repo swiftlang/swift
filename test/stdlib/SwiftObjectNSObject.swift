@@ -91,7 +91,12 @@ func TestSwiftObjectNSObjectAssertNoErrors()
 // Verify that Obj-C isEqual: provides same answer as Swift ==
 func TestEquatableEquals<T: Equatable & AnyObject>(_ e1: T, _ e2: T) {
   if e1 == e2 {
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+    // Legacy behavior: Equatable Swift does not imply == in ObjC
+    TestSwiftObjectNSObjectNotEquals(e1, e2)
+#else
     TestSwiftObjectNSObjectEquals(e1, e2)
+#endif
   } else {
     TestSwiftObjectNSObjectNotEquals(e1, e2)
   }
@@ -104,14 +109,26 @@ func TestNonEquatableEquals(_ e1: AnyObject, _ e2: AnyObject) {
 // Verify that Obj-C hashValue matches Swift hashValue for Hashable types
 func TestHashable(_ h: H)
 {
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  // Legacy behavior: Hash value is identity in ObjC
+  TestSwiftObjectNSObjectDefaultHashValue(h)
+#else
+  // New behavior: Hashable in Swift, same hash value in ObjC
   TestSwiftObjectNSObjectHashValue(h, h.hashValue)
+#endif
 }
 
 // Test Obj-C hashValue for Swift types that are Equatable but not Hashable
 func TestEquatableHash(_ e: AnyObject)
 {
-  // These should have a constant hash value
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  // Legacy behavior: Equatable in Swift => ObjC hashes with identity
+  TestSwiftObjectNSObjectDefaultHashValue(e)
+  fakeEquatableWarning(e)
+#else
+  // New behavior: These should have a constant hash value
   TestSwiftObjectNSObjectHashValue(e, 1)
+#endif
 }
 
 func TestNonEquatableHash(_ e: AnyObject)
@@ -125,10 +142,18 @@ func TestNonEquatableHash(_ e: AnyObject)
 // CHECK-NEXT: d ##SwiftObjectNSObject.D##
 // CHECK-NEXT: S ##{{.*}}SwiftObject##
 
-// Full message is longer, but this is the essential part...
+// Verify that the runtime emits the warning that we expected...
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E` {{.*}} Equatable but not Hashable
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E1` {{.*}} Equatable but not Hashable
 // CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E2` {{.*}} Equatable but not Hashable
+
+// If we're checking legacy behavior or unsupported platform, then
+// the warning above won't be emitted.  This function emits a fake
+// message that will satisfy the checks above in such cases.
+func fakeEquatableWarning(_ e: AnyObject) {
+  let msg = "Obj-C `-hash` ... type `SwiftObjectNSObject.\(type(of: e))` ... Equatable but not Hashable\n"
+  fputs(msg, stderr)
+}
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
@@ -195,7 +220,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("c ##SwiftObjectNSObject.C##\n", stderr)
   fputs("d ##SwiftObjectNSObject.D##\n", stderr)
   fputs("S ##Swift._SwiftObject##\n", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E1` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E2` ... Equatable but not Hashable", stderr)
+  fakeEquatableWarning(E(i:1))
+  fakeEquatableWarning(E1(i:1))
+  fakeEquatableWarning(E2(i:1))
 }

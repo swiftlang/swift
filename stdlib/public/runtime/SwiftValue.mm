@@ -464,7 +464,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
 	    selfHeader->type, hashableConformance);
   }
 
-  if (!runtime::bincompat::useLegacySwiftObjCHashing()) {
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
     // Legacy behavior doesn't honor Equatable conformance, only Hashable
     return (NSUInteger)self;
   }

@@ -20,6 +20,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Once.h"
 #include "swift/shims/RuntimeShims.h"
+#include "swift/shims/Target.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
@@ -247,6 +248,8 @@ bool useLegacySwiftValueUnboxingInCasting() {
 bool useLegacySwiftObjCHashing() {
 #if BINARY_COMPATIBILITY_APPLE
   return true; // For now, legacy behavior on Apple OSes
+#elif SWIFT_TARGET_OS_DARWIN
+  return true; // For now, use legacy behavior on open-source builds for Apple platforms
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif
