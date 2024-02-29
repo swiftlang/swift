@@ -397,7 +397,7 @@ class RefCountBitsT {
   bool isOverflowingUnownedRefCount(uint32_t oldValue, uint32_t inc) const {
     auto newValue = getUnownedRefCount();
     return newValue != oldValue + inc ||
-      newValue == Offsets::UnownedRefCountMask;
+      newValue == Offsets::UnownedRefCountMask >> Offsets::UnownedRefCountShift;
   }
 
   SWIFT_ALWAYS_INLINE
@@ -581,6 +581,12 @@ class RefCountBitsT {
                "releasing reference whose refcount is already zero");
     }
 #endif
+
+    // If we're decrementing by more than 1, then this underflow might end up
+    // subtracting away an existing 1 in UseSlowRC. Check that separately. This
+    // check should be constant folded away for the swift_release case.
+    if (dec > 1 && getUseSlowRC())
+      return false;
 
     // This deliberately underflows by borrowing from the UseSlowRC field.
     bits -= BitsType(dec) << Offsets::StrongExtraRefCountShift;
@@ -1007,8 +1013,8 @@ class RefCounts {
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
@@ -1306,6 +1312,8 @@ class RefCounts {
     return refCounts.load(std::memory_order_relaxed).getBitsValue();
   }
 
+  void dump() const;
+
   private:
   HeapObject *getHeapObject();
   
@@ -1505,6 +1513,10 @@ class HeapObjectSideTableEntry {
     immutableCOWBuffer = immutable;
   }
 #endif
+
+  void dumpRefCounts() {
+    refCounts.dump();
+  }
 };
 
 
