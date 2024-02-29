@@ -652,8 +652,8 @@ public:
     return Core->Bits.IsBuiltFromInterface;
   }
 
-  bool onlyHasExportableDecls() const {
-    return Core->Bits.OnlyHasExportableDecls;
+  bool allowNonResilientAccess() const {
+    return Core->Bits.AllowNonResilientAccess;
   }
 
   /// Whether this module is compiled with implicit dynamic.

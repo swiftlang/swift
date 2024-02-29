@@ -4217,8 +4217,7 @@ bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
   return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
          getModuleContext()->inSamePackage(accessingModule) &&
          !getModuleContext()->isBuiltFromInterface() &&
-         !getModuleContext()->onlyHasExportableDecls() &&
-         !getModuleContext()->isTestingEnabled();
+         !getModuleContext()->allowNonResilientAccess();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where

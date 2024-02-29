@@ -912,8 +912,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasIncrementalInfo();
     if (loadedModuleFile->isBuiltFromInterface())
       M.setIsBuiltFromInterface();
-    if (loadedModuleFile->onlyHasExportableDecls())
-      M.setOnlyHasExportableDecls();
+    if (loadedModuleFile->allowNonResilientAccess())
+      M.setAllowNonResilientAccess();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())

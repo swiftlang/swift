@@ -311,6 +311,11 @@ public:
   /// Should we skip decls that cannot be referenced externally?
   bool SkipNonExportableDecls = false;
 
+  /// True if -experimental-allow-non-resilient-access is passed and built from source
+  /// without -enable-library-evolution. This overrides \c SkipNonExportableDecls
+  /// (-experimental-skip-non-exportable-decls).
+  bool AllowNonResilientAccess = false;
+
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;

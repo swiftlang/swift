@@ -393,7 +393,7 @@ private:
 
     /// Whether this module is built with -experimental-skip-non-exportable-decls
     /// or -experimental-skip-non-inlinable-function-bodies.
-    unsigned OnlyHasExportableDecls : 1;
+    unsigned AllowNonResilientAccess : 1;
 
     // Explicitly pad out to the next word boundary.
     unsigned : 3;

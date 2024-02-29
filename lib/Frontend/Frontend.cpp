@@ -248,8 +248,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       LangOpts.hasFeature(Feature::Embedded);
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
-
-  serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
+  // Only set if -experimental-allow-non-resilient-access is
+  // not passed.
+  serializationOpts.SkipNonExportableDecls = opts.AllowNonResilientAccess ? false : opts.SkipNonExportableDecls;
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -1402,8 +1403,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
-    if (Invocation.getFrontendOptions().SkipNonExportableDecls)
-      MainModule->setOnlyHasExportableDecls();
+    if (Invocation.getFrontendOptions().AllowNonResilientAccess)
+      MainModule->setAllowNonResilientAccess();
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

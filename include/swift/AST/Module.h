@@ -711,13 +711,12 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
-  /// Returns true if the module was built with -experimental-skip-non-exportable-decls
-  /// or -experimental-skip-non-inlinable-function-bodies.
-  bool onlyHasExportableDecls() const {
-    return Bits.ModuleDecl.OnlyHasExportableDecls;
+  /// Returns true if the module was built with -experimental-allow-non-resilient-access.
+  bool allowNonResilientAccess() const {
+    return Bits.ModuleDecl.AllowNonResilientAccess;
   }
-  void setOnlyHasExportableDecls(bool flag = true) {
-    Bits.ModuleDecl.OnlyHasExportableDecls = flag;
+  void setAllowNonResilientAccess(bool flag = true) {
+    Bits.ModuleDecl.AllowNonResilientAccess = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into

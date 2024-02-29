@@ -36,7 +36,7 @@
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
 
 // RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-BC
-// CHECK-BC: ONLY_HAS_EXPORTABLE_DECLS
+// CHECK-BC: ALLOW_NON_RESILIENT_ACCESS
 
 // RUN: %target-swift-frontend -emit-silgen %t/Client.swift -I %t -module-name Client -package-name mypkg -experimental-package-bypass-resilience | %FileCheck %s --check-prefixes=CHECK,CHECK-BODY
 

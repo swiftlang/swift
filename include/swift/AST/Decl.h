@@ -752,9 +752,8 @@ protected:
     /// Whether this module has been built with C++ interoperability enabled.
     HasCxxInteroperability : 1,
 
-    /// Whether this module has been built with -experimental-skip-non-exportable-decls
-    /// or -experimental-skip-non-inlinable-function-bodies.
-    OnlyHasExportableDecls : 1
+    /// Whether this module has been built with -experimental-allow-non-resilient-access.
+    AllowNonResilientAccess : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

@@ -2123,11 +2123,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Propagate the typechecker's understanding of
   // -experimental-skip-*-function-bodies to SIL.
-  Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
+  // Only set if -experimental-allow-non-resilient-access
+  // is not passed.
+  Opts.SkipFunctionBodies = FEOpts.AllowNonResilientAccess ? FunctionBodySkipping::None : TCOpts.SkipFunctionBodies;
 
   // Propagate -experimental-skip-non-exportable-decls to SIL.
-  Opts.SkipNonExportableDecls = FEOpts.SkipNonExportableDecls;
-
+  // Only set if -experimental-allow-non-resilient-access is
+  // not passed.
+  Opts.SkipNonExportableDecls = FEOpts.AllowNonResilientAccess ? false : FEOpts.SkipNonExportableDecls;
+  
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   Opts.OptMode = OptimizationMode::NoOptimization;

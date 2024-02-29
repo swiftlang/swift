@@ -295,7 +295,22 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
+  // To allow non-resilient access from clients, internal contents
+  // besides exportable decls should be generated. If built from
+  // interface, or with -enable-library-evolution, we ignore this
+  // option (-experimental-allow-non-resilient-access). This option
+  // will however override -experimental-skip-non-exportable-decls
+  // if both are passed.
+  Opts.AllowNonResilientAccess = Args.hasArg(OPT_experimental_allow_non_resilient_access);
+
   if (Args.hasArg(OPT_enable_library_evolution)) {
+    if (Opts.AllowNonResilientAccess) {
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_due_to_conflict,
+                     "-experimental-allow-non-resilient-access",
+                     "-enable-library-evolution");
+      Opts.AllowNonResilientAccess = false;
+    }
+
     Opts.SkipNonExportableDecls |=
         Args.hasArg(OPT_experimental_skip_non_exportable_decls);
 
@@ -304,10 +319,26 @@ bool ArgsToFrontendOptionsConverter::convert(
         Args.hasArg(
             OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
   } else {
-    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls))
+    if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
       Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                      "-experimental-skip-non-exportable-decls",
                      "-enable-library-evolution");
+      if (Opts.AllowNonResilientAccess) {
+        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_due_to_conflict,
+                       "-experimental-skip-non-exportable-decls",
+                       "-experimental-allow-non-resilient-access");
+      }
+    }
+  }
+
+  // To allow non-resilient access from clients, it should be built from source.
+  if (Opts.AllowNonResilientAccess &&
+      (Opts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface ||
+       Opts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface)) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_due_to_conflict,
+                   "-experimental-allow-non-resilient-access",
+                   "-compile-module-from-interface or -typecheck-module-from-interface");
+    Opts.AllowNonResilientAccess = false;
   }
 
   // HACK: The driver currently erroneously passes all flags to module interface
