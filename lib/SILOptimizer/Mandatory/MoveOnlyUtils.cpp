@@ -277,10 +277,13 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
 
   SILInstruction *memInst = memOper->getUser();
 
-  // FIXME: drop_deinit must be handled here!
   switch (memInst->getKind()) {
   default:
     return false;
+
+  case SILInstructionKind::DropDeinitInst:
+    assert(memOper->get()->getType().isValueTypeWithDeinit());
+    return true;
 
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);

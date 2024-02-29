@@ -47,28 +47,48 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   selfType = F.mapTypeIntoContext(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
+  uint16_t ArgNo = 1; // Hardcoded for destructors.
+  auto dv = SILDebugVariable(selfDecl->isLet(), ArgNo);
+
   // If we have a move only type, then mark it with
   // mark_unresolved_non_copyable_value so we can't escape it.
-  if (selfType.isMoveOnly()) {
-    // For now, we do not handle move only class deinits. This is because we
-    // need to do a bit more refactoring to handle the weird way that it deals
-    // with ownership. But for simple move only deinits (like struct/enum), that
-    // are owned, lets mark them as needing to be no implicit copy checked so
-    // they cannot escape.
-    if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
-      selfValue = B.createMarkUnresolvedNonCopyableValueInst(
-          selfDecl, selfValue,
+  //
+  // For now, we do not handle move only class deinits. This is because we need
+  // to do a bit more refactoring to handle the weird way that it deals with
+  // ownership. But for simple move only deinits (like struct/enum), that are
+  // owned, lets mark them as needing to be no implicit copy checked so they
+  // cannot escape.
+  if (selfType.isMoveOnly() && !selfType.isAnyClassReferenceType()) {
+    if (getASTContext().LangOpts.hasFeature(
+            Feature::MoveOnlyPartialConsumption)) {
+      SILValue addr = B.createAllocStack(selfDecl, selfValue->getType(), dv);
+      addr = B.createMarkUnresolvedNonCopyableValueInst(
+          selfDecl, addr,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
+      if (selfValue->getType().isObject()) {
+        B.createStore(selfDecl, selfValue, addr, StoreOwnershipQualifier::Init);
+      } else {
+        B.createCopyAddr(selfDecl, selfValue, addr, IsTake, IsInitialization);
+      }
+      // drop_deinit invalidates any user-defined struct/enum deinit
+      // before the individual members are destroyed.
+      addr = B.createDropDeinit(selfDecl, addr);
+      selfValue = addr;
+    } else {
+      if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
+        selfValue = B.createMarkUnresolvedNonCopyableValueInst(
+            selfDecl, selfValue,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
+      }
     }
   }
 
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
-  uint16_t ArgNo = 1; // Hardcoded for destructors.
-  B.createDebugValue(PrologueLoc, selfValue,
-                     SILDebugVariable(selfDecl->isLet(), ArgNo));
+  B.createDebugValue(PrologueLoc, selfValue, dv);
   return selfValue;
 }
 
