@@ -3950,9 +3950,7 @@ void ASTMangler::appendDistributedThunk(
   if (auto type = inProtocolExtensionMangleAsReference()) {
     appendContext(type->getDeclContext(), thunk->getAlternateModuleName());
     auto baseName = type->getBaseName();
-    std::string syntheticName = "$";
-    syntheticName.append(baseName.getIdentifier().str());
-    appendIdentifier(syntheticName);
+    appendIdentifier(Twine("$", baseName.getIdentifier().str()).str());
     appendOperator("C"); // necessary for roundtrip, though we don't use it
   } else {
     appendContextOf(thunk);
