@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -254,9 +255,7 @@ struct TypeSubElementCount {
   TypeSubElementCount(SILType type, SILFunction *fn)
       : TypeSubElementCount(type, fn->getModule(), TypeExpansionContext(*fn)) {}
 
-  TypeSubElementCount(SILValue value)
-      : TypeSubElementCount(value->getType(), *value->getModule(),
-                            TypeExpansionContext(*value->getFunction())) {}
+  TypeSubElementCount(SILValue value);
 
   operator unsigned() const { return number; }
 
@@ -302,6 +301,39 @@ struct TypeTreeLeafTypeRange {
       return std::nullopt;
     return {{*startEltOffset,
              *startEltOffset + TypeSubElementCount(projectedValue)}};
+  }
+
+  /// Which bits of \p rootValue are involved in \p op.
+  ///
+  /// This is a subset of (usually equal to) the bits of op->getType() in \p
+  /// rootValue.
+  static std::optional<TypeTreeLeafTypeRange> get(Operand *op,
+                                                  SILValue rootValue) {
+    auto projectedValue = op->get();
+    auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+    if (!startEltOffset)
+      return std::nullopt;
+
+    // A drop_deinit only consumes the deinit bit of its operand.
+    auto *ddi = dyn_cast<DropDeinitInst>(op->getUser());
+    if (ddi) {
+      auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+      return {{upperBound - 1, upperBound}};
+    }
+
+    // Uses that borrow a value do not involve the deinit bit.
+    //
+    // FIXME: This shouldn't be limited to applies.
+    unsigned deinitBitOffset = 0;
+    if (op->get()->getType().isValueTypeWithDeinit() &&
+        op->getOperandOwnership() == OperandOwnership::Borrow &&
+        ApplySite::isa(op->getUser())) {
+      deinitBitOffset = 1;
+    }
+
+    return {{*startEltOffset, *startEltOffset +
+                                  TypeSubElementCount(projectedValue) -
+                                  deinitBitOffset}};
   }
 
   /// Given a type \p rootType and a set of needed elements specified by the bit
