@@ -36,10 +36,10 @@ final class Obj : Codable, Sendable {
 }
 
 struct LargeStruct : Codable {
-  var a: Int
-  var b: Int
-  var c: String
-  var d: Double
+var a: Int
+var b: Int
+var c: String
+var d: Double
 }
 
 @available(SwiftStdlib 5.7, *)

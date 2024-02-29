@@ -159,7 +159,6 @@ public:
     DistributedThunk,
     DistributedAccessor,
     AccessibleFunctionRecord,
-    AccessibleProtocolRequirementFunctionRecord,
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,
@@ -246,6 +245,12 @@ public:
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
 
+  void appendDistributedThunk(const AbstractFunctionDecl *thunk,
+                              bool asReference);
+  std::string mangleDistributedThunkRef(const AbstractFunctionDecl *thunk);
+  /// Mangling for distributed function accessible function record.
+  /// Used in Linking when emitting the record.
+  std::string mangleDistributedThunkRecord(const AbstractFunctionDecl *thunk);
   std::string mangleDistributedThunk(const AbstractFunctionDecl *thunk);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC

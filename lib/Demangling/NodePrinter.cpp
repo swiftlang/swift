@@ -633,7 +633,6 @@ private:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
-    case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::ExtendedExistentialTypeShape:
@@ -2309,11 +2308,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::AccessibleFunctionRecord:
     if (!Options.ShortenThunk) {
       Printer << "accessible function runtime record for ";
-    }
-    return nullptr;
-  case Node::Kind::AccessibleProtocolRequirementFunctionRecord:
-    if (!Options.ShortenThunk) {
-      Printer << "accessible distributed function runtime record for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:

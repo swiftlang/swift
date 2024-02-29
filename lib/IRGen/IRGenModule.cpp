@@ -652,12 +652,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       createStructType(*this, "swift.accessible_function",
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
-  AccessibleProtocolRequirementFunctionRecordTy =
-      createStructType(*this, "swift.distributed_accessible_function",
-                       {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
-                        RelativeAddressTy, Int32Ty,
-                        // Extra fields, after AccessibleFunctionRecordTy fields
-                        RelativeAddressTy, RelativeAddressTy});
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
