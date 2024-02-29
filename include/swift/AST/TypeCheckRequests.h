@@ -1333,8 +1333,8 @@ public:
 
 /// Obtain the method that could be used to decode argument values passed
 /// to a particular actor invocation type.
-class GetDistributedActorArgumentDecodingMethodRequest :
-  public SimpleRequest<GetDistributedActorArgumentDecodingMethodRequest,
+class GetDistributedActorConcreteArgumentDecodingMethodRequest :
+  public SimpleRequest<GetDistributedActorConcreteArgumentDecodingMethodRequest,
                        FuncDecl *(NominalTypeDecl *),
                        RequestFlags::Cached> {
 public:

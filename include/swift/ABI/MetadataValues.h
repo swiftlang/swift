@@ -1619,8 +1619,6 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Functions accessible at runtime (i.e. distributed method accessors).
   const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
-  const uint16_t AccessibleProtocolRequirementFunctionRecord =
-      0xa98e; // = 43406
 
   /// C type GetExtraInhabitantTag function descriminator
   const uint16_t GetExtraInhabitantTagFunction = 0x392e; // = 14638

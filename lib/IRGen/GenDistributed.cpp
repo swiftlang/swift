@@ -197,13 +197,6 @@ private:
 
 } // end namespace
 
-static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
-  assert(thunk->isDistributed() && thunk->isThunk());
-  return thunk->getDeclContext()
-      ->getInnermostTypeContext()
-      ->getSelfNominalTypeDecl();
-}
-
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
 static CanSILFunctionType getAccessorType(IRGenModule &IGM,
@@ -620,8 +613,6 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 }
 
 void DistributedAccessor::emit() {
-  assert(getDistributedActorOf(Target) &&
-         "target of distributed accessor must be a distributed actor");
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
@@ -797,10 +788,18 @@ DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
 ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
   auto &C = IGM.Context;
-  auto *actor = getDistributedActorOf(Target);
+  DeclContext *targetContext = Target->getDeclContext();
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
-  auto *decodeFn = C.getDistributedActorArgumentDecodingMethod(actor);
+  /// If the context was a function, unwrap it and look for the decode method
+  /// based off a concrete class; If we're not in a concrete class, we'll be
+  /// using a witness for the decoder so returning null is okey.
+  FuncDecl *decodeFn = nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(targetContext)) {
+    decodeFn = C.getDistributedActorArgumentDecodingMethod(
+        func->getDeclContext()->getSelfNominalTypeDecl());;
+  }
+
 
   // If distributed actor is generic over actor system, we have to
   // use witness to reference `decodeNextArgument`.

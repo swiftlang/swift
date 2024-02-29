@@ -195,6 +195,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
   }
 }
 
+/// Mangle the target thunk in a way that we can look up the appropriate record.
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
     ASTContext &C, AbstractFunctionDecl *thunk) {
@@ -202,7 +203,7 @@ mangleDistributedThunkForAccessorRecordName(
 
   // default mangling
   auto mangled =
-      C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+      C.AllocateCopy(mangler.mangleDistributedThunkRef(cast<FuncDecl>(thunk)));
   return mangled;
 }
 
@@ -217,8 +218,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   auto func = static_cast<FuncDecl *>(context);
   auto funcDC = func->getDeclContext();
-  NominalTypeDecl *nominal = funcDC->getSelfNominalTypeDecl();
-  assert(nominal && nominal->isDistributedActor() &&
+  assert(funcDC->getSelfNominalTypeDecl() &&
+         funcDC->getSelfNominalTypeDecl()->isDistributedActor() &&
          "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
@@ -730,9 +731,6 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     return nullptr;
   }
 
-  assert(getConcreteReplacementForProtocolActorSystemType(func) &&
-         "Thunk synthesis must have concrete actor system type available");
-
   DeclName thunkName;
 
   // Since accessors don't have names, let's generate one based on
@@ -875,6 +873,23 @@ void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
 #endif
 }
 
+static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarget) {
+  if (getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
+    return true;
+  }
+
+  auto &C = distributedTarget->getASTContext();
+  ProtocolDecl *DistributedActor = C.getDistributedActorDecl();
+
+  SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
+  if (getSerializationRequirementTypesForMember(distributedTarget,
+                                                requirementProtos)) {
+    return true;
+  }
+
+  return false;
+}
+
 /******************************************************************************/
 /*********************** SYNTHESIS ENTRY POINTS *******************************/
 /******************************************************************************/
@@ -910,10 +925,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
 
   auto &C = distributedTarget->getASTContext();
 
-  if (!getConcreteReplacementForProtocolActorSystemType(distributedTarget)) {
-    // Don't synthesize thunks, unless there is a *concrete* ActorSystem.
-    // TODO(distributed): we should be able to lift this eventually,
-    // and allow resolving distributed actor protocols.
+  if (!canSynthesizeDistributedThunk(distributedTarget)) {
     return nullptr;
   }
 
