@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 855; // ref_adhoc_requirement_witness attributes are back
+const uint16_t SWIFTMODULE_VERSION_MINOR = 857; // Add superclass to protocol layout
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1527,6 +1527,7 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
+    TypeIDField,            // superclass
     AccessLevelField,       // access level
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types

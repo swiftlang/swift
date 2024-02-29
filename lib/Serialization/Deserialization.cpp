@@ -4423,6 +4423,7 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
+    TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
@@ -4430,6 +4431,7 @@ public:
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             hasSelfOrAssocTypeRequirements,
+                                            superclassID,
                                             rawAccessLevel, numInheritedTypes,
                                             rawInheritedAndDependencyIDs);
 
@@ -4454,6 +4456,8 @@ public:
         ArrayRef<PrimaryAssociatedTypeName>(), std::nullopt,
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
+
+    proto->setSuperclass(MF.getType(superclassID));
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));

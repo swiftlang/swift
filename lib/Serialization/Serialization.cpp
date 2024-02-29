@@ -4325,6 +4325,7 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->hasSelfOrAssociatedTypeRequirements(),
+                               S.addTypeRef(proto->getSuperclass()),
                                rawAccessLevel, numInherited,
                                inheritedAndDependencyTypes);
 
