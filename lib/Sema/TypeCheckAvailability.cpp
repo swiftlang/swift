@@ -2988,7 +2988,7 @@ bool swift::diagnoseParameterizedProtocolAvailability(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
   return TypeChecker::checkAvailability(
       ReferenceRange,
-      ReferenceDC->getASTContext().getParameterizedExistentialRuntimeAvailability(),
+      ReferenceDC->getASTContext().getParameterizedExistentialAvailability(),
       diag::availability_parameterized_protocol_only_version_newer,
       ReferenceDC);
 }
