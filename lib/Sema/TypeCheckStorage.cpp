@@ -793,13 +793,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  GenericEnvironment *env = nullptr;
-  if (auto *gc = storage->getAsGenericContext())
-    env = gc->getGenericEnvironment();
-  else
-    env = storage->getDeclContext()->getGenericEnvironmentOfContext();
-
-  if (isInterfaceTypeNoncopyable(storage->getValueInterfaceType(), env))
+  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
+        storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;

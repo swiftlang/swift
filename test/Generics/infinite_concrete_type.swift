@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 class G<T> {}
 
 protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete nesting limit exceeded}}

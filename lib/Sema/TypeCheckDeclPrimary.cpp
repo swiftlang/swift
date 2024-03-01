@@ -88,15 +88,6 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
   return Type();
 }
 
-bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
-  assert(!type->hasTypeParameter() || env && "must have a generic environment");
-
-  if (env)
-    type = env->mapTypeIntoContext(type);
-
-  return type->isNoncopyable();
-}
-
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -2753,8 +2744,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (isInterfaceTypeNoncopyable(var->getInterfaceType(),
-                                     DC->getGenericEnvironmentOfContext())) {
+      if (var->getTypeInContext()->isNoncopyable()) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2847,8 +2837,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (isInterfaceTypeNoncopyable(SD->getElementInterfaceType(),
-                                   SD->getGenericEnvironment())) {
+    if (SD->mapTypeIntoContext(SD->getElementInterfaceType())->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {
