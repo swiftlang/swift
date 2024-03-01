@@ -125,12 +125,43 @@ struct ArgumentDecoderInfo {
   Callee getCallee() const;
 };
 
+struct AccessorTarget {
+private:
+  IRGenFunction &IGF;
+  SILFunction *Target;
+
+  CanSILFunctionType Type;
+
+public:
+  AccessorTarget(IRGenFunction &IGF, SILFunction *target)
+      : IGF(IGF), Target(target), Type(target->getLoweredFunctionType()) {}
+
+  DeclContext *getDeclContext() const { return Target->getDeclContext(); }
+
+  CanSILFunctionType getType() const { return Type; }
+
+  bool isGeneric() const { return Target->isGeneric(); }
+
+  Callee getCallee(llvm::Value *actorSelf) const;
+
+  LinkEntity getLinking() const {
+    return LinkEntity::forDistributedTargetAccessor(Target);
+  }
+
+  WitnessMetadata *getWitnessMetadata() const {
+    return nullptr;
+  }
+
+public:
+  FunctionPointer getPointerToTarget() const;
+};
+
 class DistributedAccessor {
   IRGenModule &IGM;
   IRGenFunction &IGF;
 
   /// Underlying distributed method for this accessor.
-  SILFunction *Target;
+  AccessorTarget Target;
 
   /// The interface type of this accessor function.
   CanSILFunctionType AccessorType;
@@ -177,10 +208,6 @@ private:
   /// Emit an async return from accessor which does cleanup of
   /// all the argument allocations.
   void emitReturn(llvm::Value *errorValue);
-
-  FunctionPointer getPointerToTarget() const;
-
-  Callee getCalleeForDistributedTarget(llvm::Value *self) const;
 
   /// Given an instance of invocation decoder, its type metadata,
   /// and protocol witness table, find `decodeNextArgument`.
@@ -318,9 +345,9 @@ void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
                                          SILFunction *target,
                                          CanSILFunctionType accessorTy)
-    : IGM(IGF.IGM), IGF(IGF), Target(target), AccessorType(accessorTy),
-      AsyncLayout(getAsyncContextLayout(
-          IGM, AccessorType, AccessorType, SubstitutionMap())) {
+    : IGM(IGF.IGM), IGF(IGF), Target(IGF, target), AccessorType(accessorTy),
+      AsyncLayout(getAsyncContextLayout(IGM, AccessorType, AccessorType,
+                                        SubstitutionMap())) {
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 }
@@ -328,7 +355,7 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
 void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
                                           llvm::Value *argumentTypes,
                                           Explosion &arguments) {
-  auto fnType = Target->getLoweredFunctionType();
+  auto fnType = Target.getType();
 
   // Cover all of the arguments except to `self` of the actor.
   auto parameters = fnType->getParameters().drop_back();
@@ -612,7 +639,7 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 }
 
 void DistributedAccessor::emit() {
-  auto targetTy = Target->getLoweredFunctionType();
+  auto targetTy = Target.getType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
@@ -657,7 +684,7 @@ void DistributedAccessor::emit() {
         Signature::forAsyncEntry(IGM, AccessorType, fpKind)
             .getAsyncContextIndex();
 
-    auto entity = LinkEntity::forDistributedTargetAccessor(Target);
+    auto entity = Target.getLinking();
     emitAsyncFunctionEntry(IGF, AsyncLayout, entity, asyncContextIdx);
     emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
   }
@@ -687,7 +714,7 @@ void DistributedAccessor::emit() {
   }
 
   // Add all of the substitutions to the explosion
-  if (Target->isGeneric()) {
+  if (Target.isGeneric()) {
     // swift.type **
     llvm::Value *substitutionBuffer =
         IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
@@ -726,13 +753,13 @@ void DistributedAccessor::emit() {
     Explosion result;
     llvm::Value *targetError = nullptr;
 
-    auto callee = getCalleeForDistributedTarget(actorSelf);
+    auto callee = Target.getCallee(actorSelf);
     auto emission =
         getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
 
     emission->begin();
     emission->setArgs(arguments, /*isOutlined=*/false,
-                      /*witnessMetadata=*/nullptr);
+                      Target.getWitnessMetadata());
 
     // Load result of the thunk into the location provided by the caller.
     // This would only generate code for direct results, if thunk has an
@@ -763,31 +790,29 @@ void DistributedAccessor::emit() {
   }
 }
 
-FunctionPointer DistributedAccessor::getPointerToTarget() const {
-  auto fnType = Target->getLoweredFunctionType();
+FunctionPointer AccessorTarget::getPointerToTarget() const {
+  auto &IGM = IGF.IGM;
   auto fpKind = classifyFunctionPointerKind(Target);
-  auto signature = IGM.getSignature(fnType, fpKind);
+  auto signature = IGM.getSignature(Type, fpKind);
 
   auto *fnPtr =
     llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Target),
                                    signature.getType()->getPointerTo());
 
   return FunctionPointer::forDirect(
-      FunctionPointer::Kind(fnType), fnPtr,
+      FunctionPointer::Kind(Type), fnPtr,
       IGM.getAddrOfSILFunction(Target, NotForDefinition), signature);
 }
 
-Callee
-DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
-  auto fnType = Target->getLoweredFunctionType();
-  CalleeInfo info{fnType, fnType, SubstitutionMap()};
-  return {std::move(info), getPointerToTarget(), self};
+Callee AccessorTarget::getCallee(llvm::Value *actorSelf) const {
+  CalleeInfo info{Type, Type, SubstitutionMap()};
+  return {std::move(info), getPointerToTarget(), actorSelf};
 }
 
 ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     llvm::Value *decoder, llvm::Value *decoderTy, llvm::Value *witnessTable) {
   auto &C = IGM.Context;
-  DeclContext *targetContext = Target->getDeclContext();
+  DeclContext *targetContext = Target.getDeclContext();
   auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
   /// If the context was a function, unwrap it and look for the decode method
@@ -796,9 +821,8 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   FuncDecl *decodeFn = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(targetContext)) {
     decodeFn = C.getDistributedActorArgumentDecodingMethod(
-        func->getDeclContext()->getSelfNominalTypeDecl());;
+        func->getDeclContext()->getSelfNominalTypeDecl());
   }
-
 
   // If distributed actor is generic over actor system, we have to
   // use witness to reference `decodeNextArgument`.
