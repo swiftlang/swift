@@ -17,6 +17,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                             MARK: CaptureInfo
+//===----------------------------------------------------------------------===//
+
 CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
@@ -56,9 +60,10 @@ CaptureInfo CaptureInfo::empty() {
 }
 
 bool CaptureInfo::hasLocalCaptures() const {
-  for (auto capture : getCaptures())
-    if (capture.getDecl()->isLocalCapture())
+  for (auto capture : getCaptures()) {
+    if (capture.isLocalCapture())
       return true;
+  }
   return false;
 }
 
@@ -71,7 +76,7 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
 
   // Filter out global variables.
   for (auto capture : getCaptures()) {
-    if (!capture.getDecl()->isLocalCapture())
+    if (!capture.isLocalCapture())
       continue;
 
     Result.push_back(capture);
@@ -83,10 +88,12 @@ VarDecl *CaptureInfo::getIsolatedParamCapture() const {
     return nullptr;
 
   for (const auto &capture : getCaptures()) {
-    if (!capture.getDecl()->isLocalCapture())
+    // Check for dynamic self metadata before checking if we have a local
+    // capture since dynamic self metadata doesn't have a decl.
+    if (capture.isDynamicSelfMetadata())
       continue;
 
-    if (capture.isDynamicSelfMetadata())
+    if (!capture.isLocalCapture())
       continue;
 
     // If we captured an isolated parameter, return it.
@@ -134,3 +141,11 @@ void CaptureInfo::print(raw_ostream &OS) const {
   OS << ')';
 }
 
+//===----------------------------------------------------------------------===//
+//                            MARK: CapturedValue
+//===----------------------------------------------------------------------===//
+
+bool CapturedValue::isLocalCapture() const {
+  auto *decl = Value.getPointer().dyn_cast<ValueDecl *>();
+  return decl && decl->isLocalCapture();
+}
