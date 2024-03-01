@@ -33,9 +33,9 @@ using namespace swift;
 using namespace irgen;
 
 OutliningMetadataCollector::OutliningMetadataCollector(
-    IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
+    SILType T, IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
     DeinitIsNeeded_t needsDeinitTypes)
-    : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
+    : T(T), IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
 
 void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
@@ -180,7 +180,7 @@ bool TypeInfo::withWitnessableMetadataCollector(
   }
 
   if (needsCollector) {
-    OutliningMetadataCollector collector(IGF, needsLayout, needsDeinit);
+    OutliningMetadataCollector collector(T, IGF, needsLayout, needsDeinit);
     if (needsDeinit || needsLayout) {
       // Only collect if anything would be collected.
       collectMetadataForOutlining(collector, T);
@@ -479,7 +479,8 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
 
 void TypeInfo::callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
                                    Atomicity atomicity) const {
-  OutliningMetadataCollector collector(IGF, LayoutIsNotNeeded, DeinitIsNeeded);
+  OutliningMetadataCollector collector(T, IGF, LayoutIsNotNeeded,
+                                       DeinitIsNeeded);
   collectMetadataForOutlining(collector, T);
   collector.emitCallToOutlinedRelease(addr, T, *this, atomicity);
 }

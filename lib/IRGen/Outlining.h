@@ -20,6 +20,7 @@
 #include "IRGen.h"
 #include "LocalTypeDataKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {
@@ -33,6 +34,7 @@ class CanType;
 enum IsInitialization_t : bool;
 enum IsTake_t : bool;
 class SILType;
+class NominalTypeDecl;
 
 namespace irgen {
 class Address;
@@ -60,6 +62,7 @@ enum DeinitIsNeeded_t : bool {
 ///   - emit the call to the outlined copy/destroy helper
 class OutliningMetadataCollector {
 public:
+  SILType T;
   IRGenFunction &IGF;
   const unsigned needsLayout : 1;
   const unsigned needsDeinit : 1;
@@ -69,7 +72,8 @@ private:
   friend class IRGenModule;
 
 public:
-  OutliningMetadataCollector(IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
+  OutliningMetadataCollector(SILType T, IRGenFunction &IGF,
+                             LayoutIsNeeded_t needsLayout,
                              DeinitIsNeeded_t needsDeinitTypes);
 
   void collectTypeMetadata(SILType type);
