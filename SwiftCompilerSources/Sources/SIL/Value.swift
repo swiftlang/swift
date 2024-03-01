@@ -25,9 +25,12 @@ public protocol Value : AnyObject, CustomStringConvertible {
   var definingInstruction: Instruction? { get }
   
   /// The block where the value is defined.
-  ///
-  /// It's not legal to get the definingBlock of an `Undef` value.
   var parentBlock: BasicBlock { get }
+
+  /// The function where the value lives in.
+  ///
+  /// It's not legal to get the parentFunction of an instruction in a global initializer.
+  var parentFunction: Function { get }
 
   /// True if the value has a trivial type.
   var hasTrivialType: Bool { get }
@@ -113,6 +116,7 @@ extension Value {
 
   public var uses: UseList { UseList(bridged.getFirstUse()) }
   
+  // Default implementation for all values which have a parent block, like instructions and arguments.
   public var parentFunction: Function { parentBlock.parentFunction }
 
   public var type: Type { bridged.getType().type }
@@ -206,8 +210,11 @@ extension BridgedValue {
 public final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
 
+  public var parentFunction: Function { bridged.SILUndef_getParentFunction().function }
+
   public var parentBlock: BasicBlock {
-    fatalError("undef has no defining block")
+    // By convention, undefs are considered to be defined at the entry of the function.
+    parentFunction.entryBlock
   }
 
   /// Undef has not parent function, therefore the default `hasTrivialType` does not work.
@@ -221,9 +228,12 @@ public final class Undef : Value {
 
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
+
   public var parentBlock: BasicBlock {
     fatalError("PlaceholderValue has no defining block")
   }
+
+  public var parentFunction: Function { bridged.PlaceholderValue_getParentFunction().function }
 }
 
 extension OptionalBridgedValue {

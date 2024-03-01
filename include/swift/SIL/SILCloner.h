@@ -592,9 +592,7 @@ SILCloner<ImplClass>::getMappedValue(SILValue Value) {
   // If we have undef, just remap the type.
   if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
-    ValueBase *undef =
-        (type == U->getType() ? U : SILUndef::get(Builder.getFunction(), type));
-    return SILValue(undef);
+    return SILUndef::get(Builder.getFunction(), type);
   }
 
   llvm_unreachable("Unmapped value while cloning?");
