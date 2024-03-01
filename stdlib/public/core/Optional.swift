@@ -134,7 +134,7 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
 
 extension Optional: Copyable /* where Wrapped: Copyable */ {}
 
-extension Optional: ExpressibleByNilLiteral {
+extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
   /// Creates an instance initialized with `nil`.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
