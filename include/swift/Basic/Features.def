@@ -109,6 +109,8 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor
 SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated types")
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AssociatedTypeAvailability, 0, "Availability on associated types")
+SUPPRESSIBLE_LANGUAGE_FEATURE(AsyncSequenceFailure, 0, "Failure associated type on AsyncSequence and AsyncIteratorProtocol")
 LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors")
 LANGUAGE_FEATURE(Macros, 0, "Macros")
 LANGUAGE_FEATURE(FreestandingExpressionMacros, 382, "Expression macros")
