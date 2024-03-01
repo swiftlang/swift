@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftDeclSynthesizer.h"
-#include "clang/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Expr.h"
@@ -19,6 +18,8 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/CXXMethodBridging.h"
+#include "clang/AST/Mangle.h"
+#include "clang/Sema/DelayedDiagnostic.h"
 
 using namespace swift;
 using namespace importer;
@@ -2001,6 +2002,171 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked*/ true};
 }
 
+clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+    const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+    ForwardingMethodKind forwardingMethodKind,
+    ReferenceReturnTypeBehaviorForBaseMethodSynthesis
+        referenceReturnTypeBehavior,
+    bool forceConstQualifier) {
+
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  auto &clangSema = ImporterImpl.getClangSema();
+  // When emitting symbolic decls, the method might not have a concrete
+  // record type as this type.
+  if (ImporterImpl.importSymbolicCXXDecls &&
+      !method->getThisType()->getPointeeCXXRecordDecl())
+    return nullptr;
+
+  // Create a new method in the derived class that calls the base method.
+  clang::DeclarationName name = method->getNameInfo().getName();
+  if (name.isIdentifier()) {
+    std::string newName;
+    llvm::raw_string_ostream os(newName);
+    os << (forwardingMethodKind == ForwardingMethodKind::Virtual
+               ? "__synthesizedVirtualCall_"
+               : "__synthesizedBaseCall_")
+       << name.getAsIdentifierInfo()->getName();
+    name = clang::DeclarationName(
+        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
+            os.str()));
+  } else if (name.getCXXOverloadedOperator() == clang::OO_Subscript) {
+    name = clang::DeclarationName(
+        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
+            (forwardingMethodKind == ForwardingMethodKind::Virtual
+                 ? "__synthesizedVirtualCall_operatorSubscript"
+                 : "__synthesizedBaseCall_operatorSubscript")));
+  } else if (name.getCXXOverloadedOperator() == clang::OO_Star) {
+    name = clang::DeclarationName(
+        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
+            (forwardingMethodKind == ForwardingMethodKind::Virtual
+                 ? "__synthesizedVirtualCall_operatorStar"
+                 : "__synthesizedBaseCall_operatorStar")));
+  }
+  auto methodType = method->getType();
+  // Check if we need to drop the reference from the return type
+  // of the new method. This is needed when a synthesized `operator []`
+  // derived-to-base call is invoked from Swift's subscript getter.
+  if (referenceReturnTypeBehavior !=
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference) {
+    if (const auto *fpt = methodType->getAs<clang::FunctionProtoType>()) {
+      auto retType = fpt->getReturnType();
+      if (retType->isReferenceType() &&
+          (referenceReturnTypeBehavior ==
+               ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                   RemoveReference ||
+           (referenceReturnTypeBehavior ==
+                ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                    RemoveReferenceIfPointer &&
+            retType->getPointeeType()->isPointerType()))) {
+        methodType = clangCtx.getFunctionType(retType->getPointeeType(),
+                                              fpt->getParamTypes(),
+                                              fpt->getExtProtoInfo());
+      }
+    }
+  }
+  // Check if this method requires an additional `const` qualifier.
+  // This might needed when a non-const synthesized `operator []`
+  // derived-to-base call is invoked from Swift's subscript getter.
+  bool castThisToNonConstThis = false;
+  if (forceConstQualifier) {
+    if (const auto *fpt = methodType->getAs<clang::FunctionProtoType>()) {
+      auto info = fpt->getExtProtoInfo();
+      if (!info.TypeQuals.hasConst()) {
+        info.TypeQuals.addConst();
+        castThisToNonConstThis = true;
+        methodType = clangCtx.getFunctionType(fpt->getReturnType(),
+                                              fpt->getParamTypes(), info);
+      }
+    }
+  }
+  auto newMethod = clang::CXXMethodDecl::Create(
+      clangCtx, const_cast<clang::CXXRecordDecl *>(derivedClass),
+      method->getSourceRange().getBegin(),
+      clang::DeclarationNameInfo(name, clang::SourceLocation()), methodType,
+      method->getTypeSourceInfo(), method->getStorageClass(),
+      method->UsesFPIntrin(), /*isInline=*/true, method->getConstexprKind(),
+      method->getSourceRange().getEnd());
+  newMethod->setImplicit();
+  newMethod->setImplicitlyInline();
+  newMethod->setAccess(clang::AccessSpecifier::AS_public);
+  if (method->hasAttr<clang::CFReturnsRetainedAttr>()) {
+    // Return an FRT field at +1 if the base method also follows this
+    // convention.
+    newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
+  }
+
+  llvm::SmallVector<clang::ParmVarDecl *, 4> params;
+  for (size_t i = 0; i < method->getNumParams(); ++i) {
+    const auto &param = *method->getParamDecl(i);
+    params.push_back(clang::ParmVarDecl::Create(
+        clangCtx, newMethod, param.getSourceRange().getBegin(),
+        param.getLocation(), param.getIdentifier(), param.getType(),
+        param.getTypeSourceInfo(), param.getStorageClass(),
+        /*DefExpr=*/nullptr));
+  }
+  newMethod->setParams(params);
+
+  // Create a new Clang diagnostic pool to capture any diagnostics
+  // emitted during the construction of the method.
+  clang::sema::DelayedDiagnosticPool diagPool{
+      clangSema.DelayedDiagnostics.getCurrentPool()};
+  auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
+
+  // Construct the method's body.
+  clang::Expr *thisExpr = new (clangCtx) clang::CXXThisExpr(
+      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
+  if (castThisToNonConstThis) {
+    auto baseClassPtr =
+        clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
+    clang::CastKind Kind;
+    clang::CXXCastPath Path;
+    clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
+                                     /*IgnoreBaseAccess=*/false,
+                                     /*Diagnose=*/true);
+    auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
+                                            clang::VK_PRValue, &Path);
+    if (!conv.isUsable())
+      return nullptr;
+    thisExpr = conv.get();
+  }
+
+  auto memberExpr = clangSema.BuildMemberExpr(
+      thisExpr, /*isArrow=*/true, clang::SourceLocation(),
+      clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+      const_cast<clang::CXXMethodDecl *>(method),
+      clang::DeclAccessPair::make(const_cast<clang::CXXMethodDecl *>(method),
+                                  clang::AS_public),
+      /*HadMultipleCandidates=*/false, method->getNameInfo(),
+      clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+  llvm::SmallVector<clang::Expr *, 4> args;
+  for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
+    auto *param = newMethod->getParamDecl(i);
+    auto type = param->getType();
+    if (type->isReferenceType())
+      type = type->getPointeeType();
+    args.push_back(new (clangCtx) clang::DeclRefExpr(
+        clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
+        clang::SourceLocation()));
+  }
+  auto memberCall = clangSema.BuildCallToMemberFunction(
+      nullptr, memberExpr, clang::SourceLocation(), args,
+      clang::SourceLocation());
+  if (!memberCall.isUsable())
+    return nullptr;
+  auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
+                                              memberCall.get(), nullptr);
+
+  // Check if there were any Clang errors during the construction
+  // of the method body.
+  clangSema.DelayedDiagnostics.popWithoutEmitting(diagState);
+  if (!diagPool.empty())
+    return nullptr;
+
+  newMethod->setBody(returnStmt);
+  return newMethod;
+}
+
 FuncDecl *
 SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
                                    clang::OverloadedOperatorKind opKind) {
@@ -2067,6 +2233,26 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   }
 
   return topLevelStaticFuncDecl;
+}
+
+// MARK: C++ virtual methods
+
+FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
+    const clang::CXXMethodDecl *clangMethodDecl) {
+  auto clangDC = clangMethodDecl->getParent();
+  auto &ctx = ImporterImpl.SwiftContext;
+
+  assert(!clangMethodDecl->isStatic() &&
+         "C++ virtual functions cannot be static");
+
+  auto newMethod = synthesizeCXXForwardingMethod(
+      clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+      /*forceConstQualifier*/ false);
+
+  auto result = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
+  return result;
 }
 
 // MARK: C++ properties
