@@ -7343,10 +7343,11 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
 }
 
 void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
-  if (Ctx.LangOpts.Target.isOSBinFormatCOFF()) {
-    diagnoseAndRemoveAttr(attr, diag::attr_unsupported_on_target,
-                          attr->getAttrName(), Ctx.LangOpts.Target.str());
-  }
+  if (!Ctx.LangOpts.Target.isOSBinFormatCOFF())
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_unsupported_on_target,
+                        attr->getAttrName(), Ctx.LangOpts.Target.str());
 }
 
 namespace {
