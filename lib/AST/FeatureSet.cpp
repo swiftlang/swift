@@ -439,6 +439,7 @@ UNINTERESTING_FEATURE(GlobalConcurrency)
 UNINTERESTING_FEATURE(FullTypedThrows)
 UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
+UNINTERESTING_FEATURE(ImplicitOpenExistentials)
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features
