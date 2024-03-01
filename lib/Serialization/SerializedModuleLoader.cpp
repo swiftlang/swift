@@ -1081,6 +1081,12 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
                        loadInfo.problematicRevision, ModuleName, moduleBufferID);
     break;
+  case serialization::Status::ChannelIncompatible:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_channel,
+                       loadInfo.problematicChannel,
+                       version::getCurrentCompilerChannel(),
+                       ModuleName, moduleBufferID);
+    break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);
@@ -1168,6 +1174,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::NotInOSSA:
   case serialization::Status::NoncopyableGenericsMismatch:
   case serialization::Status::RevisionIncompatible:
+  case serialization::Status::ChannelIncompatible:
   case serialization::Status::Malformed:
   case serialization::Status::MalformedDocumentation:
   case serialization::Status::FailedToLoadBridgingHeader:

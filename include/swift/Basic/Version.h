@@ -177,6 +177,11 @@ StringRef getCurrentCompilerTag();
 /// depending on the vendor.
 StringRef getCurrentCompilerSerializationTag();
 
+/// Distribution channel of the running compiler for distributed swiftmodules.
+/// Helps to distinguish swiftmodules between different compilers using the
+/// same serialization tag.
+StringRef getCurrentCompilerChannel();
+
 /// Retrieves the value of the upcoming C++ interoperability compatibility
 /// version that's going to be presented as some new concrete version to the
 /// users.
