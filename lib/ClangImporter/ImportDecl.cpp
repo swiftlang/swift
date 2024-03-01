@@ -3753,38 +3753,42 @@ namespace {
         }
       }
 
-      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
-          if (auto dc = method->getDeclContext();
-              !decl->isPure() &&
-              isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
-
-            // generates the __synthesizedVirtualCall_ C++ thunk
-            clang::CXXMethodDecl *cxxThunk = synthesizeCxxVirtualMethod(
-                *static_cast<ClangImporter *>(
-                    dc->getASTContext().getClangModuleLoader()),
-                decl->getParent(), decl->getParent(), decl);
-
-            // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
-            if (Decl *swiftThunk =
-                    cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
-                isa_and_nonnull<FuncDecl>(swiftThunk)) {
-              // synthesize the body of the Swift method to call the swiftThunk
-              synthesizeForwardingThunkBody(cast<FuncDecl>(method),
-                                            cast<FuncDecl>(swiftThunk));
-              return method;
+      if (decl->isVirtual()) {
+        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+          if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
+            if (auto structDecl =
+                    dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+              // If this is a method of a Swift struct, any possible override of
+              // this method would get sliced away, and an invocation would get
+              // dispatched statically. This is fine because it matches the C++
+              // behavior.
+              if (decl->isPure()) {
+                // If this is a pure virtual method, we won't have any
+                // implementation of it to invoke.
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift "
+                              "because it is pure");
+              }
+            } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
+                           funcDecl->getDeclContext())) {
+              // This is a foreign reference type. Since `class T` on the Swift
+              // side is mapped from `T*` on the C++ side, an invocation of a
+              // virtual method `t->method()` should get dispatched dynamically.
+              // Create a thunk that will perform dynamic dispatch.
+              // TODO: we don't have to import the actual `method` in this case,
+              // we can just synthesize a thunk and import that instead.
+              auto result = synthesizer.makeVirtualMethod(decl);
+              if (result) {
+                return result;
+              } else {
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift");
+              }
             }
+          } else {
+            Impl.markUnavailable(
+                funcDecl, "virtual functions are not yet available in Swift");
           }
-
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              decl->isPure() ? "virtual function is not available in Swift "
-                               "because it is pure"
-                             : "virtual function is not available in Swift");
-        } else {
-          Impl.markUnavailable(
-              cast<ValueDecl>(method),
-              "virtual functions are not yet available in Swift");
         }
       }
 

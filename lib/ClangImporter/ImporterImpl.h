@@ -2024,14 +2024,4 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 }
 }
 
-// Forwards to synthesizeCxxBasicMethod(), producing a thunk that calls a
-// virtual function.
-clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
-    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
-    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method);
-
-// Exposed to produce a Swift method body for calling a Swift thunk.
-std::pair<swift::BraceStmt *, bool>
-synthesizeForwardingThunkBody(swift::AbstractFunctionDecl *afd, void *context);
-
 #endif
