@@ -52,9 +52,15 @@ void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
     }
   }
 
-  if (!needsLayout) {
+  collectTypeMetadataForLayout(ty);
+}
+
+void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
+  if (!needsLayout)
     return;
-  }
+
+  auto astType = ty.getASTType();
+  auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
 
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of

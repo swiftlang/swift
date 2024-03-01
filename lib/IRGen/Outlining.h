@@ -90,6 +90,7 @@ public:
                                  Explosion &params) const;
 
 private:
+  void collectTypeMetadataForLayout(SILType type);
   void collectFormalTypeMetadata(CanType type);
   void collectRepresentationTypeMetadata(SILType ty);
 };
