@@ -128,6 +128,8 @@ bool isInstructionTriviallyDeletable(SILInstruction *inst);
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *inst);
 
+bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *inst);
+
 /// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
