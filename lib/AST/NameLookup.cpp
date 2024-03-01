@@ -1446,10 +1446,25 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
+static bool shouldLoadMembersImmediately(ExtensionDecl *ext) {
+  assert(ext->hasLazyMembers());
+  if (ext->wasDeserialized() || ext->hasClangNode())
+    return false;
+
+  // This extension is lazy but is not deserialized or backed by a clang node,
+  // so it's a ClangImporter extension containing import-as-member globals.
+  // Historically, Swift forced these extensions to load their members
+  // immediately, bypassing the module's SwiftLookupTable. Using the
+  // SwiftLookupTable *ought* to work the same, but in practice it sometimes
+  // gives different results when a header is not properly modularized. Provide
+  // a flag to temporarily re-enable the old behavior.
+  return ext->getASTContext().LangOpts.DisableNamedLazyImportAsMemberLoading;
+}
+
 void MemberLookupTable::addExtension(ExtensionDecl *ext) {
   // If we can lazy-load this extension, only take the members we've loaded
   // so far.
-  if (ext->hasLazyMembers()) {
+  if (ext->hasLazyMembers() && !shouldLoadMembersImmediately(ext)) {
     addMembers(ext->getCurrentMembersWithoutLoading());
     clearLazilyCompleteCache();
     clearLazilyCompleteForMacroExpansionCache();

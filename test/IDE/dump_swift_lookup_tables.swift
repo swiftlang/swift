@@ -3,7 +3,6 @@
 
 // RUN: %target-typecheck-verify-swift -dump-clang-lookup-tables -import-objc-header %S/Inputs/swift_name.h -I %S/Inputs/custom-modules > %t.frontend.log 2>&1
 // RUN: %FileCheck %s < %t.frontend.log
-// RUN: false
 
 // REQUIRES: objc_interop
 import ImportAsMember
