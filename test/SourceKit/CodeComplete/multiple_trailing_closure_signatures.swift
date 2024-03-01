@@ -20,10 +20,10 @@ func func1(
 // CHECK: key.results: [
 // CHECK-DAG: key.sourcetext: "fn2: {\n<#code#>\n}"
 // CHECK-DAG: key.sourcetext: "fn3: { <#Int#> in\n<#code#>\n}"
-// CHECK-DAG: key.sourcetext: "fn4: { <#Int#>, <#String#> in\n<#code#>\n}",
-// CHECK-DAG: key.sourcetext: "fn5: { <#Int#>, <#String#> in\n<#code#>\n}",
-// CHECK-DAG: key.sourcetext: "fn7: { <#inout Int#> in\n<#code#>\n}",
-// CHECK-DAG: key.sourcetext: "fn8: { <#Int...#> in\n<#code#>\n}",
+// CHECK-DAG: key.sourcetext: "fn4: { <#Int#>, <#String#> in\n<#code#>\n}"
+// CHECK-DAG: key.sourcetext: "fn5: { <#Int#>, <#String#> in\n<#code#>\n}"
+// CHECK-DAG: key.sourcetext: "fn7: { <#inout Int#> in\n<#code#>\n}"
+// CHECK-DAG: key.sourcetext: "fn8: { <#Int...#> in\n<#code#>\n}"
 // CHECK: ]
 
 // DESCRIPTION-NOT: key.description: "fn{{[0-9]*}}: {
