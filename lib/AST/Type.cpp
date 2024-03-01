@@ -278,7 +278,20 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
+static void expandDefaults(SmallVectorImpl<ProtocolDecl *> &protocols,
+                           InvertibleProtocolSet inverses,
+                           ASTContext &ctx) {
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      if (!inverses.contains(ip)) {
+        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        protocols.push_back(proto);
+      }
+    }
+  }
 
+  ProtocolType::canonicalizeProtocols(protocols);
+}
 
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
@@ -291,9 +304,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   representsAnyObject = false;
 
   protocols.push_back(protoDecl);
-
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(), {}, protocols);
+  expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
@@ -326,13 +337,26 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  representsAnyObject =
-      hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
+  auto inverses = type->getInverses();
+  expandDefaults(protocols, inverses, type->getASTContext());
 
-  // NOTE: all the invertible protocols are usable from ObjC.
-  InverseRequirement::expandDefaults(type->getASTContext(),
-                                     type->getInverses(),
-                                     protocols);
+  representsAnyObject = [&]() {
+    if (!hasExplicitAnyObject)
+      return false;
+
+    if (explicitSuperclass)
+      return false;
+
+    if (!inverses.empty())
+      return false;
+
+    for (auto *proto : protocols) {
+      if (!proto->getInvertibleProtocolKind())
+        return false;
+    }
+
+    return true;
+  }();
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -478,12 +502,12 @@ bool TypeBase::isDistributedActor() {
   return false;
 }
 
-llvm::Optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
+std::optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
   if (auto protoTy = this->getAs<ProtocolType>())
     if (auto protoDecl = protoTy->getDecl())
       return protoDecl->getKnownProtocolKind();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool TypeBase::isSpecialized() {
@@ -1017,7 +1041,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     auto newInstanceType =
         instanceType->stripConcurrency(recurse, dropGlobalActor);
     if (instanceType.getPointer() != newInstanceType.getPointer()) {
-      llvm::Optional<MetatypeRepresentation> repr;
+      std::optional<MetatypeRepresentation> repr;
       if (existentialMetatype->hasRepresentation())
         repr = existentialMetatype->getRepresentation();
       return ExistentialMetatypeType::get(
@@ -1501,39 +1525,12 @@ static void addProtocols(Type T,
   Superclass = T;
 }
 
-bool ProtocolType::visitAllProtocols(
-                                 ArrayRef<ProtocolDecl *> protocols,
-                                 llvm::function_ref<bool(ProtocolDecl *)> fn) {
-  SmallVector<ProtocolDecl *, 4> stack;
-  SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-
-  // Prepopulate the stack.
-  for (auto proto : protocols) {
-    if (knownProtocols.insert(proto).second)
-      stack.push_back(proto);
-  }
-  std::reverse(stack.begin(), stack.end());
-
-  while (!stack.empty()) {
-    auto proto = stack.back();
-    stack.pop_back();
-
-    // Visit this protocol.
-    if (fn(proto))
-      return true;
-
-    // Add inherited protocols that we haven't seen already.
-    for (auto inherited : proto->getInheritedProtocols()) {
-      if (knownProtocols.insert(inherited).second)
-        stack.push_back(inherited);
-    }
-  }
-
-  return false;
-}
-
 static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
                                   ParameterizedProtocolMap *parameterized) {
+  // Skip a bunch of useless work.
+  if (protocols.size() <= 1)
+    return;
+
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
   bool zappedAny = false;
 
@@ -1558,23 +1555,24 @@ static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols,
     if (proto == nullptr)
       continue;
 
-    // Add the protocols we inherited.
-    proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-      if (inherited == proto)
-        return TypeWalker::Action::Continue;
+    // The below algorithm assumes the inheritance graph is acyclic. Just skip
+    // it if we have invalid code.
+    if (proto->hasCircularInheritedProtocols())
+      continue;
 
+    // Add the protocols we inherited.
+    auto allInherited = proto->getAllInheritedProtocols();
+    for (auto *inherited : allInherited) {
       auto found = known.find(inherited);
       if (found != known.end()) {
         // Don't zap protocols associated with parameterized types.
         if (parameterized && parameterized->count(inherited))
-          return TypeWalker::Action::Continue;
+          return;
 
         protocols[found->second] = nullptr;
         zappedAny = true;
       }
-
-      return TypeWalker::Action::Continue;
-    });
+    }
   }
   
   if (zappedAny) {
@@ -1757,7 +1755,7 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getReducedType(genericSig);
 
-    llvm::Optional<ASTExtInfo> extInfo = llvm::None;
+    std::optional<ASTExtInfo> extInfo = std::nullopt;
     if (funcTy->hasExtInfo())
       extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
@@ -2181,25 +2179,16 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
 }
 
 namespace {
-class IsBindableVisitor
-  : public TypeVisitor<IsBindableVisitor, CanType,
-                     CanType, ArchetypeType *, ArrayRef<ProtocolConformanceRef>>
-{
+class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, CanType, CanType> {
 public:
   using VisitBindingCallback =
-    llvm::function_ref<CanType (ArchetypeType *, CanType,
-                            ArchetypeType *, ArrayRef<ProtocolConformanceRef>)>;
+    llvm::function_ref<CanType (ArchetypeType *, CanType)>;
     
   VisitBindingCallback VisitBinding;
   
-  IsBindableVisitor(VisitBindingCallback visit)
-    : VisitBinding(visit)
-  {}
+  IsBindableVisitor(VisitBindingCallback visit) : VisitBinding(visit) {}
 
-  CanType visitArchetypeType(ArchetypeType *orig,
-                             CanType subst,
-                             ArchetypeType *upperBound,
-                             ArrayRef<ProtocolConformanceRef> substConformances) {
+  CanType visitArchetypeType(ArchetypeType *orig, CanType subst) {
     if (!subst->isTypeParameter()) {
       // Check that the archetype isn't constrained in a way that makes the
       // binding impossible.
@@ -2223,33 +2212,28 @@ public:
       // allows the binding.
     }
     // Let the binding succeed.
-    return VisitBinding(orig, subst, upperBound, substConformances);
+    return VisitBinding(orig, subst);
   }
   
-  CanType visitType(TypeBase *orig, CanType subst,
-                    ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitType(TypeBase *orig, CanType subst) {
     if (CanType(orig) == subst)
       return subst;
     
     return CanType();
   }
   
-  CanType visitDynamicSelfType(DynamicSelfType *orig, CanType subst,
-                           ArchetypeType *upperBound,
-                           ArrayRef<ProtocolConformanceRef> substConformances) {
+  CanType visitDynamicSelfType(DynamicSelfType *orig, CanType subst) {
     // A "dynamic self" type can be bound to another dynamic self type, or the
     // non-dynamic base class type.
     if (auto dynSubst = dyn_cast<DynamicSelfType>(subst)) {
-      if (auto newBase = visit(orig->getSelfType(), dynSubst.getSelfType(),
-                               upperBound, substConformances)) {
+      if (auto newBase = visit(orig->getSelfType(), dynSubst.getSelfType())) {
         return CanDynamicSelfType::get(newBase, orig->getASTContext())
                                  ->getCanonicalType();
       }
       return CanType();
     }
     
-    if (auto newNonDynBase = visit(orig->getSelfType(), subst,
-                                   upperBound, substConformances)) {
+    if (auto newNonDynBase = visit(orig->getSelfType(), subst)) {
       return newNonDynBase;
     }
     return CanType();
@@ -2259,21 +2243,15 @@ public:
   /// \c origType and \c substType must already have been established to be
   /// instantiations of the same \c NominalTypeDecl.
   CanType handleGenericNominalType(NominalTypeDecl *decl,
-                           CanType origType,
-                           CanType substType,
-                           ArchetypeType *upperBound,
-                           ArrayRef<ProtocolConformanceRef> substConformances) {
+                                   CanType origType,
+                                   CanType substType) {
     assert(origType->getAnyNominal() == decl
            && substType->getAnyNominal() == decl);
     
     LLVM_DEBUG(llvm::dbgs() << "\n---\nTesting bindability of:\n";
                origType->print(llvm::dbgs());
                llvm::dbgs() << "\nto subst type:\n";
-               substType->print(llvm::dbgs());
-               if (upperBound) {
-                 llvm::dbgs() << "\nwith upper bound archetype:\n";
-                 upperBound->print(llvm::dbgs());
-               });
+               substType->print(llvm::dbgs()););
     
     auto *moduleDecl = decl->getParentModule();
     auto origSubMap = origType->getContextSubstitutionMap(
@@ -2287,154 +2265,16 @@ public:
     llvm::DenseMap<SubstitutableType *, Type> newParamsMap;
     bool didChange = false;
     
-    // The upper bounds for the nominal type's arguments may depend on the
-    // upper bounds imposed on the nominal type itself, if conditional
-    // conformances are involved. For instance, if we're looking at:
-    //
-    // protocol P {}
-    // struct A<T: P> {}
-    // struct B<U> {}
-    // extension B: P where U: P {}
-    //
-    // and visiting `A<B<V>>`, then `B<V>` has an upper bound of `_: P` because
-    // of A's generic type constraint. In order to stay within this upper bound,
-    // `V` must also have `_: P` as its upper bound, in order to satisfy the
-    // constraint on `B<V>`. To handle this correctly, ingest requirements
-    // from any extension declarations providing conformances required by the
-    // upper bound.
-    auto upperBoundGenericSig = genericSig;
-    auto upperBoundSubstMap = substSubMap;
-    
     LLVM_DEBUG(llvm::dbgs() << "\nNominal type generic signature:\n";
-               upperBoundGenericSig.print(llvm::dbgs());
-               upperBoundSubstMap.dump(llvm::dbgs()));
+               genericSig.print(llvm::dbgs()));
     
-    if (upperBound && !upperBound->getConformsTo().empty()) {
-      // Start with the set of requirements from the nominal type.
-      SmallVector<Requirement, 4> addedRequirements;
-      
-      llvm::DenseMap<std::pair<CanType, ProtocolDecl*>, ProtocolConformanceRef> addedConformances;
-      
-      for (auto proto : upperBound->getConformsTo()) {
-        // Find the DeclContext providing the conformance for the type.
-        auto nomConformance = moduleDecl->lookupConformance(
-            substType, proto, /*allowMissing=*/true);
-        if (!nomConformance)
-          return CanType();
-        if (nomConformance.isAbstract())
-          continue;
-        auto conformanceContext = nomConformance.getConcrete()->getDeclContext();
-        
-        LLVM_DEBUG(llvm::dbgs() << "\nFound extension conformance for "
-                                << proto->getName()
-                                << " in context:\n";
-                   conformanceContext->printContext(llvm::dbgs()));
-        
-        auto conformanceSig = conformanceContext->getGenericSignatureOfContext();
-        // TODO: Conformance on generalized generic extensions could conceivably
-        // have totally different generic signatures.
-        assert(conformanceSig.getGenericParams().size()
-                 == genericSig.getGenericParams().size()
-               && "generalized generic extension not handled properly");
-        
-        // Collect requirements from the conformance not satisfied by the
-        // original declaration.
-        for (auto reqt : conformanceSig.requirementsNotSatisfiedBy(genericSig)) {
-          LLVM_DEBUG(llvm::dbgs() << "\n- adds requirement\n";
-                     reqt.dump(llvm::dbgs()));
-          
-          addedRequirements.push_back(reqt);
-          
-          // Collect the matching conformance for the substituted type.
-          // TODO: Look this up using the upperBoundSubstConformances
-          if (reqt.getKind() == RequirementKind::Conformance) {
-            auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-            auto substTy = reqt.getFirstType().subst(substSubMap);
-            ProtocolConformanceRef substConformance;
-            if (substTy->isTypeParameter()) {
-              substConformance = ProtocolConformanceRef(proto);
-            } else {
-              substConformance = moduleDecl->lookupConformance(
-                  substTy, proto, /*allowMissing=*/true);
-            }
-            
-            LLVM_DEBUG(llvm::dbgs() << "\n` adds conformance for subst type\n";
-                       substTy->print(llvm::dbgs());
-                       substConformance.dump(llvm::dbgs()));
-            
-            auto key = std::make_pair(reqt.getFirstType()->getCanonicalType(),
-                                      proto);
-            
-            addedConformances.insert({key, substConformance});
-          }
-        }
-      }
-      
-      // Build the generic signature with the additional collected requirements.
-      if (!addedRequirements.empty()) {
-        upperBoundGenericSig = buildGenericSignature(decl->getASTContext(),
-                                                     upperBoundGenericSig,
-                                                     /*genericParams=*/{ },
-                                                     std::move(addedRequirements),
-                                                     /*allowInverses=*/false);
-
-        upperBoundSubstMap = SubstitutionMap::get(upperBoundGenericSig,
-          [&](SubstitutableType *t) -> Type {
-            // Type substitutions remain the same as the original substitution
-            // map.
-            return Type(t).subst(substSubMap);
-          },
-          [&](CanType dependentType,
-              Type conformingReplacementType,
-              ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-            // Check whether we added this conformance.
-            auto added = addedConformances.find({dependentType,
-                                                 conformedProtocol});
-            if (added != addedConformances.end()) {
-              return added->second;
-            }
-            // Otherwise, use the conformance from the original map.
-            
-            return substSubMap.lookupConformance(dependentType, conformedProtocol);
-          });
-        
-        LLVM_DEBUG(llvm::dbgs() << "\nGeneric signature with conditional reqts:\n";
-                   upperBoundGenericSig.print(llvm::dbgs());
-                   upperBoundSubstMap.dump(llvm::dbgs()));
-      }
-    }
-    
-    auto upperBoundGenericEnv = upperBoundGenericSig.getGenericEnvironment();
-    
-    for (auto gpTy : upperBoundGenericSig.getGenericParams()) {
+    for (auto gpTy : genericSig.getGenericParams()) {
       auto gp = gpTy->getCanonicalType();
       
       auto orig = gp.subst(origSubMap)->getCanonicalType();
       auto subst = gp.subst(substSubMap)->getCanonicalType();
       
-      // The new type is upper-bounded by the constraints the nominal type
-      // requires. The substitution operation may be interested in transforming
-      // the substituted type's conformances to these protocols.
-      //
-      // FIXME: The upperBound on the nominal type itself may impose additional
-      // requirements on the type parameters due to conditional conformances.
-      // These are currently not considered, leading to invalid generic signatures
-      // built during SILGen.
-      auto paramUpperBound =
-        GenericEnvironment::mapTypeIntoContext(upperBoundGenericEnv, gp)
-          ->getAs<ArchetypeType>();
-      SmallVector<ProtocolConformanceRef, 4> paramSubstConformances;
-      if (paramUpperBound) {
-        for (auto proto : paramUpperBound->getConformsTo()) {
-          auto conformance = upperBoundSubstMap.lookupConformance(gp, proto);
-          if (!conformance)
-            return CanType();
-          paramSubstConformances.push_back(conformance);
-        }
-      }
-      
-      auto newParam = visit(orig, subst, paramUpperBound,
-                            paramSubstConformances);
+      auto newParam = visit(orig, subst);
       if (!newParam)
         return CanType();
       
@@ -2498,9 +2338,7 @@ public:
                ->getCanonicalType();
   }
   
-  CanType visitNominalType(NominalType *nom, CanType subst,
-                           ArchetypeType* upperBound,
-                           ArrayRef<ProtocolConformanceRef> substConformances) {
+  CanType visitNominalType(NominalType *nom, CanType subst) {
     if (auto substNom = dyn_cast<NominalType>(subst)) {
       auto nomDecl = nom->getDecl();
       if (nom->getDecl() != substNom->getDecl())
@@ -2509,8 +2347,7 @@ public:
       // If the type is generic (because it's a nested type in a generic context),
       // process the generic type bindings.
       if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
-        return handleGenericNominalType(nomDecl, CanType(nom), subst,
-                                        upperBound, substConformances);
+        return handleGenericNominalType(nomDecl, CanType(nom), subst);
       }
       // Otherwise, the nongeneric nominal types trivially match.
       return subst;
@@ -2518,15 +2355,13 @@ public:
     return CanType();
   }
   
-  CanType visitAnyMetatypeType(AnyMetatypeType *meta, CanType subst,
-                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitAnyMetatypeType(AnyMetatypeType *meta, CanType subst) {
     if (auto substMeta = dyn_cast<AnyMetatypeType>(subst)) {
       if (substMeta->getKind() != meta->getKind())
         return CanType();
       
       auto substInstance = visit(meta->getInstanceType()->getCanonicalType(),
-                               substMeta->getInstanceType()->getCanonicalType(),
-                               nullptr, {});
+                               substMeta->getInstanceType()->getCanonicalType());
       if (!substInstance)
         return CanType();
       
@@ -2540,8 +2375,7 @@ public:
     return CanType();
   }
   
-  CanType visitTupleType(TupleType *tuple, CanType subst,
-                         ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitTupleType(TupleType *tuple, CanType subst) {
     if (auto substTuple = dyn_cast<TupleType>(subst)) {
       // Tuple elements must match.
       if (tuple->getNumElements() != substTuple->getNumElements())
@@ -2555,8 +2389,7 @@ public:
         if (elt.getName() != substElt.getName())
           return CanType();
         auto newElt = visit(elt.getType(),
-                            substElt.getType()->getCanonicalType(),
-                            nullptr, {});
+                            substElt.getType()->getCanonicalType());
         if (!newElt)
           return CanType();
         newElements.push_back(substElt.getWithType(newElt));
@@ -2570,17 +2403,14 @@ public:
     return CanType();
   }
   
-  CanType visitDependentMemberType(DependentMemberType *dt, CanType subst,
-                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitDependentMemberType(DependentMemberType *dt, CanType subst) {
     return subst;
   }
-  CanType visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst,
-                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst) {
     return subst;
   }
   
-  CanType visitFunctionType(FunctionType *func, CanType subst,
-                            ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitFunctionType(FunctionType *func, CanType subst) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
       if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
@@ -2597,7 +2427,7 @@ public:
           return CanType();
         
         auto newParamTy =
-          visit(param.getPlainType(), substParam.getPlainType(), nullptr, {});
+          visit(param.getPlainType(), substParam.getPlainType());
         if (!newParamTy)
           return CanType();
         
@@ -2606,8 +2436,7 @@ public:
       }
       
       auto newReturn = visit(func->getResult()->getCanonicalType(),
-                             substFunc->getResult()->getCanonicalType(),
-                             nullptr, {});
+                             substFunc->getResult()->getCanonicalType());
       if (!newReturn)
         return CanType();
       if (!didChange && newReturn == substFunc.getResult())
@@ -2618,8 +2447,7 @@ public:
     return CanType();
   }
   
-  CanType visitSILFunctionType(SILFunctionType *func, CanType subst,
-                             ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+  CanType visitSILFunctionType(SILFunctionType *func, CanType subst) {
     if (auto substFunc = dyn_cast<SILFunctionType>(subst)) {
       if (!func->hasSameExtInfoAs(substFunc))
         return CanType();
@@ -2642,7 +2470,7 @@ public:
           auto substType =
             substSubs.getReplacementTypes()[i]->getReducedType(sig);
 
-          auto newType = visit(origType, substType, nullptr, {});
+          auto newType = visit(origType, substType);
 
           if (!newType)
             return CanType();
@@ -2672,7 +2500,7 @@ public:
           auto substType =
             substSubs.getReplacementTypes()[i]->getReducedType(sig);
           
-          auto newType = visit(origType, substType, nullptr, {});
+          auto newType = visit(origType, substType);
           
           if (!newType)
             return CanType();
@@ -2698,7 +2526,7 @@ public:
         
         auto origParam = func->getParameters()[i].getInterfaceType();
         auto substParam = substFunc->getParameters()[i].getInterfaceType();
-        auto newParam = visit(origParam, substParam, nullptr, {});
+        auto newParam = visit(origParam, substParam);
         if (!newParam)
           return CanType();
         
@@ -2715,7 +2543,7 @@ public:
 
         auto origResult = func->getResults()[i].getInterfaceType();
         auto substResult = substFunc->getResults()[i].getInterfaceType();
-        auto newResult = visit(origResult, substResult, nullptr, {});
+        auto newResult = visit(origResult, substResult);
         if (!newResult)
           return CanType();
 
@@ -2731,9 +2559,7 @@ public:
     return CanType();
   }
   
-  CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst,
-                          ArchetypeType *upperBound,
-                          ArrayRef<ProtocolConformanceRef> substConformances) {
+  CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
     auto substBGT = dyn_cast<BoundGenericType>(subst);
     if (!substBGT)
       return CanType();
@@ -2743,8 +2569,7 @@ public:
 
     auto *decl = bgt->getDecl();
 
-    return handleGenericNominalType(decl, CanType(bgt), subst,
-                                    upperBound, substConformances);
+    return handleGenericNominalType(decl, CanType(bgt), subst);
   }
 };
 }
@@ -2752,7 +2577,7 @@ public:
 CanType TypeBase::substituteBindingsTo(Type ty,
                              IsBindableVisitor::VisitBindingCallback substFn) {
   return IsBindableVisitor(substFn)
-    .visit(getCanonicalType(), ty->getCanonicalType(), nullptr, {});
+    .visit(getCanonicalType(), ty->getCanonicalType());
 }
 
 bool TypeBase::isBindableTo(Type ty) {
@@ -2762,8 +2587,7 @@ bool TypeBase::isBindableTo(Type ty) {
   llvm::DenseMap<ArchetypeType *, CanType> Bindings;
   
   return !substituteBindingsTo(ty,
-    [&](ArchetypeType *archetype, CanType binding,
-        ArchetypeType*, ArrayRef<ProtocolConformanceRef>) -> CanType {
+    [&](ArchetypeType *archetype, CanType binding) -> CanType {
       // If we already bound this archetype, make sure the new binding candidate
       // is the same type.
       auto bound = Bindings.find(archetype);
@@ -3953,13 +3777,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
       }
     }
 
-    // Drop any explicitly provided invertible protocols.
-    if (auto ip = proto->getInvertibleProtocolKind()) {
-      // We diagnose '~Copyable & Copyable' before forming the PCT.
-      assert(!Inverses.contains(*ip) && "opposing invertible constraints!");
-      continue;
-    }
-
     CanTypes.push_back(proto->getDeclaredInterfaceType());
   }
 
@@ -4196,7 +4013,7 @@ bool SILFunctionType::hasNonDerivableClangType() {
   auto results = getResults();
   auto computedClangType = getASTContext().getCanonicalClangFunctionType(
       getParameters(),
-      results.empty() ? llvm::None : llvm::Optional<SILResultInfo>(results[0]),
+      results.empty() ? std::nullopt : std::optional<SILResultInfo>(results[0]),
       getRepresentation());
   assert(computedClangType && "Failed to compute Clang type.");
   return clangTypeInfo != ClangTypeInfo(computedClangType);
@@ -4251,7 +4068,7 @@ Identifier DependentMemberType::getName() const {
 /// \param pos The variance position of the result type.
 static bool transformSILResult(
     TypePosition pos, SILResultInfo &result, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = result.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4266,7 +4083,7 @@ static bool transformSILResult(
 /// \param pos The variance position of the yield type.
 static bool transformSILYield(
     TypePosition pos, SILYieldInfo &yield, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = yield.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4281,7 +4098,7 @@ static bool transformSILYield(
 /// \param pos The variance position of the parameter type.
 static bool transformSILParameter(
     TypePosition pos, SILParameterInfo &param, bool &changed,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn) {
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn) {
   Type transType = param.getInterfaceType().transformWithPosition(pos, fn);
   if (!transType) return true;
 
@@ -4296,7 +4113,7 @@ static bool transformSILParameter(
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   return transformWithPosition(
       TypePosition::Invariant,
-      [fn](TypeBase *type, auto) -> llvm::Optional<Type> {
+      [fn](TypeBase *type, auto) -> std::optional<Type> {
         Type transformed = fn(Type(type));
         if (!transformed)
           return Type();
@@ -4304,7 +4121,7 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
         // If the function didn't change the type at
         // all, let transformRec() recurse.
         if (transformed.getPointer() == type)
-          return llvm::None;
+          return std::nullopt;
 
         return transformed;
       });
@@ -4328,18 +4145,18 @@ static PackType *getTransformedPack(Type substType) {
 }
 
 Type Type::transformRec(
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *)> fn) const {
+    llvm::function_ref<std::optional<Type>(TypeBase *)> fn) const {
   return transformWithPosition(TypePosition::Invariant,
                                [fn](TypeBase *type, auto) { return fn(type); });
 }
 
 Type Type::transformWithPosition(
     TypePosition pos,
-    llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn)
+    llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn)
     const {
   if (!isa<ParenType>(getPointer())) {
     // Transform this type node.
-    if (llvm::Optional<Type> transformed = fn(getPointer(), pos))
+    if (std::optional<Type> transformed = fn(getPointer(), pos))
       return *transformed;
 
     // Recur.
@@ -4506,7 +4323,7 @@ case TypeKind::Id:
       transInterfaceResults.push_back(result);
     }
 
-    llvm::Optional<SILResultInfo> transErrorResult;
+    std::optional<SILResultInfo> transErrorResult;
     if (fnTy->hasErrorResult()) {
       SILResultInfo result = fnTy->getErrorResult();
       if (transformSILResult(pos, result, changed, fn)) return Type();
@@ -5048,7 +4865,7 @@ case TypeKind::Id:
       isUnchanged = false;
 
     // Transform the extended info.
-    llvm::Optional<ASTExtInfo> extInfo;
+    std::optional<ASTExtInfo> extInfo;
     if (function->hasExtInfo()) {
       auto origExtInfo = function->getExtInfo();
       extInfo = origExtInfo;
@@ -5581,10 +5398,10 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
-llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
+std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
-    return llvm::None;
+    return std::nullopt;
 
   // If there is no specified thrown error type, it throws "any Error".
   Type thrownError = getThrownError();
@@ -5593,7 +5410,7 @@ llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
 
   // If the thrown interface type is "Never", this function does not throw.
   if (thrownError->isNever())
-    return llvm::None;
+    return std::nullopt;
 
   // Otherwise, return the typed error.
   return thrownError;
@@ -5606,7 +5423,7 @@ Type AnyFunctionType::getEffectiveThrownErrorTypeOrNever() const {
   return getASTContext().getNeverType();
 }
 
-llvm::Optional<TangentSpace>
+std::optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
   auto &ctx = getASTContext();
@@ -5615,7 +5432,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto lookup = ctx.AutoDiffTangentSpaces.find(cacheKey);
   if (lookup != ctx.AutoDiffTangentSpaces.end())
     return lookup->getSecond();
-  auto cache = [&](llvm::Optional<TangentSpace> tangentSpace) {
+  auto cache = [&](std::optional<TangentSpace> tangentSpace) {
     ctx.AutoDiffTangentSpaces.insert({cacheKey, tangentSpace});
     return tangentSpace;
   };
@@ -5644,7 +5461,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
   if (!differentiableProtocol)
-    return cache(llvm::None);
+    return cache(std::nullopt);
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
@@ -5654,12 +5471,13 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
-  auto assocTy = dependentType->substBaseType(this, lookupConformance, llvm::None);
+  auto assocTy =
+      dependentType->substBaseType(this, lookupConformance, std::nullopt);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 
   // Otherwise, there is no associated tangent space. Return `None`.
-  return cache(llvm::None);
+  return cache(std::nullopt);
 }
 
 bool TypeBase::isForeignReferenceType() {

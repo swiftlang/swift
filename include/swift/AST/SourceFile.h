@@ -46,7 +46,7 @@ enum class RestrictedImportKind {
 };
 
 /// Import that limits the access level of imported entities.
-using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
+using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
 /// Stores range information for a \c #if block in a SourceFile.
 class IfConfigRangeInfo final {
@@ -142,7 +142,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is \c None until it is filled in by the import resolution phase.
-  llvm::Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
+  std::optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
   /// The underlying clang module, if imported in this file.
   ModuleDecl *ImportedUnderlyingModule = nullptr;
@@ -175,7 +175,7 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  llvm::Optional<StableHasher> InterfaceHasher;
+  std::optional<StableHasher> InterfaceHasher;
 
   /// The ID for the memory buffer containing this file's source.
   ///
@@ -217,7 +217,7 @@ private:
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
   /// have been removed, this can become an optional ArrayRef.
-  llvm::Optional<std::vector<ASTNode>> Items;
+  std::optional<std::vector<ASTNode>> Items;
 
   /// The list of hoisted declarations. See Decl::isHoisted().
   /// This is only used by lldb.
@@ -299,10 +299,10 @@ public:
 
   /// Retrieves an immutable view of the top-level items if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
-  llvm::Optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
+  std::optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
     if (!Items)
-      return llvm::None;
-    return llvm::makeArrayRef(*Items);
+      return std::nullopt;
+    return llvm::ArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.
@@ -388,7 +388,7 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, llvm::Optional<unsigned> bufferID,
+  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -565,16 +565,16 @@ public:
 
   Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
   Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
-  llvm::Optional<ExternalSourceLocs::RawLocs>
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  llvm::Optional<unsigned> getBufferID() const {
+  std::optional<unsigned> getBufferID() const {
     if (BufferID == -1)
-      return llvm::None;
+      return std::nullopt;
     return BufferID;
   }
 
@@ -608,7 +608,7 @@ public:
   ///
   /// \Returns the fulfilled macro role, or \c None if this source file is not
   /// for a macro expansion.
-  llvm::Optional<MacroRole> getFulfilledMacroRole() const;
+  std::optional<MacroRole> getFulfilledMacroRole() const;
 
   /// When this source file is enclosed within another source file, for example
   /// because it describes a macro expansion, return the source file it was
@@ -787,7 +787,7 @@ private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
   /// source file.
-  llvm::Optional<ArrayRef<Token>> AllCollectedTokens;
+  std::optional<ArrayRef<Token>> AllCollectedTokens;
 };
 
 inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,

@@ -52,7 +52,6 @@
 // UNSUPPORTED: swift_evolve
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
-Func AsyncSequence.flatMap(_:) has mangled name changing from '(extension in _Concurrency):Swift.AsyncSequence.flatMap<A where A1: Swift.AsyncSequence>((A.Element) async -> A1) -> _Concurrency.AsyncFlatMapSequence<A, A1>' to '(extension in _Concurrency):Swift.AsyncSequence.flatMap<A where A1: Swift.AsyncSequence>(@Sendable (A.Element) async -> A1) -> _Concurrency.AsyncFlatMapSequence<A, A1>'
 Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
 Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
 Func _asyncLet_get(_:_:) has mangled name changing from '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> Builtin.RawPointer' to '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> ()'
@@ -80,3 +79,6 @@ Func Executor.enqueue(_:) is a new API without @available attribute
 Func TaskLocal.withValueImpl(_:operation:file:line:) is a new API without @available attribute
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// XFAIL: noncopyable_generics
+

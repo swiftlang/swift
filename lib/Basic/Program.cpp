@@ -53,7 +53,7 @@ int swift::ExecuteInPlace(const char *Program, const char **args,
 
   return result;
 #else
-  llvm::Optional<llvm::ArrayRef<llvm::StringRef>> Env = llvm::None;
+  std::optional<llvm::ArrayRef<llvm::StringRef>> Env = std::nullopt;
   if (env)
     Env = llvm::toStringRefArray(env);
   int result =
@@ -99,7 +99,7 @@ struct Pipe {
 llvm::ErrorOr<swift::ChildProcessInfo>
 swift::ExecuteWithPipe(llvm::StringRef program,
                        llvm::ArrayRef<llvm::StringRef> args,
-                       llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env) {
+                       std::optional<llvm::ArrayRef<llvm::StringRef>> env) {
   Pipe p1; // Parent: write, child: read (child's STDIN).
   if (!p1)
     return std::error_code(errno, std::system_category());
@@ -195,7 +195,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 llvm::ErrorOr<swift::ChildProcessInfo>
 swift::ExecuteWithPipe(llvm::StringRef program,
                        llvm::ArrayRef<llvm::StringRef> args,
-                       llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env) {
+                       std::optional<llvm::ArrayRef<llvm::StringRef>> env) {
   using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
   enum { PI_READ, PI_WRITE };
 
@@ -286,7 +286,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 llvm::ErrorOr<swift::ChildProcessInfo>
 swift::ExecuteWithPipe(llvm::StringRef program,
                        llvm::ArrayRef<llvm::StringRef> args,
-                       llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env) {
+                       std::optional<llvm::ArrayRef<llvm::StringRef>> env) {
   // Not supported.
   return std::errc::not_supported;
 }

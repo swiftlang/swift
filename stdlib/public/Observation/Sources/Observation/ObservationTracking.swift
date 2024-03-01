@@ -157,7 +157,7 @@ public struct ObservationTracking: Sendable {
       }
   }
 
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public var changed: AnyKeyPath? {
       state.withCriticalRegion { $0.changed }
   }

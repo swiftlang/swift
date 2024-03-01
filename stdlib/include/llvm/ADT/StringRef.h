@@ -9,6 +9,7 @@
 #ifndef LLVM_ADT_STRINGREF_H
 #define LLVM_ADT_STRINGREF_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Compiler.h"
@@ -33,7 +34,6 @@ extern "C" size_t __builtin_strlen(const char *);
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
-  class hash_code;
   template <typename T> class SmallVectorImpl;
   template <typename T> struct DenseMapInfo;
   class StringRef;

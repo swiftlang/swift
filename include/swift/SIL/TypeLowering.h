@@ -695,6 +695,21 @@ enum class CaptureKind {
   Immutable
 };
 
+/// Interesting information about the lowering of a function type.
+struct FunctionTypeInfo {
+  /// The abstraction pattern that the type has been lowered under.
+  AbstractionPattern OrigType;
+
+  /// The formal type that the function is being used as.  When this
+  /// type is used to specify a type context (e.g. as the contextual
+  /// type info of a closure; see `TypeConverter::getClosureTypeInfo`),
+  /// this may be a subtype of the closure's formal type.
+  CanAnyFunctionType FormalType;
+
+  /// The expected lowered type.
+  CanSILFunctionType ExpectedLoweredType;
+};
+
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
   friend class TypeLowering;
@@ -825,8 +840,7 @@ class TypeConverter {
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
-  llvm::DenseMap<AbstractClosureExpr *, llvm::Optional<AbstractionPattern>>
-      ClosureAbstractionPatterns;
+  llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
 
@@ -834,7 +848,7 @@ class TypeConverter {
   
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule, BridgedType)                        \
-  llvm::Optional<CanType> BridgedType##Ty;
+  std::optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &getTypeLoweringForLoweredType(
@@ -1226,26 +1240,16 @@ public:
                                          SILType enumType,
                                          EnumElementDecl *elt);
 
-  /// Get the preferred abstraction pattern, if any, by which to lower a
-  /// declaration.
-  ///
-  /// This can be set using \c setAbstractionPattern , but only before
-  /// the abstraction pattern is queried using this function. Once the
-  /// abstraction pattern has been asked for, it may not be changed.
-  llvm::Optional<AbstractionPattern>
-  getConstantAbstractionPattern(SILDeclRef constant);
   TypeExpansionContext getCaptureTypeExpansionContext(SILDeclRef constant);
-  
-  /// Set the preferred abstraction pattern for a closure.
-  ///
-  /// The abstraction pattern can only be set before any calls to
-  /// \c getConstantAbstractionPattern on the same closure. It may not be
-  /// changed once it has been read.
-  void setAbstractionPattern(AbstractClosureExpr *closure,
-                             AbstractionPattern pattern);
-  
   void setCaptureTypeExpansionContext(SILDeclRef constant,
                                       SILModule &M);
+
+  const FunctionTypeInfo *getClosureTypeInfo(SILDeclRef constant);
+  const FunctionTypeInfo &getClosureTypeInfo(AbstractClosureExpr *closure);
+
+  void withClosureTypeInfo(AbstractClosureExpr *closure,
+                           const FunctionTypeInfo &closureInfo,
+                           llvm::function_ref<void()> operation);
 
   void setLoweredAddresses();
 
@@ -1288,15 +1292,15 @@ private:
   void verifyTrivialLowering(const TypeLowering &, AbstractionPattern origType,
                              CanType origSubstType,
                              TypeExpansionContext forExpansion);
-  bool visitAggregateLeaves(
-      Lowering::AbstractionPattern origType, CanType substType,
-      TypeExpansionContext context,
-      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
-                         llvm::Optional<unsigned>)>
-          isLeafAggregate,
-      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
-                         llvm::Optional<unsigned>)>
-          visit);
+  bool
+  visitAggregateLeaves(Lowering::AbstractionPattern origType, CanType substType,
+                       TypeExpansionContext context,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
+                                          ValueDecl *, std::optional<unsigned>)>
+                           isLeafAggregate,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
+                                          ValueDecl *, std::optional<unsigned>)>
+                           visit);
 #endif
 };
 
@@ -1305,9 +1309,10 @@ private:
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, TypeExpansionContext context,
     Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
-    SILExtInfo silExtInfo, llvm::Optional<SILDeclRef> origConstant = llvm::None,
-    llvm::Optional<SILDeclRef> constant = llvm::None,
-    llvm::Optional<SubstitutionMap> reqtSubs = llvm::None,
+    SILExtInfo silExtInfo,
+    std::optional<SILDeclRef> origConstant = std::nullopt,
+    std::optional<SILDeclRef> constant = std::nullopt,
+    std::optional<SubstitutionMap> reqtSubs = std::nullopt,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 /// The thunk kinds used in the differentiation transform.
@@ -1337,8 +1342,8 @@ CanSILFunctionType buildSILFunctionThunkType(
     CanType &outputSubstType, GenericEnvironment *&genericEnv,
     SubstitutionMap &interfaceSubs, CanType &dynamicSelfType,
     bool withoutActuallyEscaping,
-    llvm::Optional<DifferentiationThunkKind> differentiationThunkKind =
-        llvm::None);
+    std::optional<DifferentiationThunkKind> differentiationThunkKind =
+        std::nullopt);
 
 } // namespace swift
 

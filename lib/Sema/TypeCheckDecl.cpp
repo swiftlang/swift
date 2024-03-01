@@ -236,8 +236,9 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   if (canSkipCircularityCheck(decl))
     return false;
 
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
-  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
   for (auto &found : inherited) {
     auto *protoDecl = dyn_cast<ProtocolDecl>(found.Item);
     if (!protoDecl)
@@ -285,7 +286,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
                                           StaticSpellingKind staticSpelling) {
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
-  llvm::Optional<ImplicitlyFinalReason> reason;
+  std::optional<ImplicitlyFinalReason> reason;
   if (staticSpelling == StaticSpellingKind::KeywordStatic) {
     reason = ImplicitlyFinalReason::Static;
 
@@ -648,9 +649,10 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
     return true;
 
   // Determine the set of nominal types that this protocol inherits.
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
   auto allInheritedNominals =
-    getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+    getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
   // Quick check: do we inherit AnyObject?
   if (anyObject)
@@ -911,212 +913,6 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-InverseMarking
-InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
-                                       TypeDecl *decl,
-                                       InvertibleProtocolKind ip) const {
-  auto &ctx = decl->getASTContext();
-  const auto TARGET = ip;
-  using Kind = InverseMarking::Kind;
-  using Mark = InverseMarking::Mark;
-
-  switch (TARGET) {
-  case InvertibleProtocolKind::Copyable:
-    // Handle the legacy '@_moveOnly' for types they can validly appear.
-    // TypeCheckAttr handles the illegal situations for us.
-    if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>())
-      if (isa<StructDecl, EnumDecl, ClassDecl>(decl))
-        return InverseMarking::forInverse(Kind::LegacyExplicit,
-                                          attr->getLocation());
-    break;
-
-  case InvertibleProtocolKind::Escapable:
-    // Handle the legacy '@_nonEscapable' attribute
-    if (auto attr = decl->getAttrs().getAttribute<NonEscapableAttr>()) {
-      assert((isa<ClassDecl, StructDecl, EnumDecl>(decl)));
-      return InverseMarking::forInverse(Kind::LegacyExplicit,
-                                        attr->getLocation());
-    }
-    break;
-  }
-
-  // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return InverseMarking::forInverse(Kind::None);
-
-  /// The invertible protocol being targeted by this annotation request.
-
-  std::function<bool(Type)> isTarget = [&](Type t) -> bool {
-    if (auto kp = t->getKnownProtocol()) {
-      if (auto ip = getInvertibleProtocolKind(*kp))
-        return *ip == TARGET;
-    } else if (auto pct = t->getAs<ProtocolCompositionType>()) {
-      return llvm::any_of(pct->getMembers(), isTarget);
-    }
-
-    return false;
-  };
-
-  auto isInverseTarget = [&](Type t) -> bool {
-    if (auto pct = t->getAs<ProtocolCompositionType>())
-      return pct->getInverses().contains(TARGET);
-
-    return false;
-  };
-
-  // Function to check an inheritance clause for the ~IP marking.
-  auto searchInheritanceClause =
-      [&](InheritedTypes inherited) -> InverseMarking {
-    InverseMarking result;
-
-    for (size_t i = 0; i < inherited.size(); i++) {
-      auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-      if (!type)
-        continue;
-
-      SourceLoc loc;
-      if (auto *repr = inherited.getTypeRepr(i))
-        loc = repr->getLoc();
-
-      if (isTarget(type))
-        result.positive.setIfUnset(Kind::Explicit, loc);
-
-      if (isInverseTarget(type))
-          result.inverse.setIfUnset(Kind::Explicit, loc);
-    }
-
-    return result;
-  };
-
-  // Function to check the generic parameters for an explicit ~TARGET marking
-  // which would result in an Inferred ~TARGET marking for this context.
-  auto hasInferredInverseTarget = [&](GenericContext *genCtx) -> Mark {
-    auto *gpList = genCtx->getParsedGenericParams();
-    if (!gpList)
-      return InverseMarking::Mark();
-
-    llvm::SmallSet<GenericTypeParamDecl*, 4> params;
-
-    // Scan the inheritance clauses of generic parameters only for an inverse.
-    for (GenericTypeParamDecl *param : gpList->getParams()) {
-      auto clause = searchInheritanceClause(param->getInherited());
-      if (auto &inverse = clause.getInverse())
-        return inverse.with(Kind::Inferred);
-
-      params.insert(param);
-    }
-
-    Mark result;
-    // Next, scan the where clause and return the result.
-    WhereClauseOwner(genCtx).visitRequirements(TypeResolutionStage::Structural,
-      [&](Requirement req, RequirementRepr *repr) -> bool /* = stop search */ {
-      if (req.getKind() != RequirementKind::Conformance)
-        return false;
-
-      auto subject = req.getFirstType();
-      if (!subject->isTypeParameter())
-        return false;
-
-      // Skip outer params and implicit ones.
-      auto *param = subject->getRootGenericParam()->getDecl();
-      if (!param || !params.contains(param))
-        return false;
-
-      // Check constraint type
-      auto constraint = req.getSecondType();
-
-      // Found it?
-      if (isInverseTarget(constraint)) {
-        // Try to find a good location.
-        SourceLoc loc;
-        if (repr && !repr->isInvalid())
-          if (auto *constraintRepr = repr->getConstraintRepr())
-            if (!repr->isInvalid())
-              loc = constraintRepr->getLoc();
-
-        result.set(Kind::Inferred, loc);
-        return true;
-      }
-
-      return false;
-    });
-    return result;
-  };
-
-  // Checks a where clause for constraints of the form:
-  //   - selfTy : TARGET
-  //   - selfTy : ~TARGET
-  // and records them in the `InverseMarking` result.
-  auto genWhereClauseVisitor = [&](CanType selfTy, InverseMarking &result) {
-    return [&, selfTy](Requirement req,
-                       RequirementRepr *repr) -> bool/*=stop search*/ {
-      if (req.getKind() != RequirementKind::Conformance)
-        return false;
-
-      if (req.getFirstType()->getCanonicalType() != selfTy)
-        return false;
-
-      // Check constraint type
-      auto loc = repr->getConstraintRepr()->getLoc();
-      auto constraint = req.getSecondType();
-
-      if (isTarget(constraint))
-        result.positive.setIfUnset(Kind::Explicit, loc);
-
-      if (isInverseTarget(constraint))
-        result.inverse.setIfUnset(Kind::Explicit, loc);
-
-      return false;
-    };
-  };
-
-
-  /// MARK: procedure for determining if a nominal is marked with ~TARGET.
-
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // Claim that the tuple decl has an inferred ~TARGET marking.
-    if (isa<BuiltinTupleDecl>(nominal))
-      return InverseMarking::forInverse(InverseMarking::Kind::Inferred);
-
-    if (!isa<ProtocolDecl>(nominal)) {
-      // Handle non-protocol nominals specially because they infer a ~TARGET
-      // based on their generic parameters.
-      auto result = searchInheritanceClause(nominal->getInherited());
-      result.inverse.setIfUnset(hasInferredInverseTarget(nominal));
-      return result;
-    }
-  }
-
-
-  /// MARK: procedure for handling other TypeDecls
-
-  // Check inheritance clause.
-  auto result = searchInheritanceClause(decl->getInherited());
-
-  // Check the where clause for markings that refer to this decl, if this
-  // TypeDecl has a where-clause at all.
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
-    WhereClauseOwner(proto)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
-
-  } else if (auto assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
-    auto selfTy = assocTy->getInterfaceType()->getCanonicalType();
-    WhereClauseOwner(assocTy)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
-
-  } else if (auto genericTyDecl = dyn_cast<GenericTypeDecl>(decl)) {
-    auto selfTy = genericTyDecl->getInterfaceType()->getCanonicalType();
-    WhereClauseOwner(genericTyDecl)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           genWhereClauseVisitor(selfTy, result));
-  }
-
-  return result;
-}
-
 bool
 IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl))
@@ -1224,7 +1020,8 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
 
   TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
   if (defaultDefinition) {
-    return TypeResolution::forInterface(assocType->getDeclContext(), llvm::None,
+    return TypeResolution::forInterface(assocType->getDeclContext(),
+                                        std::nullopt,
                                         // Diagnose unbound generics and
                                         // placeholders.
                                         /*unboundTyOpener*/ nullptr,
@@ -1368,7 +1165,7 @@ static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
   llvm_unreachable("Unhandled AutomaticEnumValueKind in switch.");
 }
 
-llvm::Optional<AutomaticEnumValueKind>
+std::optional<AutomaticEnumValueKind>
 swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   assert(rawTy && "Cannot compute value kind without raw type!");
@@ -1399,7 +1196,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
                          conformsToProtocol)) {
     return AutomaticEnumValueKind::None;
   } else {
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -1440,7 +1237,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     return EED->RawValueExpr;
   };
 
-  llvm::Optional<AutomaticEnumValueKind> valueKind;
+  std::optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
@@ -1796,7 +1593,7 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
                                    SourceLoc nameLoc) {
   auto groups = evaluateOrDefault(
       dc->getASTContext().evaluator,
-      ValidatePrecedenceGroupRequest({dc, name, nameLoc, llvm::None}), {});
+      ValidatePrecedenceGroupRequest({dc, name, nameLoc, std::nullopt}), {});
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
@@ -2474,7 +2271,7 @@ static Type validateParameterType(ParamDecl *decl) {
   auto *dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
 
-  TypeResolutionOptions options(llvm::None);
+  TypeResolutionOptions options(std::nullopt);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
@@ -2750,7 +2547,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
-    llvm::Optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+    std::optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
 
     // (Args...) -> Result
     Type funcTy;

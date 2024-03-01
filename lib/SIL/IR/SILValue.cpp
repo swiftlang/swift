@@ -107,13 +107,13 @@ SILInstruction *ValueBase::getNextInstruction() {
   return nullptr;
 }
 
-llvm::Optional<ValueBase::DefiningInstructionResult>
+std::optional<ValueBase::DefiningInstructionResult>
 ValueBase::getDefiningInstructionResult() {
   if (auto *inst = dyn_cast<SingleValueInstruction>(this))
     return DefiningInstructionResult{inst, 0};
   if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
     return DefiningInstructionResult{result->getParent(), result->getIndex()};
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool SILPhiArgument::isLexical() const {
@@ -331,12 +331,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 
 ValueOwnershipKind::ValueOwnershipKind(StringRef S)
     : value(OwnershipKind::Any) {
-  auto Result = llvm::StringSwitch<llvm::Optional<OwnershipKind::innerty>>(S)
+  auto Result = llvm::StringSwitch<std::optional<OwnershipKind::innerty>>(S)
                     .Case("unowned", OwnershipKind::Unowned)
                     .Case("owned", OwnershipKind::Owned)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
-                    .Default(llvm::None);
+                    .Default(std::nullopt);
   if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
   value = Result.value();

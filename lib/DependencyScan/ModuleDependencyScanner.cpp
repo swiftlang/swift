@@ -50,7 +50,7 @@ static void findPath_dfs(ModuleDependencyID X, ModuleDependencyID Y,
   auto node = optionalNode.value();
   assert(optionalNode.has_value() && "Expected cache value for dependency.");
   for (const auto &dep : node->getModuleImports()) {
-    llvm::Optional<ModuleDependencyKind> lookupKind = llvm::None;
+    std::optional<ModuleDependencyKind> lookupKind = std::nullopt;
     // Underlying Clang module needs an explicit lookup to avoid confusing it
     // with the parent Swift module.
     if ((dep == X.ModuleName && node->isSwiftModule()) || node->isClangModule())
@@ -90,7 +90,7 @@ findPathToDependency(ModuleDependencyID dependency,
 static void
 diagnoseScannerFailure(StringRef moduleName, DiagnosticEngine &Diags,
                        const ModuleDependenciesCache &cache,
-                       llvm::Optional<ModuleDependencyID> dependencyOf) {
+                       std::optional<ModuleDependencyID> dependencyOf) {
   Diags.diagnose(SourceLoc(), diag::dependency_scan_module_not_found,
                  moduleName);
   if (dependencyOf.has_value()) {
@@ -327,7 +327,7 @@ static void findAllImportedClangModules(StringRef moduleName,
 
 llvm::ErrorOr<ModuleDependencyInfo>
 ModuleDependencyScanner::getMainModuleDependencyInfo(
-    ModuleDecl *mainModule, llvm::Optional<SwiftDependencyTracker> tracker) {
+    ModuleDecl *mainModule, std::optional<SwiftDependencyTracker> tracker) {
   // Main module file name.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> mainModulePath = mainModule->getName().str();
@@ -447,7 +447,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
 }
 
 /// Retrieve the module dependencies for the Clang module with the given name.
-llvm::Optional<const ModuleDependencyInfo *>
+std::optional<const ModuleDependencyInfo *>
 ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
     StringRef moduleName, ModuleDependenciesCache &cache) {
   // Check whether we've cached this result.
@@ -463,14 +463,14 @@ ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
             moduleIdentifier, cache);
       });
   if (moduleDependencies.empty())
-    return llvm::None;
+    return std::nullopt;
 
   cache.recordDependencies(moduleDependencies);
   return cache.findDependency(moduleDependencies[0].first);
 }
 
 /// Retrieve the module dependencies for the Swift module with the given name.
-llvm::Optional<const ModuleDependencyInfo *>
+std::optional<const ModuleDependencyInfo *>
 ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
     StringRef moduleName, ModuleDependenciesCache &cache) {
   // Check whether we've cached this result.
@@ -495,7 +495,7 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
             moduleIdentifier, cache);
       });
   if (moduleDependencies.empty())
-    return llvm::None;
+    return std::nullopt;
 
   cache.recordDependencies(moduleDependencies);
   return cache.findDependency(moduleDependencies[0].first);
@@ -560,9 +560,9 @@ void ModuleDependencyScanner::resolveImportDependencies(
   assert(optionalModuleDependencyInfo.has_value());
   auto moduleDependencyInfo = optionalModuleDependencyInfo.value();
 
-  llvm::StringMap<llvm::Optional<ModuleDependencyVector>> moduleLookupResult;
+  llvm::StringMap<std::optional<ModuleDependencyVector>> moduleLookupResult;
   for (const auto &dependsOn : moduleDependencyInfo->getModuleImports())
-    moduleLookupResult.insert(std::make_pair(dependsOn, llvm::None));
+    moduleLookupResult.insert(std::make_pair(dependsOn, std::nullopt));
 
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
@@ -615,7 +615,7 @@ void ModuleDependencyScanner::resolveImportDependencies(
         bool underlyingClangModule = moduleID.ModuleName == moduleName;
         auto lookupResult = moduleLookupResult[moduleName];
         // The imported module was found in the cache
-        if (lookupResult == llvm::None) {
+        if (lookupResult == std::nullopt) {
           const ModuleDependencyInfo *cachedInfo;
           if (underlyingClangModule)
             cachedInfo =
@@ -734,10 +734,10 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
     ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &swiftOverlayDependencies,
     ModuleDependencyIDSetVector &directDependencies) {
-  llvm::StringMap<llvm::Optional<ModuleDependencyVector>>
+  llvm::StringMap<std::optional<ModuleDependencyVector>>
       swiftOverlayLookupResult;
   for (const auto &clangDep : clangDependencies)
-    swiftOverlayLookupResult.insert(std::make_pair(clangDep, llvm::None));
+    swiftOverlayLookupResult.insert(std::make_pair(clangDep, std::nullopt));
 
   // A scanning task to query a Swift module by-name. If the module already
   // exists in the cache, do nothing and return.
@@ -769,7 +769,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
                        moduleID](const std::string &moduleName) {
     auto lookupResult = swiftOverlayLookupResult[moduleName];
     if (moduleName != moduleID.ModuleName) {
-      if (lookupResult == llvm::None) {
+      if (lookupResult == std::nullopt) {
         const ModuleDependencyInfo *cachedInfo = cache.findDependency(moduleName).value();
         swiftOverlayDependencies.insert({moduleName, cachedInfo->getKind()});
         // FIXME: Once all clients know to fetch these dependencies from

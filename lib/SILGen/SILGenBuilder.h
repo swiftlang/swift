@@ -289,7 +289,7 @@ public:
   /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
   /// user to be explicit that they want to use this API.
   ManagedValue createInputFunctionArgument(SILType type,
-                                           llvm::Optional<SILLocation> loc);
+                                           std::optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
@@ -470,7 +470,13 @@ public:
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
-                                 bool isLexical = false);
+                                 bool isLexical = false,
+                                 bool isFixed = false);
+
+  ManagedValue createFormalAccessBeginBorrow(SILLocation loc,
+                                             ManagedValue value,
+                                             bool isLexical = false,
+                                             bool isFixed = false);
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,

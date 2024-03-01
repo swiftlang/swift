@@ -116,6 +116,10 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
   return cContext.unbridged().LangOpts.hasFeature((Feature)feature);
 }
 
+unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext) {
+  return cContext.unbridged().LangOpts.EffectiveLanguageVersion[0];
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
@@ -363,14 +367,14 @@ BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
   }
 }
 
-llvm::Optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
+std::optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
     return DeclAttrKind::CLASS;
 #include "swift/AST/DeclAttr.def"
   case BridgedDeclAttrKindNone:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("unhandled enum value");
 }
@@ -1016,7 +1020,7 @@ static void setParsedMembers(IterableDeclContext *IDC,
 
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
-      FingerprintAndMembers{llvm::None, ctx.AllocateCopy(members)});
+      FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
 }
 
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl bridgedDecl,
@@ -1965,14 +1969,14 @@ BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   }
 }
 
-static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
+static std::optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case BridgedTypeAttrKind##CLASS:                                             \
     return TypeAttrKind::CLASS;
 #include "swift/AST/TypeAttr.def"
   case BridgedTypeAttrKindNone:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("unhandled enum value");
 }
@@ -2451,7 +2455,7 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);
     ASTContext &context = cContext.unbridged();
-    decl->setInherited(context.AllocateCopy(llvm::makeArrayRef(entry)));
+    decl->setInherited(context.AllocateCopy(llvm::ArrayRef(entry)));
   }
 
   return decl;

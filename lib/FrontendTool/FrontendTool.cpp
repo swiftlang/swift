@@ -1753,7 +1753,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  std::optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -2235,10 +2235,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::setBugReportMsg(nullptr);
   }
   
-  /// Enable leaks checking because this SILModule is the only one in the process
-  /// (leaks checking is not thread safe).
-  Invocation.getSILOptions().checkSILModuleLeaks = true;
-
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2252,12 +2248,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<std::optional<PrettyStackTraceFileContents>[]>(
           configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              llvm::Optional<PrettyStackTraceFileContents> &trace) {
+              std::optional<PrettyStackTraceFileContents> &trace) {
              trace.emplace(*buffer);
            });
 

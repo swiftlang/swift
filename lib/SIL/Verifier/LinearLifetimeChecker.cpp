@@ -55,7 +55,7 @@ struct State {
   /// If we are checking for a specific value, this is that value. This is only
   /// used for diagnostic purposes. The algorithm if this is set works on the
   /// parent block of the value.
-  llvm::Optional<SILValue> value;
+  std::optional<SILValue> value;
 
   /// The insertion point where the live range begins. If the field value is not
   /// None, then:
@@ -80,11 +80,11 @@ struct State {
   /// If non-null a callback that we should pass any detected leaking blocks for
   /// our caller. The intention is that this can be used in a failing case to
   /// put in missing destroys.
-  llvm::Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback;
+  std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback;
 
   /// If non-null a callback that we should pass all uses that we detect are not
   /// within the linear lifetime we are checking.
-  llvm::Optional<function_ref<void(Operand *)>>
+  std::optional<function_ref<void(Operand *)>>
       nonConsumingUseOutsideLifetimeCallback;
 
   /// The list of passed in consuming uses.
@@ -113,12 +113,11 @@ struct State {
   /// terminates.
   llvm::SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
-  State(
-      SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      llvm::Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-      llvm::Optional<function_ref<void(Operand *)>>
-          nonConsumingUseOutsideLifetimeCallback,
-      ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
+  State(SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+        std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        std::optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
+        ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
         errorBuilder(errorBuilder), visitedBlocks(value->getFunction()),
         leakingBlockCallback(leakingBlockCallback),
@@ -127,13 +126,12 @@ struct State {
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses),
         blocksWithConsumingUses(value->getFunction()) {}
 
-  State(
-      SILBasicBlock *beginBlock,
-      LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      llvm::Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-      llvm::Optional<function_ref<void(Operand *)>>
-          nonConsumingUseOutsideLifetimeCallback,
-      ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
+  State(SILBasicBlock *beginBlock,
+        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+        std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        std::optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
+        ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
         visitedBlocks(beginBlock->getParent()),
         leakingBlockCallback(leakingBlockCallback),
@@ -558,8 +556,8 @@ void State::checkDataflowEndState(DeadEndBlocks *deBlocks) {
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
-    llvm::Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-    llvm::Optional<function_ref<void(Operand *)>>
+    std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+    std::optional<function_ref<void(Operand *)>>
         nonConsumingUseOutsideLifetimeCallback) {
   // FIXME: rdar://71240363. This assert does not make sense because
   // consumingUses in some cases only contains the destroying uses. Owned values
@@ -667,7 +665,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder) {
   return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
-                        llvm::None, llvm::None);
+                        std::nullopt, std::nullopt);
 }
 
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
@@ -675,7 +673,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
     ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
     function_ref<void(SILBasicBlock *)> leakingBlocksCallback) {
   return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
-                        leakingBlocksCallback, llvm::None);
+                        leakingBlocksCallback, std::nullopt);
 }
 
 bool LinearLifetimeChecker::completeConsumingUseSet(
@@ -712,13 +710,13 @@ bool LinearLifetimeChecker::usesNotContainedWithinLifetime(
       ErrorBehaviorKind::StoreNonConsumingUsesOutsideLifetime);
   ErrorBuilder errorBuilder(*value->getFunction(), errorBehavior);
 
-  using OptType = llvm::Optional<function_ref<void(Operand *)>>;
+  using OptType = std::optional<function_ref<void(Operand *)>>;
 #ifndef NDEBUG
   SmallVector<Operand *, 32> uniqueUsers;
 #endif
   unsigned numFoundUses = 0;
   auto error = checkValueImpl(value, consumingUses, usesToTest, errorBuilder,
-                              llvm::None, OptType([&](Operand *use) {
+                              std::nullopt, OptType([&](Operand *use) {
 #ifndef NDEBUG
                                 uniqueUsers.push_back(use);
 #endif

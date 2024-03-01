@@ -47,10 +47,10 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx,
                                            unsigned argInsertIdx) {
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool MatchCallArgumentListener::missingLabel(unsigned paramIdx) { return true; }
@@ -90,9 +90,9 @@ bool MatchCallArgumentListener::canClaimArgIgnoringNameMismatch(
 /// \returns the score, if it is good enough to even consider this a match.
 /// Otherwise, an empty optional.
 ///
-static llvm::Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
-                                                         StringRef argName,
-                                                         unsigned maxScore) {
+static std::optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
+                                                        StringRef argName,
+                                                        unsigned maxScore) {
   using namespace camel_case;
 
   // Compute the edit distance.
@@ -101,7 +101,7 @@ static llvm::Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 
   // If the edit distance would be too long, we're done.
   if (maxScore != 0 && dist > maxScore)
-    return llvm::None;
+    return std::nullopt;
 
   // The distance can be zero due to the "with" transformation above.
   if (dist == 0)
@@ -115,7 +115,7 @@ static llvm::Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   // Only allow about one typo for every two properly-typed characters, which
   // prevents completely-wacky suggestions in many cases.
   if (dist > (argName.size() + 1) / 3)
-    return llvm::None;
+    return std::nullopt;
 
   return dist;
 }
@@ -189,7 +189,7 @@ static bool areConservativelyCompatibleArgumentLabels(
     ConstraintSystem &cs, OverloadChoice choice,
     SmallVectorImpl<FunctionType::Param> &args,
     MatchCallArgumentListener &listener,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex) {
+    std::optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -244,7 +244,7 @@ static bool areConservativelyCompatibleArgumentLabels(
 
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
-                            /*allow fixes*/ false, listener, llvm::None)
+                            /*allow fixes*/ false, listener, std::nullopt)
       .has_value();
 }
 
@@ -311,7 +311,7 @@ static bool backwardScanAcceptsTrailingClosure(
 /// a parameter with this label.
 static bool anyParameterRequiresArgument(
     ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
-    unsigned firstParamIdx, llvm::Optional<Identifier> beforeLabel) {
+    unsigned firstParamIdx, std::optional<Identifier> beforeLabel) {
   for (unsigned paramIdx : range(firstParamIdx, params.size())) {
     // If have been asked to stop when we reach a parameter with a particular
     // label, and we see a parameter with that label, we're done: no parameter
@@ -340,7 +340,7 @@ static bool isCodeCompletionTypeVar(Type type) {
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
+    std::optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
     TrailingClosureMatching trailingClosureMatching,
     MatchCallArgumentListener &listener,
     SmallVectorImpl<ParamBinding> &parameterBindings) {
@@ -411,16 +411,16 @@ static bool matchCallArgumentsImpl(
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed =
       [&](unsigned &nextArgIdx, Identifier paramLabel, bool ignoreNameMismatch,
-          bool forVariadic = false) -> llvm::Optional<unsigned> {
+          bool forVariadic = false) -> std::optional<unsigned> {
     // Skip over any claimed arguments.
     skipClaimedArgs(nextArgIdx);
 
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
-      return llvm::None;
+      return std::nullopt;
 
     // Go hunting for an unclaimed argument whose name does match.
-    llvm::Optional<unsigned> claimedWithSameName;
+    std::optional<unsigned> claimedWithSameName;
     unsigned firstArgIdx = nextArgIdx;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       auto argLabel = args[i].getLabel();
@@ -430,7 +430,7 @@ static bool matchCallArgumentsImpl(
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
-          return llvm::None;
+          return std::nullopt;
 
         if ((i == firstArgIdx || ignoreNameMismatch) &&
             listener.canClaimArgIgnoringNameMismatch(args[i])) {
@@ -476,7 +476,7 @@ static bool matchCallArgumentsImpl(
 
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
-      return llvm::None;
+      return std::nullopt;
 
     // Several things could have gone wrong here, and we'll check for each
     // of them at some point:
@@ -502,11 +502,11 @@ static bool matchCallArgumentsImpl(
     // Redundant keyword arguments.
     if (claimedWithSameName) {
       // FIXME: We can provide better diagnostics here.
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Typo correction is handled in a later pass.
-    return llvm::None;
+    return std::nullopt;
   };
 
   // Local function that attempts to bind the given parameter to arguments in
@@ -568,8 +568,8 @@ static bool matchCallArgumentsImpl(
           anyParameterRequiresArgument(
               params, paramInfo, paramIdx + 1,
               nextArgIdx + 1 < numArgs
-                  ? llvm::Optional<Identifier>(args[nextArgIdx + 1].getLabel())
-                  : llvm::Optional<Identifier>(llvm::None))) {
+                  ? std::optional<Identifier>(args[nextArgIdx + 1].getLabel())
+                  : std::optional<Identifier>(std::nullopt))) {
         haveUnfulfilledParams = true;
         return;
       }
@@ -642,7 +642,7 @@ static bool matchCallArgumentsImpl(
     unsigned prevParamIdx = numParams;
 
     // Scan backwards from the end to match the unlabeled trailing closure.
-    llvm::Optional<unsigned> unlabeledParamIdx;
+    std::optional<unsigned> unlabeledParamIdx;
     if (prevParamIdx > 0) {
       unsigned paramIdx = prevParamIdx - 1;
 
@@ -828,7 +828,7 @@ static bool matchCallArgumentsImpl(
   }
 
   // If we have any unfulfilled parameters, check them now.
-  llvm::Optional<unsigned> prevArgIdx;
+  std::optional<unsigned> prevArgIdx;
   if (haveUnfulfilledParams) {
     for (auto paramIdx : indices(params)) {
       // If we have a binding for this parameter, we're done.
@@ -1006,7 +1006,7 @@ static bool matchCallArgumentsImpl(
 static bool requiresBothTrailingClosureDirections(
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex) {
+    std::optional<unsigned> unlabeledTrailingClosureArgIndex) {
   // If there's no unlabeled trailing closure, direction doesn't matter.
   if (!unlabeledTrailingClosureArgIndex)
     return false;
@@ -1048,25 +1048,25 @@ static bool requiresBothTrailingClosureDirections(
   return false;
 }
 
-llvm::Optional<MatchCallArgumentResult> constraints::matchCallArguments(
+std::optional<MatchCallArgumentResult> constraints::matchCallArguments(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
-    llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
+    std::optional<unsigned> unlabeledTrailingClosureArgIndex, bool allowFixes,
     MatchCallArgumentListener &listener,
-    llvm::Optional<TrailingClosureMatching> trailingClosureMatching) {
+    std::optional<TrailingClosureMatching> trailingClosureMatching) {
 
   /// Perform a single call to the implementation of matchCallArguments,
   /// invoking the listener and using the results from that match.
   auto singleMatchCall = [&](TrailingClosureMatching scanDirection)
-      -> llvm::Optional<MatchCallArgumentResult> {
+      -> std::optional<MatchCallArgumentResult> {
     SmallVector<ParamBinding, 4> paramBindings;
     if (matchCallArgumentsImpl(
             args, params, paramInfo, unlabeledTrailingClosureArgIndex,
             allowFixes, scanDirection, listener, paramBindings))
-      return llvm::None;
+      return std::nullopt;
 
     return MatchCallArgumentResult{scanDirection, std::move(paramBindings),
-                                   llvm::None};
+                                   std::nullopt};
   };
 
   // If we know that we won't have to perform both forward and backward
@@ -1139,22 +1139,22 @@ bool CompletionArgInfo::allowsMissingArgAt(unsigned argInsertIdx,
   return true;
 }
 
-llvm::Optional<CompletionArgInfo>
+std::optional<CompletionArgInfo>
 constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   auto *exprAnchor = getAsExpr(anchor);
   if (!exprAnchor)
-    return llvm::None;
+    return std::nullopt;
 
   auto *args = exprAnchor->getArgs();
   if (!args)
-    return llvm::None;
+    return std::nullopt;
 
   for (unsigned i : indices(*args)) {
     if (CS.containsIDEInspectionTarget(args->getExpr(i)))
       return CompletionArgInfo{i, args->getFirstTrailingClosureIndex(),
                                args->size()};
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -1163,7 +1163,7 @@ protected:
   NullablePtr<ValueDecl> Callee;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
-  llvm::Optional<unsigned> UnlabeledTrailingClosureArgIndex;
+  std::optional<unsigned> UnlabeledTrailingClosureArgIndex;
   ConstraintLocatorBuilder Locator;
 
 private:
@@ -1199,7 +1199,7 @@ public:
       ConstraintSystem &cs, ValueDecl *callee,
       SmallVectorImpl<AnyFunctionType::Param> &args,
       ArrayRef<AnyFunctionType::Param> params,
-      llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
+      std::optional<unsigned> unlabeledTrailingClosureArgIndex,
       ConstraintLocatorBuilder locator)
       : CS(cs), Callee(callee), Arguments(args), Parameters(params),
         UnlabeledTrailingClosureArgIndex(unlabeledTrailingClosureArgIndex),
@@ -1215,10 +1215,10 @@ public:
     }
   }
 
-  llvm::Optional<unsigned> missingArgument(unsigned paramIdx,
-                                           unsigned argInsertIdx) override {
+  std::optional<unsigned> missingArgument(unsigned paramIdx,
+                                          unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
-      return llvm::None;
+      return std::nullopt;
 
     unsigned newArgIdx =
         synthesizeArgument(paramIdx, /*isAfterCodeCompletionLoc=*/false);
@@ -1358,14 +1358,14 @@ public:
       ConstraintSystem &cs, ValueDecl *callee,
       SmallVectorImpl<AnyFunctionType::Param> &args,
       ArrayRef<AnyFunctionType::Param> params,
-      llvm::Optional<unsigned> unlabeledTrailingClosureArgIndex,
+      std::optional<unsigned> unlabeledTrailingClosureArgIndex,
       ConstraintLocatorBuilder locator, struct CompletionArgInfo ArgInfo)
       : ArgumentFailureTracker(cs, callee, args, params,
                                unlabeledTrailingClosureArgIndex, locator),
         ArgInfo(ArgInfo) {}
 
-  llvm::Optional<unsigned> missingArgument(unsigned paramIdx,
-                                           unsigned argInsertIdx) override {
+  std::optional<unsigned> missingArgument(unsigned paramIdx,
+                                          unsigned argInsertIdx) override {
     // When solving for code completion, if any argument contains the
     // completion location, later arguments shouldn't be considered missing
     // (causing the solution to have a worse score) as the user just hasn't
@@ -1431,9 +1431,9 @@ public:
 
   bool hadLabelingIssues() const { return HadLabelingIssues; }
 
-  llvm::Optional<ArrayRef<Identifier>> getLabelReplacements() const {
+  std::optional<ArrayRef<Identifier>> getLabelReplacements() const {
     if (!hadLabelingIssues() || NewLabels.empty())
-      return llvm::None;
+      return std::nullopt;
 
     return {NewLabels};
   }
@@ -1467,24 +1467,24 @@ namespace {
 /// variable (from the opened parameter type) the existential type that needs
 /// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
-static llvm::Optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                 Type, OpenedExistentialAdjustments>>
+static std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
+                                Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
   if (!callee)
-    return llvm::None;
+    return std::nullopt;
 
   // Only applies to functions and subscripts.
   if (!isa<AbstractFunctionDecl>(callee) && !isa<SubscriptDecl>(callee))
-    return llvm::None;
+    return std::nullopt;
 
   // Special semantics prohibit opening existentials.
   switch (TypeChecker::getDeclTypeCheckingSemantics(callee)) {
   case DeclTypeCheckingSemantics::OpenExistential:
   case DeclTypeCheckingSemantics::TypeOf:
     // type(of:) and _openExistential handle their own opening.
-    return llvm::None;
+    return std::nullopt;
 
   case DeclTypeCheckingSemantics::Normal:
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
@@ -1494,12 +1494,12 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   // C++ function templates require specialization, which is not possible with
   // opened existential archetypes, so do not open.
   if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
-    return llvm::None;
+    return std::nullopt;
 
   // The actual parameter type needs to involve a type variable, otherwise
   // type inference won't be possible.
   if (!paramTy->hasTypeVariable())
-    return llvm::None;
+    return std::nullopt;
 
   // An argument expression that explicitly coerces to an existential
   // disables the implicit opening of the existential unless it's
@@ -1510,7 +1510,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       if (auto typeRepr = argCast->getCastTypeRepr()) {
         if (auto toType = cs.getType(typeRepr)) {
           if (!isa<ParenExpr>(argExpr) && toType->isAnyExistentialType())
-            return llvm::None;
+            return std::nullopt;
         }
       }
     }
@@ -1532,15 +1532,15 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 
   // The argument type needs to be an existential type or metatype thereof.
   if (!argTy->isAnyExistentialType())
-    return llvm::None;
+    return std::nullopt;
 
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
-    return llvm::None;
+    return std::nullopt;
 
   // If the parameter is non-generic variadic, don't open.
   if (param->isVariadic())
-    return llvm::None;
+    return std::nullopt;
 
   // Look through an inout and optional types on the formal type of the
   // parameter.
@@ -1560,22 +1560,22 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   // The parameter type must be a type variable.
   auto paramTypeVar = paramTy->getAs<TypeVariableType>();
   if (!paramTypeVar)
-    return llvm::None;
+    return std::nullopt;
 
   auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
   if (!genericParam)
-    return llvm::None;
+    return std::nullopt;
 
   // Only allow opening the innermost generic parameters.
   auto genericContext = callee->getAsGenericContext();
   if (!genericContext || !genericContext->isGeneric())
-    return llvm::None;
+    return std::nullopt;
 
   auto genericSig = callee->getInnermostDeclContext()
       ->getGenericSignatureOfContext().getCanonicalSignature();
   if (genericParam->getDepth() <
           genericSig.getGenericParams().back()->getDepth())
-    return llvm::None;
+    return std::nullopt;
 
   // If the existential argument conforms to all of protocol requirements on
   // the formal parameter's type, don't open.
@@ -1599,7 +1599,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
     }
 
     if (!containsNonSelfConformance)
-      return llvm::None;
+      return std::nullopt;
   }
 
   // Ensure that the formal parameter is only used in covariant positions,
@@ -1610,7 +1610,7 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       /*skipParamIdx=*/paramIdx);
   if (referenceInfo.selfRef > TypePosition::Covariant ||
       referenceInfo.assocTypeRef > TypePosition::Covariant)
-    return llvm::None;
+    return std::nullopt;
 
   return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
 }
@@ -1621,7 +1621,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
-    llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
+    std::optional<TrailingClosureMatching> trailingClosureMatching,
     SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
         &openedExistentials) {
   assert(subKind == ConstraintKind::OperatorArgumentConversion ||
@@ -2451,8 +2451,7 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
     auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
 
     auto instantiatedPattern = pattern.transformRec([&](Type t)
-                                                        -> llvm::Optional<
-                                                            Type> {
+                                                        -> std::optional<Type> {
       if (isPackExpansionType(t))
         return t;
 
@@ -2478,7 +2477,7 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
         }
       }
 
-      return llvm::None;
+      return std::nullopt;
     });
 
     if (packExpansionElt != nullptr) {
@@ -2843,7 +2842,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // If there are N parameters but a single closure argument
   // (which might be anonymous), it's most likely used as a
   // tuple e.g. `$0.0`.
-  llvm::Optional<TypeBase *> argumentTuple;
+  std::optional<TypeBase *> argumentTuple;
   if (isSingleTupleParam(ctx, args)) {
     auto argType = args.back().getPlainType();
     // Let's unpack argument tuple into N arguments, this corresponds
@@ -4358,8 +4357,13 @@ static bool isBindable(TypeVariableType *typeVar, Type type) {
   // what the \c type is, because contextual type is just a hint
   // in this situation and type variable would be bound to its
   // opened type instead.
+  //
+  // Note that although inference doesn't allow direct bindings to
+  // type variables, they can still get through via `matchTypes`
+  // when type is a partially resolved pack expansion that simplifies
+  // down to a type variable.
   return typeVar->getImpl().isPackExpansion() ||
-         !type->is<DependentMemberType>();
+         !(type->is<TypeVariableType>() || type->is<DependentMemberType>());
 }
 
 ConstraintSystem::TypeMatchResult
@@ -4639,7 +4643,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 static ConstraintFix *fixPropertyWrapperFailure(
     ConstraintSystem &cs, Type baseTy, ConstraintLocator *locator,
     llvm::function_ref<bool(SelectedOverload, VarDecl *, Type)> attemptFix,
-    llvm::Optional<Type> toType = llvm::None) {
+    std::optional<Type> toType = std::nullopt) {
   // Don't attempt this fix if this is a key path dynamic member
   // lookup which produced no results. Unwrapping or wrapping
   // the base type is not going to produce desired results.
@@ -8921,8 +8925,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   // Rest of the implicit conversions depend on the resolved type.
   {
     auto getPointerFor = [&ctx](PointerTypeKind ptrKind,
-                                llvm::Optional<Type> elementTy =
-                                    llvm::None) -> Type {
+                                std::optional<Type> elementTy =
+                                    std::nullopt) -> Type {
       switch (ptrKind) {
       case PTK_UnsafePointer:
         assert(elementTy);
@@ -10583,7 +10587,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
 static ConstraintFix *fixMemberRef(
     ConstraintSystem &cs, Type baseTy, DeclNameRef memberName,
     const OverloadChoice &choice, ConstraintLocator *locator,
-    llvm::Optional<MemberLookupResult::UnviableReason> reason = llvm::None) {
+    std::optional<MemberLookupResult::UnviableReason> reason = std::nullopt) {
   // Not all of the choices handled here are going
   // to refer to a declaration.
   if (auto *decl = choice.getDeclOrNull()) {
@@ -10931,7 +10935,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                          result.ViableCandidates);
 
       generateConstraints(
-          candidates, memberTy, outerAlternatives, useDC, locator, llvm::None,
+          candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
             return treatAsViable ? nullptr
@@ -10946,7 +10950,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // and disable them by default, they'd get picked up in the "salvage" mode.
     generateConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
-        /*favoredChoice=*/llvm::None, /*requiresFix=*/true,
+        /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator,
                               result.UnviableReasons[idx]);
@@ -11629,10 +11633,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto getContextualParamAt =
       [&contextualType, &inferredClosureType](
-          unsigned index) -> llvm::Optional<AnyFunctionType::Param> {
+          unsigned index) -> std::optional<AnyFunctionType::Param> {
     auto *fnType = contextualType->getAs<FunctionType>();
     if (!fnType)
-      return llvm::None;
+      return std::nullopt;
 
     auto numContextualParams = fnType->getNumParams();
 
@@ -11652,13 +11656,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           return AnyFunctionType::Param(elt.getType(), elt.getName());
         }
 
-        return llvm::None;
+        return std::nullopt;
       }
     }
 
     if (numContextualParams != inferredClosureType->getNumParams() ||
         numContextualParams <= index)
-      return llvm::None;
+      return std::nullopt;
 
     return fnType->getParams()[index];
   };
@@ -12949,7 +12953,7 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     Type type1, Type type2,
-    llvm::Optional<TrailingClosureMatching> trailingClosureMatching,
+    std::optional<TrailingClosureMatching> trailingClosureMatching,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
 
@@ -13150,7 +13154,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
         auto *newArgumentList = ArgumentList::createParsed(
             ctx, argumentList->getLParenLoc(), newArguments,
             argumentList->getRParenLoc(),
-            /*firstTrailingClosureIndex=*/llvm::None);
+            /*firstTrailingClosureIndex=*/std::nullopt);
 
         auto trailingClosureTypes = func1->getParams().take_back(numTrailing);
         // The original result type is going to become a result of
@@ -14602,7 +14606,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!ArgumentLists.count(argumentsLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
-          /*firstTrailingClosureIndex=*/llvm::None,
+          /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
       ArgumentLists.insert({argumentsLoc, argList});
     }
@@ -15412,7 +15416,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                  locator)) {
       return SolutionKind::Error;
     }
-    return simplifyApplicableFnConstraint(first, second, llvm::None, subflags,
+    return simplifyApplicableFnConstraint(first, second, std::nullopt, subflags,
                                           locator);
   }
   case ConstraintKind::DynamicCallableApplicableFunction:
@@ -15645,7 +15649,7 @@ void ConstraintSystem::addConstraint(Requirement req,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored) {
   bool conformsToAnyObject = false;
-  llvm::Optional<ConstraintKind> kind;
+  std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
   case RequirementKind::SameShape: {
     auto type1 = req.getFirstType();
@@ -15875,7 +15879,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(fix, constraint.getFirstType(),
                                    constraint.getSecondType(), matchKind,
-                                   llvm::None, constraint.getLocator());
+                                   std::nullopt, constraint.getLocator());
     }
 
     // If there is a restriction on this constraint, apply it directly rather
@@ -15883,11 +15887,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     if (auto restriction = constraint.getRestriction()) {
       return simplifyRestrictedConstraint(
           *restriction, constraint.getFirstType(), constraint.getSecondType(),
-          matchKind, llvm::None, constraint.getLocator());
+          matchKind, std::nullopt, constraint.getLocator());
     }
 
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
-                      matchKind, llvm::None, constraint.getLocator());
+                      matchKind, std::nullopt, constraint.getLocator());
   }
 
   case ConstraintKind::BridgingConversion:
@@ -15895,49 +15899,49 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(fix, constraint.getFirstType(),
                                    constraint.getSecondType(), matchKind,
-                                   llvm::None, constraint.getLocator());
+                                   std::nullopt, constraint.getLocator());
     }
 
     return simplifyBridgingConstraint(constraint.getFirstType(),
-                                      constraint.getSecondType(), llvm::None,
+                                      constraint.getSecondType(), std::nullopt,
                                       constraint.getLocator());
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getTrailingClosureMatching(), llvm::None,
+        constraint.getTrailingClosureMatching(), std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
-    return simplifyDynamicTypeOfConstraint(constraint.getFirstType(),
-                                           constraint.getSecondType(),
-                                           llvm::None, constraint.getLocator());
+    return simplifyDynamicTypeOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
+        constraint.getLocator());
 
   case ConstraintKind::EscapableFunctionOf:
     return simplifyEscapableFunctionOfConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::OpenedExistentialOf:
     return simplifyOpenedExistentialOfConstraint(
-        constraint.getFirstType(), constraint.getSecondType(), llvm::None,
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::KeyPath:
     return simplifyKeyPathConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getThirdType(), constraint.getTypeVariables(), llvm::None,
+        constraint.getThirdType(), constraint.getTypeVariables(), std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::KeyPathApplication:
     return simplifyKeyPathApplicationConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getThirdType(), llvm::None, constraint.getLocator());
+        constraint.getThirdType(), std::nullopt, constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     if (auto *fix = constraint.getFix()) {
@@ -15959,24 +15963,24 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifySubclassOfConstraint(constraint.getFirstType(),
                                         constraint.getSecondType(),
                                         constraint.getLocator(),
-                                        /*flags*/ llvm::None);
+                                        /*flags*/ std::nullopt);
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getKind(), constraint.getLocator(), llvm::None);
+        constraint.getKind(), constraint.getLocator(), std::nullopt);
 
   case ConstraintKind::TransitivelyConformsTo:
-    return simplifyTransitivelyConformsTo(constraint.getFirstType(),
-                                          constraint.getSecondType(),
-                                          constraint.getLocator(), llvm::None);
+    return simplifyTransitivelyConformsTo(
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getLocator(), std::nullopt);
 
   case ConstraintKind::CheckedCast: {
     auto result = simplifyCheckedCastConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
     // NOTE: simplifyCheckedCastConstraint() may return Unsolved, e.g. if the
     // subexpression's type is unresolved. Don't record the fix until we
     // successfully simplify the constraint.
@@ -15993,7 +15997,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
@@ -16002,30 +16006,30 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getSecondType(), constraint.getMemberUseDC(),
         constraint.getFunctionRefKind(),
         /*outerAlternatives=*/{},
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::ValueWitness:
     return simplifyValueWitnessConstraint(
         constraint.getKind(), constraint.getFirstType(),
         constraint.getRequirement(), constraint.getSecondType(),
         constraint.getMemberUseDC(), constraint.getFunctionRefKind(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::FallbackType:
     return simplifyFallbackTypeConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getTypeVariables(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::PropertyWrapper:
     return simplifyPropertyWrapperConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
@@ -16037,48 +16041,48 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyOneWayConstraint(
         constraint.getKind(), constraint.getFirstType(),
         constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::UnresolvedMemberChainBase:
     return simplifyUnresolvedMemberChainBaseConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags=*/llvm::None, constraint.getLocator());
+        /*flags=*/std::nullopt, constraint.getLocator());
 
   case ConstraintKind::SyntacticElement:
     return simplifySyntacticElementConstraint(
         constraint.getSyntacticElement(), constraint.getElementContext(),
         constraint.isDiscardedElement(),
-        /*flags=*/llvm::None, constraint.getLocator());
+        /*flags=*/std::nullopt, constraint.getLocator());
 
   case ConstraintKind::BindTupleOfFunctionParams:
     return simplifyBindTupleOfFunctionParamsConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::SameShape:
     return simplifySameShapeConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::ExplicitGenericArguments:
     return simplifyExplicitGenericArgumentsConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::MaterializePackExpansion:
     return simplifyMaterializePackExpansionConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
-        /*flags*/ llvm::None, constraint.getLocator());
+        /*flags*/ std::nullopt, constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

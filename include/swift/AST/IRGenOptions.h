@@ -25,13 +25,13 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Config.h"
 #include "clang/Basic/PointerAuthOptions.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -492,10 +492,10 @@ public:
   TypeInfoDumpFilter TypeInfoFilter;
   
   /// Pull in runtime compatibility shim libraries by autolinking.
-  llvm::Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
   bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 

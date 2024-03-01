@@ -18,7 +18,6 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -27,6 +26,7 @@
 #include "gtest/gtest.h"
 #include <chrono>
 #include <map>
+#include <optional>
 #include <random>
 #include <set>
 

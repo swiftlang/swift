@@ -23,9 +23,9 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 
@@ -87,7 +87,7 @@ public:
 
   Decl *getAsDecl() const { return OpKind == DeclKind ? Declaration : nullptr; }
 
-  llvm::Optional<uint64_t> getAsConstInt() const {
+  std::optional<uint64_t> getAsConstInt() const {
     if (OpKind == ConstIntKind)
       return ConstantInt;
     else

@@ -140,11 +140,11 @@ public:
   }
 
   void open(const char *DocName, StringRef Text,
-            Optional<ArrayRef<const char *>> CArgs = llvm::None) {
+            std::optional<ArrayRef<const char *>> CArgs = std::nullopt) {
     auto Args = CArgs.has_value() ? makeArgs(DocName, *CArgs)
                                   : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, std::nullopt);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -164,7 +164,7 @@ public:
     getLang().getCursorInfo(
         DocName, DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
-        /*vfsOptions=*/None, CancellationToken,
+        /*vfsOptions=*/std::nullopt, CancellationToken,
         [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
@@ -404,7 +404,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   // info, to ensure the ASTManager doesn't try to handle this cursor info with
   // the wrong AST.
   setNeedsSema(true);
-  open(DocName, Contents, llvm::makeArrayRef(Args));
+  open(DocName, Contents, llvm::ArrayRef(Args));
   // Change 'foo' to 'fog' by replacing the last character.
   replaceText(DocName, FooOffs + 2, 1, "g");
   replaceText(DocName, FooRefOffs + 2, 1, "g");
@@ -429,7 +429,7 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
                              "}\n";
   auto SlowOffset = findOffset("x", SlowContents);
   const char *Args[] = {"-parse-as-library"};
-  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForSlow = llvm::ArrayRef(Args).vec();
   ArgsForSlow.push_back(SlowDocName);
 
   const char *FastDocName = "fast.swift";
@@ -437,11 +437,11 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
                              "    let foo = 123\n"
                              "}\n";
   auto FastOffset = findOffset("foo", FastContents);
-  std::vector<const char *> ArgsForFast = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForFast = llvm::ArrayRef(Args).vec();
   ArgsForFast.push_back(FastDocName);
 
-  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
-  open(FastDocName, FastContents, llvm::makeArrayRef(Args));
+  open(SlowDocName, SlowContents, llvm::ArrayRef(Args));
+  open(FastDocName, FastContents, llvm::ArrayRef(Args));
 
   // Schedule a cursor info request that takes long to execute. This should be
   // cancelled as the next cursor info (which is faster) gets requested.
@@ -449,7 +449,7 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   getLang().getCursorInfo(
       SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/nullptr,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         FirstCursorInfoSema.signal();
@@ -479,10 +479,10 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
                              "}\n";
   auto SlowOffset = findOffset("x", SlowContents);
   const char *Args[] = {"-parse-as-library"};
-  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForSlow = llvm::ArrayRef(Args).vec();
   ArgsForSlow.push_back(SlowDocName);
 
-  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
+  open(SlowDocName, SlowContents, llvm::ArrayRef(Args));
 
   SourceKitCancellationToken CancellationToken = createCancellationToken();
 
@@ -492,7 +492,7 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
   getLang().getCursorInfo(
       SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/CancellationToken,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         CursorInfoSema.signal();

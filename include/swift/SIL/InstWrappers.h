@@ -59,9 +59,9 @@ struct LoadOperation {
   ///
   /// TODO: Rather than use an optional here, we should include an invalid
   /// representation in LoadOwnershipQualifier.
-  llvm::Optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
+  std::optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
     if (auto *lbi = value.dyn_cast<LoadBorrowInst *>()) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     return value.get<LoadInst *>()->getOwnershipQualifier();
@@ -111,6 +111,8 @@ struct ConversionOperation {
 
   static bool isa(SILInstruction *inst) {
     switch (inst->getKind()) {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+    case SILInstructionKind::MarkUninitializedInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::UpcastInst:
     case SILInstructionKind::AddressToPointerInst:
@@ -135,6 +137,9 @@ struct ConversionOperation {
     case SILInstructionKind::RefToUnownedInst:
     case SILInstructionKind::UnmanagedToRefInst:
     case SILInstructionKind::UnownedToRefInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
       return true;
     default:
       return false;

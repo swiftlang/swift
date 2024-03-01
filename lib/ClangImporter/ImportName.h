@@ -263,21 +263,21 @@ public:
 
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
-  llvm::Optional<ForeignErrorConvention::Info> getErrorInfo() const {
+  std::optional<ForeignErrorConvention::Info> getErrorInfo() const {
     if (info.hasErrorInfo)
       return info.errorInfo;
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// For names that map Objective-C methods with completion handlers into
   /// async Swift methods, describes how the mapping is performed.
-  llvm::Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
+  std::optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
     if (info.hasAsyncInfo) {
       assert(!info.hasAsyncAlternateInfo
              && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// For names with a variant that maps Objective-C methods with completion
@@ -288,20 +288,20 @@ public:
   /// and gives you the contents of \c getAsyncInfo() on the async method's
   /// name. It is not set on the async method's name, and it is not set if a
   /// non-async method doesn't have an async equivalent.
-  llvm::Optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
+  std::optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
     if (info.hasAsyncAlternateInfo) {
       assert(!info.hasAsyncInfo && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  llvm::Optional<unsigned> getSelfIndex() const {
+  std::optional<unsigned> getSelfIndex() const {
     if (info.hasSelfIndex)
       return info.selfIndex;
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Retrieve the base name as an identifier, including mapping special
@@ -505,22 +505,22 @@ private:
                          const clang::IdentifierInfo *proposedName,
                          const clang::TypedefNameDecl *cfTypedef);
 
-  llvm::Optional<ForeignErrorConvention::Info>
+  std::optional<ForeignErrorConvention::Info>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  llvm::Optional<ForeignAsyncConvention::Info> considerAsyncImport(
+  std::optional<ForeignAsyncConvention::Info> considerAsyncImport(
       const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
       SmallVectorImpl<StringRef> &paramNames,
       ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
-      llvm::Optional<unsigned> explicitCompletionHandlerParamIndex,
+      std::optional<unsigned> explicitCompletionHandlerParamIndex,
       CustomAsyncName customName,
-      llvm::Optional<unsigned> completionHandlerFlagParamIndex,
+      std::optional<unsigned> completionHandlerFlagParamIndex,
       bool completionHandlerFlagIsZeroOnError,
-      llvm::Optional<ForeignErrorConvention::Info> errorInfo);
+      std::optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

@@ -63,6 +63,17 @@ extension Unicode {
   }
 }
 
+struct WordBreakEntry : Comparable {
+  static func < (lhs: WordBreakEntry, rhs: WordBreakEntry) -> Bool {
+    return lhs.index < rhs.index
+  }
+  
+  let index: Int
+  let range: ClosedRange<UInt32>
+  let property: Unicode.WordBreakProperty
+}
+
+
 func getWordBreakPropertyData(
   for path: String
 ) -> [(ClosedRange<UInt32>, Unicode.WordBreakProperty)] {
@@ -115,17 +126,23 @@ func getWordBreakPropertyData(
 }
 
 func emit(
-  _ data: [(ClosedRange<UInt32>, Unicode.WordBreakProperty)],
+  _ data: [WordBreakEntry],
   into result: inout String
 ) {
+  
+  result += """
+  #define WORD_BREAK_DATA_COUNT \(data.count)
+  
+  """
+  
   emitCollection(
     data,
     name: "_swift_stdlib_words",
     type: "__swift_uint32_t",
     into: &result
   ) {
-    var value = $0.0.lowerBound
-    value |= UInt32($0.0.count) << 21
+    var value = $0.range.lowerBound
+    value |= UInt32($0.range.count) << 21
     
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
@@ -136,22 +153,36 @@ func emit(
     type: "__swift_uint8_t",
     into: &result
   ) {
-    let value = $0.1.rawValue
+    let value = $0.property.rawValue
     
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
 }
 
-// Main entry point into the grapheme break property generator.
-func generateGraphemeBreakProperty() {
+// Main entry point into the word break generator.
+func generateWordBreak() {
   var result = readFile("Input/WordData.h")
   
   let baseData = getWordBreakPropertyData(for: "Data/15/WordBreakProperty.txt")
   let emojiData = getWordBreakPropertyData(for: "Data/15/emoji-data.txt")
   
-  let data = flatten(baseData + emojiData)
+  var idx = 0
+  let data = flatten(baseData + emojiData).map { (values) -> WordBreakEntry in
+    idx += 1
+    return WordBreakEntry(
+      index: idx,
+      range: values.0,
+      property: values.1
+    )
+  }
   
-  emit(data, into: &result)
+  let reorderedData = eytzingerize(data, dummy: WordBreakEntry(
+    index: 0,
+    range: 0...0,
+    property: .extend
+  ))
+  
+  emit(reorderedData, into: &result)
   
   result += """
   #endif // #ifndef WORD_DATA_H
@@ -161,4 +192,4 @@ func generateGraphemeBreakProperty() {
   write(result, to: "Output/Common/WordData.h")
 }
 
-generateGraphemeBreakProperty()
+generateWordBreak()

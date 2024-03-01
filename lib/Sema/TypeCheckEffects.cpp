@@ -809,12 +809,12 @@ class Classification {
 
   // Throwing
   ConditionalEffectKind ThrowKind = ConditionalEffectKind::None;
-  llvm::Optional<PotentialEffectReason> ThrowReason;
+  std::optional<PotentialEffectReason> ThrowReason;
   Type ThrownError;
 
   // Async
   ConditionalEffectKind AsyncKind = ConditionalEffectKind::None;
-  llvm::Optional<PotentialEffectReason> AsyncReason;
+  std::optional<PotentialEffectReason> AsyncReason;
 
   void print(raw_ostream &out) const {
     out << "{ IsInvalid = " << IsInvalid
@@ -863,19 +863,18 @@ public:
   Classification onlyAsync() const {
     Classification result(*this);
     result.ThrowKind = ConditionalEffectKind::None;
-    result.ThrowReason = llvm::None;
+    result.ThrowReason = std::nullopt;
     result.ThrownError = Type();
     return result;
   }
   
   /// Return a classification that only retains the throwing parts of the
   /// given classification.
-  Classification onlyThrowing(
-      llvm::Optional<PotentialEffectReason> newThrowReason = llvm::None
-  ) const {
+  Classification onlyThrowing(std::optional<PotentialEffectReason>
+                                  newThrowReason = std::nullopt) const {
     Classification result(*this);
     result.AsyncKind = ConditionalEffectKind::None;
-    result.AsyncReason = llvm::None;
+    result.AsyncReason = std::nullopt;
 
     if (result.hasThrows() && newThrowReason)
       result.ThrowReason = newThrowReason;
@@ -943,12 +942,10 @@ public:
   }
 
   /// Return a classification for a given declaration reference.
-  static Classification forDeclRef(
-      ConcreteDeclRef declRef,
-      ConditionalEffectKind conditionalKind,
-      PotentialEffectReason reason,
-      llvm::Optional<EffectKind> onlyEffect = llvm::None
-  ) {
+  static Classification
+  forDeclRef(ConcreteDeclRef declRef, ConditionalEffectKind conditionalKind,
+             PotentialEffectReason reason,
+             std::optional<EffectKind> onlyEffect = std::nullopt) {
     Classification result;
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
@@ -1180,7 +1177,7 @@ public:
     }
 
     if (auto *var = dyn_cast<VarDecl>(decl)) {
-      ActorReferenceResult::Options options = llvm::None;
+      ActorReferenceResult::Options options = std::nullopt;
       ModuleDecl *module;
       if (DC != nullptr) {
         module = DC->getParentModule();
@@ -1540,7 +1537,7 @@ private:
            !param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
-               ->getGlobalActor().isNull());
+               ->getIsolation().isNonIsolated());
 
     ConditionalEffectKind conditional;
 
@@ -2079,7 +2076,7 @@ private:
   }
 
   Kind TheKind;
-  llvm::Optional<AnyFunctionRef> Function;
+  std::optional<AnyFunctionRef> Function;
   DeclContext *DC;
   bool HandlesErrors = false;
   bool HandlesAsync = false;
@@ -2092,13 +2089,12 @@ private:
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
   explicit Context(Kind kind, DeclContext *dc)
-      : TheKind(kind), Function(llvm::None), DC(dc), HandlesErrors(false) {
+      : TheKind(kind), Function(std::nullopt), DC(dc), HandlesErrors(false) {
     assert(TheKind != Kind::PotentiallyHandled);
   }
 
   explicit Context(bool handlesErrors, bool handlesAsync,
-                   llvm::Optional<AnyFunctionRef> function,
-                   DeclContext *dc)
+                   std::optional<AnyFunctionRef> function, DeclContext *dc)
       : TheKind(Kind::PotentiallyHandled), Function(function), DC(dc),
         HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) {}
 
@@ -2177,7 +2173,7 @@ public:
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
-                   /*handlesAsync=*/D->isAsyncContext(), llvm::None, D);
+                   /*handlesAsync=*/D->isAsyncContext(), std::nullopt, D);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
@@ -2567,9 +2563,8 @@ public:
   }
   /// I did not want to add 'await' as a PotentialEffectReason, since it's
   /// not actually an effect. So, we have this odd boolean hanging around.
-  unsigned
-  effectReasonToIndex(llvm::Optional<PotentialEffectReason> maybeReason,
-                      bool forAwait = false) {
+  unsigned effectReasonToIndex(std::optional<PotentialEffectReason> maybeReason,
+                               bool forAwait = false) {
     // while not actually an effect, in some instances we diagnose the
     // appearance of an await within a non-async context.
     if (forAwait)
@@ -2639,7 +2634,7 @@ public:
   /// providing a \c kind helps tailor the emitted message.
   void
   diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
-                             llvm::Optional<PotentialEffectReason> maybeReason,
+                             std::optional<PotentialEffectReason> maybeReason,
                              bool forAwait = false) {
     if (node.isImplicit())
       return;
@@ -2831,7 +2826,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     SourceLoc OldAwaitLoc;
 
   public:
-    ContextScope(CheckEffectsCoverage &self, llvm::Optional<Context> newContext)
+    ContextScope(CheckEffectsCoverage &self, std::optional<Context> newContext)
         : Self(self), OldContext(self.CurContext),
           OldRethrowsDC(self.RethrowsDC), OldReasyncDC(self.ReasyncDC),
           OldFlags(self.Flags), OldMaxThrowingKind(self.MaxThrowingKind),
@@ -3083,7 +3078,7 @@ private:
   checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
     // For an if/switch expression, we reset coverage such that a 'try'/'await'
     // does not cover the branches.
-    ContextScope scope(*this, /*newContext*/ llvm::None);
+    ContextScope scope(*this, /*newContext*/ std::nullopt);
     scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
     scope.preserveCoverageFromSingleValueStmtExpr();
@@ -3104,7 +3099,7 @@ private:
   }
 
   ConditionalEffectKind checkNonExhaustiveDoBody(DoCatchStmt *S) {
-    ContextScope scope(*this, llvm::None);
+    ContextScope scope(*this, std::nullopt);
     assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
     scope.resetCoverageForDoCatch();
 
@@ -3424,7 +3419,7 @@ private:
   ShouldRecurse_t checkAwait(AwaitExpr *E) {
 
     // Walk the operand.
-    ContextScope scope(*this, llvm::None);
+    ContextScope scope(*this, std::nullopt);
     scope.enterAwait(E->getAwaitLoc());
 
     E->getSubExpr()->walk(*this);
@@ -3436,7 +3431,7 @@ private:
       if (CurContext.handlesAsync(ConditionalEffectKind::Conditional)) {
         diagnoseRedundantAwait(E);
       } else {
-        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, llvm::None,
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, std::nullopt,
                                               /*forAwait=*/true);
       }
     }
@@ -3448,7 +3443,7 @@ private:
   
   ShouldRecurse_t checkTry(TryExpr *E) {
     // Walk the operand.
-    ContextScope scope(*this, llvm::None);
+    ContextScope scope(*this, std::nullopt);
     scope.enterTry();
 
     E->getSubExpr()->walk(*this);
@@ -3519,7 +3514,7 @@ private:
     Flags.set(ContextFlags::HasAnyAsyncSite);
 
     if (!CurContext.handlesAsync(ConditionalEffectKind::Always))
-      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, llvm::None);
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, std::nullopt);
 
     // A 'for try await' has a thrown error type that depends on the
     // AsyncSequence conformance.
@@ -3755,22 +3750,23 @@ void TypeChecker::checkPropertyWrapperEffects(
   expr->walk(LocalFunctionEffectsChecker());
 }
 
-llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
+std::optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
   if (classification.getConditionalKind(EffectKind::Throws) ==
         ConditionalEffectKind::None)
-    return llvm::None;
+    return std::nullopt;
 
   return classification.getThrownError();
 }
 
-llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, ForEachStmt *forEach) {
+std::optional<Type> TypeChecker::canThrow(ASTContext &ctx,
+                                          ForEachStmt *forEach) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyForEach(forEach).onlyThrowing();
   if (classification.getConditionalKind(EffectKind::Throws) ==
         ConditionalEffectKind::None)
-    return llvm::None;
+    return std::nullopt;
 
   return classification.getThrownError();
 }

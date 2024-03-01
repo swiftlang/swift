@@ -168,21 +168,21 @@ bool CallbackClassifier::hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes) {
   return false;
 }
 
-llvm::Optional<ClassifiedCondition>
+std::optional<ClassifiedCondition>
 CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
                                               const NodesToPrint &SuccessNodes,
                                               Stmt *ElseStmt) {
   if (!Cond.isValid())
-    return llvm::None;
+    return std::nullopt;
 
   // If the condition involves a refutable pattern, we can't currently handle
   // it.
   if (Cond.BindPattern && Cond.BindPattern->isRefutablePattern())
-    return llvm::None;
+    return std::nullopt;
 
   auto *SubjectParam = dyn_cast<ParamDecl>(Cond.Subject);
   if (!SubjectParam)
-    return llvm::None;
+    return std::nullopt;
 
   // For certain types of condition, they need to be certain kinds of params.
   auto CondType = *Cond.Type;
@@ -190,17 +190,17 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
   case ConditionType::NOT_NIL:
   case ConditionType::NIL:
     if (!Params.isUnwrappableParam(SubjectParam))
-      return llvm::None;
+      return std::nullopt;
     break;
   case ConditionType::IS_TRUE:
   case ConditionType::IS_FALSE:
     if (!Params.isSuccessParam(SubjectParam))
-      return llvm::None;
+      return std::nullopt;
     break;
   case ConditionType::SUCCESS_PATTERN:
   case ConditionType::FAILURE_PATTEN:
     if (SubjectParam != Params.getResultParam())
-      return llvm::None;
+      return std::nullopt;
     break;
   }
 
@@ -235,7 +235,7 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
   // success or failure.
   if (auto KnownBoolFlag = Params.getKnownBoolFlagParam()) {
     if (KnownBoolFlag->Param != SubjectParam)
-      return llvm::None;
+      return std::nullopt;
 
     // The path may need to be flipped depending on whether the flag indicates
     // success.
@@ -264,13 +264,13 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
     if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
       Nodes = BS->getElements();
     } else {
-      Nodes = llvm::makeArrayRef(ElseNode);
+      Nodes = llvm::ArrayRef(ElseNode);
     }
     if (hasForceUnwrappedErrorParam(Nodes)) {
       // If we also found an unwrap in the success block, we don't know what's
       // happening here.
       if (FoundInSuccessBlock)
-        return llvm::None;
+        return std::nullopt;
 
       // Otherwise we can determine this as a success condition. Note this is
       // flipped as if the error is present in the else block, this condition
@@ -288,14 +288,14 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
   }
 
   // Otherwise we can't classify this.
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool CallbackClassifier::classifyConditionsOf(
     StmtCondition Cond, const NodesToPrint &ThenNodesToPrint, Stmt *ElseStmt,
     ClassifiedCallbackConditions &Conditions) {
   bool UnhandledConditions = false;
-  llvm::Optional<ClassifiedCondition> ObjCFlagCheck;
+  std::optional<ClassifiedCondition> ObjCFlagCheck;
   auto TryAddCond = [&](CallbackCondition CC) {
     auto Classified = classifyCallbackCondition(CC, ThenNodesToPrint, ElseStmt);
 
@@ -397,7 +397,7 @@ void CallbackClassifier::classifyConditional(Stmt *Statement,
 
   // If all the conditions were classified, make sure they're all consistently
   // on the success or failure path.
-  llvm::Optional<ConditionPath> Path;
+  std::optional<ConditionPath> Path;
   for (auto &Entry : CallbackConditions) {
     auto &Cond = Entry.second;
     if (!Path) {

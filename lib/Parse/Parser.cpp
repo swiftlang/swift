@@ -137,8 +137,8 @@ bool IDEInspectionSecondPassRequest::evaluate(
 void Parser::performIDEInspectionSecondPassImpl(
     IDEInspectionDelayedDeclState &info) {
   // Disable updating the interface hash
-  llvm::SaveAndRestore<llvm::Optional<StableHasher>> CurrentTokenHashSaver(
-      CurrentTokenHash, llvm::None);
+  llvm::SaveAndRestore<std::optional<StableHasher>> CurrentTokenHashSaver(
+      CurrentTokenHash, std::nullopt);
 
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
@@ -406,7 +406,7 @@ public:
   TokenRecorder(ASTContext &ctx, Lexer &BaseLexer)
       : Ctx(ctx), BaseLexer(BaseLexer), BufferID(BaseLexer.getBufferID()) {}
 
-  llvm::Optional<std::vector<Token>> finalize() override {
+  std::optional<std::vector<Token>> finalize() override {
     auto &SM = Ctx.SourceMgr;
 
     // We should consume the comments at the end of the file that don't attach
@@ -847,7 +847,7 @@ getStructureMarkerKindForToken(const Token &tok) {
 Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser, SourceLoc loc,
                                                  StructureMarkerKind kind)
     : StructureMarkerRAII(parser) {
-  parser.StructureMarkers.push_back({loc, kind, llvm::None});
+  parser.StructureMarkers.push_back({loc, kind, std::nullopt});
   if (parser.StructureMarkers.size() > MaxDepth) {
     parser.diagnose(loc, diag::structure_overflow, MaxDepth);
     // We need to cut off parsing or we will stack-overflow.
@@ -1097,19 +1097,14 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   return Status;
 }
 
-llvm::Optional<StringRef>
-Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
-                                          bool AllowMultiline) {
+std::optional<StringRef>
+Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
   assert(Tok.is(tok::string_literal));
 
   // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
-    return llvm::None;
-  }
-  if (!AllowMultiline && Tok.isMultilineString()) {
-    diagnose(Loc, diag::forbidden_multiline_string, DiagText)
-        .warnUntilSwiftVersion(6);
+    return std::nullopt;
   }
 
   SmallVector<Lexer::StringSegment, 1> Segments;
@@ -1117,7 +1112,7 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
   if (Segments.size() != 1 ||
       Segments.front().Kind == Lexer::StringSegment::Expr) {
     diagnose(Loc, diag::forbidden_interpolated_string, DiagText);
-    return llvm::None;
+    return std::nullopt;
   }
 
   return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
@@ -1203,7 +1198,7 @@ void ParserUnit::parse() {
   SmallVector<ASTNode, 128> items;
   P.parseTopLevelItems(items);
 
-  llvm::Optional<ArrayRef<Token>> tokensRef;
+  std::optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = P.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 

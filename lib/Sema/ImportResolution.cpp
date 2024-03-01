@@ -1230,7 +1230,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
     return ArrayRef<ValueDecl *>();
   }
 
-  llvm::Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
+  std::optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
   if (!actualKind.has_value()) {
     // FIXME: print entire module name?
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
@@ -1239,7 +1239,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
       ctx.Diags.diagnose(next, diag::found_candidate);
 
   } else if (!isCompatibleImportKind(importKind, *actualKind)) {
-    llvm::Optional<InFlightDiagnostic> emittedDiag;
+    std::optional<InFlightDiagnostic> emittedDiag;
     if (*actualKind == ImportKind::Type && isNominalImportKind(importKind)) {
       assert(decls.size() == 1 &&
              "if we start suggesting ImportKind::Type for, e.g., a mix of "
@@ -1396,8 +1396,7 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
     // declares a cross-import with any previous one.
     auto oldImports =
         // Slice from the start of crossImportableModules up to newImport.
-        llvm::makeArrayRef(crossImportableModules.getArrayRef().data(),
-                           &newImport);
+        llvm::ArrayRef(crossImportableModules.getArrayRef().data(), &newImport);
     findCrossImportsInLists(I, {newImport}, oldImports,
                             /*shouldDiagnoseRedundantCrossImports=*/true);
 

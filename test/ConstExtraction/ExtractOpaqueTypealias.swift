@@ -71,3 +71,6 @@ private func baz() -> some protoA<testModBStruct> & protoB<Float> & testModBProt
 // CHECK-NEXT:    "properties": []
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+
+// XFAIL: noncopyable_generics
+

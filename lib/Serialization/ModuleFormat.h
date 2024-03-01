@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 854; // _distributedThunkTarget
+const uint16_t SWIFTMODULE_VERSION_MINOR = 855; // ref_adhoc_requirement_witness attributes are back
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -109,16 +109,16 @@ public:
     return rawValue != 0;
   }
 
-  llvm::Optional<DeclID> getAsDeclID() const {
+  std::optional<DeclID> getAsDeclID() const {
     if (rawValue > 0)
       return DeclID(rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+  std::optional<LocalDeclContextID> getAsLocalDeclContextID() const {
     if (rawValue < 0)
       return LocalDeclContextID(-rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
   static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {

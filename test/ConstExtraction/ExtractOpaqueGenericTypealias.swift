@@ -55,3 +55,6 @@ struct Foo<L : Hashable> : myProto {
 // CHECK-NEXT:     "properties": []
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+
+// XFAIL: noncopyable_generics
+

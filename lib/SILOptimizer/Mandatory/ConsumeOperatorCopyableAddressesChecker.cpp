@@ -2496,7 +2496,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
     auto addressToProcess =
-        llvm::makeArrayRef(addressesToCheck.begin(), addressesToCheck.end());
+        llvm::ArrayRef(addressesToCheck.begin(), addressesToCheck.end());
 
     SILOptFunctionBuilder funcBuilder(*this);
 

@@ -16,7 +16,7 @@
 
 ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,
                          std::vector<swift::CharSourceRange> labelRanges,
-                         llvm::Optional<unsigned> firstTrailingLabel,
+                         std::optional<unsigned> firstTrailingLabel,
                          LabelRangeType labelType, bool isActive,
                          ResolvedLocContext context)
     : range(range), labelRanges(labelRanges),
@@ -33,8 +33,8 @@ BridgedResolvedLoc::BridgedResolvedLoc(BridgedCharSourceRange range,
     : resolvedLoc(
           new ResolvedLoc(range.unbridged(), labelRanges.takeUnbridged(),
                           firstTrailingLabel == UINT_MAX
-                              ? llvm::None
-                              : llvm::Optional<unsigned>(firstTrailingLabel),
+                              ? std::nullopt
+                              : std::optional<unsigned>(firstTrailingLabel),
                           labelType, isActive, context)) {}
 
 BridgedResolvedLocVector::BridgedResolvedLocVector()

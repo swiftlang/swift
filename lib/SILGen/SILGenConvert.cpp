@@ -1170,6 +1170,22 @@ emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
   case ConversionPeepholeHint::Identity:
     return produceValue(C);
 
+  case ConversionPeepholeHint::SubtypeIntoSubstToOrig: {
+    assert(!hint.isForced());
+    assert(innerConversion.getKind() == Conversion::Subtype);
+    assert(outerConversion.getKind() == Conversion::SubstToOrig);
+    // The outer conversion's source type is somewhere between
+    // the inner conversion's source type and the outer conversion's result
+    // type, but subtyping is not path-dependent (right?) so we shouldn't
+    // have to preserve it.
+    auto newConversion = Conversion::getSubstToOrig(
+      innerConversion.getBridgingSourceType(),
+      outerConversion.getReabstractionOrigType(),
+      outerConversion.getReabstractionSubstResultType(),
+      outerConversion.getReabstractionLoweredResultType());
+    return SGF.emitConvertedRValue(loc, newConversion, C, produceOrigValue);
+  }
+
   case ConversionPeepholeHint::BridgeToAnyObject: {
     auto value = produceValue(SGFContext());
     return SGF.emitNativeToBridgedValue(loc, value, getBridgingSourceType(),
@@ -1181,6 +1197,7 @@ emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
     // Otherwise, emit and convert.
     // TODO: if the context allows +0, use it in more situations.
     auto value = produceValue(SGFContext());
+
     SILType loweredResultTy = getBridgingLoweredResultType();
 
     // Nothing to do if the value already has the right representation.
@@ -1225,16 +1242,7 @@ bool ConvertingInitialization::tryPeephole(SILGenFunction &SGF, SILLocation loc,
   ManagedValue value = emitPeepholedConversions(SGF, loc, outerConversion,
                                                 innerConversion, *hint,
                                                 FinalContext, produceValue);
-  
-  // The callers to tryPeephole assume that the initialization is ready to be
-  // finalized after returning. If this conversion sits on top of another
-  // initialization, forward the value into the underlying initialization and
-  // report the value as emitted in context.
-  if (FinalContext.getEmitInto() && !value.isInContext()) {
-    value.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, FinalContext.getEmitInto());
-    value = ManagedValue::forInContext();
-  }
-  setConvertedValue(value);
+  initWithConvertedValue(SGF, loc, value);
   return true;
 }
 
@@ -1246,14 +1254,28 @@ void ConvertingInitialization::copyOrInitValueInto(SILGenFunction &SGF,
 
   // TODO: take advantage of borrowed inputs?
   if (!isInit) formalValue = formalValue.copy(SGF, loc);
-  State = Initialized;
-  
-  Value = TheConversion.emit(SGF, loc, formalValue, FinalContext);
-  
-  if (FinalContext.getEmitInto() && !Value.isInContext()) {
-    Value.forwardInto(SGF, loc, FinalContext.getEmitInto());
-    Value = ManagedValue::forInContext();
+
+  // Convert the value.
+  auto value = TheConversion.emit(SGF, loc, formalValue, FinalContext);
+
+ initWithConvertedValue(SGF, loc, value);
+}
+
+void ConvertingInitialization::initWithConvertedValue(SILGenFunction &SGF,
+                                                      SILLocation loc,
+                                                      ManagedValue value) {
+  assert(getState() == Uninitialized);
+  auto finalInit = FinalContext.getEmitInto();
+  if (value.isInContext()) {
+    assert(finalInit);
+  } else if (finalInit) {
+    value.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, finalInit);
+    value = ManagedValue::forInContext();
   }
+
+  assert(value.isInContext() == (finalInit != nullptr));
+  Value = value;
+  State = Initialized;
 }
 
 ManagedValue
@@ -1264,23 +1286,16 @@ ConvertingInitialization::emitWithAdjustedConversion(SILGenFunction &SGF,
   ConvertingInitialization init(adjustedConversion, getFinalContext());
   auto result = produceValue(SGF, loc, SGFContext(&init));
   result = init.finishEmission(SGF, loc, result);
-  setConvertedValue(result);
+  initWithConvertedValue(SGF, loc, result);
   finishInitialization(SGF);
   return ManagedValue::forInContext();
-}
-
-llvm::Optional<AbstractionPattern>
-ConvertingInitialization::getAbstractionPattern() const {
-  if (TheConversion.isReabstraction()) {
-    return TheConversion.getReabstractionOrigType();
-  }
-  return llvm::None;
 }
 
 ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue value, SGFContext C) const {
   switch (getKind()) {
   case AnyErasure:
+  case Subtype:
     return SGF.emitTransformedValue(loc, value, getBridgingSourceType(),
                                     getBridgingResultType(), C);
 
@@ -1315,31 +1330,36 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
                                         /*isResult*/ true);
 
   case SubstToOrig:
-    return SGF.emitSubstToOrigValue(loc, value,
+    return SGF.emitTransformedValue(loc, value,
+                 AbstractionPattern(getReabstractionSubstSourceType()),
+                                    getReabstractionSubstSourceType(),
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(),
+                                    getReabstractionSubstResultType(),
                                     getReabstractionLoweredResultType(), C);
 
   case OrigToSubst:
-    return SGF.emitOrigToSubstValue(loc, value,
+    return SGF.emitTransformedValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(),
+                                    getReabstractionSubstSourceType(),
+                 AbstractionPattern(getReabstractionSubstResultType()),
+                                    getReabstractionSubstResultType(),
                                     getReabstractionLoweredResultType(), C);
   }
   llvm_unreachable("bad kind");
 }
 
-llvm::Optional<Conversion>
+std::optional<Conversion>
 Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   switch (getKind()) {
   case SubstToOrig:
   case OrigToSubst:
     // TODO: handle reabstraction conversions here, too.
-    return llvm::None;
+    return std::nullopt;
 
   case ForceAndBridgeToObjC:
-    return llvm::None;
+    return std::nullopt;
 
+  case Subtype:
   case AnyErasure:
   case BridgeToObjC:
   case BridgeFromObjC:
@@ -1352,7 +1372,7 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   llvm_unreachable("bad kind");
 }
 
-llvm::Optional<Conversion> Conversion::adjustForInitialForceValue() const {
+std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
   switch (getKind()) {
   case SubstToOrig:
   case OrigToSubst:
@@ -1360,7 +1380,8 @@ llvm::Optional<Conversion> Conversion::adjustForInitialForceValue() const {
   case BridgeFromObjC:
   case BridgeResultFromObjC:
   case ForceAndBridgeToObjC:
-    return llvm::None;
+  case Subtype:
+    return std::nullopt;
 
   case BridgeToObjC: {
     auto sourceOptType =
@@ -1384,8 +1405,10 @@ static void printReabstraction(const Conversion &conversion,
                                llvm::raw_ostream &out, StringRef name) {
   out << name << "(orig: ";
   conversion.getReabstractionOrigType().print(out);
-  out << ", subst: ";
-  conversion.getReabstractionSubstType().print(out);
+  out << ", substSource: ";
+  conversion.getReabstractionSubstSourceType().print(out);
+  out << ", substResult: ";
+  conversion.getReabstractionSubstResultType().print(out);
   out << ", loweredResult: ";
   conversion.getReabstractionLoweredResultType().print(out);
   out << ')';
@@ -1408,6 +1431,8 @@ void Conversion::print(llvm::raw_ostream &out) const {
     return printReabstraction(*this, out, "OrigToSubst");
   case AnyErasure:
     return printBridging(*this, out, "AnyErasure");
+  case Subtype:
+    return printBridging(*this, out, "Subtype");
   case BridgeToObjC:
     return printBridging(*this, out, "BridgeToObjC");
   case ForceAndBridgeToObjC:
@@ -1500,7 +1525,9 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   return false;
 }
 
-llvm::Optional<ConversionPeepholeHint>
+/// TODO: this would really be a lot cleaner if it just returned a
+/// std::optional<Conversion>.
+std::optional<ConversionPeepholeHint>
 Lowering::canPeepholeConversions(SILGenFunction &SGF,
                                  const Conversion &outerConversion,
                                  const Conversion &innerConversion) {
@@ -1515,25 +1542,36 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
 
       if (innerConversion.getReabstractionOrigType().getCachingKey() !=
           outerConversion.getReabstractionOrigType().getCachingKey() ||
-          innerConversion.getReabstractionSubstType() !=
-          outerConversion.getReabstractionSubstType()) {
+          innerConversion.getReabstractionSubstSourceType() !=
+          outerConversion.getReabstractionSubstResultType()) {
         break;
       }
 
       return ConversionPeepholeHint(ConversionPeepholeHint::Identity, false);
 
+    case Conversion::Subtype:
+      if (outerConversion.getKind() == Conversion::SubstToOrig)
+        return ConversionPeepholeHint(
+                 ConversionPeepholeHint::SubtypeIntoSubstToOrig, false);
+      break;
+
     default:
       break;
     }
 
-    return llvm::None;
+    return std::nullopt;
+
+  case Conversion::Subtype:
+    if (innerConversion.getKind() == Conversion::Subtype)
+      return ConversionPeepholeHint(ConversionPeepholeHint::Subtype, false);
+    return std::nullopt;
 
   case Conversion::AnyErasure:
   case Conversion::BridgeFromObjC:
   case Conversion::BridgeResultFromObjC:
     // TODO: maybe peephole bridging through a Swift type?
     // This isn't actually something that happens in normal code generation.
-    return llvm::None;
+    return std::nullopt;
 
   case Conversion::ForceAndBridgeToObjC:
   case Conversion::BridgeToObjC:
@@ -1547,7 +1585,7 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       // Never peephole if both conversions are explicit; there might be
       // something the user's trying to do which we don't understand.
       if (outerExplicit && innerExplicit)
-        return llvm::None;
+        return std::nullopt;
 
       // Otherwise, we can peephole if we understand the resulting conversion
       // and applying the peephole doesn't change semantics.
@@ -1564,7 +1602,7 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       if (forced) {
         sourceType = sourceType.getOptionalObjectType();
         if (!sourceType)
-          return llvm::None;
+          return std::nullopt;
         intermediateType = intermediateType.getOptionalObjectType();
         assert(intermediateType);
       }
@@ -1596,7 +1634,7 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       // TODO: use special SILGen to preserve semantics in this case,
       // e.g. by making a copy.
       if (!outerExplicit && !innerExplicit) {
-        return llvm::None;
+        return std::nullopt;
       }
 
       // Okay, now we're in the domain of the bridging peephole: an
@@ -1629,11 +1667,11 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
         }
       }
 
-      return llvm::None;
+      return std::nullopt;
     }
 
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
   llvm_unreachable("bad kind");

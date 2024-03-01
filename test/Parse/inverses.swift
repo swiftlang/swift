@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
-
-
 protocol U {}
 
 enum Maybe<Thing: ~Copyable> : ~Copyable {}
@@ -50,8 +48,7 @@ public struct MoveOnlyS1<T> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS2<T: Equatable> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS3<T: ~Copyable> : ~Copyable { /*deinit {}*/ }
 
-protocol Rope<Element>: Hashable, ~ Copyable {
-
+protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
   associatedtype Element: ~Copyable
 }
 

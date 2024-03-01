@@ -42,10 +42,8 @@ static bool requiresHeapHeader(LayoutKind kind) {
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM,
-                           llvm::Optional<CanType> type,
-                           LayoutKind layoutKind,
-                           LayoutStrategy strategy,
+StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
+                           LayoutKind layoutKind, LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
   NominalTypeDecl *decl = nullptr;
@@ -387,6 +385,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
   IsLoadable &= eltTI.isLoadable();
+  IsKnownCopyable &= eltTI.isCopyable(ResilienceExpansion::Maximal);
 
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);

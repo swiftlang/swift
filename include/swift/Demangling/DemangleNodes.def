@@ -133,6 +133,7 @@ NODE(ImplConvention)
 NODE(ImplDifferentiabilityKind)
 NODE(ImplErasedIsolation)
 NODE(ImplParameterResultDifferentiability)
+NODE(ImplParameterTransferring)
 NODE(ImplFunctionAttribute)
 NODE(ImplFunctionConvention)
 NODE(ImplFunctionConventionName)
@@ -149,7 +150,9 @@ NODE(InfixOperator)
 CONTEXT_NODE(Initializer)
 CONTEXT_NODE(InitAccessor)
 NODE(Isolated)
+NODE(Transferring)
 NODE(IsolatedAnyFunctionType)
+NODE(TransferringResultFunctionType)
 NODE(KeyPathGetterThunkHelper)
 NODE(KeyPathSetterThunkHelper)
 NODE(KeyPathEqualsThunkHelper)
@@ -358,7 +361,7 @@ NODE(AsyncSuspendResumePartialFunction)
 NODE(AccessibleFunctionRecord)
 NODE(CompileTimeConst)
 
-// Added in Swift 5.11
+// Added in Swift 6.0
 NODE(AccessibleProtocolRequirementFunctionRecord)
 
 // Added in Swift 5.7
@@ -376,7 +379,7 @@ NODE(HasSymbolQuery)
 NODE(OpaqueReturnTypeIndex)
 NODE(OpaqueReturnTypeParent)
 
-// Addedn in Swift 5.11
+// Addedn in Swift 6.0
 NODE(OutlinedEnumTagStore)
 NODE(OutlinedEnumProjectDataForLoad)
 NODE(OutlinedEnumGetTag)

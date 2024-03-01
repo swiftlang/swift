@@ -178,7 +178,7 @@ SourceLoc Stmt::getEndLoc() const {
 }
 
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
-                     llvm::Optional<bool> implicit)
+                     std::optional<bool> implicit)
     : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
       LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
@@ -194,7 +194,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
-                             llvm::Optional<bool> implicit) {
+                             std::optional<bool> implicit) {
   assert(std::none_of(elts.begin(), elts.end(),
                       [](ASTNode node) -> bool { return node.isNull(); }) &&
          "null element in BraceStmt");
@@ -351,7 +351,7 @@ SourceLoc ReturnStmt::getEndLoc() const {
 
 YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
                              SourceLoc lpLoc, ArrayRef<Expr *> yields,
-                             SourceLoc rpLoc, llvm::Optional<bool> implicit) {
+                             SourceLoc rpLoc, std::optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
                               alignof(YieldStmt));
   return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
@@ -467,13 +467,11 @@ Expr *ForEachStmt::getTypeCheckedSequence() const {
   return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
-DoCatchStmt *DoCatchStmt::create(DeclContext *dc,
-                                 LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc,
-                                 SourceLoc throwsLoc, TypeLoc thrownType,
-                                 Stmt *body,
+DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
+                                 SourceLoc doLoc, SourceLoc throwsLoc,
+                                 TypeLoc thrownType, Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
-                                 llvm::Optional<bool> implicit) {
+                                 std::optional<bool> implicit) {
   ASTContext &ctx = dc->getASTContext();
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
@@ -685,7 +683,7 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
 }
 
 IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
-               Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
+               Stmt *Else, std::optional<bool> implicit, ASTContext &Ctx)
     : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
              Else, implicit) {}
 
@@ -723,7 +721,7 @@ bool IfStmt::isSyntacticallyExhaustive() const {
 }
 
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
-                     llvm::Optional<bool> implicit, ASTContext &Ctx)
+                     std::optional<bool> implicit, ASTContext &Ctx)
     : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {}
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
@@ -746,8 +744,8 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
                    BraceStmt *body,
-                   llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
-                   llvm::Optional<bool> implicit,
+                   std::optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   std::optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
       UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
@@ -787,7 +785,7 @@ getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
   SmallVector<VarDecl *, 4> tmp;
   labelItems.front().getPattern()->collectVariables(tmp);
   return ctx.AllocateTransform<VarDecl *>(
-      llvm::makeArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
+      llvm::ArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
         auto *vNew = new (ctx) VarDecl(
             /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
             vOld->getName(), vOld->getDeclContext());
@@ -864,8 +862,8 @@ CaseStmt *
 CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
                  ArrayRef<CaseLabelItem> caseLabelItems,
                  SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
-                 llvm::Optional<MutableArrayRef<VarDecl *>> caseVarDecls,
-                 llvm::Optional<bool> implicit,
+                 std::optional<MutableArrayRef<VarDecl *>> caseVarDecls,
+                 std::optional<bool> implicit,
                  NullablePtr<FallthroughStmt> fallthroughStmt) {
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(

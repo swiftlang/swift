@@ -17,7 +17,6 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -29,9 +28,10 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/thread.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/thread.h"
 #include <fstream>
+#include <optional>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <sys/param.h>
 #include <unistd.h>
@@ -260,7 +260,7 @@ static void skt_main(skt_args *args) {
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
-  auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
@@ -319,7 +319,7 @@ static int printDiags();
 
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename);
 
-static Optional<int64_t> getReqOptValueAsInt(StringRef Value) {
+static std::optional<int64_t> getReqOptValueAsInt(StringRef Value) {
   if (Value.equals_insensitive("true"))
     return 1;
   if (Value.equals_insensitive("false"))
@@ -327,21 +327,22 @@ static Optional<int64_t> getReqOptValueAsInt(StringRef Value) {
   int64_t Ret;
   if (Value.find_first_not_of("-0123456789") != StringRef::npos ||
       Value.getAsInteger(0, Ret)) {
-    return None;
+    return std::nullopt;
   }
   return Ret;
 }
 
-static Optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
+static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
   if (!Value.startswith("uid:"))
-    return None;
+    return std::nullopt;
   Value = Value.drop_front(4);
   return sourcekitd_uid_get_from_buf(Value.data(), Value.size());
 }
 
-static Optional<sourcekitd_object_t> getReqOptValueAsArray(StringRef Value) {
+static std::optional<sourcekitd_object_t>
+getReqOptValueAsArray(StringRef Value) {
   if (!Value.startswith("[") || !Value.endswith("]"))
-    return None;
+    return std::nullopt;
   SmallVector<StringRef, 4> Elements;
   Value.drop_front().drop_back().split(Elements, ';');
   auto Array = sourcekitd_request_array_create(nullptr, 0);
@@ -478,7 +479,7 @@ static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
                                              const TestOptions &opts) {
   if (opts.PrintRequest)
     sourcekitd_request_description_dump(req);
-  Optional<PrintingTimer> timer;
+  std::optional<PrintingTimer> timer;
   if (opts.timeRequest)
     timer.emplace("request time");
   return sourcekitd_send_request_sync(req);
@@ -1159,6 +1160,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyIndexStorePath, Opts.IndexStorePath.c_str());
     sourcekitd_request_dictionary_set_string(Req, KeyIndexUnitOutputPath, Opts.IndexUnitOutputPath.c_str());
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndexToStore);
+    addRequestOptionsDirect(Req, Opts);
     break;
   }
 
@@ -1806,6 +1808,7 @@ struct ResponseSymbolInfo {
   const char *TypeUSR = nullptr;
   const char *ContainerTypeUSR = nullptr;
   const char *DocComment = nullptr;
+  const char *DocCommentAsXML = nullptr;
   const char *GroupName = nullptr;
   const char *LocalizationKey = nullptr;
   const char *AnnotatedDeclaration = nullptr;
@@ -1854,6 +1857,8 @@ struct ResponseSymbolInfo {
         sourcekitd_variant_dictionary_get_string(Info, KeyContainerTypeUsr);
 
     Symbol.DocComment =
+        sourcekitd_variant_dictionary_get_string(Info, KeyDocComment);
+    Symbol.DocCommentAsXML =
         sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
     Symbol.GroupName =
         sourcekitd_variant_dictionary_get_string(Info, KeyGroupName);
@@ -1979,8 +1984,12 @@ struct ResponseSymbolInfo {
       OS << AnnotatedDeclaration << '\n';
     if (FullyAnnotatedDeclaration)
       OS << FullyAnnotatedDeclaration << '\n';
+    OS << "DOC COMMENT\n";
     if (DocComment)
       OS << DocComment << '\n';
+    OS << "DOC COMMENT XML\n";
+    if (DocCommentAsXML)
+      OS << DocCommentAsXML << '\n';
     if (LocalizationKey) {
       OS << "<LocalizationKey>" << LocalizationKey;
       OS << "</LocalizationKey>" << '\n';
@@ -2124,7 +2133,7 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
-  llvm::Optional<int64_t> Offset;
+  std::optional<int64_t> Offset;
   if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
     Offset = sourcekitd_variant_int64_get_value(OffsetObj);
   }
@@ -2222,7 +2231,7 @@ static void printFoundUSR(sourcekitd_variant_t Info,
                           llvm::raw_ostream &OS) {
   sourcekitd_variant_t OffsetObj =
       sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
-  llvm::Optional<int64_t> Offset;
+  std::optional<int64_t> Offset;
   if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL)
     Offset = sourcekitd_variant_int64_get_value(OffsetObj);
 
@@ -2620,7 +2629,7 @@ static std::string initializeSource(StringRef Input) {
   return result;
 }
 
-static Optional<std::pair<unsigned, unsigned>>
+static std::optional<std::pair<unsigned, unsigned>>
 firstPlaceholderRange(StringRef Source, unsigned from) {
   const char *StartPtr = Source.data();
   Source = Source.drop_front(from);
@@ -2640,7 +2649,7 @@ firstPlaceholderRange(StringRef Source, unsigned from) {
     Source = Source.substr(Pos+2);
     return std::make_pair(OffsetStart, OffsetEnd-OffsetStart);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,

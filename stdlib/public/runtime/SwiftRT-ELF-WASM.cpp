@@ -38,7 +38,7 @@ static const void *__backtraceRef __attribute__((used))
 #if defined(__ELF__)
 # define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"a\"\n");
 #elif defined(__wasm__)
-# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"\",@\n");
+# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"R\",@\n");
 #endif
 
 #define DECLARE_SWIFT_SECTION(name)                                                          \
@@ -61,7 +61,6 @@ DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
 DECLARE_SWIFT_SECTION(swift5_mpenum)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
-DECLARE_SWIFT_SECTION(swift5_accessible_protocol_requirement_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
 DECLARE_SWIFT_SECTION(swift5_tests)
 }
@@ -99,7 +98,6 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_capture),
       SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
-      SWIFT_SECTION_RANGE(swift5_accessible_protocol_requirement_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
       SWIFT_SECTION_RANGE(swift5_tests),
   };

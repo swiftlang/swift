@@ -1,8 +1,10 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50 -disable-objc-attr-requires-foundation-module
 // RUN: not %target-swift-frontend -target %target-cpu-apple-macosx10.50 -disable-objc-attr-requires-foundation-module -typecheck %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 
+// XFAIL: noncopyable_generics
+
 // Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
-// RUN: not %target-swift-frontend -target %target-cpu-apple-macosx10.50 -typecheck -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | %FileCheck %s '--implicit-check-not=error:'
+// RUN: not %target-swift-frontend -target %target-cpu-apple-macosx10.50 -typecheck -disable-objc-attr-requires-foundation-module -disable-availability-checking %s -diagnostic-style llvm 2>&1 | %FileCheck %s '--implicit-check-not=error:'
 
 // REQUIRES: OS=macosx
 

@@ -808,6 +808,19 @@ WARNING(sema_import_current_module_with_file,none,
 ERROR(sema_opening_import,Fatal,
       "opening import file for module %0: %1", (Identifier, StringRef))
 
+REMARK(serialization_skipped_invalid_decl,none,
+       "serialization skipped invalid %kind0",
+       (const Decl *))
+REMARK(serialization_skipped_invalid_type,none,
+       "serialization skipped for invalid type %0",
+       (TypeRepr *))
+REMARK(serialization_skipped_invalid_type_unknown_name,none,
+       "serialization skipped for invalid type",
+       ())
+ERROR(serialization_failed,none,
+      "serialization of module %0 failed due to the errors above",
+      (const ModuleDecl *))
+
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
@@ -5627,6 +5640,9 @@ ERROR(sendable_raw_storage,none,
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
+WARNING(restate_unchecked_sendable,none,
+        "class %0 must restate inherited '@unchecked Sendable' conformance",
+        (DeclName))
 ERROR(unchecked_not_inheritance_clause,none,
       "'unchecked' attribute only applies in inheritance clauses", ())
 ERROR(unchecked_not_existential,none,
@@ -7832,6 +7848,12 @@ ERROR(lifetime_dependence_cannot_use_infer, none,
        (StringRef))
 ERROR(lifetime_dependence_on_bitwise_copyable, none,
       "invalid lifetime dependence on bitwise copyable type", ())
+ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
+      "cannot infer lifetime dependence on implicit initializer of ~Escapable"
+      " type, define an initializer with explicit lifetime dependence"
+      " specifiers", ())
+ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
+      "lifetime dependence specifiers cannot be applied to tuple elements", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Transferring

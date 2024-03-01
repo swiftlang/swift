@@ -183,7 +183,7 @@ void AvailableValues::dump() const { print(llvm::dbgs(), nullptr); }
 struct borrowtodestructure::Implementation {
   BorrowToDestructureTransform &interface;
 
-  llvm::Optional<AvailableValueStore> blockToAvailableValues;
+  std::optional<AvailableValueStore> blockToAvailableValues;
 
   /// The liveness that we use for all borrows or for individual switch_enum
   /// arguments.
@@ -435,8 +435,9 @@ bool Implementation::gatherUses(SILValue value) {
       continue;
     }
     case OperandOwnership::Borrow: {
-      // Look through borrows.
-      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser())) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser());
+          bbi && !bbi->isFixed()) {
+        // Look through non-fixed borrows.
         LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
         for (auto *use : bbi->getUses()) {
           useWorklist.push_back(use);
@@ -452,7 +453,7 @@ bool Implementation::gatherUses(SILValue value) {
       }
 
       // Otherwise, treat it as a normal use.
-      LLVM_DEBUG(llvm::dbgs() << "        Treating non-begin_borrow borrow as "
+      LLVM_DEBUG(llvm::dbgs() << "        Treating borrow as "
                                  "a non lifetime ending use!\n");
       blocksToUses.insert(nextUse->getParentBlock(),
                           {nextUse,
@@ -498,7 +499,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
     // First loop through our uses and handle any consuming twice errors. We
     // also setup usedBits to check for non-consuming uses that may overlap.
     Operand *badOperand = nullptr;
-    llvm::Optional<TypeTreeLeafTypeRange> badRange;
+    std::optional<TypeTreeLeafTypeRange> badRange;
     for (auto *use : instRangePair.second) {
       if (!use->isConsuming())
         continue;
@@ -632,7 +633,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
 
 #ifndef NDEBUG
 static void dumpSmallestTypeAvailable(
-    SmallVectorImpl<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>>
+    SmallVectorImpl<std::optional<std::pair<TypeOffsetSizePair, SILType>>>
         &smallestTypeAvailable) {
   LLVM_DEBUG(llvm::dbgs() << "            Dumping smallest type available!\n");
   for (auto pair : llvm::enumerate(smallestTypeAvailable)) {
@@ -726,11 +727,11 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
         : targetBlockRPO(*pofi->getRPONumber(block)), pe(block->pred_end()),
           pofi(pofi) {}
 
-    llvm::Optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
+    std::optional<SILBasicBlock *> operator()(SILBasicBlock *predBlock) const {
       // If our predecessor block has a larger RPO number than our target block,
       // then their edge must be a backedge.
       if (targetBlockRPO < *pofi->getRPONumber(predBlock))
-        return llvm::None;
+        return std::nullopt;
       return predBlock;
     }
   };
@@ -762,7 +763,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "        Computing smallest type available for "
                              "available values for block bb"
                           << block->getDebugID() << '\n');
-  SmallVector<llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
+  SmallVector<std::optional<std::pair<TypeOffsetSizePair, SILType>>, 8>
       smallestTypeAvailable;
   {
     auto pi = predsSkippingBackEdges.begin();
@@ -789,7 +790,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
               {{TypeOffsetSizePair(predAvailableValues[i], getRootValue()),
                 predAvailableValues[i]->getType()}});
         else
-          smallestTypeAvailable.emplace_back(llvm::None);
+          smallestTypeAvailable.emplace_back(std::nullopt);
       }
       LLVM_DEBUG(llvm::dbgs() << "        Finished computing initial smallest "
                                  "type available for block bb"
@@ -811,7 +812,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
           continue;
 
         if (!predAvailableValues[i]) {
-          smallestTypeAvailable[i] = llvm::None;
+          smallestTypeAvailable[i] = std::nullopt;
           continue;
         }
 

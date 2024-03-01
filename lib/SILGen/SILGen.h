@@ -89,34 +89,34 @@ public:
 
   size_t anonymousSymbolCounter = 0;
 
-  llvm::Optional<SILDeclRef> StringToNSStringFn;
-  llvm::Optional<SILDeclRef> NSStringToStringFn;
-  llvm::Optional<SILDeclRef> ArrayToNSArrayFn;
-  llvm::Optional<SILDeclRef> NSArrayToArrayFn;
-  llvm::Optional<SILDeclRef> DictionaryToNSDictionaryFn;
-  llvm::Optional<SILDeclRef> NSDictionaryToDictionaryFn;
-  llvm::Optional<SILDeclRef> SetToNSSetFn;
-  llvm::Optional<SILDeclRef> NSSetToSetFn;
-  llvm::Optional<SILDeclRef> BoolToObjCBoolFn;
-  llvm::Optional<SILDeclRef> ObjCBoolToBoolFn;
-  llvm::Optional<SILDeclRef> BoolToDarwinBooleanFn;
-  llvm::Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  llvm::Optional<SILDeclRef> NSErrorToErrorFn;
-  llvm::Optional<SILDeclRef> ErrorToNSErrorFn;
-  llvm::Optional<SILDeclRef> BoolToWindowsBoolFn;
-  llvm::Optional<SILDeclRef> WindowsBoolToBoolFn;
+  std::optional<SILDeclRef> StringToNSStringFn;
+  std::optional<SILDeclRef> NSStringToStringFn;
+  std::optional<SILDeclRef> ArrayToNSArrayFn;
+  std::optional<SILDeclRef> NSArrayToArrayFn;
+  std::optional<SILDeclRef> DictionaryToNSDictionaryFn;
+  std::optional<SILDeclRef> NSDictionaryToDictionaryFn;
+  std::optional<SILDeclRef> SetToNSSetFn;
+  std::optional<SILDeclRef> NSSetToSetFn;
+  std::optional<SILDeclRef> BoolToObjCBoolFn;
+  std::optional<SILDeclRef> ObjCBoolToBoolFn;
+  std::optional<SILDeclRef> BoolToDarwinBooleanFn;
+  std::optional<SILDeclRef> DarwinBooleanToBoolFn;
+  std::optional<SILDeclRef> NSErrorToErrorFn;
+  std::optional<SILDeclRef> ErrorToNSErrorFn;
+  std::optional<SILDeclRef> BoolToWindowsBoolFn;
+  std::optional<SILDeclRef> WindowsBoolToBoolFn;
 
-  llvm::Optional<ProtocolDecl *> PointerProtocol;
+  std::optional<ProtocolDecl *> PointerProtocol;
 
-  llvm::Optional<ProtocolDecl *> ObjectiveCBridgeable;
-  llvm::Optional<FuncDecl *> BridgeToObjectiveCRequirement;
-  llvm::Optional<FuncDecl *> UnconditionallyBridgeFromObjectiveCRequirement;
-  llvm::Optional<AssociatedTypeDecl *> BridgedObjectiveCType;
+  std::optional<ProtocolDecl *> ObjectiveCBridgeable;
+  std::optional<FuncDecl *> BridgeToObjectiveCRequirement;
+  std::optional<FuncDecl *> UnconditionallyBridgeFromObjectiveCRequirement;
+  std::optional<AssociatedTypeDecl *> BridgedObjectiveCType;
 
-  llvm::Optional<ProtocolDecl *> BridgedStoredNSError;
-  llvm::Optional<VarDecl *> NSErrorRequirement;
+  std::optional<ProtocolDecl *> BridgedStoredNSError;
+  std::optional<VarDecl *> NSErrorRequirement;
 
-  llvm::Optional<ProtocolConformance *> NSErrorConformanceToError;
+  std::optional<ProtocolConformance *> NSErrorConformanceToError;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -149,7 +149,7 @@ public:
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
-  llvm::Optional<SILVTable::Entry>
+  std::optional<SILVTable::Entry>
   emitVTableMethod(ClassDecl *theClass, SILDeclRef derived, SILDeclRef base);
 
   /// True if a function has been emitted for a given SILDeclRef.
@@ -305,7 +305,9 @@ public:
 
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  SILFunction *emitClosure(AbstractClosureExpr *ce);
+  SILFunction *emitClosure(AbstractClosureExpr *ce,
+                           const FunctionTypeInfo &closureInfo);
+
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
@@ -417,12 +419,6 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-
-  /// Should the self argument of the given method always be emitted as
-  /// an r-value (meaning that it can be borrowed only if that is not
-  /// semantically detectable), or it acceptable to emit it as a borrowed
-  /// storage reference?
-  bool shouldEmitSelfAsRValue(FuncDecl *method, CanType selfType);
 
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);

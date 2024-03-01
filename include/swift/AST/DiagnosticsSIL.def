@@ -130,6 +130,10 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
 
+ERROR(without_actually_escaping_on_isolated_any,none,
+      "withoutActuallyEscaping is currently unimplemented for @isolated(any) "
+      "function values", ())
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
@@ -967,11 +971,21 @@ NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
 //
 
 ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring non-Sendable value %0 could yield races with later accesses",
+      "transferring %0 may cause a race",
       (Identifier))
+ERROR(regionbasedisolation_stronglytransfer_assignment_yields_race_name, none,
+      "assigning %0 to transferring parameter %1 may cause a race",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_stronglytransfer_taskisolated_assign_note, none,
+      "%0 is a task isolated value that is assigned into transferring parameter %1. Transferred uses of %1 may race with caller uses of %0",
+      (Identifier, Identifier))
+
 NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
      "%0 is transferred from %1 caller to %2 callee. Later uses in caller could race with potential uses in callee",
      (Identifier, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_transfer_non_transferrable_named_note, none,
+      "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
+      (Identifier, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_info_isolated_capture, none,
      "%1 value %0 is captured by %2 closure. Later local uses could race",
      (Identifier, ActorIsolation, ActorIsolation))

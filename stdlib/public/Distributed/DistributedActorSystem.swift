@@ -382,6 +382,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  @available(SwiftStdlib 6.0, *)
   func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -413,6 +414,22 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
       where Act: DistributedActor,
             Act.ID == ActorID,
             Err: Error
+
+  // Implementation notes:
+  // The `metatype` must be the type of `Value`, and it must conform to
+  // `SerializationRequirement`. If it does not, the method will crash at
+  // runtime. This is because we cannot express
+  // `Value: SerializationRequirement`, however the generic `Value` is still
+  // useful since it allows us to avoid boxing the value into an existential,
+  // before we'd right away unbox it as first thing in the implementation of
+  // this function.
+  /// Implementation synthesized by the compiler.
+  /// Not intended to be invoked explicitly from user code!
+  func invokeHandlerOnReturn(
+    handler: ResultHandler,
+    resultBuffer: UnsafeRawPointer,
+    metatype: Any.Type
+  ) async throws
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
@@ -466,33 +483,13 @@ extension DistributedActorSystem {
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
-    let concreteTargetNameTypeNamePair: _SwiftNamePair?
-    if #available(SwiftStdlib 5.11, *) {
-      let dataAndLength = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        _getConcreteAccessibleWitnessName(on: actor,
-          targetNameUTF8.baseAddress!, UInt(targetNameUTF8.endIndex))
-      }
-      // If the length is greater than zero it is a real value, nil otherwise
-      if dataAndLength.1 > 0 {
-        concreteTargetNameTypeNamePair = dataAndLength
-      } else {
-        concreteTargetNameTypeNamePair = nil
-      }
-    } else {
-      // protocol method targets not supported in previous Swift versions,
-      // the targetName can be assumed to be a concrete name
-      concreteTargetNameTypeNamePair = nil
-    }
-    let concreteTargetNameData = concreteTargetNameTypeNamePair?.0
-    let concreteTargetNameLength = (concreteTargetNameTypeNamePair?.1).map(UInt.init)
-
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
-        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-          _getGenericEnvironmentOfDistributedTarget(
-            concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-            concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
-        }
+      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        _getGenericEnvironmentOfDistributedTarget(
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex))
+      }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
     var witnessTablesBuffer: UnsafeRawPointer? = nil
@@ -519,7 +516,7 @@ extension DistributedActorSystem {
       }
 
       (witnessTablesBuffer, numWitnessTables) = _getWitnessTablesFor(environment: genericEnv,
-                                                                     genericArguments: substitutionsBuffer!)
+        genericArguments: substitutionsBuffer!)
       if numWitnessTables < 0 {
         throw ExecuteDistributedTargetError(
           message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))",
@@ -530,8 +527,8 @@ extension DistributedActorSystem {
     let paramCount =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         __getParameterCount(
-          concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-          concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex))
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex))
       }
 
     guard paramCount >= 0 else {
@@ -553,8 +550,8 @@ extension DistributedActorSystem {
     // Demangle and write all parameter types into the prepared buffer
     let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
       __getParameterTypeInfo(
-        concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-        concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
+        targetNameUTF8.baseAddress!,
+        UInt(targetNameUTF8.endIndex),
         genericEnv,
         substitutionsBuffer,
         argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
@@ -588,8 +585,8 @@ extension DistributedActorSystem {
     let maybeReturnTypeFromTypeInfo =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         __getReturnTypeInfo(
-          /*targetName:*/concreteTargetNameData ?? targetNameUTF8.baseAddress!,
-          /*targetLength:*/concreteTargetNameLength ?? UInt(targetNameUTF8.endIndex),
+          /*targetName:*/targetNameUTF8.baseAddress!,
+          /*targetLength:*/UInt(targetNameUTF8.endIndex),
           /*genericEnv:*/genericEnv,
           /*genericArguments:*/substitutionsBuffer)
       }
@@ -618,44 +615,26 @@ extension DistributedActorSystem {
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
       // Execute the target!
-      // Boilerplate invocation since types don't quite align between
-      // concreteTargetNameData and
-      if let concreteTargetNameData,
-         let concreteTargetNameLength {
-        try await _executeDistributedTarget(
-          on: actor,
-          /*targetNameData:*/concreteTargetNameData,
-          /*targetNameLength:*/concreteTargetNameLength,
-          argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-          resultBuffer: resultBuffer._rawValue,
-          substitutions: UnsafeRawPointer(substitutionsBuffer),
-          witnessTables: witnessTablesBuffer,
-          numWitnessTables: UInt(numWitnessTables)
-        )
-      } else {
-        try await _executeDistributedTarget(
-          on: actor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.count),
-          argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-          resultBuffer: resultBuffer._rawValue,
-          substitutions: UnsafeRawPointer(substitutionsBuffer),
-          witnessTables: witnessTablesBuffer,
-          numWitnessTables: UInt(numWitnessTables)
-        )
-      }
+      try await _executeDistributedTarget(
+        on: actor,
+        /*targetNameData:*/targetName,
+        /*targetNameLength:*/UInt(targetName.count),
+        argumentDecoder: &invocationDecoder,
+        argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+        resultBuffer: resultBuffer._rawValue,
+        substitutions: UnsafeRawPointer(substitutionsBuffer),
+        witnessTables: witnessTablesBuffer,
+        numWitnessTables: UInt(numWitnessTables)
+      )
 
       if returnType == Void.self {
         try await handler.onReturnVoid()
       } else {
-        func invokeOnReturn<R>(_ returnType: R.Type) async throws {
-          let value = resultBuffer.load(as: returnType)
-          try await handler.onReturn(value: value)
-        }
-
-        try await _openExistential(returnType, do: invokeOnReturn)
+        try await self.invokeHandlerOnReturn(
+          handler: handler,
+          resultBuffer: resultBuffer,
+          metatype: returnType
+        )
       }
     } catch {
       try await handler.onThrow(error: error)
@@ -702,8 +681,8 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
-func _executeDistributedTarget<D: DistributedTargetInvocationDecoder, DA: DistributedActor>(
-  on actor: DA, // DistributedActor
+func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
+  on actor: AnyObject, // : DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
@@ -783,6 +762,7 @@ public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
 
   /// Record an argument of `Argument` type.
   /// This will be invoked for every argument of the target, in declaration order.
+  @available(SwiftStdlib 6.0, *)
   mutating func recordArgument<Value/*: SerializationRequirement*/>(
     _ argument: RemoteCallArgument<Value>
   ) throws
@@ -795,6 +775,7 @@ public protocol DistributedTargetInvocationEncoder<SerializationRequirement> {
 
   /// Record the return type of the distributed method.
   /// This method will not be invoked if the target is returning `Void`.
+  @available(SwiftStdlib 6.0, *)
   mutating func recordReturnType<R/*: SerializationRequirement*/>(_ type: R.Type) throws
 
   /// Invoked to signal to the encoder that no further `record...` calls will be made on it.
@@ -933,6 +914,7 @@ public protocol DistributedTargetInvocationDecoder<SerializationRequirement> {
   /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
   /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
   /// performs the actual distributed (local) instance method invocation.
+  @available(SwiftStdlib 6.0, *)
   mutating func decodeNextArgument<Argument/*: SerializationRequirement*/>() throws -> Argument
 
   /// Decode the specific error type that the distributed invocation target has recorded.
@@ -981,6 +963,7 @@ public protocol DistributedTargetInvocationResultHandler<SerializationRequiremen
 
   /// Invoked when the distributed target execution returns successfully.
   /// The `value` is the return value of the executed distributed invocation target.
+  @available(SwiftStdlib 6.0, *)
   func onReturn<Success/*: SerializationRequirement*/>(value: Success) async throws
 
   /// Invoked when the distributed target execution of a `Void` returning

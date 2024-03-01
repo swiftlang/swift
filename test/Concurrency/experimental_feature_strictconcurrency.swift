@@ -31,7 +31,7 @@ func iterate(stream: AsyncStream<Int>) async {
   // FIXME: Region isolation should consider a value from a 'nonisolated(unsafe)'
   // declaration to be in a disconnected region
 
-  // expected-region-isolation-warning @+3 {{transferring non-Sendable value 'it' could yield races with later accesses}}
+  // expected-region-isolation-warning @+3 {{transferring 'it' may cause a race}}
   // expected-region-isolation-note @+2 {{'it' is transferred from main actor-isolated caller to nonisolated callee. Later uses in caller could race with potential uses in callee}}
   // expected-region-isolation-note @+1 {{access here could race}}
   while let element = await it.next() {

@@ -508,7 +508,7 @@ struct UseState {
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
 
-  llvm::Optional<unsigned> cachedNumSubelements;
+  std::optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
   ///
@@ -653,11 +653,11 @@ struct UseState {
   /// instruction.
   /// 2. In the case of a ref_element_addr or a global, this will contain the
   /// end_access.
-  llvm::Optional<ScopeRequiringFinalInit>
+  std::optional<ScopeRequiringFinalInit>
   isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
     auto iter = scopeEndsRequiringInit.find(inst);
     if (iter == scopeEndsRequiringInit.end()) {
-      return llvm::None;
+      return std::nullopt;
     }
     return {iter->second};
   }
@@ -689,7 +689,7 @@ struct UseState {
 
   void clear() {
     address = nullptr;
-    cachedNumSubelements = llvm::None;
+    cachedNumSubelements = std::nullopt;
     consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
@@ -1128,13 +1128,20 @@ void UseState::initializeLiveness(
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
-  // Assume a strict check of a temporary is initialized before the check.
-  if (auto *asi = dyn_cast<BeginAccessInst>(address->getOperand());
-      asi && address->isStrict()) {
+  // Assume a strict-checked value initialized before the check.
+  if (address->isStrict()) {
     LLVM_DEBUG(llvm::dbgs()
-               << "Adding strict-marked begin_access as init!\n");
+               << "Adding strict marker as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
+  }
+  
+  // Assume a value wrapped in a MoveOnlyWrapper is initialized.
+  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address->getOperand())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Adding copyable_to_move_only_wrapper as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());    
   }
 
   // Now that we have finished initialization of defs, change our multi-maps
@@ -1718,7 +1725,7 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
 }
 
 /// Whether an error should be emitted in response to a partial consumption.
-static llvm::Optional<PartialMutationError>
+static std::optional<PartialMutationError>
 shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
                                SILInstruction *user, SILType useType,
                                TypeTreeLeafTypeRange usedBits) {
@@ -1971,17 +1978,13 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
 } // end anonymous namespace
 
 bool GatherUsesVisitor::visitTransitiveUseAsEndPointUse(Operand *op) {
-  // If an access is checked by its own strict mark_unresolved_noncopyable
-  // instruction, then treat the access as an opaque borrowing use from the
-  // outside.
+  // If an access is static and marked as "no nested conflict", we use that
+  // in switch codegen to mark an opaque sub-access that move-only checking
+  // should not look through.
   if (auto ba = dyn_cast<BeginAccessInst>(op->getUser())) {
-    for (auto accessUse : ba->getUses()) {
-      if (auto mark
-         = dyn_cast<MarkUnresolvedNonCopyableValueInst>(accessUse->getUser())) {
-        if (mark->isStrict()) {
-          return true;
-        }
-      }
+    if (ba->getEnforcement() == SILAccessEnforcement::Static
+        && ba->hasNoNestedConflict()) {
+      return true;
     }
   }
   return false;
@@ -2541,20 +2544,29 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
   
-  // Treat an opaque read access as a borrow liveness use for the duration
-  // of the access.
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
-    assert(access->getAccessKind() == SILAccessKind::Read);
-    LLVM_DEBUG(llvm::dbgs() << "begin_access use\n");
-    
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange) {
-      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
-      return false;
-    }
+    switch (access->getAccessKind()) {
+    // Treat an opaque read access as a borrow liveness use for the duration
+    // of the access.
+    case SILAccessKind::Read: {
+      LLVM_DEBUG(llvm::dbgs() << "begin_access [read]\n");
+      
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
 
-    useState.recordLivenessUse(user, *leafRange);
-    return true;
+      useState.recordLivenessUse(user, *leafRange);
+      return true;
+    }
+    // Treat a deinit access as a consume of the entire value.
+    case SILAccessKind::Deinit:
+      llvm_unreachable("should have been handled by `memInstMustConsume`");
+    case SILAccessKind::Init:
+    case SILAccessKind::Modify:
+      llvm_unreachable("should look through these kinds of accesses currently");
+    }
   }
 
   // If we don't fit into any of those categories, just track as a liveness
@@ -2570,9 +2582,14 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
-    llvm::errs() << "Found a write classified as a liveness use?!\n";
-    llvm::errs() << "Use: " << *user;
-    llvm_unreachable("standard failure");
+    // TODO: `unchecked_take_enum_addr` should inherently be understood as
+    // non-side-effecting when it's nondestructive.
+    auto ue = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
+    if (!ue || ue->isDestructive()) {
+      llvm::errs() << "Found a write classified as a liveness use?!\n";
+      llvm::errs() << "Use: " << *user;
+      llvm_unreachable("standard failure");
+    }
   }
 #endif
   useState.recordLivenessUse(user, *leafRange);
@@ -2588,7 +2605,7 @@ namespace {
 
 using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
 using InstOptionalLeafTypePair =
-    std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>>;
+    std::pair<SILInstruction *, std::optional<TypeTreeLeafTypeRange>>;
 
 /// Post process the found liveness and emit errors if needed. TODO: Better
 /// name.

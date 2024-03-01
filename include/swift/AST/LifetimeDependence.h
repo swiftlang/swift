@@ -137,11 +137,11 @@ class LifetimeDependenceInfo {
                                                  unsigned index,
                                                  ValueOwnership ownership);
 
-  static llvm::Optional<LifetimeDependenceInfo>
+  static std::optional<LifetimeDependenceInfo>
   fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
 
-  static llvm::Optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
-                                                      Type resultType);
+  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
+                                                     Type resultType);
 
 public:
   LifetimeDependenceInfo()
@@ -183,7 +183,7 @@ public:
   std::optional<LifetimeDependenceKind>
   getLifetimeDependenceOnParam(unsigned paramIndex);
 
-  static llvm::Optional<LifetimeDependenceInfo>
+  static std::optional<LifetimeDependenceInfo>
   get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
 
   static LifetimeDependenceInfo

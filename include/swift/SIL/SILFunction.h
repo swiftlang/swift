@@ -99,6 +99,9 @@ public:
     Partial
   };
 
+  static GenericSignature buildTypeErasedSignature(
+      GenericSignature sig, ArrayRef<Type> typeErasedParams);
+
   static SILSpecializeAttr *create(SILModule &M,
                                    GenericSignature specializedSignature,
                                    ArrayRef<Type> typeErasedParams,
@@ -264,6 +267,17 @@ private:
   /// @_dynamicReplacement(for:) function.
   SILFunction *ReplacedFunction = nullptr;
 
+  /// This SILFunction REFerences an ad-hoc protocol requirement witness in
+  /// order to keep it alive, such that it main be obtained in IRGen. Without
+  /// this explicit reference, the witness would seem not-used, and not be
+  /// accessible for IRGen.
+  ///
+  /// Specifically, one such case is the DistributedTargetInvocationDecoder's
+  /// 'decodeNextArgument' which must be retained, as it is only used from IRGen
+  /// and such, appears as-if unused in SIL and would get optimized away.
+  // TODO: Consider making this a general "references adhoc functions" and make it an array?
+  SILFunction *RefAdHocRequirementFunction = nullptr;
+
   Identifier ObjCReplacementFor;
 
   /// The head of a single-linked list of currently alive BasicBlockBitfield.
@@ -301,7 +315,7 @@ private:
   StringRef WasmExportName;
 
   /// Name of a Wasm import module and field if @_extern(wasm) attribute
-  llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
+  std::optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
@@ -484,7 +498,7 @@ private:
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-         llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+         std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
          IsDistributed_t isDistributed,
@@ -583,6 +597,27 @@ public:
       return;
     ReplacedFunction->decrementRefCount();
     ReplacedFunction = nullptr;
+  }
+
+  SILFunction *getReferencedAdHocRequirementWitnessFunction() const {
+    return RefAdHocRequirementFunction;
+  }
+  // Marks that this `SILFunction` uses the passed in ad-hoc protocol
+  // requirement witness `f` and therefore must retain it explicitly,
+  // otherwise we might not be able to get a reference to it.
+  void setReferencedAdHocRequirementWitnessFunction(SILFunction *f) {
+    assert(RefAdHocRequirementFunction == nullptr && "already set");
+
+    if (f == nullptr)
+      return;
+    RefAdHocRequirementFunction = f;
+    RefAdHocRequirementFunction->incrementRefCount();
+  }
+  void dropReferencedAdHocRequirementWitnessFunction() {
+    if (!RefAdHocRequirementFunction)
+      return;
+    RefAdHocRequirementFunction->decrementRefCount();
+    RefAdHocRequirementFunction = nullptr;
   }
 
   bool hasObjCReplacement() const {

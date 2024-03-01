@@ -112,3 +112,7 @@ class C5 {
 class C6: C5, ServiceProvider {
   @MainActor func allOperations() async -> [String] { [] }
 }
+
+extension ImplementsLoadable: @retroactive Loadable {
+  public func loadStuff(withOtherIdentifier otherIdentifier: Int, reply: @escaping () -> Void) {}
+}

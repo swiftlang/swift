@@ -23,10 +23,6 @@ file(GENERATE
 #define COMPILED_WITH_SWIFT
 #endif
 
-#ifndef SWIFT_TARGET
-#define SWIFT_TARGET
-#endif
-
 #include \"swift/Basic/BasicBridging.h\"
 #include \"swift/AST/ASTBridging.h\"
 #include \"swift/IDE/IDEBridging.h\"

@@ -375,11 +375,11 @@ public:
 
 private:
   // Build concrete existential information using findInitExistential.
-  llvm::Optional<ConcreteOpenedExistentialInfo>
+  std::optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
 
   // Build concrete existential information using SoleConformingType.
-  llvm::Optional<ConcreteOpenedExistentialInfo>
+  std::optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfoFromSoleConformingType(Operand &ArgOperand);
 
   // Common utility function to build concrete existential information for all

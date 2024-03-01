@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -print-ast -disable-objc-attr-requires-foundation-module -enable-objc-interop %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 var x = 0.0
 

@@ -82,28 +82,26 @@ protected:
   std::string getGlobalDebugPathRemapping() const override;
   
   /// Retrieve the target SDK version for the given target triple.
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
   getTargetSDKVersion(const llvm::Triple &triple) const;
 
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
   /// when there will be a linker job.
-  mutable llvm::Optional<clang::DarwinSDKInfo> SDKInfo;
+  mutable std::optional<clang::DarwinSDKInfo> SDKInfo;
 
-  const llvm::Optional<llvm::Triple> TargetVariant;
+  const std::optional<llvm::Triple> TargetVariant;
 
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple,
-         const llvm::Optional<llvm::Triple> &TargetVariant)
+         const std::optional<llvm::Triple> &TargetVariant)
       : ToolChain(D, Triple), TargetVariant(TargetVariant) {}
 
   ~Darwin() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
 
-  llvm::Optional<llvm::Triple> getTargetVariant() const {
-    return TargetVariant;
-  }
+  std::optional<llvm::Triple> getTargetVariant() const { return TargetVariant; }
 };
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {

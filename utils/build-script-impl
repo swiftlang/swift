@@ -146,6 +146,7 @@ KNOWN_SETTINGS=(
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
     build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -sil-based-debuginfo to enable debugging and profiling on SIL level"
+    build-swift-clang-overlays                    "1"               "set to 1 to build the Swift overlays for the clang builtin modules"
     build-swift-dynamic-sdk-overlay               ""                "set to 1 to build dynamic variants of the Swift SDK overlay"
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
@@ -1437,95 +1438,6 @@ function cmake_config_opt() {
     fi
 }
 
-function copy_lib_stripping_architecture() {
-    local source="$1"
-    local dest="$2"
-    local arch="$3"
-
-    # An alternative approach would be to use || to first
-    # attempt the removal of the slice and fall back to the
-    # copy when failing.
-    # However, this would leave unneeded error messages in the logs
-    # that may hinder investigation; in addition, in this scenario
-    # the `call` function seems to not propagate correctly failure
-    # exit codes.
-    if lipo -archs "${source}" | grep -q "${arch}"; then
-        call lipo -remove "${arch}" "${source}" -output "${dest}"
-    else
-        call cp "${source}" "${dest}"
-    fi
-}
-
-function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
-    local clang_dest_dir="$1"
-
-    HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-    HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
-    DEST_LIB_CLANG_DIR="${clang_dest_dir}/lib/clang"
-
-    [ -d "${HOST_LIB_CLANG_DIR}" -a -d "${DEST_LIB_CLANG_DIR}" ] || return 0
-
-    DEST_CXX_BUILTINS_VERSION=$(ls -1 "${DEST_LIB_CLANG_DIR}")
-    DEST_BUILTINS_DIR="${clang_dest_dir}/lib/clang/${DEST_CXX_BUILTINS_VERSION}/lib/darwin"
-
-    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
-
-            for OS in ios watchos tvos; do
-                # Copy over the device .a when necessary
-                LIB_NAME="libclang_rt.$OS.a"
-                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                if [[ ! -f "${DEST_LIB_PATH}" ]]; then
-                    if [[ -f "${HOST_LIB_PATH}" ]]; then
-                        if [[ "$OS" == "tvos" ]]; then
-                            # This is to avoid strip failures when generating a toolchain
-                            copy_lib_stripping_architecture "${HOST_LIB_PATH}" "${DEST_LIB_PATH}" i386
-                        else
-                           call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
-                        fi
-                    elif [[ "${VERBOSE_BUILD}" ]]; then
-                        echo "no file exists at ${HOST_LIB_PATH}"
-                    fi
-                fi
-
-                # Copy over the simulator .a when necessary
-                SIM_LIB_NAME="libclang_rt.${OS}sim.a"
-                HOST_SIM_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$SIM_LIB_NAME"
-                DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
-                if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
-                    if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                        if [[ "$OS" == "tvos" ]]; then
-                            # This is to avoid strip failures when generating a toolchain
-                            copy_lib_stripping_architecture "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}" i386
-                        else
-                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                        fi
-                    elif [[ -f "${HOST_LIB_PATH}" ]]; then
-                        # The simulator .a might not exist if the host
-                        # Xcode is old. In that case, copy over the
-                        # device library to the simulator location to allow
-                        # clang to find it. The device library has the simulator
-                        # slices in Xcode that doesn't have the simulator .a, so
-                        # the link is still valid.
-                        echo "copying over faux-sim library ${HOST_LIB_PATH} to ${SIM_LIB_NAME}"
-                        if [[ "$OS" == "tvos" ]]; then
-                            echo "Remove i386 from tvOS ${DEST_SIM_LIB_PATH}"
-                            call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
-                        else
-                            call cp "${HOST_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                        fi
-                    elif [[ "${VERBOSE_BUILD}" ]]; then
-                        echo "no file exists at ${HOST_SIM_LIB_PATH}"
-                    fi
-                fi
-            done
-        done
-    fi
-}
-
 #
 # Configure and build each product
 #
@@ -1870,6 +1782,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
+                    -DSWIFT_BUILD_CLANG_OVERLAYS:BOOL=$(true_false "${BUILD_SWIFT_CLANG_OVERLAYS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL=$(true_false "${BUILD_SWIFT_EXTERNAL_GENERIC_METADATA_BUILDER}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
@@ -2843,6 +2756,18 @@ for host in "${ALL_HOSTS[@]}"; do
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
                 fi
+
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "FALSE" ]]; then
+                    echo "--- Rerun LLDB API tests (Config: Redecl completion) ---"
+                     with_pushd ${results_dir} \
+                        call "${llvm_build_dir}/bin/llvm-lit" \
+                             "${lldb_build_dir}/test/API" \
+                             ${LLVM_LIT_ARGS} \
+                             --param dotest-args="--setting plugin.typesystem.clang.experimental-redecl-completion=true" \
+                             --filter="lang|functionalities|types|commands"
+
+                    # FIXME: run shell-tests with new setting. LLDB doesn't support that yet.
+                 fi
                 continue
                 ;;
             llbuild)

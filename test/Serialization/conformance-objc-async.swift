@@ -4,6 +4,8 @@
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Conformance.swiftinterface -module-name Conformance -o /dev/null -I %t
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar119435253
+
 //--- module.modulemap
 module ObjCProto {
   header "objc_proto.h"

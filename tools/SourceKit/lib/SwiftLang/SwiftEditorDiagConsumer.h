@@ -46,7 +46,7 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
   bool HadAnyError = false;
 
   BufferInfoSharedPtr getBufferInfo(StringRef FileName,
-                                    llvm::Optional<unsigned> BufferID,
+                                    std::optional<unsigned> BufferID,
                                     swift::SourceManager &SM);
 
 public:

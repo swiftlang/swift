@@ -113,7 +113,7 @@ std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
 
-llvm::Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
+std::optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
 class XMLEscapingPrinter : public StreamPrinter {
   public:
@@ -173,8 +173,8 @@ private:
   bool IsRef = true;
   Type Ty;
   Type ContainerType;
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
-      llvm::None;
+  std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      std::nullopt;
 
   bool IsKeywordArgument = false;
   /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
@@ -197,7 +197,7 @@ public:
   explicit ResolvedValueRefCursorInfo(
       SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
       ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
-      llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
+      std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
       bool IsKeywordArgument, bool IsDynamic,
       SmallVector<NominalTypeDecl *> ReceiverTypes,
       SmallVector<ValueDecl *> ShorthandShadowedDecls)
@@ -241,7 +241,7 @@ public:
 
   ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
 
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>>
+  std::optional<std::pair<const CustomAttr *, Decl *>>
   getCustomAttrRef() const {
     return CustomAttrRef;
   }
@@ -428,7 +428,7 @@ public:
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
   operator bool() const { return !BaseName.empty(); }
   StringRef base() const { return BaseName; }
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef(Labels); }
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
@@ -466,7 +466,7 @@ struct NoteRegion {
   unsigned StartColumn;
   unsigned EndLine;
   unsigned EndColumn;
-  llvm::Optional<unsigned> ArgIndex;
+  std::optional<unsigned> ArgIndex;
 };
 
 struct Replacement {
@@ -599,7 +599,7 @@ getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind);
 // Get the ranges of argument labels from an Arg, either tuple or paren, and
 // the index of the first trailing closure argument, if any. This includes empty
 // ranges for any unlabelled arguments, including the first trailing closure.
-std::pair<std::vector<CharSourceRange>, llvm::Optional<unsigned>>
+std::pair<std::vector<CharSourceRange>, std::optional<unsigned>>
 getCallArgLabelRanges(SourceManager &SM, ArgumentList *Args,
                       LabelRangeEndAt EndKind);
 

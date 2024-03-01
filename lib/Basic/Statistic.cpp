@@ -154,7 +154,7 @@ auxName(StringRef ModuleName,
 
 class UnifiedStatsReporter::RecursionSafeTimers {
   struct RecursionSafeTimer {
-    llvm::Optional<llvm::NamedRegionTimer> Timer;
+    std::optional<llvm::NamedRegionTimer> Timer;
     size_t RecursionDepth;
   };
 

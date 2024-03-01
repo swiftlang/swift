@@ -28,16 +28,15 @@
 #include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
 #include <atomic>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -136,7 +135,7 @@ namespace swift {
     /// a zippered binary that can be loaded into both macCatalyst and
     /// macOS processes. A value of 'None' means no zippering will be
     /// performed.
-    llvm::Optional<llvm::Triple> TargetVariant;
+    std::optional<llvm::Triple> TargetVariant;
 
     /// The target triple to instantiate the internal clang instance.
     /// When not specified, the compiler will use the value of -target to
@@ -146,13 +145,13 @@ namespace swift {
     /// the loading module.
     /// The lowering triple may result in multiple versions of the same Clang
     /// modules being built.
-    llvm::Optional<llvm::Triple> ClangTarget;
+    std::optional<llvm::Triple> ClangTarget;
 
     /// The SDK version, if known.
-    llvm::Optional<llvm::VersionTuple> SDKVersion;
+    std::optional<llvm::VersionTuple> SDKVersion;
 
     /// The target variant SDK version, if known.
-    llvm::Optional<llvm::VersionTuple> VariantSDKVersion;
+    std::optional<llvm::VersionTuple> VariantSDKVersion;
 
     /// The SDK canonical name, if known.
     std::string SDKName;
@@ -172,7 +171,7 @@ namespace swift {
     ///
 
     /// User-overridable language version to compile for.
-    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
+    version::Version EffectiveLanguageVersion = version::Version{5, 10};
 
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
@@ -190,7 +189,7 @@ namespace swift {
     bool EnableBypassResilienceInPackage = false;
 
     /// Optimization mode for unavailable declarations.
-    llvm::Optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
+    std::optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.
@@ -218,7 +217,8 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    llvm::Optional<DiagnosticBehavior> RequireExplicitAvailability = llvm::None;
+    std::optional<DiagnosticBehavior> RequireExplicitAvailability =
+        std::nullopt;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.
@@ -242,6 +242,9 @@ namespace swift {
 
     /// Emit remarks about contextual inconsistencies in loaded modules.
     bool EnableModuleRecoveryRemarks = false;
+
+    /// Emit remarks for unexpected conditions when serializing a module.
+    bool EnableModuleSerializationRemarks = false;
 
     /// Emit remarks about the source of each element exposed by the module API.
     bool EnableModuleApiImportRemarks = false;
@@ -560,7 +563,7 @@ namespace swift {
     bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = false;
+    bool EnableExperimentalLifetimeDependenceInference = true;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;

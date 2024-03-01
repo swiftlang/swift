@@ -24,7 +24,7 @@ void emitDistributedActorSystemWitnessCall(
     SILType actorType,
     // call arguments, except the base which will be passed last
     ArrayRef<SILValue> args,
-    llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
+    std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
   auto &F = B.getFunction();
   auto &M = B.getModule();
   auto &C = F.getASTContext();
@@ -91,15 +91,15 @@ void emitDistributedActorSystemWitnessCall(
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 
-  llvm::Optional<SILValue> temporaryArgumentBuffer;
+  std::optional<SILValue> temporaryArgumentBuffer;
 
   // If the self parameter is indirect but the base is a value, put it
   // into a temporary allocation.
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
-  llvm::Optional<SILValue> temporaryActorSystemBuffer;
+  std::optional<SILValue> temporaryActorSystemBuffer;
   if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
       !base->getType().isAddress()) {
-    auto buf = B.createAllocStack(loc, base->getType(), llvm::None);
+    auto buf = B.createAllocStack(loc, base->getType(), std::nullopt);
     base = B.emitCopyValueOperation(loc, base);
     B.emitStoreValueOperation(
         loc, base, buf, StoreOwnershipQualifier::Init);
@@ -115,7 +115,7 @@ void emitDistributedActorSystemWitnessCall(
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
         !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
-      auto buf = B.createAllocStack(loc, arg->getType(), llvm::None);
+      auto buf = B.createAllocStack(loc, arg->getType(), std::nullopt);
       auto argCopy = B.emitCopyValueOperation(loc, arg);
       B.emitStoreValueOperation(
           loc, argCopy, buf, StoreOwnershipQualifier::Init);

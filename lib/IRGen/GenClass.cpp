@@ -16,9 +16,6 @@
 
 #include "GenClass.h"
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/RecordLayout.h"
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -37,13 +34,15 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
-#include "llvm/ADT/None.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/RecordLayout.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
-#include "clang/AST/DeclObjC.h"
 
 #include "Callee.h"
 #include "ClassLayout.h"
@@ -101,7 +100,7 @@ namespace {
     // added before the class fields, and the tail elements themselves
     // come after. We don't make a ClassLayout in this case, only a
     // StructLayout.
-    llvm::Optional<ArrayRef<SILType>> TailTypes;
+    std::optional<ArrayRef<SILType>> TailTypes;
 
     // Normally, Swift only emits static metadata for a class if it has no
     // generic ancestry and no fields with resilient value types, which
@@ -132,10 +131,10 @@ namespace {
     Size HeaderSize;
 
   public:
-    ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
-                       ReferenceCounting refcounting,
-                       bool completelyFragileLayout,
-                       llvm::Optional<ArrayRef<SILType>> tailTypes = llvm::None)
+    ClassLayoutBuilder(
+        IRGenModule &IGM, SILType classType, ReferenceCounting refcounting,
+        bool completelyFragileLayout,
+        std::optional<ArrayRef<SILType>> tailTypes = std::nullopt)
         : StructLayoutBuilder(IGM), TailTypes(tailTypes),
           CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
@@ -160,7 +159,7 @@ namespace {
       case ReferenceCounting::Error:
         llvm_unreachable("not a class refcounting kind");
       }
-      
+
       // Next, add the fields for the given class.
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
@@ -671,7 +670,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::ConstantDirect: {
     Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
-    Address memberAddr = element.project(IGF, baseAddr, llvm::None);
+    Address memberAddr = element.project(IGF, baseAddr, std::nullopt);
     // We may need to bitcast the address if the field is of a generic type.
     if (memberAddr.getElementType() != fieldTI.getStorageType())
       memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
@@ -1126,27 +1125,27 @@ namespace {
       }
       return nullptr;
     }
-    llvm::Optional<CanType> getSpecializedGenericType() const {
+    std::optional<CanType> getSpecializedGenericType() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       const ClassPair *classPair;
       if (!(classPair = classUnion->dyn_cast<ClassPair>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       auto &pair = *classPair;
       return pair.second;
     }
 
-    llvm::Optional<StringRef> getObjCImplCategoryName() const {
+    std::optional<StringRef> getObjCImplCategoryName() const {
       if (!TheExtension || !TheExtension->isObjCImplementation())
-        return llvm::None;
+        return std::nullopt;
       if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
         assert(!ident->empty());
         return ident->str();
       }
-      return llvm::None;
+      return std::nullopt;
     }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
@@ -1361,7 +1360,7 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      llvm::Optional<CanType> specializedGenericType =
+      std::optional<CanType> specializedGenericType =
           getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
@@ -1408,7 +1407,7 @@ namespace {
         dataPtr
       };
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            makeArrayRef(fields));
+                                            llvm::ArrayRef(fields));
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =
@@ -1603,7 +1602,7 @@ namespace {
       //     const uint8_t *IvarLayout;
       //     ClassMetadata *NonMetaClass;
       // };
-      llvm::Optional<CanType> specializedGenericType;
+      std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
         b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),

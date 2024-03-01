@@ -137,6 +137,10 @@ public:
   /// Is this type representation a protocol?
   bool isProtocolOrProtocolComposition(DeclContext *dc);
 
+  /// Is this `~<target>` representation.
+  bool isInverseOf(InvertibleProtocolKind target,
+                   DeclContext *dc);
+
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
@@ -216,22 +220,22 @@ public:
 /// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
-  llvm::Optional<ZeroArgDiagnostic> DelayedDiag;
+  std::optional<ZeroArgDiagnostic> DelayedDiag;
 
-  ErrorTypeRepr(SourceRange Range, llvm::Optional<ZeroArgDiagnostic> Diag)
+  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
       : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
 
 public:
   static ErrorTypeRepr *
   create(ASTContext &Context, SourceRange Range,
-         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
     assert((!DelayedDiag || Range) && "diagnostic needs a location");
     return new (Context) ErrorTypeRepr(Range, DelayedDiag);
   }
 
   static ErrorTypeRepr *
   create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
-         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
     return create(Context, SourceRange(Loc), DelayedDiag);
   }
 
@@ -277,8 +281,8 @@ public:
                                     TypeRepr *ty);
 
   ArrayRef<TypeOrCustomAttr> getAttrs() const {
-    return llvm::makeArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
-                              Bits.AttributedTypeRepr.NumAttributes);
+    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
+                          Bits.AttributedTypeRepr.NumAttributes);
   }
 
   TypeAttribute *get(TypeAttrKind kind) const;
@@ -867,12 +871,12 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::makeMutableArrayRef(getTrailingObjects<TypeRepr*>(),
-                                     Bits.PackTypeRepr.NumElements);
+    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
+                                 Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::makeArrayRef(getTrailingObjects<TypeRepr*>(),
-                              Bits.PackTypeRepr.NumElements);
+    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
+                          Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {

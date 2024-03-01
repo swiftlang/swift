@@ -175,6 +175,9 @@ public:
     if (F->getExtFlags().isIsolatedAny()) {
       printField("isolated", "any");
     }
+    if (F->getExtFlags().hasTransferringResult()) {
+      printField("", "transferring-result");
+    }
 
     stream << "\n";
     Indent += 2;
@@ -189,17 +192,17 @@ public:
         stream << "\n";
       }
 
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         printHeader("inout");
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         printHeader("shared");
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         printHeader("owned");
         break;
       }
@@ -209,6 +212,9 @@ public:
 
       if (flags.isVariadic())
         printHeader("variadic");
+
+      if (flags.isTransferring())
+        printHeader("transferring");
 
       printRec(param.getType());
 
@@ -675,22 +681,25 @@ public:
       if (flags.isNoDerivative()) {
         wrapInput(Node::Kind::NoDerivative);
       }
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         wrapInput(Node::Kind::InOut);
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         wrapInput(Node::Kind::Shared);
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
       }
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
+      }
+      if (flags.isTransferring()) {
+        wrapInput(Node::Kind::Transferring);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -764,6 +773,9 @@ public:
       funcNode->addChild(node, Dem);
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
+      funcNode->addChild(node, Dem);
+    } else if (F->getExtFlags().hasTransferringResult()) {
+      auto node = Dem.createNode(Node::Kind::TransferringResultFunctionType);
       funcNode->addChild(node, Dem);
     }
 
@@ -1043,7 +1055,7 @@ Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
-llvm::Optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   NodePointer node = getDemangling(Dem);
   if (!node)
     return {};
@@ -1085,7 +1097,7 @@ unsigned NominalTypeTrait::getDepth() const {
   return 0;
 }
 
-llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
+std::optional<GenericArgumentMap> TypeRef::getSubstMap() const {
   GenericArgumentMap Substitutions;
   switch (getKind()) {
     case TypeRefKind::Nominal: {
@@ -1100,13 +1112,13 @@ llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
       unsigned Index = 0;
       for (auto Param : BG->getGenericParams()) {
         if (!Param->isConcrete())
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert({{Depth, Index++}, Param});
       }
       if (auto Parent = BG->getParent()) {
         auto ParentSubs = Parent->getSubstMap();
         if (!ParentSubs)
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert(ParentSubs->begin(), ParentSubs->end());
       }
       break;
@@ -1371,11 +1383,11 @@ public:
     return EM;
   }
 
-  llvm::Optional<TypeRefRequirement>
+  std::optional<TypeRefRequirement>
   visitTypeRefRequirement(const TypeRefRequirement &req) {
     auto newFirst = visit(req.getFirstType());
     if (!newFirst)
-      return llvm::None;
+      return std::nullopt;
 
     switch (req.getKind()) {
     case RequirementKind::SameShape:
@@ -1384,7 +1396,7 @@ public:
     case RequirementKind::SameType: {
       auto newSecond = visit(req.getFirstType());
       if (!newSecond)
-        return llvm::None;
+        return std::nullopt;
       return TypeRefRequirement(req.getKind(), newFirst, newSecond);
     }
     case RequirementKind::Layout:

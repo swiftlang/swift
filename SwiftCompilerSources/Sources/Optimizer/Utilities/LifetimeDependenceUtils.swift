@@ -706,12 +706,8 @@ extension LifetimeDependenceUseDefWalker {
   mutating func walkUpDefault(dependent value: Value, owner: Value?)
     -> WalkResult {
     switch value.definingInstruction {
-    case let copyInst as CopyValueInst:
-      return walkUp(newLifetime: copyInst.fromValue)
-    case let moveInst as MoveValueInst:
-      return walkUp(value: moveInst.fromValue, owner)
-    case let borrow as BeginBorrowInst:
-      return walkUp(newLifetime: borrow.borrowedValue)
+    case let transition as OwnershipTransitionInstruction:
+      return walkUp(newLifetime: transition.operand.value)
     case let load as LoadInstruction:
       return walkUp(address: load.address)
     case let markDep as MarkDependenceInst:
@@ -780,7 +776,7 @@ extension LifetimeDependenceUseDefWalker {
 ///   escapingDependence(on operand: Operand) -> WalkResult
 ///   returnedDependence(result: Operand) -> WalkResult
 ///   returnedDependence(address: FunctionArgument, using: Operand) -> WalkResult
-///
+///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
 ///   walkDown(root: Value)
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
@@ -796,6 +792,8 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 
   mutating func returnedDependence(address: FunctionArgument, using: Operand)
     -> WalkResult
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult
 }
 
 extension LifetimeDependenceDefUseWalker {
@@ -841,6 +839,9 @@ extension LifetimeDependenceDefUseWalker {
     if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
       return returnedDependence(result: operand)
     }
+    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+      return yieldedDependence(result: operand)
+    }
     return escapingDependence(on: operand)
   }
 }
@@ -857,11 +858,8 @@ extension LifetimeDependenceDefUseWalker {
       return leafUse(of: operand)
     }
     switch operand.instruction {
-    case let copy as CopyingInstruction:
-      return walkDownUses(of: copy, using: operand)
-
-    case let move as MoveValueInst:
-      return walkDownUses(of: move, using: operand)
+    case let transition as OwnershipTransitionInstruction:
+      return walkDownUses(of: transition.ownershipResult, using: operand)
 
     case let mdi as MarkDependenceInst where mdi.isUnresolved:
       // Override mark_dependence [unresolved] to handle them just
@@ -1008,6 +1006,9 @@ extension LifetimeDependenceDefUseWalker {
     }
     if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
       return returnedDependence(result: operand)
+    }
+    if operand.instruction is YieldInst, !operand.value.type.isEscapable {
+      return yieldedDependence(result: operand)
     }
     return escapingDependence(on: operand)
   }
@@ -1206,6 +1207,11 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
   mutating func returnedDependence(address: FunctionArgument,
                                    using operand: Operand) -> WalkResult {
     print("Returned use: \(operand) in: \(address)")
+    return .continueWalk
+  }
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult {
+    print("Yielded use: \(result)")
     return .continueWalk
   }
 }

@@ -256,7 +256,7 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     return nullptr;
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  if (!systemTy)
+  if (!systemTy || systemTy->is<GenericTypeParamType>())
     return nullptr;
 
   auto decoderTy =
@@ -390,6 +390,7 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
+// TODO(distributed): probably can be removed?
 llvm::ArrayRef<ValueDecl *>
 AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);

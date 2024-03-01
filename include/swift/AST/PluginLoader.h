@@ -15,9 +15,9 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 
@@ -47,7 +47,7 @@ private:
   const bool disableSandbox;
 
   /// Map a module name to an plugin entry that provides the module.
-  llvm::Optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
+  std::optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
 
   /// Get or lazily create and populate 'PluginMap'.
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();

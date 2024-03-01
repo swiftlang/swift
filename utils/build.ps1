@@ -1061,7 +1061,11 @@ function Build-Compilers() {
   }
 }
 
-function Build-LLVM($Arch) {
+enum Platform {
+  Windows
+}
+
+function Build-LLVM([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-TargetProjectBinaryCache $Arch LLVM) `
@@ -1071,7 +1075,7 @@ function Build-LLVM($Arch) {
     }
 }
 
-function Build-ZLib($Arch) {
+function Build-ZLib([Platform]$Platform, $Arch) {
   $ArchName = $Arch.ShortName
 
   Build-CMakeProject `
@@ -1087,7 +1091,7 @@ function Build-ZLib($Arch) {
     }
 }
 
-function Build-XML2($Arch) {
+function Build-XML2([Platform]$Platform, $Arch) {
   $ArchName = $Arch.ShortName
 
   Build-CMakeProject `
@@ -1110,7 +1114,7 @@ function Build-XML2($Arch) {
     }
 }
 
-function Build-CURL($Arch) {
+function Build-CURL([Platform]$Platform, $Arch) {
   $ArchName = $Arch.ShortName
 
   Build-CMakeProject `
@@ -1203,7 +1207,7 @@ function Build-CURL($Arch) {
     }
 }
 
-function Build-ICU($Arch) {
+function Build-ICU([Platform]$Platform, $Arch) {
   $ArchName = $Arch.ShortName
 
   if (-not $ToBatch) {
@@ -1236,7 +1240,7 @@ function Build-ICU($Arch) {
     })
 }
 
-function Build-Runtime($Arch) {
+function Build-Runtime([Platform]$Platform, $Arch) {
   Isolate-EnvVars {
     $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
@@ -1270,7 +1274,7 @@ function Build-Runtime($Arch) {
     -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 }
 
-function Build-Dispatch($Arch, [switch]$Test = $false) {
+function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $Targets = if ($Test) { @("default", "ExperimentalTest") } else { @("default", "install") }
 
   Build-CMakeProject `
@@ -1287,7 +1291,7 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
     }
 }
 
-function Build-Foundation($Arch, [switch]$Test = $false) {
+function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
   $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
   $ShortArch = $Arch.ShortName
@@ -1336,7 +1340,7 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
   }
 }
 
-function Build-XCTest($Arch, [switch]$Test = $false) {
+function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
   $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
   $XCTestBinaryCache = Get-TargetProjectBinaryCache $Arch XCTest
@@ -1890,19 +1894,19 @@ if ($Clean) {
   }
 }
 
-foreach ($Arch in $WindowsSDKArchs) {
-  if (-not $SkipBuild) {
-    Invoke-BuildStep Build-ZLib $Arch
-    Invoke-BuildStep Build-XML2 $Arch
-    Invoke-BuildStep Build-CURL $Arch
-    Invoke-BuildStep Build-ICU $Arch
-    Invoke-BuildStep Build-LLVM $Arch
+if (-not $SkipBuild) {
+  foreach ($Arch in $WindowsSDKArchs) {
+    Invoke-BuildStep Build-ZLib Windows $Arch
+    Invoke-BuildStep Build-XML2 Windows $Arch
+    Invoke-BuildStep Build-CURL Windows $Arch
+    Invoke-BuildStep Build-ICU Windows $Arch
+    Invoke-BuildStep Build-LLVM Windows $Arch
 
     # Build platform: SDK, Redist and XCTest
-    Invoke-BuildStep Build-Runtime $Arch
-    Invoke-BuildStep Build-Dispatch $Arch
-    Invoke-BuildStep Build-Foundation $Arch
-    Invoke-BuildStep Build-XCTest $Arch
+    Invoke-BuildStep Build-Runtime Windows $Arch
+    Invoke-BuildStep Build-Dispatch Windows $Arch
+    Invoke-BuildStep Build-Foundation Windows $Arch
+    Invoke-BuildStep Build-XCTest Windows $Arch
   }
 }
 
@@ -1963,9 +1967,15 @@ if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm",
   Build-Compilers $HostArch @Tests
 }
 
-if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }
-if ($Test -contains "foundation") { Build-Foundation $HostArch -Test }
-if ($Test -contains "xctest") { Build-XCTest $HostArch -Test }
+if ($Test -contains "dispatch") {
+  Build-Dispatch Windows $HostArch -Test
+}
+if ($Test -contains "foundation") {
+  Build-Foundation Windows $HostArch -Test
+}
+if ($Test -contains "xctest") {
+  Build-XCTest Windows $HostArch -Test
+}
 if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
 if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
 

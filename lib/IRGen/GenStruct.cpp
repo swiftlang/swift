@@ -234,11 +234,11 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
-    llvm::Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
-                                                     VarDecl *field) const {
+    std::optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
+                                                    VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
-        return llvm::None;
+        return std::nullopt;
       return fieldInfo.getStructIndex();
     }
 
@@ -436,11 +436,11 @@ namespace {
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -476,12 +476,10 @@ namespace {
                              fields, storageType, size,
                              // We can't assume any spare bits in a C++ type
                              // with user-defined special member functions.
-                             SpareBitVector(llvm::Optional<APInt>{
+                             SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
-                             IsNotBitwiseTakable,
-                             IsCopyable,
-                             IsFixedSize),
+                             IsNotBitwiseTakable, IsCopyable, IsFixedSize),
           clangDecl(clangDecl) {
       (void)clangDecl;
     }
@@ -526,11 +524,11 @@ namespace {
       destroy(IGF, src, T, isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -607,7 +605,7 @@ namespace {
           /*callee=*/ParameterConvention::Direct_Unowned,
           /*params*/ {ptrParam},
           /*yields*/ {}, /*results*/ {result},
-          /*error*/ llvm::None,
+          /*error*/ std::nullopt,
           /*pattern subs*/ SubstitutionMap(),
           /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
     }
@@ -622,7 +620,7 @@ namespace {
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
-      Signature signature = IGF.IGM.getSignature(fnType);
+      Signature signature = IGF.IGM.getSignature(fnType, copyConstructor);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
       auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
@@ -652,13 +650,13 @@ namespace {
                              fields, storageType, size,
                              // We can't assume any spare bits in a C++ type
                              // with user-defined special member functions.
-                             SpareBitVector(llvm::Optional<APInt>{
+                             SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotTriviallyDestroyable, IsNotBitwiseTakable,
+                             align, IsNotTriviallyDestroyable,
+                             IsNotBitwiseTakable,
                              // TODO: Set this appropriately for the type's
                              // C++ import behavior.
-                             IsCopyable,
-                             IsFixedSize),
+                             IsCopyable, IsFixedSize),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -837,11 +835,11 @@ namespace {
                                                          isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -917,11 +915,11 @@ namespace {
                               bool isOutlined) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -1020,11 +1018,11 @@ namespace {
           fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return llvm::None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -1597,9 +1595,9 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getFieldAccessStrategy, baseType, field);
 }
 
-llvm::Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                            SILType baseType,
-                                                            VarDecl *field) {
+std::optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                           SILType baseType,
+                                                           VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 

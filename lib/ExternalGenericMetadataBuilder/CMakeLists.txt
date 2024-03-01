@@ -13,9 +13,9 @@ target_link_libraries(swiftGenericMetadataBuilder
                       swiftDemangling)
 
 swift_install_in_component(TARGETS swiftGenericMetadataBuilder
+  COMPONENT compiler
   LIBRARY
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-    COMPONENT compiler
   ARCHIVE
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-    COMPONENT compiler)
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}")
+add_dependencies(compiler swiftGenericMetadataBuilder)

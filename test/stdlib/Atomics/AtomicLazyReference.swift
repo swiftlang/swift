@@ -7,7 +7,7 @@ import StdlibUnittest
 
 let suite = TestSuite("AtomicLazyReference")
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
 
 suite.test("creation") {
   expectEqual(LifetimeTracked.instances, 0)
@@ -40,6 +40,6 @@ suite.test("storeIfNil") {
   expectEqual(LifetimeTracked.instances, 0)
 }
 
-} // if #available(SwiftStdlib 5.11)
+} // if #available(SwiftStdlib 6.0)
 
 runAllTests()

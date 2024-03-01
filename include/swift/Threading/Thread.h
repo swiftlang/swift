@@ -19,7 +19,7 @@
 #ifndef SWIFT_THREADING_THREAD_H
 #define SWIFT_THREADING_THREAD_H
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "Impl.h"
 
@@ -70,7 +70,7 @@ public:
   }
 
   // Retrieve the bounds of the current thread's stack
-  static llvm::Optional<StackBounds> stackBounds() {
+  static std::optional<StackBounds> stackBounds() {
     return threading_impl::thread_get_current_stack_bounds();
   }
 };

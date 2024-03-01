@@ -35,6 +35,7 @@ UID_KEYS = [
     KEY('GenericParams', 'key.generic_params'),
     KEY('GenericRequirements', 'key.generic_requirements'),
     KEY('DocFullAsXML', 'key.doc.full_as_xml'),
+    KEY('DocComment', 'key.doc_comment'),
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
@@ -216,6 +217,11 @@ UID_KEYS = [
     KEY('ExpandedMacroReplacements', 'key.expanded_macro_replacements'),
     KEY('IndexStorePath', 'key.index_store_path'),
     KEY('IndexUnitOutputPath', 'key.index_unit_output_path'),
+    KEY('IncludeLocals', 'key.include_locals'),
+    KEY('IgnoreClangModules', 'key.ignore_clang_modules'),
+    KEY('IncludeSystemModules', 'key.include_system_modules'),
+    KEY('IgnoreStdlib', 'key.ignore_stdlib'),
+    KEY('DisableImplicitModules', 'key.disable_implicit_modules'),
 ]
 
 

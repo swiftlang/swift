@@ -125,6 +125,7 @@ LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
 LANGUAGE_FEATURE(OptionalIsolatedParameters, 420, "Optional isolated parameters")
 SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
+LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)

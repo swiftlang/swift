@@ -59,7 +59,4 @@ Added: _$ss20__StaticArrayStorageCfd
 Added: _OBJC_CLASS_$__TtCs20__StaticArrayStorage
 Added: _OBJC_METACLASS_$__TtCs20__StaticArrayStorage
 
-// Distributed actors: finding accessible function by protocol method + act type
-Added: _swift_findAccessibleFunctionForConcreteType
-
 // Runtime Symbols

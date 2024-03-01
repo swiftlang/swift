@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify -enable-experimental-feature BorrowingSwitch %s
 
 struct Payload: ~Copyable {
     var x: Int
@@ -242,3 +243,102 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
     }
 }
 
+enum E<T>: ~Copyable {
+    case a(T)
+}
+
+extension E {
+    func f() {
+        switch self {
+        case .a:
+            print("a")
+        }
+    }
+
+    func g() {
+        switch self {
+        case .a(_borrowing t): // expected-warning{{}}
+            print("a")
+        }
+    }
+}
+
+struct Box: ~Copyable {
+    let ptr: UnsafeMutablePointer<Int>
+}
+
+struct ChonkyBox: ~Copyable {
+    let container: Any
+}
+
+enum List<Element>: ~Copyable {
+    case end
+    case more(Element, Box)
+}
+
+enum ChonkyList<Element>: ~Copyable {
+    case end
+    case more(Element, ChonkyBox)
+}
+
+extension List {
+    var isEmpty: Bool {
+        switch self {
+        case .end: true
+        case .more: false
+        }
+    }
+
+    var peek: Box {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_, _borrowing box):
+                yield box
+            }
+        }
+    }
+
+    var head: Element {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_borrowing head, _):
+                yield head
+            }
+        }
+    }
+}
+
+extension ChonkyList {
+    var isEmpty: Bool {
+        switch self {
+        case .end: true
+        case .more: false
+        }
+    }
+
+    var peek: ChonkyBox {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_, _borrowing box):
+                yield box
+            }
+        }
+    }
+
+    var head: Element {
+        _read {
+            switch self {
+            case .end:
+                fatalError()
+            case .more(_borrowing head, _):
+                yield head
+            }
+        }
+    }
+}

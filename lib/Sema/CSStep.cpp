@@ -147,7 +147,7 @@ void SplitterStep::computeFollowupSteps(
     // handles all combinations of incoming partial solutions.
     steps.push_back(std::make_unique<DependentComponentSplitterStep>(
         CS, &Components[i], solutionIndex, std::move(components[i]),
-        llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
+        llvm::MutableArrayRef(PartialSolutions.get(), numComponents)));
   }
 
   assert(CS.InactiveConstraints.empty() && "Missed a constraint");
@@ -280,7 +280,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
   // Produce all combinations of partial solutions for the inputs.
   SmallVector<std::unique_ptr<SolverStep>, 4> followup;
   SmallVector<unsigned, 2> indices(Component.getDependencies().size(), 0);
-  auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
+  auto dependsOnSetsRef = llvm::ArrayRef(dependsOnSets);
   do {
     // Form the set of input partial solutions.
     SmallVector<const Solution *, 2> dependsOnSolutions;
@@ -398,7 +398,7 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   enum class StepKind { Binding, Disjunction, Conjunction };
 
-  auto chooseStep = [&]() -> Optional<StepKind> {
+  auto chooseStep = [&]() -> std::optional<StepKind> {
     // Bindings usually happen first, but sometimes we want to prioritize a
     // disjunction or conjunction.
     if (bestBindings) {
@@ -416,7 +416,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     if (conjunction)
       return StepKind::Conjunction;
 
-    return None;
+    return std::nullopt;
   };
 
   if (auto step = chooseStep()) {
@@ -645,8 +645,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
   // same structural position in the first type.
   TypeSubstitutionMap substMap;
   substTypeB = substTypeB->substituteBindingsTo(substTypeA,
-      [&](ArchetypeType *origType, CanType substType,
-          ArchetypeType *, ArrayRef<ProtocolConformanceRef>) -> CanType {
+      [&](ArchetypeType *origType, CanType substType) -> CanType {
     auto interfaceTy =
         origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
 

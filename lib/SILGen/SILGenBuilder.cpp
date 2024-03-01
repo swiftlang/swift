@@ -594,7 +594,7 @@ ManagedValue SILGenBuilder::createInputFunctionArgument(
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(
-    SILType type, llvm::Optional<SILLocation> inputLoc) {
+    SILType type, std::optional<SILLocation> inputLoc) {
   assert(inputLoc.has_value() && "This optional is only for overload resolution "
                                 "purposes! Do not pass in None here!");
   return ::createInputFunctionArgument(*this, type, *inputLoc);
@@ -1038,11 +1038,24 @@ ManagedValue SILGenBuilder::createMarkDependence(
 
 ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
                                               ManagedValue value,
-                                              bool isLexical) {
+                                              bool isLexical,
+                                              bool isFixed) {
   auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+      SILBuilder::createBeginBorrow(loc, value.getValue(),
+                                    isLexical, false, false, isFixed);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
   return ManagedValue::forBorrowedObjectRValue(newValue);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              bool isLexical,
+                                              bool isFixed) {
+  auto *newValue =
+      SILBuilder::createBeginBorrow(loc, value.getValue(),
+                                    isLexical, false, false, isFixed);
+  return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
+                                                    value.getValue(), newValue);
 }
 
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,

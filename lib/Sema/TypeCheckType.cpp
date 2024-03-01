@@ -2151,11 +2151,11 @@ namespace {
     bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
                            SmallVectorImpl<SILYieldInfo> &yields,
                            SmallVectorImpl<SILResultInfo> &results,
-                           llvm::Optional<SILResultInfo> &errorResult);
+                           std::optional<SILResultInfo> &errorResult);
     bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
-                                llvm::Optional<SILResultInfo> &errorResult);
+                                std::optional<SILResultInfo> &errorResult);
     NeverNullType resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
                                             TypeResolutionOptions options);
     NeverNullType resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
@@ -2213,10 +2213,10 @@ namespace {
                                      TypeAttribute *thicknessAttr);
     NeverNullType
     buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
-                      llvm::Optional<MetatypeRepresentation> storedRepr);
+                      std::optional<MetatypeRepresentation> storedRepr);
     NeverNullType
     buildProtocolType(ProtocolTypeRepr *repr, Type instanceType,
-                      llvm::Optional<MetatypeRepresentation> storedRepr);
+                      std::optional<MetatypeRepresentation> storedRepr);
 
     NeverNullType resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                           unsigned ordinal,
@@ -2587,7 +2587,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<DeclRefTypeRepr>(repr) && !isa<PackExpansionTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
-    options.setContext(llvm::None);
+    options.setContext(std::nullopt);
   }
 
   bool isDirect = false;
@@ -2828,7 +2828,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     TypeRepr *repr, TypeResolutionOptions options, OpenedTypeAttr *openedAttr) {
   assert(silContext);
 
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   auto *dc = getDeclContext();
   auto &ctx = dc->getASTContext();
@@ -2910,7 +2910,7 @@ TypeResolver::resolvePackElementArchetype(
     return ErrorType::get(ctx);
   }
 
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   // The interface type is the type wrapped by the attribute. Resolve it
   // within the generic parameter list for the opened generic environment.
@@ -4003,7 +4003,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     return ErrorType::get(ctx);
   }
 
-  llvm::Optional<SILInnerGenericContextRAII> innerGenericContext;
+  std::optional<SILInnerGenericContextRAII> innerGenericContext;
   if (auto *genericParams = repr->getGenericParams()) {
     if (!silContext) {
       diagnose(genericParams->getLAngleLoc(), diag::generic_function_type)
@@ -4013,7 +4013,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     innerGenericContext.emplace(silContext, genericParams);
   }
 
-  TypeResolutionOptions options = llvm::None;
+  TypeResolutionOptions options = std::nullopt;
   options |= parentOptions.withoutContext().getFlags();
   auto params =
       resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options, diffKind);
@@ -4180,7 +4180,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                                    TypeResolutionOptions options,
                                                    TypeAttrSet *attrs) {
   assert(silContext);
-  options.setContext(llvm::None);
+  options.setContext(std::nullopt);
 
   bool hasError = false;
 
@@ -4301,7 +4301,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILParameterInfo, 4> params;
   SmallVector<SILYieldInfo, 4> yields;
   SmallVector<SILResultInfo, 4> results;
-  llvm::Optional<SILResultInfo> errorResult;
+  std::optional<SILResultInfo> errorResult;
 
   // Resolve generic params in the pattern environment, if present, or
   // else the function's generic environment, if it has one.
@@ -4458,8 +4458,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   if (shouldStoreClangType(representation) && !clangFnType) {
     assert(results.size() <= 1 && yields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
-    auto result =
-        results.empty() ? llvm::Optional<SILResultInfo>() : results[0];
+    auto result = results.empty() ? std::optional<SILResultInfo>() : results[0];
     clangFnType = getASTContext().getCanonicalClangFunctionType(params, result,
                                                                 representation);
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
@@ -4570,7 +4569,7 @@ bool TypeResolver::resolveSingleSILResult(
     TypeRepr *repr, TypeResolutionOptions options,
     SmallVectorImpl<SILYieldInfo> &yields,
     SmallVectorImpl<SILResultInfo> &ordinaryResults,
-    llvm::Optional<SILResultInfo> &errorResult) {
+    std::optional<SILResultInfo> &errorResult) {
   Type type;
   auto convention = DefaultResultConvention;
   bool isErrorResult = false;
@@ -4670,7 +4669,7 @@ bool TypeResolver::resolveSILResults(
     TypeRepr *repr, TypeResolutionOptions options,
     SmallVectorImpl<SILYieldInfo> &yields,
     SmallVectorImpl<SILResultInfo> &ordinaryResults,
-    llvm::Optional<SILResultInfo> &errorResult) {
+    std::optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
     // If any of the elements have a label, or an explicit missing label (_:),
     // resolve the entire result type as a single tuple type.
@@ -5049,6 +5048,11 @@ TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
 
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
     LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+  if (options.is(TypeResolverContext::TupleElement)) {
+    diagnoseInvalid(repr, repr->getSpecifierLoc(),
+                    diag::lifetime_dependence_cannot_be_applied_to_tuple_elt);
+    return ErrorType::get(getASTContext());
+  }
   if (!options.is(TypeResolverContext::FunctionResult)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(),
@@ -5407,7 +5411,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  llvm::Optional<unsigned> moveOnlyElementIndex = llvm::None;
+  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
@@ -5486,146 +5490,89 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, ctx);
 }
 
-/// \returns the inverse ~P that is conflicted if a protocol in \c tys
-/// requires P. For example, `Q & ~Copyable` is a conflict, if `Q` requires
-/// or is equal to `Copyable`
-static std::optional<InvertibleProtocolKind>
-hasConflictedInverse(ArrayRef<Type> tys, InvertibleProtocolSet inverses) {
-  // Fast-path: no inverses that could be conflicted!
-  if (inverses.empty())
-    return std::nullopt;
-
-  for (auto ty : tys) {
-    // Handle nested PCT's recursively since we haven't flattened them away yet.
-    if (auto pct = dyn_cast<ProtocolCompositionType>(ty)) {
-      if (auto conflict = hasConflictedInverse(pct->getMembers(), inverses))
-        return conflict;
-      continue;
-    }
-
-    // Dig out a protocol.
-    ProtocolDecl *decl = nullptr;
-    if (auto protoTy = dyn_cast<ProtocolType>(ty))
-      decl = protoTy->getDecl();
-    else if (auto paramProtoTy = dyn_cast<ParameterizedProtocolType>(ty))
-      decl = paramProtoTy->getProtocol();
-
-    if (!decl)
-      continue;
-
-    // If an inverse ~I exists for this protocol member of the PCT that
-    // requires I, then it's a conflict.
-    for (auto inverse : inverses) {
-      if (decl->isSpecificProtocol(getKnownProtocolKind(inverse))
-          || decl->requiresInvertible(inverse)) {
-        return inverse;
-      }
-    }
-  }
-
-  return std::nullopt;
-}
-
 NeverNullType
 TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                      TypeResolutionOptions options) {
+
+  SmallVector<Type, 4> Members;
 
   // Note that the superclass type will appear as part of one of the
   // types in 'Members', so it's not used when constructing the
   // fully-realized type below -- but we just record it to make sure
   // there is only one superclass.
   Type SuperclassType;
-  SmallVector<Type, 4> Members;
-  InvertibleProtocolSet Inverses;
-  bool HasAnyObject = false;
 
-  // Whether we saw at least one protocol. A protocol composition
-  // must either be empty (in which case it is Any or AnyObject),
-  // or if it has a superclass constraint, have at least one protocol.
-  bool HasProtocol = false;
+  // Did we see at least one protocol or inverse?
+  bool HasNonClassMember = false;
 
-  auto checkSuperclass = [&](SourceLoc loc, Type t) -> bool {
-    if (SuperclassType && !SuperclassType->isEqual(t)) {
-      diagnose(loc, diag::protocol_composition_one_class, t,
-               SuperclassType);
-      return true;
+  // If true, we cannot form a composition from these members.
+  bool IsInvalid = false;
+
+  std::function<void (SourceLoc, Type)> checkMember
+      = [&](SourceLoc loc, Type ty) {
+    if (auto pct = ty->getAs<ProtocolCompositionType>()) {
+      if (!pct->getInverses().empty())
+        HasNonClassMember = true;
+
+      for (auto member : pct->getMembers())
+        checkMember(loc, member);
+      return;
     }
 
-    SuperclassType = t;
-    return false;
-  };
+    if (ty->is<ProtocolType>() ||
+        ty->is<ParameterizedProtocolType>()) {
+      HasNonClassMember = true;
+      return;
+    }
 
-  bool IsInvalid = false;
+    assert(isa<ClassDecl>(ty->getAnyNominal()));
+
+    if (SuperclassType && !SuperclassType->isEqual(ty)) {
+      diagnose(loc, diag::protocol_composition_one_class, ty,
+               SuperclassType);
+      IsInvalid = true;
+      return;
+    }
+
+    SuperclassType = ty;
+  };
 
   for (auto tyR : repr->getTypes()) {
     auto ty = resolveType(tyR,
         options.withContext(TypeResolverContext::GenericRequirement));
     if (ty->hasError()) return ty;
 
-    auto nominalDecl = ty->getAnyNominal();
-    if (isa_and_nonnull<ClassDecl>(nominalDecl)) {
-      if (checkSuperclass(tyR->getStartLoc(), ty))
-        continue;
-
+    if (ty->is<ProtocolType>()) {
+      checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
     }
 
     // FIXME: Support compositions involving parameterized protocol types,
     // like 'any Collection<String> & Sendable', etc.
-    if (ty->isConstraintType()) {
-      if (ty->is<ProtocolType>()) {
-        HasProtocol = true;
-        Members.push_back(ty);
-        continue;
-      }
+    if (ty->is<ParameterizedProtocolType>() &&
+        !options.isConstraintImplicitExistential() &&
+        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
+    }
 
-      if (ty->is<ParameterizedProtocolType>() &&
-          !options.isConstraintImplicitExistential() &&
-          options.getContext() != TypeResolverContext::ExistentialConstraint) {
-        HasProtocol = true;
-        Members.push_back(ty);
-        continue;
-      }
+    if (ty->is<ProtocolCompositionType>()) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
+    }
 
-      if (auto pct = ty->getAs<ProtocolCompositionType>()) {
-        auto layout = ty->getExistentialLayout();
-        if (auto superclass = layout.explicitSuperclass)
-          if (checkSuperclass(tyR->getStartLoc(), superclass))
-            continue;
-        if (!layout.getProtocols().empty())
-          HasProtocol = true;
-        if (layout.hasExplicitAnyObject)
-          HasAnyObject = true;
-
-        Inverses.insertAll(pct->getInverses());
-        Members.push_back(ty);
-        continue;
-      }
+    if (isa_and_nonnull<ClassDecl>(ty->getAnyNominal())) {
+      checkMember(tyR->getStartLoc(), ty);
+      Members.push_back(ty);
+      continue;
     }
 
     diagnose(tyR->getStartLoc(),
              diag::invalid_protocol_composition_member,
              ty);
-
-    IsInvalid = true;
-  }
-
-  // Cannot combine inverses with Superclass or AnyObject in a composition.
-  if ((SuperclassType || HasAnyObject) && !Inverses.empty()) {
-    diagnose(repr->getStartLoc(),
-             diag::inverse_with_class_constraint,
-             HasAnyObject,
-             getProtocolName(getKnownProtocolKind(*Inverses.begin())),
-             SuperclassType);
-    IsInvalid = true;
-  }
-
-  // Cannot provide an inverse in the same composition requiring the protocol.
-  if (auto conflict = hasConflictedInverse(Members, Inverses)) {
-    diagnose(repr->getLoc(),
-       diag::inverse_conflicts_explicit_composition,
-       getProtocolName(getKnownProtocolKind(*conflict)));
     IsInvalid = true;
   }
 
@@ -5637,17 +5584,58 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // Avoid confusing diagnostics ('MyClass' not convertible to 'MyClass',
   // etc) by collapsing a composition consisting of a single class down
   // to the class itself.
-  if (SuperclassType && !HasProtocol)
+  if (SuperclassType && !HasNonClassMember)
     return SuperclassType;
 
-  // In user-written types, AnyObject constraints always refer to the
-  // AnyObject type in the standard library.
   auto composition =
-      ProtocolCompositionType::get(getASTContext(), Members, Inverses,
+      ProtocolCompositionType::get(getASTContext(), Members,
+                                   /*Inverses=*/{},
                                    /*HasExplicitAnyObject=*/false);
+
+  // Flatten the composition.
+  if (auto canComposition = dyn_cast<ProtocolCompositionType>(
+          composition->getCanonicalType())) {
+    auto inverses = canComposition->getInverses();
+    auto layout = composition->getExistentialLayout();
+
+    // Cannot provide an inverse in the same composition requiring the protocol.
+    for (auto ip : inverses) {
+      auto kp = getKnownProtocolKind(ip);
+
+      if (layout.requiresClass()) {
+        bool hasExplicitAnyObject = layout.hasExplicitAnyObject;
+        diagnose(repr->getStartLoc(),
+                 diag::inverse_with_class_constraint,
+                 hasExplicitAnyObject,
+                 getProtocolName(kp),
+                 layout.getSuperclass());
+        IsInvalid = true;
+        break;
+      }
+
+      auto *proto = getASTContext().getProtocol(kp);
+      for (auto *otherProto : layout.getProtocols()) {
+        if (proto == otherProto ||
+            otherProto->inheritsFrom(proto)) {
+          diagnose(repr->getLoc(),
+                   diag::inverse_conflicts_explicit_composition,
+                   getProtocolName(kp));
+          IsInvalid = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (IsInvalid) {
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
+  }
+
   if (options.isConstraintImplicitExistential()) {
     return ExistentialType::get(composition);
   }
+
   return composition;
 }
 
@@ -5708,7 +5696,7 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  llvm::Optional<MetatypeRepresentation> storedRepr;
+  std::optional<MetatypeRepresentation> storedRepr;
 
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
@@ -5723,7 +5711,7 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
 
 NeverNullType TypeResolver::buildMetatypeType(
     MetatypeTypeRepr *repr, Type instanceType,
-    llvm::Optional<MetatypeRepresentation> storedRepr) {
+    std::optional<MetatypeRepresentation> storedRepr) {
   // If the instance type is an existential metatype, figure out if
   // the syntax is of the form '(any <protocol metatype>).Type'. In
   // this case, type resolution should produce the static metatype
@@ -5791,7 +5779,7 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  llvm::Optional<MetatypeRepresentation> storedRepr;
+  std::optional<MetatypeRepresentation> storedRepr;
 
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
@@ -5806,7 +5794,7 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
 
 NeverNullType TypeResolver::buildProtocolType(
     ProtocolTypeRepr *repr, Type instanceType,
-    llvm::Optional<MetatypeRepresentation> storedRepr) {
+    std::optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
     diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
              instanceType);

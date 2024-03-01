@@ -161,6 +161,11 @@ llvm::cl::opt<bool> SILForceVerifyAll(
     llvm::cl::desc("For all passes, precompute analyses before the pass and "
                    "verify analyses after the pass"));
 
+llvm::cl::opt<bool> DisableSwiftVerification(
+    "disable-swift-verification", llvm::cl::init(false),
+    llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+
+
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
 namespace {
@@ -611,6 +616,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                                                  MatchFun))) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftFunctionVerification(F);
   }
 
   if (SILPrintPassName)
@@ -706,6 +712,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
+    runSwiftFunctionVerification(F);
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),
@@ -715,6 +722,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                                                    MatchFun))) {
       F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
+      runSwiftFunctionVerification(F);
     }
   }
 
@@ -821,6 +829,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
                                                  MatchFun))) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftModuleVerification();
   }
 
   swiftPassInvocation.startModulePassRun(SMT);
@@ -855,6 +864,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
     Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
+    runSwiftModuleVerification();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),
@@ -864,6 +874,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
                                                    MatchFun))) {
       Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
+      runSwiftModuleVerification();
     }
   }
 }
@@ -1483,6 +1494,26 @@ void SwiftPassInvocation::endTransformFunction() {
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
 }
 
+void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
+  if (transform) {
+    assert(this->function == function);
+  } else {
+    assert(!this->function);
+    this->function = function;
+  }
+}
+
+void SwiftPassInvocation::endVerifyFunction() {
+  assert(function);
+  if (!transform) {
+    assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing &&
+           "verifyication must not change the SIL of a function");
+    assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
+    assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+    function = nullptr;
+  }
+}
+
 SwiftPassInvocation::~SwiftPassInvocation() {}
 
 //===----------------------------------------------------------------------===//
@@ -1547,7 +1578,7 @@ BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(Bridge
 
 OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
   auto bi = builtin.getAs<BuiltinInst>();
-  llvm::Optional<bool> resultsInError;
+  std::optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
 }
 
@@ -1864,3 +1895,29 @@ void BridgedCloner::clone(BridgedInstruction inst) {
   cloner->cloneInst(inst.unbridged());
 }
 
+static BridgedUtilities::VerifyFunctionFn verifyFunctionFunction;
+
+void BridgedUtilities::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
+  verifyFunctionFunction = verifyFunctionFn;
+}
+
+void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
+  if (!verifyFunctionFunction)
+    return;
+
+  if (f->getModule().getOptions().VerifyNone)
+    return;
+
+  if (DisableSwiftVerification)
+    return;
+
+  getSwiftPassInvocation()->beginVerifyFunction(f);
+  verifyFunctionFunction({getSwiftPassInvocation()}, {f});
+  getSwiftPassInvocation()->endVerifyFunction();
+}
+
+void SILPassManager::runSwiftModuleVerification() {
+  for (SILFunction &f : *Mod) {
+    runSwiftFunctionVerification(&f);
+  }
+}

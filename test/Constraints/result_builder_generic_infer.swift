@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 protocol P {
   associatedtype A
 

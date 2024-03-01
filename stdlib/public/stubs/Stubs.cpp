@@ -26,11 +26,7 @@
 #define NOMINMAX
 #include <windows.h>
 #else // defined(_WIN32)
-#if __has_include(<sys/errno.h>)
-#include <sys/errno.h>
-#else
 #include <errno.h>
-#endif
 #if __has_include(<sys/resource.h>)
 #include <sys/resource.h>
 #endif
@@ -537,8 +533,8 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-  llvm::Optional<swift::Thread::StackBounds> bounds =
-    swift::Thread::stackBounds();
+  std::optional<swift::Thread::StackBounds> bounds =
+      swift::Thread::stackBounds();
   if (!bounds)
     return false;
   *outBegin = (uintptr_t)bounds->low;

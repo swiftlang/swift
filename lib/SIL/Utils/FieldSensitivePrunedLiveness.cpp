@@ -108,13 +108,19 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
 //                           MARK: SubElementNumber
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<SubElementOffset>
+std::optional<SubElementOffset>
 SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
                                     SILValue rootAddress) {
   unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
+  LLVM_DEBUG(llvm::dbgs() << "computing element offset for root:\n";
+             rootAddress->print(llvm::dbgs()));
+
   while (1) {
+    LLVM_DEBUG(llvm::dbgs() << "projection: ";
+               projectionDerivedFromRoot->print(llvm::dbgs()));
+
     // If we got to the root, we're done.
     if (rootAddress == projectionDerivedFromRoot)
       return {SubElementOffset(finalSubElementOffset)};
@@ -195,6 +201,16 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       projectionDerivedFromRoot = initData->getOperand();
       continue;
     }
+    
+    // Look through wrappers.
+    if (auto c2m = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = c2m->getOperand();
+      continue;
+    }
+    if (auto m2c = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = m2c->getOperand();
+      continue;
+    }
 
     // If we do not know how to handle this case, just return None.
     //
@@ -205,11 +221,11 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
     LLVM_DEBUG(llvm::dbgs() << "unhandled projection derived from root:\n";
                projectionDerivedFromRoot->print(llvm::dbgs()));
 
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
-llvm::Optional<SubElementOffset>
+std::optional<SubElementOffset>
 SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
                                   SILValue rootAddress) {
   unsigned finalSubElementOffset = 0;
@@ -331,7 +347,7 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
     // really do not want to abort. Instead, our caller can choose to abort if
     // they get back a None. This ensures that we do not abort in cases where we
     // just want to emit to the user a "I do not understand" error.
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -501,13 +517,13 @@ void TypeTreeLeafTypeRange::visitContiguousRanges(
   if (bits.size() == 0)
     return;
 
-  llvm::Optional<unsigned> current = llvm::None;
+  std::optional<unsigned> current = std::nullopt;
   for (unsigned bit = 0, size = bits.size(); bit < size; ++bit) {
     auto isSet = bits.test(bit);
     if (current) {
       if (!isSet) {
         callback(TypeTreeLeafTypeRange(*current, bit));
-        current = llvm::None;
+        current = std::nullopt;
       }
     } else if (isSet) {
       current = bit;
@@ -750,11 +766,11 @@ static FunctionTest FieldSensitiveSSAUseLivenessTest(
           Ending,
           NonEnding,
         };
-        auto kind = llvm::StringSwitch<llvm::Optional<Kind>>(kindString)
+        auto kind = llvm::StringSwitch<std::optional<Kind>>(kindString)
                         .Case("non-use", Kind::NonUse)
                         .Case("ending", Kind::Ending)
                         .Case("non-ending", Kind::NonEnding)
-                        .Default(llvm::None);
+                        .Default(std::nullopt);
         if (!kind.has_value()) {
           llvm::errs() << "Unknown kind: " << kindString << "\n";
           llvm::report_fatal_error("Bad user kind.  Value must be one of "

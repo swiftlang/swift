@@ -13,6 +13,26 @@ struct NonSendableStruct {
   var second = Klass()
 }
 
+class KlassWithNonSendableStructPair {
+  var ns1: NonSendableStruct
+  var ns2: (NonSendableStruct, NonSendableStruct)
+
+  init() {
+    ns1 = NonSendableStruct()
+    ns2 = (ns1, ns1)
+  }
+}
+
+final class FinalKlassWithNonSendableStructPair {
+  var ns1: NonSendableStruct
+  var ns2: (NonSendableStruct, NonSendableStruct)
+
+  init() {
+    ns1 = NonSendableStruct()
+    ns2 = (ns1, ns1)
+  }
+}
+
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
 
@@ -93,14 +113,14 @@ func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) 
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
   // expected-note @-1:54 {{variable defined here}}
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   await transferToMain(x) // expected-note {{access here could race}}
 }
 
 func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
   // expected-note @-1 {{variable defined here}}
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   useValue(x) // expected-note {{access here could race}}
 }
@@ -116,14 +136,14 @@ actor MyActor {
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
     // expected-note @-1 {{variable defined here}}
-    await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+    await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
     // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     await transferToMain(x) // expected-note {{access here could race}}
   }
 
   func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
     // expected-note @-1 {{variable defined here}}
-    await transferToMain(x)  // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+    await transferToMain(x)  // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from actor-isolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
     useValue(x) // expected-note {{access here could race}}
   }
@@ -138,7 +158,8 @@ actor MyActor {
   // Once we assign into the actor, we cannot transfer further.
   func assignTransferringIntoActor2(_ x: transferring Klass) async {
     field = x
-    await transferToMain(x) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
+    // expected-note @-1 {{transferring actor-isolated 'x' to main actor-isolated callee could cause races between main actor-isolated and actor-isolated uses}}
   }
 }
 
@@ -148,11 +169,13 @@ actor MyActor {
 
 @MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
   globalKlass = x
-  await transferToCustom(x) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'x' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 @MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
-  await transferToCustom(globalKlass) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(globalKlass) // expected-warning {{transferring 'globalKlass' may cause a race}}
+  // expected-note @-1 {{transferring main actor-isolated 'globalKlass' to global actor 'CustomActor'-isolated callee could cause races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 }
 
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
@@ -163,7 +186,7 @@ func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
 func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
   // expected-note @-1 {{variable defined here}}
   let _ = x
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
   let _ = x // expected-note {{access here could race}}
 }
@@ -226,7 +249,7 @@ func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
   x = y
 
   // TODO: This should refer to the transferring parameter.
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   useValue(x) // expected-note {{access here could race}}
@@ -256,7 +279,7 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.
@@ -274,7 +297,7 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{transferring non-Sendable value 'x' could yield races with later accesses}}
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   // y is assigned into a field of x, so we treat this like a merge.
@@ -295,4 +318,37 @@ func testTransferSrc(_ x: transferring Klass) async {
   let y = Klass()
   await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
   x = y // expected-note {{access here could race}}
+}
+
+func testTransferOtherParam(_ x: transferring Klass, y: Klass) async {
+  x = y // expected-warning {{assigning 'y' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y'}}
+}
+
+func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) async {
+  x = y.0 // expected-warning {{assigning 'y.0' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.0' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.0'}}
+}
+
+func testTransferOtherParamStruct(_ x: transferring Klass, y: NonSendableStruct) async {
+  x = y.first // expected-warning {{assigning 'y.first' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.first' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.first'}}
+}
+
+func testTransferOtherParamTupleStruct(_ x: transferring Klass, y: (NonSendableStruct, NonSendableStruct)) async {
+  x = y.1.second // expected-warning {{assigning 'y.1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.1.second'}}
+}
+
+func testTransferOtherParamClassStructTuple(_ x: transferring Klass, y: KlassWithNonSendableStructPair) async {
+  x = y.ns1.second // expected-warning {{assigning 'y.ns1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.ns1.second' is a task isolated value that is assigned into transferring parameter 'x'}}
+  x = y.ns2.1.second // expected-warning {{assigning 'y.ns2.1.second' to transferring parameter 'x' may cause a race}}
+  // expected-note @-1 {{'y.ns2.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.ns2.1.second'}}
+}
+
+func useSugaredTypeNameWhenEmittingTaskIsolationError(_ x: @escaping @MainActor () async -> ()) {
+  func fakeInit(operation: transferring @escaping () async -> ()) {}
+
+  fakeInit(operation: x) // expected-warning {{task isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
 }

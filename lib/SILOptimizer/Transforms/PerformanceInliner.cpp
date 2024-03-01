@@ -759,8 +759,8 @@ static bool isInlineAlwaysCallSite(SILFunction *Callee, int numCallerBlocks) {
 /// It returns false if a function should not be inlined.
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
-static llvm::Optional<bool> shouldInlineGeneric(FullApplySite AI,
-                                                int numCallerBlocks) {
+static std::optional<bool> shouldInlineGeneric(FullApplySite AI,
+                                               int numCallerBlocks) {
   assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 
@@ -795,7 +795,7 @@ static llvm::Optional<bool> shouldInlineGeneric(FullApplySite AI,
     // enable inlining them in a generic context. Though the final inlining
     // decision is done by the usual heuristics. Therefore we return None and
     // not true.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // The returned partial_apply of a thunk is most likely being optimized away
@@ -811,7 +811,7 @@ static llvm::Optional<bool> shouldInlineGeneric(FullApplySite AI,
     return false;
 
   // It is not clear yet if this function should be decided or not.
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool SILPerformanceInliner::decideInWarmBlock(
@@ -1195,6 +1195,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
       }
 
       Caller->verify();
+      pm->runSwiftFunctionVerification(Caller);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -1212,6 +1213,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // the inliner without running the entire inliner.
   if (EnableVerifyAfterInlining) {
     Caller->verify();
+    pm->runSwiftFunctionVerification(Caller);
   }
 
   return true;

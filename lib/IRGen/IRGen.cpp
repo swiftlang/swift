@@ -198,7 +198,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine,
                                      llvm::raw_pwrite_stream *out) {
-  llvm::Optional<PGOOptions> PGOOpt;
+  std::optional<PGOOptions> PGOOpt;
 
   PipelineTuningOptions PTO;
 
@@ -565,7 +565,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     HashGlobal->setInitializer(HashConstant);
   }
 
-  llvm::Optional<llvm::vfs::OutputFile> OutputFile;
+  std::optional<llvm::vfs::OutputFile> OutputFile;
   SWIFT_DEFER {
     if (!OutputFile)
       return;
@@ -896,7 +896,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   // On Cygwin 64 bit, dlls are loaded above the max address for 32 bits.
   // This means that the default CodeModel causes generated code to segfault
   // when run.
-  llvm::Optional<CodeModel::Model> cmodel = llvm::None;
+  std::optional<CodeModel::Model> cmodel = std::nullopt;
   if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isWindowsCygwinEnvironment())
     cmodel = CodeModel::Large;
 
@@ -1076,10 +1076,10 @@ struct SymbolSourcesToEmit {
   IREntitiesToEmit irEntitiesToEmit;
 };
 
-static llvm::Optional<SymbolSourcesToEmit>
+static std::optional<SymbolSourcesToEmit>
 getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
   if (!desc.SymbolsToEmit)
-    return llvm::None;
+    return std::nullopt;
 
   assert(!desc.SILMod && "Already emitted SIL?");
 
@@ -1135,7 +1135,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts,
-                                              nullptr, llvm::None};
+                                              nullptr, std::nullopt};
     SILMod = evaluateOrFatal(Ctx.evaluator, LoweredSILRequest{loweringDesc});
 
     // If there was an error, bail.
@@ -1231,10 +1231,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() {
-    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    if (checkForLeaks)
-      SILModule::checkForLeaksAfterDestruction();
   };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
@@ -1546,10 +1543,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
   auto SILModuleRelease = [&SILMod]() {
-    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    if (checkForLeaks)
-      SILModule::checkForLeaksAfterDestruction();
   };
   auto releaseModuleThread = std::thread(SILModuleRelease);
 
@@ -1571,7 +1565,7 @@ GeneratedModule swift::performIRGeneration(
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forWholeModule(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
-      ModuleName, PSPs, /*symsToEmit*/ llvm::None, parallelOutputFilenames,
+      ModuleName, PSPs, /*symsToEmit*/ std::nullopt, parallelOutputFilenames,
       outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
@@ -1598,7 +1592,7 @@ performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
   auto desc = IRGenDescriptor::forFile(
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, PrivateDiscriminator,
-      /*symsToEmit*/ llvm::None, outModuleHash);
+      /*symsToEmit*/ std::nullopt, outModuleHash);
   return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 

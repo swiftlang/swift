@@ -126,6 +126,18 @@ static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
   }
 }
 
+/// Returns whether `E` has a parent expression with arguments.
+static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
+  E = CS.getParentExpr(E);
+  while (E) {
+    if (E->getArgs() || isa<ParenExpr>(E) || isa<TupleExpr>(E) || isa<CollectionExpr>(E)) {
+      return true;
+    }
+    E = CS.getParentExpr(E);
+  }
+  return false;
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -182,7 +194,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   // Find the parameter the completion was bound to (if any), as well as which
   // parameters are already bound (so we don't suggest them even when the args
   // are out of order).
-  llvm::Optional<unsigned> ParamIdx;
+  std::optional<unsigned> ParamIdx;
   std::set<unsigned> ClaimedParams;
   bool IsNoninitialVariadic = false;
 
@@ -216,7 +228,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   bool HasLabel = false;
-  llvm::Optional<unsigned> FirstTrailingClosureIndex = llvm::None;
+  std::optional<unsigned> FirstTrailingClosureIndex = std::nullopt;
   if (auto PE = CS.getParentExpr(CompletionExpr)) {
     if (auto Args = PE->getArgs()) {
       HasLabel = !Args->getLabel(ArgIdx).empty();
@@ -284,6 +296,15 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     // and the code completion token doesn’t have a label, we have a case like
     // `Point(|)`. Suggest the entire function signature.
     IncludeSignature = true;
+  } else if (!ParentCall->getArgs()->empty() &&
+             ParentCall->getArgs()->getExpr(0) == CompletionExpr &&
+             !ParentCall->getArgs()->get(0).hasLabel()) {
+    if (hasParentCallLikeExpr(ParentCall, CS)) {
+      // We are completing in cases like `bar(arg: foo(|, option: 1)`
+      // In these cases, we don’t know if `option` belongs to the call to `foo`
+      // or `bar`. Be defensive and also suggest the signature.
+      IncludeSignature = true;
+    }
   }
 
   Results.push_back(

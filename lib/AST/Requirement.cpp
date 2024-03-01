@@ -316,90 +316,20 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
-void InverseRequirement::enumerateDefaultedParams(
-    GenericContext *genericContext,
-    SmallVectorImpl<Type> &result) {
-
-  auto add = [&](Type t) {
-    assert(t->isTypeParameter());
-    result.push_back(t);
-  };
-
-  // Nothing to enumerate if it's not generic.
-  if (!genericContext->isGeneric())
-    return;
-
-  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
-    add(proto->getSelfInterfaceType());
-
-    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
-      add(assocTypeDecl->getDeclaredInterfaceType());
-
-    return;
-  }
-
-  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
-    add(gtpd->getDeclaredInterfaceType());
-}
-
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-
-  SmallVector<ProtocolDecl*, NumInvertibleProtocols> defaults;
-  expandDefaults(ctx, /*inverses=*/{}, defaults);
-
-  // Fast-path.
-  if (defaults.empty())
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return;
 
   for (auto gp : gps) {
-    for (auto *proto : defaults) {
-      auto protoTy = proto->getDeclaredInterfaceType();
-      result.push_back({{RequirementKind::Conformance, gp, protoTy},
-                        SourceLoc()});
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      result.push_back({{RequirementKind::Conformance, gp,
+                         proto->getDeclaredInterfaceType()},
+                         SourceLoc()});
     }
-  }
-}
-
-void InverseRequirement::expandDefaults(
-    ASTContext &ctx,
-    InvertibleProtocolSet inverses,
-    SmallVectorImpl<ProtocolDecl*> &protocols) {
-
-  // Skip unless noncopyable generics is enabled
-  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
-    return;
-
-  // Try to add all invertible protocols, unless:
-  //  - an inverse was provided
-  //  - an existing protocol already requires it
-  for (auto ip : InvertibleProtocolSet::full()) {
-    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
-    bool alreadyRequired = false;
-    for (auto proto : protocols) {
-      if (proto->isSpecificProtocol(getKnownProtocolKind(ip))
-          || proto->requiresInvertible(ip)) {
-        alreadyRequired = true;
-        break;
-      }
-    }
-
-    // If some protocol member already implies P, then we don't need to
-    // add a requirement for P.
-    if (alreadyRequired) {
-      assert(!inverses.contains(ip) && "cannot require P and ~P");
-      continue;
-    }
-
-    // Nothing implies P, so unless there's an inverse ~P, add the requirement.
-    if (inverses.contains(ip))
-      continue;
-
-    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-    assert(proto && "missing Copyable/Escapable from stdlib!");
-
-    protocols.push_back(proto);
   }
 }

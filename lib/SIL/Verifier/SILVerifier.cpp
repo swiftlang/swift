@@ -1389,7 +1389,7 @@ public:
   }
 
   void checkDebugVariable(SILInstruction *inst) {
-    llvm::Optional<SILDebugVariable> varInfo;
+    std::optional<SILDebugVariable> varInfo;
     if (auto *di = dyn_cast<AllocStackInst>(inst))
       varInfo = di->getVarInfo();
     else if (auto *di = dyn_cast<AllocBoxInst>(inst))
@@ -3822,7 +3822,7 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    llvm::Optional<Requirement> selfRequirement;
+    std::optional<Requirement> selfRequirement;
     for (auto req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::SameType) {
         selfRequirement = req;
@@ -7089,12 +7089,15 @@ void SILVTable::verify(const SILModule &M) const {
 
     if (M.getStage() != SILStage::Lowered &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
-              baseInfo.getSILType().castTo<SILFunctionType>(),
               entry.getImplementation()->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.getImplementation());
     }
@@ -7251,8 +7254,6 @@ void SILModule::verify(CalleeCache *calleeCache,
                        bool isCompleteOSSA, bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
-
-  checkForLeaks();
 
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;

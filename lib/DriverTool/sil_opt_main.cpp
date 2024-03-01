@@ -59,14 +59,14 @@ enum class OptGroup {
   Lowering
 };
 
-llvm::Optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
+std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   switch (defaultable) {
   case llvm::cl::BOU_TRUE:
     return true;
   case llvm::cl::BOU_FALSE:
     return false;
   case llvm::cl::BOU_UNSET:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
 }
@@ -82,8 +82,7 @@ enum class EnforceExclusivityMode {
 namespace llvm {
 
 inline raw_ostream &
-operator<<(raw_ostream &os,
-           const llvm::Optional<CopyPropagationOption> option) {
+operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
   if (option) {
     switch (*option) {
     case CopyPropagationOption::Off:
@@ -104,14 +103,14 @@ operator<<(raw_ostream &os,
 
 namespace cl {
 template <>
-class parser<llvm::Optional<CopyPropagationOption>>
-    : public basic_parser<llvm::Optional<CopyPropagationOption>> {
+class parser<std::optional<CopyPropagationOption>>
+    : public basic_parser<std::optional<CopyPropagationOption>> {
 public:
-  parser(Option &O) : basic_parser<llvm::Optional<CopyPropagationOption>>(O) {}
+  parser(Option &O) : basic_parser<std::optional<CopyPropagationOption>>(O) {}
 
   // parse - Return true on error.
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
-             llvm::Optional<CopyPropagationOption> &Value) {
+             std::optional<CopyPropagationOption> &Value) {
     if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
         Arg == "1") {
       Value = CopyPropagationOption::On;
@@ -142,8 +141,8 @@ public:
 
   // Instantiate the macro PRINT_OPT_DIFF of llvm_project's CommandLine.cpp at
   // Optional<CopyPropagationOption>.
-  void printOptionDiff(const Option &O, llvm::Optional<CopyPropagationOption> V,
-                       OptionValue<llvm::Optional<CopyPropagationOption>> D,
+  void printOptionDiff(const Option &O, std::optional<CopyPropagationOption> V,
+                       OptionValue<std::optional<CopyPropagationOption>> D,
                        size_t GlobalWidth) const {
     size_t MaxOptWidth = 8;
     printOptionName(O, GlobalWidth);
@@ -496,9 +495,9 @@ struct SILOptOptions {
                          llvm::cl::desc("Ignore [always_inline] attribute."),
                          llvm::cl::init(false));
   using CPStateOpt =
-      llvm::cl::opt<llvm::Optional<CopyPropagationOption>,
+      llvm::cl::opt<std::optional<CopyPropagationOption>,
                     /*ExternalStorage*/ false,
-                    llvm::cl::parser<llvm::Optional<CopyPropagationOption>>>;
+                    llvm::cl::parser<std::optional<CopyPropagationOption>>>;
   CPStateOpt
   CopyPropagationState = CPStateOpt(
         "enable-copy-propagation",
@@ -559,15 +558,18 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, options.Passes),
       isMandatory, IRGenMod);
 
-  if (Module->getOptions().VerifyAll)
+  if (Module->getOptions().VerifyAll) {
     Module->verify();
+    SILPassManager pm(Module, isMandatory, IRGenMod);
+    pm.runSwiftModuleVerification();
+  }
 }
 
 namespace {
 using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
 } // end anonymous namespace
 
-static llvm::Optional<ASTVerifierOverrideKind>
+static std::optional<ASTVerifierOverrideKind>
 getASTOverrideKind(const SILOptOptions &options) {
   assert(!(options.EnableASTVerifier && options.DisableASTVerifier) &&
          "Can only set one of EnableASTVerifier/DisableASTVerifier?!");
@@ -577,7 +579,7 @@ getASTOverrideKind(const SILOptOptions &options) {
   if (options.DisableASTVerifier)
     return ASTVerifierOverrideKind::DisableVerifier;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
@@ -636,7 +638,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     options.EnableExperimentalConcurrency;
-  llvm::Optional<bool> enableExperimentalMoveOnly =
+  std::optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(options.EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
     // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
@@ -706,7 +708,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.VerifySILOwnership = !options.DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = options.RemarksFilename;
   SILOpts.OptRecordPasses = options.RemarksPasses;
-  SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnableStackProtection = true;
   SILOpts.EnableMoveInoutStackProtection = options.EnableMoveInoutStackProtection;
 
@@ -760,7 +761,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   if (SILOpts.CopyPropagation == CopyPropagationOption::Off)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
-  llvm::Optional<bool> enableLexicalLifetimes =
+  std::optional<bool> enableLexicalLifetimes =
       toOptionalBool(options.EnableLexicalLifetimes);
 
   if (enableLexicalLifetimes)

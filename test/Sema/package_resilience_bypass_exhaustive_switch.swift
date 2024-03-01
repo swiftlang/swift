@@ -38,7 +38,7 @@ public enum FrozenPublicEnum {
 //--- ClientDefault.swift
 import Utils
 
-func f(_ arg: PkgEnum) -> Int {
+package func f(_ arg: PkgEnum) -> Int {
   switch arg { // expected-warning {{switch covers known cases, but 'PkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
   case .one:
     return 1
@@ -47,7 +47,7 @@ func f(_ arg: PkgEnum) -> Int {
   }
 }
 
-func g(_ arg: UfiPkgEnum) -> Int {
+package func g(_ arg: UfiPkgEnum) -> Int {
   switch arg { // expected-warning {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
   case .one:
     return 1
@@ -74,12 +74,15 @@ public func k(_ arg: FrozenPublicEnum) -> Int {
   }
 }
 
+
 //--- ClientOptimized.swift
 import Utils
 
-// No warning with optimization to bypass resilience checks for package enums.
-func f(_ arg: PkgEnum) -> Int {
-  switch arg {
+// With optimization enabled to bypass resilience checks within
+// a package boundary, public (non-frozen) or package enums no
+// longer require `@unknown default` in source code switch stmts.
+package func f(_ arg: PkgEnum) -> Int {
+  switch arg { // no-warning
   case .one:
     return 1
   case .two(let val):
@@ -87,10 +90,8 @@ func f(_ arg: PkgEnum) -> Int {
   }
 }
 
-// Warning still shows up for usableFromInline package enum as the optimization is targeted for
-// decls with package access, not the elevated public access. This might be allowed later.
-func g(_ arg: UfiPkgEnum) -> Int {
-  switch arg { // expected-warning {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+package func g(_ arg: UfiPkgEnum) -> Int {
+  switch arg { // no-warning
   case .one:
     return 1
   case .two(let val):
@@ -98,9 +99,8 @@ func g(_ arg: UfiPkgEnum) -> Int {
   }
 }
 
-// Warning still shows up for public enum as the optimization is targeted for package types.
 public func h(_ arg: PublicEnum) -> Int {
-  switch arg { // expected-warning {{switch covers known cases, but 'PublicEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+  switch arg { // no-warning
   case .one:
     return 1
   case .two(let val):

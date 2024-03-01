@@ -158,7 +158,7 @@ RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
       }
 
       if (!SRCs.empty())
-        return RawComment(ctx.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
     }
 
     // Otherwise check to see if we have a comment available in the swiftdoc.
@@ -185,37 +185,37 @@ RawComment Decl::getRawComment() const {
   return evaluateOrDefault(eval, RawCommentRequest{this}, RawComment());
 }
 
-llvm::Optional<StringRef> Decl::getGroupName() const {
+std::optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getGroupNameForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<StringRef> Decl::getSourceFileName() const {
+std::optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getSourceFileNameForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<unsigned> Decl::getSourceOrder() const {
+std::optional<unsigned> Decl::getSourceOrder() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     // We can only get source orders from deserialized module files.
     return Unit->getSourceOrderForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 CharSourceRange RawComment::getCharSourceRange() {

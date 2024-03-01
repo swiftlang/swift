@@ -20,4 +20,5 @@ swift_compiler_sources(Optimizer
   SSAUpdater.swift
   StaticInitCloner.swift
   Test.swift
+  Verifier.swift
 )

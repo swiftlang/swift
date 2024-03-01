@@ -45,7 +45,13 @@ public func unavailableOnMacOSExtensionFunc() {}
 public func unavailableOnMacOSAndMacOSExtensionFunc() {}
 
 // CHECK-LABEL:     sil{{.*}}@$s4Test20unavailableOniOSFuncyyF
-// CHECK-NOT:         function_ref @$ss36_diagnoseUnavailableCodeReached{{.*}} : $@convention(thin) () -> Never
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
 // CHECK:           } // end sil function '$s4Test20unavailableOniOSFuncyyF'
 @available(iOS, unavailable)
 public func unavailableOniOSFunc() {}
+
+// CHECK-LABEL:     sil{{.*}}@$s4Test20obsoletedOnMacOS10_9yyF
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:           } // end sil function '$s4Test20obsoletedOnMacOS10_9yyF'
+@available(macOS, obsoleted: 10.9)
+public func obsoletedOnMacOS10_9() {}

@@ -273,7 +273,7 @@ static bool usesExtendedExistentialMetadata(CanType type) {
   return layout.containsParameterized;
 }
 
-static llvm::Optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
+static std::optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
 usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
   unsigned depth = 1;
   auto cur = type.getInstanceType();
@@ -294,7 +294,7 @@ usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
     }
     return std::make_pair(cast<ExistentialType>(cur), depth);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
@@ -1215,8 +1215,8 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   {
     ConditionalDominanceScope scope(IGF);
 
-    llvm::Optional<StackAddress> labelString = emitDynamicTupleTypeLabels(
-        IGF, type, packType, shapeExpression);
+    std::optional<StackAddress> labelString =
+        emitDynamicTupleTypeLabels(IGF, type, packType, shapeExpression);
 
     // Otherwise, we know that either statically or dynamically, we have more than
     // one element. Emit the pack.
@@ -1379,11 +1379,12 @@ static llvm::Value *getFunctionParameterRef(IRGenFunction &IGF,
 /// Mapping type-level parameter flags to ABI parameter flags.
 ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
   return ParameterFlags()
-        .withValueOwnership(flags.getValueOwnership())
-        .withVariadic(flags.isVariadic())
-        .withAutoClosure(flags.isAutoClosure())
-        .withNoDerivative(flags.isNoDerivative())
-        .withIsolated(flags.isIsolated());
+      .withOwnership(asParameterOwnership(flags.getValueOwnership()))
+      .withVariadic(flags.isVariadic())
+      .withAutoClosure(flags.isAutoClosure())
+      .withNoDerivative(flags.isNoDerivative())
+      .withIsolated(flags.isIsolated())
+      .withTransferring(flags.isTransferring());
 }
 
 static std::pair<FunctionTypeFlags, ExtendedFunctionTypeFlags>
@@ -1416,8 +1417,9 @@ getFunctionTypeFlags(CanFunctionType type) {
   }
 
   auto extFlags = ExtendedFunctionTypeFlags()
-      .withTypedThrows(!type->getThrownError().isNull());
-  
+                      .withTypedThrows(!type->getThrownError().isNull())
+                      .withTransferringResult(type->hasTransferringResult());
+
   auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
       .withAsync(type->isAsync())

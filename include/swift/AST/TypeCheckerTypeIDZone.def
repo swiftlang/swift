@@ -217,9 +217,6 @@ SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, InvertibleAnnotationRequest,
-              InverseMarking(TypeDecl *, InvertibleProtocolKind),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsImplicitlyUnwrappedOptionalRequest,
@@ -514,7 +511,7 @@ SWIFT_REQUEST(TypeChecker, ExpandPreambleMacroRequest,
               ArrayRef<unsigned>(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
-              llvm::Optional<unsigned>(AbstractFunctionDecl *),
+              std::optional<unsigned>(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),
@@ -554,7 +551,7 @@ SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
-              llvm::Optional<SubstitutionMap>(const Decl *),
+              std::optional<SubstitutionMap>(const Decl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
               ArrayRef<TypeDecl *>(SourceFile *),

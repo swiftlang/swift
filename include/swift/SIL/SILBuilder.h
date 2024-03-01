@@ -110,7 +110,7 @@ class SILBuilder {
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
   const SILDebugScope *CurDebugScope = nullptr;
-  llvm::Optional<SILLocation> CurDebugLocOverride = llvm::None;
+  std::optional<SILLocation> CurDebugLocOverride = std::nullopt;
 
 public:
   explicit SILBuilder(SILFunction &F)
@@ -230,12 +230,12 @@ public:
   /// Apply a debug location override. If loc is None, the current override is
   /// removed. Otherwise, newly created debug locations use the given location.
   /// Note: the override location does not apply to debug_value[_addr].
-  void applyDebugLocOverride(llvm::Optional<SILLocation> loc) {
+  void applyDebugLocOverride(std::optional<SILLocation> loc) {
     CurDebugLocOverride = loc;
   }
 
   /// Get the current debug location override.
-  llvm::Optional<SILLocation> getCurrentDebugLocOverride() const {
+  std::optional<SILLocation> getCurrentDebugLocOverride() const {
     return CurDebugLocOverride;
   }
 
@@ -394,14 +394,13 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Substitute anonymous function arguments with "_$ArgNo".
-  llvm::Optional<SILDebugVariable>
+  std::optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
-                          llvm::Optional<SILDebugVariable> Var,
-                          SILLocation Loc);
+                          std::optional<SILDebugVariable> Var, SILLocation Loc);
 
   AllocStackInst *
   createAllocStack(SILLocation Loc, SILType elementType,
-                   llvm::Optional<SILDebugVariable> Var = llvm::None,
+                   std::optional<SILDebugVariable> Var = std::nullopt,
                    bool hasDynamicLifetime = false, bool isLexical = false,
                    bool wasMoved = false, bool skipVarDeclAssert = false) {
     llvm::SmallString<4> Name;
@@ -435,7 +434,7 @@ public:
   }
   AllocPackMetadataInst *
   createAllocPackMetadata(SILLocation loc,
-                          llvm::Optional<SILType> elementType = llvm::None) {
+                          std::optional<SILType> elementType = std::nullopt) {
     return insert(new (getModule()) AllocPackMetadataInst(
         getSILDebugLocation(loc),
         elementType.value_or(
@@ -472,7 +471,7 @@ public:
   /// SILBoxType for \p fieldType.
   AllocBoxInst *
   createAllocBox(SILLocation loc, SILType fieldType,
-                 llvm::Optional<SILDebugVariable> Var = llvm::None,
+                 std::optional<SILDebugVariable> Var = std::nullopt,
                  bool hasDynamicLifetime = false, bool reflection = false,
                  bool usesMoveableValueDebugInfo = false,
                  bool hasPointerEscape = false) {
@@ -485,7 +484,7 @@ public:
 
   AllocBoxInst *
   createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                 llvm::Optional<SILDebugVariable> Var = llvm::None,
+                 std::optional<SILDebugVariable> Var = std::nullopt,
                  bool hasDynamicLifetime = false, bool reflection = false,
                  bool usesMoveableValueDebugInfo = false,
                  bool skipVarDeclAssert = false,
@@ -818,12 +817,13 @@ public:
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false,
                                      bool hasPointerEscape = false,
-                                     bool fromVarDecl = false) {
+                                     bool fromVarDecl = false,
+                                     bool fixed = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
-                                      hasPointerEscape, fromVarDecl));
+                                      hasPointerEscape, fromVarDecl, fixed));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -1616,19 +1616,8 @@ public:
   ObjectInst *createObject(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements,
                            unsigned NumBaseElements) {
-    return createObject(Loc, Ty, Elements, NumBaseElements,
-                        hasOwnership()
-                            ? mergeSILValueOwnership(Elements)
-                            : ValueOwnershipKind(OwnershipKind::None));
-  }
-
-  ObjectInst *createObject(SILLocation Loc, SILType Ty,
-                           ArrayRef<SILValue> Elements,
-                           unsigned NumBaseElements,
-                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(ObjectInst::create(getSILDebugLocation(Loc), Ty, Elements,
-                                     NumBaseElements, getModule(),
-                                     forwardingOwnershipKind));
+                                     NumBaseElements, getModule()));
   }
 
   VectorInst *createVector(SILLocation Loc, ArrayRef<SILValue> Elements) {
@@ -1775,7 +1764,7 @@ public:
   SelectEnumInst *createSelectEnum(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
+      std::optional<ArrayRef<ProfileCounter>> CaseCounts = std::nullopt,
       ProfileCounter DefaultCount = ProfileCounter()) {
     assert(isLoadableOrOpaque(Ty));
     return insert(SelectEnumInst::create(
@@ -1786,7 +1775,7 @@ public:
   SelectEnumAddrInst *createSelectEnumAddr(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
+      std::optional<ArrayRef<ProfileCounter>> CaseCounts = std::nullopt,
       ProfileCounter DefaultCount = ProfileCounter()) {
     return insert(SelectEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
@@ -2631,13 +2620,13 @@ public:
   SwitchEnumInst *createSwitchEnum(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
+      std::optional<ArrayRef<ProfileCounter>> CaseCounts = std::nullopt,
       ProfileCounter DefaultCount = ProfileCounter());
 
   SwitchEnumInst *createSwitchEnum(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
+      std::optional<ArrayRef<ProfileCounter>> CaseCounts,
       ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind) {
     return insertTerminator(SwitchEnumInst::create(
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
@@ -2647,7 +2636,7 @@ public:
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
+      std::optional<ArrayRef<ProfileCounter>> CaseCounts = std::nullopt,
       ProfileCounter DefaultCount = ProfileCounter()) {
     return insertTerminator(SwitchEnumAddrInst::create(
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
@@ -2903,8 +2892,8 @@ public:
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILLocation Loc, IndexSubset *ParameterIndices,
       IndexSubset *ResultIndices, SILValue OriginalFunction,
-      llvm::Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions =
-          llvm::None) {
+      std::optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions =
+          std::nullopt) {
     SILValue jvpAndVJPArray[2];
     if (JVPAndVJPFunctions.has_value()) {
       jvpAndVJPArray[0] = JVPAndVJPFunctions->first;
@@ -2925,7 +2914,7 @@ public:
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILLocation Loc, IndexSubset *ParameterIndices,
       IndexSubset *ResultIndices, SILValue OriginalFunction,
-      llvm::Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions,
+      std::optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions,
       ValueOwnershipKind forwardingOwnershipKind) {
 
     return insert(DifferentiableFunctionInst::create(
@@ -2935,7 +2924,7 @@ public:
 
   LinearFunctionInst *createLinearFunction(
       SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      llvm::Optional<SILValue> TransposeFunction = llvm::None) {
+      std::optional<SILValue> TransposeFunction = std::nullopt) {
     auto ownershipKind =
         hasOwnership()
             ? (TransposeFunction ? mergeSILValueOwnership(
@@ -2949,7 +2938,7 @@ public:
   LinearFunctionInst *createLinearFunction(
       SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
       ValueOwnershipKind forwardingOwnershipKind,
-      llvm::Optional<SILValue> TransposeFunction = llvm::None) {
+      std::optional<SILValue> TransposeFunction = std::nullopt) {
     return insert(LinearFunctionInst::create(
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, forwardingOwnershipKind));
@@ -2958,7 +2947,7 @@ public:
   /// Note: explicit extractee type may be specified only in lowered SIL.
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
-      SILValue Function, llvm::Optional<SILType> ExtracteeType = llvm::None) {
+      SILValue Function, std::optional<SILType> ExtracteeType = std::nullopt) {
     return createDifferentiableFunctionExtract(
         Loc, Extractee, Function, OwnershipKind::Guaranteed, ExtracteeType);
   }
@@ -2966,7 +2955,7 @@ public:
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
       SILValue Function, ValueOwnershipKind forwardingOwnershipKind,
-      llvm::Optional<SILType> ExtracteeType = llvm::None) {
+      std::optional<SILType> ExtracteeType = std::nullopt) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, Function,
         forwardingOwnershipKind, ExtracteeType));
@@ -2998,7 +2987,7 @@ public:
   DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
       SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
       SILDifferentiabilityWitness *Witness,
-      llvm::Optional<SILType> FunctionType = llvm::None) {
+      std::optional<SILType> FunctionType = std::nullopt) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
         getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
         FunctionType));
@@ -3270,13 +3259,13 @@ public:
 /// Apply a debug location override for the duration of the current scope.
 class DebugLocOverrideRAII {
   SILBuilder &Builder;
-  llvm::Optional<SILLocation> oldOverride;
+  std::optional<SILLocation> oldOverride;
 #ifndef NDEBUG
-  llvm::Optional<SILLocation> installedOverride;
+  std::optional<SILLocation> installedOverride;
 #endif
 
 public:
-  DebugLocOverrideRAII(SILBuilder &B, llvm::Optional<SILLocation> Loc)
+  DebugLocOverrideRAII(SILBuilder &B, std::optional<SILLocation> Loc)
       : Builder(B) {
     oldOverride = B.getCurrentDebugLocOverride();
     Builder.applyDebugLocOverride(Loc);

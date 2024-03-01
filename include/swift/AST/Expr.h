@@ -32,9 +32,8 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 #include <utility>
 
 namespace llvm {
@@ -1211,9 +1210,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
+  std::optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.DeclRefExpr.IsImplicitlyAsync)
-      return llvm::None;
+      return std::nullopt;
 
     return implicitActorHopTarget;
   }
@@ -1607,9 +1606,9 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
+  std::optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.LookupExpr.IsImplicitlyAsync)
-      return llvm::None;
+      return std::nullopt;
 
     return implicitActorHopTarget;
   }
@@ -3939,12 +3938,12 @@ public:
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
 
-  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this closure cannot throw.
   ///
   /// Closures with untyped throws will produce "any Error", functions that
-  /// cannot throw or are specified to throw "Never" will return llvm::None.
-  llvm::Optional<Type> getEffectiveThrownType() const;
+  /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  std::optional<Type> getEffectiveThrownType() const;
 
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
@@ -4680,7 +4679,7 @@ class ApplyExpr : public Expr {
 
   // If this apply crosses isolation boundaries, record the callee and caller
   // isolations in this struct.
-  llvm::Optional<ApplyIsolationCrossing> IsolationCrossing;
+  std::optional<ApplyIsolationCrossing> IsolationCrossing;
 
   /// Destination information for a thrown error, which includes any
   /// necessary conversions from the actual type thrown to the type that
@@ -4741,7 +4740,7 @@ public:
 
   // Return the optionally stored ApplyIsolationCrossing instance - set iff this
   // ApplyExpr crosses isolation domains
-  const llvm::Optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+  const std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {
     return IsolationCrossing;
   }
 
@@ -4773,9 +4772,9 @@ public:
   ///
   /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
-  llvm::Optional<ActorIsolation> isImplicitlyAsync() const {
+  std::optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
-      return llvm::None;
+      return std::nullopt;
 
     auto isolationCrossing = getIsolationCrossing();
     assert(isolationCrossing.has_value()
@@ -6064,7 +6063,7 @@ public:
   /// If the provided expression appears as an argument to a subscript component
   /// of the key path, returns the index of that component. Otherwise, returns
   /// \c None.
-  llvm::Optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
+  std::optional<unsigned> findComponentWithSubscriptArg(Expr *arg);
 
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an

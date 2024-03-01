@@ -926,7 +926,7 @@ SILType ReabstractionInfo::mapTypeIntoContext(SILType type) const {
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   SmallVector<SILResultInfo, 8> SpecializedResults;
-  llvm::Optional<SILResultInfo> specializedErrorResult;
+  std::optional<SILResultInfo> specializedErrorResult;
   SmallVector<SILYieldInfo, 8> SpecializedYields;
   SmallVector<SILParameterInfo, 8> SpecializedParams;
   auto context = getResilienceExpansion();

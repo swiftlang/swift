@@ -94,7 +94,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     if (subconsumer.getInputFileName().empty())
       continue;
 
-    llvm::Optional<unsigned> bufferID =
+    std::optional<unsigned> bufferID =
         SM.getIDForBufferIdentifier(subconsumer.getInputFileName());
     assert(bufferID.has_value() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.value());
@@ -121,18 +121,18 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
          "overlapping ranges despite having distinct files");
 }
 
-llvm::Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
                                                        SourceLoc loc) {
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
-    return llvm::None;
+    return std::nullopt;
 
   // What if a there's a FileSpecificDiagnosticConsumer but there are no
   // subconsumers in it? (This situation occurs for the fix-its
   // FileSpecificDiagnosticConsumer.) In such a case, bail out now.
   if (Subconsumers.empty())
-    return llvm::None;
+    return std::nullopt;
 
   // This map is generated on first use and cached, to allow the
   // FileSpecificDiagnosticConsumer to be set up before the source files are
@@ -152,7 +152,7 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
         return SM.getIDForBufferIdentifier(subconsumer.getInputFileName())
             .has_value();
       }));
-      return llvm::None;
+      return std::nullopt;
     }
     auto *mutableThis = const_cast<FileSpecificDiagnosticConsumer*>(this);
     mutableThis->computeConsumersOrderedByRange(SM);
@@ -175,7 +175,7 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
     return &(*this)[*consumerAndRangeForLocation];
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
@@ -193,7 +193,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     subconsumer.handleDiagnostic(SM, Info);
 }
 
-llvm::Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumer(SourceManager &SM,
                                                 const DiagnosticInfo &Info) {
   // Ensure that a note goes to the same place as the preceding non-note.
@@ -211,17 +211,17 @@ FileSpecificDiagnosticConsumer::findSubconsumer(SourceManager &SM,
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
 FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
     SourceManager &SM, const DiagnosticInfo &Info) {
   const auto subconsumer = subconsumerForLocation(SM, Info.Loc);
   if (!subconsumer)
-    return llvm::None; // No place to put it; might be in an imported module
+    return std::nullopt; // No place to put it; might be in an imported module
   if ((*subconsumer)->getConsumer())
     return subconsumer; // A primary file with a .dia file
   // Try to put it in the responsible primary input
   if (Info.BufferIndirectlyCausingDiagnostic.isInvalid())
-    return llvm::None;
+    return std::nullopt;
   const auto currentPrimarySubconsumer =
       subconsumerForLocation(SM, Info.BufferIndirectlyCausingDiagnostic);
   assert(!currentPrimarySubconsumer ||

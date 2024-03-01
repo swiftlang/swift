@@ -145,8 +145,7 @@ class CaptureInfo {
       : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue), Count(count) { }
 
     ArrayRef<CapturedValue> getCaptures() const {
-      return llvm::makeArrayRef(this->getTrailingObjects<CapturedValue>(),
-                                Count);
+      return llvm::ArrayRef(this->getTrailingObjects<CapturedValue>(), Count);
     }
 
     DynamicSelfType *getDynamicSelfType() const {
@@ -188,7 +187,7 @@ public:
     // FIXME: Ideally, everywhere that synthesizes a function should include
     // its capture info.
     if (!hasBeenComputed())
-      return llvm::None;
+      return std::nullopt;
     return StorageAndFlags.getPointer()->getCaptures();
   }
 

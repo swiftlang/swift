@@ -35,31 +35,31 @@ void *DocComment::operator new(size_t Bytes, swift::markup::MarkupContext &MC,
 }
 
 namespace {
-llvm::Optional<swift::markup::ParamField *>
+std::optional<swift::markup::ParamField *>
 extractParamOutlineItem(swift::markup::MarkupContext &MC,
                         swift::markup::MarkupASTNode *Node) {
 
   auto Item = dyn_cast<swift::markup::Item>(Node);
   if (!Item)
-    return llvm::None;
+    return std::nullopt;
 
   auto Children = Item->getChildren();
   if (Children.empty())
-    return llvm::None;
+    return std::nullopt;
 
   auto FirstChild = Children.front();
   auto FirstParagraph = dyn_cast<swift::markup::Paragraph>(FirstChild);
   if (!FirstParagraph)
-    return llvm::None;
+    return std::nullopt;
 
   auto FirstParagraphChildren = FirstParagraph->getChildren();
   if (FirstParagraphChildren.empty())
-    return llvm::None;
+    return std::nullopt;
 
   auto ParagraphText =
       dyn_cast<swift::markup::Text>(FirstParagraphChildren.front());
   if (!ParagraphText)
-    return llvm::None;
+    return std::nullopt;
 
   StringRef Name;
   StringRef Remainder;
@@ -67,7 +67,7 @@ extractParamOutlineItem(swift::markup::MarkupContext &MC,
   Name = Name.rtrim();
 
   if (Name.empty())
-    return llvm::None;
+    return std::nullopt;
 
   ParagraphText->setLiteralContent(Remainder.ltrim());
 
@@ -343,8 +343,8 @@ swift::extractCommentParts(swift::markup::MarkupContext &MC,
   }
 
   // Copy BodyNodes and ParamFields into the MarkupContext.
-  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
-  Parts.ParamFields = MC.allocateCopy(llvm::makeArrayRef(ParamFields));
+  Parts.BodyNodes = MC.allocateCopy(llvm::ArrayRef(BodyNodes));
+  Parts.ParamFields = MC.allocateCopy(llvm::ArrayRef(ParamFields));
 
   for (auto Param : Parts.ParamFields) {
     auto ParamParts = extractCommentParts(MC, Param);
@@ -378,7 +378,7 @@ void DocComment::addInheritanceNote(swift::markup::MarkupContext &MC,
   SmallVector<const markup::MarkupASTNode *, 8> BodyNodes{
     Parts.BodyNodes.begin(), Parts.BodyNodes.end()};
   BodyNodes.push_back(note);
-  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
+  Parts.BodyNodes = MC.allocateCopy(llvm::ArrayRef(BodyNodes));
 }
 
 DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,
@@ -397,7 +397,7 @@ namespace {
 template <typename Result>
 class CommentProviderFinder final {
   using ResultWithDecl = std::pair<Result, const Decl *>;
-  using VisitFnTy = llvm::Optional<Result> (*)(const Decl *);
+  using VisitFnTy = std::optional<Result> (*)(const Decl *);
 
   VisitFnTy VisitFn;
 
@@ -405,17 +405,17 @@ public:
   CommentProviderFinder(VisitFnTy visitFn) : VisitFn(visitFn) {}
 
 private:
-  llvm::Optional<ResultWithDecl> visit(const Decl *D) {
+  std::optional<ResultWithDecl> visit(const Decl *D) {
     // Adapt the provided visitor function to also return the decl.
     if (auto result = VisitFn(D))
       return {{*result, D}};
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<ResultWithDecl> findOverriddenDecl(const ValueDecl *VD) {
+  std::optional<ResultWithDecl> findOverriddenDecl(const ValueDecl *VD) {
     // Only applies to class member.
     if (!VD->getDeclContext()->getSelfClassDecl())
-      return llvm::None;
+      return std::nullopt;
 
     while (auto *baseDecl = VD->getOverriddenDecl()) {
       if (auto result = visit(baseDecl))
@@ -423,14 +423,14 @@ private:
 
       VD = baseDecl;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<ResultWithDecl> findDefaultProvidedDecl(const ValueDecl *VD) {
+  std::optional<ResultWithDecl> findDefaultProvidedDecl(const ValueDecl *VD) {
     // Only applies to protocol extension member.
     auto *protocol = VD->getDeclContext()->getExtendedProtocolDecl();
     if (!protocol)
-      return llvm::None;
+      return std::nullopt;
 
     SmallVector<ValueDecl *, 2> members;
     protocol->lookupQualified(const_cast<ProtocolDecl *>(protocol),
@@ -438,7 +438,7 @@ private:
                               VD->getLoc(), NLOptions::NL_ProtocolMembers,
                               members);
 
-    llvm::Optional<ResultWithDecl> result;
+    std::optional<ResultWithDecl> result;
     for (auto *member : members) {
       if (!isa<ProtocolDecl>(member->getDeclContext()) ||
           !member->isProtocolRequirement())
@@ -450,14 +450,14 @@ private:
 
       if (result) {
         // Found two or more decls with doc-comment.
-        return llvm::None;
+        return std::nullopt;
       }
       result = newResult;
     }
     return result;
   }
 
-  llvm::Optional<ResultWithDecl> findRequirementDecl(const ValueDecl *VD) {
+  std::optional<ResultWithDecl> findRequirementDecl(const ValueDecl *VD) {
     std::queue<const ValueDecl *> requirements;
     while (true) {
       for (auto *req : VD->getSatisfiedProtocolRequirements()) {
@@ -467,7 +467,7 @@ private:
         requirements.push(req);
       }
       if (requirements.empty())
-        return llvm::None;
+        return std::nullopt;
 
       VD = requirements.front();
       requirements.pop();
@@ -475,13 +475,13 @@ private:
   }
 
 public:
-  llvm::Optional<ResultWithDecl> findCommentProvider(const Decl *D) {
+  std::optional<ResultWithDecl> findCommentProvider(const Decl *D) {
     if (auto result = visit(D))
       return result;
 
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
-      return llvm::None;
+      return std::nullopt;
 
     if (auto result = findOverriddenDecl(VD))
       return result;
@@ -492,7 +492,7 @@ public:
     if (auto result = findRequirementDecl(VD))
       return result;
 
-    return llvm::None;
+    return std::nullopt;
   }
 };
 } // end anonymous namespace
@@ -500,10 +500,10 @@ public:
 const Decl *swift::getDocCommentProvidingDecl(const Decl *D) {
   // Search for the first decl we see with a non-empty raw comment.
   auto finder = CommentProviderFinder<RawComment>(
-      [](const Decl *D) -> llvm::Optional<RawComment> {
+      [](const Decl *D) -> std::optional<RawComment> {
         auto comment = D->getRawComment();
         if (comment.isEmpty())
-          return llvm::None;
+          return std::nullopt;
         return comment;
       });
 
@@ -539,9 +539,9 @@ DocComment *swift::getCascadingDocComment(swift::markup::MarkupContext &MC,
 
 /// Retrieve the brief comment for a given decl \p D, without attempting to
 /// walk any requirements or overrides.
-static llvm::Optional<StringRef> getDirectBriefComment(const Decl *D) {
+static std::optional<StringRef> getDirectBriefComment(const Decl *D) {
   if (!D->canHaveComment())
-    return llvm::None;
+    return std::nullopt;
 
   auto *ModuleDC = D->getDeclContext()->getModuleScopeContext();
   auto &Ctx = ModuleDC->getASTContext();
@@ -555,7 +555,7 @@ static llvm::Optional<StringRef> getDirectBriefComment(const Decl *D) {
       if (target == DocCommentSerializationTarget::SwiftDocAndSourceInfo) {
         auto C = Unit->getCommentForDecl(D);
         if (!C)
-          return llvm::None;
+          return std::nullopt;
 
         return C->Brief;
       }
@@ -566,7 +566,7 @@ static llvm::Optional<StringRef> getDirectBriefComment(const Decl *D) {
   // the swiftsourceinfo if needed.
   auto RC = D->getRawComment();
   if (RC.isEmpty())
-    return llvm::None;
+    return std::nullopt;
 
   SmallString<256> BriefStr;
   llvm::raw_svector_ostream OS(BriefStr);

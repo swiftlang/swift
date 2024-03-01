@@ -12,7 +12,7 @@
 // RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
-// RUN:     %S/Inputs/Swiftskell.swift
+// RUN:     %S/../Inputs/Swiftskell.swift
 
 // Check the interfaces
 
@@ -104,11 +104,44 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: public func checkAnyInv2<Result>(_ t: borrowing Result) where Result : ~Copyable, Result : ~Escapable
 // CHECK-MISC: public func checkAnyObject<Result>(_ t: Result) where Result : AnyObject
 
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct Outer<A> where A : ~Copyable {
+// CHECK-MISC-NEXT:   public func innerFn<B>(_ b: borrowing B) where B : ~Copyable
+// CHECK-MISC:   public struct InnerStruct<C> where C : ~Copyable {
+// CHECK-MISC-NEXT:     public func g<D>(_ d: borrowing D) where D : ~Copyable
+// CHECK-MISC:   public struct InnerVariation1<D> : ~Escapable where D : ~Copyable
+// CHECK-MISC:   public struct InnerVariation2<D> : ~Copyable where D : ~Escapable
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: extension {{.*}}.Outer.InnerStruct {
+// CHECK-MISC-NEXT:   public func hello<T>(_ t: T) where T : ~Escapable
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct Freestanding<T> where T : ~Copyable, T : ~Escapable {
+
 ///////////////////////////////////////////////////////////////////////
 // Synthesized conditional conformances are next
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Hello : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : ~Copyable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : ~Escapable {
+// CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #endif
+
+// FIXME: (rdar://123293620) inner struct extensions are not feature-guarded correctly
+// CHECK-MISC: extension {{.*}}.Outer.InnerStruct : Swift.Copyable {
+// CHECK-MISC: extension {{.*}}.Outer.InnerVariation1 : Swift.Copyable {
+// CHECK-MISC: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where A : ~Copyable {
+// CHECK-MISC: extension {{.*}}.Outer : Swift.Copyable {
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Escapable where T : ~Copyable {
+
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: extension {{.*}}.Freestanding : Swift.Copyable where T : ~Escapable {
 
 ////////////////////////////////////////////////////////////////////////
 //    At the end, ensure there are no synthesized Copyable extensions

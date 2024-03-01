@@ -40,7 +40,7 @@ public:
 
 private:
   void addRenameRange(CharSourceRange Label, RefactoringRangeKind RangeKind,
-                      llvm::Optional<unsigned> NameIndex);
+                      std::optional<unsigned> NameIndex);
 
   /// Adds a replacement to rename the given base name range
   /// \return true if the given range does not match the old name
@@ -49,7 +49,7 @@ private:
   /// Adds replacements to rename the given label ranges
   /// \return true if the label ranges do not match the old name
   bool renameLabels(ArrayRef<CharSourceRange> LabelRanges,
-                    llvm::Optional<unsigned> FirstTrailingLabel,
+                    std::optional<unsigned> FirstTrailingLabel,
                     LabelRangeType RangeType, bool isCallSite);
 
 private:
@@ -72,7 +72,7 @@ private:
                          StringRef Expected);
 
   bool renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
-                           llvm::Optional<unsigned> FirstTrailingLabel,
+                           std::optional<unsigned> FirstTrailingLabel,
                            LabelRangeType RangeType);
 
   static RegionType getSyntacticRenameRegionType(const ResolvedLoc &Resolved);
@@ -80,7 +80,7 @@ private:
 
 void RenameRangeDetailCollector::addRenameRange(
     CharSourceRange Label, RefactoringRangeKind RangeKind,
-    llvm::Optional<unsigned> NameIndex) {
+    std::optional<unsigned> NameIndex) {
   Ranges.push_back({Label, RangeKind, NameIndex});
 }
 
@@ -90,13 +90,13 @@ bool RenameRangeDetailCollector::renameBase(CharSourceRange Range,
 
   if (stripBackticks(Range).str() != Old.base())
     return true;
-  addRenameRange(Range, RangeKind, llvm::None);
+  addRenameRange(Range, RangeKind, std::nullopt);
   return false;
 }
 
 bool RenameRangeDetailCollector::renameLabels(
     ArrayRef<CharSourceRange> LabelRanges,
-    llvm::Optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType,
+    std::optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType,
     bool isCallSite) {
   if (isCallSite)
     return renameLabelsLenient(LabelRanges, FirstTrailingLabel, RangeType);
@@ -259,7 +259,7 @@ bool RenameRangeDetailCollector::labelRangeMatches(CharSourceRange Range,
 
 bool RenameRangeDetailCollector::renameLabelsLenient(
     ArrayRef<CharSourceRange> LabelRanges,
-    llvm::Optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType) {
+    std::optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType) {
 
   ArrayRef<StringRef> OldNames = Old.args();
 

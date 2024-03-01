@@ -50,7 +50,7 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
 
   // An arm64 module can import an arm64e module.
-  llvm::Optional<llvm::Triple> normalizedAltTarget;
+  std::optional<llvm::Triple> normalizedAltTarget;
   if ((normalizedTarget.getArch() == llvm::Triple::ArchType::aarch64) &&
       (normalizedTarget.getSubArch() !=
        llvm::Triple::SubArchType::AArch64SubArch_arm64e)) {
@@ -86,10 +86,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 
 /// Apply \p body for each module search path in \p Ctx until \p body returns
 /// non-None value. Returns the return value from \p body, or \c None.
-llvm::Optional<bool> forEachModuleSearchPath(
+std::optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
-    llvm::function_ref<llvm::Optional<bool>(StringRef, ModuleSearchPathKind,
-                                            bool isSystem)>
+    llvm::function_ref<std::optional<bool>(StringRef, ModuleSearchPathKind,
+                                           bool isSystem)>
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
@@ -118,7 +118,7 @@ llvm::Optional<bool> forEachModuleSearchPath(
       return result;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 } // end unnamed namespace
 
@@ -203,7 +203,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
       });
-      return llvm::None;
+      return std::nullopt;
     }
     case ModuleSearchPathKind::RuntimeLibrary: {
       // Look for:
@@ -230,7 +230,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
       });
-      return llvm::None;
+      return std::nullopt;
     }
     case ModuleSearchPathKind::Framework:
     case ModuleSearchPathKind::DarwinImplicitFramework: {
@@ -252,7 +252,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
 
         names.push_back(Ctx.getIdentifier(name));
       });
-      return llvm::None;
+      return std::nullopt;
     }
     }
     llvm_unreachable("covered switch");
@@ -600,9 +600,9 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   return std::string(result.str());
 }
 
-llvm::Optional<std::string>
-SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
-                                                                 ASTContext &ctx) const {
+std::optional<std::string>
+SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(
+    llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
   if (!ctx.LangOpts.EnablePackageInterfaceLoad)
     return {};
 
@@ -635,8 +635,9 @@ SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::File
   return {};
 }
 
-llvm::Optional<std::string>
-SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
+std::optional<std::string>
+SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs,
+                                            ASTContext &ctx) const {
   std::string interfacePath{getName(file_types::TY_SwiftModuleInterfaceFile)};
   // Ensure the public swiftinterface already exists, otherwise bail early
   // as it's considered the module doesn't exist.
@@ -700,7 +701,7 @@ bool SerializedModuleLoaderBase::findModule(
   /// was diagnosed, or None if neither one happened and the search should
   /// continue.
   auto findTargetSpecificModuleFiles = [&](bool IsFramework) -> SearchResult {
-    llvm::Optional<SerializedModuleBaseName> firstAbsoluteBaseName;
+    std::optional<SerializedModuleBaseName> firstAbsoluteBaseName;
 
     for (const auto &targetSpecificBaseName : targetSpecificBaseNames) {
       SerializedModuleBaseName
@@ -855,7 +856,7 @@ getOSAndVersionForDiagnostics(const llvm::Triple &triple) {
 }
 
 LoadedFile *SerializedModuleLoaderBase::loadAST(
-    ModuleDecl &M, llvm::Optional<SourceLoc> diagLoc,
+    ModuleDecl &M, std::optional<SourceLoc> diagLoc,
     StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -1726,7 +1727,7 @@ void SerializedASTFile::lookupObjCMethods(
   File.lookupObjCMethods(selector, results);
 }
 
-llvm::Optional<Fingerprint>
+std::optional<Fingerprint>
 SerializedASTFile::loadFingerprint(const IterableDeclContext *IDC) const {
   return File.loadFingerprint(IDC);
 }
@@ -1749,7 +1750,7 @@ void SerializedASTFile::lookupImportedSPIGroups(
   }
 }
 
-llvm::Optional<CommentInfo>
+std::optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
@@ -1758,22 +1759,22 @@ bool SerializedASTFile::hasLoadedSwiftDoc() const {
   return File.hasLoadedSwiftDoc();
 }
 
-llvm::Optional<ExternalSourceLocs::RawLocs>
+std::optional<ExternalSourceLocs::RawLocs>
 SerializedASTFile::getExternalRawLocsForDecl(const Decl *D) const {
   return File.getExternalRawLocsForDecl(D);
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 SerializedASTFile::getGroupNameForDecl(const Decl *D) const {
   return File.getGroupNameForDecl(D);
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 SerializedASTFile::getSourceFileNameForDecl(const Decl *D) const {
   return File.getSourceFileNameForDecl(D);
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
   return File.getSourceOrderForDecl(D);
 }
@@ -1783,7 +1784,7 @@ void SerializedASTFile::collectAllGroups(
   File.collectAllGroups(Names);
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
   return File.getGroupNameByUSR(USR);
 }

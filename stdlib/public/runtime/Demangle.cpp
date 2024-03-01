@@ -622,22 +622,25 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       if (flags.isNoDerivative()) {
         wrapInput(Node::Kind::NoDerivative);
       }
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         wrapInput(Node::Kind::InOut);
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         wrapInput(Node::Kind::Shared);
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
       }
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
+      }
+      if (flags.isTransferring()) {
+        wrapInput(Node::Kind::Transferring);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -761,6 +764,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
+
+    if (func->getExtendedFlags().hasTransferringResult())
+      funcNode->addChild(
+          Dem.createNode(Node::Kind::TransferringResultFunctionType), Dem);
 
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);

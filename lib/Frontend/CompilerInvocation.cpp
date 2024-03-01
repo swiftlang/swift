@@ -104,7 +104,7 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
 }
 
 static std::string
-getVersionedPrebuiltModulePath(llvm::Optional<llvm::VersionTuple> sdkVer,
+getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
                                StringRef defaultPrebuiltPath) {
   if (!sdkVer.has_value())
     return defaultPrebuiltPath.str();
@@ -125,7 +125,7 @@ getVersionedPrebuiltModulePath(llvm::Optional<llvm::VersionTuple> sdkVer,
 
 std::string CompilerInvocation::computePrebuiltCachePath(
     StringRef RuntimeResourcePath, llvm::Triple target,
-    llvm::Optional<llvm::VersionTuple> sdkVer) {
+    std::optional<llvm::VersionTuple> sdkVer) {
   SmallString<64> defaultPrebuiltPath{RuntimeResourcePath};
   StringRef platform;
   if (tripleIsMacCatalystEnvironment(target)) {
@@ -327,7 +327,7 @@ static bool ParseFrontendArgs(
   return converter.convert(buffers);
 }
 
-static void diagnoseSwiftVersion(llvm::Optional<version::Version> &vers,
+static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
                                  Arg *verArg, ArgList &Args,
                                  DiagnosticEngine &diags) {
   // General invalid version error
@@ -499,6 +499,8 @@ validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "upcoming-swift")
     return {CxxCompatMode::enabled,
             version::Version({version::getUpcomingCxxInteropCompatVersion()})};
+  if (mode == "swift-6")
+    return {CxxCompatMode::enabled, version::Version({6})};
   // Swift-5.9 corresponds to the Swift 5 language mode when
   // Swift 5 is the default language version.
   if (mode == "swift-5.9")
@@ -513,18 +515,19 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
                  verArg->getAsString(Args), verArg->getValue());
 
   // Note valid C++ interoperability modes.
-  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default")};
+  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default"),
+                    llvm::StringRef("swift-6"), llvm::StringRef("swift-5.9")};
   auto versStr = "'" + llvm::join(validVers, "', '") + "'";
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
-static llvm::Optional<swift::StrictConcurrency>
+static std::optional<swift::StrictConcurrency>
 parseStrictConcurrency(StringRef value) {
-  return llvm::StringSwitch<llvm::Optional<swift::StrictConcurrency>>(value)
+  return llvm::StringSwitch<std::optional<swift::StrictConcurrency>>(value)
       .Case("minimal", swift::StrictConcurrency::Minimal)
       .Case("targeted", swift::StrictConcurrency::Targeted)
       .Case("complete", swift::StrictConcurrency::Complete)
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
@@ -683,13 +686,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    "-warn-on-potentially-unavailable-enum-case");
 
   if (const Arg *A = Args.getLastArg(OPT_unavailable_decl_optimization_EQ)) {
-    auto value =
-        llvm::StringSwitch<llvm::Optional<UnavailableDeclOptimization>>(
-            A->getValue())
-            .Case("none", UnavailableDeclOptimization::None)
-            .Case("stub", UnavailableDeclOptimization::Stub)
-            .Case("complete", UnavailableDeclOptimization::Complete)
-            .Default(llvm::None);
+    auto value = llvm::StringSwitch<std::optional<UnavailableDeclOptimization>>(
+                     A->getValue())
+                     .Case("none", UnavailableDeclOptimization::None)
+                     .Case("stub", UnavailableDeclOptimization::Stub)
+                     .Case("complete", UnavailableDeclOptimization::Complete)
+                     .Default(std::nullopt);
 
     if (value)
       Opts.UnavailableDeclOptimizationMode = *value;
@@ -983,7 +985,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     } else if (diagLevel == "error") {
       Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
     } else if (diagLevel == "ignore") {
-      Opts.RequireExplicitAvailability = llvm::None;
+      Opts.RequireExplicitAvailability = std::nullopt;
     } else {
       Diags.diagnose(SourceLoc(),
                      diag::error_unknown_require_explicit_availability,
@@ -1063,14 +1065,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
     auto value =
-        llvm::StringSwitch<llvm::Optional<AccessNoteDiagnosticBehavior>>(
+        llvm::StringSwitch<std::optional<AccessNoteDiagnosticBehavior>>(
             A->getValue())
             .Case("none", AccessNoteDiagnosticBehavior::Ignore)
             .Case("failures", AccessNoteDiagnosticBehavior::RemarkOnFailure)
             .Case("all", AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess)
             .Case("all-validate",
                   AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess)
-            .Default(llvm::None);
+            .Default(std::nullopt);
 
     if (value)
       Opts.AccessNoteBehavior = *value;
@@ -1088,6 +1090,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
   Opts.EnableModuleRecoveryRemarks = Args.hasArg(OPT_remark_module_recovery);
+  Opts.EnableModuleSerializationRemarks =
+      Args.hasArg(OPT_remark_module_serialization);
   Opts.EnableModuleApiImportRemarks = Args.hasArg(OPT_remark_module_api_import);
   Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
@@ -1227,10 +1231,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Parse OS version number arguments.
   auto parseVersionArg =
-      [&](OptSpecifier opt) -> llvm::Optional<llvm::VersionTuple> {
+      [&](OptSpecifier opt) -> std::optional<llvm::VersionTuple> {
     Arg *A = Args.getLastArg(opt);
     if (!A)
-      return llvm::None;
+      return std::nullopt;
 
     if (StringRef(A->getValue()) == "min")
       return minimumAvailableOSVersionForTriple(Opts.Target);
@@ -1243,7 +1247,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                    A->getAsString(Args), A->getValue());
-    return llvm::None;
+    return std::nullopt;
   };
 
   if (auto vers = parseVersionArg(OPT_min_inlining_target_version))
@@ -1428,10 +1432,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
-    auto value = llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+    auto value = llvm::StringSwitch<std::optional<bool>>(A->getValue())
                      .Case("off", false)
                      .Case("on", true)
-                     .Default(llvm::None);
+                     .Default(std::nullopt);
 
     if (value) {
       Opts.UseCheckedAsyncObjCBridging = *value;
@@ -1974,7 +1978,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   // If no style options are specified, default to LLVM style.
-  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
     if (contents == "llvm") {
@@ -2188,24 +2192,24 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
-  llvm::Optional<DestroyHoistingOption> specifiedDestroyHoistingOption;
+  std::optional<DestroyHoistingOption> specifiedDestroyHoistingOption;
   if (Arg *A = Args.getLastArg(OPT_enable_destroy_hoisting)) {
     specifiedDestroyHoistingOption =
-        llvm::StringSwitch<llvm::Optional<DestroyHoistingOption>>(A->getValue())
+        llvm::StringSwitch<std::optional<DestroyHoistingOption>>(A->getValue())
             .Case("true", DestroyHoistingOption::On)
             .Case("false", DestroyHoistingOption::Off)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
 
-  llvm::Optional<CopyPropagationOption> specifiedCopyPropagationOption;
+  std::optional<CopyPropagationOption> specifiedCopyPropagationOption;
   if (Arg *A = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
     specifiedCopyPropagationOption =
-        llvm::StringSwitch<llvm::Optional<CopyPropagationOption>>(A->getValue())
+        llvm::StringSwitch<std::optional<CopyPropagationOption>>(A->getValue())
             .Case("true", CopyPropagationOption::On)
             .Case("false", CopyPropagationOption::Off)
             .Case("requested-passes-only",
                   CopyPropagationOption::RequestedPassesOnly)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
   if (Args.hasArg(OPT_enable_copy_propagation)) {
     if (specifiedCopyPropagationOption) {
@@ -2236,13 +2240,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // Allow command line flags to override the default value of
   // Opts.LexicalLifetimes. If no explicit flags are passed, then
   // Opts.LexicalLifetimes retains its initial value.
-  llvm::Optional<bool> enableLexicalLifetimesFlag;
+  std::optional<bool> enableLexicalLifetimesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_lifetimes)) {
     enableLexicalLifetimesFlag =
-        llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+        llvm::StringSwitch<std::optional<bool>>(A->getValue())
             .Case("true", true)
             .Case("false", false)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
   if (Args.getLastArg(OPT_enable_lexical_lifetimes_noArg)) {
     if (!enableLexicalLifetimesFlag.value_or(true)) {
@@ -2286,13 +2290,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (specifiedDestroyHoistingOption)
     Opts.DestroyHoisting = *specifiedDestroyHoistingOption;
 
-  llvm::Optional<bool> enablePackMetadataStackPromotionFlag;
+  std::optional<bool> enablePackMetadataStackPromotionFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_pack_metadata_stack_promotion)) {
     enablePackMetadataStackPromotionFlag =
-        llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+        llvm::StringSwitch<std::optional<bool>>(A->getValue())
             .Case("true", true)
             .Case("false", false)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
   if (Args.getLastArg(OPT_enable_pack_metadata_stack_promotion_noArg)) {
     if (!enablePackMetadataStackPromotionFlag.value_or(true)) {
@@ -2694,12 +2698,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_use_jit)) {
     Opts.UseJIT = true;
     if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
-      llvm::Optional<swift::JITDebugArtifact> artifact =
-          llvm::StringSwitch<llvm::Optional<swift::JITDebugArtifact>>(
+      std::optional<swift::JITDebugArtifact> artifact =
+          llvm::StringSwitch<std::optional<swift::JITDebugArtifact>>(
               A->getValue())
               .Case("llvm-ir", JITDebugArtifact::LLVMIR)
               .Case("object", JITDebugArtifact::Object)
-              .Default(llvm::None);
+              .Default(std::nullopt);
       if (!artifact) {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getOption().getName(), A->getValue());
@@ -2780,10 +2784,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
     auto LLVMLTOKind =
-        llvm::StringSwitch<llvm::Optional<IRGenLLVMLTOKind>>(A->getValue())
+        llvm::StringSwitch<std::optional<IRGenLLVMLTOKind>>(A->getValue())
             .Case("llvm-thin", IRGenLLVMLTOKind::Thin)
             .Case("llvm-full", IRGenLLVMLTOKind::Full)
-            .Default(llvm::None);
+            .Default(std::nullopt);
     if (LLVMLTOKind)
       Opts.LLVMLTOKind = LLVMLTOKind.value();
     else
@@ -2886,13 +2890,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  auto getRuntimeCompatVersion = [&]() -> llvm::Optional<llvm::VersionTuple> {
-    llvm::Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {
+    std::optional<llvm::VersionTuple> runtimeCompatibilityVersion;
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
       if (version.equals("none")) {
-        runtimeCompatibilityVersion = llvm::None;
+        runtimeCompatibilityVersion = std::nullopt;
       } else if (version.equals("5.0")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
       } else if (version.equals("5.1")) {
@@ -2903,8 +2907,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
       } else if (version.equals("5.8")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-      } else if (version.equals("5.11")) {
-        runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
+      } else if (version.equals("6.0")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -3274,6 +3278,10 @@ bool CompilerInvocation::parseArgs(
     SILOpts.EmbeddedSwift = true;
     // OSSA modules are required for deinit de-virtualization.
     SILOpts.EnableOSSAModules = true;
+    // -g is promoted to -gdwarf-types in embedded Swift
+    if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
+      IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
+    }
   } else {
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);

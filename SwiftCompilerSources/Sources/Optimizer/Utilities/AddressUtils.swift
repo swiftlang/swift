@@ -192,8 +192,7 @@ extension AccessBase {
   /// with the initialized address. This does not guarantee that all
   /// uses of that address are dominated by the store or even that the
   /// store is a direct use of `address`.
-  func findSingleInitializer(_ context: some Context)
-    -> (initialAddress: Value, initializingStore: Instruction)? {
+  func findSingleInitializer(_ context: some Context) -> (initialAddress: Value, initializingStore: Instruction)? {
     let baseAddr: Value
     switch self {
     case let .stack(allocStack):
@@ -206,15 +205,7 @@ extension AccessBase {
     default:
       return nil
     }
-    var walker = AddressInitializationWalker(context: context)
-    if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath())
-         == .abortWalk {
-      return nil
-    }
-    guard let initializingStore = walker.initializingStore else {
-      return nil
-    }
-    return (initialAddress: baseAddr, initializingStore: initializingStore)
+    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, context: context)
   }
 }
 
@@ -222,6 +213,9 @@ extension AccessBase {
 //
 // Implements AddressUseVisitor to guarantee that we can't miss any
 // stores. This separates escapingAddressUse from leafAddressUse.
+//
+// Main entry point:
+//  static func findSingleInitializer(ofAddress: Value, context: some Context)
 //
 // TODO: Make AddressDefUseWalker always conform to AddressUseVisitor once we're
 // ready to debug changes to escape analysis etc...
@@ -248,6 +242,19 @@ struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
 
   var isProjected = false
   var initializingStore: Instruction?
+
+  static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
+    -> (initialAddress: Value, initializingStore: Instruction)? {
+
+    var walker = AddressInitializationWalker(context: context)
+    if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
+      return nil
+    }
+    guard let initializingStore = walker.initializingStore else {
+      return nil
+    }
+    return (initialAddress: baseAddr, initializingStore: initializingStore)
+  }
 
   private mutating func setInitializer(instruction: Instruction) -> WalkResult {
     // An initializer must be unique and store the full value.

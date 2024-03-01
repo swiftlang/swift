@@ -20,11 +20,11 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -1524,7 +1524,7 @@ public:
       return;
     }
 
-    auto assignResultsRef = llvm::makeArrayRef(assignResults);
+    auto assignResultsRef = llvm::ArrayRef(assignResults);
     SILValue front = assignResultsRef.front();
     assignResultsRef = assignResultsRef.drop_front();
 
@@ -2216,7 +2216,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   currentInst->getLoc().getSourceLoc().printLineAndColumn(
       llvm::dbgs(), currentInst->getFunction()->getASTContext().SourceMgr);
 
-  auto ops = llvm::makeArrayRef(currentInstPartitionOps);
+  auto ops = llvm::ArrayRef(currentInstPartitionOps);
 
   // First op on its own line.
   llvm::dbgs() << "\n ├─────╼ ";

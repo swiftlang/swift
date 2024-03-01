@@ -37,13 +37,13 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include <deque>
+#include <optional>
 
 using namespace swift;
 
@@ -55,7 +55,7 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::getInsertAfterPoint(SILValue val) {
   if (auto *inst = val->getDefiningInstruction()) {
     return std::next(inst->getIterator());
@@ -63,7 +63,7 @@ swift::getInsertAfterPoint(SILValue val) {
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
@@ -1347,11 +1347,11 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
-llvm::Optional<FindLocalApplySitesResult>
+std::optional<FindLocalApplySitesResult>
 swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   SmallVector<Operand *, 32> worklist(fri->use_begin(), fri->use_end());
 
-  llvm::Optional<FindLocalApplySitesResult> f;
+  std::optional<FindLocalApplySitesResult> f;
   f.emplace();
 
   // Optimistically state that we have no escapes before our def-use dataflow.
@@ -1424,7 +1424,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   // If we did escape and didn't find any apply sites, then we have no
   // information for our users that is interesting.
   if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
-    return llvm::None;
+    return std::nullopt;
   return f;
 }
 

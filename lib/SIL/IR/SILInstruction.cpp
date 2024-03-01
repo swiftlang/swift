@@ -1715,12 +1715,12 @@ void OpenPackElementInst::forEachDefinedLocalArchetype(
 //                         Multiple Value Instruction
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
   // First make sure we actually have one of our instruction results.
   auto *MVIR = dyn_cast<MultipleValueInstructionResult>(Target);
   if (!MVIR || MVIR->getParent() != this)
-    return llvm::None;
+    return std::nullopt;
   return MVIR->getIndex();
 }
 
@@ -1825,7 +1825,7 @@ static bool visitRecursivelyLifetimeEndingUses(
     // separately checked in the verifier. It is the only check that verifies
     // the structural requirements of on-stack partial_apply uses.
     auto *user = use->getUser();
-    if (user->getNumResults() != 1) {
+    if (user->getNumResults() == 0) {
       llvm::errs() << "partial_apply [on_stack] use:\n";
       user->printInContext(llvm::errs());
       if (isa<BranchInst>(user)) {
@@ -1834,9 +1834,10 @@ static bool visitRecursivelyLifetimeEndingUses(
       llvm::report_fatal_error("partial_apply [on_stack] must be directly "
                                "forwarded to a destroy_value");
     }
-    if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
-                                            noUsers, func)) {
-      return false;
+    for (auto res : use->getUser()->getResults()) {
+      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, func)) {
+        return false;
+      }
     }
   }
   return true;

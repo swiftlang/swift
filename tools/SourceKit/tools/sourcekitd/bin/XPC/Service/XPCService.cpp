@@ -26,6 +26,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Threading.h"
 
+#include <csignal>
 #include <xpc/xpc.h>
 
 using namespace SourceKit;
@@ -385,6 +386,7 @@ static void fatal_error_handler(void *user_data, const char *reason,
 }
 
 int main(int argc, const char *argv[]) {
+  std::signal(SIGTERM, SIG_DFL);
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd_set_uid_handlers(

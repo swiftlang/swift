@@ -18,7 +18,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace clang {
 class NamedDecl;
@@ -255,7 +255,7 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(
       CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
-      llvm::Optional<bool> FlagParamIsZeroOnError, bool predefined);
+      std::optional<bool> FlagParamIsZeroOnError, bool predefined);
 
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
   /// thunk, for the given:
@@ -377,7 +377,7 @@ public:
     ClangImporterContext,
   };
 
-  static llvm::Optional<SpecialContext>
+  static std::optional<SpecialContext>
   getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static bool isCXXCFOptionsDefinition(const ValueDecl *decl);

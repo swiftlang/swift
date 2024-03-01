@@ -177,11 +177,11 @@ private:
 
   /// Overrides parallelism level and \c BatchSizeLimit, sets exact
   /// count of batches, if in batch-mode.
-  const llvm::Optional<unsigned> BatchCount;
+  const std::optional<unsigned> BatchCount;
 
   /// Overrides maximum batch size, if in batch-mode and not overridden
   /// by \c BatchCount.
-  const llvm::Optional<unsigned> BatchSizeLimit;
+  const std::optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -246,8 +246,8 @@ public:
               size_t FilelistThreshold,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              llvm::Optional<unsigned> BatchCount = llvm::None,
-              llvm::Optional<unsigned> BatchSizeLimit = llvm::None,
+              std::optional<unsigned> BatchCount = std::nullopt,
+              std::optional<unsigned> BatchSizeLimit = std::nullopt,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
@@ -268,7 +268,7 @@ public:
   }
 
   UnwrappedArrayView<const Action> getActions() const {
-    return llvm::makeArrayRef(Actions);
+    return llvm::ArrayRef(Actions);
   }
 
   template <typename SpecificAction, typename... Args>
@@ -278,9 +278,7 @@ public:
     return newAction;
   }
 
-  UnwrappedArrayView<const Job> getJobs() const {
-    return llvm::makeArrayRef(Jobs);
-  }
+  UnwrappedArrayView<const Job> getJobs() const { return llvm::ArrayRef(Jobs); }
 
   /// To send job list to places that don't truck in fancy array views.
   std::vector<const Job *> getJobsSimply() const {
@@ -358,11 +356,9 @@ public:
     return BatchSeed;
   }
 
-  llvm::Optional<unsigned> getBatchCount() const {
-    return BatchCount;
-  }
+  std::optional<unsigned> getBatchCount() const { return BatchCount; }
 
-  llvm::Optional<unsigned> getBatchSizeLimit() const { return BatchSizeLimit; }
+  std::optional<unsigned> getBatchSizeLimit() const { return BatchSizeLimit; }
 
   /// Requests the path to a file containing all input source files. This can
   /// be shared across jobs.

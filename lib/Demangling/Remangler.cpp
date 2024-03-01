@@ -1810,6 +1810,20 @@ Remangler::mangleImplParameterResultDifferentiability(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplParameterTransferring(Node *node,
+                                                         unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
+  char diffChar = llvm::StringSwitch<char>(node->getText())
+                      .Case("transferring", 'T')
+                      .Default(0);
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterTransferring,
+                          node);
+  Buffer << diffChar;
+
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplFunctionAttribute(Node *node,
                                                      unsigned depth) {
   // handled inline
@@ -1875,8 +1889,10 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       // Mangle type. Type should be the last child.
-      DEMANGLER_ASSERT(
-          Child->getNumChildren() == 2 || Child->getNumChildren() == 3, node);
+      DEMANGLER_ASSERT(Child->getNumChildren() == 2 ||
+                           Child->getNumChildren() == 3 ||
+                           Child->getNumChildren() == 4,
+                       node);
       RETURN_IF_ERROR(mangle(Child->getLastChild(), depth + 1));
       break;
     case Node::Kind::DependentPseudogenericSignature:
@@ -1999,6 +2015,11 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         if (Child->getNumChildren() == 3) {
           RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
               Child->getChild(1), depth + 1));
+        } else if (Child->getNumChildren() == 4) {
+          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Child->getChild(1), depth + 1));
+          RETURN_IF_ERROR(
+              mangleImplParameterTransferring(Child->getChild(2), depth + 1));
         }
         break;
       }
@@ -2023,6 +2044,11 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         if (Child->getNumChildren() == 3) {
           RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
               Child->getChild(1), depth + 1));
+        } else if (Child->getNumChildren() == 4) {
+          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Child->getChild(1), depth + 1));
+          RETURN_IF_ERROR(
+              mangleImplParameterTransferring(Child->getChild(2), depth + 1));
         }
         break;
       }
@@ -2071,6 +2097,12 @@ ManglingError Remangler::mangleInOut(Node *node, unsigned depth) {
 ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yi";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleTransferring(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yu";
   return ManglingError::Success;
 }
 
@@ -3256,6 +3288,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
                                                        unsigned depth) {
   Buffer << "YA";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleTransferringResultFunctionType(Node *node,
+                                                              unsigned depth) {
+  Buffer << "YT";
   return ManglingError::Success;
 }
 

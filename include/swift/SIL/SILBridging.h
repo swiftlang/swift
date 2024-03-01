@@ -100,7 +100,7 @@ struct OptionalBridgedResultInfo {
   BridgedResultConvention convention = BridgedResultConvention::Indirect;
 
 #ifdef USED_IN_CPP_SOURCE
-  OptionalBridgedResultInfo(llvm::Optional<swift::SILResultInfo> resultInfo) {
+  OptionalBridgedResultInfo(std::optional<swift::SILResultInfo> resultInfo) {
     if (resultInfo) {
       type = resultInfo->getInterfaceType().getPointer();
       convention =
@@ -725,7 +725,7 @@ struct OptionalBridgedSILDebugVariable {
   uint64_t storage[16];
 
 #ifdef USED_IN_CPP_SOURCE
-  using OptionalSILDebugVariable = llvm::Optional<swift::SILDebugVariable>;
+  using OptionalSILDebugVariable = std::optional<swift::SILDebugVariable>;
 
   OptionalBridgedSILDebugVariable(
     OptionalSILDebugVariable &&debugVariable) {
@@ -770,6 +770,7 @@ struct BridgedInstruction {
   bool mayLoadWeakOrUnowned() const;
   bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
+  BRIDGED_INLINE bool shouldBeForwarding() const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
@@ -808,13 +809,6 @@ struct BridgedInstruction {
   struct OptionalInt {
     SwiftInt value;
     bool hasValue;
-  };
-
-  enum class AccessKind {
-    Init,
-    Read,
-    Modify,
-    Deinit
   };
 
   enum class MarkDependenceKind {
@@ -886,7 +880,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
-  BRIDGED_INLINE AccessKind BeginAccessInst_getAccessKind() const;
+  BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;

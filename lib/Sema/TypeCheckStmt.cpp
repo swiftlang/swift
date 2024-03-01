@@ -586,7 +586,7 @@ static void checkLabeledStmtShadowing(
 
   auto activeLabeledStmtsVec = ASTScope::lookupLabeledStmts(
       sourceFile, ls->getStartLoc());
-  auto activeLabeledStmts = llvm::makeArrayRef(activeLabeledStmtsVec);
+  auto activeLabeledStmts = llvm::ArrayRef(activeLabeledStmtsVec);
   for (auto prevLS : activeLabeledStmts.slice(1)) {
     if (prevLS->getLabelInfo().Name == name) {
       ctx.Diags.diagnose(
@@ -2845,7 +2845,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
   ASTContext &ctx = AFD->getASTContext();
 
-  llvm::Optional<FunctionBodyTimer> timer;
+  std::optional<FunctionBodyTimer> timer;
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
@@ -2965,7 +2965,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   BraceStmt *body = closure->getBody();
 
-  llvm::Optional<FunctionBodyTimer> timer;
+  std::optional<FunctionBodyTimer> timer;
   const auto &tyOpts = closure->getASTContext().TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(closure);

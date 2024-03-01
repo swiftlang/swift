@@ -330,7 +330,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
   }
   for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
     bool foundExactConfig = false;
-    llvm::Optional<AutoDiffConfig> supersetConfig = llvm::None;
+    std::optional<AutoDiffConfig> supersetConfig = std::nullopt;
     for (auto witnessConfig :
            witnessAFD->getDerivativeFunctionConfigurations()) {
       // All the witness's derivative generic requirements must be satisfied
@@ -483,7 +483,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
 /// \returns None iff the witness satisfies the requirement's effects limit.
 ///          Otherwise, it returns the RequirementMatch that describes the
 ///          problem.
-static llvm::Optional<RequirementMatch>
+static std::optional<RequirementMatch>
 checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
 
   if (!witness->isLessEffectfulThan(req, EffectKind::Async))
@@ -494,15 +494,15 @@ checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
     return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Get),
                             MatchKind::ThrowsConflict);
 
-  return llvm::None; // OK
+  return std::nullopt; // OK
 }
 
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<llvm::Optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
         setup,
-    llvm::function_ref<llvm::Optional<RequirementMatch>(Type, Type)> matchTypes,
+    llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
 
@@ -706,7 +706,7 @@ RequirementMatch swift::matchWitness(
   // in the process.
   Type reqType, witnessType;
   {
-    llvm::Optional<RequirementMatch> result;
+    std::optional<RequirementMatch> result;
     std::tie(result, reqType, witnessType) = setup();
     if (result) {
       return std::move(result.value());
@@ -906,7 +906,7 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
   return cacheIter->getSecond();
 }
 
-static llvm::Optional<RequirementMatch>
+static std::optional<RequirementMatch>
 findMissingGenericRequirementForSolutionFix(
     constraints::Solution &solution, constraints::ConstraintFix *fix,
     ValueDecl *witness, ProtocolConformance *conformance,
@@ -946,7 +946,7 @@ findMissingGenericRequirementForSolutionFix(
     break;
   }
   default:
-    return llvm::Optional<RequirementMatch>();
+    return std::optional<RequirementMatch>();
   }
 
   type = solution.simplifyType(type);
@@ -996,7 +996,7 @@ findMissingGenericRequirementForSolutionFix(
     return missingRequirementMatch(type);
   }
 
-  return llvm::Optional<RequirementMatch>();
+  return std::optional<RequirementMatch>();
 }
 
 /// Determine the set of effects on a given declaration.
@@ -1025,7 +1025,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   using namespace constraints;
 
   // Initialized by the setup operation.
-  llvm::Optional<ConstraintSystem> cs;
+  std::optional<ConstraintSystem> cs;
   ConstraintLocator *locator = nullptr;
   ConstraintLocator *reqLocator = nullptr;
   ConstraintLocator *witnessLocator = nullptr;
@@ -1101,7 +1101,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1168,12 +1168,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
     openWitnessType = openWitnessType->getRValueType();
 
-    return std::make_tuple(llvm::None, reqType, openWitnessType);
+    return std::make_tuple(std::nullopt, reqType, openWitnessType);
   };
 
   // Match a type in the requirement to a type in the witness.
   auto matchTypes = [&](Type reqType,
-                        Type witnessType) -> llvm::Optional<RequirementMatch> {
+                        Type witnessType) -> std::optional<RequirementMatch> {
     // `swift_attr` attributes in the type context were ignored before,
     // which means that we need to maintain status quo to avoid breaking
     // witness matching by stripping everything concurrency related from
@@ -1213,7 +1213,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     cs->addConstraint(ConstraintKind::Bind, reqType, witnessType, locator);
     // FIXME: Check whether this has already failed.
-    return llvm::None;
+    return std::nullopt;
   };
 
   // Finalize the match.
@@ -1951,7 +1951,7 @@ public:
 
   /// Peek the unsatisfied requirements collected during conformance checking.
   ArrayRef<ValueDecl*> getUnsatisfiedRequirements() {
-    return llvm::makeArrayRef(UnsatisfiedReqs);
+    return llvm::ArrayRef(UnsatisfiedReqs);
   }
 
   /// Whether this member is "covered" by one of the conformances.
@@ -2210,6 +2210,13 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
+/// Determine whether a conformance to this protocol can be determined at
+/// runtime for an arbitrary type.
+static bool hasRuntimeConformanceInfo(ProtocolDecl *proto) {
+  return !proto->isMarkerProtocol()
+      || proto->isSpecificProtocol(KnownProtocolKind::Copyable);
+}
+
 static void ensureRequirementsAreSatisfied(ASTContext &ctx,
                                            NormalProtocolConformance *conformance);
 
@@ -2279,7 +2286,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (Proto->isObjC()) {
     // Foreign classes cannot conform to objc protocols.
     if (auto clazz = DC->getSelfClassDecl()) {
-      llvm::Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
+      std::optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
           diagKind;
       switch (clazz->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
@@ -2354,11 +2361,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
     // If the protocol to which we are conditionally conforming is not a marker
     // protocol, the conditional requirements must not involve conformance to a
-    // marker protocol. We cannot evaluate such a conformance at runtime.
+    // protocol that cannot be evaluated at runtime, like most marker protocols.
     if (!Proto->isMarkerProtocol()) {
       for (const auto &req : conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
-            req.getProtocolDecl()->isMarkerProtocol()) {
+            !hasRuntimeConformanceInfo(req.getProtocolDecl())) {
           Context.Diags.diagnose(
             ComplainLoc, diag::marker_protocol_conditional_conformance,
             Proto->getName(), req.getFirstType(),
@@ -3101,7 +3108,7 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
-llvm::Optional<ActorIsolation>
+std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
                                         ValueDecl *witness) {
 
@@ -3119,8 +3126,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     loc = Conformance->getLoc();
 
   auto refResult = ActorReferenceResult::forReference(
-      getDeclRefInContext(witness), witness->getLoc(), DC, llvm::None,
-      llvm::None, llvm::None, requirementIsolation);
+      getDeclRefInContext(witness), witness->getLoc(), DC, std::nullopt,
+      std::nullopt, std::nullopt, requirementIsolation);
   bool sameConcurrencyDomain = false;
   // If the requirement is isolated (explicitly or implicitly) or
   // explicitly marked as `nonisolated` it means that the protocol
@@ -3146,13 +3153,13 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       return refResult.isolation;
 
     // Otherwise, we're done.
-    return llvm::None;
+    return std::nullopt;
 
   case ActorReferenceResult::ExitsActorToNonisolated:
     diagnoseNonSendableTypesInReference(
         /*base=*/nullptr, getDeclRefInContext(witness),
         DC, loc, SendableCheckReason::Conformance);
-    return llvm::None;
+    return std::nullopt;
   case ActorReferenceResult::EntersActor:
     // Handled below.
     break;
@@ -3231,7 +3238,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
         witness->getAttrs().hasAttribute<NonisolatedAttr>())
-      return llvm::None;
+      return std::nullopt;
 
     // Check that the results of the witnessing method are sendable
     diagnoseNonSendableTypesInReference(
@@ -3251,7 +3258,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // If the witness is accessible across actors, we don't need to consider it
     // isolated.
     if (isAccessibleAcrossActors(witness, refResult.isolation, DC))
-      return llvm::None;
+      return std::nullopt;
 
     if (refResult.isolation.isActorIsolated()) {
       if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
@@ -3263,7 +3270,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         return refResult.isolation;
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Limit the behavior of the diagnostic based on context.
@@ -3285,7 +3292,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // didn't diagnose this code, so downgrade the error to an warning
   // until Swift 6.
   if (auto *var = dyn_cast<VarDecl>(witness)) {
-    ActorReferenceResult::Options options = llvm::None;
+    ActorReferenceResult::Options options = std::nullopt;
     isLetAccessibleAnywhere(
         witness->getDeclContext()->getParentModule(),
         var, options);
@@ -3372,7 +3379,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     requirement->diagnose(diag::decl_declared_here, requirement);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Check for ill-formed uses of Objective-C generics in a type witness.
@@ -3794,7 +3801,7 @@ static void diagnoseProtocolStubFixit(
 
     // Issue diagnostics for witness types.
     if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
-      llvm::Optional<InFlightDiagnostic> diag;
+      std::optional<InFlightDiagnostic> diag;
       if (isa<BuiltinTupleDecl>(DC->getSelfNominalTypeDecl())) {
         auto expectedTy = getTupleConformanceTypeWitness(DC, MissingTypeWitness);
         diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
@@ -3891,7 +3898,7 @@ static bool hasSelfSameTypeConstraint(const ValueDecl *req) {
 ///
 /// \returns None if there is no such constraint; a non-empty optional that
 /// may have the \c RequirementRepr for the actual constraint.
-static llvm::Optional<std::pair<RequirementRepr *, Requirement>>
+static std::optional<std::pair<RequirementRepr *, Requirement>>
 getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
   auto genericSig =
     witness->getInnermostDeclContext()->getGenericSignatureOfContext();
@@ -3906,7 +3913,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
         || req.getSecondType()->getAnyNominal() == selfClass;
   });
   if (it == genericSig.getRequirements().end()) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Got it! Now try to find the requirement-as-written.
@@ -3918,7 +3925,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
 
   // A null repr indicates we don't have a valid location to diagnose. But
   // at least we have a requirement we can signal is bogus.
-  llvm::Optional<std::pair<RequirementRepr *, Requirement>> target =
+  std::optional<std::pair<RequirementRepr *, Requirement>> target =
       std::make_pair((RequirementRepr *)nullptr, Requirement(*it));
   if (!where) {
     return target;
@@ -3962,9 +3969,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
           bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
           auto &diags = ctor->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, ctor);
-          llvm::Optional<InFlightDiagnostic> fixItDiag = diags.diagnose(
-              diagLoc, diag::witness_initializer_not_required,
-              requirement, inExtension, conformance->getType());
+          std::optional<InFlightDiagnostic> fixItDiag =
+              diags.diagnose(diagLoc, diag::witness_initializer_not_required,
+                             requirement, inExtension, conformance->getType());
           if (diagLoc != ctor->getLoc() && !ctor->isImplicit()) {
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
@@ -4622,7 +4629,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 }
 
 /// FIXME: It feels like this could be part of findExistentialSelfReferences().
-static llvm::Optional<Requirement>
+static std::optional<Requirement>
 hasInvariantSelfRequirement(const ProtocolDecl *proto,
                             ArrayRef<Requirement> reqSig) {
   auto selfTy = proto->getSelfInterfaceType();
@@ -4681,7 +4688,7 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
     llvm_unreachable("Bad requirement kind");
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 static void diagnoseInvariantSelfRequirement(
@@ -4943,6 +4950,8 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 
 void ConformanceChecker::resolveValueWitnesses() {
   bool usesPreconcurrencyConformance = false;
+  auto objcRequirementMap = getObjCRequirementMap(Proto);
+
   for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
@@ -4987,7 +4996,7 @@ void ConformanceChecker::resolveValueWitnesses() {
           SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
           if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
             auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-            llvm::Optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
+            std::optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
                 diagLoc,
                 isOptional ? diag::witness_non_objc_optional
                            : diag::witness_non_objc,
@@ -5007,7 +5016,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                   requirement->getObjCRuntimeName());
             }
           } else if (isa<VarDecl>(witness)) {
-            llvm::Optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
+            std::optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
                 diagLoc,
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
@@ -5027,7 +5036,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                   requirement->getObjCRuntimeName());
             }
           } else if (isa<SubscriptDecl>(witness)) {
-            llvm::Optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
+            std::optional<InFlightDiagnostic> fixItDiag = C.Diags.diagnose(
                 diagLoc,
                 isOptional ? diag::witness_non_objc_storage_optional
                            : diag::witness_non_objc_storage,
@@ -5077,6 +5086,23 @@ void ConformanceChecker::resolveValueWitnesses() {
     // Make sure we've got an interface type.
     if (requirement->isInvalid()) {
       Conformance->setInvalid();
+      continue;
+    }
+
+    // If this requirement is part of a pair of imported async requirements,
+    // where one has already been witnessed, we can skip it.
+    //
+    // This situation primarily arises when the ClangImporter translates an
+    // async-looking ObjC protocol method requirement into two Swift protocol
+    // requirements: an async version and a sync version. Exactly one of the two
+    // must be witnessed by the conformer.
+    if (!requirement->isImplicit() &&
+        getObjCRequirementSibling(
+            Proto, requirement, objcRequirementMap,
+            [this](AbstractFunctionDecl *cand) {
+              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
+                     !cand->isImplicit() && this->Conformance->hasWitness(cand);
+            })) {
       continue;
     }
 
@@ -5419,13 +5445,13 @@ combineBaseNameAndFirstArgument(Identifier baseName,
 /// Compute the scope between two potentially-matching names, which is
 /// effectively the sum of the edit distances between the corresponding
 /// argument labels.
-static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
-                                                              DeclName rhs,
-                                                              bool isFunc,
-                                                              unsigned limit) {
+static std::optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
+                                                             DeclName rhs,
+                                                             bool isFunc,
+                                                             unsigned limit) {
   // If there are a different number of argument labels, we're done.
   if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
-    return llvm::None;
+    return std::nullopt;
 
   // Score the base name match. If there is a first argument for a
   // function, include its text along with the base name's text.
@@ -5453,11 +5479,11 @@ static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
     if (lhs.getBaseName().getKind() == rhs.getBaseName().getKind()) {
       score = 0;
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
   }
   if (score > limit)
-    return llvm::None;
+    return std::nullopt;
 
   // Compute the edit distance between matching argument names.
   for (unsigned i = isFunc ? 1 : 0; i < lhs.getArgumentNames().size(); ++i) {
@@ -5465,26 +5491,26 @@ static llvm::Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
                               rhs.getArgumentNames()[i],
                               limit - score);
     if (score > limit)
-      return llvm::None;
+      return std::nullopt;
   }
 
   return score;
 }
 
 /// Determine the score between two potentially-matching declarations.
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 scorePotentiallyMatching(ValueDecl *req, ValueDecl *witness, unsigned limit) {
   /// Apply omit-needless-words to the given declaration, if possible.
   auto omitNeedlessWordsIfPossible =
-      [](ValueDecl *VD) -> llvm::Optional<DeclName> {
+      [](ValueDecl *VD) -> std::optional<DeclName> {
     if (auto func = dyn_cast<AbstractFunctionDecl>(VD))
       return TypeChecker::omitNeedlessWords(func);
     if (auto var = dyn_cast<VarDecl>(VD)) {
       if (auto newName = TypeChecker::omitNeedlessWords(var))
         return DeclName(*newName);
-      return llvm::None;
+      return std::nullopt;
     }
-    return llvm::None;
+    return std::nullopt;
   };
 
   DeclName reqName = req->getName();
@@ -5514,7 +5540,7 @@ namespace {
 
 /// Determine we can suppress the warning about a potential witness nearly
 /// matching an optional requirement by moving the declaration.
-llvm::Optional<PotentialWitnessWarningSuppression>
+std::optional<PotentialWitnessWarningSuppression>
 canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
                                                ValueDecl *witness) {
   // If the witness is within an extension, it can be moved to another
@@ -5525,7 +5551,7 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
   // A stored property cannot be moved to an extension.
   if (auto var = dyn_cast<VarDecl>(witness)) {
     if (var->hasStorage())
-      return llvm::None;
+      return std::nullopt;
   }
 
   // If the witness is within a struct or enum, it can be freely moved to
@@ -5537,13 +5563,13 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
   // From here on, we only handle members of classes.
   auto classDecl = dyn_cast<ClassDecl>(witness->getDeclContext());
   if (!classDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // If the witness is a designated or required initializer, we can't move it
   // to an extension.
   if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
     if (ctor->isDesignatedInit() || ctor->isRequired())
-      return llvm::None;
+      return std::nullopt;
   }
 
   // We can move this entity to an extension.
@@ -5768,7 +5794,7 @@ static void diagnoseUnstableName(ProtocolConformance *conformance,
     Nested,
     Local,
   };
-  llvm::Optional<UnstableNameKind> kind;
+  std::optional<UnstableNameKind> kind;
   if (!classDecl->getDeclContext()->isModuleScopeContext()) {
     if (classDecl->getDeclContext()->isTypeContext())
       kind = UnstableNameKind::Nested;
@@ -5998,7 +6024,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
-  bool sendableConformanceIsUnchecked = false;
+  bool hasDeprecatedUnsafeSendable = false;
   bool sendableConformancePreconcurrency = false;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
@@ -6030,12 +6056,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       SendableConformance = conformance;
 
       if (auto normal = conformance->getRootNormalConformance()) {
-        if (normal->isUnchecked())
-          sendableConformanceIsUnchecked = true;
-        else if (isImpliedByConformancePredatingConcurrency(normal))
+        if (isImpliedByConformancePredatingConcurrency(normal))
           sendableConformancePreconcurrency = true;
-        else if (isa<InheritedProtocolConformance>(conformance))
-          sendableConformanceIsUnchecked = true;
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
@@ -6079,7 +6101,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
-      sendableConformanceIsUnchecked = true;
+      hasDeprecatedUnsafeSendable = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
       tryDiagnoseExecutorConformance(Context, nominal, proto);
     } else if (NoncopyableGenerics
@@ -6097,7 +6119,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   }
 
   // Check constraints of Sendable.
-  if (SendableConformance && !sendableConformanceIsUnchecked) {
+  if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
       check = SendableCheck::ImpliedByStandardProtocol;
@@ -6356,7 +6378,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   if (isa<ProtocolDecl>(nominal)) return result;
 
   DeclName name = witness->getName();
-  llvm::Optional<AccessorKind> accessorKind;
+  std::optional<AccessorKind> accessorKind;
   if (auto *accessor = dyn_cast<AccessorDecl>(witness)) {
     accessorKind = accessor->getAccessorKind();
     switch (*accessorKind) {
@@ -6385,7 +6407,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     // We only care about Objective-C protocols.
     if (!proto->isObjC()) continue;
 
-    llvm::Optional<ProtocolConformance *> conformance;
+    std::optional<ProtocolConformance *> conformance;
     for (auto req : proto->lookupDirect(name)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;

@@ -361,19 +361,29 @@ ParserStatus Parser::parseGenericWhereClause(
         SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
 
       // Add the requirement
+      //
+      // If the a type has a code completion token, don't record a same
+      // type constraint, because otherwise if we have
+      //   K.#^COMPLETE^# == Foo
+      // we parse this as
+      //   K == Foo
+      // and thus simplify K to Foo. But we didn't want to state that K is Foo
+      // but that K has a member of type Foo.
+      // FIXME: The proper way to fix this would be to represent the code
+      // completion token in the TypeRepr.
       if (FirstType.hasCodeCompletion()) {
-        // If the first type has a code completion token, don't record a same
-        // type constraint because otherwise if we have
-        //   K.#^COMPLETE^# == Foo
-        // we parse this as
-        //   K == Foo
-        // and thus simplify K to Foo. But we didn't want to state that K is Foo
-        // but that K has a member of type Foo.
-        // FIXME: The proper way to fix this would be to represent the code
-        // completion token in the TypeRepr.
+        SecondType = makeParserResult(
+            SecondType,
+            ErrorTypeRepr::create(Context, SecondType.get()->getLoc()));
+      }
+      if (SecondType.hasCodeCompletion()) {
+        FirstType = makeParserResult(
+            FirstType,
+            ErrorTypeRepr::create(Context, FirstType.get()->getLoc()));
+      }
+      if (FirstType.hasCodeCompletion() || SecondType.hasCodeCompletion()) {
         Requirements.push_back(RequirementRepr::getTypeConstraint(
-            FirstType.get(), EqualLoc,
-            ErrorTypeRepr::create(Context, SecondType.get()->getLoc()),
+            FirstType.get(), EqualLoc, SecondType.get(),
             isRequirementExpansion));
       } else {
         Requirements.push_back(RequirementRepr::getSameType(

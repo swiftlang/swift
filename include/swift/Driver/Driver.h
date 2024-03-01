@@ -25,11 +25,11 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -97,7 +97,7 @@ public:
   /// The mode in which the driver should invoke the frontend.
   Mode CompilerMode = Mode::StandardCompile;
 
-  llvm::Optional<MSVCRuntime> RuntimeVariant = llvm::None;
+  std::optional<MSVCRuntime> RuntimeVariant = std::nullopt;
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
@@ -336,7 +336,7 @@ public:
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  llvm::Optional<OutputFileMap>
+  std::optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 

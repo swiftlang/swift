@@ -31,9 +31,9 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
-                         llvm::Optional<ModuleDecl *> ExtendedModule,
+                         std::optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
-                         llvm::Optional<llvm::VersionTuple> ModuleVersion,
+                         std::optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
     : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
       ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
@@ -492,14 +492,10 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
   const auto D = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-      PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-        if (inherited != PD) {
-          recordEdge(S, Symbol(this, inherited, nullptr),
-                     RelationshipKind::ConformsTo(), nullptr);
-        }
-
-        return TypeWalker::Action::Continue;
-      });
+      for (auto *inherited : PD->getAllInheritedProtocols()) {
+        recordEdge(S, Symbol(this, inherited, nullptr),
+                   RelationshipKind::ConformsTo(), nullptr);
+      }
     } else {
       for (const auto *Conformance : NTD->getAllConformances()) {
         // Check to make sure that this conformance wasn't declared via an

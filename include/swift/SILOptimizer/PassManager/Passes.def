@@ -184,8 +184,6 @@ PASS(DeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
-PASS(DestroyHoisting, "destroy-hoisting",
-     "Hoisting of value destroys")
 PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 PASS(Devirtualizer, "devirtualizer",
@@ -512,6 +510,8 @@ SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
 SWIFT_SILCOMBINE_PASS(CopyValueInst)
 SWIFT_SILCOMBINE_PASS(DestroyValueInst)
+SWIFT_SILCOMBINE_PASS(DestructureStructInst)
+SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

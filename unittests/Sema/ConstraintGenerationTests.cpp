@@ -289,7 +289,7 @@ TEST_F(SemaTest, TestSwitchExprLocator) {
   auto *trueCase =
       CaseStmt::create(Context, CaseParentKind::Switch, SourceLoc(),
                        {CaseLabelItem(truePattern)}, SourceLoc(), SourceLoc(),
-                       trueBrace, /*caseBodyVars*/ llvm::None);
+                       trueBrace, /*caseBodyVars*/ std::nullopt);
 
   // case false: 2
   auto *falseBrace = BraceStmt::createImplicit(
@@ -300,7 +300,7 @@ TEST_F(SemaTest, TestSwitchExprLocator) {
   auto *falseCase =
       CaseStmt::create(Context, CaseParentKind::Switch, SourceLoc(),
                        {CaseLabelItem(falsePattern)}, SourceLoc(), SourceLoc(),
-                       falseBrace, /*caseBodyVars*/ llvm::None);
+                       falseBrace, /*caseBodyVars*/ std::nullopt);
 
   auto *subject = new (Context) BooleanLiteralExpr(true, SourceLoc());
 

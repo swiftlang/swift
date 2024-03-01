@@ -12,8 +12,8 @@
 
 #include "Symbol.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include <optional>
 
 #ifndef SWIFT_RQM_TERM_H
 #define SWIFT_RQM_TERM_H
@@ -80,7 +80,7 @@ public:
 
   void dump(llvm::raw_ostream &out) const;
 
-  llvm::Optional<int> compare(Term other, RewriteContext &ctx) const;
+  std::optional<int> compare(Term other, RewriteContext &ctx) const;
 
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
@@ -145,8 +145,8 @@ public:
     Symbols.append(from, to);
   }
 
-  llvm::Optional<int> compare(const MutableTerm &other,
-                              RewriteContext &ctx) const;
+  std::optional<int> compare(const MutableTerm &other,
+                             RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 

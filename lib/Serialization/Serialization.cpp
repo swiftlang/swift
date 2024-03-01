@@ -18,6 +18,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -75,8 +76,6 @@
 #include <vector>
 
 #define DEBUG_TYPE "Serialization"
-
-#pragma clang optimize off
 
 using namespace swift;
 using namespace swift::serialization;
@@ -1463,7 +1462,7 @@ getRawStableMetatypeRepresentation(const AnyMetatypeType *metatype) {
 static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 #define CASE(KIND)            \
   case RequirementKind::KIND: \
-    return GenericRequirementKind::KIND;
+    return serialization::GenericRequirementKind::KIND;
 
   switch (kind) {
   CASE(SameShape)
@@ -2844,7 +2843,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::OriginallyDefinedIn: {
       auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
-      ENCODE_VER_TUPLE(Moved, llvm::Optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      ENCODE_VER_TUPLE(
+          Moved, std::optional<llvm::VersionTuple>(theAttr->MovedVersion));
       auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
       blob.append(theAttr->OriginalModuleName.str());
@@ -2890,7 +2890,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::BackDeployed: {
       auto *theAttr = cast<BackDeployedAttr>(DA);
-      ENCODE_VER_TUPLE(Version, llvm::Optional<llvm::VersionTuple>(theAttr->Version));
+      ENCODE_VER_TUPLE(Version,
+                       std::optional<llvm::VersionTuple>(theAttr->Version));
       auto abbrCode = S.DeclTypeAbbrCodes[BackDeployedDeclAttrLayout::Code];
       BackDeployedDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
@@ -3047,12 +3048,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
-      auto typeID = S.addTypeRef(
-          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr)));
-      if (!typeID && !S.allowCompilerErrors()) {
-        llvm::PrettyStackTraceString message("CustomAttr has no type");
-        abort();
-      }
+      auto attrType =
+          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr));
+      if (S.skipTypeIfInvalid(attrType, theAttr->getTypeRepr()))
+        return;
+
+      auto typeID = S.addTypeRef(attrType);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
                                        typeID, theAttr->isArgUnsafe());
@@ -3658,27 +3659,37 @@ private:
     }
     case PatternKind::Named: {
       auto named = cast<NamedPattern>(pattern);
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, named->getLoc()))
+        break;
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[NamedPatternLayout::Code];
       NamedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addDeclRef(named->getDecl()),
-                                     S.addTypeRef(getPatternType()));
+                                     S.addTypeRef(ty));
       break;
     }
     case PatternKind::Any: {
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, pattern->getLoc()))
+        break;
+
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
       auto anyPattern = cast<AnyPattern>(pattern);
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()),
+                                   S.addTypeRef(ty),
                                    anyPattern->isAsyncLet());
       break;
     }
     case PatternKind::Typed: {
       auto typed = cast<TypedPattern>(pattern);
+      auto ty = getPatternType();
+      if (S.skipTypeIfInvalid(ty, typed->getTypeRepr()))
+        break;
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[TypedPatternLayout::Code];
       TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addTypeRef(getPatternType()));
+                                     S.addTypeRef(ty));
       writePattern(typed->getSubPattern());
       break;
     }
@@ -4565,7 +4576,7 @@ public:
         unsigned condAbbrCode =
             S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &condition : subs->getAvailability()) {
-          ENCODE_VER_TUPLE(osVersion, llvm::Optional<llvm::VersionTuple>(
+          ENCODE_VER_TUPLE(osVersion, std::optional<llvm::VersionTuple>(
                                           condition.first.getLowerEndpoint()));
           ConditionalSubstitutionConditionLayout::emitRecord(
               S.Out, S.ScratchRecord, condAbbrCode,
@@ -4845,7 +4856,7 @@ public:
     uint8_t hasExpandedDefinition = 0;
     IdentifierID externalModuleNameID = 0;
     IdentifierID externalMacroTypeNameID = 0;
-    llvm::Optional<ExpandedMacroDefinition> expandedDef;
+    std::optional<ExpandedMacroDefinition> expandedDef;
     auto def = macro->getDefinition();
     switch (def.kind) {
       case MacroDefinition::Kind::Invalid:
@@ -4998,13 +5009,8 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
 
-  if (D->isInvalid()) {
-    assert(allowCompilerErrors() &&
-           "cannot create a module with an invalid decl");
-
-    if (canSkipWhenInvalid(D))
-      return;
-  }
+  if (skipDeclIfInvalid(D))
+    return;
 
   BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
@@ -6520,7 +6526,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   bool hasLocalTypes = false;
   bool hasOpaqueReturnTypes = false;
 
-  llvm::Optional<DeclID> entryPointClassID;
+  std::optional<DeclID> entryPointClassID;
   SmallVector<DeclID, 16> orderedTopLevelDecls;
 
   ArrayRef<const FileUnit *> files;
@@ -6529,14 +6535,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     Scratch.push_back(SF);
     if (auto *synthesizedFile = SF->getSynthesizedFile())
       Scratch.push_back(synthesizedFile);
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   } else {
     for (auto file : M->getFiles()) {
       Scratch.push_back(file);
       if (auto *synthesizedFile = file->getSynthesizedFile())
         Scratch.push_back(synthesizedFile);
     }
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())
@@ -6782,6 +6788,11 @@ void Serializer::writeToStream(
     S.writeInputBlock();
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
+
+    if (S.hadError)
+      S.getASTContext().Diags.diagnose(SourceLoc(), diag::serialization_failed,
+                                       S.M);
+
     if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
           S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
@@ -6793,6 +6804,48 @@ void Serializer::writeToStream(
 
 bool Serializer::allowCompilerErrors() const {
   return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
+bool Serializer::skipDeclIfInvalid(const Decl *decl) {
+  if (!decl->isInvalid())
+    return false;
+
+  if (allowCompilerErrors())
+    return canSkipWhenInvalid(decl);
+
+  if (Options.EnableSerializationRemarks) {
+    getASTContext().Diags.diagnose(
+        decl->getLoc(), diag::serialization_skipped_invalid_decl, decl);
+  }
+
+  hadError = true;
+  return true;
+}
+
+bool Serializer::skipTypeIfInvalid(Type ty, TypeRepr *tyRepr) {
+  if ((ty && !ty->hasError()) || allowCompilerErrors())
+    return false;
+
+  if (Options.EnableSerializationRemarks) {
+    getASTContext().Diags.diagnose(
+        tyRepr->getLoc(), diag::serialization_skipped_invalid_type, tyRepr);
+  }
+
+  hadError = true;
+  return true;
+}
+
+bool Serializer::skipTypeIfInvalid(Type ty, SourceLoc loc) {
+  if ((ty && !ty->hasError()) || allowCompilerErrors())
+    return false;
+
+  if (Options.EnableSerializationRemarks) {
+    getASTContext().Diags.diagnose(
+        loc, diag::serialization_skipped_invalid_type_unknown_name);
+  }
+
+  hadError = true;
+  return true;
 }
 
 void serialization::writeToStream(

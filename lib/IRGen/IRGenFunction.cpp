@@ -43,7 +43,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              bool isPerformanceConstraint,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
-                             llvm::Optional<SILLocation> DbgLoc)
+                             std::optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
       OptMode(OptMode), isPerformanceConstraint(isPerformanceConstraint),
@@ -140,7 +140,7 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF, FunctionPointer fn,
                                        const llvm::Twine &name) {
   auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -244,7 +244,7 @@ llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
 static void emitDeallocatingCall(IRGenFunction &IGF, FunctionPointer fn,
                                  std::initializer_list<llvm::Value *> args) {
   llvm::CallInst *call =
-      IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setDoesNotThrow();
 }
 
@@ -387,7 +387,7 @@ void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
 // Debug output for Explosions.
 
 void Explosion::print(llvm::raw_ostream &OS) {
-  for (auto value : makeArrayRef(Values).slice(NextValue)) {
+  for (auto value : llvm::ArrayRef(Values).slice(NextValue)) {
     value->print(OS);
     OS << '\n';
   }

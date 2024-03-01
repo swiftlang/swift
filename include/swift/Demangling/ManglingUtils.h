@@ -13,10 +13,10 @@
 #ifndef SWIFT_DEMANGLING_MANGLINGUTILS_H
 #define SWIFT_DEMANGLING_MANGLINGUTILS_H
 
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringRef.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/Punycode.h"
+#include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 namespace Mangle {
@@ -104,8 +104,8 @@ std::string translateOperator(StringRef Op);
 /// \param allowConcurrencyManglings When true, allows the standard
 /// substitutions for types in the _Concurrency module that were introduced in
 /// Swift 5.5.
-llvm::Optional<StringRef> getStandardTypeSubst(
-    StringRef TypeName, bool allowConcurrencyManglings);
+std::optional<StringRef> getStandardTypeSubst(StringRef TypeName,
+                                              bool allowConcurrencyManglings);
 
 /// Mangles an identifier using a generic Mangler class.
 ///

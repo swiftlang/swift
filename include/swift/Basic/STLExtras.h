@@ -17,8 +17,6 @@
 #ifndef SWIFT_BASIC_STLEXTRAS_H
 #define SWIFT_BASIC_STLEXTRAS_H
 
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>
@@ -26,9 +24,9 @@
 #include <functional>
 #include <iterator>
 #include <numeric>
+#include <optional>
 #include <type_traits>
 #include <unordered_set>
-#include <optional>
 
 namespace swift {
 
@@ -528,20 +526,20 @@ template<typename Subclass>
 struct DowncastAsOptional {
   template <typename Superclass>
   auto operator()(Superclass &value) const
-      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
+      -> std::optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   template <typename Superclass>
   auto operator()(const Superclass &value) const
-      -> llvm::Optional<decltype(llvm::cast<Subclass>(value))> {
+      -> std::optional<decltype(llvm::cast<Subclass>(value))> {
     if (auto result = llvm::dyn_cast<Subclass>(value))
       return result;
 
-    return llvm::None;
+    return std::nullopt;
   }
 };
 
@@ -786,14 +784,14 @@ void emplace_back_all(VectorType &vector) {}
 
 /// Apply a function to the value if present; otherwise return None.
 template <typename OptionalElement, typename Function>
-auto transform(const llvm::Optional<OptionalElement> &value,
+auto transform(const std::optional<OptionalElement> &value,
                const Function &operation)
-    -> llvm::Optional<decltype(operation(*value))> {
+    -> std::optional<decltype(operation(*value))> {
 
   if (value) {
     return operation(*value);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 } // end namespace swift
 

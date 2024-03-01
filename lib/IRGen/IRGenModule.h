@@ -1152,10 +1152,6 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
   void addAccessibleFunction(SILFunction *func);
-  void addAccessibleFunctionDistributedAliased(
-      std::string mangledRecordName,
-      std::optional<std::string> mangledActorTypeName,
-      SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
@@ -1193,8 +1189,10 @@ public:
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
 
-  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
-                              llvm::Type *llvmType, Atomicity atomicity);
+  llvm::Constant *
+  getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
+                             llvm::Type *llvmType, Atomicity atomicity,
+                             const OutliningMetadataCollector &collector);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType objectType, const TypeInfo &objectTI,
@@ -1313,25 +1311,6 @@ private:
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
-
-  struct AccessibleProtocolFunctionsData {
-    SILFunction *function;
-    /// Mangled name of the requirement function.
-    std::optional<std::string> mangledRecordName;
-    std::optional<std::string> concreteMangledTypeName;
-    AccessibleProtocolFunctionsData(
-        SILFunction *function,
-        const std::optional<std::string> &mangledRecordName,
-        const std::optional<std::string> &concreteMangledTypeName);
-  };
-  /// List of all functions which are protocol *requirements* which may be
-  /// looked up by name at runtime. The record can be used to pair
-  /// a concrete implementation type with the protocol (record) name,
-  /// in order to locate the *witness* function name on this specific type.
-  ///
-  /// The witness function name can then be used to look up the witness at
-  /// runtime by inspecting `AccessibleFunctions`.
-  SmallVector<AccessibleProtocolFunctionsData, 4> AccessibleProtocolFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1501,7 +1480,7 @@ private:
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
-  llvm::Optional<llvm::InlineAsm *> ObjCRetainAutoreleasedReturnValueMarker;
+  std::optional<llvm::InlineAsm *> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
   llvm::AttributeList AllocAttrs;
 
@@ -1515,11 +1494,11 @@ private:                                                                       \
   llvm::Constant *Id##Fn = nullptr;
 #include "swift/Runtime/RuntimeFunctions.def"
 
-  llvm::Optional<FunctionPointer> FixedClassInitializationFn;
+  std::optional<FunctionPointer> FixedClassInitializationFn;
 
   llvm::Constant *FixLifetimeFn = nullptr;
 
-  mutable llvm::Optional<SpareBitVector> HeapPointerSpareBits;
+  mutable std::optional<SpareBitVector> HeapPointerSpareBits;
 
   //--- Generic ---------------------------------------------------------------
 public:
@@ -1595,10 +1574,13 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
-  Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind,
-                         bool forStaticCall = false);
+  Signature
+  getSignature(CanSILFunctionType fnType,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
+  Signature
+  getSignature(CanSILFunctionType fnType, FunctionPointerKind kind,
+               bool forStaticCall = false,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1654,7 +1636,7 @@ public:
   llvm::Constant *
   getAddrOfEffectiveValueWitnessTable(CanType concreteType,
                                       ConstantInit init = ConstantInit());
-  llvm::Optional<llvm::Function *>
+  std::optional<llvm::Function *>
   getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
                            ForDefinition_t forDefinition);
 

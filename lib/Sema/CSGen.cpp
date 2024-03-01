@@ -2103,7 +2103,7 @@ namespace {
       auto contextualType = CS.getContextualType(expr, /*forConstraint=*/false);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
-      auto joinElementTypes = [&](llvm::Optional<Type> elementType) {
+      auto joinElementTypes = [&](std::optional<Type> elementType) {
         const auto elements = expr->getElements();
         unsigned index = 0;
 
@@ -4474,7 +4474,7 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
 
 /// Generate constraints for a for-in statement preamble where the expression
 /// is a `PackExpansionExpr`.
-static llvm::Optional<PackIterationInfo>
+static std::optional<PackIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                PackExpansionExpr *expansion, Type patternType) {
   auto packIterationInfo = PackIterationInfo();
@@ -4487,7 +4487,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                   /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target))
-      return llvm::None;
+      return std::nullopt;
 
     cs.setTargetFor(expansion, target);
   }
@@ -4503,7 +4503,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
 /// Generate constraints for a for-in statement preamble, expecting an
 /// expression that conforms to `Swift.Sequence`.
-static llvm::Optional<SequenceIterationInfo>
+static std::optional<SequenceIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                ForEachStmt *stmt, Pattern *typeCheckedPattern,
                                bool shouldBindPatternVarsOneWay,
@@ -4523,7 +4523,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
       cs.getASTContext(), stmt->getForLoc(),
       isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return llvm::None;
+    return std::nullopt;
 
   std::string name;
   {
@@ -4576,7 +4576,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     cs.setContextualInfo(sequenceExpr, contextInfo);
 
     if (cs.generateConstraints(makeIteratorTarget))
-      return llvm::None;
+      return std::nullopt;
 
     sequenceIterationInfo.makeIteratorVar = PB;
 
@@ -4644,7 +4644,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
           isAsync ? KnownProtocolKind::AsyncIteratorProtocol
                   : KnownProtocolKind::IteratorProtocol);
       if (!iteratorProto)
-        return llvm::None;
+        return std::nullopt;
 
       ContextualTypeInfo contextInfo(iteratorProto->getDeclaredInterfaceType(),
                                      CTP_ForEachSequence);
@@ -4655,7 +4655,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                       /*contextualType=*/Type(),
                                       /*isDiscarded=*/false);
     if (cs.generateConstraints(nextTarget, FreeTypeVariableBinding::Disallow))
-      return llvm::None;
+      return std::nullopt;
 
     sequenceIterationInfo.nextCall = nextTarget.getAsExpr();
     cs.setTargetFor(sequenceIterationInfo.nextCall, nextTarget);
@@ -4666,7 +4666,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
       cs.generateConstraints(typeCheckedPattern, elementLocator,
                              shouldBindPatternVarsOneWay, nullptr, 0);
   if (!initType)
-    return llvm::None;
+    return std::nullopt;
 
   // Add a conversion constraint between the element type of the sequence
   // and the type of the element pattern.
@@ -4687,12 +4687,12 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   if (whereExpr && !ignoreForEachWhereClause) {
     Type boolType = dc->getASTContext().getBoolType();
     if (!boolType)
-      return llvm::None;
+      return std::nullopt;
 
     SyntacticElementTarget whereTarget(whereExpr, dc, CTP_Condition, boolType,
                                        /*isDiscarded=*/false);
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
-      return llvm::None;
+      return std::nullopt;
 
     cs.setTargetFor(whereExpr, whereTarget);
 
@@ -4707,7 +4707,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   return sequenceIterationInfo;
 }
 
-static llvm::Optional<SyntacticElementTarget>
+static std::optional<SyntacticElementTarget>
 generateForEachStmtConstraints(ConstraintSystem &cs,
                                SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
@@ -4720,13 +4720,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
                                                  /*isStmtCondition*/ false);
   if (!pattern)
-    return llvm::None;
+    return std::nullopt;
   target.setPattern(pattern);
 
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
 
   if (TypeChecker::typeCheckPattern(contextualPattern)->hasError()) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (isa<PackExpansionExpr>(forEachExpr)) {
@@ -4737,7 +4737,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
         pattern, elementLocator, target.shouldBindPatternVarsOneWay(), nullptr,
         0);
     if (!patternType)
-      return llvm::None;
+      return std::nullopt;
 
     if (auto whereClause = stmt->getWhere()) {
       cs.recordFix(IgnoreWhereClauseInPackIteration::create(
@@ -4747,7 +4747,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
     auto packIterationInfo =
         generateForEachStmtConstraints(cs, dc, expansion, patternType);
     if (!packIterationInfo) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     target.getForEachStmtInfo() = *packIterationInfo;
@@ -4756,7 +4756,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
         cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay(),
         target.ignoreForEachWhereClause());
     if (!sequenceIterationInfo) {
-      return llvm::None;
+      return std::nullopt;
     }
 
     target.getForEachStmtInfo() = *sequenceIterationInfo;
@@ -5127,7 +5127,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
 struct ResolvedMemberResult::Implementation {
   llvm::SmallVector<ValueDecl*, 4> AllDecls;
   unsigned ViableStartIdx;
-  llvm::Optional<unsigned> BestIdx;
+  std::optional<unsigned> BestIdx;
 };
 
 ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {}
@@ -5146,7 +5146,7 @@ getBestOverload() const { return Impl->AllDecls[Impl->BestIdx.value()]; }
 
 ArrayRef<ValueDecl*> ResolvedMemberResult::
 getMemberDecls(InterestedMemberKind Kind) {
-  auto Result = llvm::makeArrayRef(Impl->AllDecls);
+  auto Result = llvm::ArrayRef(Impl->AllDecls);
   switch (Kind) {
   case InterestedMemberKind::Viable:
     return Result.slice(Impl->ViableStartIdx);
@@ -5161,7 +5161,7 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
                                                DeclName Name) {
   ResolvedMemberResult Result;
-  ConstraintSystem CS(&DC, llvm::None);
+  ConstraintSystem CS(&DC, std::nullopt);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
@@ -5192,7 +5192,7 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
                                                TVO_CanBindToLValue |
                                                TVO_CanBindToNoEscape);
   CS.addOverloadSet(TV, LookupResult.ViableCandidates, &DC, Locator);
-  llvm::Optional<Solution> OpSolution = CS.solveSingle();
+  std::optional<Solution> OpSolution = CS.solveSingle();
   ValueDecl *Selected = nullptr;
   if (OpSolution.has_value()) {
     Selected = OpSolution.value().overloadChoices[Locator].choice.getDecl();

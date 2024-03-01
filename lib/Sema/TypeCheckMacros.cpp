@@ -81,13 +81,13 @@ lookupMacroTypeMetadataByExternalName(ASTContext &ctx, StringRef moduleName,
 
 /// Translate an argument provided as a string literal into an identifier,
 /// or return \c None and emit an error if it cannot be done.
-llvm::Optional<Identifier> getIdentifierFromStringLiteralArgument(
+std::optional<Identifier> getIdentifierFromStringLiteralArgument(
     ASTContext &ctx, MacroExpansionExpr *expansion, unsigned index) {
   auto argList = expansion->getArgs();
 
   // If there's no argument here, an error was diagnosed elsewhere.
   if (!argList || index >= argList->size()) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   auto arg = argList->getExpr(index);
@@ -97,7 +97,7 @@ llvm::Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return llvm::None;
+    return std::nullopt;
   }
 
 
@@ -107,7 +107,7 @@ llvm::Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   return ctx.getIdentifier(contents);
@@ -496,7 +496,7 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   return result;
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionExpr *mee) const {
   ConcreteDeclRef macroRef = mee->getMacroRef();
@@ -516,12 +516,12 @@ ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
     // Return the expanded buffer ID.
     return evaluateOrDefault(
         evaluator, ExpandMacroExpansionDeclRequest(mee->getSubstituteDecl()),
-        llvm::None);
+        std::nullopt);
   }
 
   // Other macro roles may also be encountered here, as they use
   // `MacroExpansionExpr` for resolution. In those cases, do not expand.
-  return llvm::None;
+  return std::nullopt;
 }
 
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
@@ -880,21 +880,21 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
 
 // If this storage declaration is a variable with an explicit initializer,
 // return the range from the `=` to the end of the explicit initializer.
-static llvm::Optional<SourceRange>
+static std::optional<SourceRange>
 getExplicitInitializerRange(AbstractStorageDecl *storage) {
   auto var = dyn_cast<VarDecl>(storage);
   if (!var)
-    return llvm::None;
+    return std::nullopt;
 
   auto pattern = var->getParentPatternBinding();
   if (!pattern)
-    return llvm::None;
+    return std::nullopt;
 
   unsigned index = pattern->getPatternEntryIndexForVarDecl(var);
   SourceLoc equalLoc = pattern->getEqualLoc(index);
   SourceRange initRange = pattern->getOriginalInitRange(index);
   if (equalLoc.isInvalid() || initRange.End.isInvalid())
-    return llvm::None;
+    return std::nullopt;
 
   return SourceRange(equalLoc, initRange.End);
 }
@@ -907,7 +907,7 @@ static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
 
   // If there is a body macro, start at the beginning of it.
   if (auto bodyBufferID = evaluateOrDefault(
-          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, std::nullopt)) {
     insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
   } else {
     // If there is a parsed body, start at the beginning of it.
@@ -1224,10 +1224,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
                                /*attr=*/nullptr);
 }
 
-llvm::Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
+std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   SourceFile *macroSourceFile = ::evaluateFreestandingMacro(mee);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   DeclContext *dc = mee->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
@@ -1310,11 +1310,11 @@ llvm::Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
 }
 
 /// Expands the given macro expansion declaration.
-llvm::Optional<unsigned>
+std::optional<unsigned>
 swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   SourceFile *macroSourceFile = ::evaluateFreestandingMacro(med);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
   auto macroRoles = macro->getMacroRoles();
@@ -1578,15 +1578,15 @@ bool swift::accessorMacroIntroducesInitAccessor(
   return false;
 }
 
-llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
-                                                CustomAttr *attr,
-                                                MacroDecl *macro) {
+std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
+                                               CustomAttr *attr,
+                                               MacroDecl *macro) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
     if (binding && binding->getSingleVar() != var) {
       var->diagnose(diag::accessor_macro_not_single_var, macro->getName());
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
@@ -1595,7 +1595,7 @@ llvm::Optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
       ::evaluateAttachedMacro(macro, storage, attr,
                               /*passParentContext=*/false, MacroRole::Accessor);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded accessor macro", storage);
@@ -1708,9 +1708,10 @@ ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
   return fn->getASTContext().AllocateCopy(bufferIDs);
 }
 
-llvm::Optional<unsigned> ExpandBodyMacroRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
-  llvm::Optional<unsigned> bufferID;
+std::optional<unsigned>
+ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
+                                 AbstractFunctionDecl *fn) const {
+  std::optional<unsigned> bufferID;
   fn->forEachAttachedMacro(MacroRole::Body,
       [&](CustomAttr *customAttr, MacroDecl *macro) {
         // FIXME: Should we complain if we already expanded a body macro?
@@ -1728,14 +1729,14 @@ llvm::Optional<unsigned> ExpandBodyMacroRequest::evaluate(
   return bufferID;
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
   auto macroSourceFile = ::evaluateAttachedMacro(macro, member, attr,
                                                  /*passParentContext=*/true,
                                                  MacroRole::MemberAttribute);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
@@ -1783,17 +1784,17 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
   return introducedConformances;
 }
 
-llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
-                                              MacroDecl *macro, Decl *decl) {
+std::optional<unsigned> swift::expandMembers(CustomAttr *attr, MacroDecl *macro,
+                                             Decl *decl) {
   auto nominal = dyn_cast<NominalTypeDecl>(decl);
   if (!nominal) {
     auto ext = dyn_cast<ExtensionDecl>(decl);
     if (!ext)
-      return llvm::None;
+      return std::nullopt;
 
     nominal = ext->getExtendedNominal();
     if (!nominal)
-      return llvm::None;
+      return std::nullopt;
   }
   auto introducedConformances = getIntroducedConformances(
       nominal, MacroRole::Member, macro);
@@ -1804,7 +1805,7 @@ llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
                               /*passParentContext=*/false, MacroRole::Member,
                               introducedConformances);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", decl);
@@ -1825,13 +1826,13 @@ llvm::Optional<unsigned> swift::expandMembers(CustomAttr *attr,
   return macroSourceFile->getBufferID();
 }
 
-llvm::Optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
-                                            Decl *decl) {
+std::optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
+                                           Decl *decl) {
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
                               /*passParentContext=*/false, MacroRole::Peer);
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
   return macroSourceFile->getBufferID();
@@ -1867,12 +1868,13 @@ ExpandExtensionMacros::evaluate(Evaluator &evaluator,
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
 
-llvm::Optional<unsigned>
-swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
-                        MacroRole role, NominalTypeDecl *nominal) {
+std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
+                                                MacroDecl *macro,
+                                                MacroRole role,
+                                                NominalTypeDecl *nominal) {
   if (nominal->getDeclContext()->isLocalContext()) {
     nominal->diagnose(diag::local_extension_macro);
-    return llvm::None;
+    return std::nullopt;
   }
 
   SmallVector<ProtocolDecl *, 2> potentialConformances;
@@ -1883,7 +1885,7 @@ swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
                                                  role, introducedConformances);
 
   if (!macroSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "applying expanded extension macro", nominal);

@@ -345,9 +345,9 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto *memberType = type->castTo<DependentMemberType>();
   auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
                                        prefixType, sig);
-  return memberType->substBaseType(substBaseType,
-                                   LookUpConformanceInSignature(sig.getPointer()),
-                                   llvm::None);
+  return memberType->substBaseType(
+      substBaseType, LookUpConformanceInSignature(sig.getPointer()),
+      std::nullopt);
 }
 
 /// Unlike most other queries, the input type can be any type, not just a
@@ -362,7 +362,7 @@ Type RequirementMachine::getReducedType(
     Type type,
     ArrayRef<GenericTypeParamType *> genericParams) const {
 
-  return type.transformRec([&](Type t) -> llvm::Optional<Type> {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     if (!t->hasTypeParameter())
       return t;
 
@@ -378,7 +378,7 @@ Type RequirementMachine::getReducedType(
     }
 
     if (!t->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     // Get a simplified term T.
     auto term = Context.getMutableTermForType(t->getCanonicalType(),

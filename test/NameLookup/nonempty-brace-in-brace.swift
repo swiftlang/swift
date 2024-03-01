@@ -9,4 +9,10 @@ public struct Foo {
 
 private extension String {}
 
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
+
+
+
+
 // CHECK-NO-ASSERTION-NOT: Assertion

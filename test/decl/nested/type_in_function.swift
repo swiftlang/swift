@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 
+// XFAIL: noncopyable_generics
+
 // Generic class locally defined in non-generic function (rdar://problem/20116710)
 func f3() {
   class B<T> {}

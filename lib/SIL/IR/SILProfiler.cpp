@@ -460,23 +460,23 @@ private:
 
   /// The counter for an incomplete region. Note we do not store counters
   /// for nodes, as we need to be able to fix them up after popping the regions.
-  llvm::Optional<CounterExpr> Counter;
+  std::optional<CounterExpr> Counter;
 
   /// The region's starting location.
-  llvm::Optional<SourceLoc> StartLoc;
+  std::optional<SourceLoc> StartLoc;
 
   /// The region's ending location.
-  llvm::Optional<SourceLoc> EndLoc;
+  std::optional<SourceLoc> EndLoc;
 
-  SourceMappingRegion(Kind RegionKind, llvm::Optional<CounterExpr> Counter,
-                      llvm::Optional<SourceLoc> StartLoc)
+  SourceMappingRegion(Kind RegionKind, std::optional<CounterExpr> Counter,
+                      std::optional<SourceLoc> StartLoc)
       : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
   }
 
   SourceMappingRegion(Kind RegionKind, ASTNode Node, SourceRange Range,
-                      llvm::Optional<CounterExpr> Counter,
+                      std::optional<CounterExpr> Counter,
                       const SourceManager &SM)
       : RegionKind(RegionKind), Node(Node), Counter(Counter) {
     assert(Range.isValid());
@@ -493,8 +493,8 @@ public:
 
     // Note we don't store counters for nodes, as we need to be able to fix them
     // up later.
-    return SourceMappingRegion(Kind::Node, Node, Range, /*Counter*/ llvm::None,
-                               SM);
+    return SourceMappingRegion(Kind::Node, Node, Range,
+                               /*Counter*/ std::nullopt, SM);
   }
 
   /// Create a source region for an ASTNode that is only present for scoping of
@@ -502,14 +502,14 @@ public:
   /// regions.
   static SourceMappingRegion
   scopingOnly(ASTNode Node, const SourceManager &SM,
-              llvm::Optional<CounterExpr> Counter = llvm::None) {
+              std::optional<CounterExpr> Counter = std::nullopt) {
     return SourceMappingRegion(Kind::ScopingOnly, Node, Node.getSourceRange(),
                                Counter, SM);
   }
 
   /// Create a refined region for a given counter.
   static SourceMappingRegion refined(CounterExpr Counter,
-                                     llvm::Optional<SourceLoc> StartLoc) {
+                                     std::optional<SourceLoc> StartLoc) {
     return SourceMappingRegion(Kind::Refined, Counter, StartLoc);
   }
 
@@ -832,7 +832,7 @@ private:
   /// A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
 
-  llvm::Optional<CounterExpr> ExitCounter;
+  std::optional<CounterExpr> ExitCounter;
 
   Stmt *ImplicitTopLevelBody = nullptr;
 
@@ -927,23 +927,23 @@ private:
   ///
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
-  llvm::Optional<CounterExpr> setExitCount(ASTNode Node) {
+  std::optional<CounterExpr> setExitCount(ASTNode Node) {
     // A `try?` absorbs child error branches, so we can assume the exit count is
     // the same as the entry count in that case.
     // NOTE: This assumes there is no other kind of control flow that can happen
     // in a nested expression, which is true today, but may not always be.
     if (Node.isExpr(ExprKind::OptionalTry))
-      return llvm::None;
+      return std::nullopt;
 
     ExitCounter = getCurrentCounter();
     if (hasCounter(Node) && getRegion().getNode() != Node)
       return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope,
-                              llvm::Optional<CounterExpr> ControlFlowAdjust) {
+                              std::optional<CounterExpr> ControlFlowAdjust) {
     // If there are no regions left, there's nothing to adjust.
     if (RegionStack.empty())
       return;
@@ -951,7 +951,7 @@ private:
     // If the region is for a brace, check to see if we have a parent labeled
     // statement, in which case the exit count needs to account for any direct
     // jumps to it though e.g break statements.
-    llvm::Optional<CounterExpr> JumpsToLabel;
+    std::optional<CounterExpr> JumpsToLabel;
     if (Scope.isStmt(StmtKind::Brace)) {
       if (auto *ParentStmt = Parent.getAsStmt()) {
         if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
@@ -1003,12 +1003,12 @@ private:
   /// Replace the current region at \p Start with a new counter. If \p Start is
   /// \c None, or the counter is semantically zero, an 'incomplete' region is
   /// formed, which is not recorded unless followed by additional AST nodes.
-  void replaceCount(CounterExpr Counter, llvm::Optional<SourceLoc> Start) {
+  void replaceCount(CounterExpr Counter, std::optional<SourceLoc> Start) {
     // If the counter is zero, form an 'incomplete' region with no starting
     // location. This prevents forming unreachable regions unless there is a
     // following statement or expression to extend the region.
     if (Start && Counter.isZero())
-      Start = llvm::None;
+      Start = std::nullopt;
 
     pushRegion(SourceMappingRegion::refined(Counter, Start));
   }
@@ -1101,7 +1101,7 @@ private:
       if (Region.getNode())
         break;
     }
-    replaceCount(CounterExpr::Zero(), /*Start*/ llvm::None);
+    replaceCount(CounterExpr::Zero(), /*Start*/ std::nullopt);
   }
 
   Expr *getConditionNode(StmtCondition SC) {
@@ -1251,7 +1251,7 @@ public:
         auto ThenDelta =
             CounterExpr::Sub(ThenCounter, getExitCounter(), CounterBuilder);
 
-        llvm::Optional<CounterExpr> ElseDelta;
+        std::optional<CounterExpr> ElseDelta;
         if (auto *Else = IS->getElseStmt()) {
           auto ElseCounter = CounterExpr::Sub(ParentCounter, ThenCounter,
                                               CounterBuilder);
@@ -1661,13 +1661,13 @@ ProfileCounter SILProfiler::getExecutionCount(ASTNode Node) {
   return getExecutionCount(ProfileCounterRef::node(Node));
 }
 
-llvm::Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
+std::optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
   if (!Node || !M.getPGOReader() || !hasRegionCounters()) {
-    return llvm::None;
+    return std::nullopt;
   }
   auto it = RegionCondToParentMap.find(Node);
   if (it == RegionCondToParentMap.end()) {
-    return llvm::None;
+    return std::nullopt;
   }
   return it->getSecond();
 }

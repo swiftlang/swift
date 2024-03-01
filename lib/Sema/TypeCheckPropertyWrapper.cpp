@@ -655,7 +655,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 }
 
 Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
-                                    llvm::Optional<unsigned> limit) {
+                                    std::optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)

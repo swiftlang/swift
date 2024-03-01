@@ -138,7 +138,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
                 archTy->getInterfaceType()->getAs<DependentMemberType>()) {
           return dmt->substRootParam(params[index],
                                      MakeAbstractConformanceForGenericType(),
-                                     llvm::None);
+                                     std::nullopt);
         }
 
         return params[index];
@@ -431,7 +431,7 @@ class PackExpansionResultPlan : public ResultPlan {
 
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder, SILValue packAddr,
-                          llvm::Optional<ArrayRef<Initialization *>> inits,
+                          std::optional<ArrayRef<Initialization *>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -599,7 +599,7 @@ public:
           builder.build(nullptr, origEltType, substEltTypes[0]));
       } else {
         origEltPlans.push_back(builder.buildForPackExpansion(
-            llvm::None, origEltType, substEltTypes));
+            std::nullopt, origEltType, substEltTypes));
       }
     });
   }
@@ -673,8 +673,8 @@ public:
         eltPlans.push_back(builder.build(eltInit, origEltType,
                                          substEltTypes[0]));
       } else {
-        auto componentInits = llvm::makeArrayRef(eltInits)
-               .slice(elt.getSubstIndex(), substEltTypes.size());
+        auto componentInits = llvm::ArrayRef(eltInits).slice(
+            elt.getSubstIndex(), substEltTypes.size());
         eltPlans.push_back(builder.buildForPackExpansion(componentInits,
                                                          origEltType,
                                                          substEltTypes));
@@ -1090,7 +1090,7 @@ public:
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(SGFAccessKind::ReadWrite,
                                 ManagedValue::forLValue(errorTemp),
-                                /*TODO: enforcement*/ llvm::None,
+                                /*TODO: enforcement*/ std::nullopt,
                                 AbstractionPattern(errorType), errorType);
   }
 
@@ -1117,7 +1117,7 @@ public:
     return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
-  llvm::Optional<std::pair<ManagedValue, ManagedValue>>
+  std::optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
     SILGenFunction::PointerAccessInfo pointerInfo = {
       unwrappedPtrType, ptrKind, SGFAccessKind::ReadWrite
@@ -1277,7 +1277,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForPackExpansion(
-    llvm::Optional<ArrayRef<Initialization *>> inits,
+    std::optional<ArrayRef<Initialization *>> inits,
     AbstractionPattern origExpansionType, CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());
 

@@ -147,7 +147,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     /// `next(isolation:)` returns the result of calling the transforming
     /// closure on the received element. If calling the closure throws an error,
     /// the sequence ends and `next(isolation:)` rethrows the error.
-    @available(SwiftStdlib 5.11, *)
+    @available(SwiftStdlib 6.0, *)
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Transformed? {
       guard !finished, let element = try await baseIterator.next(isolation: actor) else {

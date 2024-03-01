@@ -17,11 +17,10 @@
 #ifndef SWIFT_BASIC_OPTIONSET_H
 #define SWIFT_BASIC_OPTIONSET_H
 
-#include "llvm/ADT/None.h"
-
-#include <type_traits>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
+#include <type_traits>
 
 namespace swift {
 /// The Swift standard library also has an `OptionSet` type that is imported
@@ -59,7 +58,7 @@ public:
   constexpr OptionSet() : Storage() {}
 
   /// Create an empty option set.
-  constexpr OptionSet(llvm::NoneType) : Storage() {}
+  constexpr OptionSet(std::nullopt_t) : Storage() {}
 
   /// Create an option set with only the given option set.
   constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}

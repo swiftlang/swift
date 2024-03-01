@@ -819,19 +819,19 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcx16");
   }
 
-  if (llvm::Optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
+  if (std::optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (llvm::Optional<StringRef> V = ctx.SearchPathOpts.getWinSDKVersion()) {
+  if (std::optional<StringRef> V = ctx.SearchPathOpts.getWinSDKVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-version");
     invocationArgStrs.emplace_back(*V);
   }
-  if (llvm::Optional<StringRef> R = ctx.SearchPathOpts.getVCToolsRoot()) {
+  if (std::optional<StringRef> R = ctx.SearchPathOpts.getVCToolsRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (llvm::Optional<StringRef> V = ctx.SearchPathOpts.getVCToolsVersion()) {
+  if (std::optional<StringRef> V = ctx.SearchPathOpts.getVCToolsVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-version");
     invocationArgStrs.emplace_back(*V);
   }
@@ -987,7 +987,7 @@ void ClangImporter::addClangInvovcationDependencies(
     files.push_back(CWD);
 }
 
-llvm::Optional<std::string>
+std::optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
   if (isPCHFilenameExtension(ImporterOptions.BridgingHeader)) {
@@ -999,7 +999,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
   if (SwiftPCHHash.empty() || BridgingHeader.empty() || PCHOutputDir.empty()) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   SmallString<256> PCHBasename { llvm::sys::path::filename(BridgingHeader) };
@@ -1014,14 +1014,14 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.str().str();
 }
 
-llvm::Optional<std::string>
+std::optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool Cached) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
   if (!PCHFilename.has_value()) {
-    return llvm::None;
+    return std::nullopt;
   }
   if (!isExplicit && !ImporterOptions.PCHDisableValidation &&
       !canReadPCH(PCHFilename.value())) {
@@ -1030,12 +1030,12 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
     if (EC) {
       llvm::errs() << "failed to create directory '" << parentDir << "': "
         << EC.message();
-      return llvm::None;
+      return std::nullopt;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
                                         PCHFilename.value(), Cached);
     if (FailedToEmit) {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
@@ -1674,7 +1674,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
   // If we've made it to here, this is some header other than the bridging
   // header, which means we can no longer rely on one file's modification time
   // to invalidate code completion caches. :-(
-  Impl.setSinglePCHImport(llvm::None);
+  Impl.setSinglePCHImport(std::nullopt);
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
     cachedContents = cachedContents.drop_back();
@@ -2195,7 +2195,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
     if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path.getRaw()[1])) {
-      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2),
+      submodule = loadModule(llvm::ArrayRef(clangPath).slice(0, 2),
                              clang::Module::Hidden);
     }
 
@@ -2414,7 +2414,7 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
     bool isAsync) const {
   assert(!version.empty() && "Must provide version when deprecated");
   unsigned major = version.getMajor();
-  llvm::Optional<unsigned> minor = version.getMinor();
+  std::optional<unsigned> minor = version.getMinor();
 
   switch (platformKind) {
   case PlatformKind::none:
@@ -3919,7 +3919,7 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
-llvm::Optional<Decl *>
+std::optional<Decl *>
 ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
@@ -3997,13 +3997,13 @@ StringRef ClangModuleUnit::getModuleDefiningPath() const {
   return clangSourceMgr.getFilename(clangModule->DefinitionLoc);
 }
 
-llvm::Optional<clang::ASTSourceDescriptor>
+std::optional<clang::ASTSourceDescriptor>
 ClangModuleUnit::getASTSourceDescriptor() const {
   if (clangModule) {
     assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);
     return ASTSourceDescriptor;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool ClangModuleUnit::hasClangModule(ModuleDecl *M) {
@@ -4232,16 +4232,29 @@ void ClangModuleUnit::getImportedModulesForLookup(
   for (auto importMod : topLevelImported) {
     auto wrapper = owner.getWrapperForModule(importMod);
 
-    auto actualMod = wrapper->getOverlayModule();
-    if (!actualMod || actualMod == topLevelOverlay)
+    ModuleDecl *actualMod = nullptr;
+    if (owner.SwiftContext.LangOpts.EnableCXXInterop && topLevel &&
+        isCxxStdModule(topLevel) && wrapper->clangModule &&
+        isCxxStdModule(wrapper->clangModule)) {
+      // The CxxStdlib overlay re-exports the clang module std, which in recent
+      // libc++ versions re-exports top-level modules for different std headers
+      // (std_string, std_vector, etc). The overlay module for each of the std
+      // modules is the CxxStdlib module itself. Make sure we return the actual
+      // clang modules (std_xyz) as transitive dependencies instead of just
+      // CxxStdlib itself.
       actualMod = wrapper->getParentModule();
+    } else {
+      actualMod = wrapper->getOverlayModule();
+      if (!actualMod || actualMod == topLevelOverlay)
+        actualMod = wrapper->getParentModule();
+    }
 
     assert(actualMod && "Missing imported overlay");
     imports.push_back({ImportPath::Access(), actualMod});
   }
 
   // Cache our results for use next time.
-  auto importsToCache = llvm::makeArrayRef(imports).slice(firstImport);
+  auto importsToCache = llvm::ArrayRef(imports).slice(firstImport);
   importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
 }
 
@@ -6244,7 +6257,7 @@ ClangImporter::Implementation::loadNamedMembers(
   // findLookupTable, below, handles the first two cases; we assert on the
   // third.
 
-  llvm::Optional<clang::Module *> CMO;
+  std::optional<clang::Module *> CMO;
   if (CD)
     CMO = getClangSubmoduleForDecl(CD);
   else {
@@ -6462,7 +6475,7 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-llvm::Optional<Type>
+std::optional<Type>
 ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) {
   bool isInSystemModule =
@@ -6510,7 +6523,7 @@ Type ClangImporter::importVarDeclType(
                       getImportTypeAttrs(decl));
 
   if (!importedType)
-    return nullptr;
+    return ErrorType::get(Impl.SwiftContext);
 
   if (importedType.isImplicitlyUnwrapped())
     swiftDecl->setImplicitlyUnwrappedOptional(true);
@@ -7845,7 +7858,7 @@ bool importer::isCxxStdModule(const clang::Module *module) {
   return false;
 }
 
-llvm::Optional<clang::QualType>
+std::optional<clang::QualType>
 importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
   if (type->isReferenceType())
     return type->getPointeeType();

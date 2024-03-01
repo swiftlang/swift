@@ -39,10 +39,11 @@ private:
   
   void handleDiagnostic(SourceManager &SM,
                         const DiagnosticInfo &Info) override;
-  ScannerDiagnosticInfo convertDiagnosticInfo(SourceManager &SM,
-                                              const DiagnosticInfo &Info);
   void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
   std::vector<ScannerDiagnosticInfo> Diagnostics;
+  // FIXME: For now, we isolate access to shared state of this object
+  // but we really should make sure that it doesn't get shared.
+  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
 };
 
 
@@ -91,8 +92,8 @@ public:
   bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
   void resetCache();
-  
-  const std::vector<DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo>& getDiagnostics() const { return CDC.Diagnostics; }
+  /// Query diagnostics consumed so far.
+  std::vector<DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo> getDiagnostics();
   /// Discared the collection of diagnostics encountered so far.
   void resetDiagnostics();
 

@@ -58,7 +58,8 @@ void simple_display(
 
 /// Describes a set of type declarations that are "direct" referenced by
 /// a particular type in the AST.
-using DirectlyReferencedTypeDecls = llvm::TinyPtrVector<TypeDecl *>;
+using DirectlyReferencedTypeDecls = std::pair<llvm::TinyPtrVector<TypeDecl *>,
+                                              InvertibleProtocolSet>;
 
 /// Request the set of declarations directly referenced by the an "inherited"
 /// type of a type or extension declaration.
@@ -168,7 +169,7 @@ public:
 
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ClassDecl *> getCachedResult() const;
+  std::optional<ClassDecl *> getCachedResult() const;
   void cacheResult(ClassDecl *value) const;
 };
 
@@ -189,13 +190,32 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  std::optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
+};
+
+class AllInheritedProtocolsRequest
+    : public SimpleRequest<
+          AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
 };
 
 class ProtocolRequirementsRequest
@@ -214,7 +234,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ArrayRef<ValueDecl *>> getCachedResult() const;
+  std::optional<ArrayRef<ValueDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ValueDecl *> value) const;
 };
 
@@ -237,7 +257,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool) const;
 };
 
@@ -259,7 +279,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<NominalTypeDecl *> getCachedResult() const;
+  std::optional<NominalTypeDecl *> getCachedResult() const;
   void cacheResult(NominalTypeDecl *value) const;
 
 public:
@@ -270,6 +290,7 @@ public:
 
 struct SelfBounds {
   llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
 };
 
@@ -363,7 +384,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<DestructorDecl *> getCachedResult() const;
+  std::optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
 };
 
@@ -384,7 +405,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<GenericParamList *> getCachedResult() const;
+  std::optional<GenericParamList *> getCachedResult() const;
   void cacheResult(GenericParamList *value) const;
 };
 

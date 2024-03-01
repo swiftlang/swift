@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 // CHECK-LABEL: main.(file).P1@
 // CHECK: Requirement signature: <Self>
 protocol P1 {

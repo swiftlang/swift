@@ -52,14 +52,14 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 
 using DynamicKind = SILSymbolVisitor::DynamicKind;
 
-static llvm::Optional<DynamicKind> getDynamicKind(ValueDecl *VD) {
+static std::optional<DynamicKind> getDynamicKind(ValueDecl *VD) {
   if (VD->shouldUseNativeMethodReplacement())
     return DynamicKind::Replaceable;
 
   if (VD->getDynamicallyReplacedDecl())
     return DynamicKind::Replacement;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
@@ -465,7 +465,8 @@ public:
 
       auto specializedSignature = attr->getSpecializedSignature(AFD);
       auto erasedSignature =
-          specializedSignature.typeErased(attr->getTypeErasedParams());
+          SILSpecializeAttr::buildTypeErasedSignature(specializedSignature,
+                                                      attr->getTypeErasedParams());
 
       if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
         addFunction(SILDeclRef(targetFun, erasedSignature),

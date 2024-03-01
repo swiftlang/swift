@@ -307,7 +307,7 @@ static void
 mapInterfaceTypes(SILFunction *F,
                   MutableArrayRef<SILParameterInfo> InterfaceParams,
                   MutableArrayRef<SILResultInfo> InterfaceResults,
-                  llvm::Optional<SILResultInfo> &InterfaceErrorResult) {
+                  std::optional<SILResultInfo> &InterfaceErrorResult) {
 
   for (auto &Param : InterfaceParams) {
     if (!Param.getInterfaceType()->hasArchetype())
@@ -416,7 +416,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     witnessMethodConformance = ProtocolConformanceRef::forInvalid();
   }
 
-  llvm::Optional<SILResultInfo> InterfaceErrorResult;
+  std::optional<SILResultInfo> InterfaceErrorResult;
   if (ExpectedFTy->hasErrorResult()) {
     InterfaceErrorResult = ExpectedFTy->getErrorResult();
   }
@@ -668,6 +668,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     F->getReferencedAdHocRequirementWitnessFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;

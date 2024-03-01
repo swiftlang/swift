@@ -500,10 +500,10 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
   return {pack, shape};
 }
 
-static llvm::Optional<unsigned> countForShape(llvm::Value *shape) {
+static std::optional<unsigned> countForShape(llvm::Value *shape) {
   if (auto *constant = dyn_cast<llvm::ConstantInt>(shape))
     return constant->getValue().getZExtValue();
-  return llvm::None;
+  return std::nullopt;
 }
 
 MetadataResponse
@@ -1214,9 +1214,8 @@ static unsigned getConstantLabelsLength(CanTupleType type) {
 /// blank space in the static label string. We replace this with the
 /// appropriate number of blank spaces, given the dynamic length of
 /// the pack.
-llvm::Optional<StackAddress>
-irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF,
-                                  CanTupleType type,
+std::optional<StackAddress>
+irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF, CanTupleType type,
                                   CanPackType packType,
                                   llvm::Value *shapeExpression) {
   bool hasLabels = false;
@@ -1225,7 +1224,7 @@ irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF,
   }
 
   if (!hasLabels)
-    return llvm::None;
+    return std::nullopt;
 
   // Elements of pack expansion type are unlabeled, so the length of
   // the label string is the number of elements in the pack, plus the

@@ -283,12 +283,6 @@ int main(int argc, char **argv) {
   opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
                               desc("Serialize modules in OSSA"), cat(Visible));
 
-  opt<bool> EnableNoncopyableGenerics(
-      "enable-noncopyable-generics",
-      init(false),
-      desc("Serialize modules with NoncopyableGenerics"),
-      cat(Visible));
-
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -326,6 +320,8 @@ int main(int argc, char **argv) {
   if (Modules.empty())
     return 0;
 
+  bool enableNoncopyableGenerics = SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS;
+
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
   llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
@@ -333,7 +329,7 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, EnableNoncopyableGenerics,
+                        EnableOSSAModules, enableNoncopyableGenerics,
                         info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
@@ -358,13 +354,6 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
-
-  if (EnableNoncopyableGenerics)
-    Invocation.getLangOptions()
-      .enableFeature(swift::Feature::NoncopyableGenerics);
-  else
-    Invocation.getLangOptions()
-      .disableFeature(swift::Feature::NoncopyableGenerics);
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);

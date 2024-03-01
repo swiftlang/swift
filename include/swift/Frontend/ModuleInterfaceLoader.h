@@ -239,11 +239,11 @@ public:
 // Explicitly-specified Swift module inputs
 struct ExplicitSwiftModuleInputInfo {
   ExplicitSwiftModuleInputInfo(
-      std::string modulePath, llvm::Optional<std::string> moduleDocPath,
-      llvm::Optional<std::string> moduleSourceInfoPath,
-      llvm::Optional<std::vector<std::string>> headerDependencyPaths,
+      std::string modulePath, std::optional<std::string> moduleDocPath,
+      std::optional<std::string> moduleSourceInfoPath,
+      std::optional<std::vector<std::string>> headerDependencyPaths,
       bool isFramework = false, bool isSystem = false,
-      llvm::Optional<std::string> moduleCacheKey = llvm::None)
+      std::optional<std::string> moduleCacheKey = std::nullopt)
       : modulePath(modulePath), moduleDocPath(moduleDocPath),
         moduleSourceInfoPath(moduleSourceInfoPath),
         headerDependencyPaths(headerDependencyPaths), isFramework(isFramework),
@@ -251,17 +251,17 @@ struct ExplicitSwiftModuleInputInfo {
   // Path of the .swiftmodule file.
   std::string modulePath;
   // Path of the .swiftmoduledoc file.
-  llvm::Optional<std::string> moduleDocPath;
+  std::optional<std::string> moduleDocPath;
   // Path of the .swiftsourceinfo file.
-  llvm::Optional<std::string> moduleSourceInfoPath;
+  std::optional<std::string> moduleSourceInfoPath;
   // Paths of the precompiled header dependencies of this module.
-  llvm::Optional<std::vector<std::string>> headerDependencyPaths;
+  std::optional<std::vector<std::string>> headerDependencyPaths;
   // A flag that indicates whether this module is a framework
   bool isFramework = false;
   // A flag that indicates whether this module is a system module
   bool isSystem = false;
   // The cache key for clang module.
-  llvm::Optional<std::string> moduleCacheKey;
+  std::optional<std::string> moduleCacheKey;
 };
 
 // Explicitly-specified Clang module inputs
@@ -269,7 +269,7 @@ struct ExplicitClangModuleInputInfo {
   ExplicitClangModuleInputInfo(
       std::string moduleMapPath, std::string modulePath,
       bool isFramework = false, bool isSystem = false,
-      llvm::Optional<std::string> moduleCacheKey = llvm::None)
+      std::optional<std::string> moduleCacheKey = std::nullopt)
       : moduleMapPath(moduleMapPath), modulePath(modulePath),
         isFramework(isFramework), isSystem(isSystem),
         moduleCacheKey(moduleCacheKey) {}
@@ -282,7 +282,7 @@ struct ExplicitClangModuleInputInfo {
   // A flag that indicates whether this module is a system module
   bool isSystem = false;
   // The cache key for clang module.
-  llvm::Optional<std::string> moduleCacheKey;
+  std::optional<std::string> moduleCacheKey;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -363,10 +363,9 @@ private:
     if (!mapNode)
       return true;
     StringRef moduleName;
-    llvm::Optional<std::string> swiftModulePath, swiftModuleDocPath,
-                                swiftModuleSourceInfoPath, swiftModuleCacheKey,
-                                clangModuleCacheKey;
-    llvm::Optional<std::vector<std::string>> headerDependencyPaths;
+    std::optional<std::string> swiftModulePath, swiftModuleDocPath,
+        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey;
+    std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false;
     for (auto &entry : *mapNode) {
@@ -631,7 +630,7 @@ struct SwiftInterfaceInfo {
 
   /// The tools version of the compiler (e.g. 5.8) that emitted the
   /// swiftinterface. This is extracted from the `CompilerVersion` string.
-  llvm::Optional<version::Version> CompilerToolsVersion;
+  std::optional<version::Version> CompilerToolsVersion;
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {

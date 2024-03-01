@@ -526,15 +526,15 @@ public:
     basicBlockNames[block] = name.str();
 #endif
   }
-  llvm::Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+  std::optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
 #ifndef NDEBUG
     auto Known = basicBlockNames.find(block);
     if (Known == basicBlockNames.end())
-      return llvm::None;
+      return std::nullopt;
 
     return StringRef(Known->second);
 #else
-    return llvm::None;
+    return std::nullopt;
 #endif
   }
 
@@ -791,7 +791,7 @@ public:
   /// If \p linkage is provided, the deserialized function is required to have
   /// that linkage. Returns null, if this is not the case.
   SILFunction *loadFunction(StringRef name, LinkingMode LinkMode,
-                            llvm::Optional<SILLinkage> linkage = llvm::None);
+                            std::optional<SILLinkage> linkage = std::nullopt);
 
   /// Update the linkage of the SILFunction with the linkage of the serialized
   /// function.
@@ -938,19 +938,6 @@ public:
 
   /// Check linear OSSA lifetimes, assuming complete OSSA.
   void verifyOwnership() const;
-
-  /// Check if there are any leaking instructions.
-  ///
-  /// Aborts with an error if more instructions are allocated than contained in
-  /// the module.
-  void checkForLeaks() const;
-
-  /// Check if there are any leaking instructions after the SILModule is
-  /// destructed.
-  ///
-  /// The SILModule destructor already calls checkForLeaks(). This function is
-  /// useful to check if the destructor itself destroys all data structures.
-  static void checkForLeaksAfterDestruction();
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;

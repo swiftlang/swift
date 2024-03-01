@@ -184,7 +184,7 @@ public:
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
-    return llvm::makeArrayRef(ViewBuffer);
+    return llvm::ArrayRef(ViewBuffer);
   }
 
   bool isEnable() {
@@ -433,7 +433,7 @@ static void writeDeclCommentTable(
   SmallVector<const FileUnit *, 1> Scratch;
   if (SF) {
     Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   } else {
     files = M->getFiles();
   }
@@ -540,12 +540,12 @@ class DeclUSRsTableWriter {
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
 public:
   uint32_t peekNextId() const { return USRs.size(); }
-  llvm::Optional<uint32_t> getNewUSRId(StringRef USR) {
+  std::optional<uint32_t> getNewUSRId(StringRef USR) {
     // Attempt to insert the USR into the StringSet.
     auto It = USRs.insert(USR);
     // If the USR exists in the StringSet, return None.
     if (!It.second)
-      return llvm::None;
+      return std::nullopt;
     auto Id = USRs.size() - 1;
     // We have to insert the USR from the StringSet because it's where the
     // memory is owned.
@@ -682,11 +682,11 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     return MacroWalking::Expansion;
   }
 
-  llvm::Optional<uint32_t> calculateNewUSRId(Decl *D) {
+  std::optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
-      return llvm::None;
+      return std::nullopt;
     return USRWriter.getNewUSRId(OS.str());
   }
 
@@ -721,8 +721,8 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::raw_svector_ostream Out(Buffer);
     endian::Writer Writer(Out, little);
     Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
-    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
-        D, llvm::makeArrayRef(RawLocs->DocRanges)));
+    Writer.write<uint32_t>(
+        DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
     writeRawLoc(RawLocs->Loc, Writer, FWriter);
     writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
     writeRawLoc(RawLocs->EndLoc, Writer, FWriter);

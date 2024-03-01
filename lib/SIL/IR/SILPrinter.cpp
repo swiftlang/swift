@@ -158,7 +158,7 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i) {
 struct SILValuePrinterInfo {
   ID ValueID;
   SILType Type;
-  llvm::Optional<ValueOwnershipKind> OwnershipKind;
+  std::optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
   bool IsCapture = false;
@@ -910,7 +910,7 @@ public:
     *this << '\n';
 
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
-    llvm::Optional<SILLocation> PrevLoc;
+    std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
@@ -1393,7 +1393,7 @@ public:
     }
   }
 
-  void printDebugVar(llvm::Optional<SILDebugVariable> Var,
+  void printDebugVar(std::optional<SILDebugVariable> Var,
                      const SourceManager *SM = nullptr) {
     if (!Var)
       return;
@@ -1736,6 +1736,9 @@ public:
     }
     if (BBI->isFromVarDecl()) {
       *this << "[var_decl] ";
+    }
+    if (BBI->isFixed()) {
+      *this << "[fixed] ";
     }
     *this << getIDAndType(BBI->getOperand());
   }
@@ -3408,6 +3411,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (auto *usedFunc = getReferencedAdHocRequirementWitnessFunction()) {
+    OS << "[ref_adhoc_requirement_witness \"";
+    OS << usedFunc->getName();
     OS << "\"] ";
   }
 

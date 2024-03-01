@@ -156,7 +156,7 @@ protected:
   /// Visit the element of a brace statement, returning \c None if the element
   /// was transformed successfully, or an unsupported element if the element
   /// cannot be handled.
-  llvm::Optional<UnsupportedElt>
+  std::optional<UnsupportedElt>
   transformBraceElement(ASTNode element, SmallVectorImpl<ASTNode> &newBody,
                         SmallVectorImpl<Expr *> &buildBlockArguments) {
     if (auto *returnStmt = getAsStmt<ReturnStmt>(element)) {
@@ -182,7 +182,7 @@ protected:
       case DeclKind::Var:
       case DeclKind::Param:
         newBody.push_back(element);
-        return llvm::None;
+        return std::nullopt;
 
       default:
         return UnsupportedElt(decl);
@@ -194,7 +194,7 @@ protected:
       // Throw is allowed as is.
       if (auto *throwStmt = dyn_cast<ThrowStmt>(stmt)) {
         newBody.push_back(throwStmt);
-        return llvm::None;
+        return std::nullopt;
       }
 
       // Allocate variable with a placeholder type
@@ -206,7 +206,7 @@ protected:
         // A statement that doesn't contain the code completion expression can't
         // influence the type of the code completion expression, so we can skip
         // it to improve performance.
-        return llvm::None;
+        return std::nullopt;
       }
 
       auto result = visit(stmt, resultVar);
@@ -216,7 +216,7 @@ protected:
       newBody.push_back(result.get());
       buildBlockArguments.push_back(
           builder.buildVarRef(resultVar, stmt->getStartLoc()));
-      return llvm::None;
+      return std::nullopt;
     }
 
     auto *expr = element.get<Expr *>();
@@ -255,10 +255,10 @@ protected:
           builder.buildVarRef(capture, element.getStartLoc()));
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
-  std::pair<NullablePtr<Expr>, llvm::Optional<UnsupportedElt>>
+  std::pair<NullablePtr<Expr>, std::optional<UnsupportedElt>>
   transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
     SmallVector<Expr *, 4> buildBlockArguments;
 
@@ -306,7 +306,7 @@ protected:
 
         return std::make_pair(
             builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()),
-            llvm::None);
+            std::nullopt);
       }
       // If `buildBlock` does not exist at this point, it could be the case that
       // `buildPartialBlock` did not have the sufficient availability for this
@@ -324,7 +324,7 @@ protected:
       auto *buildBlock = builder.buildCall(
           braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
           /*argLabels=*/{});
-      return std::make_pair(buildBlock, llvm::None);
+      return std::make_pair(buildBlock, std::nullopt);
     }
   }
 
@@ -339,7 +339,7 @@ protected:
     };
 
     NullablePtr<Expr> buildBlockVarRef;
-    llvm::Optional<UnsupportedElt> unsupported;
+    std::optional<UnsupportedElt> unsupported;
 
     std::tie(buildBlockVarRef, unsupported) = transform(braceStmt, elements);
     if (unsupported)
@@ -485,7 +485,7 @@ protected:
   NullablePtr<IfStmt>
   transformIf(IfStmt *ifStmt,
               SmallVectorImpl<std::pair<Expr *, Stmt *>> &branchVarRefs) {
-    llvm::Optional<UnsupportedElt> unsupported;
+    std::optional<UnsupportedElt> unsupported;
 
     // If there is a #available in the condition, wrap the 'then' or 'else'
     // in a call to buildLimitedAvailability(_:).
@@ -624,7 +624,7 @@ protected:
     return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
   }
 
-  llvm::Optional<std::pair<Expr *, CaseStmt *>>
+  std::optional<std::pair<Expr *, CaseStmt *>>
   transformCase(CaseStmt *caseStmt) {
     auto *body = caseStmt->getBody();
 
@@ -637,19 +637,19 @@ protected:
         // completion. Code completion ignores diagnostics
         // and won't get any types if we fail.
         if (!ctx.SourceMgr.hasIDEInspectionTargetBuffer())
-          return llvm::None;
+          return std::nullopt;
       }
     }
 
     NullablePtr<Expr> caseVarRef;
-    llvm::Optional<UnsupportedElt> unsupported;
+    std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
 
     std::tie(caseVarRef, unsupported) = transform(body, newBody);
 
     if (unsupported) {
       recordUnsupported(*unsupported);
-      return llvm::None;
+      return std::nullopt;
     }
 
     auto *newCase = CaseStmt::create(
@@ -705,7 +705,7 @@ protected:
                           /*Commas=*/{}, /*RBrace=*/endLoc));
 
     NullablePtr<Expr> bodyVarRef;
-    llvm::Optional<UnsupportedElt> unsupported;
+    std::optional<UnsupportedElt> unsupported;
 
     SmallVector<ASTNode, 4> newBody;
     {
@@ -912,7 +912,7 @@ private:
 
 } // end anonymous namespace
 
-llvm::Optional<BraceStmt *>
+std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
@@ -964,7 +964,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
   }
 
@@ -1115,7 +1115,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   return nullptr;
 }
 
-llvm::Optional<ConstraintSystem::TypeMatchResult>
+std::optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
@@ -1168,7 +1168,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
     // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
-    return llvm::None;
+    return std::nullopt;
   }
 
   auto transformedBody = getBuilderTransformedBody(fn, builder);
@@ -1513,7 +1513,7 @@ swift::determineResultBuilderBuildFixItInfo(NominalTypeDecl *builder) {
 
 void swift::printResultBuilderBuildFunction(
     NominalTypeDecl *builder, Type componentType,
-    ResultBuilderBuildFunction function, llvm::Optional<std::string> stubIndent,
+    ResultBuilderBuildFunction function, std::optional<std::string> stubIndent,
     llvm::raw_ostream &out) {
   // Render the component type into a string.
   std::string componentTypeString;
