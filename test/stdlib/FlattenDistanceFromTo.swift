@@ -25,7 +25,10 @@ final class FlattenDistanceFromToTests {
     let tests = FlattenDistanceFromToTests()
     let suite = TestSuite("FlattenDistanceFromToTests")
     suite.test("EachIndexPair", tests.testEachIndexPair)
-    suite.test("MinMaxOutputs", tests.testMinMaxOutputs)
+    if #available(SwiftStdlib 6.0, *) {
+      // The random access time complexity was fixed in Swift 6.0.
+      suite.test("MinMaxRandomAccess", tests.testMinMaxRandomAccess)
+    }
     runAllTests()
   }
 }
@@ -50,7 +53,7 @@ extension FlattenDistanceFromToTests {
   ///     ─────────────────
   ///     [][1][2,2][3,3,3]
   ///
-  func forEachLaneSizeCase(
+  private func forEachLaneSizeCase(
     through limits: [Int],
     perform action: ([[Int]]) -> Void
   ) {
@@ -61,19 +64,18 @@ extension FlattenDistanceFromToTests {
       
       if array[index].count < limits[index] {
         array[index].append(index)
-        continue
-      }
-      
-      while index < limits.endIndex, array[index].count == limits[index] {
-        array.formIndex(after: &index)
-      }
-      
-      if index < limits.endIndex {
-        array[index].append(index)
+      } else {
+        while index < limits.endIndex, array[index].count == limits[index] {
+          array.formIndex(after: &index)
+        }
         
-        while index > array.startIndex {
-          array.formIndex(before: &index)
-          array[index].removeAll(keepingCapacity: true)
+        if index < limits.endIndex {
+          array[index].append(index)
+          
+          while index > array.startIndex {
+            array.formIndex(before: &index)
+            array[index].removeAll(keepingCapacity: true)
+          }
         }
       }
     }
@@ -88,10 +90,10 @@ extension FlattenDistanceFromToTests {
   ///     offset: 2, index: 1,1
   ///     offset: 3, index: 2
   ///
-  func forEachEnumeratedIndexIncludingEndIndex<T: Collection>(
+  private func forEachEnumeratedIndexIncludingEndIndex<T>(
     in collection: T,
     perform action: ((offset: Int, index: T.Index)) -> Void
-  ) {
+  ) where T: Collection {
     var state = (offset: 0, index: collection.startIndex)
     while true {
       action(state)
@@ -148,11 +150,15 @@ extension FlattenDistanceFromToTests {
 
 extension FlattenDistanceFromToTests {
   
-  /// Checks some `Int.min` and `Int.max` distances.
+  /// Checks some `Int.min` and `Int.max` distances with random access.
+  ///
+  /// It needs Swift 6.0+ because prior versions find the distance by
+  /// iterating from one index to the other, which takes way too long.
   ///
   /// - Note: A distance of `Int.min` requires more than `Int.max` elements.
   ///
-  func testMinMaxOutputs() {
+  @available(SwiftStdlib 6.0, *)
+  func testMinMaxRandomAccess() {
     for s: FlattenSequence in [
       
       [-1..<Int.max/1],

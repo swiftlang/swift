@@ -289,12 +289,12 @@ extension FlattenCollection: Collection {
 
   @inlinable // lazy-performance
   public func distance(from start: Index, to end: Index) -> Int {
-    let minus = start > end
+    let distanceIsNegative = start > end
     
     // The following check ensures that distance(from:to:) is invoked on
     // the _base at least once, to trigger a _precondition in forward only
     // collections.
-    if minus {
+    if distanceIsNegative {
       _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
     }
     
@@ -310,20 +310,20 @@ extension FlattenCollection: Collection {
     let lowerBound: Index
     let upperBound: Index
     
-    if minus {
+    if distanceIsNegative {
+      step = -1
       lowerBound = end
       upperBound = start
-      step = -1
     } else {
+      step = 01
       lowerBound = start
       upperBound = end
-      step = 01
     }
-        
+    
     // This always unwraps because start._outer != end._outer.
     if let inner = lowerBound._inner {
       let collection = _base[lowerBound._outer]
-      distance += minus
+      distance += distanceIsNegative
       ? collection.distance(from: collection.endIndex, to: inner)
       : collection.distance(from: inner, to: collection.endIndex)
     }
@@ -341,7 +341,7 @@ extension FlattenCollection: Collection {
     /// This unwraps if start != endIndex and end != endIndex.
     if let inner = upperBound._inner {
       let collection = _base[upperBound._outer]
-      distance += minus
+      distance += distanceIsNegative
       ? collection.distance(from: inner, to: collection.startIndex)
       : collection.distance(from: collection.startIndex, to: inner)
     }
