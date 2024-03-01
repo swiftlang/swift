@@ -88,11 +88,9 @@ VarDecl *CaptureInfo::getIsolatedParamCapture() const {
     return nullptr;
 
   for (const auto &capture : getCaptures()) {
-    // Check for dynamic self metadata before checking if we have a local
-    // capture since dynamic self metadata doesn't have a decl.
-    if (capture.isDynamicSelfMetadata())
-      continue;
-
+    // NOTE: isLocalCapture() returns false if we have dynamic self metadata
+    // since dynamic self metadata is never an isolated capture. So we can just
+    // call isLocalCapture without checking for dynamic self metadata.
     if (!capture.isLocalCapture())
       continue;
 
