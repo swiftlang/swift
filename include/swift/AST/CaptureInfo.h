@@ -100,7 +100,7 @@ public:
     return Value.getPointer().is<OpaqueValueExpr *>();
   }
 
-  /// Returns true if this captured value has a local capture.
+  /// Returns true if this captured value is a local capture.
   ///
   /// NOTE: This implies that the value is not dynamic self metadata, since
   /// values with decls are the only values that are able to be local captures.
