@@ -1961,8 +1961,10 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     auto canType = type->getReducedType(origGenericSig);
 
     auto options = SILParameterInfo::Options();
-    if (isolatedParam == varDecl)
+    if (isolatedParam == varDecl) {
       options |= SILParameterInfo::Isolated;
+      isolatedParam = nullptr;
+    }
 
     // If we're capturing a parameter pack, wrap it in a tuple.
     if (isa<PackExpansionType>(canType)) {
@@ -2043,6 +2045,9 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     }
     }
   }
+  assert(!isolatedParam &&
+         "If we had an isolated capture, we should have visited it when "
+         "iterating over loweredCaptures.getCaptures().");
 }
 
 static AccessorDecl *
