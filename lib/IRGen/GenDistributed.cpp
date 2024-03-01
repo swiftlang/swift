@@ -199,8 +199,7 @@ private:
 
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed target.
-static CanSILFunctionType getAccessorType(IRGenModule &IGM,
-                                          SILFunction *Target) {
+static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   auto &Context = IGM.Context;
 
   // func __accessor__<D: DistributedTargetInvocationDecoder>(
@@ -298,7 +297,7 @@ IRGenModule::getAddrOfDistributedTargetAccessor(SILFunction *F,
     return entry;
   }
 
-  Signature signature = getSignature(getAccessorType(*this, F));
+  Signature signature = getSignature(getAccessorType(*this));
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   return createFunction(*this, link, signature);
@@ -313,7 +312,7 @@ void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
     return;
 
   IRGenFunction IGF(*this, f);
-  DistributedAccessor(IGF, target, getAccessorType(*this, target)).emit();
+  DistributedAccessor(IGF, target, getAccessorType(*this)).emit();
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
