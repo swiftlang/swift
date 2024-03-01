@@ -210,14 +210,6 @@ static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureUnavailableFromAsync(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnavailableFromAsyncAttr>();
-}
-
-static bool usesFeatureNoAsyncAvailability(Decl *decl) {
-  return decl->getAttrs().getNoAsync(decl->getASTContext()) != nullptr;
-}
-
 static bool usesFeatureAssociatedTypeAvailability(Decl *decl) {
   return isa<AssociatedTypeDecl>(decl) &&
          decl->getAttrs().hasAttribute<AvailableAttr>();

@@ -3036,15 +3036,6 @@ static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
 }
 
 static void
-suppressingFeatureUnavailableFromAsync(PrintOptions &options,
-                                       llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::UnavailableFromAsync);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
 suppressingFeatureAssociatedTypeAvailability(
     PrintOptions &options, llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
@@ -3068,14 +3059,6 @@ suppressingFeatureLexicalLifetimes(PrintOptions &options,
   options.ExcludeAttrList.push_back(DeclAttrKind::LexicalLifetimes);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
-suppressingFeatureNoAsyncAvailability(PrintOptions &options,
-                                      llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.SuppressNoAsyncAvailabilityAttr = true;
-  action();
 }
 
 static void suppressingFeatureRetroactiveAttribute(

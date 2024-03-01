@@ -9,6 +9,8 @@
 // RUN:   --implicit-check-not "\$Sendable" \
 // RUN:   --implicit-check-not "\$InheritActorContext" \
 // RUN:   --implicit-check-not "\$UnsafeInheritExecutor" \
+// RUN:   --implicit-check-not "\$NoAsyncAvailability" \
+// RUN:   --implicit-check-not "\$UnavailableFromAsync" \
 // RUN:   < %t/FeatureTest.swiftinterface
 
 // REQUIRES: concurrency
@@ -146,20 +148,12 @@ public func unsafeInheritExecutor() async {}
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func unsafeInheritExecutorAndSpecialize<T>(value: T) async {}
 
-// CHECK:      #if compiler(>=5.3) && $UnavailableFromAsync
-// CHECK-NEXT: @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
-// CHECK-NEXT: #else
-// CHECK-NEXT: public func unavailableFromAsyncFunc()
-// CHECK-NEXT: #endif
+// CHECK:       @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
 @_unavailableFromAsync(message: "Test")
 public func unavailableFromAsyncFunc() { }
 
-// CHECK:      #if compiler(>=5.3) && $NoAsyncAvailability
-// CHECK-NEXT: @available(*, noasync, message: "Test")
+// CHECK:      @available(*, noasync, message: "Test")
 // CHECK-NEXT: public func noAsyncFunc()
-// CHECK-NEXT: #else
-// CHECK-NEXT: public func noAsyncFunc()
-// CHECK-NEXT: #endif
 @available(*, noasync, message: "Test")
 public func noAsyncFunc() { }
 
