@@ -3753,10 +3753,43 @@ namespace {
         }
       }
 
-      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
-        Impl.markUnavailable(
-            cast<ValueDecl>(method),
-            "virtual functions are not yet available in Swift");
+      if (decl->isVirtual()) {
+        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+          if (Impl.isCxxInteropCompatVersionAtLeast(6)) {
+            if (auto structDecl =
+                    dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+              // If this is a method of a Swift struct, any possible override of
+              // this method would get sliced away, and an invocation would get
+              // dispatched statically. This is fine because it matches the C++
+              // behavior.
+              if (decl->isPure()) {
+                // If this is a pure virtual method, we won't have any
+                // implementation of it to invoke.
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift "
+                              "because it is pure");
+              }
+            } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
+                           funcDecl->getDeclContext())) {
+              // This is a foreign reference type. Since `class T` on the Swift
+              // side is mapped from `T*` on the C++ side, an invocation of a
+              // virtual method `t->method()` should get dispatched dynamically.
+              // Create a thunk that will perform dynamic dispatch.
+              // TODO: we don't have to import the actual `method` in this case,
+              // we can just synthesize a thunk and import that instead.
+              auto result = synthesizer.makeVirtualMethod(decl);
+              if (result) {
+                return result;
+              } else {
+                Impl.markUnavailable(
+                    funcDecl, "virtual function is not available in Swift");
+              }
+            }
+          } else {
+            Impl.markUnavailable(
+                funcDecl, "virtual functions are not yet available in Swift");
+          }
+        }
       }
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||

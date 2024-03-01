@@ -2235,6 +2235,26 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   return topLevelStaticFuncDecl;
 }
 
+// MARK: C++ virtual methods
+
+FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
+    const clang::CXXMethodDecl *clangMethodDecl) {
+  auto clangDC = clangMethodDecl->getParent();
+  auto &ctx = ImporterImpl.SwiftContext;
+
+  assert(!clangMethodDecl->isStatic() &&
+         "C++ virtual functions cannot be static");
+
+  auto newMethod = synthesizeCXXForwardingMethod(
+      clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+      /*forceConstQualifier*/ false);
+
+  auto result = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
+  return result;
+}
+
 // MARK: C++ properties
 
 static std::pair<BraceStmt *, bool>

@@ -24,3 +24,12 @@
 // CHECK: struct VirtualNonAbstractBase {
 // CHECK-NEXT:  init()
 // CHECK-NEXT:  func nonAbstractMethod()
+
+// CHECK: class ImmortalBase {
+// CHECK:  func get42() -> Int32
+// CHECK:  func getOverridden42() -> Int32
+// CHECK: }
+// CHECK: class Immortal {
+// CHECK:  func getOverridden42() -> Int32
+// CHECK:  func get42() -> Int32
+// CHECK: }
