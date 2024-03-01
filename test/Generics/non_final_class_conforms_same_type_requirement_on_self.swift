@@ -14,7 +14,7 @@ public protocol Q {
 // exactly equal C; since C is not final, this means the conformance
 // is not covariant.
 public class C : P {
-// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.A.B' is exactly equal to 'Self'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.A.B' is exactly equal to 'Self'; this is an error in the Swift 6 language mode}}
   public typealias A = D
 }
 
@@ -54,7 +54,7 @@ public protocol ConcreteExampleP {
 }
 
 public class ConcreteExampleC : ConcreteExampleP {
-// expected-warning@-1 {{non-final class 'ConcreteExampleC' cannot safely conform to protocol 'ConcreteExampleP', which requires that 'Self.A.B' is exactly equal to 'G<Self>'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'ConcreteExampleC' cannot safely conform to protocol 'ConcreteExampleP', which requires that 'Self.A.B' is exactly equal to 'G<Self>'; this is an error in the Swift 6 language mode}}
   public typealias A = ConcreteExampleD
 }
 
@@ -67,7 +67,7 @@ public protocol SuperclassExampleP {
 }
 
 public class SuperclassExampleC : SuperclassExampleP {
-// expected-warning@-1 {{non-final class 'SuperclassExampleC' cannot safely conform to protocol 'SuperclassExampleP', which requires that 'Self.A.B' inherit from 'G<Self>'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'SuperclassExampleC' cannot safely conform to protocol 'SuperclassExampleP', which requires that 'Self.A.B' inherit from 'G<Self>'; this is an error in the Swift 6 language mode}}
   public typealias A = SuperclassExampleD
 }
 

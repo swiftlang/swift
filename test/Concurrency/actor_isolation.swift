@@ -12,7 +12,7 @@ import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Senda
 
 let immutableGlobal: String = "hello"
 
-// expected-warning@+2 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-warning@+2 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in the Swift 6 language mode}}
 // expected-note@+1 {{isolate 'mutableGlobal' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
@@ -144,7 +144,7 @@ struct InferredFromContext {
   nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
   // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
 
-  nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in Swift 6}}{{3-15=}}
+  nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in the Swift 6 language mode}}{{3-15=}}
 
   subscript(_ i: Int) -> Int { return i }
 
@@ -172,13 +172,13 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 
 // check for instance members that do not need global-actor protection
 
-// expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in Swift 6}}
+// expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
 // expected-note@+1 2 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
 struct NoGlobalActorValueType {
-  @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
+  @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{initializer for property 'point' is global actor 'SomeGlobalActor'-isolated}}
 
-  @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in Swift 6}}
+  @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in the Swift 6 language mode}}
 
   @MainActor static var polygon: [Point] = []
 }
@@ -790,15 +790,15 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l32: Int = v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l34: Int = self.v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
     nonisolated lazy var l41: Int = { l }()
     nonisolated lazy var l42: Int = l
@@ -845,26 +845,26 @@ actor SomeActorWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
     self.nonisolated()
 
     defer {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
       mutableState += 1 // okay through typechecking, since flow-isolation will verify it.
       nonisolated()
     }
 
     func local() {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
-      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
       nonisolated()
     }
     local()
 
     let _ = {
       defer {
-        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
-        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
         nonisolated()
       }
       nonisolated()
@@ -879,14 +879,14 @@ actor SomeActorWithInits {
     self.nonisolated()
   }
 
-  convenience init(i3: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
+  convenience init(i3: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{3-15=}}
     self.init(i1: i3)
     _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from a non-isolated context}}
     self.isolated()     // expected-error{{call to actor-isolated instance method 'isolated()' in a synchronous nonisolated context}}
     self.nonisolated()
   }
 
-  convenience init(i4: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
+  convenience init(i4: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{3-15=}}
     self.init(i1: i4)
     _ = mutableState
     self.isolated()
@@ -896,9 +896,9 @@ actor SomeActorWithInits {
   @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
-    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor; this is an error in Swift 6}}
+    self.nonSendable = x // expected-warning {{actor-isolated property 'nonSendable' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
 
-    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in Swift 6}}
+    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     self.nonisolated()
   }
 
@@ -912,14 +912,14 @@ actor SomeActorWithInits {
     _ = mutableState // will be caught by flow-isolation
   }
 
-  @MainActor convenience init(i7: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{14-26=}}
+  @MainActor convenience init(i7: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{14-26=}}
     self.init(i1: i7)
     _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from the main actor}}
     self.isolated()     // expected-error{{call to actor-isolated instance method 'isolated()' in a synchronous main actor-isolated context}}
     self.nonisolated()
   }
 
-  @MainActor convenience init(i8: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{14-26=}}
+  @MainActor convenience init(i8: Bool) async { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{14-26=}}
     self.init(i1: i8)
     _ = await mutableState
     await self.isolated()
@@ -940,15 +940,15 @@ actor SomeActorWithInits {
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
       mutableState += 1 // okay
       nonisolated()
     }
 
     let _ = {
       defer {
-        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
-        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
         nonisolated()
       }
       nonisolated()
@@ -1254,11 +1254,11 @@ actor Counter {
   }
 
   init() {
-    _ = self.next() // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
-    defer { _ = self.next() } // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+    _ = self.next() // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+    defer { _ = self.next() } // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
 
-    _ = computedProp  // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in Swift 6}}
-    computedProp = 1  // expected-warning {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+    _ = computedProp  // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+    computedProp = 1  // expected-warning {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
 
   }
 
@@ -1273,7 +1273,7 @@ class C2 { }
 
 @SomeGlobalActor
 class C3: C2 { }
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'; this is an error in Swift 6}}
+// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'; this is an error in the Swift 6 language mode}}
 
 @GenericGlobalActor<U>
 class GenericSuper<U> { }
@@ -1288,11 +1288,11 @@ class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'Gen
 actor Butterfly {
   var flapsPerSec = 0 // expected-note 3{{mutation of this property is only permitted within the actor}}
 
-  nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in the Swift 6 language mode}} {{3-15=}}
 
   nonisolated init(async: Void) async {}
 
-  nonisolated init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in the Swift 6 language mode}} {{3-15=}}
     self.init()
     self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
@@ -1416,7 +1416,7 @@ actor DunkTracker {
   private var curry: Int? // expected-note {{property declared here}}
 
   deinit {
-    // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a non-isolated autoclosure; this is an error in Swift 6}}
+    // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a non-isolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
       
     }
@@ -1453,7 +1453,7 @@ class None {
 // try to add inferred isolation while overriding
 @MainActor
 class MA_None1: None {
-// expected-warning@-1 {{main actor-isolated class 'MA_None1' has different actor isolation from nonisolated superclass 'None'; this is an error in Swift 6}}
+// expected-warning@-1 {{main actor-isolated class 'MA_None1' has different actor isolation from nonisolated superclass 'None'; this is an error in the Swift 6 language mode}}
 
   // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
   // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
@@ -1484,7 +1484,7 @@ class None_MADirect: MADirect {
 
 @SomeGlobalActor
 class SGA_MADirect: MADirect {
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'SGA_MADirect' has different actor isolation from nonisolated superclass 'MADirect'; this is an error in Swift 6}}
+// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'SGA_MADirect' has different actor isolation from nonisolated superclass 'MADirect'; this is an error in the Swift 6 language mode}}
 
   // inferred-SomeGlobalActor vs overridden-MainActor = mainactor
   override func method1() { beets_ma() }
@@ -1548,7 +1548,7 @@ protocol NonisolatedProtocol {
 }
 
 actor ActorWithNonSendableLet: NonisolatedProtocol {
-  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in Swift 6}}
+  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in the Swift 6 language mode}}
   let ns = NonSendable()
 }
 
@@ -1559,7 +1559,7 @@ actor ProtectNonSendable {
   init() {}
 
   @MainActor init(fromMain: Void) {
-    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in Swift 6}}
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     _ = self.ns
   }
 }
@@ -1598,6 +1598,6 @@ class MainActorIsolated {
 }
 
 nonisolated func accessAcrossActors() {
-  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
   let _ = MainActorIsolated.shared
 }
