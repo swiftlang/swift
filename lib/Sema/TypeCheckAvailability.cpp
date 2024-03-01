@@ -4234,6 +4234,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        bool warnIfConformanceUnavailablePreSwift6) {
   assert(!where.isImplicit());
 
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
   if (conformance.isPack()) {
     bool diagnosed = false;
     auto *pack = conformance.getPack();
@@ -4245,11 +4248,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     return diagnosed;
   }
 
-  if (conformance.isInvalid() || conformance.isAbstract())
-    return false;
-
   const ProtocolConformance *concreteConf = conformance.getConcrete();
   const RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+
+  // Conformance to Copyable and Escapable doesn't have its own availability
+  // independent of the type.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
+    return false;
 
   // Diagnose "missing" conformances where we needed a conformance but
   // didn't have one.
