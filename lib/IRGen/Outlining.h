@@ -70,8 +70,7 @@ private:
 
 public:
   OutliningMetadataCollector(IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
-                             DeinitIsNeeded_t needsDeinitTypes)
-      : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
+                             DeinitIsNeeded_t needsDeinitTypes);
 
   void collectTypeMetadata(SILType type);
 

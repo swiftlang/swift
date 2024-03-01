@@ -32,6 +32,11 @@
 using namespace swift;
 using namespace irgen;
 
+OutliningMetadataCollector::OutliningMetadataCollector(
+    IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
+    DeinitIsNeeded_t needsDeinitTypes)
+    : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
+
 void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
   if (!ty.hasArchetype()) {
