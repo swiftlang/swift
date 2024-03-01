@@ -4,6 +4,42 @@
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
+* [SE-0408][]:
+  A `for`-`in` loop statement can now accept a pack expansion expression,
+  enabling iteration over the elements of its respective value pack. This form
+  supports pattern matching, control transfer statements, and other features
+  available to a `Sequence`-driven `for`-`in` loop, except for the `where`
+  clause. Below is an example implementation of the equality operator for
+  tuples of arbitrary length using pack iteration:
+
+  ```swift
+  func == <each Element: Equatable>(lhs: (repeat each Element),
+                                    rhs: (repeat each Element)) -> Bool {
+
+    for (left, right) in repeat (each lhs, each rhs) {
+      guard left == right else { return false }
+    }
+    return true
+  }
+  ```
+
+  The elements of the value pack corresponding to the pack expansion expression
+  are evaluated on demand, meaning the i<sup>th</sup> element is evaluated on
+  the i<sup>th</sup> iteration:
+
+  ```swift
+  func doSomething(_: some Any) {}
+
+  func evaluateFirst<each T>(_ t: repeat each T) {
+    for _ in repeat doSomething(each t) {
+      break
+    }
+  }
+
+  evaluateFirst(1, 2, 3) 
+  // 'doSomething' will be called only on the first element of the pack.
+  ```
+
 * [SE-0352][]:
   The Swift 6 language mode will open existential values with
   "self-conforming" types (such as `any Error` or `@objc` protocols)
@@ -10145,6 +10181,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
+[SE-0408]: https://github.com/apple/swift-evolution/blob/main/proposals/0408-pack-iteration.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
 [SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
