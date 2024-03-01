@@ -356,24 +356,12 @@ static bool usesFeatureExtensionMacroAttr(Decl *decl) {
 
 static bool usesFeatureTypedThrows(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    struct Walker : public TypeWalker {
-      bool hasTypedThrows = false;
+    return usesTypeMatching(decl, [](Type ty) {
+      if (auto funcType = ty->getAs<AnyFunctionType>())
+        return funcType->hasThrownError();
 
-      Action walkToTypePre(Type ty) override {
-        if (auto funcType = ty->getAs<AnyFunctionType>()) {
-          if (funcType->hasThrownError()) {
-            hasTypedThrows = true;
-            return Action::Stop;
-          }
-        }
-
-        return Action::Continue;
-      }
-    };
-
-    Walker walker;
-    func->getInterfaceType().walk(walker);
-    return walker.hasTypedThrows;
+      return false;
+    });
   }
 
   return false;
