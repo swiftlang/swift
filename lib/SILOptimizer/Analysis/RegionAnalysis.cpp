@@ -1986,16 +1986,6 @@ public:
     SILValue srcValue = src->get();
 
     if (auto nonSendableDest = tryToTrackValue(destValue)) {
-      // Before we do anything check if we have an assignment into an
-      // alloc_stack for a consuming transferring parameter... in such a case,
-      // we need to handle this specially.
-      if (nonSendableDest->isTransferringParameter()) {
-        if (auto nonSendableSrc = tryToTrackValue(srcValue)) {
-          return translateSILAssignmentToTransferringParameter(
-              *nonSendableDest, dest, *nonSendableSrc, src);
-        }
-      }
-
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
