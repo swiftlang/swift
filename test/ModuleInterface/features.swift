@@ -23,16 +23,6 @@
 // feature is old enough. The --implicit-check-not arguments to FileCheck above
 // verify that those guards no longer pollute the emitted interface.
 
-// CHECK: #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
-// CHECK: @_specialize(exported: true, kind: full, availability: macOS, introduced: 12; where T == Swift.Int)
-// CHECK: public func specializeWithAvailability<T>(_ t: T)
-// CHECK: #else
-// CHECK: public func specializeWithAvailability<T>(_ t: T)
-// CHECK: #endif
-@_specialize(exported: true, availability: macOS 12, *; where T == Int)
-public func specializeWithAvailability<T>(_ t: T) {
-}
-
 // CHECK:      public actor MyActor
 // CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
 // CHECK-NEXT:     get
@@ -135,12 +125,6 @@ public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () asy
 @_unsafeInheritExecutor
 public func unsafeInheritExecutor() async {}
 
-// CHECK:     #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
-// CHECK:     @_specialize{{.*}}
-// CHECK:     public func unsafeInheritExecutorAndSpecialize<T>(value: T) async
-@_unsafeInheritExecutor
-@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
-public func unsafeInheritExecutorAndSpecialize<T>(value: T) async {}
 
 // CHECK:       @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
 @_unavailableFromAsync(message: "Test")

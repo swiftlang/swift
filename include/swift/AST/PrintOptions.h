@@ -575,10 +575,6 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
-
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
