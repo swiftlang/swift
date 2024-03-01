@@ -180,17 +180,12 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinBuildTaskExecutorRef)
-UNINTERESTING_FEATURE(BuiltinBuildExecutor)
 UNINTERESTING_FEATURE(BuiltinBuildComplexEqualityExecutor)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup)
 UNINTERESTING_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor)
-UNINTERESTING_FEATURE(BuiltinCopy)
-UNINTERESTING_FEATURE(BuiltinStackAlloc)
 UNINTERESTING_FEATURE(BuiltinUnprotectedStackAlloc)
 UNINTERESTING_FEATURE(BuiltinAllocVector)
-UNINTERESTING_FEATURE(BuiltinTaskRunInline)
-UNINTERESTING_FEATURE(BuiltinUnprotectedAddressOf)
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
@@ -205,9 +200,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   }
   return false;
 }
-
-UNINTERESTING_FEATURE(BuiltinAssumeAlignment)
-UNINTERESTING_FEATURE(BuiltinCreateTaskGroupWithFlags)
 
 static bool usesFeatureUnsafeInheritExecutor(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>();
@@ -247,8 +239,6 @@ static bool usesFeatureAsyncSequenceFailure(Decl *decl) {
 
   return false;
 }
-
-UNINTERESTING_FEATURE(BuiltinIntLiteralAccessors)
 
 static bool usesFeatureMacros(Decl *decl) { return isa<MacroDecl>(decl); }
 
