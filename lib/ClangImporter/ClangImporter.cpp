@@ -6432,7 +6432,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
   return EffectiveClangContext();
 }
 
-void ClangImporter::dumpSwiftLookupTables() {
+void ClangImporter::dumpSwiftLookupTables() const {
   Impl.dumpSwiftLookupTables();
 }
 

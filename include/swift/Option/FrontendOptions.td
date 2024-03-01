@@ -580,6 +580,10 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 
+def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
+  HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
+           "stderr">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 

@@ -1117,6 +1117,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
+  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
+    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
