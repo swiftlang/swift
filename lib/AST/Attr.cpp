@@ -254,6 +254,13 @@ const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
 
 void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
+  // Suppress the attribute if requested.
+  switch (getIsolationKind()) {
+  case IsolationKind::Dynamic:
+    if (options.SuppressIsolatedAny) return;
+    break;
+  }
+
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
@@ -1252,6 +1259,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Alignment:
     Printer.printAttrName("@_alignment");
     Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
+    break;
+
+  case DeclAttrKind::AllowFeatureSuppression:
+    Printer.printAttrName("@_allowFeatureSuppression");
+    Printer << "(";
+    interleave(cast<AllowFeatureSuppressionAttr>(this)->getSuppressedFeatures(),
+               [&](Identifier ident) { Printer << ident; },
+               [&] { Printer << ", "; });
+    Printer << ")";
     break;
 
   case DeclAttrKind::SILGenName:
