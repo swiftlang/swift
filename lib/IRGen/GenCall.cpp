@@ -2605,7 +2605,10 @@ public:
     if (fnConv.getNumDirectSILResults() == 1
         && (fnConv.getDirectSILResults().begin()->getConvention()
             == ResultConvention::Autoreleased)) {
-      result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+      if (IGF.IGM.Context.LangOpts.EnableObjCInterop)
+        result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+      else
+        IGF.emitNativeStrongRetain(result, IGF.getDefaultAtomicity());
     }
 
     auto origFnType = getCallee().getOrigFunctionType();
