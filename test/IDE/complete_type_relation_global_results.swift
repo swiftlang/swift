@@ -2,8 +2,6 @@
 // RUN: %empty-directory(%t/ImportPath)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// XFAIL: noncopyable_generics
-
 // RUN: %target-swift-frontend -disable-availability-checking -emit-module %t/Lib.swift -o %t/ImportPath/Lib.swiftmodule -emit-module-interface-path %t/ImportPath/Lib.swiftinterface
 
 // BEGIN Lib.swift

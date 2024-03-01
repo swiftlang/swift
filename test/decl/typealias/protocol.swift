@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// XFAIL: noncopyable_generics
-
 // Tests for typealias inside protocols
 
 protocol Bad {

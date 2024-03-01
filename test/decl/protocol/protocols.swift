@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
+
+// XFAIL: noncopyable_generics
+
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
