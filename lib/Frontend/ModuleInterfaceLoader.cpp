@@ -1944,6 +1944,10 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
       // that affects references serialized in the cached file.
       sdkBuildVersion,
 
+      // Applying the distribution channel of the current compiler enables
+      // different compilers to share a module cache location.
+      version::getCurrentCompilerChannel(),
+
       // Whether or not we're tracking system dependencies affects the
       // invalidation behavior of this cache item.
       genericSubInvocation.getFrontendOptions().shouldTrackSystemDependencies(),

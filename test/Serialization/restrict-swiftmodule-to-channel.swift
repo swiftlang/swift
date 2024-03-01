@@ -49,6 +49,16 @@ foo()
 // RUN:   -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache \
 // RUN:   -verify -verify-additional-prefix rebuild- -Rmodule-interface-rebuild
 
+/// Importing for a different channel should rebuild without cache collision.
+// RUN: env SWIFT_FORCE_SWIFTMODULE_CHANNEL=other-channel \
+// RUN:   %target-swift-frontend -typecheck %t/ResilientClient.swift \
+// RUN:   -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -verify -verify-additional-prefix rebuild- -Rmodule-interface-rebuild
+// RUN: env SWIFT_FORCE_SWIFTMODULE_CHANNEL=restricted-channel \
+// RUN:   %target-swift-frontend -typecheck %t/ResilientClient.swift \
+// RUN:   -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache \
+// RUN:   -verify -Rmodule-interface-rebuild
+
 // RUN: rm %t/build/ResilientLib.swiftinterface
 // RUN: %empty-directory(%t/cache)
 
