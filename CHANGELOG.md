@@ -4,6 +4,22 @@
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
+* [SE-0352][]:
+  The Swift 6 language mode will open existential values with
+  "self-conforming" types (such as `any Error` or `@objc` protocols)
+  passed to generic functions. For example:
+
+  ```swift
+  func takeError<E: Error>(_ error: E) { }
+
+  func passError(error: any Error) {
+    takeError(error)  // Swift 5 does not open `any Error`, Swift 6 does
+  }
+  ```
+
+  This behavior can be enabled prior to the Swift 6 language mode
+  using the upcoming language feature `ImplicitOpenExistentials`.
+
 * [SE-0422][]:
   Non-built-in expression macros can now be used as default arguments that
   expand at each call site. For example, a custom `#CurrentFile` macro used as

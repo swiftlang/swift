@@ -129,6 +129,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 LANGUAGE_FEATURE(ExpressionMacroDefaultArguments, 422, "Expression macro as caller-side default argument")
 LANGUAGE_FEATURE(BuiltinStoreRaw, 0, "Builtin.storeRaw")
 
+// Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(StrictConcurrency, 0337, 6)
@@ -140,9 +141,11 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(FullTypedThrows, 413, 6)
-UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
+UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
 
+// Swift 7
+UPCOMING_FEATURE(ExistentialAny, 335, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
