@@ -164,7 +164,7 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
   // or a freestanding implementation from a protocol extension without
   // a corresponding requirement.
 
-  auto *Proto = dyn_cast_or_null<ProtocolDecl>(DC->getSelfNominalTypeDecl());
+  auto *Proto = DC->getSelfProtocolDecl();
   if (!Proto) {
     return false;
   }
@@ -185,7 +185,8 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
   if (FoundRequirementMemberNamed(VD->getName(), Proto)) {
     return true;
   }
-  for (auto *Inherited : Proto->getInheritedProtocols()) {
+
+  for (auto *Inherited : Proto->getAllInheritedProtocols()) {
     if (FoundRequirementMemberNamed(VD->getName(), Inherited)) {
       return true;
     }
@@ -396,23 +397,18 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto VD = S.getLocalSymbolDecl();
-  if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto &InheritanceLoc : NTD->getInherited().getEntries()) {
-      auto Ty = InheritanceLoc.getType();
-      if (!Ty) {
-        continue;
-      }
-      auto *InheritedTypeDecl =
-          dyn_cast_or_null<ClassDecl>(Ty->getAnyNominal());
-      if (!InheritedTypeDecl) {
-        continue;
-      }
+  const auto D = S.getLocalSymbolDecl();
 
-      recordEdge(Symbol(this, NTD, nullptr),
-                 Symbol(this, InheritedTypeDecl, nullptr),
-                 RelationshipKind::InheritsFrom());
-    }
+  ClassDecl *Super = nullptr;
+  if (auto *CD = dyn_cast<ClassDecl>(D))
+    Super = CD->getSuperclassDecl();
+  else if (auto *PD = dyn_cast<ProtocolDecl>(D))
+    Super = PD->getSuperclassDecl();
+
+  if (Super) {
+    recordEdge(Symbol(this, cast<ValueDecl>(D), nullptr),
+               Symbol(this, Super, nullptr),
+               RelationshipKind::InheritsFrom());
   }
 }
 
@@ -457,7 +453,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
   if (const auto *Extension = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
     if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
       HandleProtocol(ExtendedProtocol);
-      for (const auto *Inherited : ExtendedProtocol->getInheritedProtocols()) {
+      for (const auto *Inherited : ExtendedProtocol->getAllInheritedProtocols()) {
         HandleProtocol(Inherited);
       }
     }
@@ -493,11 +489,19 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
       for (auto *inherited : PD->getAllInheritedProtocols()) {
+        // FIXME(noncopyable_generics): Figure out what we want here.
+        if (inherited->getInvertibleProtocolKind())
+          continue;
+
         recordEdge(S, Symbol(this, inherited, nullptr),
                    RelationshipKind::ConformsTo(), nullptr);
       }
     } else {
       for (const auto *Conformance : NTD->getAllConformances()) {
+        // FIXME(noncopyable_generics): Figure out what we want here.
+        if (Conformance->getProtocol()->getInvertibleProtocolKind())
+          continue;
+
         // Check to make sure that this conformance wasn't declared via an
         // unconditionally-unavailable extension. If so, don't add that to the graph.
         if (const auto *ED = dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext())) {
@@ -778,6 +782,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+/// FIXME: This should use AvailableAttr::isUnavailable() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
   return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
     if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
