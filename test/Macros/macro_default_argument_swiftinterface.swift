@@ -9,7 +9,8 @@
 
 // RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t -L %t %target-rpath(%t) -lInterface
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-codesign %t/%target-library-name(Interface)
+// RUN: %target-run %t/main %t/%target-library-name(Interface) | %FileCheck %s
 
 import Interface
 
