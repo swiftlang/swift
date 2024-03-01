@@ -3498,7 +3498,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     assert(!OriginalModuleName.empty());
     assert(!PlatformAndVersions.empty());
     assert(NK == NextSegmentKind::PlatformVersion);
-    AttrRange = SourceRange(Loc, Tok.getLoc());
+    AttrRange = SourceRange(Loc, RightLoc);
     for (auto &Item: PlatformAndVersions) {
       Attributes.add(new (Context) OriginallyDefinedInAttr(AtLoc, AttrRange,
                                                            OriginalModuleName,
@@ -3944,28 +3944,30 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
       
       attr = new (Context) RawLayoutAttr(size, align,
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("like")) {
       // @_rawLayout(like: T)
       auto likeType = parseType(diag::expected_type);
       if (likeType.isNull()) {
         return makeParserSuccess();
       }
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
 
       attr = new (Context) RawLayoutAttr(likeType.get(),
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else if (firstLabel.is("likeArrayOf")) {
       // @_rawLayout(likeArrayOf: T, count: N)
       auto likeType = parseType(diag::expected_type);
@@ -4003,14 +4005,15 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       
-      if (!consumeIf(tok::r_paren)) {
+      SourceLoc rParenLoc;
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
         diagnose(Tok.getLoc(), diag::attr_expected_rparen,
                  AttrName, /*isModifier*/false);
         return makeParserSuccess();
       }
       
       attr = new (Context) RawLayoutAttr(likeType.get(), count,
-                                         AtLoc, SourceRange(Loc, Tok.getLoc()));
+                                         AtLoc, SourceRange(Loc, rParenLoc));
     } else {
       diagnose(Loc, diag::attr_rawlayout_expected_label,
                "'size', 'like', or 'likeArrayOf'");
