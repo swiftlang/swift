@@ -176,60 +176,65 @@ public:
 
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
-  // The Swift 6.0 runtime is the first version able to demangle types
-  // that involve typed throws.
-  bool usesTypedThrows = type.findIf([](CanType t) -> bool {
+  enum VersionRequirement {
+    None,
+    Swift_5_2,
+    Swift_5_5,
+    Swift_6_0,
+
+    // Short-circuit if we find this requirement.
+    Latest = Swift_6_0
+  };
+
+  VersionRequirement latestRequirement = None;
+  auto addRequirement = [&](VersionRequirement req) -> bool {
+    if (req > latestRequirement) {
+      latestRequirement = req;
+      return req == Latest;
+    }
+    return false;
+  };
+
+  (void) type.findIf([&](CanType t) -> bool {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
-      if (!fn.getThrownError().isNull())
-        return true;
+      // The Swift 6.0 runtime is the first version able to demangle types
+      // that involve typed throws or @isolated(any), or for that matter
+      // represent them at all at runtime.
+      if (!fn.getThrownError().isNull() || fn->getIsolation().isErased())
+        return addRequirement(Swift_6_0);
+
+      // The Swift 5.5 runtime is the first version able to demangle types
+      // related to concurrency.
+      if (fn->isAsync() || fn->isSendable() ||
+          !fn->getIsolation().isNonIsolated())
+        return addRequirement(Swift_5_5);
+
+      return false;
+    }
+
+    if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+      // Associated types of opaque types weren't mangled in a usable
+      // form by the Swift 5.1 runtime, so we needed to add a new
+      // mangling in 5.2.
+      if (opaqueArchetype->getInterfaceType()->is<DependentMemberType>())
+        return addRequirement(Swift_5_2);
+
+      // Although opaque types in general were only added in Swift 5.1,
+      // declarations that use them are already covered by availability
+      // guards, so we don't need to limit availability of mangled names
+      // involving them.
     }
 
     return false;
   });
-  if (usesTypedThrows) {
-    return llvm::VersionTuple(6, 0);
+
+  switch (latestRequirement) {
+  case Swift_6_0: return llvm::VersionTuple(6, 0);
+  case Swift_5_5: return llvm::VersionTuple(5, 5);
+  case Swift_5_2: return llvm::VersionTuple(5, 2);
+  case None: return std::nullopt;
   }
-
-  // The Swift 5.5 runtime is the first version able to demangle types
-  // related to concurrency.
-  bool needsConcurrency = type.findIf([](CanType t) -> bool {
-    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
-      if (fn->isAsync() || fn->isSendable() || fn->hasGlobalActor())
-        return true;
-
-      for (const auto &param : fn->getParams()) {
-        if (param.isIsolated())
-          return true;
-      }
-
-      return false;
-    }
-    return false;
-  });
-  if (needsConcurrency) {
-    return llvm::VersionTuple(5, 5);
-  }
-
-  // Associated types of opaque types weren't mangled in a usable form by the
-  // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
-  if (type->hasOpaqueArchetype()) {
-    auto hasOpaqueAssocType = type.findIf([](CanType t) -> bool {
-      if (auto a = dyn_cast<ArchetypeType>(t)) {
-        return isa<OpaqueTypeArchetypeType>(a) &&
-          a->getInterfaceType()->is<DependentMemberType>();
-      }
-      return false;
-    });
-    
-    if (hasOpaqueAssocType)
-      return llvm::VersionTuple(5, 2);
-    // Although opaque types in general were only added in Swift 5.1,
-    // declarations that use them are already covered by availability
-    // guards, so we don't need to limit availability of mangled names
-    // involving them.
-  }
-
-  return std::nullopt;
+  llvm_unreachable("bad kind");
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback

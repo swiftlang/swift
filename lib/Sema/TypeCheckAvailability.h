@@ -275,10 +275,12 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &where,
     bool warnIfConformanceUnavailablePreSwift6 = false);
 
-/// Diagnose uses of the runtime features of parameterized protools. Returns
-/// \c true if a diagnostic was emitted.
-bool diagnoseParameterizedProtocolAvailability(SourceRange loc,
-                                               const DeclContext *DC);
+/// Diagnose uses of the runtime support of the given type, such as
+/// type metadata and dynamic casting.
+///
+/// Returns \c true if a diagnostic was emitted.
+bool checkTypeMetadataAvailability(Type type, SourceRange loc,
+                                   const DeclContext *DC);
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
