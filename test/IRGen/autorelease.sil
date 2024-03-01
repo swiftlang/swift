@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -enable-objc-interop -emit-ir | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-ptrsize -check-prefix %target-cpu -DINT=i%target-ptrsize %s
 
+// REQUIRES: objc_codegen
+
 // rdar://16565958
 
 import Builtin
