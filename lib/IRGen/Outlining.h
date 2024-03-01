@@ -19,7 +19,9 @@
 
 #include "IRGen.h"
 #include "LocalTypeDataKind.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -69,6 +71,8 @@ public:
 
 private:
   llvm::MapVector<LocalTypeDataKey, llvm::Value *> Values;
+  llvm::MapVector<GenericRequirement, llvm::Value *> Requirements;
+  std::optional<SubstitutionMap> Subs;
   friend class IRGenModule;
 
 public:
@@ -94,6 +98,7 @@ public:
 
 private:
   void collectTypeMetadataForLayout(SILType type);
+  void collectTypeMetadataForDeinit(SILType type);
   void collectFormalTypeMetadata(CanType type);
   void collectRepresentationTypeMetadata(SILType ty);
 };

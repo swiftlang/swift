@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-irgen -O                          \
+// RUN: %target-swift-emit-irgen -Onone                      \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -disable-type-layout                             \
 // RUN:     %s                                               \
@@ -47,6 +47,10 @@ public struct InnerDeinitingDestructableNC<T> : ~Copyable {
   deinit {
     external_symbol()
   }
+}
+public struct InnerDeinitingWithoutLayoutNC<T>: ~Copyable {
+  public let ptr: Int
+  deinit {}
 }
 
 public struct OuterDeinitingNC_1<T> : ~Copyable {
@@ -99,17 +103,17 @@ extension GenericContext_1 : P where T : P {
 // - has deinit
 // On lifetime end:
 // - call deinit
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22takeOuterDeinitingNC_1yyAA0efG2_1VyxGnlF"(
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone22takeOuterDeinitingNC_1yyAA0fgH2_1VyxGnlF"(
 // CHECK-SAME:      ptr{{.*}} %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions18OuterDeinitingNC_1VMa"(
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s30moveonly_value_functions_onone18OuterDeinitingNC_1VMa"(
 //           :        i64 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[OUTER_DEINITING_NC_1_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions18OuterDeinitingNC_1VfD"(
+// CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone18OuterDeinitingNC_1VfD"(
 // CHECK-SAME:        ptr [[OUTER_DEINITING_NC_1_METADATA]],
-// CHECK-SAME:        ptr{{.*}} %0)
+// CHECK-SAME:        ptr{{.*}} %t)
 // CHECK:       }
 public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
   external_symbol()
@@ -123,30 +127,30 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 // - is releasable
 // On lifetime end:
 // - call outlined release function
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions13takeOuterNC_1yyAA0eF2_1VyxGnlF"(
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone13takeOuterNC_1yyAA0fG2_1VyxGnlF"(
 // CHECK-SAME:      ptr{{.*}} %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
-// CHECK-SAME:        ptr %0,
+// CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone9OuterNC_1VyxGlWOh"(
+// CHECK-SAME:        ptr %o,
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
 
 // Verify that the outlined release function takes the metadata for the
 // move-only-with-deinit type InnerDeinitingReleasableNC<T> and passes it along
 // to that deinit.
-// $s24moveonly_value_functions9OuterNC_1VyxGlWOs ---> outlined release of moveonly_value_functions.OuterNC_2<A>
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
+// $s30moveonly_value_functions_onone9OuterNC_1VyxGlWOs ---> outlined release of moveonly_value_functions.OuterNC_2<A>
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone9OuterNC_1VyxGlWOh"(
 // CHECK-SAME:      ptr %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 //                ...
 //                ...
-// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingReleasableNCVMa"(
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVMa"(
 //           :        i64 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[INNER_DEINITING_RELEASABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
-// CHECK:         call swiftcc void @"$s24moveonly_value_functions26InnerDeinitingReleasableNCVfD"(
+// CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVfD"(
 // CHECK-SAME:        ptr [[INNER_DEINITING_RELEASABLE_NC_METADATA]],
 //           :        ptr noalias nocapture swiftself dereferenceable(64) %deinit.arg)
 // CHECK:       }
@@ -162,30 +166,30 @@ public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
 // - is NOT releasable
 // On lifetime end:
 // - call outlined destroy destroy
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions13takeOuterNC_2yyAA0eF2_2VyxGnlF"(
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone13takeOuterNC_2yyAA0fG2_2VyxGnlF"(
 // CHECK-SAME:      ptr{{.*}} %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_2VyxGlWOh"(
-// CHECK-SAME:        ptr %0,
+// CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone9OuterNC_2VyxGlWOh"(
+//           :        ptr %5,
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
 
 // Verify that the outlined destroy function takes the metadata for the
 // move-only-with-deinit type InnerDeinitingDestructable<T> and passes it along
 // to that deinit.
-// $s24moveonly_value_functions9OuterNC_2VyxGlWOh ---> outlined destroy of moveonly_value_functions.OuterNC_2<A>
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions9OuterNC_2VyxGlWOh"(
+// $s30moveonly_value_functions_onone9OuterNC_2VyxGlWOh ---> outlined destroy of moveonly_value_functions.OuterNC_2<A>
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone9OuterNC_2VyxGlWOh"(
 // CHECK-SAME:      ptr %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 //                ...
 //                ...
-// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"(
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s30moveonly_value_functions_onone28InnerDeinitingDestructableNCVMa"(
 //           :        [[INT]] 0,
 // CHECK-SAME:        ptr %T)
 // CHECK:         [[INNER_DEINITING_DESTRUCTABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVfD"(
+// CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone28InnerDeinitingDestructableNCVfD"(
 // CHECK-SAME:        ptr [[INNER_DEINITING_DESTRUCTABLE_NC_METADATA]], 
 //           :        ptr noalias swiftself %3)
 // CHECK:       }
@@ -193,27 +197,27 @@ public func takeOuterNC_2<T>(_ o: consuming OuterNC_2<T>) {
   external_symbol()
 }
 
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions29takeGenericContext_1OuterNC_1yyAA0eF2_1VA2A1PRzlE0gH2_1Vyx_GnAaERzlF"(
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone29takeGenericContext_1OuterNC_1yyAA0fG2_1VA2A1PRzlE0hI2_1Vyx_GnAaERzlF"(
 // CHECK-SAME:      ptr noalias %0, 
 // CHECK-SAME:      ptr %T, 
 // CHECK-SAME:      ptr %T.P)
 // CHECK-SAME:  {
-// CHECK:         call ptr @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9OuterNC_1Vyx_GAaDRzlWOh"(
-// CHECK-SAME:        ptr %0, 
+// CHECK:         call ptr @"$s30moveonly_value_functions_onone16GenericContext_1VA2A1PRzlE9OuterNC_1Vyx_GAaDRzlWOh"(
+//           :        ptr %5, 
 // CHECK-SAME:        ptr %T, 
 // CHECK-SAME:        ptr %T.P)
 // CHECK:       }
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9OuterNC_1Vyx_GAaDRzlWOh"(
+// CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone16GenericContext_1VA2A1PRzlE9OuterNC_1Vyx_GAaDRzlWOh"(
 // CHECK-SAME:      ptr %0, 
 // CHECK-SAME:      ptr %T, 
 // CHECK-SAME:      ptr %T.P)
 // CHECK-SAME:  {
-// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9Inner_NC1VMa"(
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s30moveonly_value_functions_onone16GenericContext_1VA2A1PRzlE9Inner_NC1VMa"(
 //           :        i64 0, 
 // CHECK-SAME:        ptr %T, 
 // CHECK-SAME:        ptr %T.P)
 // CHECK:         [[GENERIC_CONTEXT_1_INNER_NC_1_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK:         call swiftcc void @"$s24moveonly_value_functions16GenericContext_1VA2A1PRzlE9Inner_NC1VfD"(
+// CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone16GenericContext_1VA2A1PRzlE9Inner_NC1VfD"(
 // CHECK-SAME:        ptr [[GENERIC_CONTEXT_1_INNER_NC_1_METADATA]], 
 // CHECK-SAME:        ptr noalias swiftself %0)
 // CHECK:       }

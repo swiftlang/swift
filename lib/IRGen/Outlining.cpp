@@ -19,6 +19,7 @@
 #include "Explosion.h"
 #include "GenOpaque.h"
 #include "GenProto.h"
+#include "GenericRequirement.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
@@ -27,6 +28,7 @@
 #include "MetadataRequest.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -65,18 +67,8 @@ void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   // Substitute opaque types if allowed.
   ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
 
-  auto astType = ty.getASTType();
-  auto &ti = IGF.IGM.getTypeInfoForLowered(astType);
-
-  if (needsDeinit) {
-    auto *nominal = ty.getASTType()->getAnyNominal();
-    if (nominal && nominal->getValueTypeDestructor()) {
-      assert(ty.isMoveOnly());
-      collectFormalTypeMetadata(ty.getASTType());
-    }
-  }
-
   collectTypeMetadataForLayout(ty);
+  collectTypeMetadataForDeinit(ty);
 }
 
 void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
@@ -103,6 +95,33 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   collectRepresentationTypeMetadata(ty);
 }
 
+void OutliningMetadataCollector::collectTypeMetadataForDeinit(SILType ty) {
+  if (!needsDeinit)
+    return;
+
+  auto *nominal = ty.getASTType()->getAnyNominal();
+  if (!nominal)
+    return;
+  if (!nominal->getValueTypeDestructor())
+    return;
+  assert(ty.isMoveOnly());
+
+  if (Requirements.size())
+    return;
+
+  auto pair = getTypeAndGenericSignatureForManglingOutlineFunction(T);
+  auto sig = pair.second;
+  auto subs =
+      digOutGenericEnvironment(T.getASTType())->getForwardingSubstitutionMap();
+  Subs = subs;
+  GenericTypeRequirements requirements(IGF.IGM, sig);
+  for (auto requirement : requirements.getRequirements()) {
+    auto *value = emitGenericRequirementFromSubstitutions(
+        IGF, requirement, MetadataState::Complete, subs);
+    Requirements.insert({requirement, value});
+  }
+}
+
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
   assert(ty->hasArchetype());
@@ -126,6 +145,13 @@ void OutliningMetadataCollector::collectRepresentationTypeMetadata(SILType ty) {
 
 void OutliningMetadataCollector::addPolymorphicArguments(
     SmallVectorImpl<llvm::Value *> &args) const {
+  if (Subs) {
+    for (auto &pair : Requirements) {
+      auto *value = pair.second;
+      args.push_back(value);
+    }
+    return;
+  }
   for (auto &pair : Values) {
     auto metadata = pair.second;
     assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
@@ -135,6 +161,13 @@ void OutliningMetadataCollector::addPolymorphicArguments(
 
 void OutliningMetadataCollector::addPolymorphicParameterTypes(
     SmallVectorImpl<llvm::Type *> &paramTys) const {
+  if (Subs) {
+    for (auto &pair : Requirements) {
+      auto *value = pair.second;
+      paramTys.push_back(value->getType());
+    }
+    return;
+  }
   for (auto &pair : Values) {
     auto *metadata = pair.second;
     paramTys.push_back(metadata->getType());
@@ -143,6 +176,13 @@ void OutliningMetadataCollector::addPolymorphicParameterTypes(
 
 void OutliningMetadataCollector::bindPolymorphicParameters(
     IRGenFunction &IGF, Explosion &params) const {
+  if (Subs) {
+    for (auto &pair : Requirements) {
+      bindGenericRequirement(IGF, pair.first, params.claimNext(),
+                             MetadataState::Complete, *Subs);
+    }
+    return;
+  }
   // Note that our parameter IGF intentionally shadows the IGF that this
   // collector was built with.
   for (auto &pair : Values) {
