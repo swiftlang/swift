@@ -7722,11 +7722,69 @@ void swift::printEnumElementsAsCases(
                   OS << ": " << getCodePlaceholder() << "\n";
                 });
 }
+/// For a protocol, don't consult getInherited() at all. Instead, rebuild
+/// the inherited types from getInheritedProtocols(), getSuperclass(), and
+/// the inverse requirement transform.
+///
+/// FIXME: This seems generally useful and should be moved elsewhere.
+static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
+                                          llvm::SmallVectorImpl<InheritedEntry> &Results) {
+  auto &ctx = proto->getASTContext();
+
+  if (auto superclassTy = proto->getSuperclass()) {
+    Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
+                         /*isUnchecked=*/false,
+                         /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false);
+  }
+
+  InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
+
+  for (auto *inherited : proto->getInheritedProtocols()) {
+    if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      if (auto ip = inherited->getInvertibleProtocolKind()) {
+        inverses.remove(*ip);
+        continue;
+      }
+
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+        if (inherited->inheritsFrom(proto))
+          inverses.remove(ip);
+      }
+    }
+
+    Results.emplace_back(TypeLoc::withoutLoc(inherited->getDeclaredInterfaceType()),
+                         /*isUnchecked=*/false,
+                         /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false);
+  }
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    for (auto ip : inverses) {
+      InvertibleProtocolSet singleton;
+      singleton.insert(ip);
+
+      auto inverseTy = ProtocolCompositionType::get(
+          ctx, ArrayRef<Type>(), singleton,
+          /*hasExplicitAnyObject=*/false);
+      Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
+                           /*isUnchecked=*/false,
+                           /*isRetroactive=*/false,
+                           /*isPreconcurrency=*/false);
+    }
+  }
+}
 
 void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
     llvm::SmallVectorImpl<InheritedEntry> &Results) {
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    getSyntacticInheritanceClause(proto, Results);
+    return;
+  }
+
   InheritedTypes inherited = InheritedTypes(decl);
 
   // Collect explicit inherited types.
@@ -7753,6 +7811,10 @@ swift::getInheritedForPrinting(
   llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = attr->getProtocol()) {
+      // FIXME: Reconstitute inverses here
+      if (proto->getInvertibleProtocolKind())
+        continue;
+
       // The SerialExecutor conformance is only synthesized on the root
       // actor class, so we can just test resilience immediately.
       if (proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) &&
@@ -7787,6 +7849,10 @@ swift::getInheritedForPrinting(
       }
       continue;
     }
+
+    // FIXME: Reconstitute inverses here
+    if (proto->getInvertibleProtocolKind())
+      continue;
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                        isUnchecked,
