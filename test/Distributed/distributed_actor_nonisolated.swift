@@ -58,7 +58,7 @@ func invalidIsolatedCall<DA: DistributedActor> (
   Task {
     // expected-note@+1 {{let declared here}}
     for await closure in queue {
-      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a non-isolated context; this is an error in Swift 6}}
+      // expected-warning@+1 {{distributed actor-isolated let 'closure' can not be accessed from a non-isolated context; this is an error in the Swift 6 language mode}}
       await closure(actor)
     }
   }

@@ -19,7 +19,7 @@ extension Actor {
 @available(SwiftStdlib 5.1, *)
 func testA<T: Actor>(
   a: isolated A,  // expected-note{{previous 'isolated' parameter 'a'}}
-  b: isolated T,  // expected-warning{{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+  b: isolated T,  // expected-warning{{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
   c: isolated Int // expected-error {{'isolated' parameter type 'Int' does not conform to 'Actor' or 'DistributedActor'}}
 ) {
   a.f()
@@ -38,7 +38,7 @@ actor Counter {
 
 @available(SwiftStdlib 5.1, *)
 // expected-note@+2 {{previous 'isolated' parameter 'a'}}
-// expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+// expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
 func testDoubleIsolatedParams(a: isolated Counter, b: isolated Other) async {
   a.inc()
   b.inc()
@@ -66,7 +66,7 @@ func globalFuncIsolated(_: isolated A) { // expected-note{{calls to global funct
 }
 
 @available(SwiftStdlib 5.1, *)
-// expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in Swift 6}}{{1-12=}}
+// expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in the Swift 6 language mode}}{{1-12=}}
 @MainActor func testIsolatedParamCalls(a: isolated A, b: A) {
   globalFunc(a)
   globalFunc(b)
@@ -168,7 +168,7 @@ func tuplify<Ts>(_ fn: (Ts) -> Void) {} // expected-note {{in call to function '
 @available(SwiftStdlib 5.1, *)
 func testTuplingIsolated(
                          _ a: isolated A, // expected-note {{previous 'isolated' parameter 'a'}}
-                         _ b: isolated A  // expected-warning {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+                         _ b: isolated A  // expected-warning {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
                         ) {
   tuplify(testTuplingIsolated)
   // expected-error@-1 {{generic parameter 'Ts' could not be inferred}}
@@ -194,9 +194,9 @@ func testIsolatedClosureInference(one: A, two: A) async {
     a2.f()
   }
 
-  let f: (isolated A, isolated A) -> Void = // expected-warning {{function type cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+  let f: (isolated A, isolated A) -> Void = // expected-warning {{function type cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
       // expected-note@+2 {{previous 'isolated' parameter 'a1'}}
-      // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+      // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
       { (a1, a2) in
         a1.f()
         a2.f()
@@ -204,9 +204,9 @@ func testIsolatedClosureInference(one: A, two: A) async {
 
   await f(one, two)
 
-  let g: (isolated A, isolated A) -> Void = // expected-warning {{function type cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+  let g: (isolated A, isolated A) -> Void = // expected-warning {{function type cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
       // expected-note@+2 {{previous 'isolated' parameter '$0'}}
-      // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+      // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
       {
         $0.f()
         $1.f()
@@ -216,12 +216,12 @@ func testIsolatedClosureInference(one: A, two: A) async {
 }
 
 struct CheckIsolatedFunctionTypes {
-  // expected-warning@+2 {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
-  // expected-warning@+1 {{function type cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+  // expected-warning@+2 {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{function type cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
   func a(_ f: @MainActor @Sendable (isolated A, isolated A) -> ()) {}
 
   // expected-note@+2 {{calls to parameter 'callback' from outside of its actor context are implicitly asynchronous}}
-  // expected-warning@+1 {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
+  // expected-warning@+1 {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}
   @MainActor func update<R>(_ callback: @Sendable @escaping @MainActor (isolated A) -> R) -> R {
     callback(A()) // expected-error {{call to actor-isolated parameter 'callback' in a synchronous main actor-isolated context}}
   }
@@ -229,21 +229,21 @@ struct CheckIsolatedFunctionTypes {
 
 @available(SwiftStdlib 5.1, *)
 func checkIsolatedAndGlobalClosures(_ a: A) {
-  let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
+  let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}
       = {
     $0.f()
     mainActorFn() // expected-error {{call to main actor-isolated global function 'mainActorFn()' in a synchronous actor-isolated context}}
   }
 
-  let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
-      = { @MainActor in // expected-warning {{closure with 'isolated' parameter '$0' cannot have a global actor; this is an error in Swift 6}}{{11-22=}}
+  let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}
+      = { @MainActor in // expected-warning {{closure with 'isolated' parameter '$0' cannot have a global actor; this is an error in the Swift 6 language mode}}{{11-22=}}
     $0.f()
     mainActorFn()
   }
 
-  let _ = { @MainActor (a: isolated A, // expected-warning {{closure with 'isolated' parameter 'a' cannot have a global actor; this is an error in Swift 6}}{{13-24=}}
+  let _ = { @MainActor (a: isolated A, // expected-warning {{closure with 'isolated' parameter 'a' cannot have a global actor; this is an error in the Swift 6 language mode}}{{13-24=}}
                                        // expected-note@-1 {{previous 'isolated' parameter 'a'}}
-                        b: isolated A, // expected-warning {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+                        b: isolated A, // expected-warning {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
                         c: isolated A) async in
     a.f()
     mainActorFn()
@@ -268,7 +268,7 @@ extension TestActor {
   func isolatedMethod() { }
   // expected-note@-1{{calls to instance method 'isolatedMethod()' from outside of its actor context are implicitly asynchronous}}
 
-  // expected-warning@+1 {{instance method with 'isolated' parameter cannot be 'nonisolated'; this is an error in Swift 6}}{{3-15=}}
+  // expected-warning@+1 {{instance method with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{3-15=}}
   nonisolated func isolatedToParameter(_ other: isolated TestActor) {
     isolatedMethod()
     // expected-error@-1{{call to actor-isolated instance method 'isolatedMethod()' in a synchronous actor-isolated context}}
@@ -288,8 +288,8 @@ func isolatedClosures() {
   }
 }
 
-// expected-warning@+2 {{global function with 'isolated' parameter cannot be 'nonisolated'; this is an error in Swift 6}}{{12-24=}}
-// expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in Swift 6}}{{1-12=}}
+// expected-warning@+2 {{global function with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{12-24=}}
+// expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in the Swift 6 language mode}}{{1-12=}}
 @MainActor nonisolated func allOfEm(_ a: isolated A) {
   a.f()
 }
@@ -297,7 +297,7 @@ func isolatedClosures() {
 @MainActor class MAClass {
 
   // expected-note@+2 {{previous 'isolated' parameter 'a'}}
-  // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
+  // expected-warning@+1 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
   init(_ a: isolated A, _ b: isolated A) {
     // FIXME: wrong isolation. should be isolated to `a` only!
     a.f()
@@ -305,8 +305,8 @@ func isolatedClosures() {
   }
 
   // expected-note@+3 {{previous 'isolated' parameter 'a'}}
-  // expected-warning@+2 {{cannot have more than one 'isolated' parameter; this is an error in Swift 6}}
-  // expected-warning@+1 {{subscript with 'isolated' parameter cannot be 'nonisolated'; this is an error in Swift 6}}{{3-15=}}
+  // expected-warning@+2 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{subscript with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{3-15=}}
   nonisolated subscript(_ a: isolated A, _ b: isolated A) -> Int {
     // FIXME: wrong isolation. should be isolated to `a`.
     a.f() // expected-error {{call to actor-isolated instance method 'f()' in a synchronous actor-isolated context}}
@@ -314,7 +314,7 @@ func isolatedClosures() {
     return 0
   }
 
-  // expected-warning@+1 {{instance method with 'isolated' parameter cannot be 'nonisolated'; this is an error in Swift 6}}{{3-15=}}
+  // expected-warning@+1 {{instance method with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{3-15=}}
   nonisolated func millionDollars(_ a: isolated A) {
     a.f()
   }

@@ -5,7 +5,7 @@
 
 import UIKit
 
-@UIApplicationMain // expected-deprecated-warning {{'UIApplicationMain' is deprecated; this is an error in Swift 6}}
+@UIApplicationMain // expected-deprecated-warning {{'UIApplicationMain' is deprecated; this is an error in the Swift 6 language mode}}
 // expected-deprecated-note@-1 {{use @main instead}} {{1-19=@main}}
 class MyDelegate: NSObject, UIApplicationDelegate {
 }

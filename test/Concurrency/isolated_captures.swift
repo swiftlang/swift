@@ -42,7 +42,7 @@ class NotSendable {
   // expected-region-isolation-warning @+2 {{transferring 'ns' may cause a race}}
   // expected-region-isolation-note @+1 {{transferring global actor 'MyActor'-isolated 'ns' to global actor 'YourActor'-isolated callee could cause races between global actor 'YourActor'-isolated and global actor 'MyActor'-isolated uses}}
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -63,7 +63,7 @@ class NotSendable {
 
   // FIXME: Region isolation should diagnose this (https://github.com/apple/swift/issues/71533)
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
@@ -83,7 +83,7 @@ class NotSendable {
 
   // FIXME: Region isolation should diagnose this (https://github.com/apple/swift/issues/71533)
   await { @YourActor in
-    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in Swift 6}}
+    // expected-complete-warning@+1 {{capture of 'ns' with non-sendable type 'NotSendable' in an isolated closure; this is an error in the Swift 6 language mode}}
     YourActor.ns = ns
   }()
 
