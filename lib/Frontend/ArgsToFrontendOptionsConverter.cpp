@@ -66,6 +66,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ExplicitModulesOutputPath = A->getValue();
+  } else {
+    SmallString<128> defaultPath;
+    llvm::sys::path::cache_directory(defaultPath);
+    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();

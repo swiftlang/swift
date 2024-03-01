@@ -1397,7 +1397,7 @@ static std::set<ModuleDependencyID> computeBridgingHeaderTransitiveDependencies(
 
 static std::vector<ModuleDependencyID>
 findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
-                 ModuleDependenciesCache &cache) {
+                 const ModuleDependenciesCache &cache) {
   std::unordered_set<ModuleDependencyID> visited;
   std::vector<ModuleDependencyID> result;
   std::stack<ModuleDependencyID, std::vector<ModuleDependencyID>> stack;
@@ -1431,8 +1431,8 @@ findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
   return result;
 }
 
-static bool diagnoseCycle(CompilerInstance &instance,
-                          ModuleDependenciesCache &cache,
+static bool diagnoseCycle(const CompilerInstance &instance,
+                          const ModuleDependenciesCache &cache,
                           ModuleDependencyID mainId) {
   ModuleDependencyIDSetVector openSet;
   ModuleDependencyIDSetVector closeSet;
