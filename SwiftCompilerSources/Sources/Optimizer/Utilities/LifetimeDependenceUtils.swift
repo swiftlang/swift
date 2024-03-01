@@ -185,7 +185,7 @@ struct LifetimeDependence : CustomStringConvertible {
   var parentValue: Value { scope.parentValue }
 
   var function: Function {
-    dependentValue.parentFunction // dependentValue can't be undef
+    dependentValue.parentFunction
   }
 
   var description: String {

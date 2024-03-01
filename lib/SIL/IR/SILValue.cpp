@@ -209,6 +209,10 @@ SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
     return MVR->getParent()->getParent();
   }
+  if (auto *undef = dyn_cast<SILUndef>(this)) {
+    // By convention, undefs are considered to be defined at the entry of the function.
+    return undef->getParent()->getEntryBlock();
+  }
   return nullptr;
 }
 

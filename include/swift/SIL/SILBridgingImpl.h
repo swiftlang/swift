@@ -418,6 +418,14 @@ BridgedValue::Ownership BridgedValue::getOwnership() const {
   return castOwnership(getSILValue()->getOwnershipKind());
 }
 
+BridgedFunction BridgedValue::SILUndef_getParentFunction() const {
+  return {llvm::cast<swift::SILUndef>(getSILValue())->getParent()};
+}
+
+BridgedFunction BridgedValue::PlaceholderValue_getParentFunction() const {
+  return {llvm::cast<swift::PlaceholderValue>(getSILValue())->getParent()};
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedOperand
 //===----------------------------------------------------------------------===//
