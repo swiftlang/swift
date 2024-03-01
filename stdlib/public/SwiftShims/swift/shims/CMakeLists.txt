@@ -129,7 +129,7 @@ else()
   set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION_MAJOR}")
 endif()
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Windows")
   set(cmake_symlink_option "copy_directory")
 else()
   set(cmake_symlink_option "create_symlink")
