@@ -850,6 +850,11 @@ ERROR(serialization_module_incompatible_revision,Fatal,
       "compiled module was created by a different version of the compiler '%0'; "
       "rebuild %1 and try again: %2",
       (StringRef, Identifier, StringRef))
+ERROR(serialization_module_incompatible_channel,Fatal,
+      "compiled module was created for a different distribution channel '%0' "
+      "than the local compiler '%1', "
+      "please ensure %2 is found from the expected path: %3",
+      (StringRef, StringRef, Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,

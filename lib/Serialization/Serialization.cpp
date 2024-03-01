@@ -834,6 +834,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
+  BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
   BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
@@ -982,6 +983,7 @@ void Serializer::writeHeader() {
     control_block::TargetLayout Target(Out);
     control_block::SDKNameLayout SDKName(Out);
     control_block::RevisionLayout Revision(Out);
+    control_block::ChannelLayout Channel(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
     control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
@@ -1034,6 +1036,8 @@ void Serializer::writeHeader() {
     auto revision = forcedDebugRevision ?
       forcedDebugRevision : version::getCurrentCompilerSerializationTag();
     Revision.emit(ScratchRecord, revision);
+
+    Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 

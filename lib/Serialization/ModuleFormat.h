@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 858; // Replace inherited types with protocols in protocol layout
+const uint16_t SWIFTMODULE_VERSION_MINOR = 859; // channel check
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -860,6 +860,7 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
+    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     HAS_NONCOPYABLE_GENERICS,
@@ -895,6 +896,11 @@ namespace control_block {
 
   using RevisionLayout = BCRecordLayout<
     REVISION,
+    BCBlob
+  >;
+
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
     BCBlob
   >;
 
