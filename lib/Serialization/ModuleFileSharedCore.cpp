@@ -418,6 +418,21 @@ static ValidationInfo validateControlBlock(
       }
       break;
     }
+    case control_block::CHANNEL: {
+      static const char* ignoreRevision =
+        ::getenv("SWIFT_IGNORE_SWIFTMODULE_REVISION");
+      if (ignoreRevision)
+        break;
+
+      StringRef moduleChannel = blobData,
+                compilerChannel = version::getCurrentCompilerChannel();
+      if (requiresRevisionMatch && !compilerChannel.empty() &&
+          moduleChannel != compilerChannel) {
+        result.problematicChannel = moduleChannel;
+        result.status = Status::ChannelIncompatible;
+      }
+      break;
+    }
     case control_block::IS_OSSA: {
       auto isModuleInOSSA = scratch[0];
       if (requiresOSSAModules && !isModuleInOSSA)
@@ -532,6 +547,7 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooOld: return "FormatTooOld";
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
+  case Status::ChannelIncompatible: return "ChannelIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
   case Status::NoncopyableGenericsMismatch:
     return "NoncopyableGenericsMismatch";

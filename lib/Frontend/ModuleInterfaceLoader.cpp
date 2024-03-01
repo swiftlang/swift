@@ -316,6 +316,8 @@ struct ModuleRebuildInfo {
       return "compiled with a newer version of the compiler";
     case Status::RevisionIncompatible:
       return "compiled with a different version of the compiler";
+    case Status::ChannelIncompatible:
+      return "compiled for a different distribution channel";
     case Status::NotInOSSA:
       return "module was not built with OSSA";
     case Status::NoncopyableGenericsMismatch:
