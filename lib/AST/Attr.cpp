@@ -1918,6 +1918,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
+  case DeclAttrKind::AllowFeatureSuppression:
+    return "_allowFeatureSuppression";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2899,6 +2901,26 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                                const_cast<StorageRestrictionsAttr *>(this),
                                attachedTo, getAccessesNames()},
                            {});
+}
+
+AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(SourceLoc atLoc,
+                                                         SourceRange range,
+                                                         bool implicit,
+                                              ArrayRef<Identifier> features)
+    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression,
+                    atLoc, range, implicit) {
+  Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
+  std::uninitialized_copy(features.begin(), features.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+AllowFeatureSuppressionAttr *
+AllowFeatureSuppressionAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                                    SourceRange range, bool implicit,
+                                    ArrayRef<Identifier> features) {
+  unsigned size = totalSizeToAlloc<Identifier>(features.size());
+  auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
+  return new (mem) AllowFeatureSuppressionAttr(atLoc, range, implicit, features);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

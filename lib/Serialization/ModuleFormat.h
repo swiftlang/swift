@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 859; // channel check
+const uint16_t SWIFTMODULE_VERSION_MINOR = 860; // AllowFeatureSuppressionAttr
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2133,6 +2133,12 @@ namespace decls_block {
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     BCArray<IdentifierIDField> // name components
+  >;
+
+  using AllowFeatureSuppressionDeclAttrLayout = BCRecordLayout<
+    AllowFeatureSuppression_DECL_ATTR,
+    BCFixed<1>,   // implicit flag
+    BCArray<IdentifierIDField>  // feature names
   >;
 
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<

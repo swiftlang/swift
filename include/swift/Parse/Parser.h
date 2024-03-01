@@ -1072,6 +1072,14 @@ public:
                          SmallVector<SourceLoc, 4> &NameLocs,
                          bool &IsNullarySelector);
 
+  /// Parse a parenthesized and comma-separated list of attribute arguments.
+  ///
+  /// \returns false on success, true on error.
+  ParserStatus
+  parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
+                          bool isAttrModifier, SourceRange &parensRange,
+                          llvm::function_ref<ParserStatus()> parseAttr);
+
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
@@ -1150,6 +1158,9 @@ public:
   bool
   parseDocumentationAttributeArgument(std::optional<StringRef> &Metadata,
                                       std::optional<AccessLevel> &Visibility);
+
+  ParserResult<AllowFeatureSuppressionAttr>
+  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.

@@ -1889,6 +1889,10 @@ ERROR(attr_rawlayout_expected_params,none,
 
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to @_extern attribute", (StringRef))
+
+ERROR(attr_expected_feature_name,none,
+      "expected feature name in @%0 attribute", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------

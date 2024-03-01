@@ -379,7 +379,9 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
-      DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface};
+      DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface,
+      DeclAttrKind::AllowFeatureSuppression
+  };
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.

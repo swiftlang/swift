@@ -3112,6 +3112,8 @@ static void suppressingFeature(PrintOptions &options, Feature feature,
   case Feature::FeatureName:                                                   \
     suppressingFeature##FeatureName(options, action);                          \
     return;
+#define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("exhaustive switch");
