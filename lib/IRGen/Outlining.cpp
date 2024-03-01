@@ -32,7 +32,7 @@
 using namespace swift;
 using namespace irgen;
 
-void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
+void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
   if (!ty.hasArchetype()) {
     return;

@@ -73,7 +73,7 @@ public:
                              DeinitIsNeeded_t needsDeinitTypes)
       : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
 
-  void collectTypeMetadataForLayout(SILType type);
+  void collectTypeMetadata(SILType type);
 
   void emitCallToOutlinedCopy(Address dest, Address src,
                               SILType T, const TypeInfo &ti,

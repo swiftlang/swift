@@ -631,7 +631,7 @@ namespace {
         return;
       getSingleton()->collectMetadataForOutlining(collector,
                                         getSingletonType(collector.IGF.IGM, T));
-      collector.collectTypeMetadataForLayout(T);
+      collector.collectTypeMetadata(T);
     }
 
     void reexplode(Explosion &src, Explosion &dest)
@@ -3239,7 +3239,7 @@ namespace {
         auto payloadT = getPayloadType(IGM, T);
         getPayloadTypeInfo().collectMetadataForOutlining(collector, payloadT);
       }
-      collector.collectTypeMetadataForLayout(T);
+      collector.collectTypeMetadata(T);
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -5134,7 +5134,7 @@ namespace {
         auto &payloadTI = *payloadCasePair.ti;
         payloadTI.collectMetadataForOutlining(collector, payloadT);
       }
-      collector.collectTypeMetadataForLayout(T);
+      collector.collectTypeMetadata(T);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
@@ -6051,7 +6051,7 @@ namespace {
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
-      collector.collectTypeMetadataForLayout(T);
+      collector.collectTypeMetadata(T);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
