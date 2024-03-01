@@ -195,37 +195,46 @@ func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
 // MARK: Transferring is "var" like //
 //////////////////////////////////////
 
-// Assigning into a transferring parameter is a transfer!
-func assigningIsATransfer(_ x: transferring Klass) async {
-  // Ok, this is disconnected.
+// Assigning into a transferring parameter is a merge.
+func assigningIsAMerge(_ x: transferring Klass) async {
   let y = Klass()
 
-  // y is transferred into x.
-  x = y // expected-warning {{transferring value of non-Sendable type 'Klass' into transferring parameter; later accesses could race}}
-
-  // Since y is now in x, we can't use y anymore so we emit an error.
-  useValue(y) // expected-note {{access here could race}}
-}
-
-func assigningIsATransferNoError(_ x: transferring Klass) async {
-  // Ok, this is disconnected.
-  let y = Klass()
-
-  // y is transferred into x.
   x = y
 
-  useValue(x)
+  // We can still transfer y since x is disconnected.
+  await transferToMain(y)
 }
 
-func assigningIsATransferAny(_ x: transferring Any) async {
+func assigningIsAMergeError(_ x: transferring Klass) async {
+  let y = Klass()
+
+  x = y
+
+  // We can still transfer y since x is disconnected.
+  await transferToMain(y) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context}}
+
+  useValue(x) // expected-note {{access here could race}}
+}
+
+func assigningIsAMergeAny(_ x: transferring Any) async {
   // Ok, this is disconnected.
   let y = getAny()
 
-  // y is transferred into x.
-  x = y // expected-warning {{transferring value of non-Sendable type 'Any' into transferring parameter; later accesses could race}}
+  x = y
 
-  // Since y is now in x, we can't use y anymore so we emit an error.
-  useValue(y) // expected-note {{access here could race}}
+  await transferToMain(y)
+}
+
+func assigningIsAMergeAnyError(_ x: transferring Any) async {
+  // Ok, this is disconnected.
+  let y = getAny() // expected-note {{variable defined here}}
+
+  x = y
+
+  await transferToMain(y) // expected-warning {{transferring 'y' may cause a race}}
+  // expected-note @-1 {{'y' is transferred from nonisolated caller to main actor-isolated callee}}
+
+  useValue(x) // expected-note {{access here could race}}
 }
 
 func canTransferAfterAssign(_ x: transferring Any) async {
@@ -233,9 +242,11 @@ func canTransferAfterAssign(_ x: transferring Any) async {
   let y = getAny()
 
   // y is transferred into x.
+  await transferToMain(x)
+
   x = y
 
-  await transferToMain(x)
+  useValue(x)
 }
 
 func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
@@ -281,10 +292,10 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
-  // y is assigned into a field of x, so we treat this like a merge.
-  x.first = y
+  // y is assigned into a field of x.
+  x.first = y // expected-note {{access here could race}}
 
-  useValue(x) // expected-note {{access here could race}}
+  useValue(x)
 }
 
 func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) async {
@@ -299,12 +310,7 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
   // expected-note @-1 {{'x' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
-  // y is assigned into a field of x, so we treat this like a merge.
-  x.first = y // expected-warning {{transferring value of non-Sendable type 'Klass' into transferring parameter; later accesses could race}}
-
-  useValue(x) // expected-note {{access here could race}}
-
-  useValue(y) // expected-note {{access here could race}}
+  x.first = y  // expected-note {{access here could race}}
 }
 
 func doubleArgument() async {
@@ -320,34 +326,25 @@ func testTransferSrc(_ x: transferring Klass) async {
 }
 
 func testTransferOtherParam(_ x: transferring Klass, y: Klass) async {
-  x = y // expected-warning {{assigning 'y' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y'}}
+  x = y
 }
 
 func testTransferOtherParamTuple(_ x: transferring Klass, y: (Klass, Klass)) async {
-  x = y.0 // expected-warning {{assigning 'y.0' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y.0' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.0'}}
-}
-
-func testTransferOtherParamStruct(_ x: transferring Klass, y: NonSendableStruct) async {
-  x = y.first // expected-warning {{assigning 'y.first' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y.first' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.first'}}
-}
-
-func testTransferOtherParamTupleStruct(_ x: transferring Klass, y: (NonSendableStruct, NonSendableStruct)) async {
-  x = y.1.second // expected-warning {{assigning 'y.1.second' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.1.second'}}
-}
-
-func testTransferOtherParamClassStructTuple(_ x: transferring Klass, y: KlassWithNonSendableStructPair) async {
-  x = y.ns1.second // expected-warning {{assigning 'y.ns1.second' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y.ns1.second' is a task isolated value that is assigned into transferring parameter 'x'}}
-  x = y.ns2.1.second // expected-warning {{assigning 'y.ns2.1.second' to transferring parameter 'x' may cause a race}}
-  // expected-note @-1 {{'y.ns2.1.second' is a task isolated value that is assigned into transferring parameter 'x'. Transferred uses of 'x' may race with caller uses of 'y.ns2.1.second'}}
+  x = y.0
 }
 
 func useSugaredTypeNameWhenEmittingTaskIsolationError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: transferring @escaping () async -> ()) {}
 
   fakeInit(operation: x) // expected-warning {{task isolated value of type '@MainActor () async -> ()' passed as a strongly transferred parameter}}
+}
+
+// Make sure we error here on only the second since x by being assigned a part
+// of y becomes task isolated
+func testMergeWithTaskIsolated(_ x: transferring Klass, y: Klass) async {
+  await transferToMain(x)
+  x = y
+  // TODO: We need to say that this is task isolated.
+  await transferToMain(x) // expected-warning {{transferring 'x' may cause a race}}
+  // expected-note @-1 {{transferring nonisolated 'x' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 }
