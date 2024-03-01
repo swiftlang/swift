@@ -372,6 +372,10 @@ struct PrintOptions {
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
+  /// Whether we're supposed to slap a @rethrows on `AsyncSequence` /
+  /// `AsyncIteratorProtocol` for backward-compatibility reasons.
+  bool AsyncSequenceRethrows = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
