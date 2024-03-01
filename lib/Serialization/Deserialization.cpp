@@ -1719,6 +1719,35 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   return substitutions;
 }
 
+bool ModuleFile::readInheritedProtocols(
+    SmallVectorImpl<ProtocolDecl *> &inherited) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return false;
+
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
+  if (recordID != INHERITED_PROTOCOLS)
+    return false;
+
+  lastRecordOffset.reset();
+
+  ArrayRef<uint64_t> inheritedIDs;
+  InheritedProtocolsLayout::readRecord(scratch, inheritedIDs);
+
+  llvm::transform(inheritedIDs, std::back_inserter(inherited),
+                  [&](uint64_t protocolID) {
+                    return cast<ProtocolDecl>(getDecl(protocolID));
+                  });
+  return true;
+}
+
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
@@ -3187,6 +3216,21 @@ class DeclDeserializer {
       decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
 
+  void handleInherited(ProtocolDecl *P,
+                       ArrayRef<ProtocolDecl *> inherited) {
+    SmallVector<InheritedEntry, 2> inheritedTypes;
+    llvm::transform(inherited, std::back_inserter(inheritedTypes), [](auto *I) {
+      return InheritedEntry(TypeLoc::withoutLoc(I->getDeclaredInterfaceType()),
+                            /*isUnchecked=*/false,
+                            /*isRetroactive=*/false,
+                            /*isPreconcurrency=*/false);
+    });
+
+    P->setInherited(ctx.AllocateCopy(inheritedTypes));
+    ctx.evaluator.cacheOutput(InheritedProtocolsRequest{P},
+                              ctx.AllocateCopy(inherited));
+  }
+
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
       : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
@@ -4425,21 +4469,21 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
+    TypeID superclassID;
     uint8_t rawAccessLevel;
-    unsigned numInheritedTypes;
-    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
+    ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             hasSelfOrAssocTypeRequirements,
-                                            rawAccessLevel, numInheritedTypes,
-                                            rawInheritedAndDependencyIDs);
+                                            superclassID,
+                                            rawAccessLevel,
+                                            dependencyIDs);
 
     Identifier name = MF.getIdentifier(nameID);
     PrettySupplementalDeclNameTrace trace(name);
 
-    for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+    for (TypeID dependencyID : dependencyIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -4457,6 +4501,8 @@ public:
         /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
+    proto->setSuperclass(MF.getType(superclassID));
+
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
     ctx.evaluator.cacheOutput(HasSelfOrAssociatedTypeRequirementsRequest{proto},
@@ -4467,13 +4513,16 @@ public:
     else
       return MF.diagnoseFatal();
 
+    SmallVector<ProtocolDecl *, 2> inherited;
+    if (!MF.readInheritedProtocols(inherited))
+      return MF.diagnoseFatal();
+
+    handleInherited(proto, inherited);
+
     auto genericParams = MF.maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
     ctx.evaluator.cacheOutput(GenericParamListRequest{proto},
                               std::move(genericParams));
-
-    handleInherited(proto,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     if (isImplicit)
       proto->setImplicit();
