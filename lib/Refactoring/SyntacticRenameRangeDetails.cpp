@@ -406,19 +406,18 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
     // Unknown name usage occurs if we don't have an entry in the index that
     // tells us whether the location is a call, reference or a definition. The
     // most common reasons why this happens is if the editor is adding syntactic
-    // results (eg. from comments or string literals).
+    // results to cover comments or string literals.
     //
-    // Determine whether we should include them.
-    if (regionKind == RegionType::ActiveCode) {
-      // If the reference is in active code, we should have had a name usage
-      // from the index. Since we don't, they are likely unrelated symbols that
-      // happen to have the same name. Don't return them as matching ranges.
+    // We only want to include these textual matches inside comments and string
+    // literals. All other matches inside are likely bogus results.
+    if (regionKind != RegionType::Comment && regionKind != RegionType::String) {
       return RegionType::Unmatched;
     }
+
     if (specialBaseName != SpecialBaseName::None &&
         resolved.labelType == LabelRangeType::None) {
       // Filter out non-semantic special basename locations with no labels.
-      // We've already filtered out those in active code, so these are
+      // We've already filtered out those in code, so these are
       // any appearance of just 'init', 'subscript', or 'callAsFunction' in
       // strings, comments, and inactive code.
       return RegionType::Unmatched;

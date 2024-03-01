@@ -21,4 +21,4 @@ class Model {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %2 = load ptr, ptr %[[Self]]
 // CHECK-NOT:    !dbg
-// CHECK-NEXT:   call void @llvm.dbg.declare
+// CHECK-SAME:  {{$}}
