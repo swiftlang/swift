@@ -201,10 +201,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureUnsafeInheritExecutor(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>();
-}
-
 static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
     if (protoDecl->getPrimaryAssociatedTypes().size() > 0)

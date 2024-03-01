@@ -8,6 +8,7 @@
 // RUN:   --implicit-check-not "\$MarkerProtocol" \
 // RUN:   --implicit-check-not "\$Sendable" \
 // RUN:   --implicit-check-not "\$InheritActorContext" \
+// RUN:   --implicit-check-not "\$UnsafeInheritExecutor" \
 // RUN:   < %t/FeatureTest.swiftinterface
 
 // REQUIRES: concurrency
@@ -134,17 +135,16 @@ public func stage(with actor: MyActor) { }
 // CHECK:     func asyncIsh
 public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
-// CHECK:     #if compiler(>=5.3) && $UnsafeInheritExecutor
 // CHECK:     @_unsafeInheritExecutor public func unsafeInheritExecutor() async
 @_unsafeInheritExecutor
 public func unsafeInheritExecutor() async {}
 
-// CHECK:     #elseif compiler(>=5.3) && $SpecializeAttributeWithAvailability
+// CHECK:     #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
 // CHECK:     @_specialize{{.*}}
-// CHECK:     public func multipleSuppressible<T>(value: T) async
+// CHECK:     public func unsafeInheritExecutorAndSpecialize<T>(value: T) async
 @_unsafeInheritExecutor
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
-public func multipleSuppressible<T>(value: T) async {}
+public func unsafeInheritExecutorAndSpecialize<T>(value: T) async {}
 
 // CHECK:      #if compiler(>=5.3) && $UnavailableFromAsync
 // CHECK-NEXT: @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
