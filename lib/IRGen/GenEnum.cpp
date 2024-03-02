@@ -1854,6 +1854,18 @@ namespace {
       return func;
     }
 
+    void emitCallToConsumeEnumFunction(IRGenFunction &IGF, Explosion &src,
+                                       SILType theEnumType) const {
+      if (!consumeEnumFunction)
+        consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
+      Explosion tmp;
+      fillExplosionForOutlinedCall(IGF, src, tmp);
+      llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
+          consumeEnumFunction->getFunctionType(), consumeEnumFunction,
+          tmp.claimAll());
+      call->setCallingConv(IGM.DefaultCC);
+    }
+
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
                                             SILType theEnumType) const {
       IRGenMangler Mangler;
@@ -2806,14 +2818,7 @@ namespace {
           IGF.Builder.emitBlock(endBB);
           return;
         }
-        if (!consumeEnumFunction)
-          consumeEnumFunction = emitConsumeEnumFunction(IGM, loweredType);
-        Explosion tmp;
-        fillExplosionForOutlinedCall(IGF, src, tmp);
-        llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
-            consumeEnumFunction->getFunctionType(), consumeEnumFunction,
-            tmp.claimAll());
-        call->setCallingConv(IGM.DefaultCC);
+        emitCallToConsumeEnumFunction(IGF, src, loweredType);
         return;
       }
 
