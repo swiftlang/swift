@@ -1,6 +1,6 @@
 # CHANGELOG
 
-> **Note**\
+> [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
@@ -300,6 +300,8 @@ concurrency checking.
   guaranteed to be evaluated in the callee's isolation domain.
 
 ## Swift 5.9.2
+
+### 2023-12-11 (Xcode 15.1)
 
 * [SE-0407][]:
 
@@ -10149,6 +10151,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
+[SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
