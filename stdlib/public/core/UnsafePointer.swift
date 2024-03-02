@@ -311,9 +311,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer /* where Pointee: ~Copyable */ {
-  // FIXME: We want this to have the constraint above, but that triggers a .swiftinterface issue.
-
+extension UnsafePointer where Pointee: ~Copyable {
   /// Executes the given closure while temporarily binding memory to
   /// the specified number of instances of type `T`.
   ///
