@@ -353,6 +353,8 @@ enum class SendableCheck {
   ImplicitForExternallyVisible,
 };
 
+std::optional<ActorIsolation> getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
+                           bool onlyExplicit = false);
 /// Whether this sendable check is implicit.
 static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
