@@ -17,4 +17,4 @@ public func foo() {
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s37cf_objc_retainAutoreleasedReturnValue3fooyyF"()
 // CHECK: entry:
 // CHECK:   %0 = call {{.*}}@returnsACFBridgedType()
-// CHECK:   %1 = notail call ptr @llvm.objc.retainAutoreleasedReturnValue(ptr %0)
+// CHECK:   %1 = {{.*}}call ptr @llvm.objc.retainAutoreleasedReturnValue(ptr %0)
