@@ -68,8 +68,4 @@ struct HasOperatorPlusEqual {
 
 using HasOperatorPlusEqualInt = HasOperatorPlusEqual<int>;
 
-struct HasVirtualMethod {
-  virtual int return42() { return 42; } 
-};
-
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_PROTOCOL_CONFORMANCE_H

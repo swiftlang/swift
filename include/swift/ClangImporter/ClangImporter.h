@@ -131,7 +131,6 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
-  friend class SwiftDeclSynthesizer;
 
   // Make requests in the ClangImporter zone friends so they can access `Impl`.
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
