@@ -367,6 +367,7 @@ extension ASTGenVisitor {
       return []
     }
 
+    _ = args
     fatalError("unimplemented")
   }
 
@@ -757,6 +758,7 @@ extension ASTGenVisitor {
       return []
     }
 
+    _ = args
     fatalError("unimplemented")
   }
 
@@ -939,6 +941,8 @@ extension ASTGenVisitor {
       // TODO: Diagnose.
       return nil
     }
+
+    _ = args
     fatalError("unimplemented")
   }
 

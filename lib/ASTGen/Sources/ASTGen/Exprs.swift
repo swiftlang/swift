@@ -266,6 +266,7 @@ extension ASTGenVisitor {
 
     if let signature = node.signature {
       // FIXME: Translate the signature, capture list, 'in' location, etc.
+      _ = signature
       fatalError("unimplmented")
     } else {
       let lBraceLoc = self.generateSourceLoc(node.leftBrace)
