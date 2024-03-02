@@ -164,6 +164,7 @@ public:
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
   IGNORED_ATTR(DistributedThunkTarget)
+  IGNORED_ATTR(AllowFeatureSuppression)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

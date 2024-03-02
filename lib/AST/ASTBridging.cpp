@@ -429,6 +429,18 @@ BridgedAlignmentAttr_createParsed(BridgedASTContext cContext,
       cValue, cAtLoc.unbridged(), cRange.unbridged(), /*Implicit=*/false);
 }
 
+BridgedAllowFeatureSuppressionAttr
+BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
+                                                BridgedSourceLoc cAtLoc,
+                                                BridgedSourceRange cRange,
+                                                BridgedArrayRef cFeatures) {
+  SmallVector<Identifier> features;
+  for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
+    features.push_back(elem.unbridged());
+  return AllowFeatureSuppressionAttr::create(cContext.unbridged(),
+      cAtLoc.unbridged(), cRange.unbridged(), /*implicit*/ false, features);
+}
+
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
