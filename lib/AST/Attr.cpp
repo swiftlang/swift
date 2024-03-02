@@ -953,8 +953,12 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector modifiers;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
-    // Always print result builder attribute.
-    if (!Options.PrintImplicitAttrs && DA->isImplicit())
+    // Don't skip implicit custom attributes. Custom attributes like global
+    // actor isolation have critical semantic meaning and should never be
+    // suppressed. Other custom attrs that can be suppressed, like macros,
+    // are handled below.
+    if (DA->getKind() != DeclAttrKind::Custom &&
+        !Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
