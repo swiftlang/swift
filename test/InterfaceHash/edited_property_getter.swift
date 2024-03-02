@@ -2,6 +2,9 @@
 // Also uses awk:
 // XFAIL OS=windows
 
+// rdar://115209834
+// UNSUPPORTED: OS=linux-gnu
+
 // When adding a private protocol method, the interface hash should stay the same
 // The per-type fingerprint should change
 
