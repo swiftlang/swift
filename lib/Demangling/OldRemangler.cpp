@@ -3034,3 +3034,9 @@ ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
   Buffer << "TwS";
   return ManglingError::Success;
 }
+
+ManglingError
+Remangler::mangleDependentGenericInverseConformanceRequirement(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}

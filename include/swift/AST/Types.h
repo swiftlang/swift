@@ -6007,6 +6007,7 @@ public:
   }
 
   InvertibleProtocolSet getInverses() const { return Inverses; }
+  bool hasInverse() const { return !Inverses.empty(); }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getMembers(), getInverses(), hasExplicitAnyObject());
