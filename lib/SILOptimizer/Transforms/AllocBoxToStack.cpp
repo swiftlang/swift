@@ -1057,7 +1057,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 
     // Set the moveonly delete-if-unused flag so we do not emit an error on the
     // original once we promote all its current uses.
-    F->addSemanticsAttr(semantics::MOVEONLY_DELETE_IF_UNUSED);
+    F->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
     // If any of our promoted callee arg indices were originally noncopyable let
     // boxes, convert them from having escaping to having non-escaping
