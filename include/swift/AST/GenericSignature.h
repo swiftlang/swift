@@ -560,11 +560,11 @@ void validateGenericSignaturesInModule(ModuleDecl *module);
 /// required to be minimal or canonical, and may contain unresolved
 /// DependentMemberTypes.
 ///
-/// If \p baseSignature is non-null, the new parameters and requirements
-/// are added on; existing requirements of the base signature might become
-/// redundant.
-///
-/// If \p baseSignature is null, build a new signature from scratch.
+/// \param baseSignature if non-null, the new parameters and requirements
+///// are added on; existing requirements of the base signature might become
+///// redundant. Otherwise if null, build a new signature from scratch.
+/// \param allowInverses if true, default requirements to Copyable/Escapable are
+/// expanded for generic parameters.
 GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
