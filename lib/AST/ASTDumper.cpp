@@ -1747,11 +1747,6 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
         << "autoclosure discriminator=";
     }
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (&os != &llvm::errs() && &os != &llvm::dbgs())
-      (void)ACE->getDiscriminator();
-
     PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
@@ -2782,12 +2777,6 @@ public:
   void printClosure(AbstractClosureExpr *E, char const *name,
                                   StringRef label) {
     printCommon(E, name, label);
-
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (hasNonStandardOutput())
-      (void)E->getDiscriminator();
-
     printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
 
     switch (auto isolation = E->getActorIsolation()) {
