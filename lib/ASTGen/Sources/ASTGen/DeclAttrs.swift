@@ -936,7 +936,7 @@ extension ASTGenVisitor {
 
   func generateCustomAttr(attribute node: AttributeSyntax) -> BridgedCustomAttr? {
     guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
+      let args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
     else {
       // TODO: Diagnose.
       return nil

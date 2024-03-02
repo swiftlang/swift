@@ -317,7 +317,7 @@ extension ASTGenVisitor {
     additionalTrailingClosures: MultipleTrailingClosureElementListSyntax?
   ) -> BridgedArgumentList {
 
-    var bridgedArgs: BridgedArrayRef = {
+    let bridgedArgs: BridgedArrayRef = {
       // Arguments before ')'
       let normalArgs = labeledExprList.lazy.map({ elem in
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
@@ -363,7 +363,7 @@ extension ASTGenVisitor {
     // of the normal arguments because we don't have a convenient way to pass
     // Optional to ASTBridging,  ASTBridging can know it's "nil" if
     // bridgedArgs.count == firstTrailingClosureIndex
-    var firstTrailingClosureIndex = labeledExprList.count
+    let firstTrailingClosureIndex = labeledExprList.count
 
     return BridgedArgumentList.createParsed(
       self.ctx,
