@@ -189,11 +189,6 @@ extension _StringGuts {
 
 extension _StringGuts {
   
-  @inline(never)
-  func failAssertion(first: UInt8, second: UInt8, result: Int, realResult: Int) {
-    print("Failed with bytes \(first)+\(second) yielding \(result) instead of \(realResult)")
-    fatalError()
-  }
   /// Return the length of the extended grapheme cluster starting at offset `i`,
   /// assuming it falls on a grapheme cluster boundary.
   ///
