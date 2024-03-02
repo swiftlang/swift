@@ -8203,13 +8203,8 @@ bool UnableToInferGenericPackElementType::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();
 
-  const auto applyArgToParamElt =
-      (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
-  const auto packElementElt =
-      (path.end() - 1)->getAs<LocatorPathElt::PackElement>();
-  if (!applyArgToParamElt || !packElementElt) {
-    return false;
-  }
+  auto packElementElt = locator->getLastElementAs<LocatorPathElt::PackElement>();
+  assert(packElementElt && "Expected path to end with a pack element locator");
 
   if (isExpr<NilLiteralExpr>(getAnchor())) {
     // `nil` appears as an element of generic pack params, let's record a
@@ -8226,6 +8221,8 @@ bool UnableToInferGenericPackElementType::diagnoseAsError() {
     if (auto *calleeLocator = getSolution().getCalleeLocator(locator)) {
       if (const auto choice = getOverloadChoiceIfAvailable(calleeLocator)) {
         if (auto *decl = choice->choice.getDeclOrNull()) {
+          const auto applyArgToParamElt =
+              (path.end() - 2)->getAs<LocatorPathElt::ApplyArgToParam>();
           if (auto paramDecl =
                   getParameterAt(decl, applyArgToParamElt->getParamIdx())) {
             emitDiagnosticAt(

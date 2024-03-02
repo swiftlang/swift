@@ -83,16 +83,16 @@ do {
 
 // apple/swift#69432 - Passing nil to a parameter pack fails to produce diagnostic for expression
 do {
-  func foo<each T>(_ value: repeat each T) {} // expected-note {{in inferring pack element #1 of 'value'}}
-  // expected-note@-1 {{in inferring pack element #1 of 'value'}}
-  // expected-note@-2 {{in inferring pack element #2 of 'value'}}
+  func foo<each T>(_ value: repeat each T) {} // expected-note {{in inferring pack element #0 of 'value'}}
+  // expected-note@-1 {{in inferring pack element #0 of 'value'}}
+  // expected-note@-2 {{in inferring pack element #1 of 'value'}}
 
   foo(nil) // expected-error {{'nil' requires a contextual type}}
   foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
   foo(2, nil) // expected-error {{'nil' requires a contextual type}}
 
-  func bar<each T, U, each W>(_ t: repeat each T, u: U, w: repeat each W) {} // expected-note {{in inferring pack element #3 of 'w'}}
-  // expected-note@-1 {{in inferring pack element #4 of 't'}}
+  func bar<each T, U, each W>(_ t: repeat each T, u: U, w: repeat each W) {} // expected-note {{in inferring pack element #2 of 'w'}}
+  // expected-note@-1 {{in inferring pack element #3 of 't'}}
 
   bar(1, 2, 3, nil, "Hello", u: 3, w: 4, 8, nil) // expected-error {{'nil' requires a contextual type}}
   // expected-error@-1 {{'nil' requires a contextual type}}
@@ -100,7 +100,7 @@ do {
 
   func fooWithOverload(_ value: Int) {}
   func fooWithOverload<each T>(_ value: repeat each T) {}
-  // expected-note@-1 {{in inferring pack element #5 of 'value'}}
+  // expected-note@-1 {{in inferring pack element #4 of 'value'}}
 
   fooWithOverload(0, 1, 2, 3, nil) // expected-error {{'nil' requires a contextual type}}
 
