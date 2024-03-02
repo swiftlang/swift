@@ -202,36 +202,31 @@ extension _StringGuts {
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
     _internalInvariant(i < endIndex._encodedOffset)
     if isFastUTF8 {
-      return withFastUTF8 { utf8 in
+      let fast = withFastUTF8 { utf8 in
         let first = utf8[_unchecked: i]
-        if UTF8.isASCII(first) {
-          if i &+ 1 == utf8.count {
-            return 1
-          }
-          let second = utf8[_unchecked: i &+ 1]
-          if UTF8.isASCII(second) {
-            let result = (first == _CR && second == _LF) ? 2 : 1
-            _internalInvariant(
-              result == _opaqueComplexCharacterStride(startingAt: i, utf8: utf8)
-            )
-            return result
-          }
-        }
-        return _opaqueComplexCharacterStride(startingAt: i, utf8: utf8)
+        return UTF8.isASCII(first) && first != _CR
+      }
+      if _fastPath(fast) {
+        return 1
       }
     }
     
-    return _foreignOpaqueCharacterStride(startingAt: i)
+    return _opaqueComplexCharacterStride(startingAt: i)
   }
   
   @_effects(releasenone) @inline(never)
-  internal func _opaqueComplexCharacterStride(startingAt i: Int, utf8: UnsafeBufferPointer<UInt8>) -> Int {
-
-    let nextIdx = nextBoundary(startingAt: i) { j in
-      _internalInvariant(j >= 0)
-      guard j < utf8.count else { return nil }
-      let (scalar, len) = _decodeScalar(utf8, startingAt: j)
-      return (scalar, j &+ len)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
+    if _slowPath(isForeign) {
+      return _foreignOpaqueCharacterStride(startingAt: i)
+    }
+    
+    let nextIdx = withFastUTF8 { utf8 in
+      nextBoundary(startingAt: i) { j in
+        _internalInvariant(j >= 0)
+        guard j < utf8.count else { return nil }
+        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+        return (scalar, j &+ len)
+      }
     }
     
     return nextIdx &- i
