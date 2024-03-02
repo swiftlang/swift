@@ -37,6 +37,7 @@ class SourceManager {
 }
 
 /// MARK: Source file management
+
 extension SourceManager {
   /// Inserts a new source file into the source manager.
   ///

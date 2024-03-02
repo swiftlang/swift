@@ -82,14 +82,14 @@ func testComplexGlobal<U>(_ fn: @escaping @MainActor (U?) -> Void) {
   // CHECK-NEXT: [[SUBST_THUNKED_FN:%.*]] = convert_function [[THUNKED_FN]] : $@callee_guaranteed (@in_guaranteed Optional<U>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>
   // CHECK-NEXT: {{.*}} = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>>, #Optional.some!enumelt, [[SUBST_THUNKED_FN]] : $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> () for <U>
   compute(fn)
-  // expected-warning@-1 {{converting function value of type '@MainActor (U?) -> Void' to '(U?) -> Void' loses global actor 'MainActor'; this is an error in Swift 6}}
+  // expected-warning@-1 {{converting function value of type '@MainActor (U?) -> Void' to '(U?) -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
 
   // CHECK: [[CLOSURE:%.*]] = function_ref @$s6Client17testComplexGlobalyyyxSgScMYcclFySiScMYccfU_ : $@convention(thin) (Int) -> ()
   // CHECK-NEXT: [[CLOSURE_REF:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (Int) -> () to $@callee_guaranteed (Int) -> ()
   // CHECK: [[CLOSURE_THUNK:%.*]] = function_ref @$sSiIegy_SiIegy_TRScMTU : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
   // CHECK-NEXT: {{.*}} = partial_apply [callee_guaranteed] [[CLOSURE_THUNK]]([[CLOSURE_REF]]) : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
   compute { @MainActor (arg: Int) -> Void in
-    // expected-warning@-1 {{converting function value of type '@MainActor (Int) -> Void' to '(Int) -> Void' loses global actor 'MainActor'; this is an error in Swift 6}}
+    // expected-warning@-1 {{converting function value of type '@MainActor (Int) -> Void' to '(Int) -> Void' loses global actor 'MainActor'; this is an error in the Swift 6 language mode}}
   }
 }
 

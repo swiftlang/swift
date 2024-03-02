@@ -191,6 +191,11 @@ protected:
     SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
       isUnsafe : 1
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 32,
+      : NumPadBits,
+      NumFeatures : 32
+    );
   } Bits;
   // clang-format on
 
@@ -2633,6 +2638,32 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
     return std::nullopt;
+  }
+};
+
+/// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
+/// names are intentionally not validated, and the attribute itself is
+/// not printed when rendering a module interface.
+class AllowFeatureSuppressionAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<AllowFeatureSuppressionAttr, Identifier> {
+  friend TrailingObjects;
+
+  /// Create an implicit @objc attribute with the given (optional) name.
+  AllowFeatureSuppressionAttr(SourceLoc atLoc, SourceRange range,
+                              bool implicit, ArrayRef<Identifier> features);
+public:
+  static AllowFeatureSuppressionAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                                             SourceRange range, bool implicit,
+                                             ArrayRef<Identifier> features);
+
+  ArrayRef<Identifier> getSuppressedFeatures() const {
+    return {getTrailingObjects<Identifier>(),
+            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::AllowFeatureSuppression;
   }
 };
 

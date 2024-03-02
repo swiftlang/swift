@@ -254,6 +254,13 @@ const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
 
 void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
+  // Suppress the attribute if requested.
+  switch (getIsolationKind()) {
+  case IsolationKind::Dynamic:
+    if (options.SuppressIsolatedAny) return;
+    break;
+  }
+
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
@@ -953,8 +960,12 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector modifiers;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
-    // Always print result builder attribute.
-    if (!Options.PrintImplicitAttrs && DA->isImplicit())
+    // Don't skip implicit custom attributes. Custom attributes like global
+    // actor isolation have critical semantic meaning and should never be
+    // suppressed. Other custom attrs that can be suppressed, like macros,
+    // are handled below.
+    if (DA->getKind() != DeclAttrKind::Custom &&
+        !Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
@@ -1252,6 +1263,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Alignment:
     Printer.printAttrName("@_alignment");
     Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
+    break;
+
+  case DeclAttrKind::AllowFeatureSuppression:
+    Printer.printAttrName("@_allowFeatureSuppression");
+    Printer << "(";
+    interleave(cast<AllowFeatureSuppressionAttr>(this)->getSuppressedFeatures(),
+               [&](Identifier ident) { Printer << ident; },
+               [&] { Printer << ", "; });
+    Printer << ")";
     break;
 
   case DeclAttrKind::SILGenName:
@@ -1918,6 +1938,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
+  case DeclAttrKind::AllowFeatureSuppression:
+    return "_allowFeatureSuppression";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2899,6 +2921,26 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                                const_cast<StorageRestrictionsAttr *>(this),
                                attachedTo, getAccessesNames()},
                            {});
+}
+
+AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(SourceLoc atLoc,
+                                                         SourceRange range,
+                                                         bool implicit,
+                                              ArrayRef<Identifier> features)
+    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression,
+                    atLoc, range, implicit) {
+  Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
+  std::uninitialized_copy(features.begin(), features.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+AllowFeatureSuppressionAttr *
+AllowFeatureSuppressionAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                                    SourceRange range, bool implicit,
+                                    ArrayRef<Identifier> features) {
+  unsigned size = totalSizeToAlloc<Identifier>(features.size());
+  auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
+  return new (mem) AllowFeatureSuppressionAttr(atLoc, range, implicit, features);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

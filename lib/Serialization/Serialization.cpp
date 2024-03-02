@@ -2758,6 +2758,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::AllowFeatureSuppression: {
+      auto *theAttr = cast<AllowFeatureSuppressionAttr>(DA);
+      auto abbrCode =
+        S.DeclTypeAbbrCodes[AllowFeatureSuppressionDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID> ids;
+      for (auto id : theAttr->getSuppressedFeatures())
+        ids.push_back(S.addUniquedStringRef(id.str()));
+
+      AllowFeatureSuppressionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), ids);
+      return;
+    }
+
     case DeclAttrKind::SPIAccessControl: {
       auto theAttr = cast<SPIAccessControlAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];

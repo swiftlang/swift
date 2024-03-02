@@ -439,6 +439,7 @@ UNINTERESTING_FEATURE(GlobalConcurrency)
 UNINTERESTING_FEATURE(FullTypedThrows)
 UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
+UNINTERESTING_FEATURE(ImplicitOpenExistentials)
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features
@@ -676,15 +677,25 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
 
 void FeatureSet::collectRequiredFeature(Feature feature,
                                         InsertOrRemove operation) {
-  assert(!isSuppressibleFeature(feature));
   required.insertOrRemove(feature, operation == Insert);
 }
 
 void FeatureSet::collectSuppressibleFeature(Feature feature,
                                             InsertOrRemove operation) {
-  assert(isSuppressibleFeature(feature));
   suppressible.insertOrRemove(numFeatures() - size_t(feature),
                               operation == Insert);
+}
+
+static bool shouldSuppressFeature(StringRef featureName, Decl *decl) {
+  auto attr = decl->getAttrs().getAttribute<AllowFeatureSuppressionAttr>();
+  if (!attr) return false;
+
+  for (auto suppressedFeature : attr->getSuppressedFeatures()) {
+    if (suppressedFeature.is(featureName))
+      return true;
+  }
+
+  return false;
 }
 
 /// Go through all the features used by the given declaration and
@@ -698,6 +709,13 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
   if (usesFeature##FeatureName(decl))                                          \
     collectSuppressibleFeature(Feature::FeatureName, operation);
+#define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  if (usesFeature##FeatureName(decl)) {                                        \
+    if (shouldSuppressFeature(#FeatureName, decl))                             \
+      collectSuppressibleFeature(Feature::FeatureName, operation);             \
+    else                                                                       \
+      collectRequiredFeature(Feature::FeatureName, operation);                 \
+  }
 #include "swift/Basic/Features.def"
 }
 

@@ -253,7 +253,7 @@ namespace {
         asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
         emitCopyOfTables(IGF, dest, src);
       } else {
-        OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                              DeinitIsNotNeeded);
         collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                          IsNotInitialization, IsNotTake);
@@ -268,7 +268,7 @@ namespace {
         asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
         emitCopyOfTables(IGF, dest, src);
       } else {
-        OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                              DeinitIsNotNeeded);
         collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                          IsInitialization, IsNotTake);
@@ -283,7 +283,7 @@ namespace {
         asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
         emitCopyOfTables(IGF, dest, src);
       } else {
-        OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                              DeinitIsNotNeeded);
         collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                          IsNotInitialization, IsTake);
@@ -298,7 +298,7 @@ namespace {
         asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
         emitCopyOfTables(IGF, dest, src);
       } else {
-        OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                              DeinitIsNotNeeded);
         collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                          IsInitialization, IsTake);
@@ -311,7 +311,7 @@ namespace {
         Address valueAddr = projectValue(IGF, existential);
         asDerived().emitValueDestroy(IGF, valueAddr);
       } else {
-        OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                              DeinitIsNeeded);
         collector.emitCallToOutlinedDestroy(existential, T, *this);
       }
@@ -968,7 +968,7 @@ public:
                                                srcBuffer);
     } else {
       // Create an outlined function to avoid explosion
-      OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+      OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                            DeinitIsNotNeeded);
       collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                        IsInitialization, IsNotTake);
@@ -985,7 +985,7 @@ public:
       IGF.emitMemCpy(dest, src, getLayout().getSize(IGF.IGM));
     } else {
       // Create an outlined function to avoid explosion
-      OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+      OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
                                            DeinitIsNotNeeded);
       collector.emitCallToOutlinedCopy(dest, src, T, *this,
                                        IsInitialization, IsTake);

@@ -1578,10 +1578,13 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
     return std::nullopt;
 
   // If the existential argument conforms to all of protocol requirements on
-  // the formal parameter's type, don't open.
+  // the formal parameter's type, don't open unless ImplicitOpenExistentials is
+  // enabled.
+
   // If all of the conformance requirements on the formal parameter's type
   // are self-conforming, don't open.
-  {
+  ASTContext &ctx = argTy->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
     Type existentialObjectType;
     if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
       existentialObjectType = existentialMetaTy->getInstanceType();

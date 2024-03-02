@@ -776,6 +776,10 @@ void writeResultBuilderInformation(llvm::json::OStream &JSON,
 
   for (ProtocolDecl *Decl :
        TypeDecl->getLocalProtocols(ConformanceLookupKind::All)) {
+    // FIXME(noncopyable_generics): Should these be included?
+    if (Decl->getInvertibleProtocolKind())
+      continue;
+
     for (auto Member : Decl->getMembers()) {
       if (auto *VD = dyn_cast<swift::VarDecl>(Member)) {
         if (VD->getName() != VarDecl->getName())
@@ -840,9 +844,16 @@ void writeSubstitutedOpaqueTypeAliasDetails(
       // Ignore requirements whose subject type is that of the owner decl
       if (!Requirement.getFirstType()->isEqual(OpaqueTy.getInterfaceType()))
         continue;
-      if (Requirement.getKind() == RequirementKind::Conformance)
-        JSON.value(
-            toFullyQualifiedProtocolNameString(*Requirement.getProtocolDecl()));
+
+      if (Requirement.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // FIXME(noncopyable_generics): Should these be included?
+      if (Requirement.getProtocolDecl()->getInvertibleProtocolKind())
+        continue;
+
+      JSON.value(
+          toFullyQualifiedProtocolNameString(*Requirement.getProtocolDecl()));
     }
   });
 
@@ -920,7 +931,11 @@ void writeProperties(llvm::json::OStream &JSON,
 void writeConformances(llvm::json::OStream &JSON,
                        const NominalTypeDecl &NomTypeDecl) {
   JSON.attributeArray("conformances", [&] {
-    for (auto &Protocol : NomTypeDecl.getAllProtocols()) {
+    for (auto *Protocol : NomTypeDecl.getAllProtocols()) {
+      // FIXME(noncopyable_generics): Should these be included?
+      if (Protocol->getInvertibleProtocolKind())
+        continue;
+
       JSON.value(toFullyQualifiedProtocolNameString(*Protocol));
     }
   });

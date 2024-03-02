@@ -675,7 +675,7 @@ func testExprPatternIsolation() {
   if case .f(0.0, 0) = produceMultiPayload() {}
   if case .f(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
 
-  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in Swift 6}}
+  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
 
   // FIXME: Bad error (https://github.com/apple/swift/issues/64279)
   if case .e(nil, 0) = produceMultiPayload() {}

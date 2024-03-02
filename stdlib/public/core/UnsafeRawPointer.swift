@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -372,11 +372,11 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Result, E: Error>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
@@ -941,11 +941,11 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Result, E: Error>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"

@@ -2,6 +2,7 @@
 // RUN:     %s \
 // RUN:     -enable-builtin-module \
 // RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
+// RUN:     -enable-experimental-feature BorrowingSwitch \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -sil-verify-all \
 // RUN:     -verify

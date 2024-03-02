@@ -1,9 +1,25 @@
 # CHANGELOG
 
-> **Note**\
+> [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 6.0
+* [SE-0352][]:
+  The Swift 6 language mode will open existential values with
+  "self-conforming" types (such as `any Error` or `@objc` protocols)
+  passed to generic functions. For example:
+
+  ```swift
+  func takeError<E: Error>(_ error: E) { }
+
+  func passError(error: any Error) {
+    takeError(error)  // Swift 5 does not open `any Error`, Swift 6 does
+  }
+  ```
+
+  This behavior can be enabled prior to the Swift 6 language mode
+  using the upcoming language feature `ImplicitOpenExistentials`.
+
 * [SE-0422][]:
   Non-built-in expression macros can now be used as default arguments that
   expand at each call site. For example, a custom `#CurrentFile` macro used as
@@ -284,6 +300,8 @@ concurrency checking.
   guaranteed to be evaluated in the callee's isolation domain.
 
 ## Swift 5.9.2
+
+### 2023-12-11 (Xcode 15.1)
 
 * [SE-0407][]:
 
@@ -10133,6 +10151,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
+[SE-0422]: https://github.com/apple/swift-evolution/blob/main/proposals/0422-caller-side-default-argument-macro-expression.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

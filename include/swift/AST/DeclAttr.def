@@ -488,7 +488,10 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
 DECL_ATTR(_distributedThunkTarget, DistributedThunkTarget,
   OnAbstractFunction | UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   156)
-LAST_DECL_ATTR(DistributedThunkTarget)
+DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
+  OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
+  157)
+LAST_DECL_ATTR(AllowFeatureSuppression)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
