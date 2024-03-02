@@ -364,19 +364,16 @@ extension LifetimeDependence.Scope {
   }
 
   private init?(guaranteed base: Value, _ context: some Context) {
-    var introducers = Stack<Value>(context)
+    var introducers = Stack<BeginBorrowValue>(context)
     gatherBorrowIntroducers(for: base, in: &introducers, context)
     // If introducers is empty, then the dependence is on a trivial value, so
     // there is no dependence scope.
     //
     // TODO: Add a SIL verifier check that a mark_dependence [nonescaping]
     // base is never a guaranteed phi.
-    guard let introducer = introducers.pop() else { return nil }
+    guard let beginBorrow = introducers.pop() else { return nil }
     assert(introducers.isEmpty,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
-    guard let beginBorrow = BeginBorrowValue(introducer) else {
-      fatalError("unknown borrow introducer")
-    }
     switch beginBorrow {
     case .beginBorrow, .loadBorrow:
       let borrowOperand = beginBorrow.baseOperand!
