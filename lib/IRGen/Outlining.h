@@ -80,6 +80,9 @@ public:
                              LayoutIsNeeded_t needsLayout,
                              DeinitIsNeeded_t needsDeinitTypes);
 
+  // If any local type data is needed for \p type, add it.
+  //
+  // NOTE: To be called from TypeData instances.
   void collectTypeMetadata(SILType type);
 
   void emitCallToOutlinedCopy(Address dest, Address src,
