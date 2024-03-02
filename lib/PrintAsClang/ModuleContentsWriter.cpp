@@ -834,7 +834,7 @@ public:
             [&](const ValueDecl *vd) {
               return !printer.isVisible(vd) || vd->isObjC() ||
                      (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
-                      vd->getBaseIdentifier().str().startswith("_")) ||
+                      vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
                       vd->getASTContext().getErrorDecl() == vd);

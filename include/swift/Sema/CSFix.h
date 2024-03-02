@@ -1335,8 +1335,7 @@ class UseWrappedValue final : public ConstraintFix {
         PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
   bool usingProjection() const {
-    auto nameStr = PropertyWrapper->getName().str();
-    return !nameStr.startswith("_");
+    return !PropertyWrapper->getName().hasUnderscoredNaming();
   }
 
 public:
