@@ -2873,14 +2873,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     DiscardAttribute = true;
   }
 
-  if (Context.LangOpts.Target.isOSBinFormatCOFF()) {
-    if (DK == DeclAttrKind::WeakLinked) {
-      diagnose(Loc, diag::attr_unsupported_on_target, AttrName,
-               Context.LangOpts.Target.str());
-      DiscardAttribute = true;
-    }
-  }
-
   if (DK == DeclAttrKind::ResultDependsOnSelf &&
       !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
     diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
