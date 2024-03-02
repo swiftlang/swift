@@ -120,6 +120,31 @@ public enum OuterSinglePayloadNC_3<T>: ~Copyable {
   case some(InnerDeinitingDestructableNC<T>)
 }
 
+public enum OuterMultiPayloadNC_1<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingWithLayoutNC<T>)
+  case some2(InnerDeinitingWithLayoutNC<T>)
+}
+
+public enum OuterMultiPayloadNC_2<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingWithoutLayoutNC<T>)
+  case some2(InnerDeinitingWithoutLayoutNC<T>)
+}
+
+// FIXME: Uncomment.
+public enum OuterMultiPayloadNC_3<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingReleasableNC<T>)
+  case some2(InnerDeinitingReleasableNC<T>)
+}
+
+public enum OuterMultiPayloadNC_4<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingDestructableNC<T>)
+  case some2(InnerDeinitingDestructableNC<T>)
+}
+
 // Destroyed value:
 // - has deinit
 // On lifetime end:
@@ -311,3 +336,107 @@ public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<
 //           :        ptr noalias swiftself %0)
 // CHECK:       }
 public func takeOuterSinglePayloadNC_3<T>(_ e: consuming OuterSinglePayloadNC_3<T>) {}
+
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions25takeOuterMultiPayloadNC_1yyAA0efgH2_1OyxGnlF"(
+// CHECK-SAME:      ptr noalias %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_1OyxGlWOh"(
+// CHECK-SAME:        ptr %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_1OyxGlWOh"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         [[RESPONSE1:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingWithLayoutNCVMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[METADATA1:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE1]], 0
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingWithLayoutNCVfD"(
+// CHECK-SAME:        ptr [[METADATA1]], 
+// CHECK-SAME:        ptr noalias swiftself %0)
+// CHECK:         [[RESPONSE2:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingWithLayoutNCVMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[METADATA2:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE2]], 0
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingWithLayoutNCVfD"(
+// CHECK-SAME:        ptr [[METADATA2]], 
+// CHECK-SAME:        ptr noalias swiftself %0)
+// CHECK:       }
+public func takeOuterMultiPayloadNC_1<T>(_ e: consuming OuterMultiPayloadNC_1<T>) {}
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions25takeOuterMultiPayloadNC_2yyAA0efgH2_2OyxGnlF"(
+//           :      i64 %0, 
+//           :      i8 %1, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_2OyxGlWOe"(
+//           :        i64 %0, 
+//           :        i8 %1, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_2OyxGlWOe"(
+//           :      i64 %0, 
+//           :      i8 %1, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions29InnerDeinitingWithoutLayoutNCVfD"(
+//           :        i64 %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions29InnerDeinitingWithoutLayoutNCVfD"(
+//           :        i64 %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+public func takeOuterMultiPayloadNC_2<T>(_ e: consuming OuterMultiPayloadNC_2<T>) {}
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions25takeOuterMultiPayloadNC_3yyAA0efgH2_3OyxGnlF"(
+// CHECK-SAME:      ptr noalias nocapture dereferenceable(64) %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOs"(
+// CHECK-SAME:        ptr %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOs"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOe"(
+//           :        i64 %2, 
+//           :        i64 %4, 
+//           :        i64 %6, 
+//           :        i64 %8, 
+//           :        i64 %10, 
+//           :        i64 %12, 
+//           :        i64 %14, 
+//           :        i64 %16, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+public func takeOuterMultiPayloadNC_3<T>(_ e: consuming OuterMultiPayloadNC_3<T>) {}
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions25takeOuterMultiPayloadNC_4yyAA0efgH2_4OyxGnlF"(
+// CHECK-SAME:      ptr noalias %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_4OyxGlWOh"(
+// CHECK-SAME:        ptr %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_4OyxGlWOh"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         [[RESPONSE1:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[METADATA1:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE1]], 0
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVfD"(
+// CHECK-SAME:        ptr [[METADATA1]], 
+// CHECK-SAME:        ptr noalias swiftself %0)
+// CHECK:         [[RESPONSE2:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[METADATA2:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE2]], 0
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVfD"(
+// CHECK-SAME:        ptr [[METADATA2]], 
+// CHECK-SAME:        ptr noalias swiftself %0)
+// CHECK:       }
+public func takeOuterMultiPayloadNC_4<T>(_ e: consuming OuterMultiPayloadNC_4<T>) {}

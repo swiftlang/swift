@@ -3740,7 +3740,7 @@ namespace {
       Explosion src = IGF.collectParameters();
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
-      auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
+      auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src, nullptr);
 
       forNontrivialPayloads(IGF, parts.tag, [&](unsigned tagIndex,
                                                 EnumImplStrategy::Element elt) {
@@ -3757,21 +3757,26 @@ namespace {
       return func;
     }
 
-    llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            SILType type) const {
+    llvm::Function *
+    emitConsumeEnumFunction(IRGenModule &IGM, SILType type,
+                            OutliningMetadataCollector &collector) const {
       IRGenMangler Mangler;
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
         Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
                                               manglingBits.second);
-      auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
+      SmallVector<llvm::Type *, 2> params(PayloadTypesAndTagType);
+      collector.addPolymorphicParameterTypes(params);
+      auto func = createOutlineLLVMFunction(IGM, name, params);
 
       IRGenFunction IGF(IGM, func);
       if (IGM.DebugInfo)
         IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
       Explosion src = IGF.collectParameters();
-      auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
+      auto parts =
+          destructureAndTagLoadableEnumFromOutlined(IGF, src, &collector);
+      collector.bindPolymorphicParameters(IGF, src);
 
       forNontrivialPayloads(IGF, parts.tag, [&](unsigned tagIndex,
                                                 EnumImplStrategy::Element elt) {
@@ -3826,12 +3831,15 @@ namespace {
       bool allTriviallyDestroyable = true;
       bool allBitwiseTakable = true;
       bool allSingleRefcount = true;
+      bool allCopyable = true;
       bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
         if (!elt.ti->isTriviallyDestroyable(ResilienceExpansion::Maximal))
           allTriviallyDestroyable = false;
         if (!elt.ti->isBitwiseTakable(ResilienceExpansion::Maximal))
           allBitwiseTakable = false;
+        if (!elt.ti->isCopyable(ResilienceExpansion::Maximal))
+          allCopyable = false;
 
         // refcounting is only set in the else branches
         ReferenceCounting refcounting;
@@ -3861,7 +3869,7 @@ namespace {
       } else if (allSingleRefcount
                  && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedRefcounted;
-      } else if (allBitwiseTakable) {
+      } else if (allBitwiseTakable && allCopyable) {
         CopyDestroyKind = BitwiseTakable;
       }
     }
@@ -4048,11 +4056,11 @@ namespace {
 
       return {destructured.payload, destructured.extraTagBits, tag};
     }
-    DestructuredAndTaggedLoadableEnum
-    destructureAndTagLoadableEnumFromOutlined(IRGenFunction &IGF,
-                                              Explosion &src) const {
+    DestructuredAndTaggedLoadableEnum destructureAndTagLoadableEnumFromOutlined(
+        IRGenFunction &IGF, Explosion &src,
+        OutliningMetadataCollector *collector) const {
       EnumPayload payload;
-      unsigned claimSZ = src.size();
+      unsigned claimSZ = src.size() - (collector ? collector->size() : 0);
       if (ExtraTagBitCount > 0) {
         --claimSZ;
       }
@@ -4722,13 +4730,23 @@ namespace {
       payload.emitApplyAndMask(IGF, mask);
     }
 
-    void fillExplosionForOutlinedCall(IRGenFunction &IGF, Explosion &src,
-                                      Explosion &out) const {
+    void
+    fillExplosionForOutlinedCall(IRGenFunction &IGF, Explosion &src,
+                                 Explosion &out,
+                                 OutliningMetadataCollector *collector) const {
       assert(out.empty() && "Out explosion must be empty!");
       auto parts = destructureAndTagLoadableEnum(IGF, src);
       parts.payload.explode(IGM, out);
       if (parts.extraTagBits)
         out.add(parts.extraTagBits);
+
+      if (!collector)
+        return;
+      llvm::SmallVector<llvm::Value *, 4> args;
+      collector->addPolymorphicArguments(args);
+      for (auto *arg : args) {
+        out.add(arg);
+      }
     }
 
   public:
@@ -4786,7 +4804,7 @@ namespace {
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGM, loweredType);
         Explosion tmp;
-        fillExplosionForOutlinedCall(IGF, src, tmp);
+        fillExplosionForOutlinedCall(IGF, src, tmp, nullptr);
         llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
             copyEnumFunction->getFunctionType(), copyEnumFunction,
             tmp.getAll());
@@ -4849,10 +4867,13 @@ namespace {
               });
           return;
         }
+        OutliningMetadataCollector collector(T, IGF, LayoutIsNotNeeded,
+                                             DeinitIsNeeded);
+        IGF.getTypeInfo(T).collectMetadataForOutlining(collector, T);
         if (!consumeEnumFunction)
-          consumeEnumFunction = emitConsumeEnumFunction(IGM, loweredType);
+          consumeEnumFunction = emitConsumeEnumFunction(IGM, T, collector);
         Explosion tmp;
-        fillExplosionForOutlinedCall(IGF, src, tmp);
+        fillExplosionForOutlinedCall(IGF, src, tmp, &collector);
         llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
             consumeEnumFunction->getFunctionType(), consumeEnumFunction,
             tmp.claimAll());
