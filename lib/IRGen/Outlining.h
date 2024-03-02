@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines interfaces for outlining value witnesses.
+// This file defines interfaces for outlined value witnesses.
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,7 +19,10 @@
 
 #include "IRGen.h"
 #include "LocalTypeDataKind.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/GenericRequirement.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {
@@ -33,6 +36,7 @@ class CanType;
 enum IsInitialization_t : bool;
 enum IsTake_t : bool;
 class SILType;
+class NominalTypeDecl;
 
 namespace irgen {
 class Address;
@@ -60,20 +64,30 @@ enum DeinitIsNeeded_t : bool {
 ///   - emit the call to the outlined copy/destroy helper
 class OutliningMetadataCollector {
 public:
+  SILType T;
   IRGenFunction &IGF;
   const unsigned needsLayout : 1;
   const unsigned needsDeinit : 1;
 
 private:
   llvm::MapVector<LocalTypeDataKey, llvm::Value *> Values;
+  llvm::MapVector<GenericRequirement, llvm::Value *> Requirements;
+  std::optional<SubstitutionMap> Subs;
   friend class IRGenModule;
 
 public:
-  OutliningMetadataCollector(IRGenFunction &IGF, LayoutIsNeeded_t needsLayout,
-                             DeinitIsNeeded_t needsDeinitTypes)
-      : IGF(IGF), needsLayout(needsLayout), needsDeinit(needsDeinitTypes) {}
+  OutliningMetadataCollector(SILType T, IRGenFunction &IGF,
+                             LayoutIsNeeded_t needsLayout,
+                             DeinitIsNeeded_t needsDeinitTypes);
 
-  void collectTypeMetadataForLayout(SILType type);
+  unsigned size() const {
+    return Subs.has_value() ? Requirements.size() : Values.size();
+  }
+
+  // If any local type data is needed for \p type, add it.
+  //
+  // NOTE: To be called from TypeData instances.
+  void collectTypeMetadata(SILType type);
 
   void emitCallToOutlinedCopy(Address dest, Address src,
                               SILType T, const TypeInfo &ti,
@@ -83,14 +97,17 @@ public:
   void emitCallToOutlinedRelease(Address addr, SILType T, const TypeInfo &ti,
                                  Atomicity atomicity) const;
 
+  void addPolymorphicArguments(SmallVectorImpl<llvm::Value *> &args) const;
+  void
+  addPolymorphicParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
+  void bindPolymorphicParameters(IRGenFunction &helperIGF,
+                                 Explosion &params) const;
+
 private:
+  void collectTypeMetadataForLayout(SILType type);
+  void collectTypeMetadataForDeinit(SILType type);
   void collectFormalTypeMetadata(CanType type);
   void collectRepresentationTypeMetadata(SILType ty);
-
-  void addMetadataArguments(SmallVectorImpl<llvm::Value *> &args) const ;
-  void addMetadataParameterTypes(SmallVectorImpl<llvm::Type *> &paramTys) const;
-  void bindMetadataParameters(IRGenFunction &helperIGF,
-                              Explosion &params) const;
 };
 
 std::pair<CanType, CanGenericSignature>

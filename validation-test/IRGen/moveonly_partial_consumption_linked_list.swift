@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil \
+// RUN: %target-swift-emit-ir \
 // RUN:     %s \
 // RUN:     -enable-builtin-module \
 // RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
@@ -107,3 +107,4 @@ struct MyLittlePointer<Pointee : ~Copyable> : Copyable {
     return Builtin.take(_rawValue)
   }
 }
+
