@@ -188,6 +188,12 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
+  
+  @inline(never)
+  func failAssertion(first: UInt8, second: UInt8, result: Int, realResult: Int) {
+    print("Failed with bytes \(first)+\(second) yielding \(result) instead of \(realResult)")
+    fatalError()
+  }
   /// Return the length of the extended grapheme cluster starting at offset `i`,
   /// assuming it falls on a grapheme cluster boundary.
   ///
@@ -197,41 +203,44 @@ extension _StringGuts {
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
   @usableFromInline
-  @_effects(releasenone)
+  @_effects(releasenone) @inline(__always)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
-    if _fastPath(isFastUTF8) {
-      let ascii = withFastUTF8 { utf8 in
-        if i == utf8.count { return false }
-        let scalar = utf8[_unchecked: i]
-        return UTF8.isASCII(scalar) && scalar != 0xD /* CR */
-      }
-      if ascii {
-        return 1
+    _internalInvariant(i < endIndex._encodedOffset)
+    if isFastUTF8 {
+      return withFastUTF8 { utf8 in
+        let first = utf8[_unchecked: i]
+        if UTF8.isASCII(first) {
+          if i &+ 1 == utf8.count {
+            return 1
+          }
+          let second = utf8[_unchecked: i &+ 1]
+          if UTF8.isASCII(second) {
+            let result = (first == _CR && second == _LF) ? 2 : 1
+            _internalInvariant(
+              result == _opaqueComplexCharacterStride(startingAt: i, utf8: utf8)
+            )
+            return result
+          }
+        }
+        return _opaqueComplexCharacterStride(startingAt: i, utf8: utf8)
       }
     }
     
-    return _opaqueComplexCharacterStride(startingAt: i)
+    return _foreignOpaqueCharacterStride(startingAt: i)
   }
   
-  @_effects(releasenone)
-  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
-    if _slowPath(isForeign) {
-      return _foreignOpaqueCharacterStride(startingAt: i)
-    }
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int, utf8: UnsafeBufferPointer<UInt8>) -> Int {
 
-    let nextIdx = withFastUTF8 { utf8 in
-      nextBoundary(startingAt: i) { j in
-        _internalInvariant(j >= 0)
-        guard j < utf8.count else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
-        return (scalar, j &+ len)
-      }
+    let nextIdx = nextBoundary(startingAt: i) { j in
+      _internalInvariant(j >= 0)
+      guard j < utf8.count else { return nil }
+      let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+      return (scalar, j &+ len)
     }
-
+    
     return nextIdx &- i
   }
-  
-  
 
   /// Return the length of the extended grapheme cluster ending at offset `i`,
   /// or if `i` happens to be in the middle of a grapheme cluster, find and
@@ -239,7 +248,7 @@ extension _StringGuts {
   ///
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary.
-  @usableFromInline @inline(never)
+  @usableFromInline
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
@@ -492,9 +501,6 @@ extension Unicode {
       between scalar1: Unicode.Scalar,
       and scalar2: Unicode.Scalar
     ) -> Bool? {
-      if scalar1.value == 0xD, scalar2.value == 0xA {
-        return false
-      }
       if _hasGraphemeBreakBetween(scalar1, scalar2) {
         return true
       }
@@ -677,11 +683,7 @@ extension _GraphemeBreakingState {
     between scalar1: Unicode.Scalar,
     and scalar2: Unicode.Scalar
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
+    // includes GB3
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
@@ -833,11 +835,7 @@ extension _StringGuts {
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
+    // includes GB3
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
