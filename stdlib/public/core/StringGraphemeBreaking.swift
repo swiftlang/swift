@@ -204,7 +204,10 @@ extension _StringGuts {
     if isFastUTF8 {
       let fast = withFastUTF8 { utf8 in
         let first = utf8[_unchecked: i]
-        return UTF8.isASCII(first) && first != _CR
+        if UTF8.isASCII(first) && first != _CR {
+          return i &+ 1 == utf8.count || UTF8.isASCII(utf8[_unchecked: i &+ 1])
+        }
+        return false
       }
       if _fastPath(fast) {
         return 1
@@ -491,6 +494,10 @@ extension Unicode {
       between scalar1: Unicode.Scalar,
       and scalar2: Unicode.Scalar
     ) -> Bool? {
+      if scalar1.value == _CR, scalar2.value == _LF {
+        return false
+      }
+      
       if _hasGraphemeBreakBetween(scalar1, scalar2) {
         return true
       }
@@ -673,7 +680,11 @@ extension _GraphemeBreakingState {
     between scalar1: Unicode.Scalar,
     and scalar2: Unicode.Scalar
   ) -> Bool {
-    // includes GB3
+    // GB3
+    if scalar1.value == _CR, scalar2.value == _LF {
+      return false
+    }
+    
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
@@ -825,7 +836,10 @@ extension _StringGuts {
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
-    // includes GB3
+    if scalar1.value == _CR, scalar2.value == _LF {
+      return false
+    }
+    
     if _hasGraphemeBreakBetween(scalar1, scalar2) {
       return true
     }
