@@ -362,3 +362,18 @@ void InverseRequirement::expandDefaults(
     }
   }
 }
+
+/// Linear order on inverse requirements in a generic signature.
+int InverseRequirement::compare(const InverseRequirement &other) const {
+  int compareLHS =
+      compareDependentTypes(subject, other.subject);
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareProtos =
+      TypeDecl::compare(protocol, other.protocol);
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
+
+  return compareProtos;
+}

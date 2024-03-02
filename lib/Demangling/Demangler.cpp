@@ -84,6 +84,7 @@ static bool isRequirement(Node::Kind kind) {
     case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericConformanceRequirement:
+    case Node::Kind::DependentGenericInverseConformanceRequirement:
       return true;
     default:
       return false;
@@ -4085,8 +4086,9 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
 NodePointer Demangler::demangleGenericRequirement() {
 
   enum { Generic, Assoc, CompoundAssoc, Substitution } TypeKind;
-  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker } ConstraintKind;
+  enum { Protocol, BaseClass, SameType, SameShape, Layout, PackMarker, Inverse } ConstraintKind;
 
+  std::optional<char> invertibleKind; // INVERTIBLE-KIND
   switch (nextChar()) {
     case 'v': ConstraintKind = PackMarker; TypeKind = Generic; break;
     case 'c': ConstraintKind = BaseClass; TypeKind = Assoc; break;
@@ -4105,6 +4107,8 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
+    case 'i': ConstraintKind = Inverse; TypeKind = Generic;
+              invertibleKind = nextChar(); break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
 
@@ -4135,6 +4139,17 @@ NodePointer Demangler::demangleGenericRequirement() {
     return createWithChildren(
         Node::Kind::DependentGenericConformanceRequirement, ConstrTy,
         popProtocol());
+  case Inverse: {
+    char const* name = nullptr;
+    switch (*invertibleKind) {
+    case 'c': name = "Copyable"; break;
+    case 'e': name = "Escapable"; break;
+    default: return nullptr;
+    }
+    return createWithChildren(
+        Node::Kind::DependentGenericInverseConformanceRequirement, ConstrTy,
+        createSwiftType(Node::Kind::Protocol, name));
+  }
   case BaseClass:
     return createWithChildren(
         Node::Kind::DependentGenericConformanceRequirement, ConstrTy,

@@ -1763,32 +1763,32 @@ bool ExtensionDecl::isConstrainedExtension() const {
   return !typeSig->isEqual(extSig);
 }
 
-bool ExtensionDecl::isEquivalentToExtendedContext() const {
+bool ExtensionDecl::isInSameDefiningModule() const {
   auto decl = getExtendedNominal();
-  bool extendDeclFromSameModule = false;
   auto extensionAlterName = getAlternateModuleName();
   auto typeAlterName = decl->getAlternateModuleName();
 
   if (!extensionAlterName.empty()) {
     if (!typeAlterName.empty()) {
       // Case I: type and extension are both moved from somewhere else
-      extendDeclFromSameModule = typeAlterName == extensionAlterName;
+      return typeAlterName == extensionAlterName;
     } else {
       // Case II: extension alone was moved from somewhere else
-      extendDeclFromSameModule = extensionAlterName ==
-        decl->getParentModule()->getNameStr();
+      return extensionAlterName == decl->getParentModule()->getNameStr();
     }
   } else {
     if (!typeAlterName.empty()) {
       // Case III: extended type alone was moved from somewhere else
-      extendDeclFromSameModule = typeAlterName == getParentModule()->getNameStr();
+      return typeAlterName == getParentModule()->getNameStr();
     } else {
       // Case IV: neither of type and extension was moved from somewhere else
-      extendDeclFromSameModule = getParentModule() == decl->getParentModule();
+      return getParentModule() == decl->getParentModule();
     }
   }
+}
 
-  return extendDeclFromSameModule
+bool ExtensionDecl::isEquivalentToExtendedContext() const {
+  return isInSameDefiningModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
 }

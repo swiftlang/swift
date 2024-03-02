@@ -263,11 +263,23 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
     // To make LLVM IR more readable we always add a 'T' prefix so that type names
     // don't start with a digit and don't need to be quoted.
     Buffer << 'T';
+    bool isFirstItem = true;
+    InvertibleProtocolSet inverses = InvertibleProtocolSet::full();
     auto protocols = layout.getProtocols();
-    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      appendProtocolName(protocols[i]);
-      if (i == 0)
-        appendOperator("_");
+    for (auto *proto : protocols) {
+      if (auto ip = proto->getInvertibleProtocolKind()) {
+        inverses.remove(*ip);
+        continue;
+      }
+
+      appendProtocolName(proto);
+      appendListSeparator(isFirstItem);
+    }
+    // Append inverses like '~Copyable' as '-Copyable'
+    for (auto ip : inverses) {
+      appendOperator("-");
+      appendIdentifier(getProtocolName(getKnownProtocolKind(ip)));
+      appendListSeparator(isFirstItem);
     }
     if (auto superclass = layout.explicitSuperclass) {
       // We share type infos for different instantiations of a generic type
@@ -329,7 +341,8 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
     switch (referent.getKind()) {
     case SymbolicReferent::NominalType: {
       auto ty = referent.getNominalType();
-      appendContext(ty, ty->getAlternateModuleName());
+      BaseEntitySignature base(ty);
+      appendContext(ty, base, ty->getAlternateModuleName());
       continue;
     }
     case SymbolicReferent::OpaqueType: {
@@ -415,7 +428,8 @@ std::string IRGenMangler::mangleSymbolNameForUnderlyingTypeAccessorString(
   beginManglingWithoutPrefix();
   Buffer << "get_underlying_type_ref ";
 
-  appendContextOf(opaque);
+  BaseEntitySignature base(opaque);
+  appendContextOf(opaque, base);
   appendOpaqueDeclName(opaque);
 
   if (index == 0) {
@@ -433,7 +447,8 @@ IRGenMangler::mangleSymbolNameForUnderlyingWitnessTableAccessorString(
   beginManglingWithoutPrefix();
   Buffer << "get_underlying_witness ";
 
-  appendContextOf(opaque);
+  BaseEntitySignature base(opaque);
+  appendContextOf(opaque, base);
   appendOpaqueDeclName(opaque);
 
   appendType(req.getFirstType()->getCanonicalType(), opaque->getGenericSignature());

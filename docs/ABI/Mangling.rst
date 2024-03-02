@@ -467,8 +467,92 @@ An ``extension`` mangling is used whenever an entity's declaration context is
 an extension *and* the entity being extended is in a different module. In this
 case the extension's module is mangled first, followed by the entity being
 extended. If the extension and the extended entity are in the same module, the
-plain ``entity`` mangling is preferred. If the extension is constrained, the
-constraints on the extension are mangled in its generic signature.
+plain ``entity`` mangling is preferred, but not always used. An extension is
+considered "constrained" if it:
+
+  - Has any requirements not already satisfied by the extended nominal,
+    excluding conformance requirements for invertible protocols.
+  - Has any generic parameters with an inverse requirement.
+
+Those requirements included in any of the above are included in the extension's
+generic signature. The reason for this additional complexity is that we do not
+mangle conformance req's for invertible protocols, only their absence.
+
+::
+
+  struct S<A: ~Copyable, B: ~Copyable> {}
+
+  // An unconstrained extension.
+  extension S {}
+
+  // Also an unconstrained extension, because there are no inverses to mangle.
+  // This extension is exactly the same as the previous.
+  extension S where A: Copyable, B: Copyable {}
+
+  // A constrained extension, because of the added requirement `B: P` that is
+  // not already present in S.
+  extension S where B: P {}
+
+  // A constrained extension, because of the absence of `A: Copyable`.
+  // Despite also being absent in `S`, absences of invertible protocols
+  // are always mangled.
+  extension S where A: ~Copyable {}
+
+Some entities, like computed properties, rely on the generic signature in their
+`context`, so in order to disambiguate between those properties and
+those in a context where a generic type requires Copyable, which is not mangled,
+we have the following rule:
+
+If the innermost type declaration for an entity has any inverses in its generic
+signature, then extension mangling is used. This strategy is used to ensure
+that moving a declaration between a nominal type and one of its extensions does
+not cause an ABI break if the generic signature of the entity is equivalent in
+both circumstances. For example:
+
+::
+
+  struct R<A: ~Copyable> {
+    func f1() {} // uses extension mangling, just like `f3`
+
+    func f2() where A: Copyable {}
+  }
+
+  extension R where A: ~Copyable {
+    func f3() {}
+
+    func f4() where A: Copyable {} // uses entity mangling, just like `f2`
+  }
+
+  extension R where A: Copyable {
+    // 'f5' is mangled equivalent to 'f2' and 'f4' modulo its identifier.
+    func f5() {}
+  }
+
+For intermediate nested types, i.e., those between the top level and the entity,
+any inverses that remain in at the signature of the entity are mangled into
+that entity's generic signature:
+
+::
+
+  struct X<A: ~Copyable> {
+    struct Y<B: ~Copyable> {
+      // 'g1' uses 'entity' context mangling with and has no mangled signatures.
+      func g1() where A: Copyable, B: Copyable {}
+
+      // 'g2' uses 'entity' context mangling. The requirement `B: ~Copyable` is
+      //mangled into the generic signature for 'g2'.
+      func g2() where A: Copyable {}
+
+      // 'g3' uses extension mangling with generic signature 'A: ~Copyable'.
+      // The mangled generic signature of 'g3' is empty.
+      func g3() where B: Copyable {}
+
+      // 'g4' uses extension mangling with generic signature 'A: ~Copyable'.
+      // The mangled generic signature of 'g4' contains 'B: ~Copyable'.
+      func g4() {}
+    }
+  }
+
 
 When mangling the context of a local entity within a constructor or
 destructor, the non-allocating or non-deallocating variant is used.
@@ -680,12 +764,14 @@ Types
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
   METATYPE-REPR ::= 'o'                      // ObjC metatype representation
 
+  existential-layout ::= protocol-list 'p'                 // existential layout
+  existential-layout ::= protocol-list superclass 'Xc'     // existential layout with superclass
+  existential-layout ::= protocol-list 'Xl'                // existential layout with AnyObject
+
   type ::= associated-type
   type ::= any-generic-type
-  type ::= protocol-list 'p'                 // existential type
-  type ::= protocol-list superclass 'Xc'     // existential type with superclass
-  type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list requirement* '_' 'XP'   // constrained existential type
+  type ::= existential-layout                         // existential type
+  type ::= existential-layout requirement '_' requirement* 'XP'   // constrained existential type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -925,6 +1011,9 @@ now codified into the ABI; the index 0 is therefore reserved.
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
 
+  INVERTIBLE-KIND ::= 'c'  // Copyable
+  INVERTIBLE-KIND ::= 'e'  // Escapable
+
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
 
@@ -932,6 +1021,9 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= protocol assoc-type-name 'Rp' GENERIC-PARAM-INDEX // protocol requirement on associated type
   requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
   requirement ::= protocol substitution 'RQ'                        // protocol requirement with substitution
+#if SWIFT_RUNTIME_VERSION >= 6.0
+  requirement ::= 'Ri' INVERTIBLE-KIND GENERIC-PARAM-INDEX          // inverse requirement
+#endif
   requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
   requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type
   requirement ::= type assoc-type-list 'RC' GENERIC-PARAM-INDEX     // base class requirement on associated type at depth
