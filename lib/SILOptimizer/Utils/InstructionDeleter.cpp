@@ -180,7 +180,9 @@ bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
   bool fixLifetime = inst->getFunction()->hasOwnership();
   if (isInstructionTriviallyDead(inst)
       || isScopeAffectingInstructionDead(inst, fixLifetime)) {
-    assert(!isIncidentalUse(inst) && !isa<DestroyValueInst>(inst) &&
+    assert(!isIncidentalUse(inst) &&
+           (!isa<DestroyValueInst>(inst) ||
+            canTriviallyDeleteOSSAEndScopeInst(inst)) &&
            "Incidental uses cannot be removed in isolation. "
            "They would be removed iff the operand is dead");
     getCallbacks().notifyWillBeDeleted(inst);

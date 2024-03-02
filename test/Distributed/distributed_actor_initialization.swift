@@ -55,7 +55,7 @@ distributed actor OK6 {
 
 distributed actor OKMulti {
 
-  convenience init(y: Int, system: FakeActorSystem) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in Swift 6}}{{3-15=}}
+  convenience init(y: Int, system: FakeActorSystem) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{3-15=}}
     self.init(actorSystem: system)
   }
 

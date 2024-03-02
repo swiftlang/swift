@@ -837,7 +837,7 @@ func test_rdar89742267() {
     @Builder var body: S {
       switch entry {
       case .listen: S()
-      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
       default: S()
       }
     }

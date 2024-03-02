@@ -275,3 +275,46 @@ bb6:
   %t = tuple ()
   return %t : $()
 }
+
+sil @_swift_stdlib_isNSString : $@convention(c) (AnyObject) -> UInt8
+
+// Ensure no crash in compiler
+sil hidden [ossa] @test_clone_destroy_none : $@convention(thin) (@guaranteed AnyObject) -> Bool {
+bb0(%0 : @guaranteed $AnyObject):
+  %3 = enum $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>, #Optional.none!enumelt
+  %4 = begin_borrow %3 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  switch_enum %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%6 : @guaranteed $(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)):
+  end_borrow %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb3(%8 : $Builtin.Int1)
+
+bb2:
+  end_borrow %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  %11 = integer_literal $Builtin.Int1, 0
+  br bb3(%11 : $Builtin.Int1)
+
+bb3(%13 : $Builtin.Int1):
+  destroy_value %3 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  cond_br %13, bb4, bb5
+
+bb4:
+  %16 = integer_literal $Builtin.Int1, -1
+  %17 = struct $Bool (%16 : $Builtin.Int1)
+  br bb6(%17 : $Bool)
+
+bb5:
+  %19 = function_ref @_swift_stdlib_isNSString : $@convention(c) (AnyObject) -> UInt8
+  %20 = apply %19(%0) : $@convention(c) (AnyObject) -> UInt8
+  %21 = integer_literal $Builtin.Int8, 0
+  %22 = struct_extract %20 : $UInt8, #UInt8._value
+  %23 = builtin "cmp_eq_Int8"(%22 : $Builtin.Int8, %21 : $Builtin.Int8) : $Builtin.Int1
+  %24 = integer_literal $Builtin.Int1, -1
+  %25 = builtin "xor_Int1"(%23 : $Builtin.Int1, %24 : $Builtin.Int1) : $Builtin.Int1
+  %26 = struct $Bool (%25 : $Builtin.Int1)
+  br bb6(%26 : $Bool)
+
+bb6(%28 : $Bool):
+  return %28 : $Bool
+}

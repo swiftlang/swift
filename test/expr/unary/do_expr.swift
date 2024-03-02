@@ -191,7 +191,7 @@ func tryDo4() throws -> Int {
 func tryDo5() throws -> Int {
   return try do { tryDo4() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
-  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
   // expected-note@-5 {{did you mean to disable error propagation?}}
@@ -200,7 +200,7 @@ func tryDo5() throws -> Int {
 func tryDo6() throws -> Int {
   try do { tryDo4() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
-  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
   // expected-note@-5 {{did you mean to disable error propagation?}}
@@ -209,7 +209,7 @@ func tryDo6() throws -> Int {
 func tryDo7() throws -> Int {
   let x = try do { tryDo4() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
-  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
   // expected-note@-5 {{did you mean to disable error propagation?}}
@@ -235,7 +235,7 @@ func tryDo10() throws -> Int {
 func tryDo11() throws -> Int {
   let x = try do { try tryDo4() } catch { tryDo4() }
   // expected-warning@-1 {{'try' has no effect on 'do-catch' expression}}
-  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-2 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
   // expected-note@-5 {{did you mean to disable error propagation?}}
@@ -245,7 +245,7 @@ func tryDo11() throws -> Int {
 func tryDo12() throws -> Int {
   let x = try do { tryDo4() } catch { tryDo4() }
   // expected-warning@-1 {{'try' has no effect on 'do-catch' expression}}
-  // expected-warning@-2 2{{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-2 2{{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 2{{did you mean to use 'try'?}}
   // expected-note@-4 2{{did you mean to handle error as optional value?}}
   // expected-note@-5 2{{did you mean to disable error propagation?}}
@@ -255,13 +255,13 @@ func tryDo12() throws -> Int {
 func tryDo13() throws -> Int {
   let x = try do { // expected-warning {{'try' has no effect on 'do-catch' expression}}
     tryDo4() // expected-warning {{result of call to 'tryDo4()' is unused}}
-    // expected-warning@-1 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+    // expected-warning@-1 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
     // expected-note@-2 {{did you mean to use 'try'?}}
     // expected-note@-3 {{did you mean to handle error as optional value?}}
     // expected-note@-4 {{did you mean to disable error propagation?}}
 
     _ = tryDo4()
-    // expected-warning@-1 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+    // expected-warning@-1 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
     // expected-note@-2 {{did you mean to use 'try'?}}
     // expected-note@-3 {{did you mean to handle error as optional value?}}
     // expected-note@-4 {{did you mean to disable error propagation?}}
@@ -483,7 +483,7 @@ func awaitDo10() async -> Int {
 func awaitDo11() async -> Int {
   let x = await do { try await tryAwaitDo1() } catch { awaitDo4() }
   // expected-warning@-1 {{'await' has no effect on 'do-catch' expression}}
-  // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 {{call is 'async'}}
   return x
 }
@@ -491,7 +491,7 @@ func awaitDo11() async -> Int {
 func awaitDo12() async -> Int {
   let x = await do { try tryAwaitDo1() } catch { awaitDo4() }
   // expected-warning@-1 {{'await' has no effect on 'do-catch' expression}}
-  // expected-warning@-2 2{{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-2 2{{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-3 2{{call is 'async'}}
   return x
 }
@@ -499,11 +499,11 @@ func awaitDo12() async -> Int {
 func awaitDo13() async throws -> Int {
   let x = await do { // expected-warning {{'await' has no effect on 'do-catch' expression}}
     awaitDo4() // expected-warning {{result of call to 'awaitDo4()' is unused}}
-    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
     // expected-note@-2 {{call is 'async'}}
 
     _ = awaitDo4()
-    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
     // expected-note@-2 {{call is 'async'}}
 
     _ = await awaitDo4() // Okay.
@@ -579,11 +579,11 @@ func tryAwaitDo3() async throws -> Int {
   try await do { tryAwaitDo2() } as Int
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
   // expected-note@-6 {{did you mean to disable error propagation?}}
-  // expected-warning@-7 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-7 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-8 {{call is 'async'}}
 }
 
@@ -591,7 +591,7 @@ func tryAwaitDo4() async throws -> Int {
   try await do { try tryAwaitDo2() } as Int
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{call is 'async'}}
 }
 
@@ -599,7 +599,7 @@ func tryAwaitDo5() async throws -> Int {
   try await do { await tryAwaitDo2() } as Int
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
   // expected-note@-6 {{did you mean to disable error propagation?}}
@@ -615,11 +615,11 @@ func tryAwaitDo7() async throws -> Int {
   try await do { tryAwaitDo2() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
   // expected-note@-6 {{did you mean to disable error propagation?}}
-  // expected-warning@-7 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-7 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-8 {{call is 'async'}}
 }
 
@@ -627,7 +627,7 @@ func tryAwaitDo8() async throws -> Int {
   try await do { try tryAwaitDo2() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@-3 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{call is 'async'}}
 }
 
@@ -635,7 +635,7 @@ func tryAwaitDo9() async throws -> Int {
   try await do { await tryAwaitDo2() }
   // expected-warning@-1 {{'try' has no effect on 'do' expression}}
   // expected-warning@-2 {{'await' has no effect on 'do' expression}}
-  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in Swift 6}}
+  // expected-warning@-3 {{call can throw but is not marked with 'try'; this is an error in the Swift 6 language mode}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
   // expected-note@-6 {{did you mean to disable error propagation?}}
