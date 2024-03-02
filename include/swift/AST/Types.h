@@ -3781,6 +3781,9 @@ public:
 
   /// Returns nullptr for an empty dependence list.
   const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
+    if (!hasLifetimeDependenceInfo()) {
+      return nullptr;
+    }
     auto *info = getTrailingObjects<LifetimeDependenceInfo>();
     assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
                              "shouldn't have stored it.");
@@ -3935,6 +3938,9 @@ public:
 
   /// Returns nullptr for an empty dependence list.
   const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const {
+    if (!hasLifetimeDependenceInfo()) {
+      return nullptr;
+    }
     auto *info = getTrailingObjects<LifetimeDependenceInfo>();
     assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
                              "shouldn't have stored it.");

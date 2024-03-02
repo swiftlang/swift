@@ -132,6 +132,7 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
+  bool isExplicit;
 
   static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
                                                  unsigned index,
@@ -146,11 +147,18 @@ class LifetimeDependenceInfo {
 public:
   LifetimeDependenceInfo()
       : inheritLifetimeParamIndices(nullptr),
-        scopeLifetimeParamIndices(nullptr) {}
+        scopeLifetimeParamIndices(nullptr), isExplicit(false) {}
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
-                         IndexSubset *scopeLifetimeParamIndices)
+                         IndexSubset *scopeLifetimeParamIndices,
+                         bool isExplicit = false)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
-        scopeLifetimeParamIndices(scopeLifetimeParamIndices) {}
+        scopeLifetimeParamIndices(scopeLifetimeParamIndices),
+        isExplicit(isExplicit) {
+    assert(!empty());
+    assert(!inheritLifetimeParamIndices ||
+           !inheritLifetimeParamIndices->isEmpty());
+    assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
+  }
 
   operator bool() const { return !empty(); }
 
@@ -158,6 +166,8 @@ public:
     return inheritLifetimeParamIndices == nullptr &&
            scopeLifetimeParamIndices == nullptr;
   }
+
+  bool isExplicitlySpecified() const { return isExplicit; }
 
   bool hasInheritLifetimeParamIndices() const {
     return inheritLifetimeParamIndices != nullptr;

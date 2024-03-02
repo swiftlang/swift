@@ -1067,9 +1067,16 @@ public:
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
   std::optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
-  bool maybeReadLifetimeDependence(
+  bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
+
+  // Reads lifetime dependence info from type if present.
+  std::optional<LifetimeDependenceInfo>
+  maybeReadLifetimeDependenceInfo(unsigned numParams);
+
+  // Reads lifetime dependence specifier from decl if present
+  bool maybeReadLifetimeDependenceSpecifier(
       SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numParams);
+      unsigned numDeclParams);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();
