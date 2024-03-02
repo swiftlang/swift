@@ -729,28 +729,28 @@ public:
   }
 
 public:
-  InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
+  InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
         Loc == Tok.getLoc() && Tok.isAtStartOfLine())
       Loc = getEndOfPreviousLoc();
     return Diags.diagnose(Loc, Diag);
   }
 
-  InFlightDiagnostic diagnose(Token Tok, Diagnostic Diag) {
+  InFlightDiagnostic diagnose(Token Tok, DiagRef Diag) {
     return diagnose(Tok.getLoc(), Diag);
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(SourceLoc Loc, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
-    return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
+    return diagnose(Loc, {DiagID, {std::forward<ArgTypes>(Args)...}});
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(Token Tok, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
     return diagnose(Tok.getLoc(),
-                    Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
+                    {DiagID, {std::forward<ArgTypes>(Args)...}});
   }
     
   /// Add a fix-it to remove the space in consecutive identifiers.
@@ -809,19 +809,19 @@ public:
   /// its name in \p Result.  Otherwise, emit an error.
   ///
   /// \returns false on success, true on error.
-  bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D,
+  bool parseIdentifier(Identifier &Result, SourceLoc &Loc, DiagRef D,
                        bool diagnoseDollarPrefix);
 
   /// Consume an identifier with a specific expected name.  This is useful for
   /// contextually sensitive keywords that must always be present.
   bool parseSpecificIdentifier(StringRef expected, SourceLoc &Loc,
-                               const Diagnostic &D);
+                               DiagRef D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, SourceLoc &L,
                        bool diagnoseDollarPrefix, Diag<DiagArgTypes...> ID,
                        ArgTypes... Args) {
-    return parseIdentifier(Result, L, Diagnostic(ID, Args...),
+    return parseIdentifier(Result, L, {ID, {Args...}},
                            diagnoseDollarPrefix);
   }
   
@@ -829,19 +829,19 @@ public:
   bool parseSpecificIdentifier(StringRef expected,
                                Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
+    return parseSpecificIdentifier(expected, L, {ID, {Args...}});
   }
 
   /// Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
   bool parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
-                          const Diagnostic &D, bool diagnoseDollarPrefix);
+                          DiagRef D, bool diagnoseDollarPrefix);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseAnyIdentifier(Identifier &Result, bool diagnoseDollarPrefix,
                           Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...),
+    return parseAnyIdentifier(Result, L, {ID, {Args...}},
                               diagnoseDollarPrefix);
   }
 
@@ -849,28 +849,28 @@ public:
   /// emit the specified error diagnostic, and a note at the specified note
   /// location.
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                            const Diagnostic &D);
+                            DiagRef D);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
-  bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
+  bool parseToken(tok K, SourceLoc &TokLoc, DiagRef D);
   
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseToken(K, L, Diagnostic(ID, Args...));
+    return parseToken(K, L, {ID, {Args...}});
   }
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, SourceLoc &L,
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-    return parseToken(K, L, Diagnostic(ID, Args...));
+    return parseToken(K, L, {ID, {Args...}});
   }
   
   /// Parse the specified expected token and return its location on success.  On failure, emit the specified
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
-  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
@@ -903,7 +903,7 @@ public:
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         bool AllowSepAfterLast, DiagRef RightErrorDiag,
                          llvm::function_ref<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -1072,6 +1072,14 @@ public:
                          SmallVector<SourceLoc, 4> &NameLocs,
                          bool &IsNullarySelector);
 
+  /// Parse a parenthesized and comma-separated list of attribute arguments.
+  ///
+  /// \returns false on success, true on error.
+  ParserStatus
+  parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
+                          bool isAttrModifier, SourceRange &parensRange,
+                          llvm::function_ref<ParserStatus()> parseAttr);
+
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
@@ -1151,6 +1159,9 @@ public:
   parseDocumentationAttributeArgument(std::optional<StringRef> &Metadata,
                                       std::optional<AccessLevel> &Visibility);
 
+  ParserResult<AllowFeatureSuppressionAttr>
+  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
+
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
   ParserResult<MacroRoleAttr> parseMacroRoleAttribute(
@@ -1184,7 +1195,7 @@ public:
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
-                         const Diagnostic &D);
+                         DiagRef D);
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
@@ -1832,7 +1843,7 @@ public:
   ///   unqualified-decl-name:
   ///     unqualified-decl-base-name
   ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
-  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
+  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, DiagRef diag,
                                DeclNameOptions flags);
 
   /// Parse macro expansion.
@@ -1843,7 +1854,7 @@ public:
       SourceLoc &poundLoc, DeclNameLoc &macroNameLoc, DeclNameRef &macroNameRef,
       SourceLoc &leftAngleLoc, SmallVectorImpl<TypeRepr *> &genericArgs,
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
-      const Diagnostic &diag);
+      DiagRef diag);
 
   ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

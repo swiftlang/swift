@@ -366,6 +366,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::StaticInitializeObjCMetadata,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
+      DeclAttrKind::AllowFeatureSuppression,
   };
 
   return result;
@@ -3101,6 +3102,12 @@ static void suppressingFeatureExtern(PrintOptions &options,
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
+static void suppressingFeatureIsolatedAny(PrintOptions &options,
+                                          llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedAny, true);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -3112,6 +3119,8 @@ static void suppressingFeature(PrintOptions &options, Feature feature,
   case Feature::FeatureName:                                                   \
     suppressingFeature##FeatureName(options, action);                          \
     return;
+#define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("exhaustive switch");
@@ -6313,7 +6322,8 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
-      Printer << "@isolated(any) ";
+      if (!Options.SuppressIsolatedAny)
+        Printer << "@isolated(any) ";
       break;
     }
 
