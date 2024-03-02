@@ -349,10 +349,12 @@ bb0(%0 : @noImplicitCopy @_eagerMove $Int):
   return %14 : $Int
 }
 
-struct _UnsafeContinuation<T, R> {}
+protocol P {}
+extension Int: P {}
+struct _UnsafeContinuation<T: P, R> {}
 
-sil @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
-sil @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+sil @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+sil @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0: P> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
 
 // insertDestroyOfCapturedArguments should not crash on 'undef'
 //
@@ -362,22 +364,22 @@ sil @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0> (@guaranteed @no
 sil hidden [ossa] @testCapturedUndef : $@convention(thin) (Int) -> (Int, @error any Error) {
 bb0(%0 : $Int):
   %5 = alloc_stack $Int
-  %6 = function_ref @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
-  %7 = partial_apply [callee_guaranteed] %6(undef) : $@convention(thin) @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
-  %8 = convert_escape_to_noescape [not_guaranteed] %7 : $@callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int> to $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
-  destroy_value %7 : $@callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  %6 = function_ref @testCapturedUndefClosure : $@convention(thin) @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+  %7 = partial_apply [callee_guaranteed] %6(undef) : $@convention(thin) @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>, Int) -> () for <Int>
+  %8 = convert_escape_to_noescape [not_guaranteed] %7 : $@callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int> to $@noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  destroy_value %7 : $@callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
 
-  %10 = function_ref @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
-  try_apply %10<Int>(%5, %8) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+  %10 = function_ref @testCapturedUndefTakeClosure : $@convention(thin) <τ_0_0: P> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error)
+  try_apply %10<Int>(%5, %8) : $@convention(thin) <τ_0_0: P> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <τ_0_0>) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
 
 bb1(%12 : $()):
-  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
   %15 = load [trivial] %5 : $*Int
   dealloc_stack %5 : $*Int
   return %15 : $Int
 
 bb2(%19 : @owned $any Error):
-  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
+  destroy_value %8 : $@noescape @callee_guaranteed @substituted <τ_0_0: P> (_UnsafeContinuation<τ_0_0, any Error>) -> () for <Int>
   dealloc_stack %5 : $*Int
   throw %19 : $any Error
 }

@@ -190,3 +190,20 @@ func testArrMap(arr: [String]) {
   _ = mapArray(arr, body: G_E<Int>.tuple)
   // expected-error@-1{{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) -> G_E<Int>'}}
 }
+
+// Shadowing of typed-throws Result.get() addresses a source compatibility
+// issue with the introduction of typed throws.
+extension Result {
+  public func dematerialize() throws -> Success {
+    return try get()
+  }
+
+  public func get() throws -> Success {
+    switch self {
+    case let .success(value):
+      return value
+    case let .failure(error):
+      throw error
+    }
+  }
+}

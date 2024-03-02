@@ -93,42 +93,46 @@ func findPointerEscapingUse(of value: Value) -> Bool {
 /// such as "escaping" or "lexical". It must be precise for
 /// correctness and is performance critical.
 protocol ForwardingUseDefWalker {
-  mutating func introducer(_ value: Value) -> WalkResult
+  associatedtype PathContext
+
+  mutating func introducer(_ value: Value, _ path: PathContext) -> WalkResult
 
   // Minimally, check a ValueSet. This walker may traverse chains of
   // aggregation and destructuring along with phis.
-  mutating func needWalk(for value: Value) -> Bool
+  mutating func needWalk(for value: Value, _ path: PathContext) -> Bool
 
-  mutating func walkUp(value: Value) -> WalkResult
+  mutating func walkUp(value: Value, _ path: PathContext) -> WalkResult
 }
 
 extension ForwardingUseDefWalker {
-  mutating func walkUp(value: Value) -> WalkResult {
-    walkUpDefault(forwarded: value)
+  mutating func walkUp(value: Value, _ path: PathContext) -> WalkResult {
+    walkUpDefault(forwarded: value, path)
   }
-  mutating func walkUpDefault(forwarded value: Value) -> WalkResult {
+  mutating func walkUpDefault(forwarded value: Value, _ path: PathContext)
+    -> WalkResult {
     if let inst = value.forwardingInstruction {
-      return walkUp(instruction: inst)
+      return walkUp(instruction: inst, path)
     }
     if let phi = Phi(value) {
-      return walkUp(phi: phi)
+      return walkUp(phi: phi, path)
     }
-    return introducer(value)
+    return introducer(value, path)
   }
-  mutating func walkUp(instruction: ForwardingInstruction) -> WalkResult {
+  mutating func walkUp(instruction: ForwardingInstruction, _ path: PathContext)
+    -> WalkResult {
     for operand in instruction.forwardedOperands {
-      if needWalk(for: operand.value) {
-        if walkUp(value: operand.value) == .abortWalk {
+      if needWalk(for: operand.value, path) {
+        if walkUp(value: operand.value, path) == .abortWalk {
           return .abortWalk
         }
       }
     }
     return .continueWalk
   }
-  mutating func walkUp(phi: Phi) -> WalkResult {
+  mutating func walkUp(phi: Phi, _ path: PathContext) -> WalkResult {
     for operand in phi.incomingOperands {
-      if needWalk(for: operand.value) {
-        if walkUp(value: operand.value) == .abortWalk {
+      if needWalk(for: operand.value, path) {
+        if walkUp(value: operand.value, path) == .abortWalk {
           return .abortWalk
         }
       }
@@ -146,7 +150,7 @@ func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] 
     return .continueWalk
   }
   defer { walker.deinitialize() }
-  _ = walker.walkUp(value: value)
+  _ = walker.walkUp(value: value, ())
   return introducers
 }
 
@@ -156,7 +160,7 @@ func visitLifetimeIntroducers(for value: Value, _ context: Context,
   -> WalkResult {
   var walker = VisitLifetimeIntroducers(context, visitor: visitor)
   defer { walker.visitedValues.deinitialize() }
-  return walker.walkUp(value: value)
+  return walker.walkUp(value: value, ())
 }
 
 private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
@@ -170,11 +174,11 @@ private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
   
   mutating func deinitialize() { visitedValues.deinitialize() }
 
-  mutating func needWalk(for value: Value) -> Bool {
+  mutating func needWalk(for value: Value, _: Void) -> Bool {
     visitedValues.insert(value)
   }
-  
-  mutating func introducer(_ value: Value) -> WalkResult {
+
+  mutating func introducer(_ value: Value, _: Void) -> WalkResult {
     visitor(value)
   }
 }

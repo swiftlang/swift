@@ -429,8 +429,8 @@ extension AsyncThrowingStream: AsyncSequence {
     /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
     /// `next()` may return `nil` immediately, or else return `nil` on
     /// subsequent calls.
-    @available(SwiftStdlib 5.11, *)
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element? {
+    @available(SwiftStdlib 6.0, *)
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
       return try await context.produce()
     }
   }

@@ -42,7 +42,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     unsigned ArgIdx;
 
     /// The index of the parameter corresponding to the completion argument.
-    llvm::Optional<unsigned> ParamIdx;
+    std::optional<unsigned> ParamIdx;
 
     /// The indices of all params that were bound to non-synthesized
     /// arguments. Used so we don't suggest them even when the args are out of
@@ -69,7 +69,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// The argument index of the first trailing closure.
     ///
     /// \c None if the call doesn't have a trailing closure.
-    llvm::Optional<unsigned> FirstTrailingClosureIndex;
+    std::optional<unsigned> FirstTrailingClosureIndex;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.

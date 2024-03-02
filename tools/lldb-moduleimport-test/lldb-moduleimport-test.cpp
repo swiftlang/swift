@@ -283,12 +283,6 @@ int main(int argc, char **argv) {
   opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
                               desc("Serialize modules in OSSA"), cat(Visible));
 
-  opt<bool> EnableNoncopyableGenerics(
-      "enable-noncopyable-generics",
-      init(false),
-      desc("Serialize modules with NoncopyableGenerics"),
-      cat(Visible));
-
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -326,6 +320,8 @@ int main(int argc, char **argv) {
   if (Modules.empty())
     return 0;
 
+  bool enableNoncopyableGenerics = SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS;
+
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
   llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
@@ -333,7 +329,7 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, EnableNoncopyableGenerics,
+                        EnableOSSAModules, enableNoncopyableGenerics,
                         info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
@@ -359,13 +355,6 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
 
-  if (EnableNoncopyableGenerics)
-    Invocation.getLangOptions()
-      .enableFeature(swift::Feature::NoncopyableGenerics);
-  else
-    Invocation.getLangOptions()
-      .disableFeature(swift::Feature::NoncopyableGenerics);
-
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
   }
@@ -381,7 +370,25 @@ int main(int argc, char **argv) {
     auto *ClangImporter = static_cast<swift::ClangImporter *>(
         CI.getASTContext().getClangModuleLoader());
     ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
-  }
+ }
+
+  if (Verbose)
+    CI.getASTContext().SetPreModuleImportCallback(
+        [&](llvm::StringRef module_name,
+            swift::ASTContext::ModuleImportKind kind) {
+          switch (kind) {
+          case swift::ASTContext::Module:
+            llvm::outs() << "Loading " << module_name.str() << "\n";
+            break;
+          case swift::ASTContext::Overlay:
+            llvm::outs() << "Loading (overlay) " << module_name.str() << "\n";
+            break;
+          case swift::ASTContext::BridgingHeader:
+            llvm::outs() << "Compiling bridging header: " << module_name.str()
+                         << "\n";
+            break;
+          }
+        });
 
   llvm::SmallString<0> error;
   llvm::raw_svector_ostream errs(error);
@@ -401,7 +408,7 @@ int main(int argc, char **argv) {
   // Attempt to import all modules we found.
   for (auto path : modules) {
     if (Verbose)
-      llvm::outs() << "Importing " << path << "... ";
+      llvm::outs() << "Importing " << path << "...\n";
 
     swift::ImportPath::Module::Builder modulePath;
 #ifdef SWIFT_SUPPORTS_SUBMODULES
@@ -420,7 +427,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     if (Verbose)
-      llvm::outs() << "ok!\n";
+      llvm::outs() << "Import successful!\n";
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);

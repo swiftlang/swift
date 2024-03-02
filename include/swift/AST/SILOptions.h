@@ -31,9 +31,6 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert lexical markers.
-  Off = 0,
-
   // Insert lexical markers via lexical borrow scopes and the lexical flag on
   // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
   // Raw SIL.
@@ -272,12 +269,6 @@ public:
 
   /// Are we parsing the stdlib, i.e. -parse-stdlib?
   bool ParseStdlib = false;
-
-  /// If true, check for leaking instructions when the SILModule is destructed.
-  ///
-  /// Warning: this is not thread safe. It can only be enabled in case there
-  /// is a single SILModule in a single thread.
-  bool checkSILModuleLeaks = false;
 
   /// Are we building in embedded Swift mode?
   bool EmbeddedSwift = false;

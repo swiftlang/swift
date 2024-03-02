@@ -413,18 +413,23 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
   // and isntead directly use the current \c Instance for compilation.
-  if (FEOpts.ExplicitInterfaceBuild)
+  //
+  // FIXME: -typecheck-module-from-interface is the exception here because
+  // currently we need to ensure it still reads the flags written out
+  // in the .swiftinterface file itself. Instead, creation of that
+  // job should incorporate those flags.
+  if (FEOpts.ExplicitInterfaceBuild && !(FEOpts.isTypeCheckAction()))
     return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
         Invocation.getOutputFilename(),
         /* shouldSerializeDeps */ true,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
-  else
-    return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
+
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
-      Invocation.getClangImporterOptions(),
+      Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(), ABIPath,
@@ -1449,7 +1454,7 @@ static bool performAction(CompilerInstance &Instance,
 /// false and will not replay any output.
 static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   if (!Instance.supportCaching() ||
-      Instance.getInvocation().getFrontendOptions().CacheSkipReplay)
+      Instance.getInvocation().getCASOptions().CacheSkipReplay)
     return false;
 
   assert(Instance.getCompilerBaseKey() &&
@@ -1465,7 +1470,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
       Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
-      Instance.getInvocation().getFrontendOptions().EnableCachingRemarks);
+      Instance.getInvocation().getCASOptions().EnableCachingRemarks);
 
   // If we didn't replay successfully, re-start capture.
   if (!replayed)
@@ -1748,7 +1753,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   const ASTContext &Context = Instance.getASTContext();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  llvm::Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  std::optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
@@ -2230,10 +2235,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::setBugReportMsg(nullptr);
   }
   
-  /// Enable leaks checking because this SILModule is the only one in the process
-  /// (leaks checking is not thread safe).
-  Invocation.getSILOptions().checkSILModuleLeaks = true;
-
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2247,12 +2248,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      std::make_unique<llvm::Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<std::optional<PrettyStackTraceFileContents>[]>(
           configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],
            [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              llvm::Optional<PrettyStackTraceFileContents> &trace) {
+              std::optional<PrettyStackTraceFileContents> &trace) {
              trace.emplace(*buffer);
            });
 

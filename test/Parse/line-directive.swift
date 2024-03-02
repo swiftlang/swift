@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -c %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -c %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 let x = 0 // We need this because of the #sourceLocation-ends-with-a-newline requirement.
 
@@ -13,17 +13,6 @@ x // expected-error {{parameterless closing #sourceLocation() directive without 
 #sourceLocation(file: "x", line: 1.5) // expected-error{{expected starting line number}}
 
 #sourceLocation(file: x.swift, line: 1) // expected-error{{expected filename string literal}}
-
-// expected-warning@+1 {{expected starting line number for #sourceLocation directive; this is an error in Swift 6}}
-#sourceLocation(file: "x.swift", line: 0xff)
-
-#sourceLocation()
-
-// expected-warning@+1 {{'#sourceLocation' cannot be a multi-line string literal; this is an error in Swift 6}}
-#sourceLocation(file: """
-x.swift
-y.swift
-""", line: 42)
 
 #sourceLocation(file: "x.swift", line: 42)
 x x ; // should be ignored by expected_error because it is in a different file

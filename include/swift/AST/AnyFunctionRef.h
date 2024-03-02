@@ -21,9 +21,8 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
+#include <optional>
 
 namespace swift {
 class CaptureInfo;
@@ -58,7 +57,7 @@ public:
 
   /// Construct an AnyFunctionRef from a decl context that might be
   /// some sort of function.
-  static llvm::Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+  static std::optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
     if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
       return AnyFunctionRef(fn);
     }
@@ -67,7 +66,7 @@ public:
       return AnyFunctionRef(ace);
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   CaptureInfo getCaptureInfo() const {
@@ -118,7 +117,7 @@ public:
         return FD->mapTypeIntoContext(FD->getResultInterfaceType());
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
         if (CD->hasLifetimeDependentReturn()) {
-          return CD->getResultInterfaceType();
+          return CD->mapTypeIntoContext(CD->getResultInterfaceType());
         }
       }
       return TupleType::getEmpty(AFD->getASTContext());

@@ -418,6 +418,21 @@ static ValidationInfo validateControlBlock(
       }
       break;
     }
+    case control_block::CHANNEL: {
+      static const char* ignoreRevision =
+        ::getenv("SWIFT_IGNORE_SWIFTMODULE_REVISION");
+      if (ignoreRevision)
+        break;
+
+      StringRef moduleChannel = blobData,
+                compilerChannel = version::getCurrentCompilerChannel();
+      if (requiresRevisionMatch && !compilerChannel.empty() &&
+          moduleChannel != compilerChannel) {
+        result.problematicChannel = moduleChannel;
+        result.status = Status::ChannelIncompatible;
+      }
+      break;
+    }
     case control_block::IS_OSSA: {
       auto isModuleInOSSA = scratch[0];
       if (requiresOSSAModules && !isModuleInOSSA)
@@ -426,8 +441,8 @@ static ValidationInfo validateControlBlock(
     }
     case control_block::HAS_NONCOPYABLE_GENERICS: {
       auto hasNoncopyableGenerics = scratch[0];
-      if (requiresNoncopyableGenerics && !hasNoncopyableGenerics)
-        result.status = Status::NotUsingNoncopyableGenerics;
+      if (requiresNoncopyableGenerics != hasNoncopyableGenerics)
+        result.status = Status::NoncopyableGenericsMismatch;
       break;
     }
     default:
@@ -532,9 +547,10 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooOld: return "FormatTooOld";
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
+  case Status::ChannelIncompatible: return "ChannelIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
-  case Status::NotUsingNoncopyableGenerics:
-    return "NotUsingNoncopyableGenerics";
+  case Status::NoncopyableGenericsMismatch:
+    return "NoncopyableGenericsMismatch";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";
@@ -1060,11 +1076,11 @@ bool ModuleFileSharedCore::readCommentBlock(llvm::BitstreamCursor &cursor) {
   return false;
 }
 
-static llvm::Optional<swift::LibraryKind>
+static std::optional<swift::LibraryKind>
 getActualLibraryKind(unsigned rawKind) {
   auto stableKind = static_cast<serialization::LibraryKind>(rawKind);
   if (stableKind != rawKind)
-    return llvm::None;
+    return std::nullopt;
 
   switch (stableKind) {
   case serialization::LibraryKind::Library:
@@ -1074,10 +1090,10 @@ getActualLibraryKind(unsigned rawKind) {
   }
 
   // If there's a new case value in the module file, ignore it.
-  return llvm::None;
+  return std::nullopt;
 }
 
-static llvm::Optional<ModuleDecl::ImportFilterKind>
+static std::optional<ModuleDecl::ImportFilterKind>
 getActualImportControl(unsigned rawValue) {
   // We switch on the raw value rather than the enum in order to handle future
   // values.
@@ -1093,7 +1109,7 @@ getActualImportControl(unsigned rawValue) {
   case static_cast<unsigned>(serialization::ImportControl::PackageOnly):
     return ModuleDecl::ImportFilterKind::PackageOnly;
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 

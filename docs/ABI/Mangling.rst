@@ -643,7 +643,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -653,17 +653,23 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
-    global-actor :: = type 'Yc'                // Global actor on function type
+    function-isolation ::= type 'Yc'          // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
-  #if SWIFT_RUNTIME_VERSION >= 5.11
+  #if SWIFT_RUNTIME_VERSION >= 6.0
     throws ::= type 'YK'                     // 'throws(type)' annotation on function types
+    function-isolation ::= type 'YA'         // @isolated(any) on function type
   #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
-
+ #if SWIFT_RUNTIME_VERSION >= 5.TBD
+  lifetime-dependence ::= 'Yli'              // inherit lifetime dependence on param
+  lifetime-dependence ::= 'Yls'              // scoped lifetime dependence on param
+  self-lifetime-dependence ::= 'YLi'         // inherit lifetime dependence on self
+  self-lifetime-dependence ::= 'YLs'         // scoped lifetime dependence on self
+#endif
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
@@ -733,13 +739,15 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
+
+  ISOLATION ::= 'A'                          // @isolated(any)
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)

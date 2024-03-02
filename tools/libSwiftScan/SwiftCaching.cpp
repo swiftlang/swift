@@ -253,7 +253,7 @@ expandSwiftInvocation(int argc, const char **argv, llvm::StringSaver &Saver,
                       llvm::SmallVectorImpl<const char *> &ArgsStorage) {
   ArgsStorage.reserve(argc);
   for (int i = 0; i < argc; ++i)
-    ArgsStorage.push_back(argv[i]);
+    ArgsStorage.push_back(Saver.save(argv[i]).data());
   swift::driver::ExpandResponseFilesWithRetry(Saver, ArgsStorage);
 
   // Drop the `-frontend` option if it is passed.
@@ -835,7 +835,7 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
     return nullptr;
   }
 
-  if (!Instance->Invocation.getFrontendOptions().EnableCaching) {
+  if (!Instance->Invocation.getCASOptions().EnableCaching) {
     delete Instance;
     *error = swift::c_string_utils::create_clone(
         "caching is not enabled from command-line");
@@ -955,7 +955,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   Outputs.try_emplace(file_types::TY_CachedDiagnostics, "<cached-diagnostics>");
 
   // Load all the output buffer.
-  bool Remarks = Instance.Invocation.getFrontendOptions().EnableCachingRemarks;
+  bool Remarks = Instance.Invocation.getCASOptions().EnableCachingRemarks;
   struct OutputEntry {
     std::string Path;
     llvm::cas::ObjectProxy Proxy;

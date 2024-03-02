@@ -112,7 +112,7 @@ public:
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
   /// \param inModule only return results from this module.
-  virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+  virtual void lookupValue(StringRef name, std::optional<ClangTypeKind> kind,
                            StringRef inModule,
                            SmallVectorImpl<clang::Decl *> &results) {}
   /// vtable anchor.
@@ -131,6 +131,13 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
+  friend class SwiftDeclSynthesizer;
+
+  // Make requests in the ClangImporter zone friends so they can access `Impl`.
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
+  friend class Name;
+#include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#undef SWIFT_REQUEST
 
 public:
   class Implementation;
@@ -440,7 +447,9 @@ public:
   void verifyAllModules() override;
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  bridgeClangModuleDependencies(
+      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
@@ -508,7 +517,7 @@ public:
   /// to import said decl then return nullptr.
   /// Otherwise, if we have never encountered this decl previously then return
   /// None.
-  llvm::Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl);
+  std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl);
 
   // Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
@@ -544,7 +553,7 @@ public:
       const clang::NamedDecl *D,
       clang::DeclarationName givenName = clang::DeclarationName()) override;
 
-  llvm::Optional<Type>
+  std::optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) override;
 
@@ -552,10 +561,10 @@ public:
                          VarDecl *swiftDecl,
                          DeclContext *dc) override;
 
-  llvm::Optional<std::string>
+  std::optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash, bool Cached);
-  llvm::Optional<std::string>
+  std::optional<std::string>
   /// \param isExplicit true if the PCH filename was passed directly
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
@@ -651,7 +660,7 @@ bool isCxxStdModule(const clang::Module *module);
 
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.
-llvm::Optional<clang::QualType>
+std::optional<clang::QualType>
 getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 
 /// Returns true if the given type is a C++ `const` reference type.

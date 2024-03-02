@@ -31,6 +31,7 @@
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -491,10 +492,10 @@ public:
   TypeInfoDumpFilter TypeInfoFilter;
   
   /// Pull in runtime compatibility shim libraries by autolinking.
-  llvm::Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
   bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 
@@ -601,7 +602,8 @@ public:
   }
 
   std::string getDebugFlags(StringRef PrivateDiscriminator,
-                            bool EnableCXXInterop) const {
+                            bool EnableCXXInterop,
+                            bool EnableEmbeddedSwift) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
@@ -613,6 +615,12 @@ public:
         Flags += " ";
       Flags += "-enable-experimental-cxx-interop";
     }
+    if (EnableEmbeddedSwift) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-embedded-swift";
+    }
+
     return Flags;
   }
 

@@ -300,9 +300,10 @@ EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
 
 llvm::Value *
 EnumImplStrategy::emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
-                                      Address enumAddr) const {
+                                      Address enumAddr,
+                                      bool maskExtraTagBits) const {
   assert(TIK >= Fixed);
-  return emitGetEnumTag(IGF, T, enumAddr);
+  return emitGetEnumTag(IGF, T, enumAddr, maskExtraTagBits);
 }
 
 llvm::Value *
@@ -418,9 +419,8 @@ namespace {
                                                       T, getTypeInfo());
     }
 
-    llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
-    const override {
+    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr,
+                                bool maskExtraTagBits) const override {
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
     }
 
@@ -943,9 +943,8 @@ namespace {
       return Size((getDiscriminatorType()->getBitWidth() + 7) / 8);
     }
 
-    llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
-    const override {
+    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr,
+                                bool maskExtraTagBits) const override {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
 
@@ -1654,16 +1653,23 @@ namespace {
       return {payload, extraTag};
     }
 
-    std::pair<EnumPayload, llvm::Value*>
-    emitPrimitiveLoadPayloadAndExtraTag(IRGenFunction &IGF, Address addr) const{
+    std::pair<EnumPayload, llvm::Value *>
+    emitPrimitiveLoadPayloadAndExtraTag(IRGenFunction &IGF, Address addr,
+                                        bool maskExtraTagBits = false) const {
       llvm::Value *extraTag = nullptr;
       auto payload = EnumPayload::load(IGF, projectPayload(IGF, addr),
                                        PayloadSchema);
-      if (ExtraTagBitCount > 0)
+      if (ExtraTagBitCount > 0) {
         extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
+        if (maskExtraTagBits) {
+          auto maskBits = llvm::NextPowerOf2(NumExtraTagValues) - 1;
+          auto mask = llvm::ConstantInt::get(extraTag->getType(), maskBits);
+          extraTag = IGF.Builder.CreateAnd(extraTag, mask);
+        }
+      }
       return {std::move(payload), extraTag};
     }
-    
+
     void packIntoEnumPayload(IRGenModule &IGM,
                              IRBuilder &builder,
                              EnumPayload &outerPayload,
@@ -1947,7 +1953,8 @@ namespace {
              "extra inhabitant zero");
         
         unsigned numTags = ElementsWithNoPayload.size();
-        if (payloadTI.canValueWitnessExtraInhabitantsUpTo(IGM, numTags-1)) {
+        if (payloadTI.canValueWitnessExtraInhabitantsUpTo(IGM, numTags - 1) &&
+            payloadTI.isCopyable(ResilienceExpansion::Maximal)) {
           CopyDestroyKind = ForwardToPayload;
         }
       }
@@ -1968,8 +1975,8 @@ namespace {
 
     /// Emit a call into the runtime to get the current enum payload tag.
     /// This returns a tag index in the range [0..NumElements-1].
-    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T,
-                                Address enumAddr) const override {
+    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr,
+                                bool maskExtraTagBits = false) const override {
       auto numEmptyCases =
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size());
 
@@ -1983,9 +1990,9 @@ namespace {
                                              opaqueAddr);
     }
 
-
     llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
-                                Address enumAddr) const override {
+                                     Address enumAddr,
+                                     bool maskExtraTagBits) const override {
       assert(TIK >= Fixed);
       auto numEmptyCases =
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size());
@@ -4067,9 +4074,8 @@ namespace {
   public:
 
     /// Returns a tag index in the range [0..NumElements-1].
-    llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
-    const override {
+    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr,
+                                bool maskExtraTagBits) const override {
       unsigned numPayloadCases = ElementsWithPayload.size();
       llvm::Constant *payloadCases =
           llvm::ConstantInt::get(IGM.Int32Ty, numPayloadCases);
@@ -4087,8 +4093,8 @@ namespace {
 
       // Load the fixed-size representation and derive the tags.
       EnumPayload payload; llvm::Value *extraTagBits;
-      std::tie(payload, extraTagBits)
-        = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
+      std::tie(payload, extraTagBits) =
+          emitPrimitiveLoadPayloadAndExtraTag(IGF, addr, maskExtraTagBits);
 
       // Load the payload tag.
       llvm::Value *tagValue = extractPayloadTag(IGF, payload, extraTagBits);
@@ -5831,6 +5837,32 @@ namespace {
       tagBits.append(APInt(extraTagSize, (1U << ExtraTagBitCount) - 1U));
       return tagBits.build();
     }
+
+    std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const override {
+      SpareBitVector spareBits;
+      for (auto enumCase : getElementsWithPayload()) {
+        cast<FixedTypeInfo>(enumCase.ti)
+            ->applyFixedSpareBitsMask(IGM, spareBits);
+      }
+      // Trim leading/trailing zero bytes, then pad to a multiple of 32 bits
+      llvm::APInt bits = spareBits.asAPInt();
+      uint32_t byteOffset = bits.countTrailingZeros() / 8;
+      bits.lshrInPlace(byteOffset * 8); // Trim zero bytes from bottom end
+
+      auto bitsInMask = bits.getActiveBits(); // Ignore high-order zero bits
+      uint32_t bytesInMask = (bitsInMask + 7) / 8;
+      auto wordsInMask = (bytesInMask + 3) / 4;
+      bits = bits.zextOrTrunc(wordsInMask * 32);
+
+      // Never write an MPE descriptor bigger than 16k
+      // The runtime will fall back on its own internal
+      // spare bits calculation for this (very rare) case.
+      if (bytesInMask > 16384) {
+        return {};
+      }
+
+      return {{bits, byteOffset, bytesInMask}};
+    }
   };
 
   class ResilientEnumImplStrategy final
@@ -6150,9 +6182,8 @@ namespace {
 
     /// \group Operations for emitting type metadata
 
-    llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
-    const override {
+    llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr,
+                                bool maskExtraTagBits) const override {
       llvm_unreachable("resilient enums cannot be defined");
     }
 
@@ -7168,6 +7199,14 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
+  auto *bitwiseCopyableProtocol =
+      IGM.getSwiftModule()->getASTContext().getProtocol(
+          KnownProtocolKind::BitwiseCopyable);
+  if (bitwiseCopyableProtocol &&
+      IGM.getSwiftModule()->lookupConformance(
+          theEnum->getDeclaredInterfaceType(), bitwiseCopyableProtocol)) {
+    return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
+  }
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(

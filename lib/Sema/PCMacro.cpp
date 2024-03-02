@@ -687,7 +687,7 @@ void swift::performPCMacro(SourceFile &SF) {
           if (FD->getBody()) {
             Instrumenter I(ctx, FD, TmpNameIndex);
             I.transformDecl(FD);
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -700,7 +700,7 @@ void swift::performPCMacro(SourceFile &SF) {
               TypeChecker::checkTopLevelEffects(TLCD);
               TypeChecker::contextualizeTopLevelCode(TLCD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       }

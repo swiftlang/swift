@@ -20,11 +20,11 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/ImmutablePointerSet.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -126,13 +126,17 @@ struct UseDefChainVisitor
     // do not want to treat this as a merge.
     if (auto p = Projection(inst)) {
       switch (p.getKind()) {
+      // Currently if we load and then project_box from a memory location,
+      // we treat that as a projection. This follows the semantics/notes in
+      // getAccessProjectionOperand.
+      case ProjectionKind::Box:
+        return cast<ProjectBoxInst>(inst)->getOperand();
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
       case ProjectionKind::BlockStorageCast:
       case ProjectionKind::BitwiseCast:
-      case ProjectionKind::TailElems:
-      case ProjectionKind::Box:
       case ProjectionKind::Class:
+      case ProjectionKind::TailElems:
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
         // Index is always a merge.
@@ -413,13 +417,19 @@ static bool isProjectedFromAggregate(SILValue value) {
   return visitor.isMerge;
 }
 
-static PartialApplyInst *findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
+namespace {
+using AsyncLetSourceValue =
+    llvm::PointerUnion<PartialApplyInst *, ThinToThickFunctionInst *>;
+} // namespace
+
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
   // If our operand is Sendable then we want to return nullptr. We only want to
   // return a value if we are not
   SILValue value = bi->getOperand(1);
   auto fType = value->getType().castTo<SILFunctionType>();
   if (fType->isSendable())
-    return nullptr;
+    return {};
 
   SILValue temp = value;
   while (true) {
@@ -432,10 +442,15 @@ static PartialApplyInst *findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
     value = temp;
   }
 
-  return cast<PartialApplyInst>(value);
+  // We can also get a thin_to_thick_function here if we do not capture
+  // anything. In such a case, we just do not process the partial apply get
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return {{pai}};
+  return {{cast<ThinToThickFunctionInst>(value)}};
 }
 
-static PartialApplyInst *findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
+static std::optional<AsyncLetSourceValue>
+findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
   auto *bi = cast<BuiltinInst>(FullApplySite(ai).getArgument(0));
   assert(*bi->getBuiltinKind() ==
          BuiltinValueKind::StartAsyncLetWithLocalBuffer);
@@ -533,13 +548,22 @@ bool TrackableValue::isTransferringParameter() const {
 
   // See if we are initialized from a transferring parameter and are the only
   // use of the parameter.
-  for (auto *use : asi->getUses()) {
+  OperandWorklist worklist(asi->getFunction());
+  worklist.pushResultOperandsIfNotVisited(asi);
+
+  while (auto *use = worklist.pop()) {
     auto *user = use->getUser();
+
+    // Look through instructions that we don't care about.
+    if (isa<MarkUnresolvedNonCopyableValueInst,
+            MoveOnlyWrapperToCopyableAddrInst>(user)) {
+      worklist.pushResultOperandsIfNotVisited(user);
+    }
 
     if (auto *si = dyn_cast<StoreInst>(user)) {
       // Check if our store inst is from a function argument that is
-      // transferring. If not, then this isn't the consuming parameter
-      // alloc_stack.
+      // transferring and for which the store is the only use of the function
+      // argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
       if (!fArg || !fArg->isTransferring())
         return false;
@@ -547,9 +571,8 @@ bool TrackableValue::isTransferringParameter() const {
     }
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
-      // Check if our store inst is from a function argument that is
-      // transferring. If not, then this isn't the consuming parameter
-      // alloc_stack.
+      // Check if our copy_addr is from a function argument that is transferring
+      // and for which the copy_addr is the only use of the function argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
       if (!fArg || !fArg->isTransferring())
         return false;
@@ -1172,6 +1195,10 @@ enum class TranslationSemantics {
   /// without updating this code correctly. This is most likely driver error and
   /// should be caught in testing when we assert.
   AssertingIfNonSendable,
+
+  /// Instructions that always unconditionally transfer all of their
+  /// non-Sendable parameters and that do not have any results.
+  TransferringNoResult,
 };
 
 } // namespace
@@ -1213,6 +1240,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::AssertingIfNonSendable:
     os << "asserting_if_nonsendable";
+    return os;
+  case TranslationSemantics::TransferringNoResult:
+    os << "transferring_no_result";
     return os;
   }
 
@@ -1289,8 +1319,7 @@ class PartitionOpTranslator {
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
-              if (isNonSendableType(
-                      pbi->getType().getSILBoxFieldType(function))) {
+              if (isNonSendableType(pbi->getType())) {
                 auto trackVal = getTrackableValue(val, true);
                 (void)trackVal;
                 continue;
@@ -1325,20 +1354,21 @@ public:
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
       if (auto state = tryToTrackValue(arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
-
         // If we can transfer our parameter, just add it to
         // nonSendableSeparateIndices.
         //
         // NOTE: We do not support today the ability to have multiple parameters
         // transfer together as part of the same region.
         if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
+          LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID()
+                                  << " (transferring): " << *arg);
           nonSendableSeparateIndices.push_back(state->getID());
           continue;
         }
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // transfer list and to the region join list.
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
         valueMap.addNeverTransferredValueID(state->getID());
         nonSendableJoinedIndices.push_back(state->getID());
       }
@@ -1431,8 +1461,12 @@ public:
 
     if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst)) {
       foundResults.emplace_back(tryApplyInst->getNormalBB()->getArgument(0));
-      if (tryApplyInst->getErrorBB()->getNumArguments() > 0)
+      if (tryApplyInst->getErrorBB()->getNumArguments() > 0) {
         foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
+      }
+      for (auto indirectResults : tryApplyInst->getIndirectSILResults()) {
+        foundResults.emplace_back(indirectResults);
+      }
       return;
     }
 
@@ -1501,7 +1535,7 @@ public:
       return;
     }
 
-    auto assignResultsRef = llvm::makeArrayRef(assignResults);
+    auto assignResultsRef = llvm::ArrayRef(assignResults);
     SILValue front = assignResultsRef.front();
     assignResultsRef = assignResultsRef.drop_front();
 
@@ -1529,11 +1563,18 @@ public:
   }
 
   void translateAsyncLetGet(ApplyInst *ai) {
-    auto *pai = findAsyncLetPartialApplyFromGet(ai);
+    auto source = findAsyncLetPartialApplyFromGet(ai);
+    assert(source.has_value());
+
+    // If we didn't find a partial_apply, then we must have had a
+    // thin_to_thick_function meaning we did not capture anything.
+    if (source->is<ThinToThickFunctionInst *>())
+      return;
 
     // We should always be able to derive a partial_apply since we pattern
     // matched against the actual function call to swift_asyncLet_get in our
     // caller.
+    auto *pai = source->get<PartialApplyInst *>();
     assert(pai && "AsyncLet Get should always have a derivable partial_apply");
 
     ApplySite applySite(pai);
@@ -1602,6 +1643,7 @@ public:
       if (auto value = tryToTrackValue(op.get())) {
         // If we are tracking it, transfer it and if it is actor derived, mark
         // our partial apply as actor derived.
+        builder.addRequire(value->getRepresentative().getValue());
         builder.addTransfer(value->getRepresentative().getValue(), &op);
       }
     }
@@ -1708,6 +1750,7 @@ public:
             fas.getArgumentParameterInfo(op).hasOption(
                 SILParameterInfo::Transferring)) {
           if (auto value = tryToTrackValue(op.get())) {
+            builder.addRequire(value->getRepresentative().getValue());
             builder.addTransfer(value->getRepresentative().getValue(), &op);
           }
         } else {
@@ -1724,6 +1767,7 @@ public:
       if (fas.getArgumentParameterInfo(selfOperand)
               .hasOption(SILParameterInfo::Transferring)) {
         if (auto value = tryToTrackValue(selfOperand.get())) {
+          builder.addRequire(value->getRepresentative().getValue());
           builder.addTransfer(value->getRepresentative().getValue(),
                               &selfOperand);
         }
@@ -1734,8 +1778,24 @@ public:
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
-    return translateSILMultiAssign(applyResults, nonTransferringParameters,
-                                   options);
+
+    auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
+
+    // If our result is not transferring, just do the normal multi-assign.
+    if (!type->hasTransferringResult()) {
+      return translateSILMultiAssign(applyResults, nonTransferringParameters,
+                                     options);
+    }
+
+    // If our result is transferring, then pass in empty as our results and then
+    // perform assign fresh.
+    ArrayRef<SILValue> empty;
+    translateSILMultiAssign(empty, nonTransferringParameters, options);
+    for (SILValue result : applyResults) {
+      if (auto value = tryToTrackValue(result)) {
+        builder.addAssignFresh(value->getRepresentative().getValue());
+      }
+    }
   }
 
   void translateSILApply(SILInstruction *inst) {
@@ -1777,7 +1837,7 @@ public:
     assert((sourceApply || bool(applySite.getIsolationCrossing())) &&
            "only ApplyExpr's should cross isolation domains");
 
-    // require all operands
+    // Require all operands first before we emit transferring.
     for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative().getValue());
@@ -1797,10 +1857,10 @@ public:
     };
 
     if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutSelf());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
       handleSILSelf(&applySite.getSelfArgumentOperand());
     } else {
-      handleSILOperands(applySite->getAllOperands());
+      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
     }
 
     // non-sendable results can't be returned from cross-isolation calls without
@@ -1899,6 +1959,7 @@ public:
     // Transfer src. This ensures that we cannot use src again locally in this
     // function... which makes sense since its value is now in the transferring
     // parameter.
+    builder.addRequire(srcRoot.getRepresentative().getValue());
     builder.addTransfer(srcRoot.getRepresentative().getValue(), srcOperand);
 
     // Then check if we are assigning into an aggregate projection. In such a
@@ -1925,16 +1986,6 @@ public:
     SILValue srcValue = src->get();
 
     if (auto nonSendableDest = tryToTrackValue(destValue)) {
-      // Before we do anything check if we have an assignment into an
-      // alloc_stack for a consuming transferring parameter... in such a case,
-      // we need to handle this specially.
-      if (nonSendableDest->isTransferringParameter()) {
-        if (auto nonSendableSrc = tryToTrackValue(srcValue)) {
-          return translateSILAssignmentToTransferringParameter(
-              *nonSendableDest, dest, *nonSendableSrc, src);
-        }
-      }
-
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
@@ -2026,6 +2077,17 @@ public:
     }
   }
 
+  /// Instructions that transfer all of their non-Sendable parameters
+  /// unconditionally and that do not have a result.
+  void translateSILTransferringNoResult(MutableArrayRef<Operand> values) {
+    for (auto &op : values) {
+      if (auto ns = tryToTrackValue(op.get())) {
+        builder.addRequire(ns->getRepresentative().getValue());
+        builder.addTransfer(ns->getRepresentative().getValue(), &op);
+      }
+    }
+  }
+
   /// Translate the instruction's in \p basicBlock to a vector of PartitionOps
   /// that define the block's dataflow.
   void translateSILBasicBlock(SILBasicBlock *basicBlock,
@@ -2109,6 +2171,7 @@ public:
     }
 
     case TranslationSemantics::Asserting:
+      llvm::errs() << "BannedInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found banned instruction?!");
       return;
@@ -2119,12 +2182,14 @@ public:
             return ::isNonSendableType(value->getType(), inst->getFunction());
           }))
         return;
+      llvm::errs() << "BadInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found instruction that is not allowed to "
           "have non-Sendable parameters with such parameters?!");
       return;
+    case TranslationSemantics::TransferringNoResult:
+      return translateSILTransferringNoResult(inst->getAllOperands());
     }
-
     llvm_unreachable("Covered switch isn't covered?!");
   }
 };
@@ -2159,7 +2224,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   currentInst->getLoc().getSourceLoc().printLineAndColumn(
       llvm::dbgs(), currentInst->getFunction()->getASTContext().SourceMgr);
 
-  auto ops = llvm::makeArrayRef(currentInstPartitionOps);
+  auto ops = llvm::ArrayRef(currentInstPartitionOps);
 
   // First op on its own line.
   llvm::dbgs() << "\n ├─────╼ ";
@@ -2304,7 +2369,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
 CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
-CONSTANT_TRANSLATION(RefToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
@@ -2392,7 +2456,7 @@ CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
-CONSTANT_TRANSLATION(TestSpecificationInst, Ignored)
+CONSTANT_TRANSLATION(SpecifyTestInst, Ignored)
 
 //===---
 // Require
@@ -2414,6 +2478,8 @@ CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
 // Require of the value we extract the metatype from.
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
+// These can take a parameter. If it is non-Sendable, use a require.
+CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Require)
 
 //===---
 // Asserting If Non Sendable Parameter
@@ -2439,7 +2505,6 @@ CONSTANT_TRANSLATION(UnwindInst, Ignored)
 CONSTANT_TRANSLATION(ThrowAddrInst, Ignored)
 
 // Terminators that only need require.
-CONSTANT_TRANSLATION(ReturnInst, Require)
 CONSTANT_TRANSLATION(ThrowInst, Require)
 CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
 CONSTANT_TRANSLATION(YieldInst, Require)
@@ -2454,8 +2519,8 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 // (UnsafeContinuation and UnsafeThrowingContinuation).
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, AssertingIfNonSendable)
 CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(FunctionExtractIsolationInst, AssertingIfNonSendable)
 
 //===---
 // Existential Box
@@ -2613,6 +2678,20 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  if (ri->getFunction()->getLoweredFunctionType()->hasTransferringResult()) {
+    return TranslationSemantics::TransferringNoResult;
+  }
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitRefToBridgeObjectInst(RefToBridgeObjectInst *r) {
+  translateSILLookThrough(
+      SILValue(r), r->getOperand(RefToBridgeObjectInst::ConvertedOperand));
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
@@ -2893,6 +2972,11 @@ void BlockPartitionState::print(llvm::raw_ostream &os) const {
 static bool canComputeRegionsForFunction(SILFunction *fn) {
   if (!fn->getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation))
     return false;
+
+  assert(fn->getASTContext().LangOpts.StrictConcurrencyLevel ==
+             StrictConcurrency::Complete &&
+         "Need strict concurrency to be enabled for RegionBasedIsolation to be "
+         "enabled as well");
 
   // If this function does not correspond to a syntactic declContext and it
   // doesn't have a parent module, don't check it since we cannot check if a

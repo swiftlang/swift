@@ -221,6 +221,11 @@ swiftscan_dependency_set_t *swiftscan_dependency_graph_get_dependencies(
   return result->dependencies;
 }
 
+swiftscan_diagnostic_set_t *swiftscan_dependency_graph_get_diagnostics(
+    swiftscan_dependency_graph_t result) {
+  return result->diagnostics;
+}
+
 //=== Module Dependency Info query APIs -----------------------------------===//
 
 swiftscan_string_ref_t
@@ -472,6 +477,11 @@ swiftscan_import_set_get_imports(swiftscan_import_set_t result) {
   return result->imports;
 }
 
+swiftscan_diagnostic_set_t *
+swiftscan_import_set_get_diagnostics(swiftscan_import_set_t result) {
+  return result->diagnostics;
+}
+
 //=== Scanner Invocation Functions ----------------------------------------===//
 
 swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
@@ -521,11 +531,13 @@ void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
 void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);
   swiftscan_dependency_set_dispose(result->dependencies);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 
 void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
   swiftscan_string_set_dispose(result->imports);
+  swiftscan_diagnostics_set_dispose(result->diagnostics);
   delete result;
 }
 
@@ -613,14 +625,15 @@ swiftscan_compiler_supported_features_query() {
 swiftscan_diagnostic_set_t*
 swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
   DependencyScanningTool *ScanningTool = unwrap(scanner);
-  auto NumDiagnostics = ScanningTool->getDiagnostics().size();
-  
+  auto Diagnostics = ScanningTool->getDiagnostics();
+  auto NumDiagnostics = Diagnostics.size();
+
   swiftscan_diagnostic_set_t *Result = new swiftscan_diagnostic_set_t;
   Result->count = NumDiagnostics;
   Result->diagnostics = new swiftscan_diagnostic_info_t[NumDiagnostics];
   
   for (size_t i = 0; i < NumDiagnostics; ++i) {
-    const auto &Diagnostic = ScanningTool->getDiagnostics()[i];
+    const auto &Diagnostic = Diagnostics[i];
     swiftscan_diagnostic_info_s *DiagnosticInfo = new swiftscan_diagnostic_info_s;
     DiagnosticInfo->message = swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
     switch (Diagnostic.Severity) {

@@ -524,6 +524,15 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::AccessibleFunctionRecord: {
+    auto DC = getSILFunction()->getDeclContext();
+
+    auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
+    if (thunk && thunk->isDistributedThunk()) {
+      ASTMangler mangler;
+      return mangler.mangleDistributedThunkRecord(thunk);
+    }
+
+    // Otherwise use the default mangling: just the function name
     std::string Result(getSILFunction()->getName());
     Result.append("HF");
     return Result;
@@ -673,6 +682,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     switch (getTypeMetadataAccessStrategy(getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    case MetadataAccessStrategy::PackageUniqueAccessor:
+      return getSILLinkage(FormalLinkage::PackageUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
     case MetadataAccessStrategy::PrivateAccessor:
@@ -724,7 +735,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
-      if (linkage == FormalLinkage::PublicUnique)
+      if (linkage == FormalLinkage::PublicUnique ||
+          linkage == FormalLinkage::PackageUnique)
         linkage = FormalLinkage::HiddenUnique;
     }
 

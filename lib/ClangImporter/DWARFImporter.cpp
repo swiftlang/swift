@@ -155,7 +155,7 @@ void ClangImporter::Implementation::lookupValueDWARF(
     return;
 
   SmallVector<clang::Decl *, 4> decls;
-  DWARFImporter->lookupValue(name.getBaseName().userFacingName(), llvm::None,
+  DWARFImporter->lookupValue(name.getBaseName().userFacingName(), std::nullopt,
                              inModule.str(), decls);
   for (auto *clangDecl : decls) {
     auto *namedDecl = dyn_cast<clang::NamedDecl>(clangDecl);

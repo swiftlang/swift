@@ -33,7 +33,6 @@
 #include "swift/Basic/STLExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -41,6 +40,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 //
 // AST DUMPING TIPS
@@ -309,6 +309,8 @@ static StringRef getDumpString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
     case DefaultArgumentKind::StoredProperty: return "stored property";
+    case DefaultArgumentKind::ExpressionMacro:
+    return "expression macro";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
@@ -2794,6 +2796,10 @@ public:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
+    case ActorIsolation::Erased:
+      printFlag(true, "dynamically_isolated", CapturesColor);
+      break;
+
     case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
                        "actor_isolated", CapturesColor);
@@ -3290,8 +3296,8 @@ public:
     printRec(T->getTypeRepr());
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T, StringRef label) {
-    printCommon("type_ident", label);
+  void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
+    printCommon(isa<IdentTypeRepr>(T) ? "type_ident" : "type_member", label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())
@@ -3299,21 +3305,12 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
-      for (auto genArg : GenIdT->getGenericArgs()) {
-        printRec(genArg);
-      }
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      printRec(memberTR->getBase());
     }
 
-    printFoot();
-  }
-
-  void visitMemberTypeRepr(MemberTypeRepr *T, StringRef label) {
-    printCommon("type_member", label);
-
-    printRec(T->getBaseComponent());
-    for (auto *comp : T->getMemberComponents()) {
-      printRec(comp);
+    for (auto *genArg : T->getGenericArgs()) {
+      printRec(genArg);
     }
 
     printFoot();
@@ -3427,6 +3424,12 @@ public:
   
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T, StringRef label) {
     printCommon("isolated", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
+  void visitTransferringTypeRepr(TransferringTypeRepr *T, StringRef label) {
+    printCommon("transferring", label);
     printRec(T->getBase());
     printFoot();
   }
@@ -4306,6 +4309,7 @@ namespace {
         printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
+        printFlag(T->hasTransferringResult(), "transferring_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");

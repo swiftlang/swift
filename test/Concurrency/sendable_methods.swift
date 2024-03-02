@@ -154,7 +154,7 @@ let helloworld:  @Sendable () -> Void = World.greet
 class NonSendableC {
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in Swift 6}}
+    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
         x += 1
     }
 }

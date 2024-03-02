@@ -67,8 +67,8 @@ const void *SymbolInfo::getSymbolAddress() const {
 #endif
 }
 
-llvm::Optional<SymbolInfo> SymbolInfo::lookup(const void *address) {
-  llvm::Optional<SymbolInfo> result;
+std::optional<SymbolInfo> SymbolInfo::lookup(const void *address) {
+  std::optional<SymbolInfo> result;
 
 #if defined(__wasm__)
   // Currently, Wasm doesn't have a standard stable ABI for exporting address <->

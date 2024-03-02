@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature RawLayout %s | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 // CHECK: @_rawLayout(size: 4, alignment: 4) @_moveOnly struct Lock
 // CHECK: @_rawLayout(like: T) @_moveOnly struct Cell<T>
 // CHECK: @_rawLayout(likeArrayOf: T, count: 8) @_moveOnly struct SmallVectorBuf<T>

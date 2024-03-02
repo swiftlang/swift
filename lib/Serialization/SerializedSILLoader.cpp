@@ -62,7 +62,7 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
 
 SILFunction *
 SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                       llvm::Optional<SILLinkage> Linkage) {
+                                       std::optional<SILLinkage> Linkage) {
   for (auto &Des : LoadedSILSections) {
     if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
@@ -86,7 +86,7 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
 }
 
 bool SerializedSILLoader::hasSILFunction(StringRef Name,
-                                         llvm::Optional<SILLinkage> Linkage) {
+                                         std::optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;

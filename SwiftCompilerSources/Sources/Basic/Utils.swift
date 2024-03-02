@@ -115,37 +115,6 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
 }
 
 //===----------------------------------------------------------------------===//
-//                      Single-Element Inline Array
-//===----------------------------------------------------------------------===//
-
-public struct SingleInlineArray<Element>: RandomAccessCollection {
-  private var singleElement: Element? = nil
-  private var multipleElements: [Element] = []
-
-  public init() {}
-
-  public var startIndex: Int { 0 }
-  public var endIndex: Int {
-    singleElement == nil ? 0 : multipleElements.count + 1
-  }
-
-  public subscript(_ index: Int) -> Element {
-    if index == 0 {
-      return singleElement!
-    }
-    return multipleElements[index - 1]
-  }
-
-  public mutating func push(_ element: Element) {
-    guard singleElement != nil else {
-      singleElement = element
-      return
-    }
-    multipleElements.append(element)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 

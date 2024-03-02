@@ -424,8 +424,10 @@ private:
     case Node::Kind::IVarDestroyer:
     case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
+    case Node::Kind::ImplErasedIsolation:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplParameterResultDifferentiability:
+    case Node::Kind::ImplParameterTransferring:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
@@ -441,6 +443,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
+    case Node::Kind::Transferring:
     case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
@@ -557,6 +560,8 @@ private:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
+    case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::TransferringResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::TypedThrowsAnnotation:
@@ -637,6 +642,8 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    case Node::Kind::ParamLifetimeDependence:
+    case Node::Kind::SelfLifetimeDependence:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -873,10 +880,15 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false;
+    bool isSendable = false, isAsync = false, hasTransferringResult = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind()
+            == Node::Kind::IsolatedAnyFunctionType) {
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() ==
@@ -888,6 +900,11 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
+      ++startIndex;
+    }
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SelfLifetimeDependence) {
+      print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
 
@@ -907,6 +924,11 @@ private:
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
+    }
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::TransferringResultFunctionType) {
+      ++startIndex;
+      hasTransferringResult = true;
     }
 
     switch (diffKind) {
@@ -941,6 +963,11 @@ private:
     if (thrownErrorNode) {
       print(thrownErrorNode, depth + 1);
     }
+
+    Printer << " -> ";
+
+    if (hasTransferringResult)
+      Printer << "transferring ";
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1659,9 +1686,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
-      Printer << " -> " << Node->getText();
+      Printer << Node->getText();
     else {
-      Printer << " -> ";
       printChildren(Node, depth);
     }
     return nullptr;
@@ -1687,6 +1713,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "isolated ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::Transferring:
+    Printer << "transferring ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::CompileTimeConst:
     Printer << "_const ";
     print(Node->getChild(0), depth + 1);
@@ -1703,6 +1733,33 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ParamLifetimeDependence: {
+    Printer << "lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope ";
+      break;
+    }
+    print(Node->getChild(1), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::SelfLifetimeDependence: {
+    Printer << "(self lifetime dependence: ";
+    auto kind = (MangledLifetimeDependenceKind)Node->getIndex();
+    switch (kind) {
+    case MangledLifetimeDependenceKind::Inherit:
+      Printer << "inherit) ";
+      break;
+    case MangledLifetimeDependenceKind::Scope:
+      Printer << "scope) ";
+      break;
+    }
+    return nullptr;
+  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;
@@ -2688,10 +2745,20 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
+  case Node::Kind::ImplErasedIsolation:
+    Printer << "@isolated(any)";
+    return nullptr;
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
   case Node::Kind::ImplParameterResultDifferentiability:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with trailing space.
+    Printer << Node->getText() << ' ';
+    return nullptr;
+  case Node::Kind::ImplParameterTransferring:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;
@@ -2737,6 +2804,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     // Print differentiability, if it exists.
     if (Node->getNumChildren() == 3)
       print(Node->getChild(1), depth + 1);
+    // Print differentiability and transferring if it exists.
+    if (Node->getNumChildren() == 4) {
+      print(Node->getChild(1), depth + 1);
+      print(Node->getChild(2), depth + 1);
+    }
     // Print type.
     print(Node->getLastChild(), depth + 1);
     return nullptr;
@@ -2913,6 +2985,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     }
     return nullptr;
   }
+  case Node::Kind::IsolatedAnyFunctionType:
+    Printer << "@isolated(any) ";
+    return nullptr;
+  case Node::Kind::TransferringResultFunctionType:
+    Printer << "transferring ";
+    return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer << " async";
     return nullptr;

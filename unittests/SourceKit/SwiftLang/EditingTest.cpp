@@ -167,7 +167,7 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, std::nullopt);
   }
 
   void close(const char *DocName) {

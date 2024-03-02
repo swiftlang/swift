@@ -755,7 +755,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
   }
 
   case DiagnosticArgumentKind::FullyQualifiedType:
-  case DiagnosticArgumentKind::Type: {
+  case DiagnosticArgumentKind::Type:
+  case DiagnosticArgumentKind::WitnessType: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
@@ -777,8 +778,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
-    } else {
-      assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
+    } else if (Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType) {
       type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
       if (type.isNull()) {
         // FIXME: We should never receive a nullptr here, but this is causing
@@ -791,6 +791,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
+    } else {
+      assert(Arg.getKind() == DiagnosticArgumentKind::WitnessType);
+      type = Arg.getAsWitnessType().getType()->getWithoutParens();
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
+      printOptions.PrintGenericRequirements = false;
+      printOptions.PrintInverseRequirements = false;
+      needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     }
 
     // If a type has an unresolved type, print it with syntax sugar removed for
@@ -940,6 +953,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       }
       break;
     }
+
+    case ActorIsolation::Erased:
+      Out << "@isolated(any)";
+      break;
 
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
@@ -1197,11 +1214,11 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
   return level;
 }
 
-llvm::Optional<DiagnosticInfo>
+std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic);
   if (behavior == DiagnosticBehavior::Ignore)
-    return llvm::None;
+    return std::nullopt;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -1251,7 +1268,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            return llvm::None;
+            return std::nullopt;
           }
 
           while (!dc->isModuleContext()) {
@@ -1379,6 +1396,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
       case GeneratedSourceInfo::PrettyPrinted:
+      case GeneratedSourceInfo::DefaultArgument:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1452,6 +1470,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::PrettyPrinted:
       break;
 
+    case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
       return childNotes;
     }
@@ -1635,6 +1654,7 @@ swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
 
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
-    return DeclName();
+  case GeneratedSourceInfo::DefaultArgument:
+      return DeclName();
   }
 }

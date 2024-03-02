@@ -1507,11 +1507,10 @@ bool DataflowState::cleanupAllDestroyAddr(
           SILBuilderWithScope dbgValueInsertBuilder(dvi);
           dbgValueInsertBuilder.setCurrentDebugScope(
               addressDebugInst->getDebugScope());
-          dbgValueInsertBuilder.createDebugValue(
-              (*addressDebugInst)->getLoc(),
-              SILUndef::get(address->getType(), dvi->getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+          dbgValueInsertBuilder.createDebugValue((*addressDebugInst)->getLoc(),
+                                                 SILUndef::get(address),
+                                                 *varInfo, false,
+                                                 /*was moved*/ true);
         }
       }
       useState.destroys.insert(dvi);
@@ -1793,10 +1792,9 @@ bool DataflowState::process(
         if (auto varInfo = addressDebugInst.getVarInfo()) {
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false /*poison*/, true /*was moved*/);
+          undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                        SILUndef::get(address), *varInfo,
+                                        false /*poison*/, true /*was moved*/);
         }
       }
 
@@ -2090,11 +2088,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
       if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+        undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                      SILUndef::get(address), *varInfo, false,
+                                      /*was moved*/ true);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2201,11 +2197,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         {
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-          undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+          undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                        SILUndef::get(address), *varInfo, false,
+                                        /*was moved*/ true);
         }
         {
           // Make sure at the reinit point to create a new debug value after the
@@ -2253,11 +2247,9 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
       if (auto varInfo = addressDebugInst.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+        undefBuilder.createDebugValue(addressDebugInst->getLoc(),
+                                      SILUndef::get(address), *varInfo, false,
+                                      /*was moved*/ true);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2461,11 +2453,6 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-    auto &astContext = fn->getASTContext();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!astContext.supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
@@ -2501,7 +2488,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
     auto addressToProcess =
-        llvm::makeArrayRef(addressesToCheck.begin(), addressesToCheck.end());
+        llvm::ArrayRef(addressesToCheck.begin(), addressesToCheck.end());
 
     SILOptFunctionBuilder funcBuilder(*this);
 

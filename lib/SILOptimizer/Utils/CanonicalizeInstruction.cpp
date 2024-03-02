@@ -76,7 +76,7 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 
 // If simplification is successful, return a valid iterator to the next
 // instruction that wasn't erased.
-static llvm::Optional<SILBasicBlock::iterator>
+static std::optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its
   // scope. Nothing needs to be added to the worklist except for Result,
@@ -85,7 +85,7 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   auto result = simplifyAndReplaceAllSimplifiedUsesAndErase(
       inst, pass.callbacks, &pass.deadEndBlocks);
   if (!pass.callbacks.hadCallbackInvocation())
-    return llvm::None;
+    return std::nullopt;
 
   return result;
 }
@@ -254,7 +254,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   // Create a new address projection instruction and load instruction for each
   // unique projection.
   Projection *lastProj = nullptr;
-  llvm::Optional<LoadOperation> lastNewLoad;
+  std::optional<LoadOperation> lastNewLoad;
   for (auto &pair : projections) {
     auto &proj = pair.proj;
     auto *extract = pair.extract;
@@ -278,7 +278,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     pass.notifyNewInstruction(projInst);
 
     // When loading a trivial subelement, convert ownership.
-    llvm::Optional<LoadOwnershipQualifier> loadOwnership =
+    std::optional<LoadOwnershipQualifier> loadOwnership =
         loadInst.getOwnershipQualifier();
     if (loadOwnership.has_value()) {
       if (*loadOwnership != LoadOwnershipQualifier::Unqualified &&
@@ -484,11 +484,18 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
                            !isNestedLexicalBeginBorrow(bbi)))
     return next;
+    
+  // Fixed borrow scopes can't be eliminated during the raw stage since they
+  // control move checker behavior.
+  if (bbi->isFixed() && bbi->getModule().getStage() == SILStage::Raw) {
+    return next;
+  }
 
   // Borrow scopes representing a VarDecl can't be eliminated during the raw
   // stage because they may be needed for diagnostics.
-  if (bbi->isFromVarDecl() && (bbi->getModule().getStage() == SILStage::Raw))
+  if (bbi->isFromVarDecl() && bbi->getModule().getStage() == SILStage::Raw) {
     return next;
+  }
 
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not
@@ -536,7 +543,7 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
   return killInstruction(inst, next, pass);
 }
 
-static llvm::Optional<SILBasicBlock::iterator>
+static std::optional<SILBasicBlock::iterator>
 tryEliminateUnneededForwardingInst(SILInstruction *i,
                                    CanonicalizeInstruction &pass) {
   assert(ForwardingInstruction::isa(i) &&
@@ -545,7 +552,7 @@ tryEliminateUnneededForwardingInst(SILInstruction *i,
     if (svi->getNumOperands() == 1)
       return eliminateUnneededForwardingUnarySingleValueInst(svi, pass);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//

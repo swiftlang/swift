@@ -1438,6 +1438,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #define TYPEREPR(Id, Parent) bool visit##Id##TypeRepr(Id##TypeRepr *T);
 #include "swift/AST/TypeReprNodes.def"
 
+  bool visitDeclRefTypeRepr(DeclRefTypeRepr *T);
+
   using Action = ASTWalker::Action;
 
   using PreWalkAction = ASTWalker::PreWalkAction;
@@ -1455,13 +1457,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     switch (Pre.Action) {
     case PreWalkAction::Stop:
       return true;
-    case PreWalkAction::SkipChildren:
+    case PreWalkAction::SkipNode:
       return false;
+    case PreWalkAction::SkipChildren:
+      break;
     case PreWalkAction::Continue:
+      if (VisitChildren())
+        return true;
       break;
     }
-    if (VisitChildren())
-      return true;
     switch (WalkPost().Action) {
     case PostWalkAction::Stop:
       return true;
@@ -1476,21 +1480,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   T *traverse(PreWalkResult<T *> Pre,
               llvm::function_ref<T *(T *)> VisitChildren,
               llvm::function_ref<PostWalkResult<T *>(T *)> WalkPost) {
+    auto Node = Pre.Value;
+    assert(!Node || *Node && "Use Action::Stop instead of returning nullptr");
     switch (Pre.Action.Action) {
     case PreWalkAction::Stop:
       return nullptr;
+    case PreWalkAction::SkipNode:
+      return *Node;
     case PreWalkAction::SkipChildren:
-      assert(*Pre.Value && "Use Action::Stop instead of returning nullptr");
-      return *Pre.Value;
-    case PreWalkAction::Continue:
+      break;
+    case PreWalkAction::Continue: {
+      auto NewNode = VisitChildren(*Node);
+      if (!NewNode)
+        return nullptr;
+
+      Node = NewNode;
       break;
     }
-    assert(*Pre.Value && "Use Action::Stop instead of returning nullptr");
-    auto Value = VisitChildren(*Pre.Value);
-    if (!Value)
-      return nullptr;
-
-    auto Post = WalkPost(Value);
+    }
+    auto Post = WalkPost(*Node);
     switch (Post.Action.Action) {
     case PostWalkAction::Stop:
       return nullptr;
@@ -1618,9 +1626,24 @@ public:
     return false;
   }
 
+private:
+  /// Walk a `MemberTypeRepr` in source order such that each subsequent
+  /// dot-separated component is a child of the previous one
+  [[nodiscard]] bool doItInSourceOrderRecursive(MemberTypeRepr *T);
+
+public:
   /// Returns true on failure.
   [[nodiscard]]
   bool doIt(TypeRepr *T) {
+    if (auto *MTR = dyn_cast<MemberTypeRepr>(T)) {
+      switch (Walker.getMemberTypeReprWalkingScheme()) {
+      case MemberTypeReprWalkingScheme::SourceOrderRecursive:
+        return doItInSourceOrderRecursive(MTR);
+      case MemberTypeReprWalkingScheme::ASTOrderRecursive:
+        break;
+      }
+    }
+
     return traverse(
         Walker.walkToTypeReprPre(T),
         [&]() { return visit(T); },
@@ -1699,6 +1722,89 @@ public:
 };
 
 } // end anonymous namespace
+
+bool Traversal::doItInSourceOrderRecursive(MemberTypeRepr *T) {
+  // Qualified types are modeled resursively such that each previous
+  // dot-separated component is a child of the next one. To walk a member type
+  // representation according to
+  // `MemberTypeReprWalkingScheme::SourceOrderRecursive`:
+
+  // 1. Pre-walk the dot-separated components in source order. If asked to skip
+  //    the children of a given component:
+  //    1. Set the depth at which to start post-walking later.
+  //    2. Skip its generic arguments and subsequent components.
+  std::function<bool(TypeRepr *, std::optional<unsigned> &, unsigned)>
+      doItInSourceOrderPre = [&](TypeRepr *T,
+                                 std::optional<unsigned> &StartPostWalkDepth,
+                                 unsigned Depth) {
+        if (auto *MemberTR = dyn_cast<MemberTypeRepr>(T)) {
+          if (doItInSourceOrderPre(MemberTR->getBase(), StartPostWalkDepth,
+                                   Depth + 1)) {
+            return true;
+          }
+
+          if (StartPostWalkDepth.has_value()) {
+            return false;
+          }
+        }
+
+        switch (this->Walker.walkToTypeReprPre(T).Action) {
+        case PreWalkAction::Stop:
+          return true;
+        case PreWalkAction::SkipChildren:
+          StartPostWalkDepth = Depth;
+          return false;
+        case PreWalkAction::SkipNode:
+          StartPostWalkDepth = Depth + 1;
+          return false;
+        case PreWalkAction::Continue:
+          break;
+        }
+
+        if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
+          for (auto *Arg : DeclRefTR->getGenericArgs()) {
+            if (doIt(Arg)) {
+              return true;
+            }
+          }
+        } else if (visit(T)) {
+          return true;
+        }
+
+        return false;
+      };
+
+  // 2. Post-walk the components in reverse order, respecting the depth at which
+  //    to start post-walking if set.
+  std::function<bool(TypeRepr *, std::optional<unsigned>, unsigned)>
+      doItInSourceOrderPost = [&](TypeRepr *T,
+                                  std::optional<unsigned> StartPostWalkDepth,
+                                  unsigned Depth) {
+        if (!StartPostWalkDepth.has_value() || Depth >= *StartPostWalkDepth) {
+          switch (this->Walker.walkToTypeReprPost(T).Action) {
+          case PostWalkAction::Continue:
+            break;
+          case PostWalkAction::Stop:
+            return true;
+          }
+        }
+
+        if (auto *MemberTR = dyn_cast<MemberTypeRepr>(T)) {
+          return doItInSourceOrderPost(MemberTR->getBase(), StartPostWalkDepth,
+                                       Depth + 1);
+        }
+
+        return false;
+      };
+
+  std::optional<unsigned> StartPostWalkDepth;
+
+  if (doItInSourceOrderPre(T, StartPostWalkDepth, 0)) {
+    return true;
+  }
+
+  return doItInSourceOrderPost(T, StartPostWalkDepth, 0);
+}
 
 #pragma mark Statement traversal
 Stmt *Traversal::visitBreakStmt(BreakStmt *BS) {
@@ -2124,27 +2230,32 @@ bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
   return doIt(T->getTypeRepr());
 }
 
-bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
+bool Traversal::visitDeclRefTypeRepr(DeclRefTypeRepr *T) {
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+    if (doIt(memberTR->getBase())) {
+      return true;
+    }
+  }
+
+  for (auto *genericArg : T->getGenericArgs()) {
+    if (doIt(genericArg)) {
+      return true;
+    }
+  }
+
   return false;
+}
+
+bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
+  return visitDeclRefTypeRepr(T);
 }
 
 bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
-  for (auto genArg : T->getGenericArgs()) {
-    if (doIt(genArg))
-      return true;
-  }
-  return false;
+  return visitDeclRefTypeRepr(T);
 }
 
 bool Traversal::visitMemberTypeRepr(MemberTypeRepr *T) {
-  if (doIt(T->getBaseComponent()))
-    return true;
-
-  for (auto comp : T->getMemberComponents()) {
-    if (doIt(comp))
-      return true;
-  }
-  return false;
+  return visitDeclRefTypeRepr(T);
 }
 
 bool Traversal::visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -2215,6 +2326,10 @@ bool Traversal::visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
 }
 
 bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitTransferringTypeRepr(TransferringTypeRepr *T) {
   return doIt(T->getBase());
 }
 

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 847; // add LifetimeDependence
+const uint16_t SWIFTMODULE_VERSION_MINOR = 860; // AllowFeatureSuppressionAttr
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -109,16 +109,16 @@ public:
     return rawValue != 0;
   }
 
-  llvm::Optional<DeclID> getAsDeclID() const {
+  std::optional<DeclID> getAsDeclID() const {
     if (rawValue > 0)
       return DeclID(rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+  std::optional<LocalDeclContextID> getAsLocalDeclContextID() const {
     if (rawValue < 0)
       return LocalDeclContextID(-rawValue);
-    return llvm::None;
+    return std::nullopt;
   }
 
   static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {
@@ -359,7 +359,7 @@ enum class ParamDeclSpecifier : uint8_t {
   Consuming = 3,
   LegacyShared = 4,
   LegacyOwned = 5,
-  Transferring = 6,
+  ImplicitlyCopyableConsuming = 6,
 };
 using ParamDeclSpecifierField = BCFixed<3>;
 
@@ -402,6 +402,7 @@ enum class SILParameterDifferentiability : uint8_t {
 enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
+  Transferring = 0x4,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -537,6 +538,7 @@ enum class DefaultArgumentKind : uint8_t {
   EmptyArray,
   EmptyDictionary,
   StoredProperty,
+  ExpressionMacro,
 };
 using DefaultArgumentField = BCFixed<4>;
 
@@ -548,7 +550,8 @@ enum class ActorIsolation : uint8_t {
   Nonisolated,
   NonisolatedUnsafe,
   GlobalActor,
-  GlobalActorUnsafe
+  GlobalActorUnsafe,
+  Erased,
 };
 using ActorIsolationField = BCFixed<3>;
 
@@ -688,7 +691,7 @@ using PluginSearchOptionKindField = BCFixed<3>;
 enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
-  Dynamic,
+  Erased,
   GlobalActorOffset, // Add this to the global actor type ID
 };
 using FunctionTypeIsolationField = TypeIDField;
@@ -857,6 +860,7 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
+    CHANNEL,
     IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     HAS_NONCOPYABLE_GENERICS,
@@ -892,6 +896,11 @@ namespace control_block {
 
   using RevisionLayout = BCRecordLayout<
     REVISION,
+    BCBlob
+  >;
+
+  using ChannelLayout = BCRecordLayout<
+    CHANNEL,
     BCBlob
   >;
 
@@ -1228,7 +1237,8 @@ namespace decls_block {
     BCFixed<1>,                      // throws?
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
-    FunctionTypeIsolationField       // isolation
+    FunctionTypeIsolationField,      // isolation
+    BCFixed<1>                       // has transferring result
     // trailed by parameters
   );
 
@@ -1327,6 +1337,7 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
+    BCFixed<1>,                      // has transferring result
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1342,8 +1353,10 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
+    BCFixed<1>,                         // erased isolation?
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
+    BCFixed<1>,                         // transferring result
     BCVBR<6>,                           // number of parameters
     BCVBR<5>,                           // number of yields
     BCVBR<5>,                           // number of results
@@ -1520,11 +1533,18 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
+    TypeIDField,            // superclass
     AccessLevelField,       // access level
-    BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
-    // Trailed by the generic parameters (if any), the members record, and
-    // the default witness table record
+    BCArray<TypeIDField>    // dependency types
+    // Trailed by the inherited protocols, the generic parameters (if any),
+    // the generic signature, the members record, and the default witness table record
+  >;
+
+  /// A default witness table for a protocol.
+  using InheritedProtocolsLayout = BCRecordLayout<
+    INHERITED_PROTOCOLS,
+    BCArray<DeclIDField>
+    // An array of inherited protocol declarations
   >;
 
   /// A default witness table for a protocol.
@@ -1603,6 +1623,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isTransferring?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -1635,6 +1656,7 @@ namespace decls_block {
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
+    BCFixed<1>,   // has transferring result
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -2113,6 +2135,12 @@ namespace decls_block {
     BCArray<IdentifierIDField> // name components
   >;
 
+  using AllowFeatureSuppressionDeclAttrLayout = BCRecordLayout<
+    AllowFeatureSuppression_DECL_ATTR,
+    BCFixed<1>,   // implicit flag
+    BCArray<IdentifierIDField>  // feature names
+  >;
+
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names
@@ -2177,8 +2205,7 @@ namespace decls_block {
   using LifetimeDependenceLayout =
       BCRecordLayout<LIFETIME_DEPENDENCE,
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
-                     BCFixed<1>,         // hasBorrowLifetimeParamIndices
-                     BCFixed<1>,         // hasMutateLifetimeParamIndices
+                     BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
@@ -2351,6 +2378,14 @@ namespace decls_block {
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
   >;
+
+  using DistributedThunkTargetDeclAttrLayout = BCRecordLayout<
+      DistributedThunkTarget_DECL_ATTR,
+      BCFixed<1>, // implicit flag
+      DeclIDField // target function
+          // FIXME: not entirely right?
+  >;
+
 
   using TypeEraserDeclAttrLayout = BCRecordLayout<
     TypeEraser_DECL_ATTR,

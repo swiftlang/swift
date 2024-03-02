@@ -40,10 +40,10 @@ private:
 
   bool isInType() const { return TypeDepth > 0; }
 
-  llvm::Optional<ChunkKind>
+  std::optional<ChunkKind>
   getChunkKindForPrintNameContext(PrintNameContext context) const;
 
-  llvm::Optional<ChunkKind>
+  std::optional<ChunkKind>
   getChunkKindForStructureKind(PrintStructureKind Kind) const;
 
   void startNestedGroup(ChunkKind Kind);

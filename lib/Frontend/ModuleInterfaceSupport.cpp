@@ -432,8 +432,7 @@ class InheritedProtocolCollector {
 
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
-  getAvailabilityAttrs(const Decl *D,
-                       llvm::Optional<AvailableAttrList> &cache) {
+  getAvailabilityAttrs(const Decl *D, std::optional<AvailableAttrList> &cache) {
     if (cache.has_value())
       return cache.value();
 
@@ -488,7 +487,7 @@ class InheritedProtocolCollector {
   /// protocols.
   void recordProtocols(InheritedTypes directlyInherited, const Decl *D,
                        bool skipExtra = false) {
-    llvm::Optional<AvailableAttrList> availableAttrs;
+    std::optional<AvailableAttrList> availableAttrs;
 
     for (int i : directlyInherited.getIndices()) {
       Type inheritedTy = directlyInherited.getResolvedType(i);
@@ -670,11 +669,9 @@ public:
 
     // First record all protocols that have already been handled.
     for (ProtocolDecl *proto : IncludedProtocols) {
-      proto->walkInheritedProtocols(
-          [&handledProtocols](ProtocolDecl *inherited) -> TypeWalker::Action {
-        handledProtocols.insert(inherited);
-        return TypeWalker::Action::Continue;
-      });
+      handledProtocols.insert(proto);
+      auto allInherited = proto->getAllInheritedProtocols();
+      handledProtocols.insert(allInherited.begin(), allInherited.end());
     }
 
     // Preserve the behavior of previous implementations which formatted of
@@ -693,7 +690,7 @@ public:
       proto->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // If 'nominal' is an actor, we do not synthesize its conformance
         // to the Actor protocol through a dummy extension.
@@ -702,14 +699,14 @@ public:
         // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
 
         // Do not synthesize an extension to print a conformance to an
         // invertible protocol, as their conformances are always re-inferred
         // using the interface itself.
         if (auto kp = inherited->getKnownProtocolKind())
           if (getInvertibleProtocolKind(*kp))
-            return TypeWalker::Action::SkipChildren;
+            return TypeWalker::Action::SkipNode;
 
         if (inherited->isSPI() && printOptions.printPublicInterface())
           return TypeWalker::Action::Continue;
@@ -721,7 +718,7 @@ public:
               inherited, availability, isUnchecked, otherAttrs);
           printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
                                     protoAndAvailability);
-          return TypeWalker::Action::SkipChildren;
+          return TypeWalker::Action::SkipNode;
         }
 
         return TypeWalker::Action::Continue;
@@ -744,7 +741,7 @@ public:
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
-    auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
+    auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
         /*isRetroactive=*/false,
         /*isPreconcurrency=*/false)));

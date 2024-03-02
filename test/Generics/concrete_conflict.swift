@@ -35,7 +35,7 @@ class Class<T> {}
 
 extension Class where T == Bool {
   // CHECK-LABEL: .badRequirement()@
-  // CHECK-NEXT: <T>
+  // CHECK-NEXT: <T where T == Int>
   func badRequirement() where T == Int { }
   // expected-error@-1 {{no type for 'T' can satisfy both 'T == Int' and 'T == Bool'}}
 }

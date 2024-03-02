@@ -159,4 +159,3 @@ public import FullyPrivateClang // expected-error{{private module 'FullyPrivateC
 public import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
 // expected-warning @-1 {{public import of 'LocalClang' was not used in public declarations or inlinable code}}
 @_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
-// expected-warning @-1 {{public import of 'MainLib' was not used in public declarations or inlinable code}}

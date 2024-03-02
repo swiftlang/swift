@@ -1263,6 +1263,10 @@ public:
                 "instruction isn't dominated by its bb argument operand");
       }
 
+      if (auto *undef = dyn_cast<SILUndef>(operand.get())) {
+        require(undef->getParent() == BB->getParent(), "SILUndef in wrong function");
+      }
+
       require(operand.getUser() == I,
               "instruction's operand's owner isn't the instruction");
       require(isOperandInValueUses(&operand), "operand value isn't used by operand");
@@ -1389,7 +1393,7 @@ public:
   }
 
   void checkDebugVariable(SILInstruction *inst) {
-    llvm::Optional<SILDebugVariable> varInfo;
+    std::optional<SILDebugVariable> varInfo;
     if (auto *di = dyn_cast<AllocStackInst>(inst))
       varInfo = di->getVarInfo();
     else if (auto *di = dyn_cast<AllocBoxInst>(inst))
@@ -1469,6 +1473,7 @@ public:
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
+      bool HasFragment = false;
       for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
            It != ItEnd;) {
         require(It->getKind() == SILDIExprElement::OperatorKind,
@@ -1483,8 +1488,10 @@ public:
                   "di-expression operand kind mismatch");
 
         if (Op == SILDIExprOperator::Fragment)
-          require(It == ItEnd, "op_fragment directive needs to be at the end "
-                               "of a di-expression");
+          HasFragment = true;
+        else
+          require(!HasFragment, "no directive allowed after op_fragment"
+                  " in a di-expression");
       }
     }
   }
@@ -2085,6 +2092,17 @@ public:
       }
     }
 
+    if (resultInfo->hasErasedIsolation()) {
+      require(!PAI->getArguments().empty(),
+              "erasure to @isolated(any) requires an actor argument");
+      auto isolationTy =
+        substConv.getSILArgumentType(appliedArgStartIdx,
+                                     F.getTypeExpansionContext());
+      requireSameType(isolationTy,
+                      SILType::getOpaqueIsolationType(F.getASTContext()),
+                      "first applied argument must be the isolation value");
+    }
+
     // TODO: Impose additional constraints when partial_apply when the
     // -disable-sil-partial-apply flag is enabled. We want to reduce
     // partial_apply to being only a means of associating a closure invocation
@@ -2135,6 +2153,13 @@ public:
       require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
               "partial_apply context argument must be swift-refcounted");
     }
+  }
+
+  void checkFunctionExtractIsolationInst(FunctionExtractIsolationInst *FEI) {
+    auto fnType = requireObjectType(SILFunctionType, FEI->getFunction(),
+                                    "function_extract_isolation operand");
+    require(fnType->hasErasedIsolation(),
+            "function_extract_isolation operand must have erased isolation");
   }
 
   void checkBuiltinInst(BuiltinInst *BI) {
@@ -2212,6 +2237,10 @@ public:
       auto semanticName = semantics::LIFETIMEMANAGEMENT_COPY;
       require(BI->getFunction()->hasSemanticsAttr(semanticName),
               "_copy used within a generic context");
+    }
+
+    if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
+      require(false, "this builtin is pre-SIL-only");
     }
   }
   
@@ -3800,7 +3829,7 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    llvm::Optional<Requirement> selfRequirement;
+    std::optional<Requirement> selfRequirement;
     for (auto req : genericSig.getRequirements()) {
       if (req.getKind() != RequirementKind::SameType) {
         selfRequirement = req;
@@ -6386,6 +6415,10 @@ public:
     require(!FTy->hasSelfParam() || !FTy->getParameters().empty(),
             "Functions with a calling convention with self parameter must "
             "have at least one argument for self.");
+
+    require(!FTy->hasErasedIsolation() ||
+             FTy->getRepresentation() == SILFunctionType::Representation::Thick,
+            "only thick function types can have erased isolation");
   }
 
   struct VerifyFlowSensitiveRulesDetails {
@@ -6802,11 +6835,13 @@ public:
 
     switch (F->getLinkage()) {
     case SILLinkage::Public:
+    case SILLinkage::Package:
     case SILLinkage::Shared:
       require(F->isDefinition() || F->hasForeignBody(),
-              "public/shared function must have a body");
+              "public/package/shared function must have a body");
       break;
     case SILLinkage::PublicNonABI:
+    case SILLinkage::PackageNonABI:
       require(F->isDefinition(),
               "alwaysEmitIntoClient function must have a body");
       require(F->isSerialized() || mod.isSerialized(),
@@ -6823,6 +6858,11 @@ public:
       require(F->isExternalDeclaration() || F->isSerialized() ||
               mod.isSerialized(),
             "public-external function definition must be serialized");
+      break;
+    case SILLinkage::PackageExternal:
+      require(F->isExternalDeclaration() || F->isSerialized() ||
+              mod.isSerialized(),
+              "package-external function definition must be serialized");
       break;
     case SILLinkage::HiddenExternal:
       require(F->isExternalDeclaration(),
@@ -6851,6 +6891,9 @@ public:
       return;
     }
 
+    require(!FTy->hasErasedIsolation(),
+            "function declarations cannot have erased isolation");
+
     assert(!F->hasForeignBody());
 
     // Make sure that our SILFunction only has context generic params if our
@@ -6865,6 +6908,11 @@ public:
       require(!FTy->isPolymorphic(),
               "generic function definition must have a generic environment");
     }
+
+    // Before verifying the body of the function, validate the SILUndef map to
+    // make sure that all SILUndef in the function's map point at the function
+    // as the SILUndef's parent.
+    F->verifySILUndefMap();
 
     // Otherwise, verify the body of the function.
     verifyEntryBlock(F->getEntryBlock());
@@ -6936,6 +6984,15 @@ void SILFunction::verifyCriticalEdges() const {
   SILVerifier(*this, /*calleeCache=*/nullptr,
                      /*SingleFunction=*/true,
                      /*checkLinearLifetime=*/ false).verifyBranches(this);
+}
+
+/// Validate that all SILUndef in \p f have f as a parent.
+void SILFunction::verifySILUndefMap() const {
+  for (auto &pair : undefValues) {
+    assert(
+        pair.second->getParent() == this &&
+        "undef in f->undefValue map with different parent function than f?!");
+  }
 }
 
 /// Verify that a property descriptor follows invariants.
@@ -7053,12 +7110,15 @@ void SILVTable::verify(const SILModule &M) const {
 
     if (M.getStage() != SILStage::Lowered &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
       SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
-              baseInfo.getSILType().castTo<SILFunctionType>(),
               entry.getImplementation()->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
               "vtable entry for " + baseName + " must be ABI-compatible",
               *entry.getImplementation());
     }
@@ -7215,8 +7275,6 @@ void SILModule::verify(CalleeCache *calleeCache,
                        bool isCompleteOSSA, bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
-
-  checkForLeaks();
 
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;

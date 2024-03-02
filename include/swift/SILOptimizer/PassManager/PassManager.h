@@ -151,16 +151,20 @@ public:
 
   void endTransformFunction();
 
+  void beginVerifyFunction(SILFunction *function);
+  void endVerifyFunction();
+
   void notifyNewCloner() { numClonersAllocated++; }
   void notifyClonerDestroyed() { numClonersAllocated--; }
 
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
 
-  void initializeSSAUpdater(SILType type, ValueOwnershipKind ownership) {
+  void initializeSSAUpdater(SILFunction *fn, SILType type,
+                            ValueOwnershipKind ownership) {
     if (!ssaUpdater)
       ssaUpdater = new SILSSAUpdater;
-    ssaUpdater->initialize(type, ownership);
+    ssaUpdater->initialize(fn, type, ownership);
   }
 
   SILSSAUpdater *getSSAUpdater() const {
@@ -416,6 +420,12 @@ public:
   static bool isPassDisabled(StringRef passName);
   static bool isInstructionPassDisabled(StringRef instName);
   static bool disablePassesForFunction(SILFunction *function);
+
+  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
+  void runSwiftFunctionVerification(SILFunction *f);
+
+  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
+  void runSwiftModuleVerification();
 
 private:
   void parsePassCount(StringRef countsStr);

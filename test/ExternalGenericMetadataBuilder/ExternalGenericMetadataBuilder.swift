@@ -5,6 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx && CPU=arm64
+// REQUIRES: rdar123810110
 
 import ExternalGenericMetadataBuilder
 import Foundation
@@ -26,6 +27,11 @@ public struct GenericField<T, U> {
   var field: GenericStruct<T, U, Double>
   var int: Int
 }
+
+// The protocol conformance puts a symbol into __DATA_CONST which the builder
+// can use as the base symbol for references to other data.
+public protocol PublicProto {}
+extension GenericStruct: PublicProto {}
 
 ExternalGenericMetadataBuilderTests.test("JSON output") {
   let builder = swift_externalMetadataBuilder_create(1, "arm64")
@@ -80,15 +86,43 @@ ExternalGenericMetadataBuilderTests.test("JSON output") {
   let outputJSONObject = try! JSONSerialization.jsonObject(with: outputJSON!.data(using: .utf8)!)
   let expectedJSONObject = try! JSONSerialization.jsonObject(with: expectedJSON.data(using: .utf8)!)
 
-  let outputJSONDictionary = outputJSONObject as? NSDictionary
+  // Before comparing the JSONs, strip out things that might not be consistent
+  // from one build to the next. In particular, pointer targets with large
+  // addends are things that will depend on the specific layout of data within
+  // the binary, because we've ended up referring to an adjacent symbol, so we
+  // should replace those with something generic.
+  func prepareForComparison(_ value: Any) -> Any {
+    if let array = value as? [Any] {
+      return array.map(prepareForComparison)
+    }
+
+    if let dictionary = value as? [String: Any] {
+      // See if this dictionary contains a large addend.
+      if let addend = dictionary["addend"] as? Int64 {
+        if !(-8...8).contains(addend) {
+          // Return a placeholder value that will always match.
+          return "Target with large addend removed."
+        }
+      }
+
+      return dictionary.mapValues(prepareForComparison)
+    }
+    return value;
+  }
+
+  let outputJSONPrepped = prepareForComparison(outputJSONObject)
+  let expectedJSONPrepped = prepareForComparison(expectedJSONObject)
+
+  let outputJSONDictionary = outputJSONPrepped as? NSDictionary
   expectNotNil(outputJSONDictionary)
-  let expectedJSONDictionary = expectedJSONObject as? NSDictionary
+  let expectedJSONDictionary = expectedJSONPrepped as? NSDictionary
   expectNotNil(expectedJSONDictionary)
 
   // Don't use expectEqual, as it will print the strings on one line with \n
   // escapes, which is unreadable here.
   expectTrue(outputJSONDictionary!.isEqual(expectedJSONDictionary),
-             "Output JSON does not match expected:\n\(outputJSON!)")
+             "Output JSON does not match expected:\n\(outputJSONDictionary!)" +
+             "\nExpected:\n\(expectedJSONDictionary!)")
 
   swift_externalMetadataBuilder_destroy(builder)
 }
@@ -178,22 +212,22 @@ var expectedJSON: String {
             "contents": [
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1032,
+                    "addend": 432,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1376,
+                    "addend": 776,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1536,
+                    "addend": 936,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 1768,
+                    "addend": 1168,
                     "kind": "ptr64"
                 },
                 {
@@ -203,17 +237,17 @@ var expectedJSON: String {
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2200,
+                    "addend": 1600,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2420,
+                    "addend": 1820,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 2864,
+                    "addend": 2264,
                     "kind": "ptr64"
                 },
                 "2000000000000000200000000000000007000300FFFFFF7F"
@@ -225,22 +259,22 @@ var expectedJSON: String {
             "contents": [
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 3520,
+                    "addend": 2920,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 3892,
+                    "addend": 3292,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4052,
+                    "addend": 3452,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4312,
+                    "addend": 3712,
                     "kind": "ptr64"
                 },
                 {
@@ -250,17 +284,17 @@ var expectedJSON: String {
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 4796,
+                    "addend": 4196,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 5044,
+                    "addend": 4444,
                     "kind": "ptr64"
                 },
                 {
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
-                    "addend": 5160,
+                    "addend": 4560,
                     "kind": "ptr64"
                 },
                 "2800000000000000280000000000000007000300FFFFFF7F"

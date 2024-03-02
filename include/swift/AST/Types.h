@@ -39,14 +39,13 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace llvm {
 struct fltSemantics;
@@ -383,8 +382,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 14 };
-  enum { NumSILExtInfoBits = 13 };
+  enum { NumAFTExtInfoBits = 15 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -656,6 +655,9 @@ public:
 
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
+
+  /// Returns true if this contextual type is (Escapable && !isNoEscape).
+  bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -952,7 +954,7 @@ public:
   }
 
   /// If this type is a known protocol, return its kind.
-  llvm::Optional<KnownProtocolKind> getKnownProtocol();
+  std::optional<KnownProtocolKind> getKnownProtocol();
 
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
@@ -1143,25 +1145,16 @@ public:
   /// function with each archetype-to-substituted-type binding. The callback
   /// may return a new type to substitute into the result type, or return
   /// CanType() to error out of the operation. Each invocation of the callback
-  /// receives three arguments:
+  /// receives two arguments:
   /// - The `orig` archetype from a position in `this` type.
-  /// - The `subst` type in the same structural position of `ty` that is trying to be bound
-  ///  to `orig`.
-  /// - The `upperBound` archetype, which if set, indicates the minimum set of constraints
-  ///  that any type substituted in this structural position must conform to. May be null,
-  ///  indicating an unconstrained context.
-  /// - If `upperBound` is set, then the `substConformances` array will contain the
-  ///  protocol conformances for `subst` to each of the protocol requirements
-  ///  on `upperBound` in `getConformsTo` order.
+  /// - The `subst` type in the same structural position of `ty` that is trying
+  /// to be bound to `orig`.
   ///
   /// Returns the substituted type, or a null CanType() if this type
   /// is not bindable to the substituted type, or the callback returns
   /// CanType().
   CanType substituteBindingsTo(Type ty,
-         llvm::function_ref<CanType(ArchetypeType *orig,
-                CanType subst,
-                ArchetypeType *upperBound,
-                ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
+         llvm::function_ref<CanType(ArchetypeType *orig, CanType subst)> substFn);
 
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
@@ -1473,7 +1466,7 @@ public:
   
   /// Return the tangent space of the given type, if it exists. Otherwise,
   /// return `None`.
-  llvm::Optional<TangentSpace>
+  std::optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
 };
 
@@ -2204,10 +2197,12 @@ enum class ParamSpecifier : uint8_t {
   /// `__owned`, a legacy spelling of `consuming`.
   LegacyOwned = 5,
 
-  /// `transferring`. Indicating the transfer of a value from one isolation
-  /// domain to another.
-  Transferring = 6,
+  /// A convention that is similar to consuming a parameter that is mutable and
+  /// var like, but for which no implicit copy semantics are not implemented.
+  ImplicitlyCopyableConsuming = 6,
 };
+
+StringRef getNameForParamSpecifier(ParamSpecifier name);
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
@@ -2915,7 +2910,7 @@ class AnyMetatypeType : public TypeBase {
 protected:
   AnyMetatypeType(TypeKind kind, const ASTContext *C,
                   RecursiveTypeProperties properties, Type instanceType,
-                  llvm::Optional<MetatypeRepresentation> repr);
+                  std::optional<MetatypeRepresentation> repr);
 
 public:
   Type getInstanceType() const { return InstanceType; }
@@ -2960,7 +2955,7 @@ END_CAN_TYPE_WRAPPER(AnyMetatypeType, Type)
 /// type, in which case the ordinary metatype is spelled X.Protocol
 /// and X.Type connotes the ExistentialMetatypeType.
 class MetatypeType : public AnyMetatypeType {
-  static MetatypeType *get(Type T, llvm::Optional<MetatypeRepresentation> Repr,
+  static MetatypeType *get(Type T, std::optional<MetatypeRepresentation> Repr,
                            const ASTContext &C);
 
 public:
@@ -2968,7 +2963,7 @@ public:
   ///
   /// This leaves the 'representation' property unavailable.
   static MetatypeType *get(Type T, const ASTContext &C) {
-    return get(T, llvm::None, C);
+    return get(T, std::nullopt, C);
   }
 
   /// Return the MetatypeType for the specified type declaration with
@@ -2977,7 +2972,7 @@ public:
   /// Metatype representation is a SIL-only property. Thin metatypes
   /// can be lowered away to empty types in IR.
   static MetatypeType *
-  get(Type T, llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
+  get(Type T, std::optional<MetatypeRepresentation> repr = std::nullopt) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -2988,7 +2983,7 @@ public:
   
 private:
   MetatypeType(Type T, const ASTContext *C, RecursiveTypeProperties properties,
-               llvm::Optional<MetatypeRepresentation> repr);
+               std::optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
@@ -3014,7 +3009,7 @@ END_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
 class ExistentialMetatypeType : public AnyMetatypeType {
 public:
   static ExistentialMetatypeType *
-  get(Type T, llvm::Optional<MetatypeRepresentation> Repr, const ASTContext &C);
+  get(Type T, std::optional<MetatypeRepresentation> Repr, const ASTContext &C);
 
   /// Return the ExistentialMetatypeType for the specified type
   /// with the given representation.
@@ -3022,7 +3017,7 @@ public:
   /// Metatype representation is a SIL-only property. Existential
   /// metatypes cannot be thin.
   static ExistentialMetatypeType *
-  get(Type T, llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
+  get(Type T, std::optional<MetatypeRepresentation> repr = std::nullopt) {
     return get(T, repr, T->getASTContext());
   }
 
@@ -3036,7 +3031,7 @@ public:
 private:
   ExistentialMetatypeType(Type T, const ASTContext *C,
                           RecursiveTypeProperties properties,
-                          llvm::Optional<MetatypeRepresentation> repr);
+                          std::optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
@@ -3322,7 +3317,8 @@ public:
       return Param(getType(), Identifier(), getFlags().asParamFlags());
     }
 
-    Yield subst(SubstitutionMap subs, SubstOptions options = llvm::None) const {
+    Yield subst(SubstitutionMap subs,
+                SubstOptions options = std::nullopt) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
 
@@ -3344,7 +3340,7 @@ public:
     CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
 
     CanYield subst(SubstitutionMap subs,
-                   SubstOptions options = llvm::None) const {
+                   SubstOptions options = std::nullopt) const {
       return CanYield(getType().subst(subs, options)->getCanonicalType(),
                       getFlags());
     }
@@ -3357,7 +3353,7 @@ protected:
   /// ClangTypeInfo value if one is present.
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext, Type Output,
                   RecursiveTypeProperties properties, unsigned NumParams,
-                  llvm::Optional<ExtInfo> Info)
+                  std::optional<ExtInfo> Info)
       : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     if (Info.has_value()) {
       Bits.AnyFunctionType.HasExtInfo = true;
@@ -3444,16 +3440,13 @@ public:
       return getExtInfo().getIsolation();
     return FunctionTypeIsolation::forNonIsolated();
   }
-  bool isDynamicallyIsolated() const {
-    return getIsolation().isDynamic();
-  }
 
-  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this function cannot throw.
   ///
   /// Functions with untyped throws will produce "any Error", functions that
-  /// cannot throw or are specified to throw "Never" will return llvm::None.
-  llvm::Optional<Type> getEffectiveThrownErrorType() const;
+  /// cannot throw or are specified to throw "Never" will return std::nullopt.
+  std::optional<Type> getEffectiveThrownErrorType() const;
 
   /// Retrieve the "effective" thrown interface type, or `Never` if
   /// this function cannot throw.
@@ -3642,6 +3635,10 @@ public:
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
 
+  bool hasTransferringResult() const {
+    return getExtInfo().hasTransferringResult();
+  }
+
   bool hasEffect(EffectKind kind) const;
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
@@ -3680,7 +3677,7 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params, CanType result,
-                                llvm::Optional<ExtInfo> info = llvm::None);
+                                std::optional<ExtInfo> info = std::nullopt);
 
   CanGenericSignature getOptGenericSignature() const;
 
@@ -3740,7 +3737,7 @@ class FunctionType final
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(ArrayRef<Param> params, Type result,
-                           llvm::Optional<ExtInfo> info = llvm::None);
+                           std::optional<ExtInfo> info = std::nullopt);
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
@@ -3779,13 +3776,13 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    llvm::Optional<ExtInfo> info = llvm::None;
+    std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
       info = getExtInfo();
     Profile(ID, getParams(), getResult(), info);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Param> params,
-                      Type result, llvm::Optional<ExtInfo> info);
+                      Type result, std::optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3793,13 +3790,12 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<Param> params, Type result,
-               llvm::Optional<ExtInfo> info, const ASTContext *ctx,
-               RecursiveTypeProperties properties);
+  FunctionType(ArrayRef<Param> params, Type result, std::optional<ExtInfo> info,
+               const ASTContext *ctx, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 static CanFunctionType get(CanParamArrayRef params, CanType result,
-                           llvm::Optional<ExtInfo> info = llvm::None) {
+                           std::optional<ExtInfo> info = std::nullopt) {
   auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
   return cast<FunctionType>(fnType->getCanonicalType());
 }
@@ -3869,10 +3865,11 @@ std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);
 /// on those parameters and dependent member types thereof. The input and
 /// output types of the generic function can be expressed in terms of those
 /// generic parameters.
-class GenericFunctionType final : public AnyFunctionType,
-    public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param,
-                                  Type> {
+class GenericFunctionType final
+    : public AnyFunctionType,
+      public llvm::FoldingSetNode,
+      private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param,
+                                    Type, LifetimeDependenceInfo> {
   friend TrailingObjects;
       
   GenericSignature Signature;
@@ -3885,16 +3882,20 @@ class GenericFunctionType final : public AnyFunctionType,
     return hasGlobalActor() + hasThrownError();
   }
 
+  size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
+    return hasLifetimeDependenceInfo() ? 1 : 0;
+  }
+
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature sig, ArrayRef<Param> params, Type result,
-                      llvm::Optional<ExtInfo> info, const ASTContext *ctx,
+                      std::optional<ExtInfo> info, const ASTContext *ctx,
                       RecursiveTypeProperties properties);
 
 public:
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
                                   Type result,
-                                  llvm::Optional<ExtInfo> info = llvm::None);
+                                  std::optional<ExtInfo> info = std::nullopt);
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
@@ -3912,7 +3913,17 @@ public:
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
-                                    
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (!hasLifetimeDependenceInfo()) {
+      return LifetimeDependenceInfo();
+    }
+    auto *info = getTrailingObjects<LifetimeDependenceInfo>();
+    assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
+                             "shouldn't have stored it.");
+    return *info;
+  }
+
   /// Retrieve the generic signature of this function type.
   GenericSignature getGenericSignature() const {
     return Signature;
@@ -3927,18 +3938,18 @@ public:
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs,
-                                 SubstOptions options = llvm::None);
+                                 SubstOptions options = std::nullopt);
   FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    llvm::Optional<ExtInfo> info = llvm::None;
+    std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
       info = getExtInfo();
     Profile(ID, getGenericSignature(), getParams(), getResult(), info);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, GenericSignature sig,
                       ArrayRef<Param> params, Type result,
-                      llvm::Optional<ExtInfo> info);
+                      std::optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3950,7 +3961,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   /// Create a new generic function type.
 static CanGenericFunctionType get(CanGenericSignature sig,
                                   CanParamArrayRef params, CanType result,
-                                  llvm::Optional<ExtInfo> info = llvm::None) {
+                                  std::optional<ExtInfo> info = std::nullopt) {
   // Knowing that the argument types are independently canonical is
   // not sufficient to guarantee that the function type will be canonical.
   auto fnType =
@@ -3976,7 +3987,7 @@ END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
-                        CanType result, llvm::Optional<ExtInfo> extInfo) {
+                        CanType result, std::optional<ExtInfo> extInfo) {
   if (signature) {
     return CanGenericFunctionType::get(signature, params, result, extInfo);
   } else {
@@ -4805,7 +4816,7 @@ private:
                   ArrayRef<SILParameterInfo> params,
                   ArrayRef<SILYieldInfo> yieldResults,
                   ArrayRef<SILResultInfo> normalResults,
-                  llvm::Optional<SILResultInfo> errorResult,
+                  std::optional<SILResultInfo> errorResult,
                   SubstitutionMap patternSubs, SubstitutionMap invocationSubs,
                   const ASTContext &ctx, RecursiveTypeProperties properties,
                   ProtocolConformanceRef witnessMethodConformance);
@@ -4817,7 +4828,7 @@ public:
       ArrayRef<SILParameterInfo> interfaceParams,
       ArrayRef<SILYieldInfo> interfaceYields,
       ArrayRef<SILResultInfo> interfaceResults,
-      llvm::Optional<SILResultInfo> interfaceErrorResult,
+      std::optional<SILResultInfo> interfaceErrorResult,
       SubstitutionMap patternSubs, SubstitutionMap invocationSubs,
       const ASTContext &ctx,
       ProtocolConformanceRef witnessMethodConformance =
@@ -4868,6 +4879,13 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
+  SILFunctionTypeIsolation getIsolation() const {
+    return getExtInfo().getIsolation();
+  }
+  bool hasTransferringResult() const {
+    return getExtInfo().hasTransferringResult();
+  }
 
   /// Return the array of all the yields.
   ArrayRef<SILYieldInfo> getYields() const {
@@ -5028,11 +5046,11 @@ public:
   SILResultInfo getErrorResult() const {
     return const_cast<SILFunctionType*>(this)->getMutableErrorResult();
   }
-  llvm::Optional<SILResultInfo> getOptionalErrorResult() const {
+  std::optional<SILResultInfo> getOptionalErrorResult() const {
     if (hasErrorResult()) {
       return getErrorResult();
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
@@ -5209,7 +5227,15 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const;
+  /// Returns nullptr for an empty dependence list.
+  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const;
+
+  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
+      return *depInfo;
+    }
+    return LifetimeDependenceInfo();
+  }
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -5444,6 +5470,8 @@ public:
     enum innerty {
       None,
       DifferentFunctionRepresentations,
+      DifferentAsyncness,
+      DifferentErasedIsolation,
       ABIEscapeToNoEscapeConversion,
       DifferentNumberOfResults,
       DifferentReturnValueConventions,
@@ -5454,7 +5482,7 @@ public:
       DifferingParameterConvention,
       ABIIncompatibleParameterType,
     } kind;
-    llvm::Optional<uintptr_t> payload;
+    std::optional<uintptr_t> payload;
 
     ABICompatibilityCheckResult(innerty kind) : kind(kind) {}
     ABICompatibilityCheckResult(innerty kind, uintptr_t payload)
@@ -5474,10 +5502,10 @@ public:
     StringRef getMessage() const;
   };
 
-  /// Returns no-error if this SILFunctionType is ABI compatible with \p
-  /// other. Otherwise, it returns a true error with a message in
-  /// std::error_code. This is only meant to be used in assertions. When
-  /// assertions are disabled, this just returns true.
+  /// Returns no-error if this SILFunctionType can be trivially
+  /// converted (i.e. without introducing a thunk) to the given
+  /// function type.  Otherwise, it returns an error with a message in
+  /// std::error_code.
   ABICompatibilityCheckResult
   isABICompatibleWith(CanSILFunctionType other,
                       SILFunction &context) const;
@@ -5515,7 +5543,7 @@ public:
           SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
           ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
           ArrayRef<SILResultInfo> results,
-          llvm::Optional<SILResultInfo> errorResult,
+          std::optional<SILResultInfo> errorResult,
           ProtocolConformanceRef conformance, SubstitutionMap patternSub,
           SubstitutionMap invocationSubs);
 
@@ -5897,16 +5925,6 @@ public:
   /// of protocols that are already covered by inheritance due to other entries
   /// in the protocol list, then sorting them in some stable order.
   static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-
-  /// Visit all of the protocols in the given list of protocols, along with their
-  ///
-  /// \param fn Visitor function called for each protocol (just once). If it
-  /// returns \c true, the visit operation will abort and return \c true.
-  ///
-  /// \returns \c true if any invocation of \c fn returns \c true, and \c false
-  /// otherwise.
-  static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
-                                llvm::function_ref<bool(ProtocolDecl *)> fn);
 
 private:
   friend class NominalTypeDecl;
@@ -6393,11 +6411,6 @@ public:
     return *getSubclassTrailingObjects<LayoutConstraint>();
   }
 
-  /// Return true if the archetype has any requirements at all.
-  bool hasRequirements() const {
-    return !getConformsTo().empty() || getSuperclass();
-  }
-
   /// Retrieve the nested type with the given associated type.
   Type getNestedType(AssociatedTypeDecl *assocType);
 
@@ -6652,7 +6665,7 @@ public:
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType>
   get(CanType existential, GenericSignature parentSig,
-      llvm::Optional<UUID> knownID = llvm::None);
+      std::optional<UUID> knownID = std::nullopt);
 
   /// Get or create an archetype that represents the opened type
   /// of an existential value.
@@ -6666,7 +6679,7 @@ public:
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType>
   get(CanType existential, Type interfaceType, GenericSignature parentSig,
-      llvm::Optional<UUID> knownID = llvm::None);
+      std::optional<UUID> knownID = std::nullopt);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.

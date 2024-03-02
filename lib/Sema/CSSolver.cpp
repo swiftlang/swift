@@ -148,6 +148,10 @@ Solution ConstraintSystem::finalize() {
     (void)inserted;
   }
 
+  // Remember implied results.
+  for (auto impliedResult : ImpliedResults)
+    solution.ImpliedResults.insert(impliedResult);
+
   // Remember the opened types.
   for (const auto &opened : OpenedTypes) {
     // We shouldn't ever register opened types multiple times,
@@ -250,6 +254,10 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEltGenericEnv : PackElementGenericEnvironments)
     solution.PackElementGenericEnvironments.push_back(packEltGenericEnv);
 
+  for (const auto &synthesized : SynthesizedConformances) {
+    solution.SynthesizedConformances.insert(synthesized);
+  }
+
   return solution;
 }
 
@@ -293,6 +301,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
     argumentMatchingChoices.insert(argumentMatch);
   }
+
+  // Remember implied results.
+  for (auto impliedResult : solution.ImpliedResults)
+    ImpliedResults.insert(impliedResult);
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
@@ -396,6 +408,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
     ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  }
+
+  for (auto &synthesized : solution.SynthesizedConformances) {
+    SynthesizedConformances.insert(synthesized);
   }
 
   // Register any fixes produced along this path.
@@ -667,6 +683,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
+  numImpliedResults = cs.ImpliedResults.size();
   numContextualTypes = cs.contextualTypes.size();
   numTargets = cs.targets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
@@ -677,6 +694,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
   numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
+  numSynthesizedConformances = cs.SynthesizedConformances.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -789,6 +807,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any inferred closure types (e.g. used in result builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
 
+  // Remove any implied results.
+  truncate(cs.ImpliedResults, numImpliedResults);
+
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
 
@@ -820,6 +841,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // which are no longer in scope.
   truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
 
+  // Remove any implicitly synthesized conformances.
+  truncate(cs.SynthesizedConformances, numSynthesizedConformances);
+
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
@@ -834,7 +858,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
 ///
 /// \returns a solution if a single unambiguous one could be found, or None if
 /// ambiguous or unsolvable.
-llvm::Optional<Solution>
+std::optional<Solution>
 ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
                               bool allowFixes) {
 
@@ -846,7 +870,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
   filterSolutions(solutions);
 
   if (solutions.size() != 1)
-    return llvm::Optional<Solution>();
+    return std::optional<Solution>();
 
   return std::move(solutions[0]);
 }
@@ -878,7 +902,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(DC, llvm::None);
+  ConstraintSystem cs(DC, std::nullopt);
 
   // Set up expression type checker timer for the candidate.
   cs.Timer.emplace(E, cs);
@@ -1076,32 +1100,32 @@ void ConstraintSystem::shrink(Expr *expr) {
                             CS.getContextualType(expr, /*forConstraint=*/false),
                             CS.getContextualTypePurpose(expr));
         // Don't try to walk into the dictionary.
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Let's not attempt to type-check closures or expressions
       // which constrain closures, because they require special handling
       // when dealing with context and parameters declarations.
       if (isa<ClosureExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
       // is determined by type checking the parent interpolated string literal.
       if (isa<TapExpr>(expr)) {
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       // Same as TapExpr and ClosureExpr, we'll handle SingleValueStmtExprs
       // separately.
       if (isa<SingleValueStmtExpr>(expr))
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
 
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (coerceExpr->isLiteralInit())
           ApplyExprs.push_back({coerceExpr, 1});
         visitCoerceExpr(coerceExpr);
-        return Action::SkipChildren(expr);
+        return Action::SkipNode(expr);
       }
 
       if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {
@@ -1290,7 +1314,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
             const auto coercionType = TypeResolution::resolveContextualType(
-                typeRepr, CS.DC, llvm::None,
+                typeRepr, CS.DC, std::nullopt,
                 // FIXME: Should we really be unconditionally complaining
                 // about unbound generics and placeholders here? For
                 // example:
@@ -1430,7 +1454,7 @@ static bool debugConstraintSolverForTarget(ASTContext &C,
   return startBound != endBound;
 }
 
-llvm::Optional<std::vector<Solution>>
+std::optional<std::vector<Solution>>
 ConstraintSystem::solve(SyntacticElementTarget &target,
                         FreeTypeVariableBinding allowFreeTypeVariables) {
   llvm::SaveAndRestore<ConstraintSystemOptions> debugForExpr(Options);
@@ -1497,7 +1521,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
 
     case SolutionResult::Error:
       maybeProduceFallbackDiagnostic(target);
-      return llvm::None;
+      return std::nullopt;
 
     case SolutionResult::TooComplex: {
       auto affectedRange = solution.getTooComplexAt();
@@ -1512,7 +1536,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
           .highlight(*affectedRange);
 
       solution.markAsDiagnosed();
-      return llvm::None;
+      return std::nullopt;
     }
 
     case SolutionResult::Ambiguous:
@@ -1524,7 +1548,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
       if (stage == 1 || Context.SolutionCallback) {
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
-        return llvm::None;
+        return std::nullopt;
       }
 
       if (Options.contains(
@@ -1544,7 +1568,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
         diagnoseFailureFor(target);
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
-        return llvm::None;
+        return std::nullopt;
       }
 
       // Loop again to try to salvage.
@@ -1945,7 +1969,7 @@ static Constraint *selectBestBindingDisjunction(
   return firstBindDisjunction;
 }
 
-llvm::Optional<std::pair<Constraint *, unsigned>>
+std::optional<std::pair<Constraint *, unsigned>>
 ConstraintSystem::findConstraintThroughOptionals(
     TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
     llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate) {
@@ -2002,9 +2026,9 @@ ConstraintSystem::findConstraintThroughOptionals(
     }
 
     // Otherwise we're done.
-    return llvm::None;
+    return std::nullopt;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(

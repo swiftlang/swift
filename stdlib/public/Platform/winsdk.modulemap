@@ -315,6 +315,8 @@ module WinSDK [system] {
   }
 
   module Security {
+    header "../shared/sddl.h"
+
     module AuthZ {
       header "AuthZ.h"
       export *
@@ -464,6 +466,11 @@ module WinSDK [system] {
     header "WinUser.h"
     export *
     link "User32.Lib"
+  }
+
+  module WER {
+    header "WerApi.h"
+    export *
   }
 
   module WIC {

@@ -100,11 +100,11 @@ public:
                  SILBuilder *Builder)
       : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
 
-  static llvm::Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
-                                            SILBuilder *Builder) {
+  static std::optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
+                                           SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
-      return llvm::None;
+      return std::nullopt;
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
@@ -245,8 +245,7 @@ public:
 
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
-        calleeYield->replaceAllUsesWith(
-            SILUndef::get(calleeYield->getType(), Builder->getFunction()));
+        calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield));
       }
     }
 
@@ -276,7 +275,7 @@ class SILInlineCloner
   // The original, noninlined apply site. These become invalid after fixUp,
   // which is called as the last step in SILCloner::cloneFunctionBody.
   FullApplySite Apply;
-  llvm::Optional<BeginApplySite> BeginApply;
+  std::optional<BeginApplySite> BeginApply;
 
   InstructionDeleter &deleter;
 
@@ -904,7 +903,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
@@ -1149,6 +1148,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::UnownedCopyValueInst:
   case SILInstructionKind::WeakCopyValueInst:

@@ -131,55 +131,64 @@ public:
 
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
-  IndexSubset *borrowLifetimeParamIndices;
-  IndexSubset *mutateLifetimeParamIndices;
+  IndexSubset *scopeLifetimeParamIndices;
 
   static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
                                                  unsigned index,
                                                  ValueOwnership ownership);
 
-  static llvm::Optional<LifetimeDependenceInfo>
+  static std::optional<LifetimeDependenceInfo>
   fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
 
-  static llvm::Optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
-                                                      Type resultType);
+  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
+                                                     Type resultType);
 
 public:
   LifetimeDependenceInfo()
       : inheritLifetimeParamIndices(nullptr),
-        borrowLifetimeParamIndices(nullptr),
-        mutateLifetimeParamIndices(nullptr) {}
+        scopeLifetimeParamIndices(nullptr) {}
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
-                         IndexSubset *borrowLifetimeParamIndices,
-                         IndexSubset *mutateLifetimeParamIndices)
+                         IndexSubset *scopeLifetimeParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
-        borrowLifetimeParamIndices(borrowLifetimeParamIndices),
-        mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
+        scopeLifetimeParamIndices(scopeLifetimeParamIndices) {}
 
   operator bool() const { return !empty(); }
 
   bool empty() const {
     return inheritLifetimeParamIndices == nullptr &&
-           borrowLifetimeParamIndices == nullptr &&
-           mutateLifetimeParamIndices == nullptr;
+           scopeLifetimeParamIndices == nullptr;
   }
 
   bool hasInheritLifetimeParamIndices() const {
     return inheritLifetimeParamIndices != nullptr;
   }
-  bool hasBorrowLifetimeParamIndices() const {
-    return borrowLifetimeParamIndices != nullptr;
+  bool hasScopeLifetimeParamIndices() const {
+    return scopeLifetimeParamIndices != nullptr;
   }
-  bool hasMutateLifetimeParamIndices() const {
-    return mutateLifetimeParamIndices != nullptr;
+  
+  bool checkInherit(int index) const {
+    return inheritLifetimeParamIndices
+      && inheritLifetimeParamIndices->contains(index);
+  }
+
+  bool checkScope(int index) const {
+    return scopeLifetimeParamIndices
+      && scopeLifetimeParamIndices->contains(index);
   }
 
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
 
-  static llvm::Optional<LifetimeDependenceInfo>
+  std::optional<LifetimeDependenceKind>
+  getLifetimeDependenceOnParam(unsigned paramIndex);
+
+  static std::optional<LifetimeDependenceInfo>
   get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
+
+  static LifetimeDependenceInfo
+  get(ASTContext &ctx, const SmallBitVector &inheritLifetimeIndices,
+      const SmallBitVector &scopeLifetimeIndices);
 };
 
 } // namespace swift

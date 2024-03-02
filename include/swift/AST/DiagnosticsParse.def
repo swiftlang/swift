@@ -88,8 +88,6 @@ WARNING(escaped_parameter_name,none,
 
 ERROR(forbidden_interpolated_string,none,
       "%0 cannot be an interpolated string literal", (StringRef))
-ERROR(forbidden_multiline_string,none,
-      "%0 cannot be a multi-line string literal", (StringRef))
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
@@ -1711,6 +1709,14 @@ ERROR(expected_rparen_after_thrown_error_type,none,
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
 
+ERROR(attr_isolated_expected_lparen,none,
+      "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
+      ())
+ERROR(attr_isolated_expected_rparen,none,
+      "expected ')' after isolation kind", ())
+ERROR(attr_isolated_expected_kind,none,
+      "expected 'any' as the isolation kind", ())
+
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,
@@ -1883,6 +1889,10 @@ ERROR(attr_rawlayout_expected_params,none,
 
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to @_extern attribute", (StringRef))
+
+ERROR(attr_expected_feature_name,none,
+      "expected feature name in @%0 attribute", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -2201,5 +2211,11 @@ ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
       "expected Self return type for initializers with lifetime dependence "
       "specifiers",
       ())
+
+ERROR(transferring_after_parameter_specifier,none,
+      "'transferring' must be placed before specifier '%0'", (StringRef))
+ERROR(transferring_repeated,none,
+      "parameter may have at most one 'transferring' specifier", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

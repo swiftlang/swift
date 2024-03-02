@@ -43,9 +43,22 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    guard let markDep = instruction as? MarkDependenceInst else { continue }
-    if let lifetimeDep = LifetimeDependence(markDep, context) {
-      analyze(dependence: lifetimeDep, context)
+    if let markDep = instruction as? MarkDependenceInst {
+      if let lifetimeDep = LifetimeDependence(markDep, context) {
+        analyze(dependence: lifetimeDep, context)
+      }
+      continue
+    }
+    if let apply = instruction as? FullApplySite {
+      // Handle ~Escapable results that do not have a lifetime
+      // dependence (@_unsafeNonescapableResult).
+      apply.resultOrYields.forEach {
+        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0,
+                                                context) {
+          analyze(dependence: lifetimeDep, context)
+        }
+      }
+      continue
     }
   }
 }
@@ -63,22 +76,34 @@ private func analyze(dependence: LifetimeDependence,
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
 
+  var error = false
   let diagnostics =
-    DiagnoseDependence(dependence: dependence, range: range, context: context)
+    DiagnoseDependence(dependence: dependence, range: range,
+                       onError: { error = true }, context: context)
 
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
-  _ = walker.walkDown(root: dependence.parentValue)
+  _ = walker.walkDown(root: dependence.dependentValue)
+
+  if !error {
+    dependence.resolve(context)
+  }
 }
 
 /// Analyze and diagnose a single LifetimeDependence.
 private struct DiagnoseDependence {
   let dependence: LifetimeDependence
   let range: InstructionRange?
+  let onError: ()->()
   let context: FunctionPassContext
 
   var function: Function { dependence.function }
+
+  func diagnose(_ position: SourceLoc?, _ id: DiagID,
+                _ args: DiagnosticArgument...) {
+    context.diagnosticEngine.diagnose(position, id, args)
+  }
 
   /// Check that this use is inside the dependence scope.
   func checkInScope(operand: Operand) -> WalkResult {
@@ -102,45 +127,81 @@ private struct DiagnoseDependence {
   }
 
   func checkFunctionResult(operand: Operand) -> WalkResult {
-    // TODO: Get the argument dependence for this result. Check that it is the
-    // same as the current dependence scope
 
     if function.hasUnsafeNonEscapableResult {
       return .continueWalk
     }
-    // TODO: Take ResultInfo as an argument and provide better
-    // diagnostics for missing lifetime dependencies.
+    // FIXME: remove this condition once we have a Builtin.dependence,
+    // which developers should use to model the unsafe
+    // dependence. Builtin.lifetime_dependence will be lowered to
+    // mark_dependence [unresolved], which will be checked
+    // independently. Instead, of this function result check, allow
+    // isUnsafeApplyResult to be used be mark_dependence [unresolved]
+    // without checking its dependents.
+    //
+    // Allow returning an apply result (@_unsafeNonescapableResult) if
+    // the calling function has a dependence. This implicitly makes
+    // the unsafe nonescapable result dependent on the calling
+    // function's lifetime dependence arguments.
+    if dependence.isUnsafeApplyResult, function.hasResultDependence {
+      return .continueWalk
+    }
+    // Check that the argument dependence for this result is the same
+    // as the current dependence scope.
+    if let arg = dependence.scope.parentValue as? FunctionArgument,
+       function.argumentConventions[resultDependsOn: arg.index] != nil {
+      // The returned value depends on a lifetime that is inherited or
+      // borrowed in the caller. The lifetime of the argument value
+      // itself is irrelevant here.
+      return .continueWalk
+    }
     reportEscaping(operand: operand)
     return .abortWalk
   }
 
   func reportError(operand: Operand, diagID: DiagID) {
+    onError()
+
     // Identify the escaping variable.
     let escapingVar = LifetimeVariable(dependent: operand.value, context)
     let varName = escapingVar.name
     if let varName {
-      context.diagnosticEngine.diagnose(escapingVar.sourceLoc,
-        .lifetime_variable_outside_scope,
-        varName)
+      diagnose(escapingVar.sourceLoc, .lifetime_variable_outside_scope,
+               varName)
     } else {
-      context.diagnosticEngine.diagnose(escapingVar.sourceLoc,
-        .lifetime_value_outside_scope)
+      diagnose(escapingVar.sourceLoc, .lifetime_value_outside_scope)
     }
-    // Identify the dependence scope.
-    //
-    // TODO: add bridging for function argument locations
-    // [SILArgument.getDecl().getLoc()]
-    //
-    // TODO: For clear diagnostics: switch on dependence.scope.
-    // For an access, report both the accessed variable, and the access.
-    if let parentSourceLoc =
-         dependence.parentValue.definingInstruction?.location.sourceLoc {
-      context.diagnosticEngine.diagnose(parentSourceLoc,
-                                        .lifetime_outside_scope_parent)
-    }
+    reportScope()
     // Identify the use point.
     let userSourceLoc = operand.instruction.location.sourceLoc
-    context.diagnosticEngine.diagnose(userSourceLoc, diagID)
+    diagnose(userSourceLoc, diagID)
+  }
+
+  // Identify the dependence scope.
+  func reportScope() {
+    if case let .access(beginAccess) = dependence.scope {
+      let parentVar = LifetimeVariable(dependent: beginAccess, context)
+      if let sourceLoc = beginAccess.location.sourceLoc ?? parentVar.sourceLoc {
+        diagnose(sourceLoc, .lifetime_outside_scope_access,
+                 parentVar.name ?? "")
+      }
+      return
+    }
+    if let arg = dependence.parentValue as? Argument,
+       let varDecl = arg.varDecl,
+       let sourceLoc = arg.sourceLoc {
+      diagnose(sourceLoc, .lifetime_outside_scope_argument,
+               varDecl.userFacingName)
+      return
+    }
+    let parentVar = LifetimeVariable(dependent: dependence.parentValue, context)
+    if let parentLoc = parentVar.sourceLoc {
+      if let parentName = parentVar.name {
+        diagnose(parentLoc, .lifetime_outside_scope_variable, parentName)
+      } else {
+        diagnose(parentLoc, .lifetime_outside_scope_value)
+      }
+    }
   }
 }
 
@@ -170,18 +231,41 @@ private struct LifetimeVariable {
     return varDecl?.userFacingName
   }
 
-  init(introducer: Value) {
-    if introducer.type.isAddress {
-      switch introducer.enclosingAccessScope {
-      case let .scope(beginAccess):
-        // TODO: report both the access point and original variable.
-        self = LifetimeVariable(introducer: beginAccess.operand.value)
-        return
-      case .base(_):
-        // TODO: use an address walker to get the allocation point.
-        break
-      }
+  init(dependent value: Value, _ context: some Context) {
+    if value.type.isAddress {
+      self = Self(accessBase: value.accessBase, context)
+      return
     }
+    if let firstIntroducer = getFirstBorrowIntroducer(of: value, context) {
+      self = Self(introducer: firstIntroducer)
+      return
+    }
+    self.varDecl = nil
+    self.sourceLoc = nil
+  }
+
+  // FUTURE: consider diagnosing multiple variable introducers. It's
+  // unclear how more than one can happen.
+  private func getFirstBorrowIntroducer(of value: Value,
+                                        _ context: some Context)
+    -> Value? {
+    var introducers = Stack<Value>(context)
+    gatherBorrowIntroducers(for: value, in: &introducers, context)
+    return introducers.pop()
+  }
+
+  private func getFirstLifetimeIntroducer(of value: Value,
+                                          _ context: some Context)
+    -> Value? {
+    var introducer: Value?
+    _ = visitLifetimeIntroducers(for: value, context) {
+      introducer = $0
+      return .abortWalk
+    }
+    return introducer
+  }
+
+  private init(introducer: Value) {
     if let arg = introducer as? Argument {
       self.varDecl = arg.varDecl
     } else {
@@ -193,17 +277,42 @@ private struct LifetimeVariable {
     }
   }
 
-  init(dependent value: Value, _ context: Context) {
-    // TODO: consider diagnosing multiple variable introducers. It's
-    // unclear how more than one can happen.
-    var introducers = Stack<Value>(context)
-    gatherBorrowIntroducers(for: value, in: &introducers, context)
-    if let firstIntroducer = introducers.pop() {
-      self = LifetimeVariable(introducer: firstIntroducer)
-      return
+  // Record the source location of the variable decl if possible. The
+  // caller will already have a source location for the formal access,
+  // which is more relevant for diagnostics.
+  private init(accessBase: AccessBase, _ context: some Context) {
+    switch accessBase {
+    case .box(let projectBox):
+      if let box = getFirstLifetimeIntroducer(of: projectBox.box, context) {
+        self = Self(introducer: box)
+      }
+      // We should always find an introducer since boxes are nontrivial.
+      self.varDecl = nil
+      self.sourceLoc = nil
+    case .stack(let allocStack):
+      self = Self(introducer: allocStack)
+    case .global(let globalVar):
+      self.varDecl = globalVar.varDecl
+      self.sourceLoc = nil
+    case .class(let refAddr):
+      self.varDecl = refAddr.varDecl
+      self.sourceLoc = refAddr.location.sourceLoc
+    case .tail(let refTail):
+      self = Self(introducer: refTail.instance)
+    case .argument(let arg):
+      self.varDecl = arg.varDecl
+      self.sourceLoc = arg.sourceLoc
+    case .yield(let result):
+      // TODO: bridge VarDecl for FunctionConvention.Yields
+      self.varDecl = nil
+      self.sourceLoc = result.parentInstruction.location.sourceLoc
+    case .pointer(let ptrToAddr):
+      self.varDecl = nil
+      self.sourceLoc = ptrToAddr.location.sourceLoc
+    case .unidentified:
+      self.varDecl = nil
+      self.sourceLoc = nil
     }
-    self.varDecl = nil
-    self.sourceLoc = nil
   }
 }
 
@@ -217,8 +326,8 @@ private struct LifetimeVariable {
 ///
 /// TODO: handle stores to singly initialized temporaries like copies using a standard reaching-def analysis.
 private struct DiagnoseDependenceWalker {
-  let diagnostics: DiagnoseDependence
   let context: Context
+  var diagnostics: DiagnoseDependence
   var visitedValues: ValueSet
 
   var function: Function { diagnostics.function }
@@ -264,6 +373,10 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
   mutating func returnedDependence(address: FunctionArgument,
                                    using operand: Operand) -> WalkResult {
     return diagnostics.checkFunctionResult(operand: operand)
+  }
+
+  mutating func yieldedDependence(result: Operand) -> WalkResult {
+    return diagnostics.checkFunctionResult(operand: result)
   }
 
   // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker

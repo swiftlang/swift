@@ -61,7 +61,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
 
   Action visitNominalType(NominalType *nominal) override {
     Callback(*this, nominal->getDecl());
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
@@ -71,17 +71,15 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
     }
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
   /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
   static bool isConstrained(GenericSignature sig,
                             GenericTypeParamType *paramTy) {
-    if (sig->getSuperclassBound(paramTy))
-      return true;
-
-    return !sig->getRequiredProtocols(paramTy).empty();
+    auto existentialTy = sig->getExistentialType(paramTy);
+    return !(existentialTy->isAny() || existentialTy->isAnyObject());
   }
 
   Action visitBoundGenericType(BoundGenericType *boundGeneric) override {
@@ -103,7 +101,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
       argTy.walk(*this);
       NeedsDefinition = false;
     });
-    return Action::SkipChildren;
+    return Action::SkipNode;
   }
 
 public:

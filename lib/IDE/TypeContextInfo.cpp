@@ -47,7 +47,7 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
-                         llvm::Optional<unsigned> yieldIndex) override;
+                         std::optional<unsigned> yieldIndex) override;
 
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
@@ -78,7 +78,7 @@ void ContextInfoCallbacks::completeThenStmt(CodeCompletionExpr *E) {
   ParsedExpr = E;
 }
 void ContextInfoCallbacks::completeYieldStmt(
-    CodeCompletionExpr *E, llvm::Optional<unsigned> yieldIndex) {
+    CodeCompletionExpr *E, std::optional<unsigned> yieldIndex) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }

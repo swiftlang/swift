@@ -38,7 +38,7 @@ public:
 
 private:
   /// Lazily initialized allocator.
-  llvm::Optional<Allocator> allocator;
+  std::optional<Allocator> allocator;
 
 public:
   Allocator &get() {

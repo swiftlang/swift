@@ -572,6 +572,9 @@ def create_argument_parser():
            metavar='LITARGS',
            help='lit args to use when testing')
 
+    option('--color-in-tests', toggle_true, default=True,
+           help='Enable color output in lit tests')
+
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
@@ -750,6 +753,8 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option(['--wasmkit'], toggle_true('build_wasmkit'),
+           help='build WasmKit')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1087,6 +1092,10 @@ def create_argument_parser():
            default=True,
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
+
+    option('--build-swift-clang-overlays', toggle_true,
+           default=True,
+           help='Build Swift overlays for the clang builtin modules')
 
     option('--build-swift-remote-mirror', toggle_true,
            default=True,

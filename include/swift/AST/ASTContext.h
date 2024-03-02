@@ -27,6 +27,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
@@ -171,7 +172,7 @@ enum class KnownFoundationEntity {
 
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
-llvm::Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+std::optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
 /// Retrieve the Swift name for the given Foundation entity, where
 /// "NS" prefix stripping will apply under omit-needless-words.
@@ -239,10 +240,9 @@ class ASTContext final {
       LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
-      );
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -257,10 +257,9 @@ public:
   get(LangOptions &langOpts, TypeCheckerOptions &typecheckOpts,
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
-      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
+      symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
-      );
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -286,6 +285,9 @@ public:
 
   /// The symbol graph generation options used by this AST context.
   symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts;
+
+  /// The CAS options used by this AST context.
+  const CASOptions &CASOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
@@ -360,7 +362,7 @@ public:
   unsigned NumTypoCorrections = 0;
 
   /// Cached mapping from types to their associated tangent spaces.
-  llvm::DenseMap<Type, llvm::Optional<TangentSpace>> AutoDiffTangentSpaces;
+  llvm::DenseMap<Type, std::optional<TangentSpace>> AutoDiffTangentSpaces;
 
   /// A cache of derivative function types per configuration.
   llvm::DenseMap<SILAutoDiffDerivativeFunctionKey, CanSILFunctionType>
@@ -521,7 +523,7 @@ public:
   StringRef AllocateCopy(StringRef Str,
                     AllocationArena arena = AllocationArena::Permanent) const {
     ArrayRef<char> Result =
-        AllocateCopy(llvm::makeArrayRef(Str.data(), Str.size()), arena);
+        AllocateCopy(llvm::ArrayRef(Str.data(), Str.size()), arena);
     return StringRef(Result.data(), Result.size());
   }
 
@@ -743,9 +745,6 @@ public:
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
       AbstractFunctionDecl *thunk) const;
 
-  /// Indicates whether move-only / noncopyable types are supported.
-  bool supportsMoveOnlyTypes() const;
-
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).
   //
@@ -846,7 +845,7 @@ public:
   /// SIL analog of \c ASTContext::getClangFunctionType .
   const clang::Type *
   getCanonicalClangFunctionType(ArrayRef<SILParameterInfo> params,
-                                llvm::Optional<SILResultInfo> result,
+                                std::optional<SILResultInfo> result,
                                 SILFunctionType::Representation trueRep);
 
   /// Instantiates "Impl.Converter" if needed, then translate Swift generic
@@ -991,10 +990,10 @@ public:
     return getSwiftAvailability(5, 10);
   }
 
-  /// Get the runtime availability of features introduced in the Swift 5.11
+  /// Get the runtime availability of features introduced in the Swift 6.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift511Availability() const {
-    return getSwiftAvailability(5, 11);
+  inline AvailabilityContext getSwift60Availability() const {
+    return getSwiftAvailability(6, 0);
   }
 
   /// Get the runtime availability for a particular version of Swift (5.0+).
@@ -1250,6 +1249,13 @@ public:
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
+
+  /// Remove an externally-sourced module from the set of known loaded modules
+  /// in this context. Modules are added to the cache before being loaded to
+  /// avoid loading a module twice when there is a cyclic dependency between an
+  /// overlay and its Clang module. If a module import fails, the non-imported
+  /// module should be removed from the cache again.
+  void removeLoadedModule(Identifier RealName);
 
   /// Change the behavior of all loaders to ignore swiftmodules next to
   /// swiftinterfaces.
@@ -1566,7 +1572,7 @@ public:
 private:
   friend Decl;
 
-  llvm::Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
   void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
 
   friend TypeBase;

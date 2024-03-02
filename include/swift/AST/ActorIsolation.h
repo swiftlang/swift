@@ -66,6 +66,9 @@ public:
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
+    /// The actor isolation iss statically erased, as for a call to
+    /// an isolated(any) function.  This is not possible for declarations.
+    Erased,
   };
 
 private:
@@ -129,6 +132,10 @@ public:
     return ActorIsolation(GlobalActor, globalActor);
   }
 
+  static ActorIsolation forErased() {
+    return ActorIsolation(Erased);
+  }
+
   static std::optional<ActorIsolation> forSILString(StringRef string) {
     auto kind =
         llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
@@ -174,6 +181,7 @@ public:
     switch (getKind()) {
     case ActorInstance:
     case GlobalActor:
+    case Erased:
       return true;
 
     case Unspecified:
@@ -258,6 +266,9 @@ public:
       return;
     case GlobalActor:
       os << "global_actor";
+      return;
+    case Erased:
+      os << "erased";
       return;
     }
     llvm_unreachable("Covered switch isn't covered?!");

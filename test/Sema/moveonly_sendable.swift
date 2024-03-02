@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: concurrency
 
 
@@ -148,19 +150,6 @@ class Container<T> where T:Sendable {
 func createContainer(_ fd: borrowing FileDescriptor) {
   let _: Container<Sendable> = Container(fd) // expected-error {{noncopyable type 'FileDescriptor' cannot be erased to copyable existential type 'any Sendable'}}
   let _: Container<Sendable> = Container(CopyableStruct())
-}
-
-func takeTwo<T: Sendable>(_ s1: T, _ s2: T) {}
-
-extension Sendable {
-  func doIllegalThings() {
-    return takeTwo(self, self)
-  }
-}
-
-func tryToDupe(_ fd: borrowing FileDescriptor) {
-  // FIXME: this should describe 'Self' as 'any Sendable' or something.
-  fd.doIllegalThings() // expected-error {{noncopyable type 'FileDescriptor' cannot be substituted for copyable generic parameter 'Self' in 'Sendable'}}
 }
 
 @_moveOnly

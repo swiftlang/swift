@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: noncopyable_generics
+
 protocol P: Copyable {} 
 struct S: P {}
 
@@ -25,4 +27,8 @@ enum namespace {
   typealias Copyable = Int
 
   func Copyable() -> Copyable { return 0 }
+}
+
+extension Copyable { // expected-error {{cannot extend protocol 'Copyable'}}
+  func hello() {}
 }

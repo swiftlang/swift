@@ -115,9 +115,10 @@ public:
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     // When we start print a synthesized extension, record the target's USR.
     llvm::SmallString<64> Buf;
     llvm::raw_svector_ostream OS(Buf);
@@ -129,7 +130,7 @@ public:
 
   void printSynthesizedExtensionPost(
       const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+      std::optional<BracketOptions> Bracket) override {
     // When we leave a synthesized extension, clear target's USR.
     TargetUSR = "";
   }
@@ -305,9 +306,9 @@ public:
 } // end anonymous namespace
 
 static bool getModuleInterfaceInfo(
-    ASTContext &Ctx, StringRef ModuleName, llvm::Optional<StringRef> Group,
+    ASTContext &Ctx, StringRef ModuleName, std::optional<StringRef> Group,
     SwiftInterfaceGenContext::Implementation &Impl, std::string &ErrMsg,
-    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
+    bool SynthesizedExtensions, std::optional<StringRef> InterestedUSR) {
   ModuleDecl *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
@@ -359,16 +360,16 @@ static bool getModuleInterfaceInfo(
     }
   }
   ModuleTraversalOptions TraversalOptions =
-      llvm::None; // Don't print submodules.
+      std::nullopt; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.value());
   }
-  printModuleInterface(Mod, Group.has_value()
-                         ? llvm::makeArrayRef(Group.value())
-                         : ArrayRef<StringRef>(),
+  printModuleInterface(Mod,
+                       Group.has_value() ? llvm::ArrayRef(Group.value())
+                                         : ArrayRef<StringRef>(),
                        TraversalOptions, Printer, Options,
                        Group.has_value() && SynthesizedExtensions);
 
@@ -426,9 +427,9 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
 
 SwiftInterfaceGenContextRef SwiftInterfaceGenContext::create(
     StringRef DocumentName, bool IsModule, StringRef ModuleOrHeaderName,
-    llvm::Optional<StringRef> Group, CompilerInvocation Invocation,
+    std::optional<StringRef> Group, CompilerInvocation Invocation,
     std::string &ErrMsg, bool SynthesizedExtensions,
-    llvm::Optional<StringRef> InterestedUSR) {
+    std::optional<StringRef> InterestedUSR) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = IsModule;
@@ -642,11 +643,11 @@ SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
   return ResolvedEntity();
 }
 
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 SwiftInterfaceGenContext::findUSRRange(StringRef USR) const {
   auto Pos = Impl.Info.USRMap.find(USR);
   if (Pos == Impl.Info.USRMap.end())
-    return llvm::None;
+    return std::nullopt;
 
   return std::make_pair(Pos->getValue().Range.Offset,
                         Pos->getValue().Range.Length);
@@ -728,8 +729,8 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 //===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorOpenInterface(
     EditorConsumer &Consumer, StringRef Name, StringRef ModuleName,
-    llvm::Optional<StringRef> Group, ArrayRef<const char *> Args,
-    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
+    std::optional<StringRef> Group, ArrayRef<const char *> Args,
+    bool SynthesizedExtensions, std::optional<StringRef> InterestedUSR) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -850,7 +851,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   CompilerInvocation Invocation;
   std::string Error;
 
-  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
+  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : std::nullopt;
   if (getASTManager()->initCompilerInvocationNoInputs(
           Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
           CI.getDiags(), Error)) {
@@ -873,8 +874,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(
       Name,
-      /*IsModule=*/false, HeaderName, llvm::None, Invocation, Error,
-      SynthesizedExtensions, llvm::None);
+      /*IsModule=*/false, HeaderName, std::nullopt, Invocation, Error,
+      SynthesizedExtensions, std::nullopt);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;

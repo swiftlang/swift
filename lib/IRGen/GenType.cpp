@@ -184,7 +184,8 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    OutliningMetadataCollector collector(IGF);
+    OutliningMetadataCollector collector(IGF, LayoutIsNeeded,
+                                         DeinitIsNotNeeded);
     // No need to collect anything because we assume loadable types can be
     // loaded without enums.
     collector.emitCallToOutlinedCopy(
@@ -1488,7 +1489,7 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
-llvm::Optional<YAMLTypeInfoNode>
+std::optional<YAMLTypeInfoNode>
 TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   auto &mangledName = const_cast<TypeConverter *>(this)->DeclMangledNames[decl];
   if (mangledName.empty())
@@ -1497,7 +1498,7 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
 
   auto found = LegacyTypeInfos.find(mangledName);
   if (found == LegacyTypeInfos.end())
-    return llvm::None;
+    return std::nullopt;
 
   return found->second;
 }

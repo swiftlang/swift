@@ -12,8 +12,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 #ifndef SWIFT_RQM_SYMBOL_H
 #define SWIFT_RQM_SYMBOL_H
@@ -223,7 +223,7 @@ public:
 
   const ProtocolDecl *getRootProtocol() const;
 
-  llvm::Optional<int> compare(Symbol other, RewriteContext &ctx) const;
+  std::optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
   Symbol withConcreteSubstitutions(llvm::ArrayRef<Term> substitutions,
                                    RewriteContext &ctx) const;

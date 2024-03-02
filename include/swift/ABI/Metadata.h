@@ -4970,7 +4970,7 @@ public:
 /// and then called through a fully-abstracted entry point whose arguments
 /// can be constructed in code.
 template <typename Runtime>
-struct TargetAccessibleFunctionRecord final {
+struct TargetAccessibleFunctionRecord {
 public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.

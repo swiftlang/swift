@@ -83,7 +83,7 @@ extension AsyncMapSequence: AsyncSequence {
   ///
   /// The map sequence produces whatever type of error its
   /// base sequence does.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -120,13 +120,14 @@ extension AsyncMapSequence: AsyncSequence {
 
     /// Produces the next element in the map sequence.
     ///
-    /// This iterator calls `next()` on its base iterator; if this call returns
-    /// `nil`, `next()` returns `nil`. Otherwise, `next()` returns the result of
-    /// calling the transforming closure on the received element.
-    @available(SwiftStdlib 5.11, *)
+    /// This iterator calls `next(isolation:)` on its base iterator; if this
+    /// call returns `nil`, `next(isolation:)` returns `nil`. Otherwise,
+    /// `next(isolation:)` returns the result of calling the transforming
+    /// closure on the received element.
+    @available(SwiftStdlib 6.0, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Transformed? {
-      guard let element = try await baseIterator.next(actor) else {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Transformed? {
+      guard let element = try await baseIterator.next(isolation: actor) else {
         return nil
       }
       return await transform(element)

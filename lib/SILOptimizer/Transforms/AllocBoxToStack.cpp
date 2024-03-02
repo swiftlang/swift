@@ -567,7 +567,8 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
       }
     }
 
-    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser);
+        mmci && !mmci->isStrict()) {
       targets.push_back(mmci);
     }
   }
@@ -587,7 +588,7 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
     loc = RegularLocation::getDiagnosticsOnlyLocation(loc, next->getModule());
   SILBuilderWithScope builder(next);
 
-  auto *undef = SILUndef::get(stackBox->getType(), *stackBox->getModule());
+  auto *undef = SILUndef::get(stackBox);
 
   auto *mmci =
       builder.createMarkUnresolvedNonCopyableValueInst(loc, undef, checkKind);
@@ -603,7 +604,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
-  llvm::Optional<MarkUninitializedInst::Kind> Kind;
+  std::optional<MarkUninitializedInst::Kind> Kind;
   if (HeapBox->hasOneUse()) {
     auto *User = HeapBox->getSingleUse()->getUser();
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
@@ -1056,7 +1057,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
 
     // Set the moveonly delete-if-unused flag so we do not emit an error on the
     // original once we promote all its current uses.
-    F->addSemanticsAttr(semantics::MOVEONLY_DELETE_IF_UNUSED);
+    F->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
     // If any of our promoted callee arg indices were originally noncopyable let
     // boxes, convert them from having escaping to having non-escaping
@@ -1162,8 +1163,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     auto *PAI = cast<PartialApplyInst>(ApplyInst);
     return Builder.createPartialApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
-        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
-        PAI->isOnStack(),
+        PAI->getCalleeConvention(), PAI->getResultIsolation(), PAI->isOnStack(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   case ApplySiteKind::ApplyInst:

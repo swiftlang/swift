@@ -48,6 +48,9 @@ enum class Status {
   /// The precise revision version doesn't match.
   RevisionIncompatible,
 
+  /// The distribution channel doesn't match.
+  ChannelIncompatible,
+
   /// The module is required to be in OSSA, but is not.
   NotInOSSA,
 
@@ -84,9 +87,9 @@ enum class Status {
   /// to build the client.
   SDKMismatch,
 
-  /// The module file was not built with support for NoncopyableGenerics,
-  /// yet that is required to by this compiler.
-  NotUsingNoncopyableGenerics,
+  /// The module file was built with a different NoncopyableGenerics feature
+  /// mode than the compiler loading it.
+  NoncopyableGenericsMismatch,
 };
 
 /// Returns the string for the Status enum.
@@ -105,6 +108,7 @@ struct ValidationInfo {
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
   StringRef problematicRevision = {};
+  StringRef problematicChannel = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
   std::vector<StringRef> allowableClients;

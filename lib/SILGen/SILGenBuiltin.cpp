@@ -40,7 +40,7 @@ using namespace Lowering;
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static llvm::Optional<SmallVector<Expr *, 2>>
+static std::optional<SmallVector<Expr *, 2>>
 decomposeArguments(SILGenFunction &SGF, SILLocation loc,
                    PreparedArguments &&args, unsigned expectedCount) {
   SmallVector<Expr*, 2> result;
@@ -55,7 +55,7 @@ decomposeArguments(SILGenFunction &SGF, SILLocation loc,
   SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                    "argument to builtin should be a literal tuple");
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &SGF,
@@ -206,33 +206,46 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
-                                      SILLocation loc,
-                                      SubstitutionMap substitutions,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  assert(args.size() >= 2 && "assign should have two arguments");
+static ManagedValue emitBuiltinStore(SILGenFunction &SGF, SILLocation loc,
+                                     SubstitutionMap substitutions,
+                                     ArrayRef<ManagedValue> args, SGFContext C,
+                                     bool isStrict, bool isInvariant,
+                                     llvm::MaybeAlign alignment) {
+  assert(args.size() >= 2 && "should have two arguments");
   assert(substitutions.getReplacementTypes().size() == 1 &&
-         "assign should have a single substitution");
+         "should have a single substitution");
 
   // The substitution determines the type of the thing we're destroying.
-  CanType assignFormalType =
-    substitutions.getReplacementTypes()[0]->getCanonicalType();
-  SILType assignType = SGF.getLoweredType(assignFormalType);
-  
+  CanType formalTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+  SILType loweredTy = SGF.getLoweredType(formalTy);
+
   // Convert the destination pointer argument to a SIL address.
-  SILValue addr = SGF.B.createPointerToAddress(loc,
-                                               args.back().getUnmanagedValue(),
-                                               assignType.getAddressType(),
-                                               /*isStrict*/ true,
-                                               /*isInvariant*/ false);
-  
-  // Build the value to be assigned, reconstructing tuples if needed.
-  auto src = RValue(SGF, args.slice(0, args.size() - 1), assignFormalType);
-  
+  SILValue addr = SGF.B.createPointerToAddress(
+      loc, args.back().getUnmanagedValue(), loweredTy.getAddressType(),
+      isStrict, isInvariant, alignment);
+
+  // Build the value to be stored, reconstructing tuples if needed.
+  auto src = RValue(SGF, args.slice(0, args.size() - 1), formalTy);
+
   std::move(src).ensurePlusOne(SGF, loc).assignInto(SGF, loc, addr);
 
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
+}
+
+static ManagedValue emitBuiltinAssign(SILGenFunction &SGF, SILLocation loc,
+                                      SubstitutionMap substitutions,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/true,
+                          /*isInvariant=*/false, llvm::MaybeAlign());
+}
+
+static ManagedValue emitBuiltinStoreRaw(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  return emitBuiltinStore(SGF, loc, substitutions, args, C, /*isStrict=*/false,
+                          /*isInvariant=*/false, llvm::MaybeAlign(1));
 }
 
 /// Emit Builtin.initialize by evaluating the operand directly into
@@ -1446,7 +1459,7 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
       SGF.emitManagedBorrowedRValueWithCleanup(guaranteedNonTrivialRef);
   // Now create a mark dependence on our base and return the result.
   return SGF.B.createMarkDependence(loc, guaranteedNonTrivialRefMV, baseMV,
-                                    /*isNonEscaping*/false);
+                                    MarkDependenceKind::Escaping);
 }
 
 // Emit SIL for the named builtin: getCurrentAsyncTask.
@@ -1861,6 +1874,23 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
                               BuiltinValueKind::BuildMainActorExecutorRef);
 }
 
+static ManagedValue emitBuiltinExtractFunctionIsolation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&args, SGFContext C) {
+  auto argSources = std::move(args).getSources();
+  assert(argSources.size() == 1);
+
+  auto argType = argSources[0].getSubstRValueType();
+  if (auto fnType = dyn_cast<AnyFunctionType>(argType);
+      !fnType || !fnType->getIsolation().isErased()) {
+    SGF.SGM.diagnose(argSources[0].getLocation(),
+                     diag::builtin_get_function_isolation_bad_argument);
+    return SGF.emitUndef(SILType::getOpaqueIsolationType(SGF.getASTContext()));
+  }
+
+  return SGF.emitExtractFunctionIsolation(loc, std::move(argSources[0]), C);
+}
+
 static ManagedValue emitBuiltinGetEnumTag(SILGenFunction &SGF, SILLocation loc,
                                           SubstitutionMap subs,
                                           ArrayRef<ManagedValue> args,
@@ -1980,16 +2010,16 @@ static ManagedValue emitBuiltinDistributedActorAsAnyActor(
       });
 }
 
-llvm::Optional<SpecializedEmitter>
+std::optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
   if (function.kind != SILDeclRef::Kind::Func)
-    return llvm::None;
+    return std::nullopt;
   if (!function.hasDecl())
-    return llvm::None;
+    return std::nullopt;
   ValueDecl *decl = function.getDecl();
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
-    return llvm::None;
+    return std::nullopt;
 
   const auto name = decl->getBaseIdentifier();
   const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(name);

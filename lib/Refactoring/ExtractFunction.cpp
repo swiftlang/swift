@@ -164,7 +164,7 @@ bool RefactoringActionExtractFunction::performChange() {
   }
 
   // Correct the given name if collision happens.
-  PreferredName = correctNewDeclName(InsertToDC, PreferredName);
+  PreferredName = correctNewDeclName(InsertLoc, InsertToDC, PreferredName);
 
   // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;

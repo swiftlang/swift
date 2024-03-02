@@ -1310,6 +1310,19 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func storeBytes<T : _BitwiseCopyable>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+#if $BuiltinStoreRaw
+    Builtin.storeRaw(value, (self + offset)._rawValue)
+#else
+    fatalError("Unsupported swift compiler!")
+#endif
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
@@ -1319,6 +1332,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ) {
     _debugPrecondition(_isPOD(T.self))
 
+#if $TypedThrows
     withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1328,6 +1342,17 @@ public struct UnsafeMutableRawPointer: _Pointer {
         /*volatile:*/ false._value
       )
     }
+#else
+    try! __abi_withUnsafePointer(to: value) { source in
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue,
+        source._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+    }
+#endif
   }
 
   // This unavailable implementation uses the expected mangled name

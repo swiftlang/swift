@@ -37,13 +37,13 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include <deque>
+#include <optional>
 
 using namespace swift;
 
@@ -55,7 +55,7 @@ static llvm::cl::opt<bool> KeepWillThrowCall(
     llvm::cl::desc(
       "Keep calls to swift_willThrow, even if the throw is optimized away"));
 
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::getInsertAfterPoint(SILValue val) {
   if (auto *inst = val->getDefiningInstruction()) {
     return std::next(inst->getIterator());
@@ -63,7 +63,7 @@ swift::getInsertAfterPoint(SILValue val) {
   if (isa<SILArgument>(val)) {
     return cast<SILArgument>(val)->getParentBlock()->begin();
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Creates an increment on \p Ptr before insertion point \p InsertPt that
@@ -127,12 +127,17 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
 
 /// Returns true if OSSA scope ending instructions end_borrow/destroy_value can
 /// be deleted trivially
-static bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
+bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
   if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
     return false;
   if (isa<StoreBorrowInst>(i->getOperand(0)))
     return false;
-  return i->getOperand(0)->getOwnershipKind() == OwnershipKind::None;
+
+  auto opValue = i->getOperand(0);
+  // We can delete destroy_value with operands of none ownership unless
+  // they are move-only values, which can have custom deinit
+  return opValue->getOwnershipKind() == OwnershipKind::None &&
+         !opValue->getType().isMoveOnly();
 }
 
 /// Perform a fast local check to see if the instruction is dead.
@@ -1347,11 +1352,11 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
-llvm::Optional<FindLocalApplySitesResult>
+std::optional<FindLocalApplySitesResult>
 swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   SmallVector<Operand *, 32> worklist(fri->use_begin(), fri->use_end());
 
-  llvm::Optional<FindLocalApplySitesResult> f;
+  std::optional<FindLocalApplySitesResult> f;
   f.emplace();
 
   // Optimistically state that we have no escapes before our def-use dataflow.
@@ -1424,7 +1429,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   // If we did escape and didn't find any apply sites, then we have no
   // information for our users that is interesting.
   if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
-    return llvm::None;
+    return std::nullopt;
   return f;
 }
 
@@ -1854,12 +1859,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      if (VarInfo->DIExpr.hasFragment())
-        // Since we can't merge two different op_fragment
-        // now, we're simply bailing out if there is an
-        // existing op_fragment in DIExpression.
-        // TODO: Try to merge two op_fragment expressions here.
-        continue;
       for (VarDecl *FD : FieldDecls) {
         SILDebugVariable NewVarInfo = *VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
@@ -1933,10 +1932,7 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
     if (!debugVal)
       continue;
 
-    // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
-      continue;
 
     SILType baseType = oldValue->getType();
 

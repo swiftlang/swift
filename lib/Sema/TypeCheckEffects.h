@@ -45,6 +45,14 @@ enum class ThrownErrorSubtyping {
 ThrownErrorSubtyping compareThrownErrorsForSubtyping(
     Type subThrownError, Type superThrownError, DeclContext *dc);
 
+/// Determine whether the given function uses typed throws in a manner
+/// that is structurally similar to 'rethrows', e.g.,
+///
+/// \code
+/// func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T]
+/// \endcode
+bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func);
+
 }
 
 #endif // SWIFT_SEMA_TYPECHECKEFFECTS_H

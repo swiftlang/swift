@@ -156,19 +156,19 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 
     /// Produces the next element in the drop-while sequence.
     ///
-    /// This iterator calls `next()` on its base iterator and evaluates
-    /// the result with the `predicate` closure. As long as the predicate
-    /// returns `true`, this method returns `nil`. After the predicate returns
-    /// `false`, for a value received from the base iterator, this method
-    /// returns that value. After that, the iterator returns values received
-    /// from its base iterator as-is, and never executes the predicate closure
-    /// again.  If calling the closure throws an error, the sequence ends and
-    /// `next()` rethrows the error.
-    @available(SwiftStdlib 5.11, *)
+    /// This iterator calls `next(isolation:)` on its base iterator and
+    /// evaluates the result with the `predicate` closure. As long as the
+    /// predicate returns `true`, this method returns `nil`. After the predicate
+    /// returns `false`, for a value received from the base iterator, this
+    /// method returns that value. After that, the iterator returns values
+    /// received from its base iterator as-is, and never executes the predicate
+    /// closure again.  If calling the closure throws an error, the sequence
+    /// ends and `next(isolation:)` rethrows the error.
+    @available(SwiftStdlib 6.0, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while !finished && !doneDropping {
-        guard let element = try await baseIterator.next(actor) else {
+        guard let element = try await baseIterator.next(isolation: actor) else {
           return nil
         }
         do {
@@ -184,7 +184,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
       guard !finished else { 
         return nil
       }
-      return try await baseIterator.next(actor)
+      return try await baseIterator.next(isolation: actor)
     }
   }
 

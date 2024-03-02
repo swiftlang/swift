@@ -251,11 +251,13 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
+    // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
+    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
+    // expected-tns-warning @-2 {{transferring 'self' may cause a race}}
+    // expected-tns-note @-3 {{transferring nonisolated 'self' to main actor-isolated callee could cause races between main actor-isolated and nonisolated uses}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -270,10 +272,11 @@ final class NonSendable {
 
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
-  let t = NonSendable()
+  let t = NonSendable() // expected-tns-note {{variable defined here}}
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning@-2 {{transferring value of non-Sendable type 'NonSendable' from nonisolated context to main actor-isolated context; later accesses could race}}
+  // expected-tns-warning @-2 {{transferring 't' may cause a race}}
+  // expected-tns-note @-3 {{'t' is transferred from nonisolated caller to main actor-isolated callee. Later uses in caller could race with potential uses in callee}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -287,19 +290,19 @@ func globalSendable(_ ns: NonSendable) async {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 func callNonisolatedAsyncClosure(
-  ns: NonSendable, // expected-tns-note {{value is task isolated since it is in the same region as 'ns'}}
+  ns: NonSendable,
   g: (NonSendable) async -> Void
 ) async {
   await g(ns)
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
-  // expected-tns-warning @-3 {{task isolated value of type '@noescape @async @callee_guaranteed (@guaranteed NonSendable) -> ()' transferred to nonisolated context; later accesses to value could race}}
+  // expected-tns-warning @-2 {{transferring 'ns' may cause a race}}
+  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
-
+  // expected-tns-warning @-2 {{transferring 'ns' may cause a race}}
+  // expected-tns-note @-3 {{transferring main actor-isolated 'ns' to nonisolated callee could cause races between nonisolated and main actor-isolated uses}}
 }
 
 @available(SwiftStdlib 5.1, *)

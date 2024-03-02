@@ -149,11 +149,11 @@ let s2 = "Long ascii string with no accented characters (obviously)."
 
 StringCreateTests.test("Validating.utf8")
 .skip(.custom(
-  { if #available(SwiftStdlib 5.11, *) { false } else { true } },
-  reason: "Requires Swift 5.11's standard library"
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 5.11, *) else { return }
+  guard #available(SwiftStdlib 6.0, *) else { return }
 
   let i1 = Array(s1.utf8)
   let i2 = Array(s2.utf8)
@@ -183,11 +183,11 @@ StringCreateTests.test("Validating.utf8")
 
 StringCreateTests.test("Validating.utf8.from.int8")
 .skip(.custom(
-  { if #available(SwiftStdlib 5.11, *) { false } else { true } },
-  reason: "Requires Swift 5.11's standard library"
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 5.11, *) else { return }
+  guard #available(SwiftStdlib 6.0, *) else { return }
 
   let i1 = s1.utf8.map(Int8.init(bitPattern:))
   let i2 = s2.utf8.map(Int8.init(bitPattern:))
@@ -210,11 +210,11 @@ StringCreateTests.test("Validating.utf8.from.int8")
 
 StringCreateTests.test("Validating.ascii")
 .skip(.custom(
-  { if #available(SwiftStdlib 5.11, *) { false } else { true } },
-  reason: "Requires Swift 5.11's standard library"
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 5.11, *) else { return }
+  guard #available(SwiftStdlib 6.0, *) else { return }
 
   let i1 = Array(s1.utf8)
   let i2 = Array(s2.utf8)
@@ -237,11 +237,11 @@ StringCreateTests.test("Validating.ascii")
 
 StringCreateTests.test("Validating.utf16")
 .skip(.custom(
-  { if #available(SwiftStdlib 5.11, *) { false } else { true } },
-  reason: "Requires Swift 5.11's standard library"
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 5.11, *) else { return }
+  guard #available(SwiftStdlib 6.0, *) else { return }
 
   let i1 = Array(s1.utf16)
   let i2 = Array(s2.utf16)
@@ -264,11 +264,11 @@ StringCreateTests.test("Validating.utf16")
 
 StringCreateTests.test("Validating.utf32")
 .skip(.custom(
-  { if #available(SwiftStdlib 5.11, *) { false } else { true } },
-  reason: "Requires Swift 5.11's standard library"
+  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
+  reason: "Requires Swift 6.0's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 5.11, *) else { return }
+  guard #available(SwiftStdlib 6.0, *) else { return }
 
   let i1 = s1.unicodeScalars.map(\.value)
   let i2 = s2.unicodeScalars.map(\.value)

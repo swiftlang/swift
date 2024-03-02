@@ -4,8 +4,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-// REQUIRES: asserts
-
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/DefaultLib.swift -o %t
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t

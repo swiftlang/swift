@@ -97,7 +97,7 @@ public:
   /// This is called when a source file is fully parsed. It returns the
   /// finalized vector of tokens, or \c None if the receiver isn't configured to
   /// record them.
-  virtual llvm::Optional<std::vector<Token>> finalize() { return llvm::None; }
+  virtual std::optional<std::vector<Token>> finalize() { return std::nullopt; }
 
   virtual ~ConsumeTokenReceiver() = default;
 };
@@ -139,7 +139,7 @@ public:
 
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
-  llvm::Optional<StableHasher> CurrentTokenHash;
+  std::optional<StableHasher> CurrentTokenHash;
 
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())
@@ -311,7 +311,7 @@ public:
 
     /// The leading whitespace for this marker, if it has already been
     /// computed.
-    llvm::Optional<StringRef> LeadingWhitespace;
+    std::optional<StringRef> LeadingWhitespace;
   };
 
   /// An RAII object that notes when we have seen a structure marker.
@@ -434,7 +434,7 @@ public:
       DelayedTokenReceiver(ConsumeTokenReceiver *&receiver):
         savedConsumer(receiver, this) {}
       void receive(const Token &tok) override { delayedTokens.push_back(tok); }
-      llvm::Optional<std::vector<Token>> finalize() override {
+      std::optional<std::vector<Token>> finalize() override {
         llvm_unreachable("Cannot finalize a DelayedTokenReceiver");
       }
       ~DelayedTokenReceiver() {
@@ -718,11 +718,8 @@ public:
   ///
   /// \param Loc where to diagnose.
   /// \param DiagText name for the string literal in the diagnostic.
-  /// \param AllowMultiline Whether the string literal can be a multiline string
-  ///        literal.
-  llvm::Optional<StringRef>
-  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
-                                    bool AllowMultiline);
+  std::optional<StringRef>
+  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
 
   /// Returns true to indicate that experimental concurrency syntax should be
   /// parsed if the parser is generating only a syntax tree or if the user has
@@ -732,28 +729,28 @@ public:
   }
 
 public:
-  InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
+  InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
         Loc == Tok.getLoc() && Tok.isAtStartOfLine())
       Loc = getEndOfPreviousLoc();
     return Diags.diagnose(Loc, Diag);
   }
 
-  InFlightDiagnostic diagnose(Token Tok, Diagnostic Diag) {
+  InFlightDiagnostic diagnose(Token Tok, DiagRef Diag) {
     return diagnose(Tok.getLoc(), Diag);
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(SourceLoc Loc, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
-    return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
+    return diagnose(Loc, {DiagID, {std::forward<ArgTypes>(Args)...}});
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(Token Tok, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
     return diagnose(Tok.getLoc(),
-                    Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
+                    {DiagID, {std::forward<ArgTypes>(Args)...}});
   }
     
   /// Add a fix-it to remove the space in consecutive identifiers.
@@ -812,19 +809,19 @@ public:
   /// its name in \p Result.  Otherwise, emit an error.
   ///
   /// \returns false on success, true on error.
-  bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D,
+  bool parseIdentifier(Identifier &Result, SourceLoc &Loc, DiagRef D,
                        bool diagnoseDollarPrefix);
 
   /// Consume an identifier with a specific expected name.  This is useful for
   /// contextually sensitive keywords that must always be present.
   bool parseSpecificIdentifier(StringRef expected, SourceLoc &Loc,
-                               const Diagnostic &D);
+                               DiagRef D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseIdentifier(Identifier &Result, SourceLoc &L,
                        bool diagnoseDollarPrefix, Diag<DiagArgTypes...> ID,
                        ArgTypes... Args) {
-    return parseIdentifier(Result, L, Diagnostic(ID, Args...),
+    return parseIdentifier(Result, L, {ID, {Args...}},
                            diagnoseDollarPrefix);
   }
   
@@ -832,19 +829,19 @@ public:
   bool parseSpecificIdentifier(StringRef expected,
                                Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
+    return parseSpecificIdentifier(expected, L, {ID, {Args...}});
   }
 
   /// Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
   bool parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
-                          const Diagnostic &D, bool diagnoseDollarPrefix);
+                          DiagRef D, bool diagnoseDollarPrefix);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseAnyIdentifier(Identifier &Result, bool diagnoseDollarPrefix,
                           Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...),
+    return parseAnyIdentifier(Result, L, {ID, {Args...}},
                               diagnoseDollarPrefix);
   }
 
@@ -852,28 +849,28 @@ public:
   /// emit the specified error diagnostic, and a note at the specified note
   /// location.
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                            const Diagnostic &D);
+                            DiagRef D);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
-  bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
+  bool parseToken(tok K, SourceLoc &TokLoc, DiagRef D);
   
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseToken(K, L, Diagnostic(ID, Args...));
+    return parseToken(K, L, {ID, {Args...}});
   }
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, SourceLoc &L,
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-    return parseToken(K, L, Diagnostic(ID, Args...));
+    return parseToken(K, L, {ID, {Args...}});
   }
   
   /// Parse the specified expected token and return its location on success.  On failure, emit the specified
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
-  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
@@ -906,7 +903,7 @@ public:
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         bool AllowSepAfterLast, DiagRef RightErrorDiag,
                          llvm::function_ref<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -948,7 +945,7 @@ public:
   /// Parse the source file via the Swift Parser using the ASTGen library.
   void
   parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                           llvm::Optional<DiagnosticTransaction> &transaction,
+                           std::optional<DiagnosticTransaction> &transaction,
                            bool suppressDiagnostics = false);
 
   /// Parse the top-level SIL decls into the SIL module.
@@ -981,7 +978,7 @@ public:
                                llvm::function_ref<void(Decl *)> Handler,
                                bool fromASTGen = false);
 
-  std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
+  std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
@@ -1075,6 +1072,14 @@ public:
                          SmallVector<SourceLoc, 4> &NameLocs,
                          bool &IsNullarySelector);
 
+  /// Parse a parenthesized and comma-separated list of attribute arguments.
+  ///
+  /// \returns false on success, true on error.
+  ParserStatus
+  parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
+                          bool isAttrModifier, SourceRange &parensRange,
+                          llvm::function_ref<ParserStatus()> parseAttr);
+
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
@@ -1089,8 +1094,8 @@ public:
   /// Parse the arguments inside the @_specialize attribute
   bool parseSpecializeAttributeArguments(
       swift::tok ClosingBrace, bool &DiscardAttribute,
-      llvm::Optional<bool> &Exported,
-      llvm::Optional<SpecializeAttr::SpecializationKind> &Kind,
+      std::optional<bool> &Exported,
+      std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
       AvailabilityContext *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
@@ -1151,8 +1156,11 @@ public:
 
   /// Parse a single argument from a @_documentation attribute.
   bool
-  parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Metadata,
-                                      llvm::Optional<AccessLevel> &Visibility);
+  parseDocumentationAttributeArgument(std::optional<StringRef> &Metadata,
+                                      std::optional<AccessLevel> &Visibility);
+
+  ParserResult<AllowFeatureSuppressionAttr>
+  parseAllowFeatureSuppressionAttribute(SourceLoc atLoc, SourceLoc loc);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
@@ -1187,7 +1195,7 @@ public:
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
-                         const Diagnostic &D);
+                         DiagRef D);
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
@@ -1244,6 +1252,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
+    SourceLoc TransferringLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
@@ -1295,7 +1304,7 @@ public:
                                 SourceLoc *parseTildeCopyable = nullptr);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              llvm::function_ref<void(Decl *)> handler);
-  std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
+  std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                 bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
@@ -1463,12 +1472,13 @@ public:
   /// \endverbatim
   ParserResult<TypeRepr> parseQualifiedDeclNameBaseType();
 
-  /// Parse an identifier type, e.g 'Foo' or 'Bar<Int>'.
+  /// Parse a single type identifier, possibly followed by a generic argument
+  /// list, e.g `Foo` or `Bar<Int>`.
   ///
   /// \verbatim
   /// type-identifier: identifier generic-args?
   /// \endverbatim
-  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+  ParserResult<DeclRefTypeRepr> parseTypeIdentifier(TypeRepr *Base);
 
   /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
   ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
@@ -1560,6 +1570,9 @@ public:
 
     /// The location of the '_resultDependsOn' keyword, if present.
     SourceLoc ResultDependsOnLoc;
+
+    /// The location of the 'transferring' keyword if present.
+    SourceLoc TransferringLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
@@ -1678,7 +1691,7 @@ public:
   /// \endcode
   ///
   /// \returns The tuple pattern element, if successful.
-  std::pair<ParserStatus, llvm::Optional<TuplePatternElt>>
+  std::pair<ParserStatus, std::optional<TuplePatternElt>>
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
   
@@ -1830,7 +1843,7 @@ public:
   ///   unqualified-decl-name:
   ///     unqualified-decl-base-name
   ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
-  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
+  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, DiagRef diag,
                                DeclNameOptions flags);
 
   /// Parse macro expansion.
@@ -1841,7 +1854,7 @@ public:
       SourceLoc &poundLoc, DeclNameLoc &macroNameLoc, DeclNameRef &macroNameRef,
       SourceLoc &leftAngleLoc, SmallVectorImpl<TypeRepr *> &genericArgs,
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
-      const Diagnostic &diag);
+      DiagRef diag);
 
   ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1935,9 +1948,9 @@ public:
   ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr>
-  parseExprCollectionElement(llvm::Optional<bool> &isDictionary);
+  parseExprCollectionElement(std::optional<bool> &isDictionary);
   ParserResult<Expr>
-  parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind);
+  parseExprPoundCodeCompletion(std::optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -2125,7 +2138,7 @@ struct ParsedDeclName {
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  llvm::Optional<unsigned> SelfIndex;
+  std::optional<unsigned> SelfIndex;
 
   /// Determine whether this is a valid name.
   explicit operator bool() const { return !BaseName.empty(); }

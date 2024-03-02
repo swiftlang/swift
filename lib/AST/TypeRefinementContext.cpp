@@ -425,11 +425,11 @@ void swift::simple_display(
   out << "TRC @" << trc;
 }
 
-llvm::Optional<std::vector<TypeRefinementContext *>>
+std::optional<std::vector<TypeRefinementContext *>>
 ExpandChildTypeRefinementContextsRequest::getCachedResult() const {
   auto *TRC = std::get<0>(getStorage());
   if (TRC->getNeedsExpansion())
-    return llvm::None;
+    return std::nullopt;
   return TRC->Children;
 }
 

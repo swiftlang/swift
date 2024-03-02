@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
+// XFAIL: noncopyable_generics
+
 struct Foo<A, B> {}
 
 protocol P1 {

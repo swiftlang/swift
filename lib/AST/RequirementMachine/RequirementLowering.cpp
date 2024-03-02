@@ -536,7 +536,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Stop;
 
     if (!ty->hasTypeParameter())
-      return Action::SkipChildren;
+      return Action::SkipNode;
 
     return Action::Continue;
   }
@@ -676,8 +676,7 @@ struct InferRequirementsWalker : public TypeWalker {
 /// We automatically infer 'T : Hashable' from the fact that 'struct Set'
 /// declares a Hashable requirement on its generic parameter.
 void swift::rewriting::inferRequirements(
-    Type type, SourceLoc loc,
-    ModuleDecl *module, DeclContext *dc,
+    Type type, ModuleDecl *module, DeclContext *dc,
     SmallVectorImpl<StructuralRequirement> &result) {
   if (!type)
     return;
@@ -707,13 +706,8 @@ void swift::rewriting::realizeRequirement(
     auto secondType = req.getSecondType();
 
     if (shouldInferRequirements) {
-      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
-
-      auto secondLoc = (reqRepr ? reqRepr->getConstraintRepr()->getStartLoc()
-                                : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
+      inferRequirements(secondType, moduleForInference, dc, result);
     }
 
     realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
@@ -723,9 +717,7 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::Layout: {
     if (shouldInferRequirements) {
       auto firstType = req.getFirstType();
-      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
     }
 
     result.push_back({req, loc});
@@ -735,14 +727,10 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameType: {
     if (shouldInferRequirements) {
       auto firstType = req.getFirstType();
-      auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
-                               : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
+      inferRequirements(firstType, moduleForInference, dc, result);
 
       auto secondType = req.getSecondType();
-      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
-                                : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
+      inferRequirements(secondType, moduleForInference, dc, result);
     }
 
     result.push_back({req, loc});
@@ -843,13 +831,13 @@ void swift::rewriting::realizeInheritedRequirements(
 
     if (!inheritedType) continue;
 
-    auto *typeRepr = inheritedTypes.getTypeRepr(index);
-    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-
     if (shouldInferRequirements) {
-      inferRequirements(inheritedType, loc, moduleForInference,
+      inferRequirements(inheritedType, moduleForInference,
                         decl->getInnermostDeclContext(), result);
     }
+
+    auto *typeRepr = inheritedTypes.getTypeRepr(index);
+    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
@@ -881,7 +869,9 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   SmallVector<InverseRequirement> inverses;
 
   SmallVector<Type, 4> needsDefaultRequirements;
-  InverseRequirement::enumerateDefaultedParams(proto, needsDefaultRequirements);
+  needsDefaultRequirements.push_back(proto->getSelfInterfaceType());
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
+    needsDefaultRequirements.push_back(assocTypeDecl->getDeclaredInterfaceType());
 
   auto &ctx = proto->getASTContext();
   auto selfTy = proto->getSelfInterfaceType();
@@ -926,8 +916,11 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                       SourceLoc()});
 
     desugarRequirements(result, inverses, errors);
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
-    applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
+
+    SmallVector<StructuralRequirement, 2> defaults;
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
+    applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+    result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
@@ -994,11 +987,16 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   desugarRequirements(result, inverses, errors);
 
+  SmallVector<StructuralRequirement, 2> defaults;
   // We do not expand defaults for invertible protocols themselves.
-  if (!proto->getInvertibleProtocolKind())
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+  // HACK: We don't expand for Sendable either. This shouldn't be needed after
+  // Swift 6.0
+  if (!proto->getInvertibleProtocolKind()
+      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
+  applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+  result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);
@@ -1032,12 +1030,10 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
     if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (typealias->getUnderlyingTypeRepr() != nullptr) {
-        auto type = typealias->getStructuralType();
-        if (auto *aliasTy = cast<TypeAliasType>(type.getPointer()))
-          return aliasTy->getSinglyDesugaredType();
-        return type;
-      }
+      // If the type alias was parsed from a user-written type representation,
+      // request a structural type to avoid unnecessary type checking work.
+      if (typealias->getUnderlyingTypeRepr() != nullptr)
+        return typealias->getStructuralType();
       return typealias->getUnderlyingType();
     }
 

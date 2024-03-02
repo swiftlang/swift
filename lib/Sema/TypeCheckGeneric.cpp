@@ -118,7 +118,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         WhereClauseOwner(),
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
-        /*allowConcreteGenericParams=*/false};
+        repr->getLoc(),
+        /*isExtension=*/false,
+        /*allowInverses=*/true};
 
     interfaceSignature = evaluateOrDefault(
         ctx.evaluator, request, GenericSignatureWithError())
@@ -203,7 +205,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
                                                genericParamTypes,
-                                               std::move(requirements));
+                                               std::move(requirements),
+                                               /*allowInverses=*/true);
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;
@@ -336,10 +339,10 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // Find generic parameters or dependent member types.
       // Once such a type is found, don't recurse into its children.
       if (!ty->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
       if (ty->isTypeParameter()) {
         ReferencedGenericParams.insert(ty->getCanonicalType());
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       // Skip the count type, which is always a generic parameter;
@@ -347,7 +350,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // shape and not the metadata.
       if (auto *expansionTy = ty->getAs<PackExpansionType>()) {
         expansionTy->getPatternType().walk(*this);
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       // Don't walk into generic type alias substitutions. This does
@@ -357,7 +360,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       //   func foo<T>(_: Foo<T>) {}
       if (auto *aliasTy = dyn_cast<TypeAliasType>(ty.getPointer())) {
         Type(aliasTy->getSinglyDesugaredType()).walk(*this);
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
 
       return Action::Continue;
@@ -650,7 +653,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
        return subscript->getGenericSignature();
 
-  bool allowConcreteGenericParams = false;
   auto *genericParams = GC->getGenericParams();
   const auto *where = GC->getTrailingWhereClause();
 
@@ -680,9 +682,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   GenericSignature parentSig;
-  SmallVector<TypeLoc, 2> inferenceSources;
+  SmallVector<TypeBase *, 2> inferenceSources;
   SmallVector<Requirement, 2> extraReqs;
+  SourceLoc loc;
+
   if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
+    loc = VD->getLoc();
+
     parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
 
     auto func = dyn_cast<AbstractFunctionDecl>(VD);
@@ -727,7 +733,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         const auto type =
             resolution.withOptions(paramOptions).resolveType(typeRepr);
 
-        inferenceSources.emplace_back(typeRepr, type);
+        inferenceSources.push_back(type.getPointer());
       }
 
       // Handle the thrown error type.
@@ -742,7 +748,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
               .resolveType(thrownTypeRepr);
 
           // Add this type as an inference source.
-          inferenceSources.emplace_back(thrownTypeRepr, thrownType);
+          inferenceSources.push_back(thrownType.getPointer());
 
           // Add conformance of this type to the Error protocol.
           if (auto errorProtocol = ctx.getErrorDecl()) {
@@ -770,10 +776,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
             resolution.withOptions(TypeResolverContext::FunctionResult)
                 .resolveType(resultTypeRepr);
 
-        inferenceSources.emplace_back(resultTypeRepr, resultType);
+        inferenceSources.push_back(resultType.getPointer());
       }
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
+    loc = ext->getLoc();
+
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
@@ -796,8 +804,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       return parentSig;
     }
 
-    // Extensions allow parameters to be equated with concrete types.
-    allowConcreteGenericParams = true;
   } else {
     llvm_unreachable("Unknown generic declaration kind");
   }
@@ -805,8 +811,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   auto request = InferredGenericSignatureRequest{
       parentSig.getPointer(),
       genericParams, WhereClauseOwner(GC),
-      extraReqs, inferenceSources,
-      allowConcreteGenericParams};
+      extraReqs, inferenceSources, loc,
+      /*isExtension=*/isa<ExtensionDecl>(GC),
+      /*allowInverses=*/true};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
@@ -1044,7 +1051,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  llvm::Optional<TypeResolution> resolution;
+  std::optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,
@@ -1090,21 +1097,28 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
+  auto parentDC = typeAlias->getDeclContext();
+  auto &ctx = parentDC->getASTContext();
+
+  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
+
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
-  auto &ctx = typeAlias->getASTContext();
-  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
   if (!underlyingTypeRepr) {
     typeAlias->setInvalid();
     return ErrorType::get(ctx);
   }
 
-  const auto type =
-      TypeResolution::forStructural(typeAlias, options,
-                                    /*unboundTyOpener*/ nullptr,
-                                    /*placeholderHandler*/ nullptr,
-                                    /*packElementOpener*/ nullptr)
+  auto result = TypeResolution::forStructural(typeAlias, options,
+                                              /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
+
+  // Don't build a generic siganture for a protocol extension, because this
+  // request might be evaluated while building a protocol requirement signature.
+  if (parentDC->getSelfProtocolDecl())
+    return result;
 
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
@@ -1112,8 +1126,7 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
     subs = genericSig->getIdentitySubstitutionMap();
 
   Type parent;
-  auto parentDC = typeAlias->getDeclContext();
   if (parentDC->isTypeContext())
     parent = parentDC->getSelfInterfaceType();
-  return TypeAliasType::get(typeAlias, parent, subs, type);
+  return TypeAliasType::get(typeAlias, parent, subs, result);
 }

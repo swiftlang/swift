@@ -60,7 +60,7 @@ toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
   }
 
   StringRef paths[] = {swiftBinDir, path};
-  auto pathsRef = llvm::makeArrayRef(paths);
+  auto pathsRef = llvm::ArrayRef(paths);
   if (!hasToolchain)
     pathsRef = pathsRef.drop_back();
 
@@ -206,7 +206,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     // included with an open-source toolchain.
     const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
-    queue.addTask(xcrunPath->c_str(), args, /*Env=*/llvm::None,
+    queue.addTask(xcrunPath->c_str(), args, /*Env=*/std::nullopt,
                   /*Context=*/nullptr,
                   /*SeparateErrors=*/true);
     queue.execute(nullptr,
@@ -369,7 +369,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   // have an older Swift runtime.
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
-  llvm::Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  std::optional<llvm::VersionTuple> runtimeCompatibilityVersion;
 
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
     auto value = context.Args.getLastArgValue(
@@ -384,10 +384,10 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
     } else if (value.equals("5.8")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
-    } else if (value.equals("5.11")) {
-      runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
+    } else if (value.equals("6.0")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
     } else if (value.equals("none")) {
-      runtimeCompatibilityVersion = llvm::None;
+      runtimeCompatibilityVersion = std::nullopt;
     } else {
       // TODO: diagnose unknown runtime compatibility version?
     }
@@ -525,10 +525,10 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
   }
 }
 
-llvm::Optional<llvm::VersionTuple>
+std::optional<llvm::VersionTuple>
 toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
   if (!SDKInfo)
-    return llvm::None;
+    return std::nullopt;
   return swift::getTargetSDKVersion(*SDKInfo, triple);
 }
 

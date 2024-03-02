@@ -1819,6 +1819,17 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
   }
 }
 
+public struct GenericToVoidMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+           ()
+           """
+  }
+}
+
 public struct SingleMemberMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1975,6 +1986,74 @@ public struct NestedMagicLiteralMacro: ExpressionMacro {
   }
 }
 
+public struct NativeFileIDMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(
+        of: node, at: .afterLeadingTrivia, filePathMode: .fileID
+    )!.file
+  }
+}
+
+public struct NativeFilePathMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(
+        of: node, at: .afterLeadingTrivia, filePathMode: .filePath
+    )!.file
+  }
+}
+
+public struct NativeLineMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(of: node)!.line
+  }
+}
+
+public struct NativeColumnMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return context.location(of: node)!.column
+  }
+}
+
+public struct ClosureCallerMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        let location = context.location(of: node)!
+        return #"""
+        ClosureCaller({ (value, then) in
+            #sourceLocation(file: \#(location.file), line: \#(location.line))
+            print("\(value)@\(\#(location.file))#\(\#(location.line))")
+            then()
+            #sourceLocation()
+        })
+        """#
+    }
+}
+
+public struct PrependHelloToShadowedMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        #"""
+        "hello \(shadowed)"
+        """#
+    }
+}
+
 public struct InvalidIfExprMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2091,7 +2170,84 @@ public struct SendableMacro: ExtensionMacro {
   }
 }
 
-public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
+public struct GenerateStubMemberMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["#generateMemberStubs"]
+  }
+}
+
+public struct GenerateStubsFreestandingMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["#generateMember"]
+  }
+}
+
+public struct SingleMemberStubMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["static func member() {}"]
+  }
+}
+
+public struct GenerateStubsForProtocolRequirementsMacro: PeerMacro, ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
+      return []
+    }
+
+    let requirements =
+      proto.memberBlock.members.map { member in member.trimmed }
+    let requirementStubs = requirements
+      .map { req in
+        "\(req) { fatalError() }"
+      }
+      .joined(separator: "\n    ")
+
+    let extensionDecl: DeclSyntax =
+      """
+      extension \(proto.name) where Self: _TestStub {
+        \(raw: requirementStubs)
+      }
+      """
+    return [extensionDecl.cast(ExtensionDeclSyntax.self)]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let proto = declaration.as(ProtocolDeclSyntax.self) else {
+      return []
+    }
+
+    return [
+      """
+      struct __\(proto.name): \(proto.name), _TestStub {
+        init() {} 
+      }
+      """
+    ]
+  }
+}
+
+  public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext

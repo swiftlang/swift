@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -enable-experimental-feature NoncopyableGenerics
 
 protocol HasSelfRequirements {
   func foo(_ x: Self)
@@ -276,7 +277,7 @@ typealias Constraint = Input
 typealias ConstraintB = Input & InputB
 
 //expected-error@+2{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint' (aka 'any Input')}}
-//expected-error@+1 2{{use of 'ConstraintB' (aka 'Input & InputB') as a type must be written 'any ConstraintB' (aka 'any Input & InputB')}}
+//expected-error@+1 {{use of 'ConstraintB' (aka 'Input & InputB') as a type must be written 'any ConstraintB' (aka 'any Input & InputB')}}
 func testConstraintAlias(x: Constraint, y: ConstraintB) {}
 
 typealias Existential = any Input
@@ -307,7 +308,7 @@ enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not
 do {
   // expected-error@+1 {{use of protocol 'Decodable' as a type must be written 'any Decodable'}}
   let _: Decodable
-  // expected-error@+1 2 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable')}}
+  // expected-error@+1 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable')}}
   let _: Codable
 }
 
@@ -337,11 +338,9 @@ func testAnyFixIt() {
       typealias HasAssocAlias = HasAssoc
     }
     let wrapperMeta: Wrapper.Type
-    // FIXME: Both of these fix-its are wrong.
-    // 1. 'any' is attached to 'HasAssocAlias' instead of 'Wrapper.HasAssocAlias'
-    // 2. What is the correct fix-it for the initializer?
+    // FIXME: What is the correct fix-it for the initializer?
     //
-    // expected-error@+2:20 {{use of 'Wrapper.HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any Wrapper.HasAssocAlias' (aka 'any HasAssoc')}}{{20-33=(any HasAssocAlias)}}
+    // expected-error@+2:20 {{use of 'Wrapper.HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any Wrapper.HasAssocAlias' (aka 'any HasAssoc')}}{{12-33=(any Wrapper.HasAssocAlias)}}
     // expected-error@+1:57 {{use of 'Wrapper.HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any Wrapper.HasAssocAlias' (aka 'any HasAssoc')}}{{57-70=(any HasAssocAlias)}}
     let _: Wrapper.HasAssocAlias.Protocol = wrapperMeta.HasAssocAlias.self
   }
@@ -358,6 +357,16 @@ func testAnyFixIt() {
   let _: any HasAssoc? = nil
   // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc.Type)?'}}{{10-28=(any HasAssoc.Type)?}}
   let _: any HasAssoc.Type? = nil
+
+  do {
+    struct Outer<T> {
+      struct Inner<U> {}
+    }
+
+    // expected-error@+2:18 {{must be written 'any HasAssoc'}}
+    // expected-error@+1:34 {{must be written 'any HasAssoc'}}
+    let _: Outer<HasAssoc>.Inner<HasAssoc>
+  }
 }
 
 func testNestedMetatype() {
@@ -387,3 +396,14 @@ protocol PP {}
 struct A : PP {}
 let _: any PP = A() // Ok
 let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any (any PP)'}} {{8-12=}}
+
+// coverage for rdar://123332844
+let x: Any.Type = AnyObject.self
+let y: Any.Type = Any.self
+
+typealias Objectlike = AnyObject
+func f(_ x: Objectlike) {}
+
+typealias Copy = Copyable
+func h(_ z1: Copy, // expected-error {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable')}}
+       _ z2: Copyable) {} // expected-error {{use of protocol 'Copyable' as a type must be written 'any Copyable'}}

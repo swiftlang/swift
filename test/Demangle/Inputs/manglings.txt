@@ -453,4 +453,17 @@ $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfM
 @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered
 $sxSo8_NSRangeVRlzCRl_Cr0_llySo12ModelRequestCyxq_GIsPetWAlYl_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(witness_method) @yield_once <A, B where A: AnyObject, B: AnyObject> @substituted <A> (@inout A) -> (@yields @inout __C._NSRange) for <__C.ModelRequest<A, B>>
 $SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI ---> $SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI
-$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF --> typed_throws.rethrowConcrete() throws(typed_throws.MyError) -> ()
+$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF ---> typed_throws.rethrowConcrete() throws(typed_throws.MyError) -> ()
+$s28implicit_lifetime_dependence10BufferViewVyA2ChYlscfC ---> {T:$s28implicit_lifetime_dependence10BufferViewVyA2ChYlscfc} implicit_lifetime_dependence.BufferView.init(lifetime dependence: scope __shared implicit_lifetime_dependence.BufferView) -> implicit_lifetime_dependence.BufferView
+$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC ---> {T:$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfc} implicit_lifetime_dependence.BufferView.init(lifetime dependence: inherit implicit_lifetime_dependence.BufferView) -> implicit_lifetime_dependence.BufferView
+$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyYLsF ---> implicit_lifetime_dependence.Wrapper.getView1(self lifetime dependence: scope) () -> implicit_lifetime_dependence.BufferView
+$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYLiF ---> implicit_lifetime_dependence.Wrapper.getView2(self lifetime dependence: inherit) () -> implicit_lifetime_dependence.BufferView
+$s3red3use2fnySiyYAXE_tF ---> red.use(fn: @isolated(any) () -> Swift.Int) -> ()
+$s4testAAyAA5KlassC_ACtACnYTF ---> test.test(__owned test.Klass) -> transferring (test.Klass, test.Klass)
+$s5test24testyyAA5KlassCnYuF ---> test2.test(transferring __owned test2.Klass) -> ()
+$s7ElementSTQzqd__s5Error_pIgnrzo_ABqd__sAC_pIegnrzr_SlRzr__lTR ---> {T:} reabstraction thunk helper <A><A1 where A: Swift.Collection> from @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @owned Swift.Error) to @escaping @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @out Swift.Error)
+$sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative transferring Swift.Float) -> (@unowned Swift.Float)
+$sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned transferring Swift.Float) -> (@unowned Swift.Float)
+$s4testA2A5KlassCyYTF ---> test.test() -> transferring test.Klass
+$s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> transferring main.Klass
+$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> transferring null.NonSendableKlass

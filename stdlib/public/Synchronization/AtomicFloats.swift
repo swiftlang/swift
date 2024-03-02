@@ -16,11 +16,11 @@
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Float16: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias AtomicRepresentation = UInt16.AtomicRepresentation
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
@@ -33,7 +33,7 @@ extension Float16: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -52,7 +52,7 @@ extension Float16: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -68,11 +68,11 @@ extension Float16: AtomicRepresentable {
 // Float AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Float: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias AtomicRepresentation = UInt32.AtomicRepresentation
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
@@ -85,7 +85,7 @@ extension Float: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -104,7 +104,7 @@ extension Float: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -120,11 +120,11 @@ extension Float: AtomicRepresentable {
 
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || _pointerBitWidth(_64)
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 extension Double: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias AtomicRepresentation = UInt64.AtomicRepresentation
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
@@ -137,7 +137,7 @@ extension Double: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -156,7 +156,7 @@ extension Double: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(

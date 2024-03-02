@@ -9,7 +9,7 @@ import Dispatch
 
 let suite = TestSuite("LockFreeSingleConsumerStackTests")
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 class LockFreeSingleConsumerStack<Element> {
   struct Node {
     let value: Element
@@ -17,8 +17,8 @@ class LockFreeSingleConsumerStack<Element> {
   }
   typealias NodePtr = UnsafeMutablePointer<Node>
 
-  private var _last = Atomic<NodePtr?>(nil)
-  private var _consumerCount = Atomic<Int>(0)
+  private let _last = Atomic<NodePtr?>(nil)
+  private let _consumerCount = Atomic<Int>(0)
   private var foo = 0
 
   deinit {
@@ -67,7 +67,7 @@ class LockFreeSingleConsumerStack<Element> {
   }
 }
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
 
 suite.test("basics") {
   let stack = LockFreeSingleConsumerStack<Int>()
@@ -138,6 +138,6 @@ suite.test("concurrentPushesAndPops") {
   }
 }
 
-} // if #available(SwiftStdlib 5.11)
+} // if #available(SwiftStdlib 6.0)
 
 runAllTests()

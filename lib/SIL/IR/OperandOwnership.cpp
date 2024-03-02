@@ -113,6 +113,7 @@ SHOULD_NEVER_VISIT_INST(HasSymbol)
 SHOULD_NEVER_VISIT_INST(IntegerLiteral)
 SHOULD_NEVER_VISIT_INST(Metatype)
 SHOULD_NEVER_VISIT_INST(ObjCProtocol)
+SHOULD_NEVER_VISIT_INST(Object)
 SHOULD_NEVER_VISIT_INST(RetainValue)
 SHOULD_NEVER_VISIT_INST(RetainValueAddr)
 SHOULD_NEVER_VISIT_INST(StringLiteral)
@@ -125,7 +126,7 @@ SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
 SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
-SHOULD_NEVER_VISIT_INST(TestSpecification)
+SHOULD_NEVER_VISIT_INST(SpecifyTest)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 SHOULD_NEVER_VISIT_INST(Vector)
 
@@ -323,6 +324,7 @@ OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 // using getForwardingOperandOwnership.
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, FunctionExtractIsolation)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -361,7 +363,6 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
     return i->getForwardingOwnershipKind().getForwardingOperandOwnership(      \
         /*allowUnowned*/ false);                                               \
   }
-FORWARDING_OWNERSHIP(Object)
 FORWARDING_OWNERSHIP(OpenExistentialRef)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
@@ -658,10 +659,15 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
   }
-  if (getOperandIndex() == MarkDependenceInst::Base && mdi->isNonEscaping()) {
+  if (mdi->isNonEscaping()) {
     // This creates a "dependent value", just like on-stack partial_apply, which
     // we treat like a borrow.
     return OperandOwnership::Borrow;
+  }
+  if (mdi->hasUnresolvedEscape()) {
+    // This creates a dependent value that may extend beyond the parent's
+    // lifetime.
+    return OperandOwnership::UnownedInstantaneousUse;
   }
   // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous
@@ -902,6 +908,9 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
+
+// This should actually never be seen in SIL
+BUILTIN_OPERAND_OWNERSHIP(GuaranteedForwarding, ExtractFunctionIsolation)
 
 OperandOwnership
 OperandOwnershipBuiltinClassifier

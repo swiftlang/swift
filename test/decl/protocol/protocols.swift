@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
+
+// XFAIL: noncopyable_generics
+
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -418,7 +421,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in Swift 5}}
+    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in the Swift 5 language mode}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'any SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 

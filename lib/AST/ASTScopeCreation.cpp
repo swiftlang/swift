@@ -64,7 +64,7 @@ public:
 public:
   /// For each of searching, call this unless the insertion point is needed
   void addToScopeTree(ASTNode n, ASTScopeImpl *parent) {
-    (void)addToScopeTreeAndReturnInsertionPoint(n, parent, llvm::None);
+    (void)addToScopeTreeAndReturnInsertionPoint(n, parent, std::nullopt);
   }
   /// Return new insertion point.
   /// For ease of searching, don't call unless insertion point is needed
@@ -73,7 +73,7 @@ public:
   /// we introduce here, such as PatternEntryDeclScope and GuardStmtScope
   ASTScopeImpl *
   addToScopeTreeAndReturnInsertionPoint(ASTNode, ASTScopeImpl *parent,
-                                        llvm::Optional<SourceLoc> endLoc);
+                                        std::optional<SourceLoc> endLoc);
 
   template <typename Scope, typename... Args>
   ASTScopeImpl *constructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
@@ -115,47 +115,45 @@ public:
           scopeCreator
               .constructExpandAndInsert<ClosureParametersScope>(
                   parent, closure);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
         if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
           scopeCreator
               .constructExpandAndInsert<CaptureListScope>(
                   parent, capture);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         // If we have a single value statement expression, we need to add any
         // scopes in the underlying statement.
         if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
           scopeCreator.addToScopeTree(SVE->getStmt(), parent);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         // If we have a try/try!/try?, we need to add a scope for it
         if (auto anyTry = dyn_cast<AnyTryExpr>(E)) {
           scopeCreator.constructExpandAndInsert<TryScope>(parent, anyTry);
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
         }
 
         return Action::Continue(E);
       }
       PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-        if (isa<BraceStmt>(S)) { // closures hidden in here
-          return Action::Continue(S);
-        }
-        return Action::SkipChildren(S);
+        // Closures can occur in BraceStmts.
+        return Action::VisitNodeIf(isa<BraceStmt>(S), S);
       }
       PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-        return Action::SkipChildren(P);
+        return Action::SkipNode(P);
       }
       PreWalkAction walkToDeclPre(Decl *D) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
       PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
 
       MacroWalking getMacroWalkingBehavior() const override {
@@ -199,7 +197,7 @@ public:
   /// pattern bindings are going to be visible.
   ASTScopeImpl *addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
                                              ASTScopeImpl *parent,
-                                             llvm::Optional<SourceLoc> endLoc);
+                                             std::optional<SourceLoc> endLoc);
 
   SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
@@ -270,10 +268,24 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
       scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
+
+    if (SF->Kind == SourceFileKind::DefaultArgument) {
+      auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
+          *SF->getBufferID());
+      parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
+      if (auto parentScope =
+              findStartingScopeForLookup(enclosingSF, parentLoc)) {
+        parentAndWasExpanded.setPointer(
+            const_cast<ASTScopeImpl *>(parentScope));
+      }
+      return;
+    }
+
     auto macroRole = SF->getFulfilledMacroRole();
 
     // Determine the parent source location based on the macro role.
     AbstractFunctionDecl *bodyForDecl = nullptr;
+
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
@@ -324,10 +336,10 @@ class NodeAdder
     : public ASTVisitor<NodeAdder, ASTScopeImpl *,
                         ASTScopeImpl *, ASTScopeImpl *,
                         void, void, void, ASTScopeImpl *, ScopeCreator &> {
-  llvm::Optional<SourceLoc> endLoc;
+  std::optional<SourceLoc> endLoc;
 
 public:
-  explicit NodeAdder(llvm::Optional<SourceLoc> endLoc) : endLoc(endLoc) {}
+  explicit NodeAdder(std::optional<SourceLoc> endLoc) : endLoc(endLoc) {}
 
 #pragma mark ASTNodes that do not create scopes
 
@@ -556,7 +568,7 @@ public:
 // These definitions are way down here so it can call into
 // NodeAdder
 ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
-    ASTNode n, ASTScopeImpl *parent, llvm::Optional<SourceLoc> endLoc) {
+    ASTNode n, ASTScopeImpl *parent, std::optional<SourceLoc> endLoc) {
   if (!n)
     return parent;
 
@@ -628,7 +640,7 @@ void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
 ASTScopeImpl *
 ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
                                            ASTScopeImpl *parentScope,
-                                           llvm::Optional<SourceLoc> endLoc) {
+                                           std::optional<SourceLoc> endLoc) {
   if (auto *var = patternBinding->getSingleVar())
     addChildrenForKnownAttributes(var, parentScope);
 
@@ -642,7 +654,7 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
 
   auto *insertionPoint = parentScope;
   for (auto i : range(patternBinding->getNumPatternEntries())) {
-    llvm::Optional<SourceLoc> endLocForBinding = llvm::None;
+    std::optional<SourceLoc> endLocForBinding = std::nullopt;
     if (isLocalBinding) {
       endLocForBinding = endLoc;
       ASTScopeAssert(endLoc.has_value() && endLoc->isValid(),

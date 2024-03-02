@@ -300,7 +300,7 @@ extension String {
   }
 
   @usableFromInline
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   internal static func _validate<Encoding: Unicode.Encoding>(
     _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
     as encoding: Encoding.Type

@@ -84,7 +84,7 @@ static void addSearchPathInvocationArguments(
 
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
+    ASTContext &ctx, std::optional<StringRef> sourceFileName = std::nullopt) {
   std::vector<std::string> commandLineArgs =
       ClangImporter::getClangDriverArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
@@ -127,9 +127,29 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
   return commandLineArgs;
 }
 
+static std::unique_ptr<llvm::PrefixMapper>
+getClangPrefixMapper(DependencyScanningTool &clangScanningTool,
+                     ModuleDeps &clangModuleDep,
+                     clang::CompilerInvocation &depsInvocation) {
+  std::unique_ptr<llvm::PrefixMapper> Mapper;
+  if (clangModuleDep.IncludeTreeID) {
+    Mapper = std::make_unique<llvm::PrefixMapper>();
+  } else if (clangModuleDep.CASFileSystemRootID) {
+    assert(clangScanningTool.getCachingFileSystem());
+    Mapper = std::make_unique<llvm::TreePathPrefixMapper>(
+        clangScanningTool.getCachingFileSystem());
+  }
+
+  if (Mapper)
+    DepscanPrefixMapping::configurePrefixMapper(depsInvocation, *Mapper);
+
+  return Mapper;
+}
+
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
-     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-     StringRef moduleOutputPath, RemapPathCallback callback) {
+    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+    clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+    StringRef moduleOutputPath, RemapPathCallback callback) {
   const auto &ctx = Impl.SwiftContext;
   ModuleDependencyVector result;
 
@@ -206,6 +226,10 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     (void)success;
     assert(success && "clang option from dep scanner round trip failed");
 
+    // Create a prefix mapper that matches clang's configuration.
+    auto Mapper =
+        getClangPrefixMapper(clangScanningTool, clangModuleDep, depsInvocation);
+
     // Clear the cache key for module. The module key is computed from clang
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
@@ -237,22 +261,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     std::string IncludeTree =
         clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
-    if (ctx.ClangImporterOpts.CASOpts) {
-      swiftArgs.push_back("-cache-compile-job");
-      if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
-        swiftArgs.push_back("-cas-path");
-        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
-      }
-      if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
-        swiftArgs.push_back("-cas-plugin-path");
-        swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
-        for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
-          swiftArgs.push_back("-cas-plugin-option");
-          swiftArgs.push_back(
-              (llvm::Twine(Opt.first) + "=" + Opt.second).str());
-        }
-      }
-    }
+    ctx.CASOpts.enumerateCASConfigurationFlags(
+        [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
 
     if (!RootID.empty()) {
       swiftArgs.push_back("-no-clang-include-tree");
@@ -265,10 +275,14 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
       swiftArgs.push_back(IncludeTree);
     }
 
+    std::string mappedPCMPath = pcmPath;
+    if (Mapper)
+      Mapper->mapInPlace(mappedPCMPath);
+
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencyInfo::forClangModule(
-        pcmPath, clangModuleDep.ClangModuleMapFile,
+        pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
         RootID, IncludeTree, /*module-cache-key*/ "");
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
@@ -343,21 +357,8 @@ void ClangImporter::recordBridgingHeaderOptions(
 
   llvm::for_each(clangArgs, addClangArg);
 
-  if (ctx.ClangImporterOpts.CASOpts) {
-    swiftArgs.push_back("-cache-compile-job");
-    if (!ctx.ClangImporterOpts.CASOpts->CASPath.empty()) {
-      swiftArgs.push_back("-cas-path");
-      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->CASPath);
-    }
-    if (!ctx.ClangImporterOpts.CASOpts->PluginPath.empty()) {
-      swiftArgs.push_back("-cas-plugin-path");
-      swiftArgs.push_back(ctx.ClangImporterOpts.CASOpts->PluginPath);
-      for (auto Opt : ctx.ClangImporterOpts.CASOpts->PluginOptions) {
-        swiftArgs.push_back("-cas-plugin-option");
-        swiftArgs.push_back((llvm::Twine(Opt.first) + "=" + Opt.second).str());
-      }
-    }
-  }
+  ctx.CASOpts.enumerateCASConfigurationFlags(
+      [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
 
   if (auto Tree = deps.IncludeTreeID) {
     swiftArgs.push_back("-clang-include-tree-root");
@@ -378,7 +379,7 @@ void ClangImporter::recordBridgingHeaderOptions(
 // Clang does have a concept working directory which may be specified on this
 // Clang invocation with '-working-directory'. If so, it is crucial that we
 // use this directory as an argument to the Clang scanner invocation below.
-static llvm::Optional<std::string>
+static std::optional<std::string>
 computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
                              const ASTContext &ctx) {
   std::string workingDir;
@@ -391,7 +392,7 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
     if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          "Missing '-working-directory' argument");
-      return llvm::None;
+      return std::nullopt;
     }
     workingDir = *(clangWorkingDirPos - 1);
   }
@@ -441,7 +442,8 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
     return {};
   }
 
-  return bridgeClangModuleDependencies(*clangModuleDependencies,
+  return bridgeClangModuleDependencies(clangScanningTool,
+                                       *clangModuleDependencies,
                                        moduleOutputPath, [&](StringRef path) {
                                          if (mapper)
                                            return mapper->mapToString(path);
@@ -506,8 +508,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // Record module dependencies for each new module we found.
   auto bridgedDeps = bridgeClangModuleDependencies(
-      clangModuleDependencies->ModuleGraph, cache.getModuleOutputPath(),
-      [&cache](StringRef path) {
+      clangScanningTool, clangModuleDependencies->ModuleGraph,
+      cache.getModuleOutputPath(), [&cache](StringRef path) {
         return cache.getScanService().remapPath(path);
       });
   cache.recordDependencies(bridgedDeps);
@@ -518,8 +520,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // ... and all module dependencies.
   llvm::StringSet<> alreadyAddedModules;
-  for (const auto &moduleDep : clangModuleDependencies->ModuleGraph)
-    targetModule.addBridgingModuleDependency(moduleDep.ID.ModuleName,
+  for (const auto &moduleDep : clangModuleDependencies->ClangModuleDeps)
+    targetModule.addBridgingModuleDependency(moduleDep.ModuleName,
                                              alreadyAddedModules);
 
   if (auto TreeID = clangModuleDependencies->IncludeTreeID)

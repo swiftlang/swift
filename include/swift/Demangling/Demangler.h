@@ -566,6 +566,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplParameterTransferring();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -632,7 +633,9 @@ protected:
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
-  
+
+  NodePointer demangleLifetimeDependenceKind(bool isSelfDependence);
+
   void dump();
 
 public:

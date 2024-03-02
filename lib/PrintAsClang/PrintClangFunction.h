@@ -21,9 +21,9 @@
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 
@@ -114,8 +114,8 @@ public:
       const ModuleDecl *moduleContext, Type resultTy,
       const ParameterList *params, bool hasThrows = false,
       const AnyFunctionType *funcType = nullptr, bool isStaticMethod = false,
-      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo =
-          llvm::None);
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo =
+          std::nullopt);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
@@ -124,7 +124,7 @@ public:
       const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isStatic, bool isDefinition,
-      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(
@@ -132,7 +132,7 @@ public:
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isStatic, bool isDefinition,
-      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ subscript method.
   void printCxxSubscriptAccessorMethod(
@@ -140,7 +140,7 @@ public:
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isDefinition,
-      llvm::Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
   ClangRepresentation
@@ -151,7 +151,7 @@ public:
   static void printGenericReturnSequence(
       raw_ostream &os, const GenericTypeParamType *gtpt,
       llvm::function_ref<void(StringRef)> invocationPrinter,
-      llvm::Optional<StringRef> initializeWithTakeFromValue = llvm::None);
+      std::optional<StringRef> initializeWithTakeFromValue = std::nullopt);
 
   using PrinterTy =
       llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;

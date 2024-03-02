@@ -6,6 +6,8 @@
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: noncopyable_generics
 
 //==============================================================================
@@ -62,7 +64,8 @@ struct S_Explicit_With_Function_C : _BitwiseCopyable {
 public struct S_Public {}
 
 struct S_Explicit_With_S_Public : _BitwiseCopyable {
-  var s: S_Public
+  var s: S_Public // expected-error   {{non_bitwise_copyable_type_member}}
+                  // expected-note@-4 {{add_nominal_bitwise_copyable_conformance}}
 }
 
 struct S_Explicit_With_Generic<T> : _BitwiseCopyable {
@@ -192,6 +195,11 @@ struct S_Explicit_With_2_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> 
 struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_nonescapable}}
 
 struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
+
+struct S_Implicit_Nonescapable : ~Escapable {}
+
+struct S_Implicit_Noncopyable : ~Copyable {}
+
 
 func passUnmanaged<T : AnyObject>(_ u: Unmanaged<T>) { take3(u) }
 

@@ -1,16 +1,26 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
+// REQUIRES: asserts
 // REQUIRES: noncopyable_generics
-import Builtin
+
+struct Container {
+  let ptr: UnsafeRawBufferPointer
+}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
+  }
+  init(_ c: borrowing Container) -> _borrow(c) Self { // expected-error{{invalid lifetime dependence on bitwise copyable type}}
+    self.ptr = c.ptr
+    return self
   }
 }
 
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
+  @_unsafeNonescapableResult
   init(_ ptr: UnsafeMutableRawBufferPointer) {
     self.ptr = ptr
   }
@@ -87,8 +97,15 @@ func invalidSpecifierPosition2(_ x: borrowing BufferView) -> BufferView {
   return BufferView(y.ptr)
 }
 
+func invalidTupleLifetimeDependence(_ x: inout BufferView) -> (_mutate(x) BufferView, BufferView) { // expected-error{{lifetime dependence specifiers cannot be applied to tuple elements}}
+  return (BufferView(x.ptr), BufferView(x.ptr))
+}
+
 struct Wrapper : ~Escapable {
   let view: BufferView
+  init(_ view: consuming BufferView) {
+    self.view = view
+  }
   borrowing func getView1() -> _borrow(self) BufferView {
     return view
   }
@@ -130,9 +147,26 @@ struct Wrapper : ~Escapable {
   } 
 }
 
-struct ArrayOfBufferView : ~Escapable {
-    let arr: [BufferView]
-    subscript(index: Int) -> _borrow(self) BufferView {
-        return arr[index]
-    }
+public struct GenericBufferView<Element> : ~Escapable {
+  public typealias Index = Int
+  public typealias Pointer = UnsafePointer<Element>
+
+  public let baseAddress: Pointer
+  public let count: Int
+
+  public init<Storage>(unsafeBuffer: UnsafeBufferPointer<Element>,
+                       storage: borrowing Storage)
+    -> _borrow(storage) Self {
+    let baseAddress = unsafeBuffer.baseAddress!
+    self = GenericBufferView<Element>(baseAddress: baseAddress,
+                                      count: unsafeBuffer.count)
+    return self
+  }
+  // unsafe private API
+  @_unsafeNonescapableResult
+  init(baseAddress: Pointer, count: Int) {
+    precondition(count >= 0, "Count must not be negative")
+    self.baseAddress = baseAddress
+    self.count = count
+  } 
 }

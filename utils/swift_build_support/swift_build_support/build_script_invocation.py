@@ -134,6 +134,8 @@ class BuildScriptInvocation(object):
             "--dsymutil-jobs", str(args.dsymutil_jobs),
             '--build-swift-libexec', str(args.build_swift_libexec).lower(),
             '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
+            '--build-swift-clang-overlays', str(
+                args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
             '--build-swift-external-generic-metadata-builder', str(
                 args.build_swift_external_generic_metadata_builder).lower(),
@@ -670,6 +672,8 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
+        builder.add_product(products.WasmKit,
+                            is_enabled=self.args.build_wasmkit)
         builder.add_product(products.WasmStdlib,
                             is_enabled=self.args.build_wasmstdlib)
 

@@ -42,15 +42,16 @@ namespace swift {
 // conditional eventually. LOG_ENABLED can be used to gate work that's needed
 // for log statements but not for anything else.
 enum class LogLevel {
-  Detail,
-  Info,
-  Warning,
+  None = 0,
+  Warning = 1,
+  Info = 2,
+  Detail = 3,
 };
-static const LogLevel logLevel = LogLevel::Warning;
+
 #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #define LOG(level, fmt, ...)                                                   \
   do {                                                                         \
-    if (level >= logLevel)                                                     \
+    if (level <= getLogLevel())                                                \
       fprintf(stderr, "%s:%d:%s: " fmt "\n", METADATA_BUILDER_LOG_FILE_NAME,   \
               __LINE__, __func__, __VA_ARGS__);                                \
   } while (0)
@@ -117,10 +118,60 @@ struct TypedExternal {
   template <typename T, bool Nullable = true, typename Offset = int32_t>
   using CompactFunctionPointer = TypedInteger<T, int32_t, Nullable>;
 
+  template <unsigned discriminator>
+  struct ValueWitnessFunctionPointer {
+    StoredPointer pointer;
+  };
+
   StoredPointer
   getStrippedSignedPointer(const StoredSignedPointer pointer) const {
     return swift_ptrauth_strip(pointer);
   }
+};
+
+using ExternalRuntime32 =
+    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<4>>>;
+using ExternalRuntime64 =
+    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<8>>>;
+
+// Declare a specialized version of the value witness types that use a wrapper
+// on the functions that captures the ptrauth discriminator.
+template <>
+class TargetValueWitnessTypes<ExternalRuntime64> {
+public:
+  using StoredPointer = typename ExternalRuntime64::StoredPointer;
+
+#define WANT_ALL_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
+  typedef ExternalRuntime64::ValueWitnessFunctionPointer<                      \
+      SpecialPointerAuthDiscriminators::upperId>                               \
+      lowerId;
+#define MUTABLE_VALUE_TYPE TargetPointer<ExternalRuntime64, OpaqueValue>
+#define IMMUTABLE_VALUE_TYPE ConstTargetPointer<ExternalRuntime64, OpaqueValue>
+#define MUTABLE_BUFFER_TYPE TargetPointer<ExternalRuntime64, ValueBuffer>
+#define IMMUTABLE_BUFFER_TYPE ConstTargetPointer<ExternalRuntime64, ValueBuffer>
+#define TYPE_TYPE ConstTargetPointer<ExternalRuntime64, Metadata>
+#define SIZE_TYPE StoredSize
+#define INT_TYPE int
+#define UINT_TYPE unsigned
+#define VOID_TYPE void
+#include "swift/ABI/ValueWitness.def"
+
+  // Handle the data witnesses explicitly so we can use more specific
+  // types for the flags enums.
+  typedef size_t size;
+  typedef size_t stride;
+  typedef TargetValueWitnessFlags<typename ExternalRuntime64::StoredSize> flags;
+  typedef uint32_t extraInhabitantCount;
+};
+
+enum class PtrauthKey : int8_t {
+  None = -1,
+  IA = 0,
+  IB = 1,
+  DA = 2,
+  DB = 3,
 };
 
 template <typename T>
@@ -160,18 +211,39 @@ struct FixupTarget {
   std::variant<uint64_t, llvm::StringRef> target;
 };
 
+// An export from a library. Contains a name and address.
+struct Export {
+  std::string name;
+  uint64_t address;
+};
+
+// A segment in a library.
+struct Segment {
+  std::string name;
+  uint64_t address;
+  uint64_t size;
+
+  Segment(const char name[16], uint64_t address, uint64_t size)
+      : address(address), size(size) {
+    size_t length = strnlen(name, 16);
+    llvm::StringRef nameRef{name, length};
+    this->name = nameRef.str();
+  }
+};
+
 struct MachOFile {
   std::optional<std::unique_ptr<llvm::MemoryBuffer>> memoryBuffer;
 
   std::unique_ptr<llvm::object::MachOObjectFile> objectFile;
   std::string path;
 
-  // With the leading '_'.
-  llvm::StringMap<llvm::object::SymbolRef> symbols;
+  uint64_t baseAddress;
 
-  // Guaranteed that getName returns a value.
-  std::vector<llvm::object::SymbolRef> namedSymbolsSortedByAddress;
-  std::vector<llvm::object::SymbolRef> exportedSymbolsSortedByAddress;
+  // With the leading '_'.
+  llvm::StringMap<Export> symbols;
+
+  std::vector<Segment> segments;
+  std::vector<Export> exportsSortedByAddress;
   std::vector<const char *> libraryNames;
 
   std::unordered_map<uint64_t, FixupTarget> fixups;
@@ -188,10 +260,31 @@ class ReaderWriter;
 
 template <typename Runtime>
 class ExternalGenericMetadataBuilderContext {
+  // Structs that provide the ptrauth info for pointers to specific tyeps.
+  template <typename Target>
+  struct PtrauthInfo;
+
+  template <>
+  struct PtrauthInfo<const TargetValueTypeDescriptor<Runtime>> {
+    static constexpr PtrauthKey key = PtrauthKey::DA;
+    static constexpr bool addressDiversified = true;
+    static constexpr unsigned discriminator =
+        SpecialPointerAuthDiscriminators::TypeDescriptor;
+  };
+
+  template <>
+  struct PtrauthInfo<const TargetValueWitnessTable<Runtime>> {
+    static constexpr PtrauthKey key = PtrauthKey::DA;
+    static constexpr bool addressDiversified = true;
+    static constexpr unsigned discriminator =
+        SpecialPointerAuthDiscriminators::ValueWitnessTable;
+  };
+
   struct Atom;
 
   struct FileTarget {
     MachOFile *file;
+    const Export *nearestExport; // Pointer to entry in exportsSortedByAddress.
     uint64_t addressInFile;
   };
 
@@ -207,6 +300,10 @@ class ExternalGenericMetadataBuilderContext {
     unsigned offset;
     unsigned size;
 
+    PtrauthKey ptrauthKey;
+    bool addressDiversified;
+    unsigned discriminator;
+
     std::variant<FileTarget, AtomTarget> fileOrAtom;
   };
 
@@ -217,6 +314,8 @@ class ExternalGenericMetadataBuilderContext {
   };
 
   std::vector<std::unique_ptr<Atom>> atoms;
+
+  std::unordered_set<std::string> atomNames;
 
   Atom *allocateAtom(size_t size) {
     auto atom = atoms.emplace_back(new Atom).get();
@@ -462,7 +561,7 @@ public:
               "Symbol referenced unknown symbol '%s' in library '%s'",
               symbolName.str().c_str(), targetLibraryName);
         }
-        return context->readerWriter->template getSymbolPointer<U>(
+        return context->readerWriter->template getSymbolPointerInFile<U>(
             symbolName, foundSymbol->getValue(), targetFile);
       }
 
@@ -512,10 +611,12 @@ public:
     }
 
     template <typename U>
-    void writePointerImpl(void *where, Buffer<U> value) {
+    BuilderErrorOr<std::monostate> writePointerImpl(
+        void *where, Buffer<U> value, PtrauthKey ptrauthKey = PtrauthKey::None,
+        bool addressDiversified = true, unsigned discriminator = 0) {
       if (!value) {
         memset(where, 0, sizeof(StoredPointer));
-        return;
+        return {{}};
       }
 
       // Write some arbitrary nonzero data so that null checks work with != 0.
@@ -530,6 +631,10 @@ public:
 
       target.size = sizeof(StoredPointer);
 
+      target.ptrauthKey = ptrauthKey;
+      target.addressDiversified = addressDiversified;
+      target.discriminator = discriminator;
+
       if (auto *file = value.file) {
         auto contents = value.section.getContents();
         if (!contents) {
@@ -542,7 +647,16 @@ public:
         auto addressInFile = (uintptr_t)value.ptr -
                              (uintptr_t)contents->data() +
                              value.section.getAddress();
-        target.fileOrAtom = FileTarget{value.file, addressInFile};
+        auto foundExport =
+            this->context->readerWriter->getNearestExportedSymbol(
+                file, addressInFile);
+        if (!foundExport)
+          return BuilderError(
+              "Failed to write pointer to %s %#" PRIx64
+              " as there are no exported symbols in that segment.",
+              file->path.c_str(), addressInFile);
+
+        target.fileOrAtom = FileTarget{value.file, foundExport, addressInFile};
       } else {
         auto offsetInValue =
             (uintptr_t)value.ptr - (uintptr_t)value.atom->buffer.data();
@@ -562,12 +676,12 @@ public:
         auto prevPoint = insertionPoint - 1;
         if (prevPoint->offset == target.offset) {
           *prevPoint = target;
-          return;
+          return {{}};
         }
       }
       targets.insert(insertionPoint, target);
 
-      return;
+      return {{}};
     }
 
   public:
@@ -610,33 +724,49 @@ public:
     }
 
     template <typename U>
-    void writePointer(Pointer<U> *where, Buffer<U> value) {
+    BuilderErrorOr<std::monostate> writePointer(Pointer<U> *where,
+                                                Buffer<U> value) {
       checkPtr(where);
       where->value.value = ~(uintptr_t)value.ptr;
 
-      writePointerImpl(where, value);
+      return writePointerImpl(where, value);
     }
 
     // SignedPointer is templated on the pointer type, not the pointee type like
     // the other pointer templates.
     template <typename U>
-    void writePointer(SignedPointer<U *> *where, Buffer<U> value) {
+    BuilderErrorOr<std::monostate> writePointer(SignedPointer<U *> *where,
+                                                Buffer<U> value) {
       checkPtr(where);
       where->SignedValue.value = ~(uintptr_t)value.ptr;
 
-      writePointerImpl(where, value);
+      return writePointerImpl(where, value, PtrauthInfo<U>::key,
+                              PtrauthInfo<U>::addressDiversified,
+                              PtrauthInfo<U>::discriminator);
     }
 
     template <typename U>
-    void writePointer(StoredPointer *where, Buffer<U> value) {
+    BuilderErrorOr<std::monostate> writePointer(StoredPointer *where,
+                                                Buffer<U> value) {
       checkPtr(where);
       where->value = ~(uintptr_t)value.ptr;
 
-      writePointerImpl(where, value);
+      return writePointerImpl(where, value);
     }
 
-    void writeFunctionPointer(void *where, Buffer<const char> target) {
-      writePointer(reinterpret_cast<StoredPointer *>(where), target);
+    BuilderErrorOr<std::monostate>
+    writeFunctionPointer(void *where, Buffer<const char> target) {
+      return writePointer(reinterpret_cast<StoredPointer *>(where), target);
+    }
+
+    template <unsigned discriminator>
+    BuilderErrorOr<std::monostate> writeFunctionPointer(
+        ExternalRuntime64::ValueWitnessFunctionPointer<discriminator> *where,
+        Buffer<const char> target) {
+      checkPtr(where);
+
+      return writePointerImpl(where, target, PtrauthKey::IA, true,
+                              discriminator);
     }
   };
 
@@ -649,6 +779,14 @@ public:
   ExternalGenericMetadataBuilderContext &
   operator=(const ExternalGenericMetadataBuilderContext &) = delete;
 
+  LogLevel getLogLevel() {
+    return logLevel;
+  }
+
+  void setLogLevel(int level) {
+    logLevel = LogLevel(level);
+  }
+
   template <typename T>
   WritableData<T> allocate(size_t size) {
     auto atom = allocateAtom(size);
@@ -660,7 +798,11 @@ public:
     return allocate<T>(count * sizeof(T));
   }
 
-  void setArch(const char *arch) { this->arch = arch; }
+  void setArch(const char *arch) {
+    this->arch = arch;
+    this->usePtrauth = this->arch == "arm64e";
+  }
+
   void setNamesToBuild(const std::vector<std::string> &names) {
     this->mangledNamesToBuild = names;
   }
@@ -681,10 +823,11 @@ public:
   BuilderErrorOr<Buffer<const Metadata>>
   metadataForNode(swift::Demangle::NodePointer Node);
 
-  std::optional<std::pair<MachOFile *, llvm::object::SymbolRef>>
+  std::optional<std::pair<MachOFile *, Export>>
   findSymbol(llvm::StringRef name, MachOFile *searchFile);
   std::optional<llvm::object::SectionRef> findSectionInFile(MachOFile *file,
                                                             uint64_t address);
+  std::optional<Segment> findSegmentInFile(MachOFile *file, uint64_t address);
   std::optional<MachOFile *> findPointerInFiles(const void *ptr);
 
   void build();
@@ -703,8 +846,9 @@ private:
   void populateMachOFixups(MachOFile *file);
 
   void readMachOSections(MachOFile *file);
-  BuilderErrorOr<std::optional<typename Builder::ConstructedMetadata>>
-  constructMetadataForMangledTypeName(llvm::StringRef typeName);
+  BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(Demangle::NodePointer BoundGenericNode);
+  BuilderErrorOr<std::monostate>
+  ensureMetadataForMangledTypeName(llvm::StringRef typeName);
   BuilderErrorOr<std::optional<typename Builder::ConstructedMetadata>>
   constructMetadataForNode(swift::Demangle::NodePointer Node);
 
@@ -720,8 +864,14 @@ private:
   void writeJSONSerialization(llvm::json::OStream &J, unsigned platform,
                               const std::string &platformVersion);
 
+  // The current log level.
+  LogLevel logLevel = LogLevel::None;
+
   // The architecture being targeted.
   std::string arch;
+
+  // Does this target use pointer authentication?
+  bool usePtrauth = false;
 
   // The readerWriter and builder helper objects.
   std::unique_ptr<ReaderWriter<Runtime>> readerWriter;
@@ -734,8 +884,10 @@ private:
   std::unordered_map<std::string, Buffer<const TypeContextDescriptor>>
       mangledNominalTypeDescriptorMap;
 
-  // Map from mangled type names to the built metadata.
-  std::unordered_map<std::string, const typename Builder::ConstructedMetadata>
+  // Map from mangled type names to the built metadata, or error that occurred
+  // when building it.
+  std::unordered_map<
+      std::string, BuilderErrorOr<const typename Builder::ConstructedMetadata>>
       builtMetadataMap;
 
   // All of the MachOFile objects we're working with.
@@ -744,8 +896,8 @@ private:
   // A map from paths (install names) to MachOFile objects.
   llvm::StringMap<MachOFile *> machOFilesByPath;
 
-  // A map from symbol names (including _ prefix) to file and SymbolRef.
-  llvm::StringMap<std::pair<MachOFile *, llvm::object::SymbolRef>> allSymbols;
+  // A map from symbol names (including _ prefix) to file and export.
+  llvm::StringMap<std::pair<MachOFile *, Export>> allSymbols;
 
   swift::Demangle::Context demangleCtx;
 };
@@ -754,19 +906,14 @@ template <typename RuntimeT>
 class ReaderWriter {
   ExternalGenericMetadataBuilderContext<RuntimeT> *context;
 
-  bool sectionContainsAddress(llvm::object::SectionRef section, uint64_t addr) {
-    return section.getAddress() <= addr &&
-           addr < section.getAddress() + section.getSize();
+  bool segmentContainsAddress(Segment segment, uint64_t addr) {
+    return segment.address <= addr && addr < segment.address + segment.size;
   }
 
-  std::optional<llvm::object::SymbolRef>
-  getNearestSymbol(MachOFile *file, uint64_t addr,
-                   const std::vector<llvm::object::SymbolRef> &in) {
-    auto comparator = [&](uint64_t addr, const llvm::object::SymbolRef &sym) {
-      auto symAddr = sym.getAddress();
-      if (!symAddr)
-        return true;
-      return addr < *symAddr;
+  const Export *getNearestSymbol(MachOFile *file, uint64_t addr,
+                                 const std::vector<Export> &in) {
+    auto comparator = [&](uint64_t addr, const Export &ex) -> bool {
+      return addr < ex.address;
     };
     auto foundSymbol = std::upper_bound(in.begin(), in.end(), addr, comparator);
 
@@ -779,25 +926,24 @@ class ReaderWriter {
     if (foundSymbol == in.end())
       return {};
 
-    // Make sure the symbol is in the same section as the target.
-    auto section = foundSymbol->getSection();
-    if (!section)
+    // Make sure the symbol is in the same segment as the target.
+    auto targetSegment = context->findSegmentInFile(file, addr);
+
+    // If the target isn't even in a segment, give up. This should never happen.
+    if (!targetSegment)
       return {};
 
-    if (!sectionContainsAddress(*section.get(), addr)) {
-      // Try the following symbol and use it if it's in the same section as the
+    if (!segmentContainsAddress(*targetSegment, foundSymbol->address)) {
+      // Try the following symbol and use it if it's in the same segment as the
       // target.
       foundSymbol++;
       if (foundSymbol == in.end())
         return {};
-      auto section = foundSymbol->getSection();
-      if (!section)
-        return {};
-      if (!sectionContainsAddress(*section.get(), addr))
+      if (!segmentContainsAddress(*targetSegment, foundSymbol->address))
         return {};
     }
 
-    return *foundSymbol;
+    return &*foundSymbol;
   }
 
 public:
@@ -824,6 +970,10 @@ public:
   class ResolveToDemangling {
     ReaderWriter &readerWriter;
     Demangle::Demangler &dem;
+
+    LogLevel getLogLevel() {
+      return readerWriter.getLogLevel();
+    }
 
   public:
     ResolveToDemangling(ReaderWriter &readerWriter, Demangle::Demangler &dem)
@@ -893,11 +1043,18 @@ public:
   ReaderWriter(ExternalGenericMetadataBuilderContext<Runtime> *context)
       : context(context) {}
 
-  bool isLoggingEnabled() { return true; }
+  bool isLoggingEnabled() { return getLogLevel() >= LogLevel::Info; }
+
+  LogLevel getLogLevel() {
+    return context->getLogLevel();
+  }
 
   SWIFT_FORMAT(5, 6)
   void log(const char *filename, unsigned line, const char *function,
            const char *fmt, ...) {
+    if (!isLoggingEnabled())
+      return;
+
     va_list args;
     va_start(args, fmt);
 
@@ -909,40 +1066,21 @@ public:
   }
 
   template <typename T = char>
-  BuilderErrorOr<Buffer<const T>> getSymbolPointer(const char *name) {
-    return getSymbolPointer<T>(llvm::StringRef{name});
-  }
-
-  template <typename T = char>
-  BuilderErrorOr<Buffer<const T>>
-  getSymbolPointer(llvm::StringRef name, MachOFile *searchFile = nullptr) {
-    auto result = context->findSymbol(name, searchFile);
+  BuilderErrorOr<Buffer<const T>> getSymbolPointer(llvm::StringRef name) {
+    auto result = context->findSymbol(name, nullptr);
     if (!result)
       return BuilderError("Could not find symbol '%s'", name.str().c_str());
 
     auto [file, symbol] = *result;
-    return getSymbolPointer<T>(name, symbol, file);
+    return getSymbolPointerInFile<T>(name, symbol, file);
   }
 
   template <typename T = char>
   BuilderErrorOr<Buffer<const T>>
-  getSymbolPointer(llvm::StringRef name, llvm::object::SymbolRef symbol,
-                   MachOFile *file) {
-    auto expectedAddress = symbol.getAddress();
-    if (!expectedAddress) {
-      return BuilderError("Could not get address of symbol '%s': %s",
-                          name.str().c_str(),
-                          getErrorString(expectedAddress.takeError()).c_str());
-    }
-    auto address = expectedAddress.get();
-    auto expectedSection = symbol.getSection();
-    if (!expectedSection) {
-      return BuilderError("Could not get section of symbol '%s': %s",
-                          name.str().c_str(),
-                          getErrorString(expectedSection.takeError()).c_str());
-    }
-    auto section = expectedSection.get();
-    if (section == file->objectFile->section_end())
+  getSymbolPointerInFile(llvm::StringRef name, Export symbol, MachOFile *file) {
+    auto address = symbol.address;
+    auto section = context->findSectionInFile(file, address);
+    if (!section)
       return BuilderError("Could not get section of symbol '%s' (%#" PRIx64
                           "), it is undefined or absolute",
                           name.str().c_str(), address);
@@ -1102,11 +1240,10 @@ public:
     if (buffer.file) {
       result.libraryName = buffer.file->path;
       if (auto *address = buffer.getVirtualAddress(buffer.ptr).getValue()) {
-        auto symbol = getNearestSymbol(buffer.file, *address);
+        auto symbol = getNearestExportedSymbol(buffer.file, *address);
         if (symbol) {
-          if (auto name = symbol->getName())
-            result.symbolName = *name;
-          result.pointerOffset = *address;
+          result.symbolName = symbol->name;
+          result.pointerOffset = *address - symbol->address;
         }
       }
     }
@@ -1114,19 +1251,9 @@ public:
   }
 
   // Find the nearest exported symbol before the target, if possible. Finds the
-  // first symbol after the target if there are none before. If the file
-  // contains no symbols, returns an empty SymbolRef.
-  std::optional<llvm::object::SymbolRef>
-  getNearestExportedSymbol(MachOFile *file, uint64_t addr) {
-    return getNearestSymbol(file, addr, file->exportedSymbolsSortedByAddress);
-  }
-
-  // Find the nearest symbol before the target, if possible. Finds the first
-  // symbol after the target if there are none before. If the file contains no
-  // symbols, returns an empty SymbolRef.
-  std::optional<llvm::object::SymbolRef> getNearestSymbol(MachOFile *file,
-                                                          uint64_t addr) {
-    return getNearestSymbol(file, addr, file->namedSymbolsSortedByAddress);
+  // first symbol after the target if there are none before.
+  const Export *getNearestExportedSymbol(MachOFile *file, uint64_t addr) {
+    return getNearestSymbol(file, addr, file->exportsSortedByAddress);
   }
 
   template <typename T>
@@ -1421,7 +1548,7 @@ ExternalGenericMetadataBuilderContext<Runtime>::metadataForNode(
     auto [file, symbol] = *symbolResult;
     LOG(LogLevel::Detail, "Found symbol for metadata '%s' in %s",
         symbolName.str().c_str(), file->path.c_str());
-    return readerWriter->template getSymbolPointer<const Metadata>(
+    return readerWriter->template getSymbolPointerInFile<const Metadata>(
         symbolName, symbol, file);
   }
 
@@ -1430,10 +1557,12 @@ ExternalGenericMetadataBuilderContext<Runtime>::metadataForNode(
     return *metadataName.getError();
   auto metadata = builtMetadataMap.find(*metadataName);
   if (metadata != builtMetadataMap.end()) {
+    auto &[name, constructedMetadata] = *metadata;
+    if (!constructedMetadata)
+      return *constructedMetadata.getError();
     LOG(LogLevel::Detail, "Found metadata we already built for '%s'",
         symbolName.str().c_str());
-    auto constructedMetadata = std::get<1>(*metadata);
-    return constructedMetadata.data.offsetBy(constructedMetadata.offset)
+    return constructedMetadata->data.offsetBy(constructedMetadata->offset)
         .template cast<const Metadata>();
   }
 
@@ -1458,9 +1587,14 @@ ExternalGenericMetadataBuilderContext<Runtime>::metadataForNode(
                         "'%s', but it was not in the map",
                         metadataName->c_str());
   auto constructedMetadataFromMap = std::get<1>(*metadataFromMap);
+  if (!constructedMetadataFromMap)
+    return BuilderError("Metadata construction for '%s' indicated success, but "
+                        "the map contains an error: %s",
+                        metadataName->c_str(),
+                        constructedMetadataFromMap.getError()->cStr());
   assert((*constructedMetadata)->data.ptr ==
-         constructedMetadataFromMap.data.ptr);
-  assert((*constructedMetadata)->offset == constructedMetadataFromMap.offset);
+         constructedMetadataFromMap->data.ptr);
+  assert((*constructedMetadata)->offset == constructedMetadataFromMap->offset);
 
   return (*constructedMetadata)
       ->data.offsetBy((*constructedMetadata)->offset)
@@ -1468,7 +1602,7 @@ ExternalGenericMetadataBuilderContext<Runtime>::metadataForNode(
 }
 
 template <typename Runtime>
-std::optional<std::pair<MachOFile *, llvm::object::SymbolRef>>
+std::optional<std::pair<MachOFile *, Export>>
 ExternalGenericMetadataBuilderContext<Runtime>::findSymbol(
     llvm::StringRef toFind, MachOFile *searchFile) {
   llvm::SmallString<128> prefixed;
@@ -1505,6 +1639,19 @@ ExternalGenericMetadataBuilderContext<Runtime>::findSectionInFile(
 }
 
 template <typename Runtime>
+std::optional<Segment>
+ExternalGenericMetadataBuilderContext<Runtime>::findSegmentInFile(
+    MachOFile *file, uint64_t address) {
+  // A brute force search isn't the most efficient, but we typically have only
+  // a handful of segments.
+  for (auto &segment : file->segments) {
+    if (segment.address <= address && address < segment.address + segment.size)
+      return {segment};
+  }
+  return {};
+}
+
+template <typename Runtime>
 std::optional<MachOFile *>
 ExternalGenericMetadataBuilderContext<Runtime>::findPointerInFiles(
     const void *ptr) {
@@ -1531,10 +1678,12 @@ void ExternalGenericMetadataBuilderContext<Runtime>::build() {
 
   // Process all input symbmols.
   for (auto mangledTypeName : mangledNamesToBuild) {
-    auto result = constructMetadataForMangledTypeName(mangledTypeName);
+    LOG(LogLevel::Info, "Processing JSON requested metadata for %s",
+        mangledTypeName.c_str());
+    auto result = ensureMetadataForMangledTypeName(mangledTypeName);
     if (auto *error = result.getError())
-      fprintf(stderr, "Could not construct metadata for '%s': %s\n",
-              mangledTypeName.c_str(), error->cStr());
+      LOG(LogLevel::Warning, "Could not construct metadata for '%s': %s\n",
+          mangledTypeName.c_str(), error->cStr());
   }
 
   auto metadataMap = serializeMetadataMapTable();
@@ -1545,8 +1694,14 @@ void ExternalGenericMetadataBuilderContext<Runtime>::build() {
   topLevelData.ptr->majorVersion = PrespecializedData::currentMajorVersion;
   topLevelData.ptr->minorVersion = PrespecializedData::currentMinorVersion;
 
-  topLevelData.writePointer(&topLevelData.ptr->metadataMap,
-                            metadataMap.template cast<const void>());
+  auto result = topLevelData.writePointer(
+      &topLevelData.ptr->metadataMap, metadataMap.template cast<const void>());
+  if (!result) {
+    fprintf(stderr,
+            "Fatal error: could not write pointer to top level data: %s\n",
+            result.getError()->cStr());
+    abort();
+  }
 }
 
 template <typename Runtime>
@@ -1650,56 +1805,51 @@ void ExternalGenericMetadataBuilderContext<Runtime>::populateMachOSymbols(
     }
   }
 
-  // Find all the symbols.
-  for (auto &sym : file->objectFile->symbols()) {
-    auto type = sym.getType();
-    if (!type)
-      continue;
-    if (type.get() != llvm::object::SymbolRef::ST_Data &&
-        type.get() != llvm::object::SymbolRef::ST_Function)
-      continue;
-
-    auto name = sym.getName();
-    if (!name) {
-      consumeError(name.takeError());
-      continue;
-    }
-
-    auto flags = sym.getFlags();
-    if (!flags) {
-      consumeError(flags.takeError());
-      continue;
-    }
-
-    auto [iterator, didInsert] = file->symbols.try_emplace(*name, sym);
-    if (!didInsert) {
-      LOG(LogLevel::Detail, "Duplicate symbol name %s in %s",
-          name->str().c_str(), file->path.c_str());
-    }
-    file->namedSymbolsSortedByAddress.push_back(sym);
-
-    allSymbols.insert({*name, {file, sym}});
-
-    if (*flags & llvm::object::SymbolRef::Flags::SF_Exported) {
-      file->exportedSymbolsSortedByAddress.push_back(sym);
+  // Find all the segments.
+  for (auto &command : file->objectFile->load_commands()) {
+    auto addSegment = [&](const auto &segmentCommand) {
+      Segment segment{segmentCommand.segname, segmentCommand.vmaddr,
+                      segmentCommand.vmsize};
+      if (segment.name == "__TEXT")
+        file->baseAddress = segment.address;
+      file->segments.push_back(segment);
+    };
+    if (command.C.cmd == llvm::MachO::LC_SEGMENT_64) {
+      auto segmentCommand = file->objectFile->getSegment64LoadCommand(command);
+      addSegment(segmentCommand);
+    } else if (command.C.cmd == llvm::MachO::LC_SEGMENT) {
+      auto segmentCommand = file->objectFile->getSegmentLoadCommand(command);
+      addSegment(segmentCommand);
     }
   }
 
-  auto compareAddresses = [&](const llvm::object::SymbolRef &a,
-                              const llvm::object::SymbolRef &b) {
-    auto aAddr = a.getAddress();
-    if (!aAddr)
-      return false;
-    auto bAddr = b.getAddress();
-    if (!bAddr)
-      return true;
+  // Find all the exported symbols.
+  llvm::Error err = llvm::Error::success();
+  for (auto &ex : file->objectFile->exports(err)) {
+    // Just in case there's somehow a symbol with a name that's not valid UTF-8,
+    // ignore it, since we can't represent it in our JSON output.
+    if (!llvm::json::isUTF8(ex.name()))
+      continue;
 
-    return *aAddr < *bAddr;
+    Export convertedExport{ex.name().str(), ex.address() + file->baseAddress};
+    file->exportsSortedByAddress.push_back(convertedExport);
+    allSymbols.insert({ex.name(), {file, convertedExport}});
+
+    auto [iterator, didInsert] =
+        file->symbols.try_emplace(ex.name(), convertedExport);
+    if (!didInsert) {
+      LOG(LogLevel::Detail, "Duplicate symbol name %s in %s",
+          ex.name().str().c_str(), file->path.c_str());
+    }
+  }
+  if (err)
+    consumeError(std::move(err));
+
+  auto compareAddresses = [&](Export &a, Export &b) {
+    return a.address < b.address;
   };
-  std::sort(file->namedSymbolsSortedByAddress.begin(),
-            file->namedSymbolsSortedByAddress.end(), compareAddresses);
-  std::sort(file->exportedSymbolsSortedByAddress.begin(),
-            file->exportedSymbolsSortedByAddress.end(), compareAddresses);
+  std::sort(file->exportsSortedByAddress.begin(),
+            file->exportsSortedByAddress.end(), compareAddresses);
 
   LOG(LogLevel::Info, "%s: populated %zu linked libraries and %u symbols",
       file->path.c_str(), file->libraryNames.size(), file->symbols.size());
@@ -1826,19 +1976,7 @@ void ExternalGenericMetadataBuilderContext<Runtime>::readMachOSections(
 }
 
 template <typename Runtime>
-BuilderErrorOr<std::optional<typename ExternalGenericMetadataBuilderContext<
-    Runtime>::Builder::ConstructedMetadata>>
-ExternalGenericMetadataBuilderContext<
-    Runtime>::constructMetadataForMangledTypeName(llvm::StringRef typeName) {
-  auto node = demangleCtx.demangleTypeAsNode(typeName);
-  if (!node) {
-    return BuilderError("Failed to demangle '%s'.", typeName.str().c_str());
-  }
-  LOG(LogLevel::Detail, "Result: %s", nodeToString(node).c_str());
-  return constructMetadataForNode(node);
-}
-
-static BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(
+BuilderErrorOr<std::string> ExternalGenericMetadataBuilderContext<Runtime>::_mangledNominalTypeNameForBoundGenericNode(
     Demangle::NodePointer BoundGenericNode) {
   LOG(LogLevel::Detail, "BoundGenericNode:\n%s",
       getNodeTreeAsString(BoundGenericNode).c_str());
@@ -1866,6 +2004,20 @@ static BuilderErrorOr<std::string> _mangledNominalTypeNameForBoundGenericNode(
   }
 
   return mangling.result();
+}
+
+template <typename Runtime>
+BuilderErrorOr<std::monostate> ExternalGenericMetadataBuilderContext<
+    Runtime>::ensureMetadataForMangledTypeName(llvm::StringRef typeName) {
+  auto node = demangleCtx.demangleTypeAsNode(typeName);
+  if (!node) {
+    return BuilderError("Failed to demangle '%s'.", typeName.str().c_str());
+  }
+  LOG(LogLevel::Detail, "Result: %s", nodeToString(node).c_str());
+  auto result = metadataForNode(node);
+  if (!result)
+    return *result.getError();
+  return {{}};
 }
 
 // Returns the constructed metadata, or no value if the node doesn't contain a
@@ -1957,6 +2109,7 @@ ExternalGenericMetadataBuilderContext<Runtime>::constructMetadataForNode(
 
   LOG(LogLevel::Detail, "pattern: %p", pattern.ptr);
 
+  // Compute extra data size.
   auto maybeExtraDataSize =
       builder->extraDataSize(typeDescriptor, pattern.toConst());
   if (auto *error = maybeExtraDataSize.getError()) {
@@ -1965,9 +2118,17 @@ ExternalGenericMetadataBuilderContext<Runtime>::constructMetadataForNode(
   auto extraDataSize = *maybeExtraDataSize.getValue();
   LOG(LogLevel::Detail, "extraDataSize: %zu", extraDataSize);
 
+  // Get the canonical name for this metadata.
+  Demangle::Demangler Dem;
+  auto mangledName = _standardMangledNameForNode(node, Dem);
+  if (!mangledName)
+    return *mangledName.getError();
+
+  // Build the metadata.
   auto maybeMetadata = builder->buildGenericMetadata(
       typeDescriptor, genericTypeMetadatas, pattern.toConst(), extraDataSize);
   if (auto *error = maybeMetadata.getError()) {
+    builtMetadataMap.emplace(*mangledName, *error);
     return BuilderError("Failed to build metadata '%s': %s",
                         getNodeTreeAsString(node).c_str(), error->cStr());
   }
@@ -1975,20 +2136,22 @@ ExternalGenericMetadataBuilderContext<Runtime>::constructMetadataForNode(
 
   LOG(LogLevel::Detail, "metadata: %p", metadata.data.ptr);
 
-  Demangle::Demangler Dem;
-  auto mangledName = _standardMangledNameForNode(node, Dem);
-  if (!mangledName)
-    return *mangledName.getError();
-
+  // Place the built metadata in the map.
   metadata.data.setName(*mangledName);
-  builtMetadataMap.emplace(*mangledName, metadata);
+  BuilderErrorOr<const typename Builder::ConstructedMetadata> mapValue{
+      metadata};
+  builtMetadataMap.emplace(*mangledName, mapValue);
 
+  // Initialize the built metadata.
   auto initializeResult =
       builder->initializeGenericMetadata(metadata.data, node);
   if (auto *error = initializeResult.getError()) {
     builtMetadataMap.erase(*mangledName);
-    return BuilderError("Failed to build metadata '%s': %s",
-                        getNodeTreeAsString(node).c_str(), error->cStr());
+    builtMetadataMap.emplace(*mangledName, *error);
+    auto resultError = BuilderError("Failed to build metadata '%s': %s",
+                                    nodeToString(node).c_str(), error->cStr());
+    LOG(LogLevel::Warning, "%s", resultError.cStr());
+    return resultError;
   }
 
   auto optionalMetadata = std::optional{metadata};
@@ -2000,7 +2163,24 @@ template <typename Runtime>
 typename ExternalGenericMetadataBuilderContext<Runtime>::template Buffer<char>
 ExternalGenericMetadataBuilderContext<Runtime>::serializeMetadataMapTable(
     void) {
-  auto numEntries = builtMetadataMap.size();
+  // Build a sorted vector of the constructed metadatas. Skip all entries that
+  // contain an error.
+  std::vector<const std::pair<const std::string,
+                              BuilderErrorOr<const ConstructedMetadata>> *>
+      sortedMapElements;
+  sortedMapElements.reserve(builtMetadataMap.size());
+  for (auto &entry : builtMetadataMap) {
+    auto &[name, metadata] = entry;
+    if (metadata)
+      sortedMapElements.push_back(&entry);
+  }
+
+  std::sort(sortedMapElements.begin(), sortedMapElements.end(),
+            [](const auto *a, const auto *b) {
+              return std::get<0>(*a) < std::get<0>(*b);
+            });
+
+  auto numEntries = sortedMapElements.size();
 
   // Array size must be at least numEntries+1 per the requirements of
   // PrebuiltStringMap. Aim for a 75% load factor.
@@ -2013,19 +2193,6 @@ ExternalGenericMetadataBuilderContext<Runtime>::serializeMetadataMapTable(
   auto mapData = allocate<char>(byteSize);
   auto serializedMap = new (mapData.ptr) Map(arraySize);
 
-  std::vector<const std::pair<const std::string, const ConstructedMetadata> *>
-      sortedMapElements;
-  sortedMapElements.reserve(numEntries);
-  for (auto &entry : builtMetadataMap)
-    sortedMapElements.push_back(&entry);
-
-  std::sort(
-      sortedMapElements.begin(), sortedMapElements.end(),
-      [](const std::pair<const std::string, const ConstructedMetadata> *a,
-         const std::pair<const std::string, const ConstructedMetadata> *b) {
-        return std::get<0>(*a) < std::get<0>(*b);
-      });
-
   for (auto *entry : sortedMapElements) {
     auto [key, value] = *entry;
     auto *elementPtr = serializedMap->insert(key.c_str());
@@ -2037,10 +2204,24 @@ ExternalGenericMetadataBuilderContext<Runtime>::serializeMetadataMapTable(
     auto stringData = allocate<char>(key.size() + 1);
     memcpy(stringData.ptr, key.c_str(), key.size());
     stringData.setName("_cstring_" + key);
-    mapData.writePointer(&elementPtr->key, stringData);
+    auto result = mapData.writePointer(&elementPtr->key, stringData);
+    if (!result) {
+      fprintf(
+          stderr,
+          "Fatal error: could not write pointer to metadata table name: %s\n",
+          result.getError()->cStr());
+      abort();
+    }
 
-    auto metadataPointer = value.data.offsetBy(value.offset);
-    mapData.writePointer(&elementPtr->value, metadataPointer);
+    auto metadataPointer = value->data.offsetBy(value->offset);
+    result = mapData.writePointer(&elementPtr->value, metadataPointer);
+    if (!result) {
+      fprintf(
+          stderr,
+          "Fatal error: could not write pointer to metadata table entry: %s\n",
+          result.getError()->cStr());
+      abort();
+    }
   }
 
   mapData.setName("_swift_prespecializedMetadataMap");
@@ -2057,7 +2238,6 @@ void ExternalGenericMetadataBuilderContext<Runtime>::writeAtomContentsJSON(
     llvm::json::OStream &J,
     const typename ExternalGenericMetadataBuilderContext<Runtime>::Atom &atom,
     const SymbolCallback &symbolCallback) {
-  const char *ptrTargetKind = sizeof(StoredPointer) == 8 ? "ptr64" : "ptr32";
 
   // Maintain cursors in the atom's buffer and targets. In a loop, we write out
   // any buffer contents between the current point and the next target, then we
@@ -2080,53 +2260,33 @@ void ExternalGenericMetadataBuilderContext<Runtime>::writeAtomContentsJSON(
     J.object([&] {
       if (auto *fileTarget =
               std::get_if<FileTarget>(&targetsCursor->fileOrAtom)) {
-        std::string foundSymbolName = "";
-        uint64_t foundSymbolAddress = 0;
+        symbolCallback(fileTarget->file, fileTarget->nearestExport->name);
 
-        auto foundSymbol = readerWriter->getNearestExportedSymbol(
-            fileTarget->file, fileTarget->addressInFile);
+        auto addend = (int64_t)fileTarget->addressInFile -
+                      (int64_t)fileTarget->nearestExport->address;
 
-        if (foundSymbol) {
-          if (auto name = foundSymbol->getName()) {
-            if (auto address = foundSymbol->getAddress()) {
-              foundSymbolName = *name;
-              foundSymbolAddress = *address;
-            }
-          }
-        }
-
-        if (foundSymbolName == "") {
-          auto section =
-              findSectionInFile(fileTarget->file, fileTarget->addressInFile);
-          if (section) {
-            auto name = section->getName();
-            if (name) {
-              const char *segment = section->isText() ? "__TEXT" : "__DATA";
-              foundSymbolName = "$dylib_segment$" + fileTarget->file->path +
-                                "$start$" + segment + "$" + name->str();
-            }
-          }
-        }
-        if (foundSymbolName == "") {
-          // Couldn't find a symbol or a section, this really shouldn't happen.
-          foundSymbolName =
-              "$dylib_segment$" + fileTarget->file->path + "$start$__TEXT";
-          foundSymbolAddress = 0;
-        }
-
-        symbolCallback(fileTarget->file, foundSymbolName);
-
-        J.attribute("target", foundSymbolName);
-        J.attribute("addend", (int64_t)fileTarget->addressInFile -
-                                  (int64_t)foundSymbolAddress);
-        J.attribute("kind", ptrTargetKind);
+        J.attribute("target", fileTarget->nearestExport->name);
+        J.attribute("addend", addend);
       } else {
         auto atomTarget = std::get<AtomTarget>(targetsCursor->fileOrAtom);
         J.attribute("self", true);
         J.attribute("target", "_" + atomTarget.atom->name);
         J.attribute("addend", atomTarget.offset);
-        J.attribute("kind", ptrTargetKind);
       }
+
+      const char *ptrTargetKind =
+          sizeof(StoredPointer) == 8 ? "ptr64" : "ptr32";
+
+      if (usePtrauth && targetsCursor->ptrauthKey != PtrauthKey::None) {
+        J.attributeObject("authPtr", [&] {
+          J.attribute("key", static_cast<uint8_t>(targetsCursor->ptrauthKey));
+          J.attribute("addr", targetsCursor->addressDiversified);
+          J.attribute("diversity", targetsCursor->discriminator);
+        });
+        ptrTargetKind = "arm64_auth_ptr";
+      }
+
+      J.attribute("kind", ptrTargetKind);
     });
 
     bufferCursor = targetsCursor->offset + targetsCursor->size;
@@ -2286,16 +2446,11 @@ BuilderErrorOr<unsigned> getPointerWidth(std::string arch) {
 
 } // namespace swift
 
-using ExternalRuntime32 =
-    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<4>>>;
-using ExternalRuntime64 =
-    swift::TypedExternal<swift::WithObjCInterop<swift::RuntimeTarget<8>>>;
-
 struct SwiftExternalMetadataBuilder {
   using Builder32 =
-      swift::ExternalGenericMetadataBuilderContext<ExternalRuntime32>;
+      swift::ExternalGenericMetadataBuilderContext<swift::ExternalRuntime32>;
   using Builder64 =
-      swift::ExternalGenericMetadataBuilderContext<ExternalRuntime64>;
+      swift::ExternalGenericMetadataBuilderContext<swift::ExternalRuntime64>;
 
   std::variant<Builder32, Builder64> context;
 
@@ -2341,6 +2496,11 @@ swift_externalMetadataBuilder_create(int platform, const char *arch) {
 void swift_externalMetadataBuilder_destroy(
     struct SwiftExternalMetadataBuilder *builder) {
   delete builder;
+}
+
+void swift_externalMetadataBuilder_setLogLevel(
+    struct SwiftExternalMetadataBuilder *builder, int level) {
+  builder->withContext([&](auto *context) { context->setLogLevel(level); });
 }
 
 const char *swift_externalMetadataBuilder_readNamesJSON(

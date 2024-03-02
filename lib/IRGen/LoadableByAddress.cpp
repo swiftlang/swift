@@ -1383,7 +1383,7 @@ void LoadableStorageAllocation::allocateLoadableStorage() {
 SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                                                        SILArgument *arg,
                                                        SILType newSILType) {
-  SILValue undef = SILUndef::get(newSILType, *pass.F);
+  SILValue undef = SILUndef::get(pass.F, newSILType);
   SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
   for (auto *use : useList) {
     use->set(undef);
@@ -1459,7 +1459,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
 
 static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
                              SILArgument *arg) {
-  SILValue undef = SILUndef::get(newSILType, argBuilder.getFunction());
+  SILValue undef = SILUndef::get(argBuilder.getFunction(), newSILType);
   SmallVector<Operand *, 8> useList(arg->use_begin(), arg->use_end());
   for (auto *use : useList) {
     use->set(undef);
@@ -2619,13 +2619,12 @@ void LoadableByAddress::recreateSingleApply(
   case SILInstructionKind::PartialApplyInst: {
     auto *castedApply = cast<PartialApplyInst>(applyInst);
     // Change the type of the Closure
-    auto partialApplyConvention = castedApply->getType()
-                                      .getAs<SILFunctionType>()
-                                      ->getCalleeConvention();
+    auto partialApplyConvention = castedApply->getCalleeConvention();
+    auto resultIsolation = castedApply->getResultIsolation();
 
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, castedApply->isOnStack());
+        partialApplyConvention, resultIsolation, castedApply->isOnStack());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -2854,7 +2853,7 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     auto instr = cast<MarkDependenceInst>(convInstr);
     newInstr = convBuilder.createMarkDependence(
       instr->getLoc(), instr->getValue(), instr->getBase(),
-      instr->isNonEscaping());
+      instr->dependenceKind());
     break;
   }
   case SILInstructionKind::DifferentiableFunctionInst: {
@@ -3307,7 +3306,7 @@ bool Peepholes::optimizeLoad(SILBasicBlock &BB, SILInstruction *I) {
     if (next2It == BB.end())
       return false;
     auto *store = dyn_cast<StoreInst>(&*next2It);
-    if (!store)
+    if (!store || store->getSrc() != LI)
       return false;
     if (ignore(store))
       return false;
@@ -3460,6 +3459,19 @@ public:
 
   SILValue getAddressForValue(SILValue v) {
     auto it = valueToAddressMap.find(v);
+
+    // This can happen if we deem a container type small but a contained type
+    // big.
+    if (it == valueToAddressMap.end()) {
+      if (auto *sv = dyn_cast<SingleValueInstruction>(v)) {
+        auto addr = createAllocStack(v->getType());
+        auto builder = getBuilder(++sv->getIterator());
+        builder.createStore(sv->getLoc(), v, addr,
+                            StoreOwnershipQualifier::Unqualified);
+        mapValueToAddress(v, addr);
+        return addr;
+      }
+    }
     assert(it != valueToAddressMap.end());
 
     return it->second;
@@ -3885,7 +3897,7 @@ protected:
     auto builder = assignment.getBuilder(m->getIterator());
     auto opdAddr = assignment.getAddressForValue(m->getBase());
     auto newValue = builder.createMarkDependence(m->getLoc(), m->getValue(),
-                                                 opdAddr, m->isNonEscaping());
+                                                 opdAddr, m->dependenceKind());
     m->replaceAllUsesWith(newValue);
     assignment.markForDeletion(m);
   }
@@ -4246,11 +4258,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
       if (&bb == entryBB) {
         for (auto *arg : bb.getArguments()) {
           auto ty = arg->getType();
-          // This is an idiosyncrasy of the large loadable types pass which
-          // ignores tuple types (considers them always "small").
           if (assignment.isLargeLoadableType(ty)) {
-            assert(isa<TupleType>(ty.getASTType()));
-            ;
             auto addr = assignment.createAllocStack(ty);
             assignment.mapValueToAddress(arg, addr);
             // We will emit the store to initialize after parsing all other
@@ -4266,8 +4274,11 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
       // switch_enum.
       if (auto *pred = bb.getSinglePredecessorBlock()) {
         // switch_enum handles the basic block arguments independently.
-        if (isa<SwitchEnumInst>(pred->getTerminator()))
-          continue;
+        if (auto sw = dyn_cast<SwitchEnumInst>(pred->getTerminator())) {
+          if (assignment.isLargeLoadableType(sw->getOperand()->getType())) {
+              continue;
+          }
+        }
       }
 
       // Handle all other basic block arguments.
@@ -4282,7 +4293,8 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
           // Large try apply results have to be stored to their stack location
           // in the success block.
           if (auto *pred = bb.getSinglePredecessorBlock()) {
-            if (auto *term = dyn_cast<TryApplyInst>(pred->getTerminator())) {
+            if (isa<TryApplyInst>(pred->getTerminator()) ||
+                isa<SwitchEnumInst>(pred->getTerminator())) {
               assert(bb.getArguments().size() == 1);
               shouldDeleteBlockArgument = false;
               // We will emit the store to initialize after parsing all other

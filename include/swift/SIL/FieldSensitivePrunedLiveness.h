@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -203,8 +204,8 @@ struct SubElementOffset {
   ///
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
-  static llvm::Optional<SubElementOffset> compute(SILValue projectionFromRoot,
-                                                  SILValue root) {
+  static std::optional<SubElementOffset> compute(SILValue projectionFromRoot,
+                                                 SILValue root) {
     assert(projectionFromRoot->getType().getCategory() ==
                root->getType().getCategory() &&
            "projectionFromRoot and root must both be objects or address.");
@@ -221,9 +222,9 @@ struct SubElementOffset {
   }
 
 private:
-  static llvm::Optional<SubElementOffset>
+  static std::optional<SubElementOffset>
   computeForAddress(SILValue projectionFromRoot, SILValue rootAddress);
-  static llvm::Optional<SubElementOffset>
+  static std::optional<SubElementOffset>
   computeForValue(SILValue projectionFromRoot, SILValue rootValue);
 };
 
@@ -254,9 +255,7 @@ struct TypeSubElementCount {
   TypeSubElementCount(SILType type, SILFunction *fn)
       : TypeSubElementCount(type, fn->getModule(), TypeExpansionContext(*fn)) {}
 
-  TypeSubElementCount(SILValue value)
-      : TypeSubElementCount(value->getType(), *value->getModule(),
-                            TypeExpansionContext(*value->getFunction())) {}
+  TypeSubElementCount(SILValue value);
 
   operator unsigned() const { return number; }
 
@@ -295,13 +294,46 @@ struct TypeTreeLeafTypeRange {
   ///
   /// \returns None if we are unable to understand the path in between \p
   /// projectedAddress and \p rootAddress.
-  static llvm::Optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
-                                                   SILValue rootValue) {
+  static std::optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
+                                                  SILValue rootValue) {
     auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
-      return llvm::None;
+      return std::nullopt;
     return {{*startEltOffset,
              *startEltOffset + TypeSubElementCount(projectedValue)}};
+  }
+
+  /// Which bits of \p rootValue are involved in \p op.
+  ///
+  /// This is a subset of (usually equal to) the bits of op->getType() in \p
+  /// rootValue.
+  static std::optional<TypeTreeLeafTypeRange> get(Operand *op,
+                                                  SILValue rootValue) {
+    auto projectedValue = op->get();
+    auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+    if (!startEltOffset)
+      return std::nullopt;
+
+    // A drop_deinit only consumes the deinit bit of its operand.
+    auto *ddi = dyn_cast<DropDeinitInst>(op->getUser());
+    if (ddi) {
+      auto upperBound = *startEltOffset + TypeSubElementCount(projectedValue);
+      return {{upperBound - 1, upperBound}};
+    }
+
+    // Uses that borrow a value do not involve the deinit bit.
+    //
+    // FIXME: This shouldn't be limited to applies.
+    unsigned deinitBitOffset = 0;
+    if (op->get()->getType().isValueTypeWithDeinit() &&
+        op->getOperandOwnership() == OperandOwnership::Borrow &&
+        ApplySite::isa(op->getUser())) {
+      deinitBitOffset = 1;
+    }
+
+    return {{*startEltOffset, *startEltOffset +
+                                  TypeSubElementCount(projectedValue) -
+                                  deinitBitOffset}};
   }
 
   /// Given a type \p rootType and a set of needed elements specified by the bit
@@ -337,7 +369,7 @@ struct TypeTreeLeafTypeRange {
 
   /// Return the type tree leaf type range that is the intersection of \p this
   /// and \p other.
-  llvm::Optional<TypeTreeLeafTypeRange>
+  std::optional<TypeTreeLeafTypeRange>
   setIntersection(const TypeTreeLeafTypeRange &other) const {
     unsigned start = startEltOffset;
     if (startEltOffset < other.startEltOffset)
@@ -346,7 +378,7 @@ struct TypeTreeLeafTypeRange {
     if (endEltOffset >= other.endEltOffset)
       end = other.endEltOffset;
     if (start >= end)
-      return llvm::None;
+      return std::nullopt;
     return TypeTreeLeafTypeRange(start, end);
   }
 
@@ -521,7 +553,7 @@ private:
   ///
   /// NOTE: After clearing, this is set to None to ensure that the user
   /// reinitializes it as appropriate.
-  llvm::Optional<unsigned> numBitsToTrack;
+  std::optional<unsigned> numBitsToTrack;
 
   /// Optional vector of live blocks for clients that deterministically iterate.
   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks;
@@ -546,7 +578,7 @@ public:
     liveBlocks.clear();
     if (discoveredBlocks)
       discoveredBlocks->clear();
-    numBitsToTrack = llvm::None;
+    numBitsToTrack = std::nullopt;
     SWIFT_ASSERT_ONLY(seenUse = false);
   }
 
@@ -762,8 +794,8 @@ public:
         return;
 
       assert(ranges.empty());
-      llvm::Optional<std::pair<unsigned, IsInterestingUser>> current =
-          llvm::None;
+      std::optional<std::pair<unsigned, IsInterestingUser>> current =
+          std::nullopt;
       for (unsigned bit = 0, size = liveBits.size(); bit < size; ++bit) {
         auto interesting = selectedBits.test(bit) ? isInterestingUser(bit)
                                                   : IsInterestingUser::NonUser;
@@ -1181,11 +1213,11 @@ class FieldSensitiveSSAPrunedLiveRange
     : public FieldSensitivePrunedLiveRange<FieldSensitiveSSAPrunedLiveRange> {
   using Super = FieldSensitivePrunedLiveRange<FieldSensitiveSSAPrunedLiveRange>;
 
-  std::pair<SILValue, llvm::Optional<TypeTreeLeafTypeRange>> def = {{}, {}};
+  std::pair<SILValue, std::optional<TypeTreeLeafTypeRange>> def = {{}, {}};
 
   /// None for arguments.
-  std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>> defInst = {
-      nullptr, llvm::None};
+  std::pair<SILInstruction *, std::optional<TypeTreeLeafTypeRange>> defInst = {
+      nullptr, std::nullopt};
 
 public:
   FieldSensitiveSSAPrunedLiveRange(
@@ -1193,7 +1225,7 @@ public:
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : FieldSensitivePrunedLiveRange(fn, discoveredBlocks) {}
 
-  std::pair<SILValue, llvm::Optional<TypeTreeLeafTypeRange>> getDef() const {
+  std::pair<SILValue, std::optional<TypeTreeLeafTypeRange>> getDef() const {
     assert(isInitialized());
     return def;
   }

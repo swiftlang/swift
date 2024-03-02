@@ -31,8 +31,8 @@ struct SILSymbolVisitorOptions {
   /// are needed (e.g. decls with `@_originallyDefinedIn`.
   bool LinkerDirectivesOnly = false;
 
-  /// Whether to only visit symbols with public linkage.
-  bool PublicSymbolsOnly = true;
+  /// Whether to only visit symbols with public or package linkage.
+  bool PublicOrPackageSymbolsOnly = true;
 
   /// Whether LLVM IR Virtual Function Elimination is enabled.
   bool VirtualFunctionElimination = false;
@@ -109,6 +109,7 @@ public:
   virtual void addMethodLookupFunction(ClassDecl *CD) {}
   virtual void addNominalTypeDescriptor(NominalTypeDecl *NTD) {}
   virtual void addObjCInterface(ClassDecl *CD) {}
+  virtual void addObjCMetaclass(ClassDecl *CD) {}
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}
   virtual void addObjCResilientClassStub(ClassDecl *CD) {}
   virtual void addOpaqueTypeDescriptor(OpaqueTypeDecl *OTD) {}

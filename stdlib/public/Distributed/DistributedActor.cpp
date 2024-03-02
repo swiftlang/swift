@@ -32,6 +32,7 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
+
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
@@ -61,10 +62,7 @@ using TargetExecutorSignature =
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
                         /*decoderType=*/Metadata *,
-                        /*actorType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **,
-                        /*distributedActorWitnessTable=*/void **
-                        ),
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -91,9 +89,7 @@ using DistributedAccessorSignature =
                         /*numWitnessTables=*/size_t,
                         /*actor=*/HeapObject *,
                         /*decoderType=*/Metadata *,
-                        /*actorType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **,
-                        /*actorWitnessTable=*/void **),
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -119,8 +115,7 @@ SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError();
 
 SWIFT_CC(swiftasync)
 void swift_distributed_execute_target(
-    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    DefaultActor *actor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
     HeapObject *argumentDecoder,
     const Metadata *const *argumentTypes,
@@ -129,9 +124,8 @@ void swift_distributed_execute_target(
     void **witnessTables,
     size_t numWitnessTables,
     Metadata *decoderType,
-    Metadata *actorType,
-    void **decoderWitnessTable,
-    void **actorWitnessTable) {
+    void **decoderWitnessTable
+    ) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
@@ -139,7 +133,8 @@ void swift_distributed_execute_target(
     auto resumeInParent =
         reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
             callerContext->ResumeParent);
-    return resumeInParent(callerContext, error);
+    resumeInParent(callerContext, error);
+    return;
   }
 
   auto *asyncFnPtr = reinterpret_cast<
@@ -157,16 +152,7 @@ void swift_distributed_execute_target(
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
-  accessorEntry(calleeContext,
-                argumentDecoder,
-                argumentTypes,
-                resultBuffer,
-                substitutions,
-                witnessTables,
-                numWitnessTables,
-                actor,
-                decoderType,
-                actorType,
-                decoderWitnessTable,
-                actorWitnessTable);
+  accessorEntry(calleeContext, argumentDecoder, argumentTypes, resultBuffer,
+                substitutions, witnessTables, numWitnessTables, actor,
+                decoderType, decoderWitnessTable);
 }

@@ -289,18 +289,16 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
 
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
-  case OperandOwnership::DestroyingConsume: {
-    // partial_apply [on_stack] can introduce borrowing operand and can have
-    // destroy_value consumes.
-    auto *pai = dyn_cast<PartialApplyInst>(borrowEnd->get());
-    // TODO: When we have ForwardingInstruction abstraction, walk the use-def
-    // chain to ensure we have a partial_apply [on_stack] def.
-    assert(pai && pai->isOnStack() ||
-           ForwardingInstruction::get(
-               cast<SingleValueInstruction>(borrowEnd->get())));
+  case OperandOwnership::DestroyingConsume:
+  case OperandOwnership::ForwardingConsume: {
+    // partial_apply [on_stack] and mark_dependence [nonescaping] can introduce
+    // borrowing operand and can have destroy_value, return, or store consumes.
+    //
+    // TODO: When we have a C++ ForwardingUseDefWalker, walk the def-use
+    // chain to ensure we have a partial_apply [on_stack] or mark_dependence
+    // [nonescaping] def.
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
-
   default:
     llvm_unreachable("expected borrow scope end");
   }

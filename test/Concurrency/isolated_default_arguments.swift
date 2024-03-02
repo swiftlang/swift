@@ -154,7 +154,7 @@ struct S3 {
 }
 
 struct S4 {
-  // expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
+  // expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
   var x: Int = requiresMainActor()
 }
 
@@ -194,7 +194,7 @@ extension A {
   }
 }
 
-// expected-warning@+1 {{default initializer for 'C1' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+// expected-warning@+1 {{default initializer for 'C1' cannot be both nonisolated and main actor-isolated; this is an error in the Swift 6 language mode}}
 class C1 {
   // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = requiresMainActor()
@@ -203,7 +203,7 @@ class C1 {
 
 class NonSendable {}
 
-// expected-warning@+1 {{default initializer for 'C2' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+// expected-warning@+1 {{default initializer for 'C2' cannot be both nonisolated and main actor-isolated; this is an error in the Swift 6 language mode}}
 class C2 {
   // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = NonSendable()
@@ -231,7 +231,7 @@ func callDefaultInit() async {
   _ = MultipleVars()
 }
 
-// expected-warning@+1 {{default initializer for 'MultipleVarsInvalid' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+// expected-warning@+1 {{default initializer for 'MultipleVarsInvalid' cannot be both nonisolated and main actor-isolated; this is an error in the Swift 6 language mode}}
 class MultipleVarsInvalid {
   // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var (x, y) = (requiresMainActor(), requiresMainActor())
@@ -254,13 +254,13 @@ struct UseRequiresMain {
 }
 
 nonisolated func test() async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
   // expected-note@+1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
   _ = UseRequiresMain()
 }
 
-// expected-warning@+2 {{memberwise initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
-// expected-warning@+1 {{default initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+// expected-warning@+2 {{memberwise initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in the Swift 6 language mode}}
+// expected-warning@+1 {{default initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in the Swift 6 language mode}}
 struct InitAccessors {
   private var _a: Int
 

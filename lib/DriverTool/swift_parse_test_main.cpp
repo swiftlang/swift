@@ -81,9 +81,10 @@ struct LibParseExecutor {
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangOpts;
     symbolgraphgen::SymbolGraphOptions symbolOpts;
+    CASOptions casOpts;
     std::unique_ptr<ASTContext> ctx(
         ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
-                        clangOpts, symbolOpts, SM, diagEngine));
+                        clangOpts, symbolOpts, casOpts, SM, diagEngine));
 
     SourceFile::ParsingOptions parseOpts;
     parseOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
@@ -150,6 +151,7 @@ struct ASTGenExecutor {
     SILOptions silOpts;
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangOpts;
+    CASOptions casOpts;
     symbolgraphgen::SymbolGraphOptions symbolOpts;
 
     // Enable ASTGen.
@@ -157,7 +159,7 @@ struct ASTGenExecutor {
 
     std::unique_ptr<ASTContext> ctx(
         ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
-                        clangOpts, symbolOpts, SM, diagEngine));
+                        clangOpts, symbolOpts, casOpts, SM, diagEngine));
     registerParseRequestFunctions(ctx->evaluator);
     registerTypeCheckerRequestFunctions(ctx->evaluator);
 

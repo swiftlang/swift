@@ -547,6 +547,17 @@ private:
   // Did the convention decide that the parameter at the given index
   // was a class-pointer source?
   bool isClassPointerSource(unsigned paramIndex);
+
+  // If we are building a protocol witness thunks for
+  // `DistributedActorSystem.remoteCall` or
+  // `DistributedTargetInvocationEncoder.record{Argument, ReturnType}`
+  // `DistributedTargetInvocationDecoder.decodeNextArgument`
+  // `DistributedTargetInvocationResultHandler.onReturn`
+  // requirements we need to supply witness tables associated with `Res`,
+  // `Argument`, `R` generic parameters which are not expressible on the
+  // protocol requirement because they come from `SerializationRequirement`
+  // associated type.
+  void injectAdHocDistributedRequirements();
 };
 
 } // end anonymous namespace
@@ -720,6 +731,63 @@ bool EmitPolymorphicParameters::isClassPointerSource(unsigned paramIndex) {
     }
   }
   return false;
+}
+
+void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
+  // FIXME: We need a better way to recognize that function is
+  // a thunk for witness of `remoteCall` requirement.
+  if (!Fn.hasLocation())
+    return;
+
+  auto loc = Fn.getLocation();
+
+  auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
+  if (!(funcDecl && funcDecl->isGeneric()))
+    return;
+
+  if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+    return;
+
+  Type genericParam;
+
+  auto sig = funcDecl->getGenericSignature();
+
+  // DistributedActorSystem.remoteCall
+  if (funcDecl->isDistributedActorSystemRemoteCall(
+          /*isVoidReturn=*/false)) {
+    genericParam = funcDecl->getResultInterfaceType();
+  } else {
+    // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+    // DistributedTargetInvocationDecoder.decodeNextArgument
+    // DistributedTargetInvocationResultHandler.onReturn
+    genericParam = sig.getInnermostGenericParams().front();
+  }
+
+  if (!genericParam)
+    return;
+
+  auto protocols = sig->getRequiredProtocols(genericParam);
+  if (protocols.empty())
+    return;
+
+  auto archetypeTy = getTypeInContext(genericParam->getCanonicalType());
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(archetypeTy);
+
+  for (auto *proto : protocols) {
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+
+    // Lookup the witness table for this protocol dynamically via
+    // swift_conformsToProtocol(<<archetype>>, <<protocol>>)
+    auto *witnessTable = IGF.Builder.CreateCall(
+        IGM.getConformsToProtocolFunctionPointer(),
+        {metadata, IGM.getAddrOfProtocolDescriptor(proto)});
+
+    IGF.setUnscopedLocalTypeData(
+        archetypeTy,
+        LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
+        witnessTable);
+  }
 }
 
 namespace {
@@ -989,7 +1057,7 @@ static bool isDependentConformance(
       continue;
 
     auto assocProtocol = req.getProtocolDecl();
-    if (assocProtocol->isObjC())
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(assocProtocol))
       continue;
 
     auto assocConformance =
@@ -1295,7 +1363,7 @@ public:
     const ProtocolConformance &ConformanceInContext;
     CanType ConcreteType;
 
-    llvm::Optional<FulfillmentMap> Fulfillments;
+    std::optional<FulfillmentMap> Fulfillments;
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
@@ -1963,7 +2031,7 @@ namespace {
 
     using PlaceholderPosition =
       ConstantAggregateBuilderBase::PlaceholderPosition;
-    llvm::Optional<PlaceholderPosition> FlagsPP;
+    std::optional<PlaceholderPosition> FlagsPP;
 
   public:
     ProtocolConformanceDescriptorBuilder(
@@ -2045,7 +2113,7 @@ namespace {
       if (!normal)
         return;
 
-      llvm::Optional<Requirement> scratchRequirement;
+      std::optional<Requirement> scratchRequirement;
       auto condReqs = normal->getConditionalRequirements();
       if (condReqs.empty()) {
         // For a protocol P that conforms to another protocol, introduce a
@@ -2412,7 +2480,12 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
     break;
   case SILLinkage::Public:
-  default:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::Package:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::HiddenExternal:
     if (IGM.getOptions().InternalizeAtLink) {
       vis = VCallVisibility::VCallVisibilityLinkageUnit;
     }
@@ -2488,8 +2561,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
   } else {
-    assert(!IRGen.Opts.UseRelativeProtocolWitnessTables &&
-           "resilient relative protocol witness tables are not supported");
+    if (IRGen.Opts.UseRelativeProtocolWitnessTables)
+      llvm::report_fatal_error("resilient relative protocol witness tables are not supported");
+
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);
 
@@ -2569,6 +2643,10 @@ void EmitPolymorphicParameters::emit(EntryPointArgumentEmission &emission,
 
   // Bind all the fulfillments we can from the formal parameters.
   bindParameterSources(getParameter);
+
+  // Inject ad-hoc requirements related to `SerializationRequirement`
+  // associated type.
+  injectAdHocDistributedRequirements();
 }
 
 MetadataResponse
@@ -3662,7 +3740,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
       generics, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
       /*callee*/ ParameterConvention::Direct_Unowned,
       /*params*/ {}, /*yields*/ {},
-      /*results*/ {}, /*error*/ llvm::None,
+      /*results*/ {}, /*error*/ std::nullopt,
       /*pattern subs*/ SubstitutionMap(),
       /*invocation subs*/ SubstitutionMap(), IGM.Context);
 

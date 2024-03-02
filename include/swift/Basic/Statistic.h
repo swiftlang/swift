@@ -13,11 +13,11 @@
 #ifndef SWIFT_BASIC_STATISTIC_H
 #define SWIFT_BASIC_STATISTIC_H
 
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Timer.h"
-#include "swift/Basic/LLVM.h"
+#include <optional>
 
 #include <thread>
 #include <tuple>
@@ -157,10 +157,10 @@ private:
 
   SourceManager *SourceMgr;
   clang::SourceManager *ClangSourceMgr;
-  llvm::Optional<AlwaysOnDriverCounters> DriverCounters;
-  llvm::Optional<AlwaysOnFrontendCounters> FrontendCounters;
-  llvm::Optional<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
-  llvm::Optional<std::vector<FrontendStatsEvent>> FrontendStatsEvents;
+  std::optional<AlwaysOnDriverCounters> DriverCounters;
+  std::optional<AlwaysOnFrontendCounters> FrontendCounters;
+  std::optional<AlwaysOnFrontendCounters> LastTracedFrontendCounters;
+  std::optional<std::vector<FrontendStatsEvent>> FrontendStatsEvents;
 
   // These are unique_ptr so we can use incomplete types here.
   std::unique_ptr<RecursionSafeTimers> RecursiveTimers;

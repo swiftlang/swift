@@ -225,6 +225,22 @@ static CanType getHashableExistentialType(ModuleDecl *M) {
   return hashable->getDeclaredInterfaceType()->getCanonicalType();
 }
 
+// Distinguish between class-bound types that might be AnyObject vs other
+// class-bound types. Only types that are potentially AnyObject might have a
+// transparent runtime type wrapper like __SwiftValue. This must look through
+// all optional types because dynamic casting sees through them.
+static bool isPotentiallyAnyObject(Type type) {
+  Type unwrappedTy = type->lookThroughAllOptionalTypes();
+  if (auto archetype = unwrappedTy->getAs<ArchetypeType>()) {
+    for (auto *proto : archetype->getConformsTo()) {
+      if (!proto->getInvertibleProtocolKind())
+        return false;
+    }
+    return !archetype->getSuperclass();
+  }
+  return unwrappedTy->isAnyObject();
+}
+
 // Returns true if casting \p sourceFormalType to \p targetFormalType preserves
 // ownership.
 //
@@ -321,11 +337,11 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
     return false;
 
   // (B2) unwrapping
-  if (sourceType->isPotentiallyAnyObject())
+  if (isPotentiallyAnyObject(sourceType))
     return false;
 
   // (B1) wrapping
-  if (targetType->isPotentiallyAnyObject()) {
+  if (isPotentiallyAnyObject(targetType)) {
     // A class type cannot be wrapped in __SwiftValue, so casting
     // from a class to AnyObject preserves ownership.
     return

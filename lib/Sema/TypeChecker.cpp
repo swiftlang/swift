@@ -372,6 +372,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
@@ -418,6 +419,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   };
 
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
@@ -447,14 +449,14 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   GenericSignature GenericSig,
                                   SILTypeResolutionContext *SILContext,
                                   DeclContext *DC, bool ProduceDiagnostics) {
-  TypeResolutionOptions options = llvm::None;
+  TypeResolutionOptions options = std::nullopt;
   if (SILContext) {
     options |= TypeResolutionFlags::SILMode;
     if (SILContext->IsSILType)
       options |= TypeResolutionFlags::SILType;
   }
 
-  llvm::Optional<DiagnosticSuppression> suppression;
+  std::optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
@@ -487,14 +489,13 @@ namespace {
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
-        auto name = identBase->getNameRef().getBaseIdentifier();
-        if (auto *paramDecl = params->lookUpGenericParam(name))
-          identBase->setValue(paramDecl, dc);
+      // Only unqualified identifiers can reference generic parameters.
+      if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        auto name = simpleIdentTR->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name)) {
+          simpleIdentTR->setValue(paramDecl, dc);
+        }
       }
-    }
 
       return Action::Continue();
     }
@@ -504,7 +505,7 @@ namespace {
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
-                              DeclContext *DC) {
+                              DeclContext *DC, bool allowInverses) {
   if (genericParams == nullptr)
     return nullptr;
 
@@ -529,7 +530,9 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
   auto request = InferredGenericSignatureRequest{
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
-      {}, {}, /*allowConcreteGenericParams=*/true};
+      {}, {}, genericParams->getLAngleLoc(),
+      /*isExtension=*/false,
+      allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
@@ -599,7 +602,7 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
-                                   llvm::Optional<TypeResolutionStage> stage) {
+                                   std::optional<TypeResolutionStage> stage) {
   if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
@@ -614,8 +617,8 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
 }
 
 bool TypeChecker::diagnoseInvalidFunctionType(
-    FunctionType *fnTy, SourceLoc loc, llvm::Optional<FunctionTypeRepr *> repr,
-    DeclContext *dc, llvm::Optional<TypeResolutionStage> stage) {
+    FunctionType *fnTy, SourceLoc loc, std::optional<FunctionTypeRepr *> repr,
+    DeclContext *dc, std::optional<TypeResolutionStage> stage) {
   // Some of the below checks trigger cycles if we don't have a generic
   // signature yet; we'll run the checks again in
   // TypeResolutionStage::Interface.

@@ -225,9 +225,6 @@ public:
   /// requirement signature against the protocol generic signature
   /// <Self where Self : P>.
   void verify(ArrayRef<Requirement> reqts) const;
-
-  /// Returns a new signature with the given parameters erased
-  GenericSignature typeErased(ArrayRef<Type> typeErasedParams) const;
 };
 
 /// A reference to a canonical generic signature.
@@ -572,7 +569,8 @@ GenericSignature buildGenericSignature(
     ASTContext &ctx,
     GenericSignature baseSignature,
     SmallVector<GenericTypeParamType *, 2> addedParameters,
-    SmallVector<Requirement, 2> addedRequirements);
+    SmallVector<Requirement, 2> addedRequirements,
+    bool allowInverses);
 
 /// Summary of error conditions detected by the Requirement Machine.
 enum class GenericSignatureErrorFlags {

@@ -88,3 +88,8 @@ module wasi_emulated_signal {
   link "wasi-emulated-signal"
   export *
 }
+
+module wasi_pthread {
+  header "pthread.h"
+  export *
+}

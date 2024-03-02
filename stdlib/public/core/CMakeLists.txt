@@ -260,6 +260,11 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
+# Freestanding and Linux builds both have failures to resolve.
+if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+  list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
+endif()
+
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
@@ -309,6 +314,18 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
+  set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
+else()
+  set(swift_bin_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+  set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
+endif()
+
+list(APPEND swift_stdlib_compile_flags "-external-plugin-path"
+  "${swift_lib_dir}/swift/host/plugins#${swift_bin_dir}/swift-plugin-server")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SymbolLinkageMarkers")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
@@ -422,7 +439,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded
+        ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
         -Xfrontend -enable-ossa-modules
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"

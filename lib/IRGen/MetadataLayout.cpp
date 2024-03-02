@@ -35,7 +35,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 using namespace swift;
 using namespace irgen;
@@ -44,10 +44,10 @@ namespace {
 
 template <class Impl, template <class> class Base>
 class LayoutScanner : public Base<Impl> {
-  llvm::Optional<Size> AddressPoint;
+  std::optional<Size> AddressPoint;
 
 protected:
-  llvm::Optional<Size> DynamicOffsetBase;
+  std::optional<Size> DynamicOffsetBase;
 
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}

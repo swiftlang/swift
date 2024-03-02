@@ -67,8 +67,6 @@ actor A2: DistributedActor {
 final class DA2: DistributedActor {
 // expected-error@-1{{non-actor type 'DA2' cannot conform to the 'AnyActor' protocol}}
 // expected-error@-2{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
-// expected-error@-3{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-// expected-note@-4{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = DA2]}}
   nonisolated var id: ID {
     fatalError()
   }

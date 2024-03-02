@@ -158,7 +158,7 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i) {
 struct SILValuePrinterInfo {
   ID ValueID;
   SILType Type;
-  llvm::Optional<ValueOwnershipKind> OwnershipKind;
+  std::optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
   LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
   bool IsCapture = false;
@@ -910,7 +910,7 @@ public:
     *this << '\n';
 
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
-    llvm::Optional<SILLocation> PrevLoc;
+    std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
@@ -1393,7 +1393,7 @@ public:
     }
   }
 
-  void printDebugVar(llvm::Optional<SILDebugVariable> Var,
+  void printDebugVar(std::optional<SILDebugVariable> Var,
                      const SourceManager *SM = nullptr) {
     if (!Var)
       return;
@@ -1566,7 +1566,8 @@ public:
   }
 
   void visitPartialApplyInst(PartialApplyInst *CI) {
-    switch (CI->getFunctionType()->getCalleeConvention()) {
+    auto fnType = CI->getFunctionType();
+    switch (fnType->getCalleeConvention()) {
     case ParameterConvention::Direct_Owned:
       // Default; do nothing.
       break;
@@ -1584,6 +1585,13 @@ public:
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Inout:
       llvm_unreachable("unexpected callee convention!");
+    }
+    switch (fnType->getIsolation()) {
+    case SILFunctionTypeIsolation::Unknown:
+      break;
+    case SILFunctionTypeIsolation::Erased:
+      *this << "[isolated_any] ";
+      break;
     }
     if (CI->isOnStack())
       *this << "[on_stack] ";
@@ -1728,6 +1736,9 @@ public:
     }
     if (BBI->isFromVarDecl()) {
       *this << "[var_decl] ";
+    }
+    if (BBI->isFixed()) {
+      *this << "[fixed] ";
     }
     *this << getIDAndType(BBI->getOperand());
   }
@@ -2114,6 +2125,9 @@ public:
   void visitMarkUnresolvedNonCopyableValueInst(
       MarkUnresolvedNonCopyableValueInst *I) {
     using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+    if (I->isStrict()) {
+      *this << "[strict] ";
+    }
     switch (I->getCheckKind()) {
     case CheckKind::Invalid:
       llvm_unreachable("Invalid?!");
@@ -2530,8 +2544,15 @@ public:
     *this << getIDAndType(CBOI->getOperand());
   }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
-    if (MDI->isNonEscaping()) {
+    switch (MDI->dependenceKind()) {
+    case MarkDependenceKind::Unresolved:
+      *this << "[unresolved] ";
+      break;
+    case MarkDependenceKind::Escaping:
+      break;
+    case MarkDependenceKind::NonEscaping:
       *this << "[nonescaping] ";
+      break;
     }
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
@@ -2679,7 +2700,7 @@ public:
     *this << getIDAndType(RI->getOperand());
   }
 
-  void visitTestSpecificationInst(TestSpecificationInst *TSI) {
+  void visitSpecifyTestInst(SpecifyTestInst *TSI) {
     *this << QuotedString(TSI->getArgumentsSpecification());
   }
 
@@ -2736,6 +2757,10 @@ public:
 
   void visitExtractExecutorInst(ExtractExecutorInst *AEI) {
     *this << getIDAndType(AEI->getExpectedExecutor());
+  }
+
+  void visitFunctionExtractIsolationInst(FunctionExtractIsolationInst *I) {
+    *this << getIDAndType(I->getFunction());
   }
 
   void visitSwitchValueInst(SwitchValueInst *SII) {
@@ -3104,6 +3129,7 @@ public:
     *this << "] ";
     if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
       auto subPrinter = PrintOptions::printSIL();
+      subPrinter.PrintInverseRequirements = true;
       witnessGenSig->print(PrintState.OS, subPrinter);
       *this << " ";
     }
@@ -3220,10 +3246,13 @@ static StringRef getLinkageString(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return "public ";
   case SILLinkage::PublicNonABI: return "non_abi ";
+  case SILLinkage::Package: return "package ";
+  case SILLinkage::PackageNonABI: return "package_non_abi ";
   case SILLinkage::Hidden: return "hidden ";
   case SILLinkage::Shared: return "shared ";
   case SILLinkage::Private: return "private ";
   case SILLinkage::PublicExternal: return "public_external ";
+  case SILLinkage::PackageExternal: return "package_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
   }
   llvm_unreachable("bad linkage");
@@ -3968,7 +3997,12 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_vtable ";
   if (isSerialized())
     OS << "[serialized] ";
-  OS << getClass()->getName() << " {\n";
+  if (SILType classTy = getClassType()) {
+    OS << classTy;
+  } else {
+    OS << getClass()->getName();
+  }
+  OS << " {\n";
 
   for (auto &entry : getEntries()) {
     OS << "  ";
@@ -4178,6 +4212,7 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // (<...>)?
   if (auto derivativeGenSig = getDerivativeGenericSignature()) {
     auto subPrinter = PrintOptions::printSIL();
+    subPrinter.PrintInverseRequirements = true;
     derivativeGenSig->print(OS, subPrinter);
     OS << " ";
   }

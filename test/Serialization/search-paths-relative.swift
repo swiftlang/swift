@@ -1,4 +1,3 @@
-// REQUIRES: asserts
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/secret)
 // RUN: %target-swift-frontend -emit-module -o %t/secret %S/Inputs/struct_with_operators.swift

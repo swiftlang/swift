@@ -417,6 +417,10 @@ def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if an explicit module interface invocation has an early exit because the expected output is up-to-date">;
 
+def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about module serialization">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -515,6 +519,10 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
   HelpText<"Specify the optimization mode for unavailable declarations. The "
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
+
+def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable optimization to bypass resilience within a package">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,

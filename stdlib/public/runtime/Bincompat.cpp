@@ -20,6 +20,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Once.h"
 #include "swift/shims/RuntimeShims.h"
+#include "swift/shims/Target.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
@@ -223,6 +224,32 @@ bool useLegacySwiftValueUnboxingInCasting() {
   case oldApp: return true; // Legacy behavior for old apps
   case newApp: return false; // New behavior for new apps
   }
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Controls how ObjC -hashValue and -isEqual are handled
+// by Swift objects.
+// There are two basic semantics:
+// * pointer: -hashValue returns pointer, -isEqual: tests pointer equality
+// * proxy: -hashValue calls on Hashable conformance, -isEqual: calls Equatable conformance
+//
+// Legacy handling:
+// * Swift struct/enum values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum values that implement Equatable but not Hashable: pointer semantics
+// * Swift class values regardless of hashable/Equatable support: pointer semantics
+//
+// New behavior:
+// * Swift struct/enum/class values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum/class values that implement Equatable but not Hashable: proxy -isEqual:, constant -hashValue
+// * All other cases: pointer semantics
+//
+bool useLegacySwiftObjCHashing() {
+#if BINARY_COMPATIBILITY_APPLE
+  return true; // For now, legacy behavior on Apple OSes
+#elif SWIFT_TARGET_OS_DARWIN
+  return true; // For now, use legacy behavior on open-source builds for Apple platforms
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif

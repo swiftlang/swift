@@ -47,9 +47,6 @@ extension Value {
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
   /// It can also handle non-trivial enums with trivial cases.
   func isTrivial(_ context: some Context) -> Bool {
-    if self is Undef {
-      return true
-    }
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -64,12 +61,12 @@ extension Value {
       switch v {
       case is ValueToBridgeObjectInst:
         break
-      case is StructInst, is TupleInst:
-        let inst = (v as! SingleValueInstruction)
-        worklist.pushIfNotVisited(contentsOf: inst.operands.values.filter { !($0 is Undef) })
+      case let si as StructInst:
+        worklist.pushIfNotVisited(contentsOf: si.operands.values)
+      case let ti as TupleInst:
+        worklist.pushIfNotVisited(contentsOf: ti.operands.values)
       case let en as EnumInst:
-        if let payload = en.payload,
-           !(payload is Undef) {
+        if let payload = en.payload {
           worklist.pushIfNotVisited(payload)
         }
       default:
@@ -180,6 +177,49 @@ extension Builder {
       let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
     }
+  }
+}
+
+extension Value {
+  /// Return true if all elements occur on or after `instruction` in
+  /// control flow order. If this returns true, then zero or more uses
+  /// of `self` may be operands of `instruction` itself.
+  ///
+  /// This performs a backward CFG walk from `instruction` to `self`.
+  func usesOccurOnOrAfter(instruction: Instruction, _ context: some Context)
+  -> Bool {
+    var users = InstructionSet(context)
+    defer { users.deinitialize() }
+    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+
+    let pushPreds = { (block: BasicBlock) in
+      block.predecessors.lazy.map({ pred in pred.terminator }).forEach {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+    if let prev = instruction.previous {
+      worklist.pushIfNotVisited(prev)
+    } else {
+      pushPreds(instruction.parentBlock)
+    }
+    let definingInst = self.definingInstruction
+    while let lastInst = worklist.pop() {
+      for inst in ReverseInstructionList(first: lastInst) {
+        if users.contains(inst) {
+          return false
+        }
+        if inst == definingInst {
+          break
+        }
+      }
+      if lastInst.parentBlock != self.parentBlock {
+        pushPreds(lastInst.parentBlock)
+      }
+    }
+    return true
   }
 }
 

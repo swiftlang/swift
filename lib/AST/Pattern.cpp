@@ -211,23 +211,23 @@ namespace {
     // that is, don't walk into a closure body.
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ClosureExpr>(E)) {
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
       }
       return Action::Continue(E);
     }
 
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 } // end anonymous namespace
@@ -567,13 +567,13 @@ ExprPattern *ExprPattern::createImplicit(ASTContext &ctx, Expr *E,
 
 Expr *ExprPattern::getMatchExpr() const {
   auto &eval = DC->getASTContext().evaluator;
-  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, llvm::None)
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, std::nullopt)
       .getMatchExpr();
 }
 
 VarDecl *ExprPattern::getMatchVar() const {
   auto &eval = DC->getASTContext().evaluator;
-  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, llvm::None)
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, std::nullopt)
       .getMatchVar();
 }
 
@@ -775,13 +775,19 @@ Pattern::getOwnership(
     }
     
     void visitNamedPattern(NamedPattern *p) {
-      // `var` and `let` bindings consume the matched value.
-      // TODO: borrowing/mutating/consuming parameters
       switch (p->getDecl()->getIntroducer()) {
       case VarDecl::Introducer::Let:
       case VarDecl::Introducer::Var:
-        // `let` and `var` consume the bound value to move it into a new
-        // independent variable.
+        // If the subpattern type is copyable, then we can bind the variable
+        // by copying without requiring more than a borrow of the original.
+        if (!p->hasType() || !p->getType()->isNoncopyable()) {
+          break;
+        }
+        // TODO: An explicit `consuming` binding kind consumes regardless of
+        // type.
+      
+        // Noncopyable `let` and `var` consume the bound value to move it into
+        // a new independent variable.
         increaseOwnership(ValueOwnership::Owned, p);
         break;
         
@@ -805,9 +811,9 @@ Pattern::getOwnership(
     }
     
     void visitIsPattern(IsPattern *p) {
-      // Casting currently always consumes.
-      // TODO: Sometimes maybe it doesn't need to be.
-      increaseOwnership(ValueOwnership::Owned, p);
+      // Casting has to either be possible by borrowing or copying the subject,
+      // or can't be supported in a pattern match.
+      /* no change */
     }
     
     void visitEnumElementPattern(EnumElementPattern *p) {
@@ -821,11 +827,9 @@ Pattern::getOwnership(
     }
     
     void visitExprPattern(ExprPattern *p) {
-      // We can't get the ownership reliably if the pattern hasn't been resolved.
-      if (!p->isResolved()) {
-        return;
-      }
-      increaseOwnership(p->getMatchOperandOwnership(), p);
+      // A `~=` operator has to be able to either borrow or copy the operand,
+      // or can't be used.
+      /* no change */
     }
   };
   

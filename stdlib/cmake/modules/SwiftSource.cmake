@@ -583,6 +583,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
+  # Avoiding emiting ABI descriptor files while building stdlib.
+  if (SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-empty-abi-descriptor")
+  endif()
+
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
   endif()
@@ -610,7 +615,6 @@ function(_compile_swift_files
   if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
     list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
     list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
-    list(APPEND swift_flags "-Xfrontend" "-disable-round-trip-debug-types") # NOTE: temporary until we fix mangling!
   endif()
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)

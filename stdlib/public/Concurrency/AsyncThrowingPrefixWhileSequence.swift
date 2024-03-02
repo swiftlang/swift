@@ -145,11 +145,11 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     /// from the base sequence and calls the predicate with it. If this call
     /// succeeds, this method passes along the element. Otherwise, it returns
     /// `nil`, ending the sequence. If calling the predicate closure throws an
-    /// error, the sequence ends and `next()` rethrows the error.
-    @available(SwiftStdlib 5.11, *)
+    /// error, the sequence ends and `next(isolation:)` rethrows the error.
+    @available(SwiftStdlib 6.0, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
-      if !predicateHasFailed, let nextElement = try await baseIterator.next(actor) {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+      if !predicateHasFailed, let nextElement = try await baseIterator.next(isolation: actor) {
         do { 
           if try await predicate(nextElement) {
             return nextElement

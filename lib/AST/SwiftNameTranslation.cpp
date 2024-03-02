@@ -283,21 +283,23 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   // Generic requirements are not yet supported in C++.
   if (genericSignature) {
 
-    // FIXME: We're using getRequirementsWithInverses() here as a shortcut for
-    // checking for "no requirements except the implied Copyable ones".
+    // FIXME: This should use getRequirements() and actually
+    // support arbitrary requirements. We don't really want
+    // to use getRequirementsWithInverses() here.
     //
-    // Eventually you don't want to call getRequirementsWithInverses() at all;
-    // instead, the code here should walk the desugared requirements of the
-    // signature directly and handle everything.
+    // For now, we use the inverse transform as a quick way to
+    // check for the "default" generic signature where each
+    // generic parameter is Copyable and Escapable, but not
+    // subject to any other requirements; that's exactly the
+    // generic signature that C++ interop supports today.
     SmallVector<Requirement, 2> reqs;
     SmallVector<InverseRequirement, 2> inverseReqs;
     genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
-    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-    if (!reqs.empty())
+    if (!reqs.empty() || !inverseReqs.empty())
       return {Unsupported, UnrepresentableGenericRequirements};
   }
 
-  return {Representable, llvm::None};
+  return {Representable, std::nullopt};
 }
 
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,

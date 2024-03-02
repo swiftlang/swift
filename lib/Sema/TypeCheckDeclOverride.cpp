@@ -496,9 +496,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> std::optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return llvm::None;
+            return std::nullopt;
           return diags.diagnose(decl, diagKind,
                                 /*plural*/ std::min(numArgs, 2U), argTy);
         });
@@ -507,9 +507,9 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
       baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
     return computeFixitsForOverriddenDeclaration(
-        decl, base, [&](bool HasNotes) -> llvm::Optional<InFlightDiagnostic> {
+        decl, base, [&](bool HasNotes) -> std::optional<InFlightDiagnostic> {
           if (!HasNotes)
-            return llvm::None;
+            return std::nullopt;
           return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
                                 base->getDescriptiveKind(), baseTy);
         });
@@ -1559,6 +1559,7 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
+    UNINTERESTING_ATTR(AllowFeatureSuppression)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1635,6 +1636,7 @@ namespace  {
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
     UNINTERESTING_ATTR(StaticExclusiveOnly)
+    UNINTERESTING_ATTR(DistributedThunkTarget)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -2220,7 +2222,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
       foundAny = true;
     }
 
-    return foundAny ? TypeWalker::Action::SkipChildren
+    return foundAny ? TypeWalker::Action::SkipNode
                     : TypeWalker::Action::Continue;
   });
 

@@ -576,6 +576,24 @@ public struct TupleLargeAlignment<T> {
     }
 }
 
+public enum NestedMultiPayloadInner {
+    case a(UInt)
+    case b(AnyObject)
+    case c(AnyObject)
+}
+
+public enum NestedMultiPayloadOuter {
+    case a(NestedMultiPayloadInner)
+    case b(NestedMultiPayloadInner)
+    case c(NestedMultiPayloadInner)
+}
+
+public enum MultiPayloadError {
+    case empty
+    case error1(Int, Error)
+    case error2(Int, Error)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}

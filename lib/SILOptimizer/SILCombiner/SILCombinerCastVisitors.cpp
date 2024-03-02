@@ -183,7 +183,7 @@ private:
       auto *next = inst->getSingleUse();
       assert(next);
       assert(rest.empty() || bool(next->getUser() == rest.back()));
-      next->set(SILUndef::get(next->get()->getType(), inst->getModule()));
+      next->set(SILUndef::get(next->get()));
       SC.eraseInstFromFunction(*inst);
     }
   }
@@ -1109,7 +1109,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
       SILValue convertedVJP = createConvertEscapeToNoEscape(
         NormalDifferentiableFunctionTypeComponent::VJP);
 
-      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      std::optional<std::pair<SILValue, SILValue>> derivativeFunctions;
       if (convertedJVP && convertedVJP)
         derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
 
@@ -1196,7 +1196,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
 
         auto newPA = Builder.createPartialApply(
             pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
-            pa->getFunctionType()->getCalleeConvention());
+            pa->getFunctionType()->getCalleeConvention(),
+            pa->getResultIsolation());
         auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
                                                         partialApplyTy, false);
         replaceInstUsesWith(*pa, newConvert);
@@ -1217,7 +1218,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       SILBuilderWithScope localBuilder(std::next(pa->getIterator()), Builder);
       auto *newPA = localBuilder.createPartialApply(
           pa->getLoc(), newValue, pa->getSubstitutionMap(), args,
-          pa->getFunctionType()->getCalleeConvention());
+          pa->getFunctionType()->getCalleeConvention(),
+          pa->getResultIsolation());
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }
@@ -1292,7 +1294,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
           NormalDifferentiableFunctionTypeComponent::JVP);
       SILValue convertedVJP = createConvertFunctionOfComponent(
           NormalDifferentiableFunctionTypeComponent::VJP);
-      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      std::optional<std::pair<SILValue, SILValue>> derivativeFunctions;
       if (convertedJVP && convertedVJP)
         derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
       auto *newDFI = Builder.createDifferentiableFunction(

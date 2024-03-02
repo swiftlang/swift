@@ -20,11 +20,9 @@
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(DeclContext *DC,
-                                   llvm::Optional<Type> directResultType,
-                                   llvm::Optional<Type> errorType,
-                                   CleanupLocation CleanupL,
-                                   llvm::Optional<AbstractionPattern> origClosureType) {
+void SILGenFunction::prepareEpilog(
+    DeclContext *DC, std::optional<Type> directResultType,
+    std::optional<Type> errorType, CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -67,8 +65,8 @@ void SILGenFunction::prepareEpilog(DeclContext *DC,
 
   if (errorType) {
     auto genericSig = DC->getGenericSignatureOfContext();
-    AbstractionPattern origErrorType = origClosureType
-      ? *origClosureType->getFunctionThrownErrorType()
+    AbstractionPattern origErrorType = TypeContext
+      ? *TypeContext->OrigType.getFunctionThrownErrorType()
       : AbstractionPattern(genericSig.getCanonicalSignature(),
                            (*errorType)->getCanonicalType());
 
@@ -151,7 +149,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
     // nested tuples.
     auto resultType = SGF.F.getLoweredType(SGF.F.mapTypeIntoContext(
         fnConv.getSILResultType(SGF.getTypeExpansionContext())));
-    SmallVector<llvm::Optional<SILValue>, 4> mutableDirectResult;
+    SmallVector<std::optional<SILValue>, 4> mutableDirectResult;
     for (auto result : directResults) {
       mutableDirectResult.push_back({result});
     }
@@ -185,7 +183,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
   return SGF.B.createTuple(loc, resultType, directResults);
 }
 
-static llvm::Optional<SILLocation>
+static std::optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
                               SmallVectorImpl<SILValue> &directResults) {
@@ -206,7 +204,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
 
     // If the current bb is terminated then the epilog is just unreachable.
     if (!SGF.B.hasValidInsertionPoint())
-      return llvm::None;
+      return std::nullopt;
 
     // We emit the epilog at the current insertion point.
     return implicitReturnFromTopLevel;
@@ -230,7 +228,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
       epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
-    llvm::Optional<SILLocation> returnLoc;
+    std::optional<SILLocation> returnLoc;
     // If we are optimizing, we should use the return location from the single,
     // previously processed, return statement if any.
     if (predBranch->getLoc().is<ReturnLocation>()) {
@@ -273,7 +271,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
   return cleanupLoc;
 }
 
-std::pair<llvm::Optional<SILValue>, SILLocation>
+std::pair<std::optional<SILValue>, SILLocation>
 SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
   SILBasicBlock *epilogBB = ReturnDest.getBlock();
@@ -285,7 +283,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
   auto returnLoc =
       prepareForEpilogBlockEmission(*this, topLevel, epilogBB, directResults);
   if (!returnLoc.has_value()) {
-    return {llvm::None, topLevel};
+    return {std::nullopt, topLevel};
   }
 
   // Emit top-level cleanups into the epilog block.
@@ -313,7 +311,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
 
 SILLocation SILGenFunction::
 emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
-  llvm::Optional<SILValue> maybeReturnValue;
+  std::optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(TopLevel);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 

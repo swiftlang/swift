@@ -190,9 +190,9 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  llvm::Optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
-                                                 const PropertyMap *map,
-                                                 RewritePath *path = nullptr);
+  std::optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                                const PropertyMap *map,
+                                                RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -304,8 +304,8 @@ public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
   bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
-                             llvm::Optional<unsigned> &lhsDifferenceID,
-                             llvm::Optional<unsigned> &rhsDifferenceID);
+                             std::optional<unsigned> &lhsDifferenceID,
+                             std::optional<unsigned> &rhsDifferenceID);
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 
@@ -373,7 +373,7 @@ private:
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
 
-  llvm::Optional<std::pair<unsigned, unsigned>>
+  std::optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);

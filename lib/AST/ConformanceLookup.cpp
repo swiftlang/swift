@@ -29,6 +29,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
@@ -47,14 +48,20 @@ using namespace swift;
 ArrayRef<ProtocolConformanceRef>
 ModuleDecl::collectExistentialConformances(CanType fromType,
                                            CanType existential,
-                                           bool skipConditionalRequirements,
                                            bool allowMissing) {
-  CollectExistentialConformancesRequest request{this,
-                                                fromType,
-                                                existential,
-                                                skipConditionalRequirements,
-                                                allowMissing};
-  return evaluateOrDefault(getASTContext().evaluator, request, /*default=*/{});
+  assert(existential.isAnyExistentialType());
+
+  auto layout = existential.getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto *proto : protocols) {
+    auto conformance = lookupConformance(fromType, proto, allowMissing);
+    assert(conformance);
+    conformances.push_back(conformance);
+  }
+
+  return getASTContext().AllocateCopy(conformances);
 }
 
 ProtocolConformanceRef
@@ -172,7 +179,6 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request)) {
-        assert(!getInvertibleProtocolKind(*kp));
         return ProtocolConformanceRef::forInvalid();
       }
     }
@@ -199,6 +205,9 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
   ASTContext &ctx = protocol->getASTContext();
 
   auto *tupleDecl = ctx.getBuiltinTupleDecl();
+
+  // Ignore @lvalue's within the tuple.
+  type = type->getRValueType();
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
@@ -274,14 +283,21 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
 
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
-  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
-    return !silFnTy->isNoEscape();
-  }
+//  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+//    return !silFnTy->isNoEscape();
+//  }
+//
+//  auto functionType = eitherFnTy.get<const FunctionType *>();
+//
+//  // TODO: what about autoclosures?
+//  return !functionType->isNoEscape();
 
-  auto functionType = eitherFnTy.get<const FunctionType *>();
-
-  // TODO: what about autoclosures?
-  return !functionType->isNoEscape();
+  // FIXME: unify TypeBase::isNoEscape with TypeBase::isEscapable
+  // LazyConformanceEmitter::visitDestroyValueInst chokes on these instructions
+  // destroy_value %2 : $@convention(block) @noescape () -> ()
+  //
+  // Wrongly claim that all functions today conform to Escapable for now:
+  return true;
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
@@ -387,6 +403,40 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+static ProtocolConformanceRef
+getBuiltinInvertibleProtocolConformance(NominalTypeDecl *nominal,
+                                        Type type,
+                                        ProtocolDecl *protocol) {
+  assert(isa<ClassDecl>(nominal));
+  ASTContext &ctx = protocol->getASTContext();
+
+  auto ip = protocol->getInvertibleProtocolKind();
+  switch (*ip) {
+  case InvertibleProtocolKind::Copyable:
+    // If move-only classes is enabled, we'll check the markings.
+    if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
+      switch (nominal->hasInverseMarking(*ip).getKind()) {
+      case InverseMarking::Kind::LegacyExplicit:
+      case InverseMarking::Kind::Explicit:
+        // An inverse ~Copyable prevents conformance.
+        return ProtocolConformanceRef::forInvalid();
+
+      case InverseMarking::Kind::Inferred: // ignore "inferred" inverse marking
+      case InverseMarking::Kind::None:
+        break;
+      }
+    }
+    break;
+  case InvertibleProtocolKind::Escapable:
+    // Always conforms.
+    break;
+  }
+
+  return ProtocolConformanceRef(
+      ctx.getBuiltinConformance(type, protocol,
+                                BuiltinConformanceKind::Synthesized));
+}
+
 /// Synthesize a builtin type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef
@@ -457,10 +507,18 @@ LookupConformanceInModuleRequest::evaluate(
   auto *protocol = desc.PD;
   ASTContext &ctx = mod->getASTContext();
 
+  // Remove SIL reference ownership wrapper, if present.
+  type = type->getReferenceStorageReferent();
+
   // A dynamic Self type conforms to whatever its underlying type
   // conforms to.
   if (auto selfType = type->getAs<DynamicSelfType>())
     type = selfType->getSelfType();
+
+  // A pack element type conforms to whatever its underlying pack type
+  // conforms to.
+  if (auto packElement = type->getAs<PackElementType>())
+    type = packElement->getPackType();
 
   // An archetype conforms to a protocol if the protocol is listed in the
   // archetype's list of conformances, or if the archetype has a superclass
@@ -550,13 +608,16 @@ LookupConformanceInModuleRequest::evaluate(
 #ifndef NDEBUG
   // Ensure we haven't missed queries for the specialty SIL types
   // in the AST in conformance to one of the invertible protocols.
-  if (auto kp = protocol->getKnownProtocolKind())
-    if (getInvertibleProtocolKind(*kp))
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    if (getInvertibleProtocolKind(*kp)) {
       assert(!(type->is<SILFunctionType,
                         SILBoxType,
                         SILMoveOnlyWrappedType,
                         SILPackType,
                         SILTokenType>()));
+      assert(!type->is<ReferenceStorageType>());
+    }
+  }
 #endif
 
   auto nominal = type->getAnyNominal();
@@ -564,6 +625,13 @@ LookupConformanceInModuleRequest::evaluate(
   // If we don't have a nominal type, there are no conformances.
   if (!nominal || isa<ProtocolDecl>(nominal))
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+
+  // We specially avoid recording conformances to invertible protocols in a
+  // class's conformance table. This prevents an evaluator cycle.
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
+      && isa<ClassDecl>(nominal)
+      && protocol->getInvertibleProtocolKind())
+        return getBuiltinInvertibleProtocolConformance(nominal, type, protocol);
 
   // Expand conformances added by extension macros.
   //
@@ -728,8 +796,20 @@ LookupConformanceInModuleRequest::evaluate(
 ProtocolConformanceRef
 ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
                              bool allowMissing) {
-  assert(!type->hasTypeParameter());
+  assert(!type->hasTypeParameter()
+         && "must take a contextual type. if you really are ok with an "
+            "indefinite answer (and usually YOU ARE NOT), then consider whether "
+            "you really, definitely are ok with an indefinite answer, and "
+            "use `checkConformanceWithoutContext` instead");
 
+  // With no type parameter in the type, we should always get a definite answer
+  // from the underlying test.
+  return checkConformanceWithoutContext(type, proto, allowMissing).value();
+}
+
+std::optional<ProtocolConformanceRef>
+ModuleDecl::checkConformanceWithoutContext(Type type, ProtocolDecl *proto,
+                                           bool allowMissing) {
   auto lookupResult = lookupConformance(type, proto, allowMissing);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
@@ -739,7 +819,11 @@ ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
 
   // If we have a conditional requirements that we need to check, do so now.
   if (!condReqs.empty()) {
-    switch (checkRequirements(condReqs)) {
+    auto reqResult = checkRequirementsWithoutContext(condReqs);
+    if (!reqResult.has_value()) {
+      return std::nullopt;
+    }
+    switch (*reqResult) {
     case CheckRequirementsResult::Success:
       break;
 
@@ -750,4 +834,129 @@ ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
   }
 
   return lookupResult;
+}
+
+///
+/// Sendable checking utility
+///
+
+bool TypeBase::isSendableType() {
+  auto proto = getASTContext().getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return true;
+
+  // First check if we have a function type. If we do, check if it is
+  // Sendable. We do this since functions cannot conform to protocols.
+  if (auto *fas = getAs<SILFunctionType>())
+    return fas->isSendable();
+  if (auto *fas = getAs<AnyFunctionType>())
+    return fas->isSendable();
+
+  auto conformance = proto->getParentModule()->checkConformance(this, proto);
+  if (conformance.isInvalid())
+    return false;
+
+  // Look for missing Sendable conformances.
+  return !conformance.forEachMissingConformance(
+      [](BuiltinProtocolConformance *missing) {
+        return missing->getProtocol()->isSpecificProtocol(
+            KnownProtocolKind::Sendable);
+      });
+}
+
+///
+/// Copyable and Escapable checking utilities
+///
+
+/// Returns true if this type is _always_ Copyable using the legacy check
+/// that does not rely on conformances.
+static bool alwaysNoncopyable(Type ty) {
+  if (auto *nominal = ty->getNominalOrBoundGenericNominal())
+    return !nominal->canBeCopyable();
+
+  if (auto *expansion = ty->getAs<PackExpansionType>()) {
+    return alwaysNoncopyable(expansion->getPatternType());
+  }
+
+  // if any components of the tuple are move-only, then the tuple is move-only.
+  if (auto *tupl = ty->getCanonicalType()->getAs<TupleType>()) {
+    for (auto eltTy : tupl->getElementTypes())
+      if (alwaysNoncopyable(eltTy))
+        return true;
+  }
+
+  return false; // otherwise, the conservative assumption is it's copyable.
+}
+
+/// Preprocesses a type before querying whether it conforms to an invertible.
+static CanType preprocessTypeForInvertibleQuery(Type orig) {
+  Type type = orig;
+
+  // Strip off any StorageType wrapper.
+  type = type->getReferenceStorageReferent();
+
+  // Pack expansions such as `repeat T` themselves do not have conformances,
+  // so check its pattern type for conformance.
+  if (auto *pet = type->getAs<PackExpansionType>()) {
+    type = pet->getPatternType()->getCanonicalType();
+  }
+
+  // Strip @lvalue and canonicalize.
+  auto canType = type->getRValueType()->getCanonicalType();
+  return canType;
+}
+
+static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
+  auto &ctx = type->getASTContext();
+
+  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+  assert(proto && "missing Copyable/Escapable from stdlib!");
+
+  // Must not have a type parameter!
+  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
+
+  assert(!type->hasUnboundGenericType() && "a UGT has no conformances!");
+
+  assert(!type->is<PackExpansionType>());
+
+  // The SIL types in the AST do not have real conformances, and should have
+  // been handled in SILType instead.
+  assert(!(type->is<SILBoxType,
+                    SILMoveOnlyWrappedType,
+                    SILPackType,
+                    SILTokenType>()));
+
+  const bool conforms =
+      (bool) proto->getParentModule()->checkConformance(
+          type, proto,
+          /*allowMissing=*/false);
+
+  return conforms;
+}
+
+/// \returns true iff this type lacks conformance to Copyable.
+bool TypeBase::isNoncopyable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
+  auto &ctx = canType->getASTContext();
+
+  // for legacy-mode queries that are not dependent on conformances to Copyable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return alwaysNoncopyable(canType);
+
+  return !conformsToInvertible(canType, InvertibleProtocolKind::Copyable);
+}
+
+bool TypeBase::isEscapable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
+  auto &ctx = canType->getASTContext();
+
+  // for legacy-mode queries that are not dependent on conformances to Escapable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (auto nom = canType.getAnyNominal())
+      return nom->canBeEscapable();
+    else
+      return true;
+  }
+
+  return conformsToInvertible(canType, InvertibleProtocolKind::Escapable);
 }

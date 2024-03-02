@@ -20,15 +20,15 @@
 
 using namespace swift;
 
-llvm::Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                       KeyPathExpr *expr,
-                                                       bool requireResultType) {
+std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
+                                                      KeyPathExpr *expr,
+                                                      bool requireResultType) {
   // TODO: Native keypaths
   assert(expr->isObjC() && "native keypaths not type-checked this way");
   
   // If there is already a semantic expression, do nothing.
   if (expr->getObjCStringLiteralExpr() && !requireResultType)
-    return llvm::None;
+    return std::nullopt;
 
   // ObjC #keyPath only makes sense when we have the Objective-C runtime.
   auto &Context = dc->getASTContext();
@@ -39,7 +39,7 @@ llvm::Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     expr->setObjCStringLiteralExpr(
       new (Context) StringLiteralExpr("", expr->getSourceRange(),
                                       /*Implicit=*/true));
-    return llvm::None;
+    return std::nullopt;
   }
 
   // The key path string we're forming.
@@ -420,6 +420,6 @@ llvm::Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   }
 
   if (!currentType)
-    return llvm::None;
+    return std::nullopt;
   return currentType;
 }

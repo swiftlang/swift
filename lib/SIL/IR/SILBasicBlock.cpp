@@ -70,7 +70,7 @@ void SILBasicBlock::setDebugName(llvm::StringRef name) {
   getModule().setBasicBlockName(this, name);
 }
 
-llvm::Optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
+std::optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
   return getModule().getBasicBlockName(this);
 }
 
@@ -232,7 +232,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
   // replacePhiArgument() expects the replaced argument to not have
   // any uses.
   SmallVector<Operand *, 16> operands;
-  SILValue undef = SILUndef::get(ty, *getParent());
+  SILValue undef = SILUndef::get(getParent(), ty);
   SILArgument *arg = getArgument(i);
   while (!arg->use_empty()) {
     Operand *use = *arg->use_begin();

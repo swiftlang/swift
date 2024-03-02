@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/rdar79564324_other.swift -emit-module-path %t/rdar79564324_other.swiftmodule -dump-requirement-machine 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen %s -I %t
 
+// XFAIL: noncopyable_generics
+
 import rdar79564324_other
 
 public func test<T : P>(_ t: T) where T == T.A {

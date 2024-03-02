@@ -25,6 +25,7 @@ struct CustomActor {
 
 func useValue<T>(_ t: T) {}
 @MainActor func transferToMain<T>(_ t: T) {}
+@CustomActor func transferToCustom<T>(_ t: T) {}
 
 /////////////////
 // MARK: Tests //
@@ -85,4 +86,16 @@ func normalFunc_testLocal_2() {
     useValue(x) // expected-warning {{main actor-isolated closure captures value of non-Sendable type 'NonSendableKlass' from nonisolated context; later accesses to value could race}}
   }
   useValue(x) // expected-note {{access here could race}}
+}
+
+// We error here since we are performing a double transfer.
+//
+// TODO: Add special transfer use so we can emit a double transfer error
+// diagnostic.
+func transferBeforeCaptureErrors() async {
+  let x = NonSendableKlass()
+  await transferToCustom(x) // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor 'CustomActor'-isolated context}}
+  let _ = { @MainActor in // expected-note {{access here could race}}
+    useValue(x)
+  }
 }

@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -disable-availability-checking -verify %s -o /dev/null -swift-version 6 -enable-experimental-feature TransferringArgsAndResults
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 // This test makes sure that all of our warnings are errors in swift6 mode.
 
@@ -35,12 +34,13 @@ func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
 
 func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
   let y = NonSendableType()
-  x = y // expected-error {{transferring value of non-Sendable type 'NonSendableType' into transferring parameter; later accesses could race}}
-  useValue(y) // expected-note {{access here could race}}
+  await transferToMain(x)
+  x = y
+  useValue(y)
 }
 
 func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendableType, _ y: NonSendableType) async {
-  x = y // expected-error {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  x = y
 }
 
 func testIsolationCrossingDueToCapture() async {

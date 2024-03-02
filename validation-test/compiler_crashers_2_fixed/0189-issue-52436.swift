@@ -17,9 +17,9 @@ extension P2 {
 }
 
 class C1 : P1 {
-// expected-warning@-1 {{non-final class 'C1' cannot safely conform to protocol 'P1', which requires that 'Self.A2.A1' is exactly equal to 'Self'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'C1' cannot safely conform to protocol 'P1', which requires that 'Self.A2.A1' is exactly equal to 'Self'; this is an error in the Swift 6 language mode}}
   class A2 : P2 {
-  // expected-warning@-1 {{non-final class 'C1.A2' cannot safely conform to protocol 'P2', which requires that 'Self.A1.A2' is exactly equal to 'Self'; this is an error in Swift 6}}
+  // expected-warning@-1 {{non-final class 'C1.A2' cannot safely conform to protocol 'P2', which requires that 'Self.A1.A2' is exactly equal to 'Self'; this is an error in the Swift 6 language mode}}
     typealias A1 = C1
   }
 }

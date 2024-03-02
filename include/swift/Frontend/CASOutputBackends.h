@@ -30,7 +30,7 @@ protected:
 
   llvm::Expected<std::unique_ptr<llvm::vfs::OutputFileImpl>>
   createFileImpl(llvm::StringRef ResolvedPath,
-                 llvm::Optional<llvm::vfs::OutputConfig> Config) override;
+                 std::optional<llvm::vfs::OutputConfig> Config) override;
 
   virtual llvm::Error storeImpl(llvm::StringRef Path, llvm::StringRef Bytes,
                                 unsigned InputIndex, file_types::ID OutputKind);

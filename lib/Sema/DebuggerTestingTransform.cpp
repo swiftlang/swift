@@ -83,18 +83,18 @@ public:
     // Skip implicit decls, because the debugger isn't used to step through
     // these.
     if (D->isImplicit())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return Action::VisitChildrenIf(FD->getTypecheckedBody());
+      return Action::VisitNodeIf(FD->getTypecheckedBody());
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return Action::VisitChildrenIf(TLCD->getBody());
+      return Action::VisitNodeIf(TLCD->getBody());
     if (isa<NominalTypeDecl>(D))
       return Action::Continue();
 
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -296,7 +296,7 @@ private:
     // ensures that the type checker can infer <noescape> for captured values.
     TypeChecker::computeCaptures(Closure);
 
-    return Action::SkipChildren(FinalExpr);
+    return Action::SkipNode(FinalExpr);
   }
 };
 

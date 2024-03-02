@@ -66,14 +66,16 @@ SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
-                                               ParameterConvention calleeConvention) {
+                                               ParameterConvention calleeConvention,
+                                         SILFunctionTypeIsolation resultIsolation) {
   llvm::SmallVector<SILValue, 8> values;
   llvm::transform(args, std::back_inserter(values),
                   [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
   SILValue result =
-      createPartialApply(loc, fn, subs, values, calleeConvention);
+      createPartialApply(loc, fn, subs, values, calleeConvention,
+                         resultIsolation);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -592,7 +594,7 @@ ManagedValue SILGenBuilder::createInputFunctionArgument(
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(
-    SILType type, llvm::Optional<SILLocation> inputLoc) {
+    SILType type, std::optional<SILLocation> inputLoc) {
   assert(inputLoc.has_value() && "This optional is only for overload resolution "
                                 "purposes! Do not pass in None here!");
   return ::createInputFunctionArgument(*this, type, *inputLoc);
@@ -1022,24 +1024,38 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
   return ManagedValue::forBorrowedAddressRValue(pbi);
 }
 
-ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
-                                                 ManagedValue value,
-                                                 ManagedValue base,
-                                                 bool isNonEscaping) {
+ManagedValue SILGenBuilder::createMarkDependence(
+  SILLocation loc,
+  ManagedValue value,
+  ManagedValue base,
+  MarkDependenceKind dependenceKind) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
                                    base.forward(getSILGenFunction()),
-                                   isNonEscaping);
+                                   dependenceKind);
   return cloner.clone(mdi);
 }
 
 ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
                                               ManagedValue value,
-                                              bool isLexical) {
+                                              bool isLexical,
+                                              bool isFixed) {
   auto *newValue =
-      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+      SILBuilder::createBeginBorrow(loc, value.getValue(),
+                                    isLexical, false, false, isFixed);
   SGF.emitManagedBorrowedRValueWithCleanup(newValue);
   return ManagedValue::forBorrowedObjectRValue(newValue);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessBeginBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              bool isLexical,
+                                              bool isFixed) {
+  auto *newValue =
+      SILBuilder::createBeginBorrow(loc, value.getValue(),
+                                    isLexical, false, false, isFixed);
+  return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
+                                                    value.getValue(), newValue);
 }
 
 ManagedValue SILGenBuilder::createMoveValue(SILLocation loc, ManagedValue value,
@@ -1089,13 +1105,14 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 
 ManagedValue SILGenBuilder::createMarkUnresolvedNonCopyableValueInst(
     SILLocation loc, ManagedValue value,
-    MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
+    MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+    MarkUnresolvedNonCopyableValueInst::IsStrict_t strict) {
   assert((value.isPlusOne(SGF) || value.isLValue() ||
           value.getType().isAddress()) &&
          "Argument must be at +1 or be an address!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkUnresolvedNonCopyableValueInst(
-      loc, value.forward(getSILGenFunction()), kind);
+      loc, value.forward(getSILGenFunction()), kind, strict);
   return cloner.clone(mdi);
 }
 

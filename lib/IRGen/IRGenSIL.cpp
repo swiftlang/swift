@@ -18,6 +18,7 @@
 #include "GenKeyPath.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -870,7 +871,7 @@ public:
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   Address emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                          SILDebugVariable VarInfo,
-                         llvm::Optional<Alignment> _Align, bool Init,
+                         std::optional<Alignment> _Align, bool Init,
                          bool WasMoved) {
     auto Align = _Align.value_or(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
@@ -939,7 +940,7 @@ public:
   emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
                          const SILDebugScope *Scope, SILDebugVariable VarInfo,
                          bool IsAnonymous, bool WasMoved,
-                         llvm::Optional<Alignment> Align = llvm::None) {
+                         std::optional<Alignment> Align = std::nullopt) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1431,6 +1432,8 @@ public:
     llvm_unreachable("extract_executor should never be seen in Lowered SIL");
   }
 
+  void visitFunctionExtractIsolationInst(FunctionExtractIsolationInst *i);
+
   void visitKeyPathInst(KeyPathInst *I);
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
@@ -1440,7 +1443,7 @@ public:
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
-  void visitTestSpecificationInst(TestSpecificationInst *i) {
+  void visitSpecifyTestInst(SpecifyTestInst *i) {
     llvm_unreachable("test-only instruction in Lowered SIL?!");
   }
 
@@ -1625,7 +1628,7 @@ class AsyncNativeCCEntryPointArgumentEmission final
   Address dataAddr;
 
   Explosion loadExplosion(ElementLayout layout) {
-    Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    Address addr = layout.project(IGF, dataAddr, /*offsets*/ std::nullopt);
     auto &ti = cast<LoadableTypeInfo>(layout.getType());
     Explosion explosion;
     ti.loadAsTake(IGF, addr, explosion);
@@ -2472,6 +2475,8 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
+
+    // TODO(distributed): for protocols emit a special accessor
   }
 
   // Configure the dominance resolver.
@@ -2804,7 +2809,7 @@ void IRGenSILFunction::visitDifferentiableFunctionInst(
         i->getModule().Types,
         LookUpConformanceInModule(i->getModule().getSwiftModule()));
     auto *undef = SILUndef::get(
-        SILType::getPrimitiveObjectType(derivativeFnType), *i->getFunction());
+        i->getFunction(), SILType::getPrimitiveObjectType(derivativeFnType));
     return getLoweredExplosion(undef);
   };
   auto jvpExp = getDerivativeExplosion(AutoDiffDerivativeFunctionKind::JVP);
@@ -2942,12 +2947,21 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
 // function's implementation and the function's context size in the async
 // function pointer data structure.
 static bool mayDirectlyCallAsync(SILFunction *fn) {
-  if (fn->getLinkage() == SILLinkage::Shared ||
-      fn->getLinkage() == SILLinkage::PublicNonABI) {
+  switch (fn->getLinkage()) {
+  case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
+  case SILLinkage::Shared:
     return false;
+  case SILLinkage::Public:
+  case SILLinkage::Package:
+  case SILLinkage::Hidden:
+  case SILLinkage::Private:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::PackageExternal:
+  case SILLinkage::HiddenExternal:
+    return true;
   }
-
-  return true;
+  llvm_unreachable("Invalid SIL linkage");
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
@@ -2955,8 +2969,13 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fnType = fn->getLoweredFunctionType();
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
+  const clang::CXXConstructorDecl *cxxCtorDecl = nullptr;
 
-  auto sig = IGM.getSignature(fnType, fpKind, true /*forStaticCall*/);
+  if (auto *clangFnDecl = fn->getClangDecl())
+    cxxCtorDecl = dyn_cast<clang::CXXConstructorDecl>(clangFnDecl);
+
+  auto sig =
+      IGM.getSignature(fnType, fpKind, true /*forStaticCall*/, cxxCtorDecl);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -3422,7 +3441,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
 
   // Check for a negative capacity, which is invalid.
   auto capacity = IGF.getLoweredSingletonExplosion(vCapacity);
-  llvm::Optional<int64_t> capacityValue;
+  std::optional<int64_t> capacityValue;
   if (auto capacityConst = dyn_cast<llvm::ConstantInt>(capacity)) {
     capacityValue = capacityConst->getSExtValue();
     if (*capacityValue < 0) {
@@ -3433,7 +3452,7 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
   // Check for a negative stride, which should never occur because the caller
   // should always be using MemoryLayout<T>.stride to produce this value.
   auto stride = IGF.getLoweredSingletonExplosion(vStride);
-  llvm::Optional<int64_t> strideValue;
+  std::optional<int64_t> strideValue;
   if (auto strideConst = dyn_cast<llvm::ConstantInt>(stride)) {
     strideValue = strideConst->getSExtValue();
     if (*strideValue < 0) {
@@ -3581,7 +3600,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // If the callee is a differentiable function, we extract the original
   // function because we want to call the original function.
-  llvm::Optional<LoweredValue> diffCalleeOrigFnLV;
+  std::optional<LoweredValue> diffCalleeOrigFnLV;
   if (site.getOrigCalleeType()->isDifferentiable()) {
     auto diffFnExplosion = getLoweredExplosion(site.getCallee());
     Explosion origFnExplosion;
@@ -3628,7 +3647,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   // Allocate space for the coroutine buffer.
-  llvm::Optional<Address> coroutineBuffer;
+  std::optional<Address> coroutineBuffer;
   switch (origCalleeType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
@@ -4148,12 +4167,12 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       if (fnType->hasErrorResult()) {
         SmallVector<llvm::Value *, 16> nativeResultsStorage;
         nativeResultsStorage.push_back(getNullErrorValue());
-        return emitAsyncReturn(IGF, asyncLayout, fnType,
-                               llvm::Optional<llvm::ArrayRef<llvm::Value *>>(
-                                   nativeResultsStorage));
+        return emitAsyncReturn(
+            IGF, asyncLayout, fnType,
+            std::optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
       }
 
-      return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);
+      return emitAsyncReturn(IGF, asyncLayout, fnType, std::nullopt);
     }
   }
 
@@ -5052,15 +5071,12 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
   SILType objectT = addrTy.getObjectType();
-  llvm::Type *llvmType = addr.getAddress()->getType();
+  if (tryEmitDestroyUsingDeinit(*this, addr, addrTy)) {
+    return;
+  }
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  auto *outlinedF = cast<llvm::Function>(
-      IGM.getOrCreateReleaseFunction(addrTI, objectT, llvmType, atomicity));
-  llvm::Value *args[] = {addr.getAddress()};
-  llvm::CallInst *call =
-      Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
-  call->setCallingConv(IGM.DefaultCC);
+  addrTI.callOutlinedRelease(*this, addr, objectT, atomicity);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
@@ -5447,9 +5463,16 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
       assert(isa<SILBoxType>(RealTy));
     }
 
+  VarDecl *VD = i->getDecl();
+  if (!VD) {
+    // The source location of a DebugValueInst inserted by the SIL optimizer is
+    // not necessarily the VarDecl, as it can be the source location of the
+    // update point this DebugValueInst represents.
+    VD = VarInfo->getDecl();
+  }
   // Figure out the debug variable type
-  if (VarDecl *Decl = i->getDecl()) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealTy, getTypeInfo(SILTy),
+  if (VD) {
+    DbgTy = DebugTypeInfo::getLocalVariable(VD, RealTy, getTypeInfo(SILTy),
                                             IGM, IsFragmentType);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
@@ -7064,10 +7087,25 @@ void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
   emitSuspensionPoint(executor, resumeFn);
 }
 
+void IRGenSILFunction::visitFunctionExtractIsolationInst(
+                                              FunctionExtractIsolationInst *i) {
+  Explosion fnValue;
+  getLoweredExplosion(i->getFunction(), fnValue);
+  assert(fnValue.size() == 2);
+
+  // Ignore the function pointer and claim the closure value.
+  (void) fnValue.claimNext();
+  auto fnContext = fnValue.claimNext();
+
+  Explosion result;
+  emitExtractFunctionIsolation(*this, fnContext, result);
+  setLoweredExplosion(i, result);
+}
+
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
-  llvm::Optional<StackAddress> dynamicArgsBuf;
+  std::optional<StackAddress> dynamicArgsBuf;
   llvm::Value *args;
   if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();
@@ -7656,7 +7694,7 @@ void IRGenSILFunction::visitIncrementProfilerCounterInst(
   llvm::SmallVector<llvm::Value *, 2> indices;
   indices.append(2, llvm::ConstantInt::get(IGM.SizeTy, 0));
   auto *nameGEP = llvm::ConstantExpr::getGetElementPtr(
-      nameVar->getValueType(), nameVar, makeArrayRef(indices));
+      nameVar->getValueType(), nameVar, llvm::ArrayRef(indices));
 
   // Emit the call to the 'llvm.instrprof.increment' LLVM intrinsic.
   llvm::Value *args[] = {

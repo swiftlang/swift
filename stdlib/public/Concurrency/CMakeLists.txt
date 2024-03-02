@@ -60,10 +60,9 @@ else()
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
-
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
   "-enable-experimental-feature"
-  "OptionalIsolatedParameters"
+  "IsolatedAny"
 )
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
@@ -175,7 +174,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
-    -diagnostic-style swift
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   ${swift_concurrency_options}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
@@ -218,8 +216,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       if(NOT "${mod}" MATCHES "-macos$")
         continue()
       endif()
-      set(extra_c_compile_flags -ffreestanding)
-      set(extra_swift_compile_flags -Xcc -ffreestanding)
+      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
+      set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
     
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")

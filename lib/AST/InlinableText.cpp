@@ -69,7 +69,7 @@ public:
       }
     }
 
-    return Action::SkipChildrenIf(foundFeature, expr);
+    return Action::SkipNodeIf(foundFeature, expr);
   }
 };
 
@@ -145,13 +145,13 @@ struct ExtractInactiveRanges : public ASTWalker {
     // If there's no active clause, add the entire #if...#endif block.
     if (!clause) {
       addRange(start, end);
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     // If the clause is checking for a particular feature with $ or a compiler
     // version, keep the whole thing.
     if (anyClauseIsFeatureCheck(icd->getClauses())) {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     // Ignore range from beginning of '#if', '#elseif', or '#else' to the
@@ -174,7 +174,7 @@ struct ExtractInactiveRanges : public ASTWalker {
       if (elt.isDecl(DeclKind::IfConfig))
         elt.get<Decl *>()->walk(*this);
 
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   /// Gets the ignored ranges in source order.

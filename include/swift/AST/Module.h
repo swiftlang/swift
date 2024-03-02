@@ -31,13 +31,13 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include <optional>
 #include <set>
 
 namespace clang {
@@ -106,6 +106,7 @@ enum class SourceFileKind {
   SIL,      ///< Came from a .sil file.
   Interface, ///< Came from a .swiftinterface file, representing another module.
   MacroExpansion, ///< Came from a macro expansion.
+  DefaultArgument, ///< Came from default argument at caller side
 };
 
 /// Contains information about where a particular path is used in
@@ -480,6 +481,12 @@ public:
     return Identifier();
   }
 
+  bool inSamePackage(ModuleDecl *other) {
+    return other != nullptr &&
+           !getPackageName().empty() &&
+           getPackageName() == other->getPackageName();
+  }
+
   /// Get the package associated with this module
   PackageUnit *getPackage() const { return Package; }
 
@@ -526,7 +533,7 @@ private:
 
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
-  llvm::Optional<std::pair<ModuleDecl *, Identifier>>
+  std::optional<std::pair<ModuleDecl *, Identifier>>
       declaringModuleAndBystander;
 
   /// If this module is an underscored cross import overlay, gets the underlying
@@ -839,6 +846,7 @@ public:
                                            bool allowMissing = false);
 
   /// Global conformance lookup, checks conditional requirements.
+  /// Requires a contextualized type.
   ///
   /// \param type The type for which we are computing conformance. Must not
   /// contain type parameters.
@@ -852,8 +860,32 @@ public:
   /// \returns An invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
   ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                                          // Note: different default than above
-                                          bool allowMissing = true);
+                              // Note: different default from lookupConformance
+                              bool allowMissing = true);
+
+  /// Global conformance lookup, checks conditional requirements.
+  /// Accepts interface types without context. If the conformance cannot be
+  /// definitively established without the missing context, returns \c nullopt.
+  ///
+  /// \param type The type for which we are computing conformance. Must not
+  /// contain type parameters.
+  ///
+  /// \param protocol The protocol to which we are computing conformance.
+  ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
+  /// \returns An invalid conformance if the search definitively failed. An
+  /// abstract, concrete or pack conformance, depending on the lookup type,
+  /// if the search succeeded. `std::nullopt` if the type could have
+  /// conditionally conformed depending on the context of the interface types.
+  std::optional<ProtocolConformanceRef>
+  checkConformanceWithoutContext(Type type,
+                                 ProtocolDecl *protocol,
+                                 // Note: different default from lookupConformance
+                                 bool allowMissing = true);
+
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
@@ -862,11 +894,8 @@ public:
 
   /// Collect the conformances of \c fromType to each of the protocols of an
   /// existential type's layout.
-  ///
-  /// See `TypeChecker::containsProtocol` for details on the boolean arguments.
   ArrayRef<ProtocolConformanceRef>
   collectExistentialConformances(CanType fromType, CanType existential,
-                                 bool skipConditionalRequirements = true,
                                  bool allowMissing = false);
 
   /// Find a member named \p name in \p container that was declared in this
@@ -1091,7 +1120,7 @@ public:
   ///
   /// \returns true if there was a problem adding this file.
   bool registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
-                              llvm::Optional<ArtificialMainKind> kind);
+                              std::optional<ArtificialMainKind> kind);
 
   /// \returns true if this module has a main entry point.
   bool hasEntryPoint() const {

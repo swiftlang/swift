@@ -12,7 +12,7 @@ protocol P1 {
 }
 
 // CHECK-LABEL: .P2@
-// CHECK-NEXT: Requirement signature: <Self>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P2]T : C, Self.[P2]T == S>
 protocol P2 {
 // expected-error@-1 {{no type for 'Self.T' can satisfy both 'Self.T : C' and 'Self.T == S'}}
 // expected-error@-2 {{no type for 'Self.T' can satisfy both 'Self.T : _NativeClass' and 'Self.T == S'}}
@@ -20,7 +20,7 @@ protocol P2 {
 }
 
 // CHECK-LABEL: .P3@
-// CHECK-NEXT: Requirement signature: <Self>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P3]T : C, Self.[P3]T == S>
 protocol P3 {
 // expected-error@-1 {{no type for 'Self.T' can satisfy both 'Self.T : C' and 'Self.T == S'}}
 // expected-error@-2 {{no type for 'Self.T' can satisfy both 'Self.T : _NativeClass' and 'Self.T == S'}}
@@ -32,7 +32,7 @@ protocol P4a {
 }
 
 // CHECK-LABEL: .P4@
-// CHECK-NEXT: Requirement signature: <Self where Self.[P4]T : P4>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P4]T : P4, Self.[P4]T.[P4]T == S>
 protocol P4 {
 // expected-error@-1 {{no type for 'Self.T.T' can satisfy both 'Self.T.T == S' and 'Self.T.T : P4'}}
   associatedtype T : P4 where T.T == S

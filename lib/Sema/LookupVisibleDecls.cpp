@@ -271,6 +271,11 @@ static void lookupTypeMembers(Type BaseType, NominalTypeDecl *LookupType,
   assert(!BaseType->hasTypeParameter());
   assert(LookupType && "should have a nominal type");
 
+  // Skip lookup on invertible protocols. They have no members.
+  if (auto *proto = dyn_cast<ProtocolDecl>(LookupType))
+    if (proto->getInvertibleProtocolKind())
+      return;
+
   Consumer.onLookupNominalTypeMembers(LookupType, Reason);
 
   SmallVector<ValueDecl*, 2> FoundDecls;
@@ -444,6 +449,10 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
   for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
+    // Skip conformances to invertible protocols. They have no members.
+    if (Proto->getInvertibleProtocolKind())
+      continue;
+
     if (!Proto->isAccessibleFrom(FromContext))
       continue;
 
@@ -794,12 +803,12 @@ namespace llvm {
 
 template <> struct DenseMapInfo<FoundDeclTy> {
   static inline FoundDeclTy getEmptyKey() {
-    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable, {}};
+    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalDecl, {}};
   }
 
   static inline FoundDeclTy getTombstoneKey() {
     return FoundDeclTy{reinterpret_cast<ValueDecl *>(0x1),
-                       DeclVisibilityKind::LocalVariable,
+                       DeclVisibilityKind::LocalDecl,
                        {}};
   }
 
@@ -988,7 +997,7 @@ public:
                 VD->getFormalAccess() > OtherVD->getFormalAccess());
             if (preferVD) {
               FilteredResults.remove(
-                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+                  FoundDeclTy(OtherVD, DeclVisibilityKind::LocalDecl, {}));
               FilteredResults.insert(DeclAndReason);
               *I = VD;
             }
@@ -1171,167 +1180,129 @@ static void lookupVisibleMemberDecls(
   overrideConsumer.filterDecls(Consumer);
 }
 
-static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
-                                   const DeclContext *DC,
-                                   bool IncludeTopLevel, SourceLoc Loc) {
-  const SourceManager &SM = DC->getASTContext().SourceMgr;
-  auto MemberReason = DeclVisibilityKind::MemberOfCurrentNominal;
+namespace {
+class ASTScopeVisibleDeclConsumer
+    : public swift::namelookup::AbstractASTScopeDeclConsumer {
+  SourceLoc LookupLoc;
+  VisibleDeclConsumer &BaseConsumer;
 
-  // If we are inside of a method, check to see if there are any ivars in scope,
-  // and if so, whether this is a reference to one of them.
-  while (!DC->isModuleScopeContext()) {
-    GenericParamList *GenericParams = nullptr;
-    Type ExtendedType;
+  const DeclContext *const InnermostTypeDC;
+  DeclContext *SelfDC = nullptr;
+
+public:
+  ASTScopeVisibleDeclConsumer(SourceLoc Loc, const DeclContext *DC,
+                              VisibleDeclConsumer &BaseConsumer)
+      : LookupLoc(Loc), BaseConsumer(BaseConsumer),
+        InnermostTypeDC(DC->getInnermostTypeContext()) {}
+
+private:
+  void foundDecl(ValueDecl *VD) {
+    auto Kind = DeclVisibilityKind::LocalDecl;
+    if (isa<ParamDecl>(VD))
+      Kind = DeclVisibilityKind::FunctionParameter;
+    if (auto *GP = dyn_cast<GenericTypeParamDecl>(VD)) {
+      Kind = DeclVisibilityKind::GenericParameter;
+      // Generic param for 'some' parameter type is not "visible".
+      if (GP->isOpaqueType())
+        return;
+    }
+    BaseConsumer.foundDecl(VD, Kind);
+  }
+
+  bool consume(ArrayRef<ValueDecl *> values,
+               NullablePtr<DeclContext> baseDC) override {
+    for (auto *VD : values) {
+      if (auto *var = dyn_cast<VarDecl>(VD)) {
+        // If we have the 'self' parameter, make a note of the DeclContext
+        // where it exists.
+        if (var->isSelfParameter())
+          SelfDC = var->getDeclContext();
+
+        if (var->getPropertyWrapperBackingProperty()) {
+          // FIXME: This is currently required to set the interface type of the
+          // auxiliary variables (unless 'var' is a closure param).
+          (void)var->getPropertyWrapperBackingPropertyType();
+        }
+        var->visitAuxiliaryDecls(
+            [&](VarDecl *auxVar) { foundDecl(auxVar); });
+      }
+      // NOTE: We don't call Decl::visitAuxiliaryDecls here since peer decls of
+      // local decls should not show up in lookup results.
+      foundDecl(VD);
+    }
+    return false;
+  }
+
+  bool lookInMembers(const DeclContext *DC) const override {
     auto LS = LookupState::makeUnqualified();
     LS = LS.withIncludeProtocolExtensionMembers();
 
-    // Skip initializer contexts, we will not find any declarations there.
-    if (isa<Initializer>(DC)) {
-      // For non-'lazy' decls, lookup on the meta type.
-      if (!isa<PatternBindingInitializer>(DC) ||
-          !cast<PatternBindingInitializer>(DC)->getInitializedLazyVar())
-        LS = LS.withOnMetatype();
-      DC = DC->getParentForLookup();
-    }
+    auto canAccessInstanceMembers = [&]() {
+      // No 'self' available.
+      if (!SelfDC)
+        return false;
 
-    // We don't look for generic parameters if we are in the context of a
-    // nominal type: they will be looked up anyways via `lookupVisibleMemberDecls`.
-    if (DC && !isa<NominalTypeDecl>(DC)) {
-      if (auto *decl = DC->getAsDecl()) {
-        if (auto GC = decl->getAsGenericContext()) {
-          auto params = GC->getGenericParams();
-          namelookup::FindLocalVal(SM, Loc, Consumer).checkGenericParams(params);
-        }
+      // The 'self' we have is for a different type context than we're in.
+      if (InnermostTypeDC != DC || SelfDC->getInnermostTypeContext() != DC)
+        return false;
+
+      // If the 'self' decl is for a static member, we can't access instance
+      // members.
+      if (auto *VD = dyn_cast_or_null<ValueDecl>(SelfDC->getAsDecl())) {
+        if (VD->isStatic())
+          return false;
       }
-    }
+      return true;
+    };
 
-    if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
-      ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
-      DC = DC->getParentForLookup();
-      if (SE->isStatic())
-        LS = LS.withOnMetatype();
-    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (!canAccessInstanceMembers())
+      LS = LS.withOnMetatype();
 
-      // Look for local variables; normally, the parser resolves these
-      // for us, but it can't do the right thing inside local types.
-      // FIXME: when we can parse and typecheck the function body partially for
-      // code completion, AFD->getBody() check can be removed.
-      if (Loc.isValid() &&
-          AFD->getBodySourceRange().isValid() &&
-          SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) &&
-          AFD->getBody()) {
-        namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
-      }
+    auto MemberKind = InnermostTypeDC == DC
+                          ? DeclVisibilityKind::MemberOfCurrentNominal
+                          : DeclVisibilityKind::MemberOfOutsideNominal;
 
-      if (auto *P = AFD->getImplicitSelfDecl()) {
-        namelookup::FindLocalVal(SM, Loc, Consumer).checkValueDecl(
-          const_cast<ParamDecl *>(P), DeclVisibilityKind::FunctionParameter);
-      }
-
-      namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(
-        AFD->getParameters());
-
-      GenericParams = AFD->getGenericParams();
-
-      if (AFD->getDeclContext()->isTypeContext()) {
-        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-        DC = DC->getParentForLookup();
-
-        if (auto *FD = dyn_cast<FuncDecl>(AFD))
-          if (FD->isStatic())
-            LS = LS.withOnMetatype();
-      }
-    } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
-      if (Loc.isValid()) {
-        namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
-        if (auto P = CE->getParameters()) {
-          namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);
-        }
-      }
-    } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-      ExtendedType = ED->getSelfTypeInContext();
-    } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
-      ExtendedType = ND->getSelfTypeInContext();
-    }
-
-    // If we're inside a function context, we've already moved to
-    // the parent DC, so we have to check the function's generic
-    // parameters first.
-    if (GenericParams) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkGenericParams(GenericParams);
-    }
-
-    // Check the generic parameters of our context.
-    GenericParamList *dcGenericParams = nullptr;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-      dcGenericParams = nominal->getGenericParams();
-    else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-      dcGenericParams = ext->getGenericParams();
-    else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-      dcGenericParams = subscript->getGenericParams();
-
-    while (dcGenericParams) {
-      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-      localVal.checkGenericParams(dcGenericParams);
-      dcGenericParams = dcGenericParams->getOuterParameters();
-    }
-
-    if (ExtendedType) {
-      ::lookupVisibleMemberDecls(ExtendedType, Loc, Consumer, DC, LS,
-                                 MemberReason);
-
-      // Going outside the current type context.
-      MemberReason = DeclVisibilityKind::MemberOfOutsideNominal;
-    }
-
-    DC = DC->getParentForLookup();
+    lookupVisibleMemberDecls(DC->getSelfTypeInContext(), LookupLoc,
+                             BaseConsumer, DC, LS, MemberKind);
+    return false;
   }
+};
+} // end anonymous namespace
 
-  if (auto SF = dyn_cast<SourceFile>(DC)) {
-    if (Loc.isValid()) {
-      // Look for local variables in top-level code; normally, the parser
-      // resolves these for us, but it can't do the right thing for
-      // local types.
-      namelookup::FindLocalVal(SM, Loc, Consumer).checkSourceFile(*SF);
-    }
-
-    if (IncludeTopLevel) {
-      auto &cached = SF->getCachedVisibleDecls();
-      if (!cached.empty()) {
-        for (auto result : cached)
-          Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
-        return;
-      }
-    }
-  }
-
-  if (IncludeTopLevel) {
-    using namespace namelookup;
-    SmallVector<ValueDecl *, 0> moduleResults;
-    lookupVisibleDeclsInModule(DC, {}, moduleResults,
-                               NLKind::UnqualifiedLookup,
-                               ResolutionKind::Overloadable,
-                               DC);
-    for (auto result : moduleResults)
+static void lookupVisibleDeclsInModule(const SourceFile *SF,
+                                       VisibleDeclConsumer &Consumer) {
+  auto &cached = SF->getCachedVisibleDecls();
+  if (!cached.empty()) {
+    for (auto result : cached)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
-
-    if (auto SF = dyn_cast<SourceFile>(DC))
-      SF->cacheVisibleDecls(std::move(moduleResults));
-  }
-}
-
-void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                               const DeclContext *DC,
-                               bool IncludeTopLevel,
-                               SourceLoc Loc) {
-  if (Loc.isInvalid()) {
-    lookupVisibleDeclsImpl(Consumer, DC, IncludeTopLevel, Loc);
     return;
   }
-  UsableFilteringDeclConsumer FilteringConsumer(DC->getASTContext().SourceMgr,
-                                                DC, Loc, Consumer);
-  lookupVisibleDeclsImpl(FilteringConsumer, DC, IncludeTopLevel, Loc);
+  using namespace namelookup;
+  SmallVector<ValueDecl *, 0> moduleResults;
+  namelookup::lookupVisibleDeclsInModule(SF, {}, moduleResults,
+                                         NLKind::UnqualifiedLookup,
+                                         ResolutionKind::Overloadable, SF);
+  for (auto result : moduleResults)
+    Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
+
+  SF->cacheVisibleDecls(std::move(moduleResults));
+}
+
+void swift::lookupVisibleDecls(VisibleDeclConsumer &ParentConsumer,
+                               SourceLoc Loc, const DeclContext *DC,
+                               bool IncludeTopLevel) {
+  auto *SF = DC->getParentSourceFile();
+  assert(SF);
+  assert(Loc.isValid());
+
+  UsableFilteringDeclConsumer Consumer(SF->getASTContext().SourceMgr, DC, Loc,
+                                       ParentConsumer);
+  {
+    ASTScopeVisibleDeclConsumer ASTScopeDeclConsumer(Loc, DC, Consumer);
+    ASTScope::unqualifiedLookup(SF, Loc, ASTScopeDeclConsumer);
+  }
+  if (IncludeTopLevel)
+    ::lookupVisibleDeclsInModule(SF, Consumer);
 }
 
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,

@@ -184,8 +184,6 @@ PASS(DeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
-PASS(DestroyHoisting, "destroy-hoisting",
-     "Hoisting of value destroys")
 PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 PASS(Devirtualizer, "devirtualizer",
@@ -287,6 +285,12 @@ PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
 SWIFT_FUNCTION_PASS(LifetimeDependenceDiagnostics,
       "lifetime-dependence-diagnostics",
       "Diagnose Lifetime Dependence")
+SWIFT_FUNCTION_PASS(LifetimeDependenceInsertion,
+     "lifetime-dependence-insertion",
+     "Insert Lifetime Dependence Markers")
+SWIFT_FUNCTION_PASS(LifetimeDependenceScopeFixup,
+     "lifetime-dependence-scope-fixup",
+     "Fixup scope for lifetime dependence")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
@@ -481,6 +485,8 @@ PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
+PASS(RegionAnalysisInvalidationTransform, "region-analysis-invalidation-transform",
+     "Delete the analysis state associated with region analysis")
 PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
 PASS(MoveOnlyBorrowToDestructureTransform,
@@ -491,6 +497,8 @@ PASS(MoveOnlyBorrowToDestructureTransform,
      "any move only errors with respect to non-borrow+projection uses")
 PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
      "Check/transform reference bindings")
+PASS(DiagnosticDeadFunctionElimination, "sil-diagnostic-dead-function-elim",
+     "Eliminate dead functions from early specialization optimizations before we run later diagnostics")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
@@ -504,6 +512,8 @@ SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
 SWIFT_SILCOMBINE_PASS(CopyValueInst)
 SWIFT_SILCOMBINE_PASS(DestroyValueInst)
+SWIFT_SILCOMBINE_PASS(DestructureStructInst)
+SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

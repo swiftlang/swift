@@ -148,9 +148,9 @@ func testGlobalActorIsolatedReferences() {
   }
 
   let dataKP = \Isolated.data
-  // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+  // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in the Swift 6 language mode}}
   let subscriptKP = \Isolated.[42]
-  // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in Swift 6}}
+  // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 
   let _: KeyPath<Isolated, Int> & Sendable = dataKP
   // expected-warning@-1 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
@@ -159,7 +159,7 @@ func testGlobalActorIsolatedReferences() {
 
   func testNonIsolated() {
     _ = \Isolated.data
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in the Swift 6 language mode}}
   }
 
   @MainActor func testIsolated() {
@@ -190,14 +190,14 @@ func testReferencesToDifferentGlobalActorIsolatedMembers() {
   @MainActor func testIsolatedToMain() {
     _ = \Info.name // Ok
     _ = \Isolated.info.name
-    // expected-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in the Swift 6 language mode}}
   }
 
   @GlobalActor func testIsolatedToCustom() {
     _ = \Info.name // Ok
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
     _ = \Isolated.info.name
-    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in the Swift 6 language mode}}
   }
 }
 

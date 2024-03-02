@@ -689,10 +689,10 @@ public:
 
   /// Return the reference ownership of this type if it is a reference storage
   /// type. Otherwise, return None.
-  llvm::Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
+  std::optional<ReferenceOwnership> getReferenceStorageOwnership() const {
     auto type = getASTType()->getAs<ReferenceStorageType>();
     if (!type)
-      return llvm::None;
+      return std::nullopt;
     return type->getOwnership();
   }
 
@@ -722,12 +722,12 @@ public:
   SILType subst(Lowering::TypeConverter &tc, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                SubstOptions options = llvm::None) const;
+                SubstOptions options = std::nullopt) const;
 
   SILType subst(SILModule &M, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
-                SubstOptions options = llvm::None) const;
+                SubstOptions options = std::nullopt) const;
 
   SILType subst(Lowering::TypeConverter &tc,
                 InFlightSubstitution &IFS,
@@ -899,6 +899,12 @@ public:
   /// lifetime dependence.
   bool isEscapable() const;
 
+  /// True for (isEscapable && !isNoEscapeFunction)
+  ///
+  /// Equivalent to getASTType()->mayEscape(), but handles SIL-specific types,
+  /// namely SILFunctionType.
+  bool mayEscape() const { return !isNoEscapeFunction() && isEscapable(); }
+
   //
   // Accessors for types used in SIL instructions:
   //
@@ -933,6 +939,9 @@ public:
 
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
+
+  /// Get the type for opaque actor isolation values.
+  static SILType getOpaqueIsolationType(const ASTContext &C);
 
   //
   // Utilities for treating SILType as a pointer-like type.

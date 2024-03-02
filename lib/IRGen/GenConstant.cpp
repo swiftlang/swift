@@ -184,7 +184,7 @@ Explosion emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
 
   for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
-    llvm::Optional<unsigned> index = nextIndex(IGM, type, i);
+    std::optional<unsigned> index = nextIndex(IGM, type, i);
     if (index.has_value()) {
       unsigned idx = index.value();
       assert(elements[idx].empty() &&
@@ -378,9 +378,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     SILFunction *fn = FRI->getReferencedFunction();
 
     llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
-    assert(!fn->isAsync() && "TODO: support async functions");
-
     CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
+
+    if (irgen::classifyFunctionPointerKind(fn).isAsyncFunctionPointer()) {
+      llvm::Constant *asyncFnPtr = IGM.getAddrOfAsyncFunctionPointer(fn);
+      fnPtr = llvm::ConstantExpr::getBitCast(asyncFnPtr, fnPtr->getType());
+    }
+
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
     if (authInfo.isSigned()) {
       auto constantDiscriminator =
@@ -465,6 +469,6 @@ void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
   llvm::BLAKE3 hasher;
   hasher.update(data);
   auto rawHash = hasher.final();
-  auto truncHash = llvm::makeArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
+  auto truncHash = llvm::ArrayRef(rawHash).slice(0, NumBytes_UniqueHash);
   add(llvm::ConstantDataArray::get(IGM().getLLVMContext(), truncHash));
 }

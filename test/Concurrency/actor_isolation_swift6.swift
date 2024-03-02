@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 final class ImmutablePoint: Sendable {
   let x : Int = 0

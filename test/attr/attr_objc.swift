@@ -368,7 +368,7 @@ protocol subject_containerObjCProtocol2 {
 
   @objc // FIXME: Access notes can't distinguish between init(a:) overloads
   init(a: Double)
-  // expected-warning@-1 {{initializer 'init(a:)' with Objective-C selector 'initWithA:' conflicts with previous declaration with the same Objective-C selector; this is an error in Swift 6}}
+  // expected-warning@-1 {{initializer 'init(a:)' with Objective-C selector 'initWithA:' conflicts with previous declaration with the same Objective-C selector; this is an error in the Swift 6 language mode}}
 
   func func1() -> Int
   @objc // access-note-move{{subject_containerObjCProtocol2.func1_()}}

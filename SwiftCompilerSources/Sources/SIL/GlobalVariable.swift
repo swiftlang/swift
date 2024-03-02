@@ -14,6 +14,10 @@ import Basic
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.getDecl())
+  }
+
   public var name: StringRef {
     return StringRef(bridged: bridged.getName())
   }
@@ -133,9 +137,6 @@ extension Instruction {
         // initializers.
         return false
       }
-    case let fri as FunctionRefInst:
-      // TODO: support async function pointers in static globals.
-      return !fri.referencedFunction.isAsync
     case is StructInst,
          is TupleInst,
          is EnumInst,
@@ -148,7 +149,8 @@ extension Instruction {
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,
          is AddressToPointerInst,
-         is GlobalAddrInst:
+         is GlobalAddrInst,
+         is FunctionRefInst:
       return true
     default:
       return false

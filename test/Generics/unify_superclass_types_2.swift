@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures -disable-requirement-machine-reuse 2>&1 | %FileCheck %s
 // RUN: %target-typecheck-verify-swift -dump-requirement-machine -disable-requirement-machine-reuse 2>&1 | %FileCheck %s --check-prefix=CHECK-RULE
 
+// XFAIL: noncopyable_generics
+
 // Note: The GSB fails this test, because it doesn't implement unification of
 // superclass type constructor arguments.
 

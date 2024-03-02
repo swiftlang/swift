@@ -179,7 +179,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter,
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
-  llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
+  std::optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
   GenericSignature genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
@@ -194,7 +194,15 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (typeDecl->isGeneric()) {
     genericSignature = typeDecl->getGenericSignature();
 
-    // FIXME: Support generic requirements.
+    // FIXME: This should use getRequirements() and actually
+    // support arbitrary requirements. We don't really want
+    // to use getRequirementsWithInverses() here.
+    //
+    // For now, we use the inverse transform as a quick way to
+    // check for the "default" generic signature where each
+    // generic parameter is Copyable and Escapable, but not
+    // subject to any other requirements; that's exactly the
+    // generic signature that C++ interop supports today.
     SmallVector<Requirement, 2> reqs;
     SmallVector<InverseRequirement, 2> inverseReqs;
     genericSignature->getRequirementsWithInverses(reqs, inverseReqs);

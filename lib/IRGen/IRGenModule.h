@@ -1155,6 +1155,8 @@ public:
   llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
 
   void emitAccessibleFunctions();
+  void emitAccessibleFunction(StringRef sectionName,
+                              SILFunction *func);
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1181,8 +1183,10 @@ public:
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
 
-  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
-                              llvm::Type *llvmType, Atomicity atomicity);
+  llvm::Constant *
+  getOrCreateReleaseFunction(const TypeInfo &objectTI, SILType t,
+                             llvm::Type *llvmType, Atomicity atomicity,
+                             const OutliningMetadataCollector &collector);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType objectType, const TypeInfo &objectTI,
@@ -1297,6 +1301,7 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<SILFunction *, 4> AccessibleFunctions;
@@ -1469,7 +1474,7 @@ private:
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
-  llvm::Optional<llvm::InlineAsm *> ObjCRetainAutoreleasedReturnValueMarker;
+  std::optional<llvm::InlineAsm *> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
   llvm::AttributeList AllocAttrs;
 
@@ -1483,11 +1488,11 @@ private:                                                                       \
   llvm::Constant *Id##Fn = nullptr;
 #include "swift/Runtime/RuntimeFunctions.def"
 
-  llvm::Optional<FunctionPointer> FixedClassInitializationFn;
+  std::optional<FunctionPointer> FixedClassInitializationFn;
 
   llvm::Constant *FixLifetimeFn = nullptr;
 
-  mutable llvm::Optional<SpareBitVector> HeapPointerSpareBits;
+  mutable std::optional<SpareBitVector> HeapPointerSpareBits;
 
   //--- Generic ---------------------------------------------------------------
 public:
@@ -1563,10 +1568,13 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
-  Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind,
-                         bool forStaticCall = false);
+  Signature
+  getSignature(CanSILFunctionType fnType,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
+  Signature
+  getSignature(CanSILFunctionType fnType, FunctionPointerKind kind,
+               bool forStaticCall = false,
+               const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1622,7 +1630,7 @@ public:
   llvm::Constant *
   getAddrOfEffectiveValueWitnessTable(CanType concreteType,
                                       ConstantInit init = ConstantInit());
-  llvm::Optional<llvm::Function *>
+  std::optional<llvm::Function *>
   getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
                            ForDefinition_t forDefinition);
 

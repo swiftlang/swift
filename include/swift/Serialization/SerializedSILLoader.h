@@ -62,9 +62,9 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *lookupSILFunction(StringRef Name,
-                                 llvm::Optional<SILLinkage> linkage);
+                                 std::optional<SILLinkage> linkage);
   bool hasSILFunction(StringRef Name,
-                      llvm::Optional<SILLinkage> linkage = llvm::None);
+                      std::optional<SILLinkage> linkage = std::nullopt);
   SILVTable *lookupVTable(const ClassDecl *C);
   SILMoveOnlyDeinit *lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);

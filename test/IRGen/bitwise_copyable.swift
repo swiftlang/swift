@@ -6,9 +6,11 @@
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
+// REQUIRES: objc_interop
 
 // Force verification of TypeLowering's isTrivial.
 
+import Foundation
 import Builtin
 
 struct Box<T : _BitwiseCopyable> : _BitwiseCopyable {
@@ -32,3 +34,7 @@ func nameBuiltinBridgeObject(_ b: Builtin.BridgeObject) {}
 func nameBuiltinUnsafeValueBuffer(_ b: Builtin.UnsafeValueBuffer) {}
 func nameBuiltinDefaultActorStorage(_ b: Builtin.DefaultActorStorage) {}
 func nameBuiltinNonDefaultDistributedActorStorage(_ b: Builtin.NonDefaultDistributedActorStorage) {}
+
+struct MyObjCBool {
+  var value: ObjCBool
+}

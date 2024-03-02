@@ -51,6 +51,7 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.dc = dc;
   expression.contextualInfo = contextualInfo;
   expression.pattern = nullptr;
+  expression.parentReturnStmt = nullptr;
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
@@ -180,6 +181,18 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 }
 
 SyntacticElementTarget
+SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
+                                  DeclContext *dc) {
+  assert(contextTy);
+  assert(returnStmt->hasResult() && "Must have result to be type-checked");
+  ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
+  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
+                                /*isDiscarded*/ false);
+  target.expression.parentReturnStmt = returnStmt;
+  return target;
+}
+
+SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
                                        bool ignoreWhereClause,
                                        GenericEnvironment *packElementEnv) {
@@ -243,7 +256,6 @@ bool SyntacticElementTarget::infersOpaqueReturnType() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
     if (Type convertType = getExprContextualType())
       return convertType->hasOpaqueArchetype();
     return false;
@@ -261,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
     return true;
   case CTP_Unused:
   case CTP_ReturnStmt:
-  case CTP_ImpliedReturnStmt:
   case CTP_YieldByValue:
   case CTP_YieldByReference:
   case CTP_CaseStmt:
@@ -290,7 +301,7 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   llvm_unreachable("invalid contextual type");
 }
 
-llvm::Optional<SyntacticElementTarget>
+std::optional<SyntacticElementTarget>
 SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
   switch (kind) {
@@ -299,13 +310,13 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
       if (auto *newPattern = getInitializationPattern()->walk(walker)) {
         result.setPattern(newPattern);
       } else {
-        return llvm::None;
+        return std::nullopt;
       }
     }
     if (auto *newExpr = getAsExpr()->walk(walker)) {
       result.setExpr(newExpr);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -313,7 +324,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newClosure = closure.closure->walk(walker)) {
       result.closure.closure = cast<ClosureExpr>(newClosure);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -321,7 +332,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newBody = getFunctionBody()->walk(walker)) {
       result.function.body = cast<BraceStmt>(newBody);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -336,27 +347,27 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newPattern = item->getPattern()->walk(walker)) {
       item->setPattern(newPattern, item->isPatternResolved());
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     if (auto guardExpr = item->getGuardExpr()) {
       if (auto newGuardExpr = guardExpr->walk(walker)) {
         item->setGuardExpr(newGuardExpr);
       } else {
-        return llvm::None;
+        return std::nullopt;
       }
     }
     break;
   }
   case Kind::patternBinding: {
     if (getAsPatternBinding()->walk(walker))
-      return llvm::None;
+      return std::nullopt;
     break;
   }
   case Kind::uninitializedVar: {
     if (auto *P = getAsUninitializedVar()->walk(walker)) {
       result.setPattern(P);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }
@@ -364,7 +375,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     if (auto *newStmt = getAsForEachStmt()->walk(walker)) {
       result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     break;
   }

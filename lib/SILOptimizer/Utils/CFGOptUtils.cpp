@@ -81,7 +81,7 @@ static void deleteTriviallyDeadOperandsOfDeadArgument(
   auto *i = op.get()->getDefiningInstruction();
   if (!i)
     return;
-  op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
+  op.set(SILUndef::get(op.get()));
   eliminateDeadInstruction(i, callbacks);
 }
 

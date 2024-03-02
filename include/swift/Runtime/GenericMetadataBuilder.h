@@ -289,12 +289,18 @@ public:
           extraDataPattern->SizeInWords, extraDataPattern->OffsetInWords);
       auto patternPointers =
           patternBuffer.resolvePointer(&extraDataPattern->Pattern);
+      if (!patternPointers)
+        return *patternPointers.getError();
       for (unsigned i = 0; i < extraDataPattern->SizeInWords; i++) {
         auto patternPointer =
             patternPointers->resolvePointer(&patternPointers->ptr[i]);
-        data.writePointer(
+        if (!patternPointer)
+          return *patternPointer.getError();
+        auto writeResult = data.writePointer(
             &metadataExtraData[i + extraDataPattern->OffsetInWords],
             patternPointer->template cast<const StoredPointer>());
+        if (!writeResult)
+          return *writeResult.getError();
       }
     }
 
@@ -303,8 +309,13 @@ public:
     // necessary.
     auto valueWitnesses =
         patternBuffer.resolvePointer(&pattern->ValueWitnesses);
+    if (!valueWitnesses)
+      return *valueWitnesses.getError();
     METADATA_BUILDER_LOG("Setting initial value witnesses");
-    data.writePointer(&fullMetadata->ValueWitnesses, *valueWitnesses);
+    auto writeResult =
+        data.writePointer(&fullMetadata->ValueWitnesses, *valueWitnesses);
+    if (!writeResult)
+      return *writeResult.getError();
 
     // Set the metadata kind.
     METADATA_BUILDER_LOG("Setting metadata kind %#x",
@@ -313,7 +324,9 @@ public:
 
     // Set the type descriptor.
     METADATA_BUILDER_LOG("Setting descriptor");
-    data.writePointer(&metadata->Description, descriptionBuffer);
+    writeResult = data.writePointer(&metadata->Description, descriptionBuffer);
+    if (!writeResult)
+      return *writeResult.getError();
 
     return {{}};
   }
@@ -347,8 +360,11 @@ public:
         header.NumKeyArguments,
         getGenericArgumentOffset(
             descriptionBuffer.template cast<const TypeContextDescriptor>()));
-    for (unsigned i = 0; i < header.NumKeyArguments; i++)
-      data.writePointer(&dst[i], arguments[i]);
+    for (unsigned i = 0; i < header.NumKeyArguments; i++) {
+      auto writeResult = data.writePointer(&dst[i], arguments[i]);
+      if (!writeResult)
+        return *writeResult.getError();
+    }
 
     // TODO: parameter pack support.
 
@@ -489,7 +505,11 @@ public:
   auto LOWER_ID##_Buffer = from.resolveFunctionPointer(&from.ptr->LOWER_ID);   \
   if (!LOWER_ID##_Buffer)                                                      \
     return *LOWER_ID##_Buffer.getError();                                      \
-  vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->LOWER_ID, *LOWER_ID##_Buffer);
+  if (auto *error = vwtBuffer                                                  \
+                        .writeFunctionPointer(&vwtBuffer.ptr->LOWER_ID,        \
+                                              *LOWER_ID##_Buffer)              \
+                        .getError())                                           \
+    return *error;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
 
@@ -514,7 +534,7 @@ public:
                            (size_t)flags.getAlignmentMask());
       switch (sizeWithAlignmentMask(layout.size, flags.getAlignmentMask(),
                                     hasExtraInhabitants)) {
-      default:
+      default: {
         // For uncommon layouts, use value witnesses that work with an arbitrary
         // size and alignment.
         METADATA_BUILDER_LOG("Uncommon layout case, flags.isInlineStorage=%s",
@@ -522,32 +542,48 @@ public:
         if (flags.isInlineStorage()) {
           if (!pod_direct_initializeBufferWithCopyOfBuffer)
             return *pod_direct_initializeBufferWithCopyOfBuffer.getError();
-          vwtBuffer.writeFunctionPointer(
+          auto writeResult = vwtBuffer.writeFunctionPointer(
               &vwtBuffer.ptr->initializeBufferWithCopyOfBuffer,
               *pod_direct_initializeBufferWithCopyOfBuffer);
+          if (!writeResult)
+            return *writeResult.getError();
         } else {
           if (!pod_indirect_initializeBufferWithCopyOfBuffer)
             return *pod_indirect_initializeBufferWithCopyOfBuffer.getError();
-          vwtBuffer.writeFunctionPointer(
+          auto writeResult = vwtBuffer.writeFunctionPointer(
               &vwtBuffer.ptr->initializeBufferWithCopyOfBuffer,
               *pod_indirect_initializeBufferWithCopyOfBuffer);
+          if (!writeResult)
+            return *writeResult.getError();
         }
         if (!pod_destroy)
           return *pod_destroy.getError();
         if (!pod_copy)
           return *pod_copy.getError();
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->destroy, *pod_destroy);
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithCopy,
-                                       *pod_copy);
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithTake,
-                                       *pod_copy);
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->assignWithCopy,
-                                       *pod_copy);
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->assignWithTake,
-                                       *pod_copy);
+        auto writeResult = vwtBuffer.writeFunctionPointer(
+            &vwtBuffer.ptr->destroy, *pod_destroy);
+        if (!writeResult)
+          return *writeResult.getError();
+        writeResult = vwtBuffer.writeFunctionPointer(
+            &vwtBuffer.ptr->initializeWithCopy, *pod_copy);
+        if (!writeResult)
+          return *writeResult.getError();
+        writeResult = vwtBuffer.writeFunctionPointer(
+            &vwtBuffer.ptr->initializeWithTake, *pod_copy);
+        if (!writeResult)
+          return *writeResult.getError();
+        writeResult = vwtBuffer.writeFunctionPointer(
+            &vwtBuffer.ptr->assignWithCopy, *pod_copy);
+        if (!writeResult)
+          return *writeResult.getError();
+        writeResult = vwtBuffer.writeFunctionPointer(
+            &vwtBuffer.ptr->assignWithTake, *pod_copy);
+        if (!writeResult)
+          return *writeResult.getError();
         // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
         // interestingly optimizable based on POD-ness.
         return {{}};
+      }
 
       case sizeWithAlignmentMask(1, 0, 0): {
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(1, 0, 0)");
@@ -623,8 +659,10 @@ public:
       // Use POD value witnesses for operations that do an initializeWithTake.
       if (!pod_copy)
         return *pod_copy.getError();
-      vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithTake,
-                                     *pod_copy);
+      auto writeResult = vwtBuffer.writeFunctionPointer(
+          &vwtBuffer.ptr->initializeWithTake, *pod_copy);
+      if (!writeResult)
+        return *writeResult.getError();
     }
     return {{}};
   }
@@ -755,7 +793,10 @@ public:
     auto fptr = oldVWTBuffer->resolveFunctionPointer(&oldVWT->LOWER_ID);       \
     if (!fptr)                                                                 \
       return *fptr.getError();                                                 \
-    newVWTData.writeFunctionPointer(&newVWT->LOWER_ID, *fptr);                 \
+    if (auto *error =                                                          \
+            newVWTData.writeFunctionPointer(&newVWT->LOWER_ID, *fptr)          \
+                .getError())                                                   \
+      return *error;                                                           \
   }
 #include "swift/ABI/ValueWitness.def"
 
@@ -768,9 +809,11 @@ public:
     newVWT->extraInhabitantCount = layout.extraInhabitantCount;
     newVWT->flags = layout.flags;
 
-    metadataBuffer.writePointer(
+    auto writeResult = metadataBuffer.writePointer(
         &metadataBuffer.ptr->ValueWitnesses,
         newVWTData.template cast<const ValueWitnessTable>());
+    if (!writeResult)
+      return *writeResult.getError();
     return {{}}; // success
   }
 

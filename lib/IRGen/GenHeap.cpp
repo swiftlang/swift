@@ -274,7 +274,7 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
                        NecessaryBindings &&bindings, unsigned bindingsIndex)
-    : StructLayout(IGM, /*type=*/ llvm::None, LayoutKind::HeapObject, strategy,
+    : StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::HeapObject, strategy,
                    fieldTypeInfos, typeToFill),
       ElementTypes(fieldTypes.begin(), fieldTypes.end()),
       Bindings(std::move(bindings)), BindingsIndex(bindingsIndex) {
@@ -444,7 +444,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
     auto bindingsAddr = layout.getElement(layout.getBindingsIndex())
-                            .project(IGF, structAddr, llvm::None);
+                            .project(IGF, structAddr, std::nullopt);
     layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
@@ -1571,10 +1571,10 @@ public:
       auto astType = boxedInterfaceType.getASTType();
       astType =
           astType
-              .transformRec([](Type t) -> llvm::Optional<Type> {
+              .transformRec([](Type t) -> std::optional<Type> {
                 if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
                   return openedExistential->getInterfaceType();
-                return llvm::None;
+                return std::nullopt;
               })
               ->getCanonicalType();
       boxedInterfaceType = SILType::getPrimitiveType(
@@ -1604,7 +1604,7 @@ public:
   project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
   const override {
     Address rawAddr = layout.emitCastTo(IGF, box);
-    rawAddr = layout.getElement(0).project(IGF, rawAddr, llvm::None);
+    rawAddr = layout.getElement(0).project(IGF, rawAddr, std::nullopt);
     auto &ti = IGF.getTypeInfo(boxedType);
     return IGF.Builder.CreateElementBitCast(rawAddr, ti.getStorageType());
   }
@@ -1845,6 +1845,9 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
                             cast<llvm::Instruction>(SelfValue)))
                       : CurFn->getEntryBlock().begin();
   Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+  // Do not inherit the debug location of this insertion point, it could be
+  // anything (e.g. the location of a dbg.declare).
+  Builder.SetCurrentDebugLocation(llvm::DebugLoc());
 
   switch (SelfKind) {
   case SwiftMetatype:

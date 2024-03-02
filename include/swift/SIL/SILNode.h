@@ -124,6 +124,7 @@ public:
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
+  enum { NumMarkDependenceKindBits = 2 };
 
 protected:
   friend class SILInstruction;
@@ -242,7 +243,8 @@ protected:
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
                  pointerEscape : 1,
-                 fromVarDecl : 1);
+                 fromVarDecl : 1,
+                 fixed : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -277,7 +279,7 @@ protected:
                  fromVarDecl : 1);
 
     SHARED_FIELD(MarkDependenceInst, uint8_t
-                 nonEscaping : 1);
+                 dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
@@ -407,12 +409,13 @@ public:
   /// otherwise return null.
   SILBasicBlock *getParentBlock() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent function,
-  /// otherwise return null.
+  /// Returns the parent function of this value.
+  ///
+  /// Only returns nullptr if the given value's parent is a sil global variable
+  /// initializer.
   SILFunction *getFunction() const;
 
-  /// If this is a SILArgument or a SILInstruction get its parent module,
-  /// otherwise return null.
+  /// Return the parent module of this value.
   SILModule *getModule() const;
   
   /// Pretty-print the node.  If the node is an instruction, the output

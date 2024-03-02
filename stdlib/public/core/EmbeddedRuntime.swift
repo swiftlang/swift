@@ -302,6 +302,11 @@ public func swift_deletedMethodError() -> Never {
 public func swift_willThrow() throws {
 }
 
+/// Called when a typed error will be thrown.
+@_silgen_name("swift_willThrowTyped")
+public func _willThrowTyped<E: Error>(_ error: E) {
+}
+
 @_extern(c, "arc4random_buf")
 func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 

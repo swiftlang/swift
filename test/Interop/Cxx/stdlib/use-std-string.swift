@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
 //
 // REQUIRES: executable_test

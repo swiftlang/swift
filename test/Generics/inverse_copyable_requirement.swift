@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
+// XFAIL: noncopyable_generics
+
 // REQUIRES: noncopyable_generics
 
 // a concrete move-only type

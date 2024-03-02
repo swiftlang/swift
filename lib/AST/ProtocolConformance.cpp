@@ -44,7 +44,7 @@ Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
                  GenericSignature witnessThunkSig,
                  SubstitutionMap reqToWitnessThunkSigSubs,
                  GenericSignature derivativeGenSig,
-                 llvm::Optional<ActorIsolation> enterIsolation) {
+                 std::optional<ActorIsolation> enterIsolation) {
   if (!witnessThunkSig && substitutions.empty() &&
       reqToWitnessThunkSigSubs.empty() && !enterIsolation) {
     storage = decl;
@@ -102,9 +102,10 @@ switch (getKind()) {                                                         \
     return cast<NormalProtocolConformance>(this)->Method Args;               \
   case ProtocolConformanceKind::Self:                                        \
     return cast<SelfProtocolConformance>(this)->Method Args;                 \
+  case ProtocolConformanceKind::Builtin:                                     \
+    return cast<BuiltinProtocolConformance>(this)->Method Args;              \
   case ProtocolConformanceKind::Specialized:                                 \
   case ProtocolConformanceKind::Inherited:                                   \
-  case ProtocolConformanceKind::Builtin:                                     \
     llvm_unreachable("not a root conformance");                              \
 }                                                                            \
 llvm_unreachable("bad ProtocolConformanceKind");
@@ -352,7 +353,7 @@ bool NormalProtocolConformance::isResilient() const {
   return getDeclContext()->getParentModule()->isResilient();
 }
 
-llvm::Optional<ArrayRef<Requirement>>
+std::optional<ArrayRef<Requirement>>
 ProtocolConformance::getConditionalRequirementsIfAvailable() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());
 }
@@ -361,12 +362,12 @@ ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
 }
 
-llvm::Optional<ArrayRef<Requirement>>
+std::optional<ArrayRef<Requirement>>
 NormalProtocolConformance::getConditionalRequirementsIfAvailable() const {
   const auto &eval = getDeclContext()->getASTContext().evaluator;
   if (eval.hasActiveRequest(ConditionalRequirementsRequest{
           const_cast<NormalProtocolConformance *>(this)})) {
-    return llvm::None;
+    return std::nullopt;
   }
   return getConditionalRequirements();
 }
@@ -555,7 +556,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
-  llvm::Optional<ProtocolConformanceRef> result;
+  std::optional<ProtocolConformanceRef> result;
 
   auto &ctx = getDeclContext()->getASTContext();
 
@@ -612,13 +613,13 @@ void NormalProtocolConformance::createAssociatedConformanceArray() {
 
   auto &ctx = proto->getASTContext();
   AssociatedConformances =
-      ctx.Allocate<llvm::Optional<ProtocolConformanceRef>>(count);
+      ctx.Allocate<std::optional<ProtocolConformanceRef>>(count);
 }
 
-llvm::Optional<ProtocolConformanceRef>
+std::optional<ProtocolConformanceRef>
 NormalProtocolConformance::getAssociatedConformance(unsigned index) const {
   if (!hasComputedAssociatedConformances())
-    return llvm::None;
+    return std::nullopt;
 
   return AssociatedConformances[index];
 }
@@ -683,7 +684,7 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
   return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap(),
-                 GenericSignature(), llvm::None);
+                 GenericSignature(), std::nullopt);
 }
 
 ConcreteDeclRef
@@ -1076,19 +1077,9 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
-  const bool haveNoncopyableGenerics =
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
-
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
-
-    // No synthesized conformances for move-only nominals.
-    if (!haveNoncopyableGenerics && !canBeCopyable()) {
-      // assumption is Sendable gets synthesized elsewhere.
-      assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-      return;
-    }
 
     if (protocols.count(proto) == 0) {
       ConformanceTable->addSynthesizedConformance(
@@ -1099,12 +1090,23 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Synthesize the unconditional conformances to invertible protocols.
   // For conditional ones, see findSynthesizedConformances .
-  if (haveNoncopyableGenerics) {
-    for (auto ip : InvertibleProtocolSet::full()) {
-      auto invertible = getMarking(ip);
-      if (!invertible.getInverse() || bool(invertible.getPositive()))
-        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Classes get their conformances during ModuleDecl::lookupConformance.
+    if (!isa<ClassDecl>(this)) {
+      bool missingOne = false;
+      for (auto ip : InvertibleProtocolSet::full()) {
+        if (!hasInverseMarking(ip))
+          addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+        else
+          missingOne = true;
+      }
+
+      // FIXME: rdar://122289155 (NCGenerics: convert Equatable, Hashable, and RawRepresentable to ~Copyable.)
+      if (missingOne)
+        return;
     }
+  } else if (!canBeCopyable()) {
+    return; // No synthesized conformances for move-only nominals.
   }
 
   // Add protocols for any synthesized protocol attributes.

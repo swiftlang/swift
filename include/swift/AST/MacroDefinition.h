@@ -78,16 +78,25 @@ class ExpandedMacroDefinition {
   /// The macro replacements, ASTContext-allocated.
   ArrayRef<ExpandedMacroReplacement> replacements;
 
+  /// Same as above but for generic argument replacements
+  ArrayRef<ExpandedMacroReplacement> genericReplacements;
+
   ExpandedMacroDefinition(
     StringRef expansionText,
-    ArrayRef<ExpandedMacroReplacement> replacements
-  ) : expansionText(expansionText), replacements(replacements) { }
+    ArrayRef<ExpandedMacroReplacement> replacements,
+    ArrayRef<ExpandedMacroReplacement> genericReplacements
+  ) : expansionText(expansionText),
+          replacements(replacements),
+          genericReplacements(genericReplacements) { }
 
 public:
   StringRef getExpansionText() const { return expansionText; }
 
   ArrayRef<ExpandedMacroReplacement> getReplacements() const {
     return replacements;
+  }
+  ArrayRef<ExpandedMacroReplacement> getGenericReplacements() const {
+    return genericReplacements;
   }
 };
 
@@ -162,7 +171,8 @@ public:
   static MacroDefinition forExpanded(
       ASTContext &ctx,
       StringRef expansionText,
-      ArrayRef<ExpandedMacroReplacement> replacements
+      ArrayRef<ExpandedMacroReplacement> replacements,
+      ArrayRef<ExpandedMacroReplacement> genericReplacements
   );
 
   /// Retrieve the external macro being referenced.

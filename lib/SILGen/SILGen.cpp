@@ -96,7 +96,7 @@ SILGenModule::~SILGenModule() {
   M.verifyIncompleteOSSA();
 }
 
-static SILDeclRef getBridgingFn(llvm::Optional<SILDeclRef> &cacheSlot,
+static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
                                 SILGenModule &SGM, Identifier moduleName,
                                 StringRef functionName,
                                 std::initializer_list<Type> inputTypes,
@@ -278,7 +278,7 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
-                llvm::makeArrayRef(Identifier()));
+                llvm::ArrayRef(Identifier()));
   auto *found = dyn_cast_or_null<FuncDecl>(
     proto->getSingleRequirement(name));
 
@@ -597,7 +597,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(
       SILLinkage::PublicExternal, functionName, functionTy, env,
-      /*location*/ llvm::None, IsNotBare, IsNotTransparent, IsNotSerialized,
+      /*location*/ std::nullopt, IsNotBare, IsNotTransparent, IsNotSerialized,
       IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   return fn;
@@ -1461,23 +1461,30 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }
 }
 
-SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
-  SILDeclRef constant(ce);
-  SILFunction *f = getFunction(constant, ForDefinition);
+SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
+                                       const FunctionTypeInfo &closureInfo) {
+  Types.setCaptureTypeExpansionContext(SILDeclRef(e), M);
 
-  // Generate the closure function, if we haven't already.
-  //
-  // We may visit the same closure expr multiple times in some cases,
-  // for instance, when closures appear as in-line initializers of stored
-  // properties. In these cases the closure will be emitted into every
-  // initializer of the containing type.
-  if (!f->isExternalDeclaration())
-    return f;
+  SILFunction *f = nullptr;
+  Types.withClosureTypeInfo(e, closureInfo, [&] {
+    SILDeclRef constant(e);
+    f = getFunction(constant, ForDefinition);
 
-  // Emit property wrapper argument generators.
-  emitArgumentGenerators(ce, ce->getParameters());
+    // Generate the closure function, if we haven't already.
+    //
+    // We may visit the same closure expr multiple times in some cases,
+    // for instance, when closures appear as in-line initializers of stored
+    // properties. In these cases the closure will be emitted into every
+    // initializer of the containing type.
+    if (!f->isExternalDeclaration())
+      return;
 
-  emitFunctionDefinition(constant, f);
+    // Emit property wrapper argument generators.
+    emitArgumentGenerators(e, e->getParameters());
+
+    emitFunctionDefinition(constant, f);
+  });
+
   return f;
 }
 
@@ -1617,6 +1624,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
     break;
   }
 }
@@ -1888,7 +1896,10 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
-      return !decl->isFormallyResilient();
+      // Assert here as key path component cannot refer to a static var.
+      assert(!decl->isStatic());
+      // By this point, decl is a fixed layout or its enclosing type is non-resilient.
+      return true;
     }
 
     // If the type is computed and doesn't have a setter that's hidden from
@@ -1898,7 +1909,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
     if (!setter)
       return true;
 
-    if (setter->getFormalAccessScope(nullptr, true).isPublic())
+    if (setter->getFormalAccessScope(nullptr, true).isPublicOrPackage())
       return true;
 
     return false;
@@ -1945,7 +1956,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   bool needsGenericContext = true;
   
   if (canStorageUseTrivialDescriptor(*this, decl)) {
-    (void)SILProperty::create(M, /*serialized*/ false, decl, llvm::None);
+    (void)SILProperty::create(M, /*serialized*/ false, decl, std::nullopt);
     return;
   }
   
@@ -2108,11 +2119,8 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
                              ASTLoweringDescriptor desc) const {
   // If we have a .sil file to parse, defer to the parsing request.
   if (desc.getSourceFileToParse()) {
-    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+    return evaluateOrFatal(evaluator, ParseSILModuleRequest{desc});
   }
-
-  // For leak detection.
-  SILInstruction::resetInstructionCounts();
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts, desc.irgenOptions);
@@ -2160,9 +2168,9 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
-                                                    llvm::None, irgenOptions);
-  return llvm::cantFail(
-      mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
+                                                    std::nullopt, irgenOptions);
+  return evaluateOrFatal(mod->getASTContext().evaluator,
+                         ASTLoweringRequest{desc});
 }
 
 std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
@@ -2174,7 +2182,8 @@ std::unique_ptr<SILModule> swift::performASTLowering(CompilerInstance &CI,
   auto &TC = CI.getSILTypes();
   auto Desc = ASTLoweringDescriptor::forWholeModule(
       M, TC, SILOpts, std::move(Sources), &IRGenOpts);
-  return llvm::cantFail(M->getASTContext().evaluator(ASTLoweringRequest{Desc}));
+  return evaluateOrFatal(M->getASTContext().evaluator,
+                         ASTLoweringRequest{Desc});
 }
 
 std::unique_ptr<SILModule>
@@ -2182,6 +2191,7 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc =
-      ASTLoweringDescriptor::forFile(sf, tc, options, llvm::None, irgenOptions);
-  return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
+      ASTLoweringDescriptor::forFile(sf, tc, options, std::nullopt, irgenOptions);
+  return evaluateOrFatal(sf.getASTContext().evaluator,
+                         ASTLoweringRequest{desc});
 }

@@ -393,3 +393,12 @@ extension B4 {
 // expected-error@-1 {{extension of existential type 'B4' (aka 'any P4') is not supported}}
 // expected-note@-2 {{did you mean to extend 'P4' instead?}} {{11-13=P4}}
 }
+
+
+extension Sendable {} // expected-error {{cannot extend protocol 'Sendable'}}
+extension Copyable {} // expected-error {{cannot extend protocol 'Copyable'}}
+extension Escapable {} // expected-error {{cannot extend protocol 'Escapable'}}
+extension _BitwiseCopyable {} // expected-error {{cannot extend protocol '_BitwiseCopyable'}}
+
+@_marker protocol MyMarkerProto {}
+extension MyMarkerProto {} // OK

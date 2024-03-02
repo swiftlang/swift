@@ -17,7 +17,7 @@ struct UIntPair: Equatable {
   }
 }
 
-@available(SwiftStdlib 5.11, *)
+@available(SwiftStdlib 6.0, *)
 func componentsInMemoryOrder(of dword: WordPair) -> UIntPair {
   let p = UnsafeMutableRawPointer.allocate(
     byteCount: MemoryLayout<WordPair>.size,
@@ -28,7 +28,7 @@ func componentsInMemoryOrder(of dword: WordPair) -> UIntPair {
   return UIntPair(first, second)
 }
 
-if #available(SwiftStdlib 5.11, *) {
+if #available(SwiftStdlib 6.0, *) {
 
 suite.test("basics") {
   expectEqual(MemoryLayout<WordPair>.size, 2 * MemoryLayout<UInt>.size)
@@ -47,6 +47,6 @@ suite.test("basics") {
   expectEqual(value1.second, 0)
 }
 
-} // if #available(SwiftStdlib 5.11, *)
+} // if #available(SwiftStdlib 6.0, *)
 
 runAllTests()

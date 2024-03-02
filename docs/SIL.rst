@@ -459,6 +459,20 @@ number of ways:
   - Other function type conventions are described in ``Properties of Types`` and
     ``Calling Convention``.
 
+- SIL function types do not directly carry most of the actor-isolation
+  information available in the Swift type system.  Actor isolation is mostly
+  simply erased from the SIL type system and treated as a dynamic property
+  in SIL functions.
+
+  However, ``@isolated(any)`` requires some additional ABI support and
+  therefore must be carried on SIL function types.  ``@isolated(any)`` is
+  only allowed in combination with ``@convention(thick)``; in particular,
+  this precludes SIL function declarations from having ``@isolated(any)``
+  type.  Instead, ``@isolated(any)`` function values are constructed with
+  ``partial_apply [isolated_any]``, which has additional requirements.
+  The isolation of an ``@isolated(any)`` function can be read with the
+  ``function_extract_isolation`` instruction.
+
 - A SIL function type declares the conventions for its parameters.
   The parameters are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
@@ -1594,6 +1608,7 @@ VTables
 
   decl ::= sil-vtable
   sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
+  sil-vtable ::= 'sil_vtable' sil-type '{' sil-vtable-entry* '}'
 
   sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
@@ -1655,6 +1670,13 @@ class (such as ``C.bas`` in ``C``'s vtable).
 
 In case the SIL function is a thunk, the function name is preceded with the
 linkage of the original implementing function.
+
+If the vtable refers to a specialized class, a SIL type specifies the bound
+generic class type::
+
+  sil_vtable $G<Int> {
+    // ...
+  }
 
 Witness Tables
 ~~~~~~~~~~~~~~
@@ -6118,12 +6140,13 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' callee-ownership-attr? on-stack-attr? sil-value
+  sil-instruction ::= 'partial_apply' partial-apply-attr* sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
-  callee-ownership-attr ::= '[callee_guaranteed]'
-  on-stack-attr ::= '[on_stack]'
+  partial-apply-attr ::= '[callee_guaranteed]'
+  partial-apply-attr ::= '[isolated_any]'
+  partial-apply-attr ::= '[on_stack]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -6179,13 +6202,24 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     return %ret : $Int
   }
 
+**Erased Isolation**: If the ``partial_apply`` is marked with the flag
+``[isolated_any]``, the first applied argument must have type
+``Optional<any Actor>``.  In addition to being provided as an argument to
+the partially-applied function, this value will be stored in a special
+place in the context and can be recovered with ``function_extract_isolation``.
+The result type of the ``partial_apply`` will be an ``@isolated(any)``
+function type.
+
 **Ownership Semantics of Closure Context during Invocation**: By default, an
 escaping ``partial_apply`` (``partial_apply`` without ``[on_stack]]`` creates a
 closure whose invocation takes ownership of the context, meaning that a call
-implicitly releases the closure. If the ``partial_apply`` is marked with the
-flag ``[callee_guaranteed]`` the invocation instead uses a caller-guaranteed
-model, where the caller promises not to release the closure while the function
-is being called.
+implicitly releases the closure.
+
+If the ``partial_apply`` is marked with the flag ``[callee_guaranteed]``,
+the invocation instead uses a caller-guaranteed model, where the caller
+promises not to release the closure while the function is being called.
+The result type of the ``partial_apply`` will be a ``@callee_guaranteed``
+function type.
 
 **Captured Value Ownership Semantics**: In the instruction syntax, the type of
 the callee is specified after the argument list; the types of the argument and
@@ -6580,6 +6614,17 @@ autorelease_value
   autorelease_value %0 : $A
 
 *TODO* Complete this section.
+
+function_extract_isolation
+``````````````````````````
+
+::
+  sil-instruction ::= function_extract_isolation sil-operand
+
+Reads the isolation of a `@isolated(any)` function value.  The result is
+always a borrowed value of type `$Optional<any Actor>`.  It is exactly
+the value that was originally used to construct the function with
+`partial_apply [isolated_any]`.
 
 tuple
 `````

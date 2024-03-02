@@ -61,7 +61,7 @@ SIMPLE_LOCATOR_PATH_ELT(ClosureThrownError)
 /// closure returns.
 ///
 /// The type of a closure body.
-CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
+SIMPLE_LOCATOR_PATH_ELT(ClosureBody)
 
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)

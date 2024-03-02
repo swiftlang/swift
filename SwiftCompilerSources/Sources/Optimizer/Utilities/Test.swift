@@ -21,6 +21,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// TO TROUBLESHOOT A NEW TEST, consider the following scenarios:
+// - PROBLEM: The test isn't running on PLATFORM and the failure says
+//
+//                Found no test named my_new_test.
+//
+//   SOLUTION: Is this a platform one that doesn't use SwiftCompilerSources
+//             (e.g. Windows)?  Then add
+//
+//                 // REQUIRES: swift_in_compiler
+//
+//             to the test file.
+//   EXPLANATION: The tests written within SwiftCompilerSources only get built
+//                and registered on platforms where the SwiftCompilerSources are
+//                built and used.
+//
+//===----------------------------------------------------------------------===//
+//
 // Provides a mechanism for writing tests against compiler code in the context
 // of a function.  The goal is to get the same effect as calling a function and
 // checking its output.
@@ -136,18 +153,19 @@ extension BridgedTestArguments {
 public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
-      parseTestSpecificationTest,
-      forwardingUseDefTest,
-      forwardingDefUseTest,
-      borrowIntroducersTest,
-      enclosingValuesTest,
-      linearLivenessTest,
-      interiorLivenessTest,
-      variableIntroducerTest,
-      lifetimeDependenceScopeTest,
-      lifetimeDependenceRootTest,
-      lifetimeDependenceUseTest
-    )
+    argumentConventionsTest,
+    borrowIntroducersTest,
+    enclosingValuesTest,
+    forwardingDefUseTest,
+    forwardingUseDefTest,
+    interiorLivenessTest,
+    lifetimeDependenceRootTest,
+    lifetimeDependenceScopeTest,
+    lifetimeDependenceUseTest,
+    linearLivenessTest,
+    parseTestSpecificationTest,
+    variableIntroducerTest
+  )
 
   // Finally register the thunk they all call through.
   registerFunctionTestThunk(functionTestThunk)
@@ -253,4 +271,3 @@ FunctionTest("test_specification_parsing") { function, arguments, context in
     }
   }
 }
-

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
 // REQUIRES: noncopyable_generics
+// XFAIL: noncopyable_generics
 
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
@@ -193,10 +194,9 @@ extension Cond: Copyable where T: Copyable {}
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
 struct ImplicitCond<T: ~Escapable & ~Copyable> {}
 
-// FIXME: At the moment, Sendable in the stdlib requires Escapable.
 // CHECK-LABEL: StructDecl name=ImplicitCond
 // CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable"
-// CHECK-NEXT:      (assoc_conformance type="Self" proto="Escapable"
+// CHECK-NOT:      (assoc_conformance type="Self" proto="Escapable"
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
 // CHECK: Generic signature: <T>

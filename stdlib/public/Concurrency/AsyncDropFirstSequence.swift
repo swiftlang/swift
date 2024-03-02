@@ -74,7 +74,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   ///
   /// The drop-first sequence produces whatever type of error its base
   /// sequence produces.
-  @available(SwiftStdlib 5.11, *)
+  @available(SwiftStdlib 6.0, *)
   public typealias Failure = Base.Failure
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
@@ -118,24 +118,24 @@ extension AsyncDropFirstSequence: AsyncSequence {
     /// Produces the next element in the drop-first sequence.
     ///
     /// Until reaching the number of elements to drop, this iterator calls
-    /// `next(_:)` on its base iterator and discards the result. If the
+    /// `next(isolation:)` on its base iterator and discards the result. If the
     /// base iterator returns `nil`, indicating the end of the sequence, this
     /// iterator returns `nil`. After reaching the number of elements to drop,
-    /// this iterator passes along the result of calling `next(_:)` on the
-    /// base iterator.
-    @available(SwiftStdlib 5.11, *)
+    /// this iterator passes along the result of calling `next(isolation:)` on
+    /// the base iterator.
+    @available(SwiftStdlib 6.0, *)
     @inlinable
-    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       var remainingToDrop = count
       while remainingToDrop > 0 {
-        guard try await baseIterator.next(actor) != nil else {
+        guard try await baseIterator.next(isolation: actor) != nil else {
           count = 0
           return nil
         }
         remainingToDrop -= 1
       }
       count = 0
-      return try await baseIterator.next(actor)
+      return try await baseIterator.next(isolation: actor)
     }
   }
 

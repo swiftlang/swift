@@ -10,6 +10,12 @@
 
 @end
 
+@interface ImplClass () <NSMutableCopying>
+
+- (void)extensionMethod:(int)param;
+
+@end
+
 
 @interface ImplClass (Category1)
 

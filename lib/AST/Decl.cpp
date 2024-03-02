@@ -477,7 +477,7 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
 
   if (role != MacroRole::MemberAttribute) {
     llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
-    llvm::Optional<unsigned> foundDiscriminator;
+    std::optional<unsigned> foundDiscriminator;
 
     forEachAttachedMacro(
         role, [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
@@ -538,7 +538,7 @@ const Decl *Decl::getInnermostDeclWithAvailability() const {
   return nullptr;
 }
 
-llvm::Optional<llvm::VersionTuple>
+std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
     if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
@@ -547,10 +547,10 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
       }
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<llvm::VersionTuple>
+std::optional<llvm::VersionTuple>
 Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx)) {
     auto version = attr->Version;
@@ -561,11 +561,11 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
   if (auto *AD = dyn_cast<AccessorDecl>(this))
     return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool Decl::isBackDeployed(ASTContext &Ctx) const {
-  return getBackDeployedBeforeOSVersion(Ctx) != llvm::None;
+  return getBackDeployedBeforeOSVersion(Ctx) != std::nullopt;
 }
 
 bool Decl::hasBackDeployedAttr() const {
@@ -829,7 +829,7 @@ bool Decl::isInMacroExpansionInContext() const {
   if (file->getBufferID() == parentFile->getBufferID())
     return false;
 
-  return file->getFulfilledMacroRole() != llvm::None;
+  return file->getFulfilledMacroRole() != std::nullopt;
 }
 
 SourceLoc Decl::getLocFromSource() const {
@@ -956,11 +956,11 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   llvm_unreachable("invalid file kind");
 }
 
-llvm::Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
+std::optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<Decl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, GlobalActorAttributeRequest{mutableThis}, llvm::None);
+      ctx.evaluator, GlobalActorAttributeRequest{mutableThis}, std::nullopt);
 }
 
 bool Decl::preconcurrency() const {
@@ -989,14 +989,13 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
   return CatchNode(mutableThis).getExplicitCaughtType(getASTContext());
 }
 
-llvm::Optional<Type> 
-AbstractFunctionDecl::getEffectiveThrownErrorType() const {
+std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   // FIXME: Only getters can have thrown error types right now, and DidSet
   // has a cyclic reference if we try to get its interface type here. Find a
   // better way to express this.
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     if (accessor->getAccessorKind() != AccessorKind::Get)
-      return llvm::None;
+      return std::nullopt;
   }
 
   Type interfaceType = getInterfaceType();
@@ -1008,7 +1007,7 @@ AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   if (auto fnType = interfaceType->getAs<AnyFunctionType>())
     return fnType->getEffectiveThrownErrorType();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AbstractStorageDecl::isCompileTimeConst() const {
@@ -1301,9 +1300,10 @@ bool GenericContext::isComputingGenericSignature() const {
 
 /// If we hit a cycle while building the generic signature, we can't return
 /// nullptr, since this breaks invariants elsewhere. Instead, build a dummy
-/// signature with no requirements.
+/// signature where everything is Copyable and Escapable, to avoid spurious
+/// downstream diagnostics concerning move-only types.
 static GenericSignature getPlaceholderGenericSignature(
-    const DeclContext *DC) {
+    ASTContext &ctx, const DeclContext *DC) {
   SmallVector<GenericParamList *, 2> gpLists;
   DC->forEachGenericContext([&](GenericParamList *genericParams) {
     gpLists.push_back(genericParams);
@@ -1316,30 +1316,32 @@ static GenericSignature getPlaceholderGenericSignature(
   for (unsigned i : indices(gpLists))
     gpLists[i]->setDepth(i);
 
-  SmallVector<GenericTypeParamType *, 2> result;
-  for (auto *genericParams : gpLists) {
-    for (auto *genericParam : *genericParams) {
-      result.push_back(genericParam->getDeclaredInterfaceType()
-                                   ->castTo<GenericTypeParamType>());
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  SmallVector<Requirement, 2> requirements;
+
+  for (auto *gpList : gpLists) {
+    for (auto *genericParam : *gpList) {
+      auto type = genericParam->getDeclaredInterfaceType();
+      genericParams.push_back(type->castTo<GenericTypeParamType>());
+
+      if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+        for (auto ip : InvertibleProtocolSet::full()) {
+          auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+          requirements.emplace_back(RequirementKind::Conformance, type,
+                                    proto->getDeclaredInterfaceType());
+        }
+      }
     }
   }
 
-  return GenericSignature::get(result, {});
+  return GenericSignature::get(genericParams, requirements);
 }
 
 GenericSignature GenericContext::getGenericSignature() const {
-  // Don't use evaluateOrDefault() here, because getting the 'default value'
-  // is slightly expensive here so we don't want to do it eagerly.
-  auto result = getASTContext().evaluator(
-      GenericSignatureRequest{const_cast<GenericContext *>(this)});
-  if (auto err = result.takeError()) {
-    llvm::handleAllErrors(std::move(err),
-      [](const CyclicalRequestError<GenericSignatureRequest> &E) {
-        // cycle detected
-      });
-    return getPlaceholderGenericSignature(this);
-  }
-  return *result;
+  auto &ctx = getASTContext();
+  return ctx.evaluator(
+      GenericSignatureRequest{const_cast<GenericContext *>(this)},
+      [&ctx, this]() { return getPlaceholderGenericSignature(ctx, this); });
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
@@ -1457,7 +1459,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   llvm_unreachable("bad DeclKind");
 }
 
-llvm::Optional<ImportKind>
+std::optional<ImportKind>
 ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   assert(!Decls.empty());
   ImportKind FirstKind = ImportDecl::getBestImportKind(Decls.front());
@@ -1466,11 +1468,11 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   if (Decls.size() == 1)
     return FirstKind;
   if (FirstKind != ImportKind::Func)
-    return llvm::None;
+    return std::nullopt;
 
   for (auto NextDecl : Decls.slice(1)) {
     if (ImportDecl::getBestImportKind(NextDecl) != FirstKind)
-      return llvm::None;
+      return std::nullopt;
   }
 
   return FirstKind;
@@ -1561,6 +1563,15 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
   }
 }
 
+InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
+  Entries = typeDecl->Inherited;
+}
+
+InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
+    : Decl(extensionDecl) {
+  Entries = extensionDecl->Inherited;
+}
+
 InheritedTypes::InheritedTypes(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl)
     : Decl(decl) {
@@ -1637,15 +1648,6 @@ SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
                                  inheritedClause[i].getSourceRange().End);
 
   return SourceRange(afterPriorLoc, afterMyEndLoc);
-}
-
-InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
-  Entries = typeDecl->Inherited;
-}
-
-InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
-    : Decl(extensionDecl) {
-  Entries = extensionDecl->Inherited;
 }
 
 Type InheritedTypes::getResolvedType(unsigned i,
@@ -1818,14 +1820,12 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
-llvm::Optional<Identifier>
+std::optional<Identifier>
 ExtensionDecl::getCategoryNameForObjCImplementation() const {
-  assert(isObjCImplementation());
-
   auto attr = getAttrs()
                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-  if (attr->isCategoryNameInvalid())
-    return llvm::None;
+  if (!attr || attr->isCategoryNameInvalid())
+    return std::nullopt;
 
   return attr->CategoryName;
 }
@@ -2290,9 +2290,8 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
 
   // Also support the desugared 'Optional<T>' spelling.
   if (!ctx.isSwiftVersionAtLeast(5)) {
-    if (auto *identRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
-      if (identRepr->getNameRef().getBaseIdentifier() == ctx.Id_Void)
-        return true;
+    if (typeRepr->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
+      return true;
     }
 
     if (auto *identRepr = dyn_cast<GenericIdentTypeRepr>(typeRepr)) {
@@ -2492,6 +2491,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::Erased: // really can't happen
             return true;
         }
       }
@@ -2960,28 +2960,21 @@ bool Decl::isOutermostPrivateOrFilePrivateScope() const {
          !isInPrivateOrLocalContext(this);
 }
 
-bool AbstractStorageDecl::isFormallyResilient() const {
+bool AbstractStorageDecl::isResilient() const {
   // Check for an explicit @_fixed_layout attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
   // If we're an instance property of a nominal type, query the type.
-  auto *dc = getDeclContext();
   if (!isStatic())
-    if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
+    if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
 
   // Non-public global and static variables always have a
   // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
-    return false;
-
-  return true;
-}
-
-bool AbstractStorageDecl::isResilient() const {
-  if (!isFormallyResilient())
+  auto accessScope = getFormalAccessScope(/*useDC=*/nullptr,
+                                          /*treatUsableFromInlineAsPublic=*/true);
+  if (!accessScope.isPublicOrPackage())
     return false;
 
   return getModuleContext()->isResilient();
@@ -2993,7 +2986,12 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    if (M == getModuleContext())
+      return false;
+    // Non-resilient if bypass optimization in package is enabled
+    if (bypassResilienceInPackage(M))
+      return false;
+    return isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -3149,7 +3147,7 @@ unsigned ValueDecl::getLocalDiscriminator() const {
        (getLoc().isValid() &&
         getModuleContext()
                 ->getSourceFileContainingLocation(getLoc())
-                ->getFulfilledMacroRole() != llvm::None))) {
+                ->getFulfilledMacroRole() != std::nullopt))) {
     auto discriminator = ctx.getNextDiscriminator(getDeclContext());
     ctx.setMaxAssignedDiscriminator(getDeclContext(), discriminator + 1);
     const_cast<ValueDecl *>(this)->LocalDiscriminator = discriminator;
@@ -3793,16 +3791,16 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
-llvm::Optional<AttributedImport<ImportedModule>>
+std::optional<AttributedImport<ImportedModule>>
 ValueDecl::findImport(const DeclContext *fromDC) {
   // If the type is from the current module, there's no import.
   auto module = getModuleContext();
   if (module == fromDC->getParentModule())
-    return llvm::None;
+    return std::nullopt;
 
   auto fromSourceFile = fromDC->getParentSourceFile();
   if (!fromSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Look to see if the owning module was directly imported.
   for (const auto &import : fromSourceFile->getImports()) {
@@ -3821,7 +3819,7 @@ ValueDecl::findImport(const DeclContext *fromDC) {
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool ValueDecl::isProtocolRequirement() const {
@@ -3866,12 +3864,8 @@ bool ValueDecl::isRecursiveValidation() const {
 
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
-  if (auto type =
-          evaluateOrDefault(ctx.evaluator,
-                            InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
-                            Type()))
-    return type;
-  return ErrorType::get(ctx);
+  return ctx.evaluator(InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
+                       [&ctx]() { return ErrorType::get(ctx); });
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -3896,7 +3890,7 @@ StringRef ValueDecl::getCDeclName() const {
   return "";
 }
 
-llvm::Optional<ObjCSelector>
+std::optional<ObjCSelector>
 ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->getObjCSelector(DeclName(), skipIsObjCResolution);
@@ -3921,7 +3915,7 @@ ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   if (auto var = dyn_cast<VarDecl>(this))
     return makeSelector(var->getObjCPropertyName());
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
@@ -4219,11 +4213,10 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
-bool ValueDecl::hasPackageAccess() const {
-  AccessLevel access =
-      getAdjustedFormalAccess(this, /*useDC*/ nullptr,
-                              /*treatUsableFromInlineAsPublic*/ false);
-  return access == AccessLevel::Package;
+bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
+  return getASTContext().LangOpts.EnableBypassResilienceInPackage &&
+         getModuleContext()->inSamePackage(accessingModule) &&
+         !getModuleContext()->isBuiltFromInterface();
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -4537,7 +4530,7 @@ ImportAccessLevel Decl::getImportAccessFrom(const DeclContext *useDC) const {
       return useSF->getImportAccessLevel(Mod);
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
@@ -4627,7 +4620,7 @@ static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
     CanGenericSignature genericSig, GenericTypeParamType *genericParam,
     const AnyFunctionType *fnType, TypePosition position,
     bool treatNonResultCovarianceAsInvariant, bool canBeCovariantResult,
-    llvm::Optional<unsigned> skipParamIndex) {
+    std::optional<unsigned> skipParamIndex) {
   // If there are no type parameters, we're done.
   if (!isa<GenericFunctionType>(fnType) && !fnType->hasTypeParameter())
     return GenericParameterReferenceInfo();
@@ -4707,7 +4700,7 @@ findGenericParameterReferences(CanGenericSignature genericSig,
     return findGenericParameterReferencesInFunction(
         genericSig, genericParam, funcTy, position,
         treatNonResultCovarianceAsInvariant, canBeCovariantResult,
-        /*skipParamIndex=*/llvm::None);
+        /*skipParamIndex=*/std::nullopt);
   }
 
   // Metatypes preserve variance.
@@ -4869,7 +4862,7 @@ swift::findGenericParameterReferences(const ValueDecl *value,
                                       CanGenericSignature sig,
                                       GenericTypeParamType *genericParam,
                                       bool treatNonResultCovarianceAsInvariant,
-                                      llvm::Optional<unsigned> skipParamIndex) {
+                                      std::optional<unsigned> skipParamIndex) {
   assert(isa<TypeDecl>(value) == false);
   assert(sig->getGenericParamOrdinal(genericParam) <
          sig.getGenericParams().size());
@@ -4919,15 +4912,7 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   auto genericParam = sig.getGenericParams().front();
   return findGenericParameterReferences(this, sig, genericParam,
                                         treatNonResultCovariantSelfAsInvariant,
-                                        llvm::None);
-}
-
-InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      InvertibleAnnotationRequest{const_cast<TypeDecl *>(this), ip},
-      InverseMarking::forInverse(InverseMarking::Kind::None)
-  );
+                                        std::nullopt);
 }
 
 static TypeDecl::CanBeInvertible::Result
@@ -4936,10 +4921,11 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Handle protocols specially, without building a GenericSignature.
-  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))
-    return protoDecl->requiresInvertible(ip)
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+    return protoDecl->inheritsFrom(proto)
          ? TypeDecl::CanBeInvertible::Always
          : TypeDecl::CanBeInvertible::Never;
+  }
 
   Type selfTy = decl->getDeclaredInterfaceType();
   assert(selfTy);
@@ -4956,23 +4942,21 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   return TypeDecl::CanBeInvertible::Always;
 }
 
-TypeDecl::CanBeInvertible::Result TypeDecl::canBeCopyable() const {
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeCopyable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto copyable = getMarking(InvertibleProtocolKind::Copyable);
-    return !copyable.getInverse() || bool(copyable.getPositive())
-         ? CanBeInvertible::Always
-         : CanBeInvertible::Never;
+    return !hasInverseMarking(InvertibleProtocolKind::Copyable)
+               ? CanBeInvertible::Always
+               : CanBeInvertible::Never;
   }
 
   return conformanceExists(this, InvertibleProtocolKind::Copyable);
 }
 
-TypeDecl::CanBeInvertible::Result TypeDecl::canBeEscapable() const {
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto escapable = getMarking(InvertibleProtocolKind::Escapable);
-    return !escapable.getInverse() || bool(escapable.getPositive())
-         ? CanBeInvertible::Always
-         : CanBeInvertible::Never;
+    return !hasInverseMarking(InvertibleProtocolKind::Escapable)
+               ? CanBeInvertible::Always
+               : CanBeInvertible::Never;
   }
 
   return conformanceExists(this, InvertibleProtocolKind::Escapable);
@@ -5066,7 +5050,6 @@ bool NominalTypeDecl::isFormallyResilient() const {
 bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
-
   return getModuleContext()->isResilient();
 }
 
@@ -5098,9 +5081,12 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Maximal:
     // We can access declarations from the same module
     // non-resiliently in a maximal context.
-    if (M == getModuleContext()) {
+    if (M == getModuleContext())
       return false;
-    }
+    // Non-resilient if bypass optimization in package is enabled
+    if (bypassResilienceInPackage(M))
+      return false;
+
     // If a protocol is originally declared in the current module, then we
     // directly expose protocol witness tables and their contents for any
     // conformances in the same module as symbols. If the protocol later
@@ -5297,7 +5283,7 @@ bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
 
-llvm::Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
+std::optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   auto &ctx = getASTContext();
 #define CASE(NAME) if (this == ctx.get##NAME##Decl()) return KPTK_##NAME;
   CASE(KeyPath)
@@ -5306,7 +5292,7 @@ llvm::Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   CASE(AnyKeyPath)
   CASE(PartialKeyPath)
 #undef CASE
-  return llvm::None;
+  return std::nullopt;
 }
 
 PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
@@ -5555,12 +5541,11 @@ Type AssociatedTypeDecl::getDefaultDefinitionType() const {
            Type());
 }
 
-llvm::Optional<Type>
-AssociatedTypeDecl::getCachedDefaultDefinitionType() const {
+std::optional<Type> AssociatedTypeDecl::getCachedDefaultDefinitionType() const {
   if (Bits.AssociatedTypeDecl.IsDefaultDefinitionTypeComputed)
     return DefaultDefinition.getType();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void AssociatedTypeDecl::setDefaultDefinitionType(Type ty) {
@@ -5649,7 +5634,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
-      ctx.evaluator, EnumRawTypeRequest{const_cast<EnumDecl *>(this)}, Type());
+      ctx.evaluator, EnumRawTypeRequest{const_cast<EnumDecl *>(this)},
+      ErrorType::get(ctx));
 }
 
 void EnumDecl::setRawType(Type rawType) {
@@ -5739,7 +5725,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
-  llvm::Optional<ImplicitMemberAction> action = llvm::None;
+  std::optional<ImplicitMemberAction> action = std::nullopt;
   if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
@@ -6271,7 +6257,7 @@ bool ClassDecl::walkSuperclasses(
     switch (fn(cls)) {
     case TypeWalker::Action::Stop:
       return true;
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       return false;
     case TypeWalker::Action::Continue:
       cls = cls->getSuperclassDecl();
@@ -6387,7 +6373,11 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Non-public, non-versioned enums are always exhaustive.
   AccessScope accessScope = getFormalAccessScope(/*useDC*/nullptr,
                                                  /*respectVersioned*/true);
-  if (!accessScope.isPublic())
+  // Both public and package enums should behave the same unless
+  // package enum is optimized with bypassing resilience checks.
+  if (!accessScope.isPublicOrPackage())
+    return true;
+  if (useDC && bypassResilienceInPackage(useDC->getParentModule()))
     return true;
 
   // All other checks are use-site specific; with no further information, the
@@ -6465,18 +6455,25 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
-llvm::Optional<InvertibleProtocolKind>
+std::optional<InvertibleProtocolKind>
 ProtocolDecl::getInvertibleProtocolKind() const {
   if (auto kp = getKnownProtocolKind())
     return ::getInvertibleProtocolKind(*kp);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            InheritedProtocolsRequest{mutThis},
+                           {});
+}
+
+ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AllInheritedProtocolsRequest{mutThis},
                            {});
 }
 
@@ -6599,7 +6596,7 @@ bool ProtocolDecl::walkInheritedProtocols(
       }
       break;
 
-    case TypeWalker::Action::SkipChildren:
+    case TypeWalker::Action::SkipNode:
       break;
     }
   }
@@ -6611,53 +6608,185 @@ bool ProtocolDecl::walkInheritedProtocols(
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   assert(super);
 
+  // Fast path.
   if (this == super)
     return false;
 
-  if (auto ip = super->getInvertibleProtocolKind())
-    return requiresInvertible(*ip);
-
-  return walkInheritedProtocols([super](ProtocolDecl *inherited) {
-    if (inherited == super)
-      return TypeWalker::Action::Stop;
-
-    return TypeWalker::Action::Continue;
-  });
+  auto allInherited = getAllInheritedProtocols();
+  return (llvm::find(allInherited, super) != allInherited.end());
 }
 
-bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
-  // Protocols don't inherit from themselves.
-  if (auto thisIP = getInvertibleProtocolKind()) {
-    if (thisIP == ip)
-      return false;
+static void findInheritedType(
+    InheritedTypes inherited,
+    llvm::function_ref<bool(Type, NullablePtr<TypeRepr>)> isMatch) {
+  for (size_t i = 0; i < inherited.size(); i++) {
+    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
+    if (!type)
+      continue;
+
+    if (isMatch(type, inherited.getTypeRepr(i)))
+      break;
+  }
+}
+
+static InverseMarking::Mark
+findInverseInInheritance(InheritedTypes inherited,
+                         InvertibleProtocolKind target) {
+  auto isInverseOfTarget = [&](Type t) {
+    if (auto pct = t->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(target);
+    return false;
+  };
+
+  InverseMarking::Mark inverse;
+  findInheritedType(inherited,
+                    [&](Type inheritedTy, NullablePtr<TypeRepr> repr) {
+                      if (!isInverseOfTarget(inheritedTy))
+                        return false;
+
+                      inverse = InverseMarking::Mark(
+                          InverseMarking::Kind::Explicit,
+                          repr.isNull() ? SourceLoc() : repr.get()->getLoc());
+                      return true;
+                    });
+  return inverse;
+}
+
+InverseMarking::Mark
+AssociatedTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  auto &ctx = getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::Mark();
+
+  return findInverseInInheritance(getInherited(), target);
+}
+
+InverseMarking::Mark
+NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  switch (target) {
+  case InvertibleProtocolKind::Copyable:
+    // Handle the legacy '@_moveOnly' for types they can validly appear.
+    // TypeCheckAttr handles the illegal situations for us.
+    if (auto attr = getAttrs().getAttribute<MoveOnlyAttr>())
+      if (isa<StructDecl, EnumDecl, ClassDecl>(this))
+        return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
+                                    attr->getLocation());
+    break;
+
+  case InvertibleProtocolKind::Escapable:
+    // Handle the legacy '@_nonEscapable' attribute
+    if (auto attr = getAttrs().getAttribute<NonEscapableAttr>()) {
+      assert((isa<ClassDecl, StructDecl, EnumDecl>(this)));
+      return InverseMarking::Mark(InverseMarking::Kind::LegacyExplicit,
+                                  attr->getLocation());
+    }
+    break;
   }
 
-  auto kp = ::getKnownProtocolKind(ip);
+  auto &ctx = getASTContext();
 
-  // Otherwise, check for inverses on all of the inherited protocols. If there
-  // is one protocol missing an inverse for this `super` protocol, then it is
-  // implicitly inherited.
-  return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {
-    if (proto->isSpecificProtocol(kp))
-      return TypeWalker::Action::Stop; // It is explicitly inherited.
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::Mark(InverseMarking::Kind::None);
 
-    // There is no implicit inheritance of an invertible protocol requirement
-    // on an invertible protocol itself.
-    if (proto->getInvertibleProtocolKind())
-      return TypeWalker::Action::Continue;
+  // Claim that the tuple decl has an inferred ~TARGET marking.
+  if (isa<BuiltinTupleDecl>(this))
+    return InverseMarking::Mark(InverseMarking::Kind::Inferred);
 
-    // Otherwise, check to see if there's an inverse on this protocol.
-    switch (proto->getMarking(ip).getInverse().getKind()) {
-    case InverseMarking::Kind::None:
-      return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
+  if (auto P = dyn_cast<ProtocolDecl>(this))
+    return P->hasInverseMarking(target);
 
-    case InverseMarking::Kind::LegacyExplicit:
-    case InverseMarking::Kind::Explicit:
-    case InverseMarking::Kind::Inferred:
-      // The implicit requirement was suppressed on this protocol, keep looking.
-      return TypeWalker::Action::Continue;
-    }
-  });
+  // Search the inheritance clause first.
+  if (auto inverse = findInverseInInheritance(getInherited(), target))
+    return inverse;
+
+  // Check the generic parameters for an explicit ~TARGET marking
+  // which would result in an Inferred ~TARGET marking for this context.
+  auto *gpList = getParsedGenericParams();
+  if (!gpList)
+    return InverseMarking::Mark();
+
+  llvm::SmallSet<GenericTypeParamDecl *, 4> params;
+
+  // Scan the inheritance clauses of generic parameters only for an inverse.
+  for (GenericTypeParamDecl *param : gpList->getParams()) {
+    auto inverse = findInverseInInheritance(param->getInherited(), target);
+
+    // Inverse is inferred from one of the generic parameters.
+    if (inverse)
+      return inverse.with(InverseMarking::Kind::Inferred);
+
+    params.insert(param);
+  }
+
+  // Next, scan the where clause and return the result.
+  auto whereClause = getTrailingWhereClause();
+  if (!whereClause)
+    return InverseMarking::Mark();
+
+  auto requirements = whereClause->getRequirements();
+  for (unsigned i : indices(requirements)) {
+    auto requirementRepr = requirements[i];
+    if (requirementRepr.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
+
+    auto *subjectRepr =
+        dyn_cast<IdentTypeRepr>(requirementRepr.getSubjectRepr());
+
+    if (!(subjectRepr && subjectRepr->isBound()))
+      continue;
+
+    auto *subjectGP =
+        dyn_cast<GenericTypeParamDecl>(subjectRepr->getBoundDecl());
+    if (!subjectGP || !params.contains(subjectGP))
+      continue;
+
+    auto *constraintRepr =
+        dyn_cast<InverseTypeRepr>(requirementRepr.getConstraintRepr());
+    if (!constraintRepr || constraintRepr->isInvalid())
+      continue;
+
+    if (constraintRepr->isInverseOf(target, getDeclContext()))
+      return InverseMarking::Mark(InverseMarking::Kind::Inferred,
+                                  constraintRepr->getLoc());
+  }
+
+  return InverseMarking::Mark();
+}
+
+InverseMarking::Mark
+ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
+  auto &ctx = getASTContext();
+
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::Mark();
+
+  if (auto inverse = findInverseInInheritance(getInherited(), target))
+    return inverse;
+
+  auto *whereClause = getTrailingWhereClause();
+  if (!whereClause)
+    return InverseMarking::Mark();
+
+  for (const auto &reqRepr : whereClause->getRequirements()) {
+    if (reqRepr.isInvalid() ||
+        reqRepr.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
+
+    auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
+    auto *constraintRepr = reqRepr.getConstraintRepr();
+
+    if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))
+      continue;
+
+    if (constraintRepr->isInverseOf(target, getDeclContext()))
+      return InverseMarking::Mark(InverseMarking::Kind::Explicit,
+                                  constraintRepr->getLoc());
+  }
+
+  return InverseMarking::Mark();
 }
 
 bool ProtocolDecl::requiresClass() const {
@@ -6726,13 +6855,16 @@ ProtocolDecl::getProtocolDependencies() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       ProtocolDependenciesRequest{const_cast<ProtocolDecl *>(this)},
-      llvm::None);
+      std::nullopt);
 }
 
 RequirementSignature ProtocolDecl::getRequirementSignature() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-               RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
-               RequirementSignature());
+  return getASTContext().evaluator(
+               RequirementSignatureRequest{const_cast<ProtocolDecl *>(this)},
+               [this]() {
+                 return RequirementSignature::getPlaceholderRequirementSignature(
+                     this, GenericSignatureErrors());
+               });
 }
 
 bool ProtocolDecl::isComputingRequirementSignature() const {
@@ -6741,7 +6873,6 @@ bool ProtocolDecl::isComputingRequirementSignature() const {
 }
 
 void ProtocolDecl::setRequirementSignature(RequirementSignature requirementSig) {
-  assert(!RequirementSig && "requirement signature already set");
   RequirementSig = requirementSig;
 }
 
@@ -6806,11 +6937,11 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
-llvm::Optional<KnownDerivableProtocolKind>
+std::optional<KnownDerivableProtocolKind>
 ProtocolDecl::getKnownDerivableProtocolKind() const {
   const auto knownKind = getKnownProtocolKind();
   if (!knownKind)
-    return llvm::None;
+    return std::nullopt;
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
@@ -6846,7 +6977,7 @@ ProtocolDecl::getKnownDerivableProtocolKind() const {
   case KnownProtocolKind::DistributedActorSystem:
     return KnownDerivableProtocolKind::DistributedActorSystem;
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -7128,10 +7259,10 @@ AbstractStorageDecl::setSynthesizedAccessor(AccessorKind kind,
   accessors->addOpaqueAccessor(accessor);
 }
 
-static llvm::Optional<ObjCSelector>
+static std::optional<ObjCSelector>
 getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
   if (!attr)
-    return llvm::None;
+    return std::nullopt;
   if (auto name = attr->getName()) {
     if (attr->isNameImplicit()) {
       // preferredName > implicit name, because implicit name is just cached
@@ -7143,7 +7274,7 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
       return *name;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 ObjCSelector
@@ -7427,7 +7558,7 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return SourceRange();
 }
 
-static llvm::Optional<std::pair<CaseStmt *, Pattern *>>
+static std::optional<std::pair<CaseStmt *, Pattern *>>
 findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto getMatchingPattern = [&](CaseStmt *cs) -> Pattern * {
     // Check if inputVD is in our case body var decls if we have any. If we do,
@@ -7458,7 +7589,7 @@ findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
   auto *caseStmt =
       dyn_cast_or_null<CaseStmt>(canonicalVD->getParentPatternStmt());
   if (!caseStmt)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto *p = getMatchingPattern(caseStmt))
     return std::make_pair(caseStmt, p);
@@ -7468,7 +7599,7 @@ findParentPatternCaseStmtAndPattern(const VarDecl *inputVD) {
       return std::make_pair(caseStmt, p);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 VarDecl *VarDecl::getCanonicalVarDecl() const {
@@ -7787,7 +7918,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
   // `inout` and `consuming` parameters are locally mutable.
   case ParamSpecifier::InOut:
   case ParamSpecifier::Consuming:
-  case ParamSpecifier::Transferring:
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
     introducer = VarDecl::Introducer::Var;
     break;
   }
@@ -7812,8 +7943,7 @@ bool ParamDecl::isAnonClosureParam() const {
 
 bool ParamDecl::isVariadic() const {
   (void) getInterfaceType();
-
-  return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+  return getOptions().contains(Flag::IsVariadic);
 }
 
 ParamDecl::Specifier ParamDecl::getSpecifier() const {
@@ -7851,8 +7981,8 @@ StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
     return "__shared";
   case ParamSpecifier::LegacyOwned:
     return "__owned";
-  case ParamSpecifier::Transferring:
-    return "transferring";
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
+    return "implicitly_copyable_consuming";
   }
   llvm_unreachable("invalid ParamSpecifier");
 }
@@ -8001,15 +8131,16 @@ VarDecl::getPropertyWrapperInitializerInfo() const {
       PropertyWrapperInitializerInfo());
 }
 
-llvm::Optional<PropertyWrapperMutability>
+std::optional<PropertyWrapperMutability>
 VarDecl::getPropertyWrapperMutability() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator, PropertyWrapperMutabilityRequest{mutableThis}, llvm::None);
+  return evaluateOrDefault(ctx.evaluator,
+                           PropertyWrapperMutabilityRequest{mutableThis},
+                           std::nullopt);
 }
 
-llvm::Optional<PropertyWrapperSynthesizedPropertyKind>
+std::optional<PropertyWrapperSynthesizedPropertyKind>
 VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
   if (getOriginalWrappedProperty(
           PropertyWrapperSynthesizedPropertyKind::Backing))
@@ -8017,7 +8148,7 @@ VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
   if (getOriginalWrappedProperty(
           PropertyWrapperSynthesizedPropertyKind::Projection))
     return PropertyWrapperSynthesizedPropertyKind::Projection;
-  return llvm::None;
+  return std::nullopt;
 }
 
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
@@ -8223,7 +8354,7 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
     : VarDecl(DeclKind::Param,
               /*IsStatic*/ false, VarDecl::Introducer::Let, parameterNameLoc,
               parameterName, dc, StorageIsNotMutable),
-      ArgumentNameAndFlags(argumentName, llvm::None),
+      ArgumentNameAndFlags(argumentName, std::nullopt),
       ParameterNameLoc(parameterNameLoc), ArgumentNameLoc(argumentNameLoc),
       SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.OwnershipSpecifier = 0;
@@ -8235,8 +8366,7 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   auto *Clone = new (Ctx) ParamDecl(
       SourceLoc(), SourceLoc(), PD->getArgumentName(),
       SourceLoc(), PD->getParameterName(), PD->getDeclContext());
-  Clone->DefaultValueAndFlags.setPointerAndInt(
-      nullptr, PD->DefaultValueAndFlags.getInt());
+  Clone->setOptionsAndPointers(nullptr, nullptr, PD->getOptions());
   Clone->Bits.ParamDecl.defaultArgumentKind =
       PD->Bits.ParamDecl.defaultArgumentKind;
 
@@ -8289,6 +8419,9 @@ DefaultArgumentKind swift::getDefaultArgKind(Expr *init) {
   // checking.
   if (isa<NilLiteralExpr>(init))
     return DefaultArgumentKind::NilLiteral;
+
+  if (isa<MacroExpansionExpr>(init))
+    return DefaultArgumentKind::ExpressionMacro;
 
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
@@ -8454,18 +8587,17 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn(),
-      getSpecifier() == ParamDecl::Specifier::Transferring /*is transferring*/);
+      hasResultDependsOn(), isTransferring());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
-llvm::Optional<Initializer *>
+std::optional<Initializer *>
 ParamDecl::getCachedDefaultArgumentInitContext() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
     if (auto *init = defaultInfo->InitContextAndIsTypeChecked.getPointer())
       return init;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 Initializer *ParamDecl::getDefaultArgumentInitContext() const {
@@ -8489,6 +8621,7 @@ bool ParamDecl::hasDefaultExpr() const {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::ExpressionMacro:
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
@@ -8512,6 +8645,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
     return true;
   }
   llvm_unreachable("invalid default argument kind");
@@ -8647,11 +8781,11 @@ swift::findWrappedValuePlaceholder(Expr *init) {
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
-        return Action::SkipChildren(E);
+        return Action::SkipNode(E);
 
       if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
         placeholder = value;
-        return Action::SkipChildren(value);
+        return Action::SkipNode(value);
       }
 
       return Action::Continue(E);
@@ -8708,6 +8842,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   switch (getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
+  case DefaultArgumentKind::ExpressionMacro:
   case DefaultArgumentKind::Normal: {
     assert(DefaultValueAndFlags.getPointer() &&
            "default value not provided yet");
@@ -8800,7 +8935,8 @@ ParamDecl::getDefaultValueStringRepresentation(
 void
 ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
   assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal ||
-         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty);
+         getDefaultArgumentKind() == DefaultArgumentKind::StoredProperty ||
+         getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro);
   assert(!stringRepresentation.empty());
 
   if (!DefaultValueAndFlags.getPointer()) {
@@ -9134,12 +9270,12 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
          !paramType->isNoEscape() && !param->isAutoClosure();
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 AbstractFunctionDecl::findPotentialCompletionHandlerParam(
     const AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
-    return llvm::None;
+    return std::nullopt;
 
   // If no async alternative given, just find the last parameter that matches
   // a completion handler signature
@@ -9148,7 +9284,7 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
       if (isPotentialCompletionHandler(params->get(i)))
         return i;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   // If this is an imported function with an async convention then we already
@@ -9173,7 +9309,7 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
   const ParameterList *asyncParams = asyncAlternative->getParameters();
   unsigned paramIndex = 0;
   unsigned asyncParamIndex = 0;
-  llvm::Optional<unsigned> potentialParam;
+  std::optional<unsigned> potentialParam;
   while (paramIndex < params->size() || asyncParamIndex < asyncParams->size()) {
     if (paramIndex >= params->size()) {
       // Have more async params than original params, if we haven't found a
@@ -9181,7 +9317,7 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
       // ensure the rest of the async params are defaulted
       if (!potentialParam ||
           !asyncParams->get(asyncParamIndex)->isDefaultArgument())
-        return llvm::None;
+        return std::nullopt;
       asyncParamIndex++;
       continue;
     }
@@ -9200,7 +9336,7 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
 
       // Don't have types for some reason, just return no match
       if (!param->getInterfaceType() || !asyncParam->getInterfaceType())
-        return llvm::None;
+        return std::nullopt;
 
       paramMatches = param->getInterfaceType()->matchesParameter(
           asyncParam->getInterfaceType(), TypeMatchOptions());
@@ -9215,7 +9351,7 @@ AbstractFunctionDecl::findPotentialCompletionHandlerParam(
     // Param doesn't match, either it's the first completion handler or these
     // functions don't match
     if (potentialParam || !isPotentialCompletionHandler(param))
-      return llvm::None;
+      return std::nullopt;
 
     // The next original param should match the current async, so don't
     // increment the async index
@@ -9289,7 +9425,7 @@ static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
   // Expand a body macro, if there is one.
   BraceStmt *macroExpandedBody = nullptr;
   if (auto bufferID = evaluateOrDefault(
-          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, std::nullopt)) {
     CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
     auto bufferStart = bufferRange.getStart();
     auto module = fn->getParentModule();
@@ -9403,7 +9539,7 @@ BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
 }
 
 void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
-  llvm::Optional<Fingerprint> fp = llvm::None;
+  std::optional<Fingerprint> fp = std::nullopt;
   if (getBodyKind() == BodyKind::TypeChecked ||
       getBodyKind() == BodyKind::Parsed) {
     fp = BodyAndFP.getFingerprint();
@@ -9526,7 +9662,7 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   return getNameLoc();
 }
 
-llvm::Optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
+std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
   ASTContext &ctx = getASTContext();
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -9534,7 +9670,7 @@ llvm::Optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
       .getFingerprint();
 }
 
-llvm::Optional<Fingerprint>
+std::optional<Fingerprint>
 AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 
   class HashCombiner : public ASTWalker {
@@ -9550,7 +9686,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (D->isImplicit())
-        return Action::SkipChildren();
+        return Action::SkipNode();
 
       if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
         if (auto fp = idc->getBodyFingerprint())
@@ -9561,7 +9697,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
         for (auto *d : idc->getParsedMembers())
           const_cast<Decl *>(d)->walk(*this);
 
-        return Action::SkipChildren();
+        return Action::SkipNode();
       }
 
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -9647,9 +9783,9 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
   }
 
   // The number of selector pieces we'll have.
-  llvm::Optional<ForeignAsyncConvention> asyncConvention =
+  std::optional<ForeignAsyncConvention> asyncConvention =
       getForeignAsyncConvention();
-  llvm::Optional<ForeignErrorConvention> errorConvention =
+  std::optional<ForeignErrorConvention> errorConvention =
       getForeignErrorConvention();
   unsigned numSelectorPieces
     = argNames.size() + (asyncConvention.has_value() ? 1 : 0)
@@ -9875,13 +10011,13 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
 }
 
-llvm::Optional<SubstitutionMap>
+std::optional<SubstitutionMap>
 OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
@@ -9889,7 +10025,7 @@ OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const {
   auto found = std::find(opaqueReprs.begin(), opaqueReprs.end(), repr);
   if (found != opaqueReprs.end())
     return found - opaqueReprs.begin();
-  return llvm::None;
+  return std::nullopt;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -10078,6 +10214,8 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
+  if (llvm::isa_and_nonnull<TransferringTypeRepr>(ResultTyR))
+    FD->setTransferringResult();
   return FD;
 }
 
@@ -10919,8 +11057,14 @@ Type ClassDecl::getSuperclass() const {
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    SuperclassDeclRequest{const_cast<ClassDecl *>(this)}, nullptr);
+  auto result = evaluateOrDefault(ctx.evaluator,
+    SuperclassDeclRequest{const_cast<ClassDecl *>(this)},
+    const_cast<ClassDecl *>(this));
+
+  if (result == this)
+    return nullptr;
+
+  return result;
 }
 
 void ClassDecl::setSuperclass(Type superclass) {
@@ -10953,6 +11097,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
+      case ActorIsolation::Erased:
         return false;
 
       case ActorIsolation::ActorInstance:
@@ -11198,7 +11343,7 @@ SourceLoc swift::extractNearestSourceLoc(TypeOrExtensionDecl container) {
   return extractNearestSourceLoc(container.Decl);
 }
 
-llvm::Optional<BodyAndFingerprint>
+std::optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
@@ -11214,7 +11359,7 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
 
   case BodyKind::Synthesize:
   case BodyKind::Unparsed:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("Unhandled BodyKing in switch");
 }
@@ -11243,12 +11388,12 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
   }
 }
 
-llvm::Optional<bool> IsFunctionBodySkippedRequest::getCachedResult() const {
+std::optional<bool> IsFunctionBodySkippedRequest::getCachedResult() const {
   using BodySkippedStatus = AbstractFunctionDecl::BodySkippedStatus;
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodySkippedStatus()) {
   case BodySkippedStatus::Unknown:
-    return llvm::None;
+    return std::nullopt;
   case BodySkippedStatus::Skipped:
     return true;
   case BodySkippedStatus::NotSkipped:
@@ -11342,7 +11487,8 @@ ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
 }
 
 NominalTypeDecl *ActorIsolation::getActor() const {
-  assert(getKind() == ActorInstance);
+  assert(getKind() == ActorInstance ||
+         getKind() == GlobalActor);
 
   if (silParsed)
     return nullptr;
@@ -11413,6 +11559,13 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
   case NonisolatedUnsafe:
   case Unspecified:
     return true;
+
+  case Erased:
+    // Different functions with erased isolation have the same *kind* of
+    // isolation, but we must generally assume that they're not isolated
+    // the *same way*, which is what this function is apparently supposed
+    // to answer.
+    return false;
 
   case ActorInstance: {
     auto *lhsActor = lhs.getActorInstance();
@@ -11577,7 +11730,7 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
               roles.contains(MacroRole::CodeItem)) {
             (void)evaluateOrDefault(ctx.evaluator,
                                     ExpandMacroExpansionExprRequest{expr},
-                                    llvm::None);
+                                    std::nullopt);
             if (auto substituted = expr->getSubstituteDecl()) {
               macroRef = substituted;
               baseDecl = substituted;
@@ -11664,7 +11817,7 @@ SourceRange MacroDecl::getSourceRange() const {
 }
 
 MacroRoles MacroDecl::getMacroRoles() const {
-  MacroRoles contexts = llvm::None;
+  MacroRoles contexts = std::nullopt;
   for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
     contexts |= attr->getMacroRole();
   return contexts;
@@ -11843,20 +11996,22 @@ void MacroDecl::setDefinition(MacroDefinition definition) {
                                         std::move(definition));
 }
 
-llvm::Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
+std::optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   auto def = getDefinition();
   if (def.kind != MacroDefinition::Kind::Builtin)
-    return llvm::None;
+    return std::nullopt;
   return def.getBuiltinKind();
 }
 
 MacroDefinition MacroDefinition::forExpanded(
     ASTContext &ctx,
     StringRef expansionText,
-    ArrayRef<ExpandedMacroReplacement> replacements
+    ArrayRef<ExpandedMacroReplacement> replacements,
+    ArrayRef<ExpandedMacroReplacement> genericReplacements
 ) {
   return ExpandedMacroDefinition{ctx.AllocateCopy(expansionText),
-                                 ctx.AllocateCopy(replacements)};
+                                 ctx.AllocateCopy(replacements),
+                                 ctx.AllocateCopy(genericReplacements)};
 }
 
 MacroExpansionDecl::MacroExpansionDecl(DeclContext *dc,
@@ -12006,6 +12161,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::DefaultArgument:
     return origDC;
   }
 }
@@ -12016,13 +12172,13 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
       expansion->getPoundLoc(), expansion->getDeclContext());
 }
 
-llvm::Optional<Type>
+std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
       return func->mapTypeIntoContext(*thrownError);
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (auto closure = dyn_cast<ClosureExpr *>()) {
@@ -12031,18 +12187,18 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
 
     if (Type thrownType = closure->getExplicitThrownType()) {
       if (thrownType->isNever())
-        return llvm::None;
+        return std::nullopt;
 
       return thrownType;
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (auto doCatch = dyn_cast<DoCatchStmt *>()) {
     if (auto thrownError = doCatch->getCaughtErrorType()) {
       if (thrownError->isNever())
-        return llvm::None;
+        return std::nullopt;
 
       return thrownError;
     }
@@ -12120,11 +12276,11 @@ bool ExplicitCaughtTypeRequest::isCached() const {
   llvm_unreachable("Unhandled catch node");
 }
 
-llvm::Optional<Type> ExplicitCaughtTypeRequest::getCachedResult() const {
-  // Map a possibly-null Type to llvm::Optional<Type>.
-  auto nonnullTypeOrNone = [](Type type) -> llvm::Optional<Type> {
+std::optional<Type> ExplicitCaughtTypeRequest::getCachedResult() const {
+  // Map a possibly-null Type to std::optional<Type>.
+  auto nonnullTypeOrNone = [](Type type) -> std::optional<Type> {
     if (type.isNull())
-      return llvm::None;
+      return std::nullopt;
 
     return type;
   };
@@ -12140,7 +12296,7 @@ llvm::Optional<Type> ExplicitCaughtTypeRequest::getCachedResult() const {
       return nonnullTypeOrNone(closure->ThrownType->getInstanceType());
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {

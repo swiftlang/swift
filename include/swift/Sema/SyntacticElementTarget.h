@@ -91,6 +91,9 @@ private:
       /// pattern.
       Pattern *pattern;
 
+      /// The parent return statement if any.
+      ReturnStmt *parentReturnStmt;
+
       struct {
         /// The variable to which property wrappers have been applied, if
         /// this is an initialization involving a property wrapper.
@@ -260,6 +263,10 @@ public:
   forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
+
+  /// Form an expression target for a ReturnStmt.
+  static SyntacticElementTarget
+  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
 
   /// Form a target for a for-in loop.
   static SyntacticElementTarget
@@ -457,6 +464,11 @@ public:
     return cast<ExprPattern>(expression.pattern);
   }
 
+  ReturnStmt *getParentReturnStmt() const {
+    assert(kind == Kind::expression);
+    return expression.parentReturnStmt;
+  }
+
   Type getClosureContextualType() const {
     assert(kind == Kind::closure);
     return closure.convertType;
@@ -601,7 +613,7 @@ public:
     expression.pattern = pattern;
   }
 
-  llvm::Optional<AnyFunctionRef> getAsFunction() const {
+  std::optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -610,7 +622,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::function:
       return function.function;
@@ -618,7 +630,7 @@ public:
     llvm_unreachable("invalid function kind");
   }
 
-  llvm::Optional<StmtCondition> getAsStmtCondition() const {
+  std::optional<StmtCondition> getAsStmtCondition() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -627,7 +639,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::stmtCondition:
       return stmtCondition.stmtCondition;
@@ -635,7 +647,7 @@ public:
     llvm_unreachable("invalid statement kind");
   }
 
-  llvm::Optional<CaseLabelItem *> getAsCaseLabelItem() const {
+  std::optional<CaseLabelItem *> getAsCaseLabelItem() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -644,7 +656,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
@@ -876,7 +888,7 @@ public:
   }
 
   /// Walk the contents of the application target.
-  llvm::Optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
+  std::optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
 };
 
 } // namespace constraints

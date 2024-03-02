@@ -261,6 +261,12 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
+/// StoreRaw has type (T, Builtin.RawPointer) -> ()
+/// Stores a T to raw memory.
+/// Its address does not adhere to strict aliasing.
+/// See also LoadRaw.
+BUILTIN_SIL_OPERATION(StoreRaw, "storeRaw", Special)
+
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 ///
 /// This builtin asserts if the underlying type /could/ be objc.
@@ -1067,6 +1073,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
 /// Build a Builtin.Executor value for the main actor.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
                                    "buildMainActorExecutorRef", "n", Special)
+
+/// extractFunctionIsolation: <T>(_: T) -> (any Actor)?
+///
+/// Returns the isolation of a value, which must be an @isolated(any)
+/// function type.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ExtractFunctionIsolation,
+                                   "extractFunctionIsolation", "", Special)
 
 /// getEnumTag: <T>(_: T) -> Builtin.Int32
 ///

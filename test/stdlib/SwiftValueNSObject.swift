@@ -77,9 +77,25 @@ func TestSwiftValueNSObjectDefaultHashValue(_: AnyObject)
 func TestSwiftValueNSObjectAssertNoErrors()
 
 // Verify that Obj-C isEqual: provides same answer as Swift ==
-func TestEquatableEquals<T: Equatable>(_ e1: T, _ e2: T) {
+// This has been true for a long time for Hashable value types
+func TestHashableEquals<T: Equatable>(_ e1: T, _ e2: T) {
   if e1 == e2 {
     TestSwiftValueNSObjectEquals(e1 as AnyObject, e2 as AnyObject)
+  } else {
+    TestSwiftValueNSObjectNotEquals(e1 as AnyObject, e2 as AnyObject)
+  }
+}
+
+// Verify that Obj-C isEqual: provides same answer as Swift ==
+// This has not always been true for Equatable value types
+func TestEquatableEquals<T: Equatable>(_ e1: T, _ e2: T) {
+  if e1 == e2 {
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+    // Legacy: Swift Equatable is not used in ObjC
+    TestSwiftValueNSObjectNotEquals(e1 as AnyObject, e2 as AnyObject)
+#else
+    TestSwiftValueNSObjectEquals(e1 as AnyObject, e2 as AnyObject)
+#endif
   } else {
     TestSwiftValueNSObjectNotEquals(e1 as AnyObject, e2 as AnyObject)
   }
@@ -98,8 +114,14 @@ func TestHashable<T: Hashable>(_ h: T)
 // Test Obj-C hashValue for Swift types that are Equatable but not Hashable
 func TestEquatableHash<T: Equatable>(_ e: T)
 {
-  // These should have a constant hash value
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  // Legacy behavior used the pointer value, which is
+  // incompatible with user-defined equality.
+  TestSwiftValueNSObjectDefaultHashValue(e as AnyObject)
+#else
+  // New behavior uses a constant hash value in this case
   TestSwiftValueNSObjectHashValue(e as AnyObject, 1)
+#endif
 }
 
 func TestNonEquatableHash<T>(_ e: T)
@@ -112,10 +134,6 @@ func TestNonEquatableHash<T>(_ e: T)
 // CHECK: c ##This is C's debug description##
 // CHECK-NEXT: d ##This is D's description##
 // CHECK-NEXT: S ##{{.*}}__SwiftValue##
-
-// Full message is longer, but this is the essential part...
-// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftValueNSObject.E` {{.*}} Equatable but not Hashable
-// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftValueNSObject.E1` {{.*}} Equatable but not Hashable
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
@@ -141,9 +159,9 @@ if #available(OSX 10.12, iOS 10.0, *) {
   TestNonEquatableHash(D())
 
   // Hashable types are also Equatable
-  TestEquatableEquals(H(i:1), H(i:1))
-  TestEquatableEquals(H(i:1), H(i:2))
-  TestEquatableEquals(H(i:2), H(i:1))
+  TestHashableEquals(H(i:1), H(i:1))
+  TestHashableEquals(H(i:1), H(i:2))
+  TestHashableEquals(H(i:2), H(i:1))
 
   // Verify Obj-C hash value agrees with Swift
   TestHashable(H(i:1))
@@ -156,6 +174,4 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("c ##This is C's debug description##\n", stderr)
   fputs("d ##This is D's description##\n", stderr)
   fputs("S ##__SwiftValue##\n", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftValueNSObject.E` ... Equatable but not Hashable", stderr)
-  fputs("Obj-C `-hash` ... type `SwiftValueNSObject.E1` ... Equatable but not Hashable", stderr)
 }

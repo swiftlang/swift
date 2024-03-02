@@ -511,9 +511,9 @@ public:
                                      Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
-  llvm::Optional<unsigned> _depthIndexToFlatIndex(
-                                          unsigned depth, unsigned index,
-                                          llvm::ArrayRef<unsigned> paramCounts);
+  std::optional<unsigned>
+  _depthIndexToFlatIndex(unsigned depth, unsigned index,
+                         llvm::ArrayRef<unsigned> paramCounts);
 
   /// Gathers all of the written generic parameters needed for
   /// '_gatherGenericParameters'. This takes a list of key arguments and fills
@@ -537,7 +537,7 @@ public:
   /// passed to an instantiation function) will be added to this vector.
   ///
   /// \returns the error if an error occurred, None otherwise.
-  llvm::Optional<TypeLookupError> _checkGenericRequirements(
+  std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,

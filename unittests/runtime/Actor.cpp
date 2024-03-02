@@ -14,10 +14,10 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "gtest/gtest.h"
-#include <vector>
+#include <optional>
 #include <tuple>
+#include <vector>
 
 using namespace swift;
 
@@ -125,7 +125,7 @@ static TestActor *createActor() {
 /// matches an async task continuation function signature.
 template <class Fn, class Context>
 class TaskContinuationFromLambda {
-  static llvm::Optional<Fn> lambdaStorage;
+  static std::optional<Fn> lambdaStorage;
 
   SWIFT_CC(swiftasync)
   static void invoke(SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT HeapObject *) {
@@ -140,7 +140,7 @@ public:
 };
 
 template <class Fn, class Context>
-llvm::Optional<Fn> TaskContinuationFromLambda<Fn, Context>::lambdaStorage;
+std::optional<Fn> TaskContinuationFromLambda<Fn, Context>::lambdaStorage;
 
 } // end anonymous namespace
 

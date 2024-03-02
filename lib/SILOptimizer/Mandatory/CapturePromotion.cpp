@@ -46,6 +46,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
@@ -1473,6 +1474,10 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
+  // Mark the original partial apply function as deletable if it doesn't have
+  // uses later.
+  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
+
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
   SILBuilderWithScope builder(pai);
@@ -1538,7 +1543,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // Create a new partial apply with the new arguments.
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
-      pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      pai->getCalleeConvention(), pai->getResultIsolation(),
       pai->isOnStack());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

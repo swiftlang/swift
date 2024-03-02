@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope --color
+// RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
 
 // X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking  -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
 

@@ -51,6 +51,9 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   void *queuedDiagnostics = nullptr;
   llvm::DenseMap<unsigned, QueuedBuffer> queuedBuffers;
 
+  /// Source file syntax nodes cached by { source manager, buffer ID }.
+  llvm::DenseMap<std::pair<SourceManager *, unsigned>, void *> sourceFileSyntax;
+
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
   ~PrintingDiagnosticConsumer();
@@ -90,6 +93,10 @@ public:
   }
 
 private:
+  /// Retrieve the SourceFileSyntax for the given buffer.
+  void *getSourceFileSyntax(SourceManager &SM, unsigned bufferID,
+                            StringRef displayName);
+
   void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
 };

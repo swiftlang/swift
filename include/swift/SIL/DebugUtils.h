@@ -437,7 +437,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  llvm::Optional<SILDebugVariable> getVarInfo() const {
+  std::optional<SILDebugVariable> getVarInfo() const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
@@ -529,6 +529,19 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
       varName = decl->getBaseName().userFacingName();
     }
     return varName;
+  }
+
+  std::optional<StringRef> maybeGetName() const {
+    assert(getKind() != Kind::Invalid);
+    if (auto varInfo = getVarInfo()) {
+      return varInfo->Name;
+    }
+
+    if (auto *decl = getDecl()) {
+      return decl->getBaseName().userFacingName();
+    }
+
+    return {};
   }
 
   /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a

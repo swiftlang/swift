@@ -11,13 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
@@ -275,14 +277,15 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->setDynamicallyReplacedFunction(replacedFunc);
     }
   } else if (constant.isDistributedThunk()) {
-    auto decodeFuncDecl =
+    // It's okay for `decodeFuncDecl` to be null because system could be
+    // generic.
+    if (auto decodeFuncDecl =
             getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl);
-    assert(decodeFuncDecl && "decodeNextArgument function not found!");
-
-    auto decodeRef = SILDeclRef(decodeFuncDecl);
-    auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-    F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+                decl)) {
+      auto decodeRef = SILDeclRef(decodeFuncDecl);
+      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+    }
   }
 }
 
@@ -309,8 +312,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
-             (linkageForDef == SILLinkage::PublicNonABI &&
-              fnLinkage == SILLinkage::Shared))));
+             (linkageForDef == SILLinkage::PublicNonABI ||
+              linkageForDef == SILLinkage::PackageNonABI) &&
+              fnLinkage == SILLinkage::Shared)));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally
@@ -352,8 +356,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
 
   auto *F = SILFunction::create(
-      mod, linkage, name, constantType, nullptr, llvm::None, IsNotBare, IsTrans,
-      IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
+      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare,
+      IsTrans, IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
       IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
       inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -415,7 +419,7 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
 
 SILFunction *SILFunctionBuilder::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericEnvironment *genericEnv, llvm::Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, std::optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

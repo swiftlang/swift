@@ -82,133 +82,59 @@ static const unsigned TypeDepthThreshold = 50;
 /// Set the width threshold rather high, because some projects uses very wide
 /// tuples to model fixed size arrays.
 static const unsigned TypeWidthThreshold = 2000;
+/// Max length of an opaque archetype's type parameter.
+static const unsigned TypeLengthThreshold = 10;
 
 /// Compute the width and the depth of a type.
 /// We compute both, because some pathological test-cases result in very
 /// wide types and some others result in very deep types. It is important
 /// to bail as soon as we hit the threshold on any of both dimensions to
 /// prevent compiler hangs and crashes.
-static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
-  unsigned Depth = 0;
-  unsigned Width = 0;
-  if (auto *BGT = t->getAs<BoundGenericType>()) {
-    auto *NTD = BGT->getNominalOrBoundGenericNominal();
-    if (NTD) {
-      auto StoredProperties = NTD->getStoredProperties();
-      Width += StoredProperties.size();
-    }
-    ++Depth;
-    unsigned MaxTypeDepth = 0;
-    auto GenericArgs = BGT->getGenericArgs();
-    for (auto Ty : GenericArgs) {
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    Depth += MaxTypeDepth;
-    return std::make_pair(Depth, Width);
-  }
-
-  if (auto *TupleTy = t->getAs<TupleType>()) {
-    Width += TupleTy->getNumElements();
-    ++Depth;
-    unsigned MaxTypeDepth = 0;
-    auto ElementTypes = TupleTy->getElementTypes();
-    for (auto Ty : ElementTypes) {
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    Depth += MaxTypeDepth;
-    return std::make_pair(Depth, Width);
-  }
-
-  if (auto *FnTy = t->getAs<SILFunctionType>()) {
-    ++Depth;
-    unsigned MaxTypeDepth = 0;
-    auto Params = FnTy->getParameters();
-    Width += Params.size();
-    for (auto Param : Params) {
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) =
-        getTypeDepthAndWidth(Param.getInterfaceType());
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    auto Results = FnTy->getResults();
-    Width += Results.size();
-    for (auto Result : Results) {
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) =
-        getTypeDepthAndWidth(Result.getInterfaceType());
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    if (FnTy->hasErrorResult()) {
-      Width += 1;
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) =
-          getTypeDepthAndWidth(FnTy->getErrorResult().getInterfaceType());
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    Depth += MaxTypeDepth;
-    return std::make_pair(Depth, Width);
-  }
-
-  if (auto *FnTy = t->getAs<FunctionType>()) {
-    ++Depth;
-    unsigned MaxTypeDepth = 0;
-    auto Params = FnTy->getParams();
-    Width += Params.size();
-    for (auto &Param : Params) {
-      unsigned TypeWidth;
-      unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getParameterType());
-      if (TypeDepth > MaxTypeDepth)
-        MaxTypeDepth = TypeDepth;
-      Width += TypeWidth;
-    }
-    unsigned TypeWidth;
-    unsigned TypeDepth;
-    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getResult());
-    if (TypeDepth > MaxTypeDepth)
-      MaxTypeDepth = TypeDepth;
-    Width += TypeWidth;
-    Depth += MaxTypeDepth;
-    return std::make_pair(Depth, Width);
-  }
-
-  if (auto *MT = t->getAs<MetatypeType>()) {
-    Depth += 1;
-    unsigned TypeWidth;
-    unsigned TypeDepth;
-    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(MT->getInstanceType());
-    Width += TypeWidth;
-    Depth += TypeDepth;
-    return std::make_pair(Depth, Width);
-  }
-
-  return std::make_pair(Depth, Width);
-}
-
 static bool isTypeTooComplex(Type t) {
-  unsigned TypeWidth;
-  unsigned TypeDepth;
-  std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(t);
-  return TypeWidth >= TypeWidthThreshold || TypeDepth >= TypeDepthThreshold;
+  struct Walker : TypeWalker {
+    unsigned Depth = 0;
+    unsigned MaxDepth = 0;
+    unsigned MaxWidth = 0;
+    unsigned MaxLength = 0;
+
+    Action walkToTypePre(Type ty) override {
+      // The TypeWalker won't visit the interface type encapsulated by the
+      // archetype, so we do it directly to measure its length.
+      if (auto *opaqueArchetypeTy = ty->getAs<OpaqueTypeArchetypeType>()) {
+        auto interfaceTy = opaqueArchetypeTy->getInterfaceType();
+
+        unsigned length = 0;
+        while (auto memberTy = interfaceTy->getAs<DependentMemberType>()) {
+          ++length;
+          interfaceTy = memberTy->getBase();
+        }
+        assert(interfaceTy->is<GenericTypeParamType>());
+
+        if (length > MaxLength)
+          MaxLength = length;
+      }
+
+      ++Depth;
+      MaxDepth = std::max(Depth, MaxDepth);
+
+      ++MaxWidth;
+
+      return Action::Continue;
+    }
+
+    Action walkToTypePost(Type ty) override {
+      --Depth;
+
+      return Action::Continue;
+    }
+  };
+
+  Walker walker;
+  t.walk(walker);
+
+  return (walker.MaxWidth >= TypeWidthThreshold ||
+          walker.MaxDepth >= TypeDepthThreshold ||
+          walker.MaxLength >= TypeLengthThreshold);
 }
 
 namespace {
@@ -1000,7 +926,7 @@ SILType ReabstractionInfo::mapTypeIntoContext(SILType type) const {
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   SmallVector<SILResultInfo, 8> SpecializedResults;
-  llvm::Optional<SILResultInfo> specializedErrorResult;
+  std::optional<SILResultInfo> specializedErrorResult;
   SmallVector<SILYieldInfo, 8> SpecializedYields;
   SmallVector<SILParameterInfo, 8> SpecializedParams;
   auto context = getResilienceExpansion();
@@ -1101,7 +1027,8 @@ getGenericEnvironmentAndSignatureWithRequirements(
 
   auto NewGenSig = buildGenericSignature(M.getASTContext(),
                                          OrigGenSig, { },
-                                         std::move(RequirementsCopy));
+                                         std::move(RequirementsCopy),
+                                         /*allowInverses=*/false);
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1776,7 +1703,8 @@ FunctionSignaturePartialSpecializer::
 
   // Finalize the archetype builder.
   auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
-                                      AllGenericParams, AllRequirements);
+                                      AllGenericParams, AllRequirements,
+                                      /*allowInverses=*/false);
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
@@ -2523,7 +2451,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     }
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
-        pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+        pai->getCalleeConvention(), pai->getResultIsolation(),
         pai->isOnStack());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
@@ -3419,7 +3347,7 @@ void swift::trySpecializeApplyOfGeneric(
     Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
-      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PAI->getCalleeConvention(), PAI->getResultIsolation(),
       PAI->isOnStack());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);

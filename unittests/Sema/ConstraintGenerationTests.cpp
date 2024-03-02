@@ -132,7 +132,7 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
                                             /*explicitResultType=*/nullptr, DC);
   closure->setImplicit();
   // Create a return statement so this is treated as a single expression.
-  auto *RS = ReturnStmt::forSingleExprBody(
+  auto *RS = ReturnStmt::createImplied(
       Context, TupleExpr::createImplicit(Context, {}, {}));
   closure->setBody(BraceStmt::createImplicit(Context, /*elements=*/{RS}));
 
@@ -289,7 +289,7 @@ TEST_F(SemaTest, TestSwitchExprLocator) {
   auto *trueCase =
       CaseStmt::create(Context, CaseParentKind::Switch, SourceLoc(),
                        {CaseLabelItem(truePattern)}, SourceLoc(), SourceLoc(),
-                       trueBrace, /*caseBodyVars*/ llvm::None);
+                       trueBrace, /*caseBodyVars*/ std::nullopt);
 
   // case false: 2
   auto *falseBrace = BraceStmt::createImplicit(
@@ -300,7 +300,7 @@ TEST_F(SemaTest, TestSwitchExprLocator) {
   auto *falseCase =
       CaseStmt::create(Context, CaseParentKind::Switch, SourceLoc(),
                        {CaseLabelItem(falsePattern)}, SourceLoc(), SourceLoc(),
-                       falseBrace, /*caseBodyVars*/ llvm::None);
+                       falseBrace, /*caseBodyVars*/ std::nullopt);
 
   auto *subject = new (Context) BooleanLiteralExpr(true, SourceLoc());
 

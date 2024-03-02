@@ -228,9 +228,8 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
   ;
   if (auto Nominal = Ty->getAnyNominal()) {
     if (auto *Proto = dyn_cast<ProtocolDecl>(Nominal)) {
-      Proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-        if (Proto != inherited &&
-            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+      for (auto *inherited : Proto->getAllInheritedProtocols()) {
+        if (!inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
             !inherited->getInvertibleProtocolKind()) {
           LLVM_DEBUG(llvm::dbgs() << "Adding inherited protocol "
                                   << inherited->getName()
@@ -238,9 +237,7 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           Supertypes.push_back(USRBasedType::fromType(
             inherited->getDeclaredInterfaceType(), Arena));
         }
-
-        return TypeWalker::Action::Continue;
-      });
+      }
     } else {
       auto Conformances = Nominal->getAllConformances();
       Supertypes.reserve(Conformances.size());
@@ -396,7 +393,7 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&
-             !ExpectedTy->castTo<ArchetypeType>()->hasRequirements();
+             ExpectedTy->castTo<ArchetypeType>()->getExistentialType()->isAny();
 
     if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true,
                                   const_cast<DeclContext &>(DC)))
@@ -428,8 +425,9 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
 
   auto Result = TypeRelation::Unrelated;
   for (auto expectedTy : typeContext.getPossibleTypes()) {
-    // Do not use Void type context for a single-expression body, since the
-    // implicit return does not constrain the expression.
+    // Do not use Void type context for an implied result such as a
+    // single-expression closure body, since the implicit return does not
+    // constrain the expression.
     //
     //     { ... -> ()  in x } // x can be anything
     //
@@ -437,16 +435,15 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
     //
     //     { ... -> Int in x }        // x must be Int
     //     { ... -> ()  in return x } // x must be Void
-    if (typeContext.isImplicitSingleExpressionReturn() && expectedTy->isVoid())
+    if (typeContext.isImpliedResult() && expectedTy->isVoid())
       continue;
 
     Result = std::max(Result, calculateTypeRelation(Ty, expectedTy, DC));
   }
 
-  // Map invalid -> unrelated when in a single-expression body, since the
-  // input may be incomplete.
-  if (typeContext.isImplicitSingleExpressionReturn() &&
-      Result == TypeRelation::Invalid)
+  // Map invalid -> unrelated for an implied result, since the input may be
+  // incomplete.
+  if (typeContext.isImpliedResult() && Result == TypeRelation::Invalid)
     Result = TypeRelation::Unrelated;
 
   return Result;

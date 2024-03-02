@@ -125,7 +125,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -141,7 +141,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -157,7 +157,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 template <typename Verifier, typename Kind>
@@ -170,7 +170,7 @@ ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return ASTWalker::Action::SkipChildren(node);
+  return ASTWalker::Action::SkipNode(node);
 }
 
 namespace {
@@ -401,7 +401,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue();
       cleanup(node);
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -419,7 +419,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -430,7 +430,7 @@ public:
       if (shouldVerify(node))
         return Action::Continue(node);
       cleanup(node);
-      return Action::SkipChildren(node);
+      return Action::SkipNode(node);
     }
 
     /// Helper template for dispatching post-visitation.
@@ -1078,6 +1078,7 @@ public:
       } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
         if (CD->hasLifetimeDependentReturn()) {
           resultType = CD->getResultInterfaceType();
+          resultType = CD->mapTypeIntoContext(resultType);
         } else {
           resultType = TupleType::getEmpty(Ctx);
         }
@@ -2651,6 +2652,11 @@ public:
 
     void verifyChecked(VarDecl *var) {
       if (!var->hasInterfaceType())
+        return;
+
+      // The types for imported vars are produced lazily and
+      // could fail to import.
+      if (var->getClangDecl() && var->isInvalid())
         return;
 
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);

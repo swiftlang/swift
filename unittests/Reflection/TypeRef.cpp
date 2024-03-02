@@ -160,10 +160,10 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   // Test parameter with and without inout/shared/variadic and/or label.
   ParameterFlags paramFlags;
-  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
+  auto inoutFlags = paramFlags.withOwnership(ParameterOwnership::InOut);
   auto variadicFlags = paramFlags.withVariadic(true);
-  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
-  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
+  auto sharedFlags = paramFlags.withOwnership(ParameterOwnership::Shared);
+  auto ownedFlags = paramFlags.withOwnership(ParameterOwnership::Owned);
 
   auto F6 = Builder.createFunctionType(
       {Param1.withFlags(inoutFlags)}, Result, FunctionTypeFlags(),
@@ -335,9 +335,9 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC_decl, nullptr);
-  auto M1 = Builder.createMetatypeType(N1, llvm::None);
-  auto M2 = Builder.createMetatypeType(N1, llvm::None);
-  auto MM3 = Builder.createMetatypeType(M1, llvm::None);
+  auto M1 = Builder.createMetatypeType(N1, std::nullopt);
+  auto M2 = Builder.createMetatypeType(N1, std::nullopt);
+  auto MM3 = Builder.createMetatypeType(M1, std::nullopt);
   auto M4 = Builder.createMetatypeType(N1, Demangle::ImplMetatypeRepresentation::Thick);
 
   EXPECT_EQ(M1, M2);

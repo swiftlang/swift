@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import other_global_actor_inference
 

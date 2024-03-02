@@ -265,6 +265,19 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           continue;
         }
 
+        if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+            Tok.isContextualKeyword("transferring")) {
+          if (param.TransferringLoc.isValid()) {
+            diagnose(Tok, diag::parameter_specifier_repeated)
+                .fixItRemove(Tok.getLoc());
+            consumeToken();
+            continue;
+          }
+
+          param.TransferringLoc = consumeToken();
+          continue;
+        }
+
         if (!hasSpecifier) {
           // These cases are handled later when mapping to ParamDecls for
           // better fixits.
@@ -282,11 +295,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
-            param.SpecifierLoc = consumeToken();
-          } else if (Context.LangOpts.hasFeature(
-                         Feature::TransferringArgsAndResults) &&
-                     Tok.isContextualKeyword("transferring")) {
-            param.SpecifierKind = ParamDecl::Specifier::Transferring;
             param.SpecifierLoc = consumeToken();
           }
 
@@ -574,6 +582,12 @@ mapParsedParameters(Parser &parser,
         param->setResultDependsOn();
       }
 
+      if (paramInfo.TransferringLoc.isValid()) {
+        type = new (parser.Context)
+            TransferringTypeRepr(type, paramInfo.TransferringLoc);
+        param->setTransferring();
+      }
+
       param->setTypeRepr(type);
 
       // Dig through the type to find any attributes or modifiers that are
@@ -601,6 +615,8 @@ mapParsedParameters(Parser &parser,
               param->setCompileTimeConst(true);
             else if (isa<ResultDependsOnTypeRepr>(STR))
               param->setResultDependsOn(true);
+            else if (isa<TransferringTypeRepr>(STR))
+              param->setTransferring(true);
             unwrappedType = STR->getBase();
             continue;
           }
@@ -1201,7 +1217,7 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
 ///
 ///   pattern-tuple-element:
 ///     (identifier ':')? pattern
-std::pair<ParserStatus, llvm::Optional<TuplePatternElt>>
+std::pair<ParserStatus, std::optional<TuplePatternElt>>
 Parser::parsePatternTupleElement() {
   // If this element has a label, parse it.
   Identifier Label;
@@ -1216,9 +1232,9 @@ Parser::parsePatternTupleElement() {
   // Parse the pattern.
   ParserResult<Pattern>  pattern = parsePattern();
   if (pattern.hasCodeCompletion())
-    return std::make_pair(makeParserCodeCompletionStatus(), llvm::None);
+    return std::make_pair(makeParserCodeCompletionStatus(), std::nullopt);
   if (pattern.isNull())
-    return std::make_pair(makeParserError(), llvm::None);
+    return std::make_pair(makeParserError(), std::nullopt);
 
   auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get());
   return std::make_pair(makeParserSuccess(), Elt);
@@ -1244,7 +1260,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
               [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
-    llvm::Optional<TuplePatternElt> elt;
+    std::optional<TuplePatternElt> elt;
     std::tie(EltStatus, elt) = parsePatternTupleElement();
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();

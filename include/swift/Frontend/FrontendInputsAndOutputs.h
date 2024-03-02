@@ -172,6 +172,7 @@ public:
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
   bool shouldTreatAsModuleInterface() const;
+  bool shouldTreatAsNonPackageModuleInterface() const;
   bool shouldTreatAsObjCHeader() const;
 
   bool areAllNonPrimariesSIB() const;

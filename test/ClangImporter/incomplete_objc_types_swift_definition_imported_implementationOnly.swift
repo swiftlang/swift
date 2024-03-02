@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library %S/Inputs/custom-modules/IncompleteTypes/complete-swift-types.swift -module-name CompleteSwiftTypes -emit-module -emit-module-path %t/CompleteSwiftTypes.swiftmodule
-// RUN: not %target-swift-frontend -enable-upcoming-feature ImportObjcForwardDeclarations -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %s 2>&1 | %FileCheck %s
-// RUN: not %target-swift-frontend -swift-version 6 -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %s 2>&1 | %FileCheck  %s
+// RUN: not %target-swift-frontend -enable-upcoming-feature ImportObjcForwardDeclarations -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %s -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -swift-version 6 -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %s -diagnostic-style llvm 2>&1 | %FileCheck  %s
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
 
 @_implementationOnly import CompleteSwiftTypes
 import ObjCLibraryForwardDeclaringCompleteSwiftTypes

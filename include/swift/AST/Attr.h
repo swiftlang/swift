@@ -38,7 +38,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -46,6 +45,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 
 namespace swift {
 class ArgumentList;
@@ -54,6 +54,7 @@ class ASTContext;
 struct PrintOptions;
 class CustomAttr;
 class Decl;
+class DeclRefTypeRepr;
 class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
@@ -189,6 +190,11 @@ protected:
 
     SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
       isUnsafe : 1
+    );
+
+    SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 32,
+      : NumPadBits,
+      NumFeatures : 32
     );
   } Bits;
   // clang-format on
@@ -471,7 +477,7 @@ public:
   /// Also note that this recognizes both attributes like '@inline' (with no @)
   /// and decl modifiers like 'final'.
   ///
-  static llvm::Optional<DeclAttrKind> getAttrKindFromString(StringRef Str);
+  static std::optional<DeclAttrKind> getAttrKindFromString(StringRef Str);
 
   static DeclAttribute *createSimple(const ASTContext &context,
                                      DeclAttrKind kind, SourceLoc atLoc,
@@ -663,8 +669,7 @@ enum class PlatformAgnosticAvailabilityKind {
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
-#define INIT_VER_TUPLE(X)                                                      \
-  X(X.empty() ? llvm::Optional<llvm::VersionTuple>() : X)
+#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                 StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
@@ -702,19 +707,19 @@ public:
   ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
-  const llvm::Optional<llvm::VersionTuple> Introduced;
+  const std::optional<llvm::VersionTuple> Introduced;
 
   /// Indicates where the Introduced version was specified.
   const SourceRange IntroducedRange;
 
   /// Indicates when the symbol was deprecated.
-  const llvm::Optional<llvm::VersionTuple> Deprecated;
+  const std::optional<llvm::VersionTuple> Deprecated;
 
   /// Indicates where the Deprecated version was specified.
   const SourceRange DeprecatedRange;
 
   /// Indicates when the symbol was obsoleted.
-  const llvm::Optional<llvm::VersionTuple> Obsoleted;
+  const std::optional<llvm::VersionTuple> Obsoleted;
 
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
@@ -815,7 +820,7 @@ class ObjCAttr final : public DeclAttribute,
   void *NameData;
 
   /// Create an implicit @objc attribute with the given (optional) name.
-  explicit ObjCAttr(llvm::Optional<ObjCSelector> name, bool implicitName)
+  explicit ObjCAttr(std::optional<ObjCSelector> name, bool implicitName)
       : DeclAttribute(DeclAttrKind::ObjC, SourceLoc(), SourceRange(),
                       /*Implicit=*/true),
         NameData(nullptr) {
@@ -829,7 +834,7 @@ class ObjCAttr final : public DeclAttribute,
 
   /// Create an @objc attribute written in the source.
   ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
-           llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+           std::optional<ObjCSelector> name, SourceRange parenRange,
            ArrayRef<SourceLoc> nameLocs);
 
   /// Determine whether this attribute has trailing location information.
@@ -857,7 +862,7 @@ class ObjCAttr final : public DeclAttribute,
 
 public:
   /// Create implicit ObjC attribute with a given (optional) name.
-  static ObjCAttr *create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
+  static ObjCAttr *create(ASTContext &Ctx, std::optional<ObjCSelector> name,
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
@@ -903,9 +908,9 @@ public:
   bool hasName() const { return NameData != nullptr; }
 
   /// Retrieve the name of this entity, if specified.
-  llvm::Optional<ObjCSelector> getName() const {
+  std::optional<ObjCSelector> getName() const {
     if (!hasName())
-      return llvm::None;
+      return std::nullopt;
 
     return ObjCSelector::getFromOpaqueValue(NameData);
   }
@@ -1766,7 +1771,7 @@ public:
   ///
   /// For an identifier type repr, return a pair of `nullptr` and the
   /// identifier.
-  std::pair<IdentTypeRepr *, IdentTypeRepr *> destructureMacroRef();
+  std::pair<IdentTypeRepr *, DeclRefTypeRepr *> destructureMacroRef();
 
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }
@@ -1863,7 +1868,7 @@ public:
 
   /// Returns non-optional if this attribute is active given the current platform.
   /// The value provides more details about the active platform.
-  llvm::Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
+  std::optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::OriginallyDefinedIn;
   }
@@ -2023,7 +2028,7 @@ struct DeclNameRefWithLoc {
   /// The declaration name location.
   DeclNameLoc Loc;
   /// An optional accessor kind.
-  llvm::Optional<AccessorKind> AccessorKind;
+  std::optional<AccessorKind> AccessorKind;
 
   void print(ASTPrinter &Printer) const;
 };
@@ -2087,7 +2092,7 @@ class DerivativeAttr final
   /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
-  llvm::Optional<AutoDiffDerivativeFunctionKind> Kind = llvm::None;
+  std::optional<AutoDiffDerivativeFunctionKind> Kind = std::nullopt;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                           TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
@@ -2347,28 +2352,27 @@ class ExternAttr : public DeclAttribute {
   SourceLoc LParenLoc, RParenLoc;
 
 public:
-  ExternAttr(llvm::Optional<StringRef> ModuleName,
-             llvm::Optional<StringRef> Name, SourceLoc AtLoc,
-             SourceLoc LParenLoc, SourceLoc RParenLoc, SourceRange Range,
-             ExternKind Kind, bool Implicit)
+  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+             SourceLoc AtLoc, SourceLoc LParenLoc, SourceLoc RParenLoc,
+             SourceRange Range, ExternKind Kind, bool Implicit)
       : DeclAttribute(DeclAttrKind::Extern, AtLoc, Range, Implicit),
         LParenLoc(LParenLoc), RParenLoc(RParenLoc), ModuleName(ModuleName),
         Name(Name) {
     Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
   }
 
-  ExternAttr(llvm::Optional<StringRef> ModuleName,
-             llvm::Optional<StringRef> Name, ExternKind Kind, bool Implicit)
+  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+             ExternKind Kind, bool Implicit)
       : ExternAttr(ModuleName, Name, SourceLoc(), SourceLoc(), SourceLoc(),
                    SourceRange(), Kind, Implicit) {}
 
   /// The module name to import the named declaration in it
   /// Used for Wasm import declaration.
-  const llvm::Optional<StringRef> ModuleName;
+  const std::optional<StringRef> ModuleName;
 
   /// The declaration name to import
   /// std::nullopt if the declaration name is not specified with @_extern(c)
-  const llvm::Optional<StringRef> Name;
+  const std::optional<StringRef> Name;
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
@@ -2395,17 +2399,17 @@ public:
 class DocumentationAttr: public DeclAttribute {
 public:
   DocumentationAttr(SourceLoc AtLoc, SourceRange Range, StringRef Metadata,
-                    llvm::Optional<AccessLevel> Visibility, bool Implicit)
+                    std::optional<AccessLevel> Visibility, bool Implicit)
       : DeclAttribute(DeclAttrKind::Documentation, AtLoc, Range, Implicit),
         Metadata(Metadata), Visibility(Visibility) {}
 
-  DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
+  DocumentationAttr(StringRef Metadata, std::optional<AccessLevel> Visibility,
                     bool Implicit)
       : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility,
                           Implicit) {}
 
   const StringRef Metadata;
-  const llvm::Optional<AccessLevel> Visibility;
+  const std::optional<AccessLevel> Visibility;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Documentation;
@@ -2557,49 +2561,72 @@ public:
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  llvm::Optional<std::pair<TypeRepr *, unsigned>> getArrayLikeTypeAndCount() const {
+  std::optional<std::pair<TypeRepr *, unsigned>>
+  getArrayLikeTypeAndCount() const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment == ~0u)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(LikeType, SizeOrCount);
   }
-  
+
   /// Return the size and alignment of the attributed type. Returns
   /// None if the attribute specifies layout like some other type.
-  llvm::Optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {
+  std::optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {
     if (LikeType)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(SizeOrCount, Alignment);
   }
-  
+
   Type getResolvedLikeType(StructDecl *sd) const;
 
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns None if the attribute specifies an array or manual
   /// layout.
-  llvm::Optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
+  std::optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment != ~0u)
-      return llvm::None;
+      return std::nullopt;
     return getResolvedLikeType(sd);
   }
-  
+
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  llvm::Optional<std::pair<Type, unsigned>>
+  std::optional<std::pair<Type, unsigned>>
   getResolvedArrayLikeTypeAndCount(StructDecl *sd) const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment == ~0u)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
   }
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawLayout;
+  }
+};
+
+/// The @_distributedThunkTarget(for:) attribute.
+class DistributedThunkTargetAttr final
+    : public DeclAttribute {
+
+  AbstractFunctionDecl *TargetFunction;
+
+public:
+  DistributedThunkTargetAttr(AbstractFunctionDecl *target)
+      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(),
+                      SourceRange(),
+                      /*Implicit=*/false),
+        TargetFunction(target) {}
+
+  AbstractFunctionDecl *getTargetFunction() const {
+    return TargetFunction;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
   }
 };
 
@@ -2607,10 +2634,36 @@ public:
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}
 
-  llvm::Optional<const ATTR *> operator()(const DeclAttribute *Attr) const {
+  std::optional<const ATTR *> operator()(const DeclAttribute *Attr) const {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
-    return llvm::None;
+    return std::nullopt;
+  }
+};
+
+/// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
+/// names are intentionally not validated, and the attribute itself is
+/// not printed when rendering a module interface.
+class AllowFeatureSuppressionAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<AllowFeatureSuppressionAttr, Identifier> {
+  friend TrailingObjects;
+
+  /// Create an implicit @objc attribute with the given (optional) name.
+  AllowFeatureSuppressionAttr(SourceLoc atLoc, SourceRange range,
+                              bool implicit, ArrayRef<Identifier> features);
+public:
+  static AllowFeatureSuppressionAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                                             SourceRange range, bool implicit,
+                                             ArrayRef<Identifier> features);
+
+  ArrayRef<Identifier> getSuppressedFeatures() const {
+    return {getTrailingObjects<Identifier>(),
+            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::AllowFeatureSuppression;
   }
 };
 
@@ -2655,7 +2708,8 @@ public:
   /// Finds the most-specific platform-specific attribute that is
   /// active for the current platform.
   const AvailableAttr *
-  findMostSpecificActivePlatform(const ASTContext &ctx) const;
+  findMostSpecificActivePlatform(const ASTContext &ctx,
+                                 bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or the first one that indicates it's
@@ -2664,7 +2718,8 @@ public:
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
-  const AvailableAttr *getUnavailable(const ASTContext &ctx) const;
+  const AvailableAttr *getUnavailable(const ASTContext &ctx,
+                                      bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is deprecated on all deployment targets, or null otherwise.
@@ -2853,7 +2908,7 @@ public:
 
   ParsedDeclAttrFilter(const Decl *decl) : decl(decl) {}
 
-  llvm::Optional<const DeclAttribute *>
+  std::optional<const DeclAttribute *>
   operator()(const DeclAttribute *Attr) const;
 };
 
@@ -2936,6 +2991,10 @@ protected:
       : NumPadBits,
       Index : 32
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
+      Kind : 8
+    );
   } Bits;
   // clang-format on
 
@@ -2982,7 +3041,7 @@ public:
 
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.
-  static llvm::Optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
+  static std::optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
 
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);
@@ -3059,7 +3118,7 @@ public:
 
   StringRef getConventionName() const { return Name.Item; }
   SourceLoc getConventionLoc() const { return Name.Loc; }
-  llvm::Optional<StringRef> getClangType() const {
+  std::optional<StringRef> getClangType() const {
     if (!ClangType.Item.empty()) return ClangType.Item;
     return {};
   }
@@ -3157,6 +3216,39 @@ public:
   SourceLoc getUUIDLoc() const {
     return ID.Loc;
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The @isolated function type attribute, not to be confused with the
+/// `isolated` declaration modifier (IsolatedAttr) or the `isolated`
+/// parameter specifier (IsolatedTypeRepr).
+class IsolatedTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Isolated> {
+public:
+  enum class IsolationKind : uint8_t {
+    Dynamic
+  };
+
+private:
+  SourceLoc KindLoc;
+
+public:
+  IsolatedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                   Located<IsolationKind> kind)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange), KindLoc(kind.Loc) {
+    Bits.IsolatedTypeAttr.Kind = uint8_t(kind.Item);
+  }
+
+  IsolationKind getIsolationKind() const {
+    return IsolationKind(Bits.IsolatedTypeAttr.Kind);
+  }
+  SourceLoc getIsolationKindLoc() const {
+    return KindLoc;
+  }
+  const char *getIsolationKindName() const {
+    return getIsolationKindName(getIsolationKind());
+  }
+  static const char *getIsolationKindName(IsolationKind kind);
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

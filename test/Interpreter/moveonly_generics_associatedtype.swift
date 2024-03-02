@@ -4,7 +4,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: asserts
-// REQUIRES: noncopyable_generics
+
 
 class Backend {
     private var data: [String: String] = [:]

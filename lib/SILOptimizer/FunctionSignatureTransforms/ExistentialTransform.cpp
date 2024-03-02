@@ -330,7 +330,8 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   /// Compute the updated generic signature.
   NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
                                         std::move(GenericParams),
-                                        std::move(Requirements));
+                                        std::move(Requirements),
+                                        /*allowInverses=*/true);
 
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;
@@ -353,7 +354,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   }
 
   // Add error results.
-  llvm::Optional<SILResultInfo> InterfaceErrorResult;
+  std::optional<SILResultInfo> InterfaceErrorResult;
   if (FTy->hasErrorResult()) {
     InterfaceErrorResult = FTy->getErrorResult();
   }

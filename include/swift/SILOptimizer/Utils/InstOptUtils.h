@@ -67,7 +67,7 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
                                                   SILInstruction *insertpt);
 
 /// Get the insertion point after \p val.
-llvm::Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
+std::optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
 
 /// True if this instruction's only uses are debug_value (in -O mode),
 /// destroy_value, end_lifetime or end-of-scope instruction such as end_borrow.
@@ -127,6 +127,8 @@ bool isInstructionTriviallyDeletable(SILInstruction *inst);
 ///
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *inst);
+
+bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *inst);
 
 /// Return true if this is a release instruction that's not going to
 /// free the object.
@@ -488,7 +490,7 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 ///
 /// 1. We discovered that the function_ref never escapes.
 /// 2. We were able to find either a partial apply or a full apply site.
-llvm::Optional<FindLocalApplySitesResult>
+std::optional<FindLocalApplySitesResult>
 findLocalApplySites(FunctionRefBaseInst *fri);
 
 /// Gets the base implementation of a method.

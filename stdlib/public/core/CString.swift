@@ -186,11 +186,16 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @_silgen_name("$sSS14validatingUTF8SSSgSPys4Int8VG_tcfC")
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
-    // FIXME: https://github.com/apple/swift/issues/68433 (rdar://115296219)
-    self.init(validatingUTF8: nullTerminatedUTF8)
+    let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
+    let validated = nullTerminatedUTF8.withMemoryRebound(
+      to: UInt8.self,
+      capacity: len,
+      { String._tryFromUTF8(UnsafeBufferPointer(start: $0, count: len)) }
+    )
+    guard let validated else { return nil }
+    self = validated
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -223,15 +228,12 @@ extension String {
   ///
   /// - Parameter cString:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
+  @inlinable
+  @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
+  @_silgen_name("_swift_se0405_String_validatingUTF8")
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
-    guard let str = cString.withMemoryRebound(to: UInt8.self, capacity: len, {
-      String._tryFromUTF8(UnsafeBufferPointer(start: $0, count: len))
-    })
-    else { return nil }
-
-    self = str
+    self.init(validatingCString: cString)
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8

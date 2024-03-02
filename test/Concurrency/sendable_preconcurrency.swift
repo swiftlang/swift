@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t %s -o /dev/null -verify -emit-sil -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -strict-concurrency=complete) type
 @preconcurrency import NonStrictModule

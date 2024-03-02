@@ -18,7 +18,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace clang {
 class NamedDecl;
@@ -245,6 +245,12 @@ public:
                                              Type GlobalActorBound,
                                              ModuleDecl *Module);
 
+  void appendDistributedThunk(const AbstractFunctionDecl *thunk,
+                              bool asReference);
+  std::string mangleDistributedThunkRef(const AbstractFunctionDecl *thunk);
+  /// Mangling for distributed function accessible function record.
+  /// Used in Linking when emitting the record.
+  std::string mangleDistributedThunkRecord(const AbstractFunctionDecl *thunk);
   std::string mangleDistributedThunk(const AbstractFunctionDecl *thunk);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC
@@ -254,7 +260,7 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(
       CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
-      llvm::Optional<bool> FlagParamIsZeroOnError, bool predefined);
+      std::optional<bool> FlagParamIsZeroOnError, bool predefined);
 
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
   /// thunk, for the given:
@@ -376,7 +382,7 @@ public:
     ClangImporterContext,
   };
 
-  static llvm::Optional<SpecialContext>
+  static std::optional<SpecialContext>
   getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static bool isCXXCFOptionsDefinition(const ValueDecl *decl);
@@ -481,6 +487,7 @@ protected:
                                FunctionManglingKind functionMangling);
 
   void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
+                               LifetimeDependenceInfo lifetimeDependenceInfo,
                                GenericSignature sig,
                                const ValueDecl *forDecl = nullptr);
   void appendFunctionResultType(Type resultType,
@@ -489,10 +496,17 @@ protected:
 
   void appendTypeList(Type listTy, GenericSignature sig,
                       const ValueDecl *forDecl = nullptr);
+
   void appendTypeListElement(Identifier name, Type elementType,
-                             ParameterTypeFlags flags,
                              GenericSignature sig,
                              const ValueDecl *forDecl = nullptr);
+  void appendParameterTypeListElement(
+      Identifier name, Type elementType, ParameterTypeFlags flags,
+      std::optional<LifetimeDependenceKind> lifetimeDependenceKind,
+      GenericSignature sig, const ValueDecl *forDecl = nullptr);
+  void appendTupleTypeListElement(Identifier name, Type elementType,
+                                  GenericSignature sig,
+                                  const ValueDecl *forDecl = nullptr);
 
   /// Append a generic signature to the mangling.
   ///
@@ -599,6 +613,9 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
+
+  void appendLifetimeDependenceKind(LifetimeDependenceKind kind,
+                                    bool isSelfDependence);
 };
 
 } // end namespace Mangle

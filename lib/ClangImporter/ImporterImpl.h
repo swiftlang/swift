@@ -599,6 +599,10 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  // Caches used by ObjCInterfaceAndImplementationRequest.
+  llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
+  llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -813,8 +817,8 @@ private:
 
   /// If there is a single .PCH file imported into the __ObjC module, this
   /// is the filename of that PCH. When other files are imported, this should
-  /// be llvm::None.
-  llvm::Optional<std::string> SinglePCHImport = llvm::None;
+  /// be std::nullopt.
+  std::optional<std::string> SinglePCHImport = std::nullopt;
 
 public:
   importer::NameImporter &getNameImporter() {
@@ -1074,9 +1078,9 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  llvm::Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
-                                          Version version,
-                                          bool UseCanonicalDecl = true);
+  std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
+                                         Version version,
+                                         bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
@@ -1126,7 +1130,7 @@ public:
                                    SmallVectorImpl<Decl *> &newMembers);
   void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                      DeclContext *dc,
-                                     llvm::Optional<DeclBaseName> name,
+                                     std::optional<DeclBaseName> name,
                                      SmallVectorImpl<Decl *> &members);
 
   /// Utility function for building simple generic signatures.
@@ -1348,7 +1352,7 @@ public:
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true,
-      llvm::Optional<unsigned> completionHandlerErrorParamIndex = llvm::None);
+      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1468,11 +1472,11 @@ public:
   ///        with \c ImportDiagnosticAdder .
   ///
   /// \returns The imported parameter result on success, or None on failure.
-  llvm::Optional<ImportParameterTypeResult> importParameterType(
+  std::optional<ImportParameterTypeResult> importParameterType(
       const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
       bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
       bool paramIsError, bool paramIsCompletionHandler,
-      llvm::Optional<unsigned> completionHandlerErrorParamIndex,
+      std::optional<unsigned> completionHandlerErrorParamIndex,
       ArrayRef<GenericTypeParamDecl *> genericParams,
       llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
@@ -1522,9 +1526,8 @@ public:
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool isFromSystemModule, ParameterList **bodyParams,
       importer::ImportedName importedName,
-      llvm::Optional<ForeignAsyncConvention> &asyncConv,
-      llvm::Optional<ForeignErrorConvention> &errorConv,
-      SpecialMethodKind kind);
+      std::optional<ForeignAsyncConvention> &asyncConv,
+      std::optional<ForeignErrorConvention> &errorConv, SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
@@ -1555,7 +1558,7 @@ public:
   /// Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
   /// based on the name of the typedef.
-  llvm::Optional<MappedTypeNameKind>
+  std::optional<MappedTypeNameKind>
   getSpecialTypedefKind(clang::TypedefNameDecl *decl);
 
   /// Look up a name, accepting only typedef results.
@@ -1621,7 +1624,8 @@ private:
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
-                                  SmallVectorImpl<Decl *> &members);
+                                  SmallVectorImpl<Decl *> &members,
+                                  DeclContext *expectedDC = nullptr);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
@@ -1814,7 +1818,7 @@ public:
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
 
-  void setSinglePCHImport(llvm::Optional<std::string> PCHFilename) {
+  void setSinglePCHImport(std::optional<std::string> PCHFilename) {
     if (PCHFilename.has_value()) {
       assert(llvm::sys::path::extension(PCHFilename.value())
                  .endswith(file_types::getExtension(file_types::TY_PCH)) &&
@@ -1964,7 +1968,7 @@ static inline Type applyToFunctionType(
   return type;
 }
 
-inline llvm::Optional<const clang::EnumDecl *>
+inline std::optional<const clang::EnumDecl *>
 findAnonymousEnumForTypedef(const ASTContext &ctx,
                             const clang::TypedefType *typedefType) {
   auto *typedefDecl = typedefType->getDecl();
@@ -2001,7 +2005,7 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   if (swiftPrivateFound != foundDecls.end())
     return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
@@ -2019,15 +2023,5 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 
 }
 }
-
-// Forwards to synthesizeCxxBasicMethod(), producing a thunk that calls a
-// virtual function.
-clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
-    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
-    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method);
-
-// Exposed to produce a Swift method body for calling a Swift thunk.
-std::pair<swift::BraceStmt *, bool>
-synthesizeForwardingThunkBody(swift::AbstractFunctionDecl *afd, void *context);
 
 #endif

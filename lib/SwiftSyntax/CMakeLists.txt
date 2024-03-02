@@ -37,6 +37,7 @@ set(SWIFT_SYNTAX_MODULES
   SwiftCompilerPluginMessageHandling
   # Support for LSP
   SwiftIDEUtils
+  SwiftRefactor
 )
 
 # Install shared runtime libraries

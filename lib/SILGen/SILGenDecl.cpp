@@ -502,7 +502,7 @@ public:
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
-                              llvm::Optional<MarkUninitializedInst::Kind> kind,
+                              std::optional<MarkUninitializedInst::Kind> kind,
                               uint16_t ArgNo, bool generateDebugInfo,
                               SILGenFunction &SGF)
       : decl(decl) {
@@ -545,7 +545,7 @@ public:
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
 
-    llvm::Optional<SILDebugVariable> DbgVar;
+    std::optional<SILDebugVariable> DbgVar;
     if (generateDebugInfo)
       DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(
@@ -1492,7 +1492,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
-    llvm::Optional<MarkUninitializedInst::Kind> uninitKind;
+    std::optional<MarkUninitializedInst::Kind> uninitKind;
     if (isUninitialized) {
       uninitKind = MarkUninitializedInst::Kind::Var;
     }
@@ -1726,8 +1726,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // Begin a new binding scope, which is popped when the next innermost debug
           // scope ends. The cleanup location loc isn't the perfect source location
           // but it's close enough.
-          B.getSILGenFunction().enterDebugScope(loc,
-                                                      /*isBindingScope=*/true);
+          B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
         InitializationPtr initialization =
           emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
@@ -1998,7 +1997,7 @@ CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
 
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
-    VarDecl *vd, llvm::Optional<MarkUninitializedInst::Kind> kind,
+    VarDecl *vd, std::optional<MarkUninitializedInst::Kind> kind,
     unsigned ArgNo, bool generateDebugInfo) {
   return InitializationPtr(new LocalVariableInitialization(
       vd, kind, ArgNo, generateDebugInfo, *this));

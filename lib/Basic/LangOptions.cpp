@@ -23,11 +23,11 @@
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include <limits.h>
+#include <optional>
 
 using namespace swift;
 
@@ -47,6 +47,13 @@ LangOptions::LangOptions() {
 #endif
 
   // Note: Introduce default-on language options here.
+
+  // Default-on NoncopyableGenerics when the build-script setting is enabled.
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    Features.insert(Feature::NoncopyableGenerics);
+    EnableExperimentalAssociatedTypeInference = true;
+  }
+
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
@@ -290,11 +297,11 @@ bool LangOptions::hasFeature(Feature feature) const {
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  auto feature = llvm::StringSwitch<llvm::Optional<Feature>>(featureName)
+  auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-                     .Default(llvm::None);
+                     .Default(std::nullopt);
   if (feature)
     return hasFeature(*feature);
 
@@ -591,19 +598,6 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-bool swift::isSuppressibleFeature(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return false;
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  case Feature::FeatureName:                                                   \
-    return true;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
 bool swift::isFeatureAvailableInProduction(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
@@ -616,32 +610,32 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
+std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
-llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
+std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
-llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
+std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -666,12 +660,13 @@ llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<PlaygroundOption> swift::getPlaygroundOption(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<PlaygroundOption>>(name)
+std::optional<PlaygroundOption>
+swift::getPlaygroundOption(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<PlaygroundOption>>(name)
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   .Case(#OptionName, PlaygroundOption::OptionName)
 #include "swift/Basic/PlaygroundOptions.def"
-  .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
@@ -690,7 +685,7 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
 }
 
 namespace {
-  static constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+  constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
        {"-I",
         "-F",
         "-fmodule-map-file=",
@@ -707,6 +702,23 @@ namespace {
         "-ivfsoverlay",
         "-working-directory=",
         "-working-directory"};
+
+constexpr std::array<std::string_view, 15> knownClangDependencyIgnorablePrefiexes =
+     {"-I",
+      "-F",
+      "-fmodule-map-file=",
+      "-iquote",
+      "-idirafter",
+      "-iframeworkwithsysroot",
+      "-iframework",
+      "-iprefix",
+      "-iwithprefixbefore",
+      "-iwithprefix",
+      "-isystemafter",
+      "-isystem",
+      "-isysroot",
+      "-working-directory=",
+      "-working-directory"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
@@ -749,7 +761,7 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
 std::vector<std::string>
 ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
   auto matchIncludeOption = [](StringRef &arg) {
-    for (const auto &option : knownSearchPathPrefiexes)
+    for (const auto &option : knownClangDependencyIgnorablePrefiexes)
       if (arg.consume_front(option))
         return true;
     return false;

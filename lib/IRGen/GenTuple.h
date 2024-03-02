@@ -55,18 +55,18 @@ namespace irgen {
   /// Return the offset to the given tuple element, if it's fixed.
   ///
   /// This API is used by RemoteAST.
-  llvm::Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
-                                                  SILType tupleType,
-                                                  unsigned fieldNo);
+  std::optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
+                                                 SILType tupleType,
+                                                 unsigned fieldNo);
 
   /// Returns the index of the element in the llvm struct type which represents
   /// \p fieldNo in \p tupleType.
   ///
   /// Returns None if the tuple element is an empty type and therefore has no
   /// corresponding element in the llvm type.
-  llvm::Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
-                                                              SILType tupleType,
-                                                              unsigned fieldNo);
+  std::optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
+                                                             SILType tupleType,
+                                                             unsigned fieldNo);
 
   /// Emit a string encoding the labels in the given tuple type.
   llvm::Constant *getTupleLabelsString(IRGenModule &IGM,

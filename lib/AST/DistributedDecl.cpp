@@ -65,9 +65,20 @@ using namespace swift;
 /******************************************************************************/
 
 // TODO(distributed): make into a request
-Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) {
-  auto &C = member->getASTContext();
-  auto *DC = member->getDeclContext();
+Type swift::getConcreteReplacementForProtocolActorSystemType(
+    ValueDecl *anyValue) {
+  auto &C = anyValue->getASTContext();
+
+  // FIXME(distributed): clean this up, we want a method that gets us AS type
+  // given any value, but is this the best way?
+  DeclContext *DC;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(anyValue)) {
+    DC = nominal;
+  } else if (auto extension = dyn_cast<ExtensionDecl>(anyValue)) {
+    DC = extension->getExtendedNominal();
+  } else {
+    DC = anyValue->getDeclContext();
+  }
   auto DA = C.getDistributedActorDecl();
 
   // === When declared inside an actor, we can get the type directly
@@ -78,7 +89,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   /// === Maybe the value is declared in a protocol?
   if (auto protocol = DC->getSelfProtocolDecl()) {
     GenericSignature signature;
-    if (auto *genericContext = member->getAsGenericContext()) {
+    if (auto *genericContext = anyValue->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
     } else {
       signature = DC->getGenericSignatureOfContext();
@@ -128,7 +139,7 @@ Type swift::getSerializationRequirementTypesForMember(
     return signature->getConcreteType(SerReqAssocType);
   }
 
-  llvm_unreachable("Unable to fetch ActorSystem type!");
+  llvm_unreachable("Unable to fetch SerializationRequirement type!");
 }
 
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
@@ -245,7 +256,7 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
     return nullptr;
 
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
-  if (!systemTy)
+  if (!systemTy || systemTy->is<GenericTypeParamType>())
     return nullptr;
 
   auto decoderTy =
@@ -312,14 +323,10 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 /******** Functions on DistributedActorSystem and friends *********************/
 /******************************************************************************/
 
-
 FuncDecl*
 ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
-  if (!actor->isDistributedActor())
-    return nullptr;
-
   return evaluateOrDefault(
-      evaluator, GetDistributedActorArgumentDecodingMethodRequest{actor}, nullptr);
+      evaluator, GetDistributedActorConcreteArgumentDecodingMethodRequest{actor}, nullptr);
 }
 
 NominalTypeDecl*
@@ -380,6 +387,21 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
+// TODO(distributed): probably can be removed?
+llvm::ArrayRef<ValueDecl *>
+AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  // Only a 'distributed' decl can witness 'distributed' protocol
+  if (!isDistributed()) {
+    return llvm::ArrayRef<ValueDecl *>();
+  }
+
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedMethodWitnessedProtocolRequirements(mutableThis), {});
+}
+
 /******************************************************************************/
 /********************* Ad-hoc protocol requirement checks *********************/
 /******************************************************************************/
@@ -387,6 +409,10 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
 bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
   auto &C = getASTContext();
   auto module = getParentModule();
+  auto *DC = getDeclContext();
+
+  if (!DC->isTypeContext() || !isGeneric())
+    return false;
 
   // === Check the name
   auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
@@ -398,7 +424,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   ProtocolDecl *systemProto =
       C.getDistributedActorSystemDecl();
 
-  auto systemNominal = getDeclContext()->getSelfNominalTypeDecl();
+  auto systemNominal = DC->getSelfNominalTypeDecl();
   auto distSystemConformance = module->lookupConformance(
       systemNominal->getDeclaredInterfaceType(), systemProto);
 
@@ -1253,11 +1279,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 /********************** Distributed Functions *********************************/
 /******************************************************************************/
 
-bool AbstractFunctionDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
-bool AbstractStorageDecl::isDistributed() const {
+bool ValueDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 

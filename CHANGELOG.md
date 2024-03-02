@@ -3,7 +3,73 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
-## Swift 5.11
+## Swift 6.0
+* [SE-0352][]:
+  The Swift 6 language mode will open existential values with
+  "self-conforming" types (such as `any Error` or `@objc` protocols)
+  passed to generic functions. For example:
+
+  ```swift
+  func takeError<E: Error>(_ error: E) { }
+
+  func passError(error: any Error) {
+    takeError(error)  // Swift 5 does not open `any Error`, Swift 6 does
+  }
+  ```
+
+  This behavior can be enabled prior to the Swift 6 language mode
+  using the upcoming language feature `ImplicitOpenExistentials`.
+
+* [SE-0422][]:
+  Non-built-in expression macros can now be used as default arguments that
+  expand at each call site. For example, a custom `#CurrentFile` macro used as
+  a default argument in 'Library.swift' won't be expanded to `"Library.swift"`:
+
+  ```swift
+  @freestanding(expression)
+  public macro CurrentFile() -> String = ...
+
+  public func currentFile(name: String = #CurrentFile) { name }
+  ```
+
+  Instead, it will be expanded at where the function is called:
+  
+  ```swift
+  print(currentFile())
+  // Prints "main.swift"
+  ```
+
+  The expanded code can also use declarations from the caller side context:
+
+  ```swift
+  var person = "client"
+  greetPerson(/* greeting: #informalGreeting */)
+  // Prints "Hi client" if macro expands to "Hi \(person)"
+  ```
+
+* [SE-0417][]:
+  Tasks now gain the ability to respect Task Executor preference.
+  This allows tasks executing default actors (which do not declare a custom executor),
+  and nonisolated asynchronous functions to fall back to a preferred executor, rather than always
+  executing on the default global pool.
+
+  The executor preference may be stated using the `withTaskExecutorPreference` function:
+
+  ```swift
+  nonisolated func doSomething() async { ... }
+  
+  await withTaskExecutorPreference(preferredExecutor) {
+    doSomething()
+  ```
+
+  Or when creating new unstructured or child-tasks (e.g. in a task group):
+
+  ```swift
+  Task(executorPreference: preferredExecutor) {
+    // executes on 'preferredExecutor'
+    await doSomething() // doSomething body would execute on 'preferredExecutor'
+  }
+  ```
 
 * [SE-0413][]:
 
@@ -64,6 +130,35 @@
   \_SwiftConcurrencyShims used to declare the `exit` function, even though it
   might not be available. The declaration has been removed, and must be imported
   from the appropriate C library module (e.g. Darwin or SwiftGlibc)
+  
+* [SE-0270][]:
+
+  The Standard Library now provides APIs for performing collection operations
+  over noncontiguous elements. For example:
+  
+  ```swift
+  var numbers = Array(1...15)
+
+  // Find the indices of all the even numbers
+  let indicesOfEvens = numbers.indices(where: { $0.isMultiple(of: 2) })
+
+  // Perform an operation with just the even numbers
+  let sumOfEvens = numbers[indicesOfEvens].reduce(0, +)
+  // sumOfEvens == 56
+
+  // You can gather the even numbers at the beginning
+  let rangeOfEvens = numbers.moveSubranges(indicesOfEvens, to: numbers.startIndex)
+  // numbers == [2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+  // numbers[rangeOfEvens] == [2, 4, 6, 8, 10, 12, 14]
+  ```
+  
+  The standard library now provides a new `indices(where:)` function which creates
+  a `RangeSet` - a new type representing a set of discontiguous indices. `RangeSet`
+  is generic over its index type and can be used to execute operations over
+  noncontiguous indices such as collecting, moving, or removing elements from a
+  collection. Additionally, `RangeSet` is generic over any `Comparable` collection
+  index and can be used to represent a selection of items in a list or a refinement
+  of a filter or search result.
 
 ## Swift 5.10
 
@@ -9986,6 +10081,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md>
 [SE-0268]: <https://github.com/apple/swift-evolution/blob/main/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/main/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0270]: <https://github.com/apple/swift-evolution/blob/main/proposals/0270-rangeset-and-collection-operations.md>
 [SE-0274]: <https://github.com/apple/swift-evolution/blob/main/proposals/0274-magic-file.md>
 [SE-0276]: <https://github.com/apple/swift-evolution/blob/main/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0279]: <https://github.com/apple/swift-evolution/blob/main/proposals/0279-multiple-trailing-closures.md>
@@ -10050,6 +10146,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
+[SE-0417]: https://github.com/apple/swift-evolution/blob/main/proposals/0417-task-executor-preference.md
 [SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [#64927]: <https://github.com/apple/swift/issues/64927>

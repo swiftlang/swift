@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type whose values can safely be passed across concurrency domains by copying.
+/// A thread-safe type whose values can be shared across arbitrary concurrent
+/// contexts without introducing a risk of data races. Values of the type may
+/// have no shared mutable state, or they may protect that state with a lock or
+/// by forcing it to only be accessed from a specific actor.
 ///
 /// You can safely pass values of a sendable type
 /// from one concurrency domain to another ---

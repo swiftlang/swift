@@ -95,10 +95,10 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
-llvm::Optional<ExprKind>
+std::optional<ExprKind>
 TypeVariableType::Implementation::getAtomicLiteralKind() const {
   if (!locator || !locator->directlyAt<LiteralExpr>())
-    return llvm::None;
+    return std::nullopt;
 
   auto kind = getAsExpr(locator->getAnchor())->getKind();
   switch (kind) {
@@ -109,7 +109,7 @@ TypeVariableType::Implementation::getAtomicLiteralKind() const {
   case ExprKind::NilLiteral:
     return kind;
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -338,7 +338,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     // We skip out-of-place expr checking here since we've already performed it.
-    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ llvm::None,
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ std::nullopt,
                                     /*isExprStmt=*/false,
                                     /*disableAvailabilityChecking*/ false,
                                     /*disableOutOfPlaceExprChecking*/ true);
@@ -350,7 +350,7 @@ public:
       }
     }
 
-    return Action::SkipChildren(expr);
+    return Action::SkipNode(expr);
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
@@ -370,13 +370,13 @@ public:
   }
 
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return Action::SkipChildren(pattern);
+    return Action::SkipNode(pattern);
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToParameterListPre(ParameterList *params) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // end anonymous namespace
@@ -414,7 +414,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
     // context of the parent nodes.
     auto *body = target.getFunctionBody();
     diagnoseOutOfPlaceExprs(dc->getASTContext(), body,
-                            /*contextualPurpose*/ llvm::None);
+                            /*contextualPurpose*/ std::nullopt);
 
     FunctionSyntacticDiagnosticWalker walker(dc);
     body->walk(walker);
@@ -451,7 +451,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 /// FIXME: In order to remote this function both \c FrontendStatsTracer
 /// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
 // instead of each individual syntactic element types.
-llvm::Optional<SyntacticElementTarget>
+std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
                                  TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -463,7 +463,7 @@ TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
   return typeCheckTarget(target, options);
 }
 
-llvm::Optional<SyntacticElementTarget>
+std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                              TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -475,7 +475,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckTarget(
           target, /*replaceInvalidRefsWithErrors=*/true)) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Check whether given target has a code completion token which requires
@@ -485,7 +485,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                                  [&](const constraints::Solution &S) {
                                    Context.CompletionCallback->sawSolution(S);
                                  }))
-    return llvm::None;
+    return std::nullopt;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -517,7 +517,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable)
-    return llvm::None;
+    return std::nullopt;
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -528,7 +528,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Unless the client has disabled them, perform syntactic checks on the
@@ -545,7 +545,8 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
-                                            bool isAutoClosure) {
+                                            bool isAutoClosure,
+                                            bool atCallerSide) {
   // During normal type checking we don't type check the parameter default if
   // the param has an error type. For code completion, we also type check the
   // parameter default because it might contain the code completion token.
@@ -569,10 +570,16 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // different contextual type, see below.
     DiagnosticTransaction diagnostics(ctx.Diags);
 
+    TypeCheckExprOptions options;
+    // Expand macro expansion expression at caller side only
+    if (!atCallerSide && isa<MacroExpansionExpr>(defaultValue)) {
+      options |= TypeCheckExprFlags::DisableMacroExpansions;
+    }
+
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(defaultExprTarget)) {
+    if (auto result = typeCheckExpression(defaultExprTarget, options)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }
@@ -1118,7 +1125,7 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
       if (isa<LoadExpr>(E))
         return Action::Stop();
 
-      return Action::SkipChildren(createLoadExpr(E));
+      return Action::SkipNode(createLoadExpr(E));
     }
 
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
@@ -1957,29 +1964,33 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
 
   // A cast from a function type to an existential type (except `Any`)
   // or an archetype type (with constraints) cannot succeed
-  auto toArchetypeType = toType->is<ArchetypeType>();
-  auto fromFunctionType = fromType->is<FunctionType>();
-  auto toExistentialType = toType->isAnyExistentialType();
+  if (fromType->is<FunctionType>()) {
+    auto toArchetypeType = toType->is<ArchetypeType>();
+    auto toExistentialType = toType->isAnyExistentialType();
 
-  auto toConstrainedArchetype = false;
-  if (toArchetypeType) {
-    auto archetype = toType->castTo<ArchetypeType>();
-    toConstrainedArchetype = !archetype->getConformsTo().empty();
-  }
+    auto conformsToAllProtocols = true;
+    if (toArchetypeType) {
+      auto archetype = toType->castTo<ArchetypeType>();
+      conformsToAllProtocols = llvm::all_of(archetype->getConformsTo(),
+        [&](ProtocolDecl *proto) {
+          return module->checkConformance(fromType, proto,
+                                          /*allowMissing=*/false);
+        });
+    }
 
-  if (fromFunctionType &&
-      (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
-    switch (contextKind) {
-    case CheckedCastContextKind::None:
-    case CheckedCastContextKind::ConditionalCast:
-    case CheckedCastContextKind::ForcedCast:
-      return CheckedCastKind::Unresolved;
+    if (toExistentialType || (toArchetypeType && !conformsToAllProtocols)) {
+      switch (contextKind) {
+      case CheckedCastContextKind::None:
+      case CheckedCastContextKind::ConditionalCast:
+      case CheckedCastContextKind::ForcedCast:
+        return CheckedCastKind::Unresolved;
 
-    case CheckedCastContextKind::IsPattern:
-    case CheckedCastContextKind::EnumElementPattern:
-    case CheckedCastContextKind::IsExpr:
-    case CheckedCastContextKind::Coercion:
-      break;
+      case CheckedCastContextKind::IsPattern:
+      case CheckedCastContextKind::EnumElementPattern:
+      case CheckedCastContextKind::IsExpr:
+      case CheckedCastContextKind::Coercion:
+        break;
+      }
     }
   }
 
@@ -2354,19 +2365,19 @@ void ConstraintSystem::forEachExpr(
 
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         if (!CS.participatesInInference(closure))
-          return Action::SkipChildren(NewE);
+          return Action::SkipNode(NewE);
       }
       return Action::Continue(NewE);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 

@@ -435,8 +435,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   LLVM_DEBUG(llvm::dbgs()
              << "Found at least one value to check, performing checking.\n");
   auto valuesToProcess =
-      llvm::makeArrayRef(valuesToCheck.begin(), valuesToCheck.end());
-  auto &mod = fn->getModule();
+      llvm::ArrayRef(valuesToCheck.begin(), valuesToCheck.end());
 
   // If we do not emit any diagnostics, we need to put in a break after each dbg
   // info carrying inst for a lexical value that we find a move on. This ensures
@@ -493,10 +492,9 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
             // scope as our original so that the backend treats them as
             // referring to the same "debug entity".
             builder.setCurrentDebugScope(dbgVarInst->getDebugScope());
-            builder.createDebugValue(
-                dbgVarInst->getLoc(),
-                SILUndef::get(mvi->getOperand()->getType(), mod), *varInfo,
-                false /*poison*/, true /*moved*/);
+            builder.createDebugValue(dbgVarInst->getLoc(),
+                                     SILUndef::get(mvi->getOperand()), *varInfo,
+                                     false /*poison*/, true /*moved*/);
           }
         }
         foundMove = true;
@@ -552,10 +550,6 @@ namespace {
 class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (fn->wasDeserializedCanonical())

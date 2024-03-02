@@ -52,25 +52,31 @@ static void addConformanceFixIt(const NominalTypeDecl *nominal,
 // a conformance to KP.
 static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
                                           InvertibleProtocolKind ip,
-                                          InverseMarking marking,
+                                          InverseMarking::Mark inverseMarking,
                                           NominalTypeDecl *nominal) {
   auto kp = getKnownProtocolKind(ip);
 
   // Immediately flush, then emit notes, so they're associated.
   diag.flush();
 
-  auto &ctx = nominal->getASTContext();
-  // Not expecting the positive KP constraint to be classified as "Inferred".
-  assert(marking.getPositive().getKind() != InverseMarking::Kind::Inferred);
-
   // Have no advice for situations where the KP conformance is explicit.
-  if (marking.getPositive().isPresent())
-    return;
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  auto inheritedNominals = getDirectlyInheritedNominalTypeDecls(
+      nominal, inverses, anyObject);
+  for (auto entry : inheritedNominals) {
+    if (auto *otherProto = dyn_cast<ProtocolDecl>(entry.Item)) {
+      if (otherProto->isSpecificProtocol(kp))
+        return;
+    }
+  }
 
-  switch (marking.getInverse().getKind()) {
+  auto &ctx = nominal->getASTContext();
+
+  switch (inverseMarking.getKind()) {
   case InverseMarking::Kind::Inferred:
     // Note that the enclosing type is conditionally conforming to KP first.
-    ctx.Diags.diagnose(marking.getInverse().getLoc(),
+    ctx.Diags.diagnose(inverseMarking.getLoc(),
                        diag::note_inverse_preventing_conformance_implicit,
                        nominal, getProtocolName(kp));
     LLVM_FALLTHROUGH;
@@ -104,7 +110,7 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
   auto kp = getKnownProtocolKind(ip);
 
   // Check the enclosing type's markings to see what to suggest.
-  auto enclosingMarking = enclosingNom->getMarking(ip);
+  auto enclosingMarking = enclosingNom->hasInverseMarking(ip);
 
   // First, the generic advice.
   emitAdviceToApplyInverseAfter(std::move(diag), ip,
@@ -131,7 +137,7 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
   // not IP.
   if (auto nominal = nonConformingTy->getAnyNominal()) {
     if (nominal->getLoc(/*SerializedOK=*/false)) {
-      auto inverse = nominal->getMarking(ip).getInverse();
+      auto inverse = nominal->hasInverseMarking(ip);
       auto loc = inverse.getLoc();
 
       switch (inverse.getKind()) {
@@ -156,44 +162,6 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
   }
 }
 
-/// MARK: conformance queries
-
-static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
-  auto &ctx = type->getASTContext();
-
-  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(proto && "missing Copyable/Escapable from stdlib!");
-
-  // Must not have a type parameter!
-  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
-
-  assert(!type->is<PackExpansionType>());
-
-  // The SIL types in the AST do not have real conformances, and should have
-  // been handled in SILType instead.
-  assert(!(type->is<SILBoxType,
-                    SILMoveOnlyWrappedType,
-                    SILPackType,
-                    SILTokenType>()));
-
-  const bool conforms =
-      (bool) proto->getParentModule()->checkConformance(
-          type, proto,
-          /*allowMissing=*/false);
-
-  return conforms;
-}
-
-bool IsEscapableRequest::evaluate(Evaluator &evaluator,
-                                  CanType type) const {
-  return conformsToInvertible(type, InvertibleProtocolKind::Escapable);
-}
-
-bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
-                                    CanType type) const {
-  return !conformsToInvertible(type, InvertibleProtocolKind::Copyable);
-}
-
 /// MARK: conformance checking
 static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
                                              InvertibleProtocolKind ip) {
@@ -209,21 +177,15 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
   auto &ctx = nom->getASTContext();
   bool conforms = true;
 
-  // An explicit `~IP` prevents conformance if any of these are true:
+  // An explicit `~IP` prevents conformance if it appears on the same
+  // declaration that also declares the conformance.
   //
-  // 1. It appears on a class.
-  // 2. Appears on the same declaration that also declares the conformance.
-  //    So, if the nominal has `~Copyable` but this conformance is
-  //    written in an extension, then we do not raise an error.
-  auto marking = nom->getMarking(ip);
-  if (marking.getInverse().getKind() == InverseMarking::Kind::Explicit) {
-    if (isa<ClassDecl>(nom)) {
-      ctx.Diags.diagnose(marking.getInverse().getLoc(),
-                         diag::inverse_on_class,
-                         getProtocolName(kp));
-      conforms &= false;
-    } else if (conformance->getDeclContext() == nom) {
-      ctx.Diags.diagnose(marking.getInverse().getLoc(),
+  // So, if the nominal has `~Copyable` but this conformance is
+  // written in an extension, then we do not raise an error.
+  auto inverseMarking = nom->hasInverseMarking(ip);
+  if (inverseMarking.isAnyExplicit()) {
+    if (conformance->getDeclContext() == nom) {
+      ctx.Diags.diagnose(inverseMarking.getLoc(),
                          diag::inverse_but_also_conforms,
                          nom, getProtocolName(kp));
       conforms &= false;
@@ -236,7 +198,7 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
 
   // Protocols do not directly define any storage.
   if (isa<ProtocolDecl, BuiltinTupleDecl>(nom))
-    llvm_unreachable("unexpected nominal to check Copyable conformance");
+    llvm_unreachable("unexpected nominal to check invertible's conformance");
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {
@@ -244,7 +206,7 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
       auto diag = deinit->diagnose(diag::copyable_illegal_deinit, nom);
       emitAdviceToApplyInverseAfter(std::move(diag),
                                     ip,
-                                    nom->getMarking(ip),
+                                    inverseMarking,
                                     nom);
       conforms &= false;
     }
@@ -381,6 +343,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
   if (!ip)
     llvm_unreachable("not an invertible protocol");
 
+  assert(!isa<ClassDecl>(nominal) && "classes aren't handled here");
   auto file = cast<FileUnit>(nominal->getModuleScopeContext());
 
   // Generates a conformance for the nominal to the protocol.
@@ -422,7 +385,8 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     for (auto param : params)
       reqs.push_back({RequirementKind::Conformance, param, protoTy});
 
-    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs);
+    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs,
+                                       /*allowInverses=*/false);
     ext->setGenericSignature(genericSig);
 
     // Bind the extension.
@@ -440,37 +404,16 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return generateConformance(ext);
   };
 
-  switch (*ip) {
-  case InvertibleProtocolKind::Copyable:
-    // If move-only classes is enabled, we'll check the markings.
-    if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
-      break;
-
-  LLVM_FALLTHROUGH;
-  case InvertibleProtocolKind::Escapable:
-    // Always derive unconditional IP conformance for classes
-    if (isa<ClassDecl>(nominal))
-      return generateConformance(nominal);
-    break;
-  }
-
-  auto marking = nominal->getMarking(*ip);
-
-  // Unexpected to have any positive marking for IP if we're deriving it.
-  assert(!marking.getPositive().isPresent());
-
   // Check what kind of inverse-marking we have to determine whether to generate
   // a conformance for IP.
-  switch (marking.getInverse().getKind()) {
+  switch (nominal->hasInverseMarking(*ip).getKind()) {
   case InverseMarking::Kind::LegacyExplicit:
   case InverseMarking::Kind::Explicit:
     return nullptr; // No positive IP conformance will be inferred.
 
   case InverseMarking::Kind::Inferred:
-    if (!isa<ClassDecl>(nominal))
-      return generateConditionalConformance();
+    return generateConditionalConformance();
 
-  LLVM_FALLTHROUGH;
   case InverseMarking::Kind::None:
     // All types already start with conformances to the invertible protocols in
     // this case, within `NominalTypeDecl::prepareConformanceTable`.

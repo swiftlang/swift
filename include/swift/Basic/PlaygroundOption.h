@@ -13,9 +13,9 @@
 #ifndef SWIFT_BASIC_PLAYGROUND_OPTIONS_H
 #define SWIFT_BASIC_PLAYGROUND_OPTIONS_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 
@@ -40,7 +40,7 @@ constexpr unsigned numPlaygroundOptions() {
 llvm::StringRef getPlaygroundOptionName(PlaygroundOption option);
 
 /// Get the playground option that corresponds to a given name, if there is one.
-llvm::Optional<PlaygroundOption> getPlaygroundOption(llvm::StringRef name);
+std::optional<PlaygroundOption> getPlaygroundOption(llvm::StringRef name);
 
 /// Set of enabled playground options.
 typedef llvm::SmallSet<PlaygroundOption, 8> PlaygroundOptionSet;

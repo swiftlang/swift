@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature OptionalIsolatedParameters -verify
+// RUN: %target-swift-frontend -typecheck %s -verify
 
-// RUN: %target-swift-frontend -dump-ast %s -enable-experimental-feature OptionalIsolatedParameters | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: distributed
+// REQUIRES: swift_swift_parser
 
 import Distributed
 
@@ -16,7 +16,7 @@ extension DistributedActor {
     // CHECK: rewritten=current_context_isolation_expr
     // CHECK-NEXT: inject_into_optional
     // CHECK: member_ref_expr{{.*}}asLocalActor
-    // CHECK: declref_expr implicit type="Self"
+    // CHECK: declref_expr type="Self"
     _ = #isolation
   }
 }

@@ -40,3 +40,14 @@ func testCalls(x: some AsyncSequence<Int, Never>, y: any AsyncSequence<Int, any 
   await f3(x, x)
   try await f3(x, y)
 }
+
+// Treat @rethrows protocols that inherit AsyncSequence like they are
+// AsyncSequence for the purpose of rethrowing methods.
+@rethrows
+protocol InheritsAsyncSequence: AsyncSequence { }
+
+extension InheritsAsyncSequence {
+  func blah() async rethrows -> [Element] {
+    try await self.reduce(into: [Element]()) { $0.append($1) }
+  }
+}

@@ -32,13 +32,13 @@ using namespace swift;
 namespace {
 
 /// Get PlatformConditionKind from platform condition name.
-static llvm::Optional<PlatformConditionKind>
+static std::optional<PlatformConditionKind>
 getPlatformConditionKind(StringRef Name) {
-  return llvm::StringSwitch<llvm::Optional<PlatformConditionKind>>(Name)
+  return llvm::StringSwitch<std::optional<PlatformConditionKind>>(Name)
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
     .Case(IDENTIFIER, PlatformConditionKind::LABEL)
 #include "swift/AST/PlatformConditionKinds.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 /// Get platform condition name from PlatformConditionKind.
@@ -58,9 +58,8 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-static bool
-isValidPrefixUnaryOperator(llvm::Optional<StringRef> UnaryOperator) {
-  return UnaryOperator != llvm::None &&
+static bool isValidPrefixUnaryOperator(std::optional<StringRef> UnaryOperator) {
+  return UnaryOperator != std::nullopt &&
          (UnaryOperator.value() == ">=" || UnaryOperator.value() == "<");
 }
 
@@ -165,13 +164,13 @@ class ValidateIfConfigCondition :
   bool HasError;
 
   /// Get the identifier string of the UnresolvedDeclRefExpr.
-  llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
+  std::optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
     auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
     if (!UDRE ||
         !UDRE->hasName() ||
         UDRE->getRefKind() != Kind ||
         UDRE->getName().isCompoundName())
-      return llvm::None;
+      return std::nullopt;
 
     return UDRE->getName().getBaseIdentifier().str();
   }
@@ -198,7 +197,7 @@ class ValidateIfConfigCondition :
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
 
-    auto getNextOperator = [&]() -> llvm::Optional<StringRef> {
+    auto getNextOperator = [&]() -> std::optional<StringRef> {
       assert((S.size() & 1) == 0);
       while (!S.empty()) {
         auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
@@ -213,7 +212,7 @@ class ValidateIfConfigCondition :
         // Consume invalid operator and the immediate RHS.
         S = S.slice(2);
       }
-      return llvm::None;
+      return std::nullopt;
     };
 
     // Extract out the first operator name.
@@ -327,9 +326,9 @@ public:
     if (*KindName == "swift" || *KindName == "compiler" ||
         *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
-      llvm::Optional<StringRef> PrefixName =
+      std::optional<StringRef> PrefixName =
           PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator)
-              : llvm::None;
+              : std::nullopt;
       if (!isValidPrefixUnaryOperator(PrefixName)) {
         D.diagnose(
             Arg->getLoc(), diag::unsupported_platform_condition_argument,
@@ -785,8 +784,8 @@ Result Parser::parseIfConfigRaw(
       SourceMgr.getIDEInspectionTargetBufferID() == L->getBufferID() &&
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
                                  SourceMgr.getIDEInspectionTargetLoc())) {
-    llvm::SaveAndRestore<llvm::Optional<StableHasher>> H(CurrentTokenHash,
-                                                         llvm::None);
+    llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
+                                                        std::nullopt);
     BacktrackingScope backtrack(*this);
     do {
       auto startLoc = Tok.getLoc();
@@ -875,9 +874,9 @@ Result Parser::parseIfConfigRaw(
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
-    llvm::Optional<llvm::SaveAndRestore<llvm::Optional<StableHasher>>> T;
+    std::optional<llvm::SaveAndRestore<std::optional<StableHasher>>> T;
     if (!isActive)
-      T.emplace(CurrentTokenHash, llvm::None);
+      T.emplace(CurrentTokenHash, std::nullopt);
 
     if (isActive || !isVersionCondition) {
       parseElements(

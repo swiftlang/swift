@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
-// REQUIRES: noncopyable_generics
-
 protocol U {}
 
 enum Maybe<Thing: ~Copyable> : ~Copyable {}
@@ -50,8 +48,7 @@ public struct MoveOnlyS1<T> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS2<T: Equatable> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS3<T: ~Copyable> : ~Copyable { /*deinit {}*/ }
 
-protocol Rope<Element>: Hashable, ~ Copyable {
-
+protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
   associatedtype Element: ~Copyable
 }
 
@@ -100,4 +97,4 @@ typealias Z5 = (~Int) -> Void // expected-error {{type 'Int' is not invertible}}
 typealias Z6 = ~() -> () // expected-error {{single argument function types require parentheses}}
                          // expected-error@-1 {{type '()' is not invertible}}
 typealias Z7 = ~(Copyable & Hashable) // expected-error {{type 'Hashable' is not invertible}}
-typealias Z8 = ~Copyable & Hashable
+typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}

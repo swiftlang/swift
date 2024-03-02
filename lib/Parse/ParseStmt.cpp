@@ -214,7 +214,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 /// given that we're in the middle of a switch already.
 static bool isAtStartOfSwitchCase(Parser &parser,
                                   bool needsToBacktrack = true) {
-  llvm::Optional<Parser::BacktrackingScope> backtrack;
+  std::optional<Parser::BacktrackingScope> backtrack;
 
   // Check for and consume attributes. The only valid attribute is `@unknown`
   // but that's a semantic restriction.
@@ -852,7 +852,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     auto result = makeParserResult(
       YieldStmt::create(Context, yieldLoc, SourceLoc(), cce, SourceLoc()));
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/llvm::None);
+      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/std::nullopt);
     }
     result.setHasCodeCompletionAndIsError();
     consumeToken();
@@ -1088,7 +1088,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     // Change the DeclContext for any variables declared in the defer to be within
     // the defer closure.
     ParseFunctionBody cc(*this, tempDecl);
-    llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(
+    llvm::SaveAndRestore<std::optional<StableHasher>> T(
         CurrentTokenHash, StableHasher::defaultHasher());
 
     ParserResult<BraceStmt> Body =
@@ -1295,7 +1295,7 @@ validateAvailabilitySpecList(Parser &P,
                              SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  llvm::Optional<SourceLoc> OtherPlatformSpecLoc = llvm::None;
+  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
 
   if (Specs.size() == 1 &&
       isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
@@ -1345,7 +1345,7 @@ validateAvailabilitySpecList(Parser &P,
 
   switch (Source) {
   case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == llvm::None) {
+    if (OtherPlatformSpecLoc == std::nullopt) {
       SourceLoc InsertWildcardLoc = P.PreviousLoc;
       P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
@@ -1353,7 +1353,7 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != llvm::None) {
+    if (OtherPlatformSpecLoc != std::nullopt) {
       SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
         .fixItRemove(Loc);
@@ -1361,7 +1361,7 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != llvm::None) {
+    if (OtherPlatformSpecLoc != std::nullopt) {
       SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
     }
@@ -2773,9 +2773,8 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
       return makeParserError();
     }
 
-    auto messageOpt =
-        getStringLiteralIfNotInterpolated(Tok.getLoc(), "'#assert' message",
-                                          /*AllowMultiline=*/true);
+    auto messageOpt = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                        "'#assert' message");
     consumeToken();
     if (!messageOpt)
       return makeParserError();

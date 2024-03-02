@@ -75,6 +75,8 @@ RequirementMachine::getLocalRequirements(
   for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
+  ProtocolType::canonicalizeProtocols(result.protos);
+
   result.layout = props->getLayoutConstraint();
 
   return result;
@@ -305,7 +307,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
     Action walkToTypePre(Type component) override {
       if (!component->hasTypeParameter())
-        return Action::SkipChildren;
+        return Action::SkipNode;
 
       if (!component->isTypeParameter())
         return Action::Continue;
@@ -327,7 +329,7 @@ bool RequirementMachine::isReducedType(Type type) const {
 
       // The parent of a reduced type parameter might be non-reduced
       // because it is concrete.
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
   };
 
@@ -345,9 +347,9 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto *memberType = type->castTo<DependentMemberType>();
   auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
                                        prefixType, sig);
-  return memberType->substBaseType(substBaseType,
-                                   LookUpConformanceInSignature(sig.getPointer()),
-                                   llvm::None);
+  return memberType->substBaseType(
+      substBaseType, LookUpConformanceInSignature(sig.getPointer()),
+      std::nullopt);
 }
 
 /// Unlike most other queries, the input type can be any type, not just a
@@ -362,7 +364,7 @@ Type RequirementMachine::getReducedType(
     Type type,
     ArrayRef<GenericTypeParamType *> genericParams) const {
 
-  return type.transformRec([&](Type t) -> llvm::Optional<Type> {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     if (!t->hasTypeParameter())
       return t;
 
@@ -378,7 +380,7 @@ Type RequirementMachine::getReducedType(
     }
 
     if (!t->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     // Get a simplified term T.
     auto term = Context.getMutableTermForType(t->getCanonicalType(),

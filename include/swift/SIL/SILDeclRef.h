@@ -310,7 +310,7 @@ struct SILDeclRef {
   /// context) or its parent context.
   DeclContext *getInnermostDeclContext() const;
 
-  llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
+  std::optional<AnyFunctionRef> getAnyFunctionRef() const;
 
   SILLocation getAsRegularLocation() const;
 
@@ -553,7 +553,7 @@ struct SILDeclRef {
                                                     AbstractFunctionDecl *func);
 
   /// Returns the availability of the decl for computing linkage.
-  llvm::Optional<AvailabilityContext> getAvailabilityForLinkage() const;
+  std::optional<AvailabilityContext> getAvailabilityForLinkage() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

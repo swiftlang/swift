@@ -36,13 +36,13 @@
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-library-evolution \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -explicit-interface-module-build -Rcache-compile-job @%t/MyApp.cmd -input-file-key @%t/key 2>&1 \
-// RUN:   | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-MISS
+// RUN:   | %FileCheck %s --check-prefix=CACHE-MISS
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid  \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-library-evolution \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -explicit-interface-module-build -Rcache-compile-job @%t/MyApp.cmd -input-file-key @%t/key 2>&1 \
-// RUN:   | %FileCheck %s --check-prefix=VERIFY-OUTPUT --check-prefix=CACHE-HIT
+// RUN:   | %FileCheck %s --check-prefix=CACHE-HIT
 
 // CACHE-MISS: remark: cache miss for input
 // VERIFY-OUTPUT: warning: module 'B' was not compiled with library evolution support

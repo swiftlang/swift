@@ -116,12 +116,12 @@ SourceRange TypeAttribute::getSourceRange() const {
 /// Given a name like "autoclosure", return the type attribute ID that
 /// corresponds to it.
 ///
-llvm::Optional<TypeAttrKind>
+std::optional<TypeAttrKind>
 TypeAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(Str)
+  return llvm::StringSwitch<std::optional<TypeAttrKind>>(Str)
 #define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
 #include "swift/AST/TypeAttr.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 /// Return the name (like "autoclosure") for an attribute ID.
@@ -245,6 +245,28 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
+  switch (kind) {
+  case IsolationKind::Dynamic: return "any";
+  }
+  llvm_unreachable("bad kind");
+}
+
+void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
+                                 const PrintOptions &options) const {
+  // Suppress the attribute if requested.
+  switch (getIsolationKind()) {
+  case IsolationKind::Dynamic:
+    if (options.SuppressIsolatedAny) return;
+    break;
+  }
+
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@isolated");
+  printer << "(" << getIsolationKindName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -253,14 +275,14 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
 /// Also note that this recognizes both attributes like '@inline' (with no @)
 /// and decl modifiers like 'final'.
 ///
-llvm::Optional<DeclAttrKind>
+std::optional<DeclAttrKind>
 DeclAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(Str)
+  return llvm::StringSwitch<std::optional<DeclAttrKind>>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DeclAttrKind::CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DeclAttrKind::CLASS)
 #include "swift/AST/DeclAttr.def"
       .Case(SPI_AVAILABLE_ATTRNAME, DeclAttrKind::Available)
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
@@ -322,7 +344,8 @@ DeclAttributes::isUnavailableInSwiftVersion(
 }
 
 const AvailableAttr *
-DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx) const{
+DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
+                                               bool ignoreAppExtensions) const {
   const AvailableAttr *bestAttr = nullptr;
 
   for (auto attr : *this) {
@@ -337,6 +360,9 @@ DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx) const{
       continue;
 
     if (!avAttr->isActivePlatform(ctx))
+      continue;
+
+    if (ignoreAppExtensions && isApplicationExtensionPlatform(avAttr->Platform))
       continue;
 
     // We have an attribute that is active for the platform, but
@@ -392,10 +418,12 @@ DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
   return potential;
 }
 
-const AvailableAttr *DeclAttributes::getUnavailable(
-                          const ASTContext &ctx) const {
+const AvailableAttr *
+DeclAttributes::getUnavailable(const ASTContext &ctx,
+                               bool ignoreAppExtensions) const {
   const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
+  const AvailableAttr *bestActive =
+      findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
 
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
@@ -412,6 +440,10 @@ const AvailableAttr *DeclAttributes::getUnavailable(
       if (!AvAttr->isActivePlatform(ctx) &&
           !AvAttr->isLanguageVersionSpecific() &&
           !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      if (ignoreAppExtensions &&
+          isApplicationExtensionPlatform(AvAttr->Platform))
         continue;
 
       // Unconditional unavailable.
@@ -454,7 +486,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -492,7 +524,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
           !AvAttr->isPackageDescriptionVersionSpecific())
         continue;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -1007,22 +1039,22 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
-llvm::Optional<const DeclAttribute *>
+std::optional<const DeclAttribute *>
 ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   if (Attr->isImplicit())
-    return llvm::None;
+    return std::nullopt;
 
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
   auto *declFile = mod->getSourceFileContainingLocation(declLoc);
   auto *attrFile = mod->getSourceFileContainingLocation(Attr->getLocation());
   if (!declFile || !attrFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Only attributes in the same buffer as the declaration they're attached to
   // are part of the original attribute list.
   if (declFile->getBufferID() != attrFile->getBufferID())
-    return llvm::None;
+    return std::nullopt;
 
   return Attr;
 }
@@ -1227,6 +1259,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Alignment:
     Printer.printAttrName("@_alignment");
     Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
+    break;
+
+  case DeclAttrKind::AllowFeatureSuppression:
+    Printer.printAttrName("@_allowFeatureSuppression");
+    Printer << "(";
+    interleave(cast<AllowFeatureSuppressionAttr>(this)->getSuppressedFeatures(),
+               [&](Identifier ident) { Printer << ident; },
+               [&] { Printer << ", "; });
+    Printer << ")";
     break;
 
   case DeclAttrKind::SILGenName:
@@ -1873,6 +1914,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_section";
   case DeclAttrKind::Documentation:
     return "_documentation";
+  case DeclAttrKind::DistributedThunkTarget:
+    return "_distributedThunkTarget";
   case DeclAttrKind::Nonisolated:
     if (cast<NonisolatedAttr>(this)->isUnsafe()) {
         return "nonisolated(unsafe)";
@@ -1891,12 +1934,14 @@ StringRef DeclAttribute::getAttrName() const {
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
+  case DeclAttrKind::AllowFeatureSuppression:
+    return "_allowFeatureSuppression";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
 
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
-                   llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+                   std::optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
     : DeclAttribute(DeclAttrKind::ObjC, atLoc, baseRange, /*Implicit=*/false),
       NameData(nullptr) {
@@ -1918,7 +1963,7 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   Bits.ObjCAttr.ImplicitName = false;
 }
 
-ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
+ObjCAttr *ObjCAttr::create(ASTContext &Ctx, std::optional<ObjCSelector> name,
                            bool isNameImplicit) {
   return new (Ctx) ObjCAttr(name, isNameImplicit);
 }
@@ -1926,11 +1971,11 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
   return new (Ctx)
-      ObjCAttr(AtLoc, SourceRange(ObjCLoc), llvm::None, SourceRange(), {});
+      ObjCAttr(AtLoc, SourceRange(ObjCLoc), std::nullopt, SourceRange(), {});
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(llvm::None, false);
+  return new (Ctx) ObjCAttr(std::nullopt, false);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -2159,7 +2204,7 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                IsSPI);
 }
 
-llvm::Optional<OriginallyDefinedInAttr::ActiveVersion>
+std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
@@ -2178,7 +2223,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
     Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
     return Result;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
@@ -2722,18 +2767,18 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
       CustomAttr(atLoc, range, type, initContext, argList, implicit);
 }
 
-std::pair<IdentTypeRepr *, IdentTypeRepr *> CustomAttr::destructureMacroRef() {
+std::pair<IdentTypeRepr *, DeclRefTypeRepr *>
+CustomAttr::destructureMacroRef() {
   TypeRepr *typeRepr = getTypeRepr();
   if (!typeRepr)
     return {nullptr, nullptr};
   if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
     return {nullptr, identType};
-  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
-    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
-      if (memType->getMemberComponents().size() == 1)
-        if (auto first =
-                dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))
-          return {base, first};
+  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr)) {
+    if (auto *base = dyn_cast<SimpleIdentTypeRepr>(memType->getBase())) {
+      return {base, memType};
+    }
+  }
   return {nullptr, nullptr};
 }
 
@@ -2874,6 +2919,26 @@ StorageRestrictionsAttr::getAccessesProperties(AccessorDecl *attachedTo) const {
                            {});
 }
 
+AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(SourceLoc atLoc,
+                                                         SourceRange range,
+                                                         bool implicit,
+                                              ArrayRef<Identifier> features)
+    : DeclAttribute(DeclAttrKind::AllowFeatureSuppression,
+                    atLoc, range, implicit) {
+  Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
+  std::uninitialized_copy(features.begin(), features.end(),
+                          getTrailingObjects<Identifier>());
+}
+
+AllowFeatureSuppressionAttr *
+AllowFeatureSuppressionAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                                    SourceRange range, bool implicit,
+                                    ArrayRef<Identifier> features) {
+  unsigned size = totalSizeToAlloc<Identifier>(features.size());
+  auto *mem = ctx.Allocate(size, alignof(AllowFeatureSuppressionAttr));
+  return new (mem) AllowFeatureSuppressionAttr(atLoc, range, implicit, features);
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
@@ -2881,7 +2946,7 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
 
 bool swift::hasAttribute(
     const LangOptions &langOpts, llvm::StringRef attributeName) {
-  llvm::Optional<DeclAttrKind> kind =
+  std::optional<DeclAttrKind> kind =
       DeclAttribute::getAttrKindFromString(attributeName);
   if (!kind)
     return false;

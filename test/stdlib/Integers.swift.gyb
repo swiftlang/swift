@@ -852,17 +852,17 @@ tests.test("Strideable") {
   expectEqual(dist(UInt8.max, UInt8.min), -255)
   expectEqual(dist(Int8.min, Int8.max), 255)
   expectEqual(dist(Int8.max, Int8.min), -255)
-  
-  expectEqual(dist(UInt.max, UInt.max / 2), Int.min)
-  expectEqual(dist(Int.max, -1 as Int), Int.min)
 
-% if int(WORD_BITS) <= 64:
-  expectEqual(dist(UInt64(UInt.max), UInt64(UInt.max / 2)), Int.min)
-  expectEqual(dist(Int64(Int.max), Int64(-1 as Int)), Int.min)
-% end
+  if #available(SwiftStdlib 6.0, *) {
+    // Edge cases fixed in Swift 6.0
+    expectEqual(Int8.min.advanced(by: Int(Int8.max)+1), 0)
+    expectEqual(UInt.max.advanced(by: Int.min), UInt.max / 2)
 
-  expectEqual(Int8.min.advanced(by: Int(Int8.max)+1), 0)
-  expectEqual(UInt.max.advanced(by: Int.min), UInt.max / 2)
+%   if int(WORD_BITS) <= 64:
+    expectEqual(dist(UInt64(UInt.max), UInt64(UInt.max / 2)), Int.min)
+    expectEqual(dist(Int64(Int.max), Int64(-1 as Int)), Int.min)
+%   end
+  }
 }
 
 tests.test("signum/generic") {

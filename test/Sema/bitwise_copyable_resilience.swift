@@ -27,6 +27,10 @@ case somebody(T)
 case noone
 }
 
+public struct Integer {
+  var value: Int
+}
+
 //--- Downstream.swift
 import Library
 
@@ -47,3 +51,4 @@ struct S_Explicit_With_Woopsional<T> : _BitwiseCopyable {
 func passWoopsional<T>(_ t: Woopsional<T>) { take(t) } // expected-error    {{type_does_not_conform_decl_owner}}
                                                        // expected-note@-15 {{where_requirement_failure_one_subst}}
 
+extension Integer : @retroactive _BitwiseCopyable {} // expected-error {{bitwise_copyable_outside_module}}

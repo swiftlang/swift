@@ -19,8 +19,6 @@
 
 namespace swift {
 
-class InvertibleAnnotationRequest;
-
 /// Describes the way an inverse and its corresponding positive contraint
 /// appears on a TypeDecl, i.e., the way it was marked.
 struct InverseMarking {
@@ -57,6 +55,11 @@ struct InverseMarking {
     }
     operator bool() const { return isPresent(); }
 
+    // Is there any kind of explicit marking?
+    bool isAnyExplicit() const {
+      return is(Kind::Explicit) || is(Kind::LegacyExplicit);
+    }
+
     SourceLoc getLoc() const { return loc; }
 
     void set(Kind k, SourceLoc l = SourceLoc()) {
@@ -86,8 +89,6 @@ private:
   Mark inverse;
   Mark positive;
 
-  // This friend initializes the marks.
-  friend InvertibleAnnotationRequest;
 public:
 
   // Creates an empty marking.

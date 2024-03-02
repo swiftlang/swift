@@ -526,7 +526,11 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -619,7 +623,11 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -814,7 +822,11 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(
@@ -1027,7 +1039,11 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
+#if $TypedThrows
     try _base.map(transform)
+#else
+    try _base.__rethrows_map(transform)
+#endif
   }
   @inlinable
   internal override func _filter(

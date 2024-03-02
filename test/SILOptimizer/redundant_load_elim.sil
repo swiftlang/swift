@@ -134,6 +134,7 @@ sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @escaped_a_ptr : $@convention(thin) () -> @out A
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
 
 
 // We have a bug in the old projection code which this test case exposes.
@@ -1294,4 +1295,23 @@ bb0:
   end_apply %3
   %7 = tuple (%4 : $String, %5 : $Int64)
   return %7 : $(String, Int64)
+}
+
+// CHECK-LABEL: sil @dont_remove_load_from_stored_pointer :
+// CHECK:         [[L:%[0-9]+]] = load
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'dont_remove_load_from_stored_pointer'
+sil @dont_remove_load_from_stored_pointer : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1 : $*Int
+  %5 = address_to_pointer %1 : $*Int to $Builtin.RawPointer
+  %32 = alloc_stack $Builtin.RawPointer
+  store %5 to %32 : $*Builtin.RawPointer
+  %34 = function_ref @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  %35 = apply %34(%32) : $@convention(thin) (@in Builtin.RawPointer) -> ()
+  dealloc_stack %32 : $*Builtin.RawPointer
+  %53 = load %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %53 : $Int
 }

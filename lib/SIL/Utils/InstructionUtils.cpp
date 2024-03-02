@@ -570,6 +570,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::PackLengthInst:
   case SILInstructionKind::DebugStepInst:
+  case SILInstructionKind::FunctionExtractIsolationInst:
     return RuntimeEffect::NoEffect;
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
@@ -581,7 +582,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
     return RuntimeEffect::NoEffect;
-  case SILInstructionKind::TestSpecificationInst:
+  case SILInstructionKind::SpecifyTestInst:
     // Ignore runtime calls of test-only instructions
     return RuntimeEffect::NoEffect;
 
@@ -869,6 +870,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isBlockPointerCompatible())
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
+    if (impactType.isMoveOnly() &&
+        !isa<DropDeinitInst>(lookThroughOwnershipInsts(inst->getOperand(0)))) {
+      // Not de-virtualized value type deinits can require metatype in case the
+      // deinit needs to be called via the value witness table.
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    }
     return ifNonTrivial(inst->getOperand(0)->getType(),
                         RuntimeEffect::Releasing);
 

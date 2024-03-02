@@ -18,8 +18,8 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
+#include <optional>
 
 namespace SourceKit {
 namespace CodeCompletion {
@@ -84,7 +84,7 @@ struct NameStyle {
 class Completion {
   const SwiftResult &base;
   void *opaqueCustomKind = nullptr;
-  llvm::Optional<uint8_t> moduleImportDepth;
+  std::optional<uint8_t> moduleImportDepth;
   PopularityFactor popularityFactor;
   StringRef name;
   StringRef description;
@@ -106,7 +106,7 @@ public:
   bool hasCustomKind() const { return opaqueCustomKind; }
   void *getCustomKind() const { return opaqueCustomKind; }
   StringRef getDescription() const { return description; }
-  llvm::Optional<uint8_t> getModuleImportDepth() const {
+  std::optional<uint8_t> getModuleImportDepth() const {
     return moduleImportDepth;
   }
 
@@ -203,7 +203,7 @@ class CompletionBuilder {
   CodeCompletionFlair flair;
   CodeCompletionString *completionString;
   void *customKind = nullptr;
-  llvm::Optional<uint8_t> moduleImportDepth;
+  std::optional<uint8_t> moduleImportDepth;
   PopularityFactor popularityFactor;
 
 public:
@@ -211,7 +211,7 @@ public:
 
   void setCustomKind(void *opaqueCustomKind) { customKind = opaqueCustomKind; }
 
-  void setModuleImportDepth(llvm::Optional<uint8_t> value) {
+  void setModuleImportDepth(std::optional<uint8_t> value) {
     assert(!value || *value <= Completion::maxModuleImportDepth);
     moduleImportDepth = value;
   }

@@ -675,7 +675,7 @@ func testExprPatternIsolation() {
   if case .f(0.0, 0) = produceMultiPayload() {}
   if case .f(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
 
-  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in Swift 6}}
+  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
 
   // FIXME: Bad error (https://github.com/apple/swift/issues/64279)
   if case .e(nil, 0) = produceMultiPayload() {}
@@ -772,5 +772,22 @@ func issue66750(_ x: Result<String, Error>) {
   case (.failure(), let y):
     // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
     break
+  }
+}
+
+// rdar://123466496 - `type of expression is ambiguous without a type annotation` with extra elements
+do {
+  enum E {
+  case test(a: Int, b: String)
+  }
+
+  func test(_: (E) -> Void) {
+  }
+
+  test {
+    switch $0 {
+    case .test(a: 42, b: "", c: 0.0): break
+      // expected-error@-1 {{tuple pattern has the wrong length for tuple type '(Int, String)'}}
+    }
   }
 }

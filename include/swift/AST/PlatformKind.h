@@ -19,9 +19,9 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
+#include <optional>
 
 namespace swift {
 
@@ -40,12 +40,16 @@ StringRef platformString(PlatformKind platform);
   
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.
-llvm::Optional<PlatformKind> platformFromString(StringRef Name);
+std::optional<PlatformKind> platformFromString(StringRef Name);
+
+/// Safely converts the given unsigned value to a valid \c PlatformKind value or
+/// \c nullopt otherwise.
+std::optional<PlatformKind> platformFromUnsigned(unsigned value);
 
 /// Returns a valid platform string that is closest to the candidate string
 /// based on edit distance. Returns \c None if the closest valid platform
 /// distance is not within a minimum threshold.
-llvm::Optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
+std::optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
 
 /// Returns a human-readable version of the platform name as a string, suitable
 /// for emission in diagnostics (e.g., "macOS").
@@ -54,8 +58,14 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// Returns the base platform for an application-extension platform. For example
 /// `iOS` would be returned for `iOSApplicationExtension`. Returns `None` for
 /// platforms which are not application extension platforms.
-llvm::Optional<PlatformKind>
+std::optional<PlatformKind>
 basePlatformForExtensionPlatform(PlatformKind Platform);
+
+/// Returns true if \p Platform represents and application extension platform,
+/// e.g. `iOSApplicationExtension`.
+inline bool isApplicationExtensionPlatform(PlatformKind Platform) {
+  return basePlatformForExtensionPlatform(Platform).has_value();
+}
 
 /// Returns whether the passed-in platform is active, given the language
 /// options. A platform is active if either it is the target platform or its

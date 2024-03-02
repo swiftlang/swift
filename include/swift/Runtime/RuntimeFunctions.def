@@ -2807,6 +2807,24 @@ FUNCTION(InitRawStructMetadata,
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
+// _Unwind_Reason_Code _swift_exceptionPersonality(int version,
+//                                                 _Unwind_Action actions,
+//                                                 uint64 exceptionClass,
+//                                                 struct _Unwind_Exception *exceptionObject,
+//                                                 struct _Unwind_Context *context);
+FUNCTION(ExceptionPersonality,
+         _swift_exceptionPersonality,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty,
+              Int32Ty,
+              Int64Ty,
+              Int8PtrTy,
+              Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

@@ -223,12 +223,19 @@ enum class CheckRequirementsResult : uint8_t {
 /// not contain any type parameters.
 CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
 
+/// Check if each substituted requirement is satisfied. If the requirement
+/// contains type parameters, and the answer would depend on the context of
+/// those type parameters, then `nullopt` is returned.
+std::optional<CheckRequirementsResult>
+checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
+
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
-CheckRequirementsResult checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
-    TypeSubstitutionFn substitutions, SubstOptions options=llvm::None);
+CheckRequirementsResult checkRequirements(ModuleDecl *module,
+                                          ArrayRef<Requirement> requirements,
+                                          TypeSubstitutionFn substitutions,
+                                          SubstOptions options = std::nullopt);
 
 /// A requirement as written in source, together with a source location. See
 /// ProtocolDecl::getStructuralRequirements().
@@ -249,15 +256,6 @@ struct InverseRequirement {
   InverseRequirement(Type subject, ProtocolDecl *protocol, SourceLoc loc);
 
   InvertibleProtocolKind getKind() const;
-
-  /// Adds the type parameters of this generic context to the result if
-  /// it has default requirements.
-  static void enumerateDefaultedParams(GenericContext *decl,
-                                       SmallVectorImpl<Type> &result);
-
-  /// \returns the protocols that are required by default for the given type
-  /// parameter. These are not inverses themselves.
-  static InvertibleProtocolSet expandDefault(Type gp);
 
   /// Appends additional requirements corresponding to defaults for the given
   /// generic parameters.

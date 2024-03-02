@@ -173,12 +173,12 @@ bb0:
   destroy_value %9 : $String
   %12 = tuple ()
   return %12 : $()
-    // CHECK-DAG [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
-    // CHECK-DAG {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
-    // CHECK-DAG [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
-    // CHECK-DAG [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG [[LIT]] = string_literal oslog "test message: %lld"
-    // CHECK-DAG destroy_value [[STRINGCONST]] : $String
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
 // Test that the OSLogOptimization pass does not fold instructions that define
@@ -407,7 +407,8 @@ bb0:
     // CHECK: [[ALLOCATORREF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK: [[TUPLE:%[0-9]+]] = apply [[ALLOCATORREF]]<Int64>([[NUMELEMS]])
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
-    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]] : $Builtin.RawPointer to [strict] $*Int64
+    // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<Int64>
+    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Int64
     // CHECK: store [[ELEM1INT]] to [trivial] [[STORAGEADDR]] : $*Int64
     // CHECK: [[INDEX1:%[0-9]+]] = integer_literal $Builtin.Word, 1
     // CHECK: [[INDEXADDR1:%[0-9]+]] = index_addr [[STORAGEADDR]] : $*Int64, [[INDEX1]] : $Builtin.Word
@@ -539,7 +540,8 @@ bb0:
     // CHECK: [[ALLOCATORREF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK: [[TUPLE:%[0-9]+]] = apply [[ALLOCATORREF]]<String>([[NUMELEMS]])
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
-    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]] : $Builtin.RawPointer to [strict] $*String
+    // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<String>
+    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*String
     // CHECK: store [[STRINGCONST]] to [init] [[STORAGEADDR]] : $*String
     // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
     // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<String>([[ARRAY]])

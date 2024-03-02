@@ -128,6 +128,12 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
+struct BridgedUtilities {
+  typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
+
+  static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
+};
+
 struct BridgedBasicBlockSet {
   swift::BasicBlockSet * _Nonnull set;
 
@@ -301,7 +307,9 @@ struct BridgedPassContext {
 
   // SSAUpdater
 
-  BRIDGED_INLINE void SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE void
+  SSAUpdater_initialize(BridgedFunction function, BridgedType type,
+                        BridgedValue::Ownership ownership) const;
   BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;

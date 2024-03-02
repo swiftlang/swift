@@ -259,17 +259,17 @@ public:
   
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
-  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
-                                      SILType T,
-                                      Address enumAddr) const = 0;
+  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T,
+                                      Address enumAddr,
+                                      bool maskExtraTagBits = false) const = 0;
 
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
   ///
   /// Only ever called for fixed types.
-  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF,
-                                           SILType T,
-                                           Address enumAddr) const;
+  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                           Address enumAddr,
+                                           bool maskExtraTagBits = false) const;
   llvm::Value *emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                                            Address enumAddr) const;
 
@@ -517,6 +517,20 @@ public:
                                                    unsigned index) const {
     return false;
   }
+
+  struct SpareBitsMaskInfo {
+    const llvm::APInt bits;
+    const uint32_t byteOffset;
+    const uint32_t bytesInMask;
+
+    uint64_t wordsInMask() const { return (bytesInMask + 3) / 4; }
+  };
+
+  /// Calculates the spare bits mask for the enum. Returns none if the type
+  /// should not emit the spare bits.
+  virtual std::optional<SpareBitsMaskInfo> calculateSpareBitsMask() const {
+    return {};
+  };
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

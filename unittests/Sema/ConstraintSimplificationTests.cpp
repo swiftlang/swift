@@ -45,7 +45,7 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto choice = solution.argumentMatchingChoices.find(locator);
   ASSERT_TRUE(choice != solution.argumentMatchingChoices.end());
   MatchCallArgumentResult expected{
-      TrailingClosureMatching::Forward, {{0}, {1}}, llvm::None};
+      TrailingClosureMatching::Forward, {{0}, {1}}, std::nullopt};
   ASSERT_EQ(choice->second, expected);
 }
 

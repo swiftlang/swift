@@ -92,7 +92,7 @@ valid_type_ref:
 }
 
 /// Load and normalize a mangled name so it can be matched with string equality.
-llvm::Optional<std::string>
+std::optional<std::string>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::normalizeReflectionName(
     RemoteRef<char> reflectionName) {
   const auto reflectionNameRemoteAddress = reflectionName.getAddressData();
@@ -114,13 +114,13 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::normalizeReflectionName(
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
       // Symbolic references cannot be mangled, return a failure.
       NormalizedReflectionNameCache.insert(std::make_pair(
-          reflectionNameRemoteAddress, llvm::Optional<std::string>()));
+          reflectionNameRemoteAddress, std::optional<std::string>()));
       return {};
     default:
       auto mangling = mangleNode(node);
       if (!mangling.isSuccess()) {
         NormalizedReflectionNameCache.insert(std::make_pair(
-            reflectionNameRemoteAddress, llvm::Optional<std::string>()));
+            reflectionNameRemoteAddress, std::optional<std::string>()));
         return {};
       }
       NormalizedReflectionNameCache.insert(
@@ -214,7 +214,7 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, *SubstMap);
 }
 
-static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
+static std::optional<StringRef> FindOutermostModuleName(NodePointer Node) {
   if (!Node)
     return {};
   // Breadth first search until we find the module name so we find the outermost
@@ -265,7 +265,7 @@ void TypeRefBuilder::ReflectionTypeDescriptorFinder::
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
+std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::findFieldDescriptorAtIndex(
     size_t Index, const std::string &MangledName) {
   populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
@@ -273,19 +273,19 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::findFieldDescriptorAtIndex(
   if (Found != FieldTypeInfoCache.end()) {
     return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
+std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::
     getFieldDescriptorFromExternalCache(const std::string &MangledName) {
   if (!ExternalTypeRefCache)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto Locator =
           ExternalTypeRefCache->getFieldDescriptorLocator(MangledName)) {
     if (Locator->InfoID >= ReflectionInfos.size())
-      return llvm::None;
+      return std::nullopt;
 
     auto &Field = ReflectionInfos[Locator->InfoID].Field;
     auto Addr = Field.startAddress().getAddressData() + Locator->Offset;
@@ -309,7 +309,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
     if (Found != FieldTypeInfoCache.end())
       return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 RemoteRef<FieldDescriptor>
@@ -574,6 +574,50 @@ TypeRefBuilder::getBuiltinTypeDescriptor(const TypeRef *TR) {
   return nullptr;
 }
 
+namespace {
+/// A builtin type descriptor implementation that wraps a reflection builtin
+/// type descriptor.
+class MultiPayloadEnumDescriptorImpl : public MultiPayloadEnumDescriptorBase {
+  RemoteRef<MultiPayloadEnumDescriptor> MPED;
+  TypeRefBuilder &Builder;
+
+public:
+  MultiPayloadEnumDescriptorImpl(RemoteRef<MultiPayloadEnumDescriptor> MPED,
+                                 TypeRefBuilder &Builder)
+      : MultiPayloadEnumDescriptorBase(), MPED(MPED), Builder(Builder) {}
+
+  ~MultiPayloadEnumDescriptorImpl() override {}
+
+  StringRef getMangledTypeName() override {
+    return Builder.getTypeRefString(Builder.readTypeRef(MPED, MPED->TypeName));
+  };
+
+  uint32_t getContentsSizeInWords() const override {
+    return MPED->getContentsSizeInWords();
+  }
+
+  size_t getSizeInBytes() const override { return MPED->getSizeInBytes(); }
+
+  uint32_t getFlags() const override { return MPED->getFlags(); }
+
+  bool usesPayloadSpareBits() const override {
+    return MPED->usesPayloadSpareBits();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteOffset() const override {
+    return MPED->getPayloadSpareBitMaskByteOffset();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteCount() const override {
+    return MPED->getPayloadSpareBitMaskByteCount();
+  }
+
+  const uint8_t *getPayloadSpareBits() const override {
+    return MPED->getPayloadSpareBits();
+  }
+};
+} // namespace
+  
 RemoteRef<MultiPayloadEnumDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
     const TypeRef *TR) {
@@ -616,6 +660,23 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
       return MultiPayloadEnumDescriptor;
     }
   }
+
+  return nullptr;
+}
+
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumDescriptor(
+    const TypeRef *TR) {
+  if (auto BTI = getMultiPayloadEnumInfo(TR))
+    return std::make_unique<MultiPayloadEnumDescriptorImpl>(BTI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::getMultiPayloadEnumDescriptor(const TypeRef *TR) {
+  for (auto *DF : getDescriptorFinders())
+    if (auto descriptor = DF->getMultiPayloadEnumDescriptor(TR))
+      return descriptor;
 
   return nullptr;
 }
@@ -705,11 +766,11 @@ void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpTypeRef(
 
 FieldTypeCollectionResult
 TypeRefBuilder::ReflectionTypeDescriptorFinder::collectFieldTypes(
-    llvm::Optional<std::string> forMangledTypeName) {
+    std::optional<std::string> forMangledTypeName) {
   FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      llvm::Optional<std::string> optionalMangledTypeName;
+      std::optional<std::string> optionalMangledTypeName;
       std::string typeName;
       {
         TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
@@ -762,7 +823,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::collectFieldTypes(
 void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpFieldSection(
     std::ostream &stream) {
   auto fieldInfoCollectionResult =
-      collectFieldTypes(llvm::Optional<std::string>());
+      collectFieldTypes(std::optional<std::string>());
   for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
     stream << info.FullyQualifiedName << "\n";
     for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)

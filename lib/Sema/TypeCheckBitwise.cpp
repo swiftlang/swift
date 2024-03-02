@@ -51,14 +51,13 @@ bool isImplicit(BitwiseCopyableCheck check) {
 /// The implicit check kind appropriate to \p nominal, if any.
 ///
 /// For public, non-frozen types, this is ::None.
-llvm::Optional<BitwiseCopyableCheck>
+std::optional<BitwiseCopyableCheck>
 getImplicitCheckForNominal(NominalTypeDecl *nominal) {
   assert(nominal);
   if (!nominal
            ->getFormalAccessScope(
                /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true)
-           .isPublic() ||
-      !nominal->isResilient())
+           .isPublicOrPackage())
     return {BitwiseCopyableCheck::Implicit};
 
   if (nominal->hasClangNode() ||
@@ -66,7 +65,7 @@ getImplicitCheckForNominal(NominalTypeDecl *nominal) {
       nominal->getAttrs().hasAttribute<FrozenAttr>())
     return {BitwiseCopyableCheck::Implicit};
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Checks that \p nominal conforms to BitwiseCopyable and emits the relevant
@@ -114,6 +113,16 @@ private:
 bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
   storage = decl;
   SWIFT_DEFER { storage = nullptr; };
+
+  auto *element = dyn_cast<EnumElementDecl>(decl);
+  if (element && element->isIndirect()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_indirect_enum_element);
+      element->diagnose(diag::note_non_bitwise_copyable_type_indirect_enum_element);
+    }
+    invalid = true;
+    return true;
+  }
 
   // Fields with unowned(unsafe) ownership are bitwise-copyable.
   auto *roa = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
@@ -224,18 +233,38 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
       KnownProtocolKind::BitwiseCopyable));
 
   if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isNoncopyable()) {
-    nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_noncopyable);
+    }
     return true;
   }
 
   if (!dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())->isEscapable()) {
-    nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_nonescapable);
+    }
     return true;
   }
 
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
       nominal->diagnose(diag::non_bitwise_copyable_type_class);
+    }
+    return true;
+  }
+
+  auto *ed = dyn_cast<EnumDecl>(nominal);
+  if (ed && ed->isIndirect()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_indirect_enum);
+    }
+    return true;
+  }
+
+  auto *sd = dyn_cast<StructDecl>(nominal);
+  if (sd && sd->isCxxNonTrivial()) {
+    if (!isImplicit(check)) {
+      nominal->diagnose(diag::non_bitwise_copyable_type_cxx_nontrivial);
     }
     return true;
   }
@@ -299,6 +328,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
 
     case SourceFileKind::Library:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
     case SourceFileKind::Main:
     case SourceFileKind::SIL:
       return true;
@@ -367,6 +397,13 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
   if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
     if (AvailableAttr::isUnavailable(ext))
       return false;
+  }
+
+  // BitwiseCopyable must be added in the same source file.
+  auto conformanceDecl = conformanceDC->getAsDecl();
+  if (conformanceDecl->getModuleContext() != nominal->getModuleContext()) {
+    conformanceDecl->diagnose(diag::bitwise_copyable_outside_module, nominal);
+    return true;
   }
 
   auto check = isImplicit ? BitwiseCopyableCheck::Implicit

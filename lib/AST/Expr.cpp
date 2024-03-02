@@ -516,21 +516,21 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
 
       // We're only interested in the immediate children, so don't walk any
       // further.
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
   
@@ -562,17 +562,17 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      return Action::SkipChildren(P);
+      return Action::SkipNode(P);
     }
     PreWalkAction walkToDeclPre(Decl *D) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -1917,7 +1917,7 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != llvm::None)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt)) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
@@ -1953,11 +1953,11 @@ Type AbstractClosureExpr::getResultType(
   return T->castTo<FunctionType>()->getResult();
 }
 
-llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
+std::optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
   if (auto fnType = getType()->getAs<AnyFunctionType>())
     return fnType->getEffectiveThrownErrorType();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
@@ -2236,57 +2236,47 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   assert(ParentNameLoc.isValid());
   assert(NameLoc.isValid());
 
-  // The base component is the parent type.
-  auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
-                                                 Parent->createNameRef());
-  ParentComp->setValue(Parent, nullptr);
+  // The base is the parent type.
+  auto *BaseTR =
+      new (C) SimpleIdentTypeRepr(ParentNameLoc, Parent->createNameRef());
+  BaseTR->setValue(Parent, nullptr);
 
-  // The member component is the member we just found.
-  auto *MemberComp =
-      new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
-  MemberComp->setValue(Decl, nullptr);
+  auto *MemberTR =
+      MemberTypeRepr::create(C, BaseTR, NameLoc, Decl->createNameRef());
+  MemberTR->setValue(Decl, nullptr);
 
-  auto *TR = MemberTypeRepr::create(C, ParentComp, {MemberComp});
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(MemberTR);
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
-  // Add a new component for the member we just found.
-  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
-  NewComp->setValue(Decl, nullptr);
+  auto *MemberTR =
+      MemberTypeRepr::create(C, ParentTR, NameLoc, Decl->createNameRef());
+  MemberTR->setValue(Decl, nullptr);
 
-  TypeRepr *TR = nullptr;
-  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(ParentTR)) {
-    // Create a new list of components.
-    SmallVector<IdentTypeRepr *, 4> Components;
-    if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
-      auto MemberComps = MemberTR->getMemberComponents();
-      Components.append(MemberComps.begin(), MemberComps.end());
-    }
-
-    Components.push_back(NewComp);
-    TR = MemberTypeRepr::create(C, DeclRefTR->getBaseComponent(), Components);
-  } else {
-    TR = MemberTypeRepr::create(C, ParentTR, NewComp);
-  }
-
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(MemberTR);
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
                                              ArrayRef<TypeRepr *> Args,
                                              SourceRange AngleLocs,
                                              ASTContext &C) {
-  auto *lastComp = ParentTR->getLastComponent();
+  DeclRefTypeRepr *specializedTR = nullptr;
 
-  if (!isa<SimpleIdentTypeRepr>(lastComp) || !lastComp->getBoundDecl())
+  auto *boundDecl = ParentTR->getBoundDecl();
+  if (!boundDecl || ParentTR->hasGenericArgList()) {
     return nullptr;
+  }
 
-  if (isa<TypeAliasDecl>(lastComp->getBoundDecl())) {
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+  if (isa<IdentTypeRepr>(ParentTR)) {
+    specializedTR = GenericIdentTypeRepr::create(
+        C, ParentTR->getNameLoc(), ParentTR->getNameRef(), Args, AngleLocs);
+    specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
+  } else {
+    auto *const memberTR = cast<MemberTypeRepr>(ParentTR);
+    if (isa<TypeAliasDecl>(boundDecl)) {
       // If any of our parent types are unbound, bail out and let
       // the constraint solver can infer generic parameters for them.
       //
@@ -2299,50 +2289,30 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
       //
       // FIXME: Once we can model generic typealiases properly, rip
       // this out.
-      auto isUnboundGenericComponent = [](IdentTypeRepr *ITR) -> bool {
-        if (isa<SimpleIdentTypeRepr>(ITR)) {
-          auto *decl = dyn_cast_or_null<GenericTypeDecl>(ITR->getBoundDecl());
+      MemberTypeRepr *currTR = memberTR;
+      while (auto *declRefBaseTR =
+                 dyn_cast<DeclRefTypeRepr>(currTR->getBase())) {
+        if (!declRefBaseTR->hasGenericArgList()) {
+          auto *decl =
+              dyn_cast_or_null<GenericTypeDecl>(declRefBaseTR->getBoundDecl());
           if (decl && decl->isGeneric())
-            return true;
+            return nullptr;
         }
 
-        return false;
-      };
-
-      for (auto *comp : memberTR->getMemberComponents().drop_back()) {
-        if (isUnboundGenericComponent(comp))
-          return nullptr;
-      }
-
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
-        if (isUnboundGenericComponent(identBase))
-          return nullptr;
+        currTR = dyn_cast<MemberTypeRepr>(declRefBaseTR);
+        if (!currTR) {
+          break;
+        }
       }
     }
+
+    specializedTR =
+        MemberTypeRepr::create(C, memberTR->getBase(), ParentTR->getNameLoc(),
+                               ParentTR->getNameRef(), Args, AngleLocs);
+    specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   }
 
-  auto *genericComp = GenericIdentTypeRepr::create(
-      C, lastComp->getNameLoc(), lastComp->getNameRef(), Args, AngleLocs);
-  genericComp->setValue(lastComp->getBoundDecl(), lastComp->getDeclContext());
-
-  TypeRepr *TR = nullptr;
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
-    auto oldMemberComps = memberTR->getMemberComponents().drop_back();
-
-    // Create a new list of member components, replacing the last one with the
-    // new specialized one.
-    SmallVector<IdentTypeRepr *, 2> newMemberComps;
-    newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
-    newMemberComps.push_back(genericComp);
-
-    TR =
-        MemberTypeRepr::create(C, memberTR->getBaseComponent(), newMemberComps);
-  } else {
-    TR = genericComp;
-  }
-
-  return new (C) TypeExpr(TR);
+  return new (C) TypeExpr(specializedTR);
 }
 
 // Create an implicit TypeExpr, with location information even though it
@@ -2466,14 +2436,14 @@ KeyPathExpr::setComponents(ASTContext &C,
   Components = Components.slice(0, newComponents.size());
 }
 
-llvm::Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
+std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   for (auto idx : indices(getComponents())) {
     if (auto *args = getComponents()[idx].getSubscriptArgs()) {
       if (args->findArgumentExpr(arg))
         return idx;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 BoundGenericType *KeyPathExpr::getKeyPathType() const {
@@ -2550,37 +2520,21 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
     if (!BS)
       continue;
 
-    if (auto *S = BS->getSingleActiveStatement()) {
-      if (mustBeExpr) {
-        // If this must be an expression, we can eagerly wrap any exhaustive if,
-        // switch, and do statement.
-        if (auto *IS = dyn_cast<IfStmt>(S)) {
-          if (!IS->isSyntacticallyExhaustive())
-            continue;
-        } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
-            continue;
-          if (!DCS->isSyntacticallyExhaustive())
-            continue;
-        } else if (isa<DoStmt>(S)) {
-          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
-            continue;
-        } else if (!isa<SwitchStmt>(S)) {
-          continue;
-        }
-      } else {
-        // Otherwise do the semantic checking to verify that we can wrap the
-        // branch.
-        if (!S->mayProduceSingleValue(ctx))
-          continue;
-      }
-      BS->setLastElement(SingleValueStmtExpr::createWithWrappedBranches(
-          ctx, S, DC, mustBeExpr));
-    }
+    // Check to see if we can wrap an implicit last element of the brace.
+    if (!isLastElementImplicitResult(BS, ctx, mustBeExpr))
+      continue;
 
-    // Wrap single expression branches in an implicit 'then <expr>'.
-    if (auto *E = BS->getSingleActiveExpression())
-      BS->setLastElement(ThenStmt::createImplicit(ctx, E));
+    auto &result = BS->getElements().back();
+    assert(result.is<Expr *>() || result.is<Stmt *>());
+
+    // Wrap a statement in a SingleValueStmtExpr.
+    if (auto *S = result.dyn_cast<Stmt *>()) {
+      result = SingleValueStmtExpr::createWithWrappedBranches(ctx, S, DC,
+                                                              mustBeExpr);
+    }
+    // Wrap an expression in an implicit 'then <expr>'.
+    if (auto *E = result.dyn_cast<Expr *>())
+      result = ThenStmt::createImplicit(ctx, E);
   }
   return SVE;
 }
@@ -2628,6 +2582,50 @@ SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
   SVEFinder finder;
   E->walk(finder);
   return finder.FoundSVE;
+}
+
+bool SingleValueStmtExpr::isLastElementImplicitResult(
+    BraceStmt *BS, ASTContext &ctx, bool mustBeSingleValueStmt) {
+  if (BS->empty())
+    return false;
+
+  // We must either be allowing implicit last expressions, or we must have a
+  // single active element, which is guaranteed to be the last element.
+  if (!ctx.LangOpts.hasFeature(Feature::ImplicitLastExprResults) &&
+      !BS->getSingleActiveElement()) {
+    return false;
+  }
+  auto elt = BS->getLastElement();
+
+  // Expressions are always valid.
+  if (elt.is<Expr *>())
+    return true;
+
+  if (auto *S = elt.dyn_cast<Stmt *>()) {
+    if (mustBeSingleValueStmt) {
+      // If this must be a SingleValueStmtExpr, we can eagerly take any
+      // exhaustive if, switch, and do statement.
+      if (auto *IS = dyn_cast<IfStmt>(S))
+        return IS->isSyntacticallyExhaustive();
+
+      // Guaranteed to be exhaustive.
+      if (isa<SwitchStmt>(S))
+        return true;
+
+      if (ctx.LangOpts.hasFeature(Feature::DoExpressions)) {
+        if (auto *DCS = dyn_cast<DoCatchStmt>(S))
+          return DCS->isSyntacticallyExhaustive();
+
+        if (isa<DoStmt>(S))
+          return true;
+      }
+      return false;
+    }
+    // Otherwise do the semantic checking to verify the statement produces
+    // a single value.
+    return S->mayProduceSingleValue(ctx).isValid();
+  }
+  return false;
 }
 
 ThenStmt *SingleValueStmtExpr::getThenStmtFrom(BraceStmt *BS) {

@@ -17,7 +17,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -142,10 +141,10 @@ Version::operator llvm::VersionTuple() const
   }
 }
 
-llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
+std::optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (size()) {
   case 0:
-    return llvm::None;
+    return std::nullopt;
   case 1:
     break;
   case 2:
@@ -153,12 +152,12 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     // component is 4.2.
     if (Components[0] == 4 && Components[1] == 2)
       break;
-    return llvm::None;
+    return std::nullopt;
   default:
     // We do not want to permit users requesting more precise effective language
     // versions since accepting such an argument promises more than we're able
     // to deliver.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // FIXME: When we switch to Swift 5 by default, the "4" case should return
@@ -176,22 +175,13 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     assert(size() == 2 && Components[0] == 4 && Components[1] == 2);
     return Version{4, 2};
   case 5:
-    static_assert(SWIFT_VERSION_MAJOR == 5,
+    return Version{5, 10};
+  case 6:
+    static_assert(SWIFT_VERSION_MAJOR == 6,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
-  case 6:
-    // Allow version '6' in asserts compilers *only* so that we can start
-    // testing changes slated for Swift 6. Note that it's still not listed in
-    // `Version::getValidEffectiveVersions()`.
-    // FIXME: When Swift 6 becomes real, remove 'REQUIRES: asserts' from tests
-    //        using '-swift-version 6'.
-#ifdef NDEBUG
-    LLVM_FALLTHROUGH;
-#else
-    return Version{6};
-#endif
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -321,6 +311,16 @@ StringRef getCurrentCompilerSerializationTag() {
 #else
   return StringRef();
 #endif
+}
+
+StringRef getCurrentCompilerChannel() {
+  static const char* forceDebugChannel =
+    ::getenv("SWIFT_FORCE_SWIFTMODULE_CHANNEL");
+  if (forceDebugChannel)
+    return forceDebugChannel;
+
+  // Leave it to downstream compilers to define the different channels.
+  return StringRef();
 }
 
 unsigned getUpcomingCxxInteropCompatVersion() {

@@ -132,8 +132,12 @@ namespace swift {
     /// When an instruction or block argument is defined, this method is used to
     /// register it and update our symbol table.
     void setLocalValue(ValueBase *Value, serialization::ValueID Id);
+
     /// Get a reference to a local value with the specified ID and type.
-    SILValue getLocalValue(serialization::ValueID Id,
+    ///
+    /// NOTE: \p inContext is expected to be nullptr if we are inserting into a
+    /// global variable initializer.
+    SILValue getLocalValue(SILFunction *inContext, serialization::ValueID Id,
                            SILType Type);
 
     SILType getSILType(Type ty, SILValueCategory category,
@@ -142,7 +146,7 @@ namespace swift {
     SILDifferentiabilityWitness *
     getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
 
-    SILFunction *getFuncForReference(StringRef Name, SILType Ty);
+    SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
@@ -171,7 +175,7 @@ namespace swift {
     SILDifferentiabilityWitness *
         readDifferentiabilityWitness(serialization::DeclID);
 
-    llvm::Optional<KeyPathPatternComponent>
+    std::optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
 
   public:
@@ -185,7 +189,7 @@ namespace swift {
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name,
-                        llvm::Optional<SILLinkage> Linkage = llvm::None);
+                        std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);
     SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);

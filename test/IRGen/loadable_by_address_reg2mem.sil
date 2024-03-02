@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
 
 sil_stage canonical
 
@@ -27,6 +27,16 @@ struct X {
 struct Y {
   var y1 : X
   var y2: X
+}
+
+class C1 {
+}
+
+sil_vtable C1 {
+}
+
+struct Small {
+  var x1 : Int
 }
 
 // CHECK: sil @test1 : $@convention(thin) () -> () {
@@ -212,6 +222,50 @@ bb0(%0 : $*Y):
   %4 = struct_extract %2 : $Y, #Y.y1
   store %4 to %1 : $*X
   dealloc_stack %1 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test8
+// CHECK: bb0(%0 : $SamplesType):
+// CHECK:   %1 = alloc_stack $SamplesType
+// CHECK:   store %0 to %1 : $*SamplesType
+sil @helper : $@convention(thin) (SamplesType) -> ()
+
+sil @test8 : $@convention(c) (SamplesType) -> () {
+bb0(%0 : $SamplesType):
+  %1 = function_ref @helper : $@convention(thin) (SamplesType) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (SamplesType) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// In this test case Container type is identified as not large but contained
+// type is.
+sil @test9 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $_ContainerType
+  %1 = load %0 : $*_ContainerType
+  %2 = alloc_stack $(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+
+  %3 = struct_extract %1 : $_ContainerType, #_ContainerType.l
+  store %3 to %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %2 : $*(_ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType,
+                     _ContainedType, _ContainedType, _ContainedType, _ContainedType, _ContainedType)
+  dealloc_stack %0 : $*_ContainerType
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @test10 : $@convention(thin) (@in_guaranteed C1, @in Small) -> () {
+bb0(%0 : $*C1, %1 : $*Small):
+  %2 = load %1 : $*Small
+  %3 = load %0 : $*C1
+  retain_value %3 : $C1
+  store %2 to %1 : $*Small
+  retain_value %3 : $C1
   %t = tuple ()
   return %t : $()
 }
