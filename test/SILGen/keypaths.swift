@@ -649,7 +649,12 @@ struct CodingStackEntry {
 
 struct Test {
   var codingStack: [CodingStackEntry]
-  var codingPath: [any CodingKey] { codingStack.map(\.key) }
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}codingPathAny
+  var codingPathAny: [any CodingKey] { codingStack.map(\.key) }
+  // CHECK: keypath $KeyPath<CodingStackEntry, URICoderCodingKey>, (root $CodingStackEntry; stored_property #CodingStackEntry.key : $URICoderCodingKey)
+
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}codingPathOpt
+  var codingPathOpt: [URICoderCodingKey?] { codingStack.map(\.key) }
   // CHECK: keypath $KeyPath<CodingStackEntry, URICoderCodingKey>, (root $CodingStackEntry; stored_property #CodingStackEntry.key : $URICoderCodingKey)
 }
 
