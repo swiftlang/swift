@@ -1639,10 +1639,11 @@ namespace {
       return {payload, extraTag};
     }
     std::pair<EnumPayload, llvm::Value *>
-    getPayloadAndExtraTagFromExplosionOutlined(IRGenFunction &IGF,
-                                               Explosion &src) const {
+    getPayloadAndExtraTagFromExplosionOutlined(
+        IRGenFunction &IGF, Explosion &src,
+        OutliningMetadataCollector *collector) const {
       EnumPayload payload;
-      unsigned claimSZ = src.size();
+      unsigned claimSZ = src.size() - (collector ? collector->size() : 0);
       if (ExtraTagBitCount > 0) {
         --claimSZ;
       }
@@ -1833,7 +1834,7 @@ namespace {
       EnumPayload payload;
       llvm::Value *extraTag;
       std::tie(payload, extraTag) =
-          getPayloadAndExtraTagFromExplosionOutlined(IGF, src);
+          getPayloadAndExtraTagFromExplosionOutlined(IGF, src, nullptr);
       llvm::BasicBlock *endBB =
           testFixedEnumContainsPayload(IGF, payload, extraTag);
 
@@ -1856,25 +1857,33 @@ namespace {
 
     void emitCallToConsumeEnumFunction(IRGenFunction &IGF, Explosion &src,
                                        SILType theEnumType) const {
+      OutliningMetadataCollector collector(theEnumType, IGF, LayoutIsNotNeeded,
+                                           DeinitIsNeeded);
+      IGF.getTypeInfo(theEnumType)
+          .collectMetadataForOutlining(collector, theEnumType);
       if (!consumeEnumFunction)
-        consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
+        consumeEnumFunction =
+            emitConsumeEnumFunction(IGF.IGM, theEnumType, collector);
       Explosion tmp;
-      fillExplosionForOutlinedCall(IGF, src, tmp);
+      fillExplosionForOutlinedCall(IGF, src, tmp, &collector);
       llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
           consumeEnumFunction->getFunctionType(), consumeEnumFunction,
           tmp.claimAll());
       call->setCallingConv(IGM.DefaultCC);
     }
 
-    llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            SILType theEnumType) const {
+    llvm::Function *
+    emitConsumeEnumFunction(IRGenModule &IGM, SILType theEnumType,
+                            OutliningMetadataCollector &collector) const {
       IRGenMangler Mangler;
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
         Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
                                               manglingBits.second);
-      auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
+      SmallVector<llvm::Type *, 2> params(PayloadTypesAndTagType);
+      collector.addPolymorphicParameterTypes(params);
+      auto func = createOutlineLLVMFunction(IGM, name, params);
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
@@ -1884,7 +1893,8 @@ namespace {
       EnumPayload payload;
       llvm::Value *extraTag;
       std::tie(payload, extraTag) =
-          getPayloadAndExtraTagFromExplosionOutlined(IGF, src);
+          getPayloadAndExtraTagFromExplosionOutlined(IGF, src, &collector);
+      collector.bindPolymorphicParameters(IGF, src);
       llvm::BasicBlock *endBB =
           testFixedEnumContainsPayload(IGF, payload, extraTag);
 
@@ -2678,8 +2688,10 @@ namespace {
       }
     }
 
-    void fillExplosionForOutlinedCall(IRGenFunction &IGF, Explosion &src,
-                                      Explosion &out) const {
+    void
+    fillExplosionForOutlinedCall(IRGenFunction &IGF, Explosion &src,
+                                 Explosion &out,
+                                 OutliningMetadataCollector *collector) const {
       assert(out.empty() && "Out explosion must be empty!");
       EnumPayload payload;
       llvm::Value *extraTag;
@@ -2688,8 +2700,16 @@ namespace {
       payload.explode(IGM, out);
       if (extraTag)
         out.add(extraTag);
+
+      if (!collector)
+        return;
+      llvm::SmallVector<llvm::Value *, 4> args;
+      collector->addPolymorphicArguments(args);
+      for (auto *arg : args) {
+        out.add(arg);
+      }
     }
-    
+
     void unpackIntoPayloadExplosion(IRGenFunction &IGF,
                                     Explosion &asEnumIn,
                                     Explosion &asPayloadOut) const {
@@ -2749,7 +2769,7 @@ namespace {
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGM, loweredType);
         Explosion tmp;
-        fillExplosionForOutlinedCall(IGF, src, tmp);
+        fillExplosionForOutlinedCall(IGF, src, tmp, nullptr);
         llvm::CallInst *call = IGF.Builder.CreateCallWithoutDbgLoc(
             copyEnumFunction->getFunctionType(), copyEnumFunction,
             tmp.getAll());
@@ -2818,7 +2838,7 @@ namespace {
           IGF.Builder.emitBlock(endBB);
           return;
         }
-        emitCallToConsumeEnumFunction(IGF, src, loweredType);
+        emitCallToConsumeEnumFunction(IGF, src, T);
         return;
       }
 

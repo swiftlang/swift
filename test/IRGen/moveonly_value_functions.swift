@@ -49,6 +49,16 @@ public struct InnerDeinitingDestructableNC<T> : ~Copyable {
   }
 }
 
+public struct InnerDeinitingWithLayoutNC<T> : ~Copyable {
+  public let t: T
+  deinit {}
+}
+
+public struct InnerDeinitingWithoutLayoutNC<T>: ~Copyable {
+  public let ptr: Int
+  deinit {}
+}
+
 public struct OuterDeinitingNC_1<T> : ~Copyable {
   public let i1: Int
   public let c1: C<T>
@@ -93,6 +103,21 @@ extension GenericContext_1 : P where T : P {
     }
     func beinit() {}
   }
+}
+
+public enum OuterSinglePayloadNC_1<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingWithoutLayoutNC<T>)
+}
+
+public enum OuterSinglePayloadNC_2<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingReleasableNC<T>)
+}
+
+public enum OuterSinglePayloadNC_3<T>: ~Copyable {
+  case none
+  case some(InnerDeinitingDestructableNC<T>)
 }
 
 // Destroyed value:
@@ -218,3 +243,71 @@ public func takeOuterNC_2<T>(_ o: consuming OuterNC_2<T>) {
 // CHECK-SAME:        ptr noalias swiftself %0)
 // CHECK:       }
 public func takeGenericContext_1OuterNC_1<T : P>(_ e: consuming GenericContext_1<T>.OuterNC_1) {}
+
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions26takeOuterSinglePayloadNC_1yyAA0efgH2_1OyxGnlF"(
+//           :      i64 %0, 
+//           :      i8 %1, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_1OyxGlWOe"(
+//           :        i64 %0, 
+//           :        i1 %2, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_1OyxGlWOe"(
+//           :      i64 %0, 
+//           :      i1 %1, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions29InnerDeinitingWithoutLayoutNCVfD"(
+//           :        i64 %0,
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<T>) {}
+
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions26takeOuterSinglePayloadNC_2yyAA0efgH2_2OyxGnlF"(
+// CHECK-SAME:      ptr noalias nocapture dereferenceable(64) %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOs"(
+// CHECK-SAME:        ptr %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOs"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOe"(
+//            :       i64 %2, 
+//            :       i64 %4, 
+//            :       i64 %6, 
+//            :       i64 %8, 
+//            :       i64 %10, 
+//            :       i64 %12, 
+//            :       i64 %14, 
+//            :       i64 %16, 
+//            :       ptr %T)
+// CHECK:       }
+public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<T>) {}
+
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions26takeOuterSinglePayloadNC_3yyAA0efgH2_3OyxGnlF"(
+// CHECK-SAME:      ptr noalias %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME: {
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_3OyxGlWOh"(
+// CHECK-SAME:        ptr %0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:       }
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_3OyxGlWOh"(
+// CHECK-SAME:      ptr %0, 
+// CHECK-SAME:      ptr %T)
+// CHECK-SAME:  {
+// CHECK:         [[RESPONSE:%[^,]+]] = call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVMa"(
+//           :        i64 0, 
+// CHECK-SAME:        ptr %T)
+// CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE:%[^,]+]], 0
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions28InnerDeinitingDestructableNCVfD"(
+// CHECK-SAME:        ptr [[METADATA:%[^,]+]], 
+//           :        ptr noalias swiftself %0)
+// CHECK:       }
+public func takeOuterSinglePayloadNC_3<T>(_ e: consuming OuterSinglePayloadNC_3<T>) {}

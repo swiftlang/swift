@@ -80,6 +80,10 @@ public:
                              LayoutIsNeeded_t needsLayout,
                              DeinitIsNeeded_t needsDeinitTypes);
 
+  unsigned size() const {
+    return Subs.has_value() ? Requirements.size() : Values.size();
+  }
+
   // If any local type data is needed for \p type, add it.
   //
   // NOTE: To be called from TypeData instances.
