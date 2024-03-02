@@ -2557,6 +2557,24 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       AFD->getParameters()->getParams(argTy);
 
       maybeAddParameterIsolation(infoBuilder, argTy);
+
+      auto &ctx = AFD->getASTContext();
+
+      auto isolationFromAttr = getIsolationFromAttributes(AFD);
+      if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
+          !AFD->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+        auto preconcurrency =
+            new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
+        AFD->getAttrs().add(preconcurrency);
+      }
+
+      if (isolationFromAttr) {
+        // Global actors should be added to interface type.
+        if (isolationFromAttr->isGlobalActor()) {
+          auto isolation  = FunctionTypeIsolation::forGlobalActor(isolationFromAttr->getGlobalActor());
+          infoBuilder = infoBuilder.withIsolation(isolation);
+        }
+      }
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
       // 'throws' only applies to the innermost function.

@@ -4213,9 +4213,9 @@ static bool hasExplicitIsolationAttribute(const Decl *decl) {
 /// \returns the actor isolation determined from attributes alone (with no
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
-static std::optional<ActorIsolation>
-getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
-                           bool onlyExplicit = false) {
+std::optional<ActorIsolation>
+swift::getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose,
+                           bool onlyExplicit) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
@@ -4839,7 +4839,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
   // If this declaration has an isolated parameter, it's isolated to that
   // parameter.
-  if (auto paramIdx = getIsolatedParamIndex(value)) {
+  if (auto paramIdx = getIsolatedParamIndex(value)) { // might need to add this to interface request
     checkDeclWithIsolatedParameter(value);
 
     ParamDecl *param = getParameterList(value)->get(*paramIdx);
@@ -4894,7 +4894,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return isolation;
   };
 
-  auto isolationFromAttr = getIsolationFromAttributes(value);
+  auto isolationFromAttr = getIsolationFromAttributes(value);      // add to interface request
   if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
@@ -4902,7 +4902,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     value->getAttrs().add(preconcurrency);
   }
 
-  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
+  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) { // add to interface request
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
     std::optional<ActorIsolation> mainIsolation =
@@ -4942,7 +4942,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // When no other isolation applies, an actor's non-async init is independent
-  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) // some member , add to interface request
     if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
         if (!ctor->hasAsync())
