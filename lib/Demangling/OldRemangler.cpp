@@ -1736,6 +1736,12 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplTransferringResult(Node *node,
+                                                      unsigned depth) {
+  // The old mangler does not encode transferring result
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplPatternSubstitutions(Node *node,
                                                         unsigned depth) {
   // The old mangler does not encode substituted function types.
